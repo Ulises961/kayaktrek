@@ -1,9 +1,9 @@
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import CurrentPageTitle from "@/components/common/current-page-title";
-import { Trip, tripDto, TripsSchema } from "@/lib/dtos/trip";
+import { Trip, TripsSchema } from "@/lib/dtos/trip";
 import z from "zod";
 import { PlusIcon } from "lucide-react";
-import router from "next/router";
+import Link from "next/link";
 
 
 
@@ -52,29 +52,35 @@ export default async function Page() {
 
 
     let trips: Array<Trip> = await TripsSchema.parseAsync(fetchTrips());
-    const navigate = () => 
+    const navigate = () => { };
     return (
         <>
             <CurrentPageTitle />
 
             <div className="w-full bg-blue-500">
-                {trips.map((trip, index) => {
-                    return (
-                        <Card className="w-full m-1" key={trip.id}>
-                            <CardHeader>
-                                <CardTitle>{trip.destination}</CardTitle>
-                                <CardAction onClick={() => router.push(`/trips/trip/${trip.id}`)}><PlusIcon/></CardAction>
-                            </CardHeader>
-                            <CardContent>
-                                <p>Card Content</p>
-                            </CardContent>
-                            <CardFooter>
-                                <p>Card Footer</p>
-                            </CardFooter>
-                        </Card>
-                    )
-                })}
+                {trips.map((trip, index) => (
+                    <Card className="w-full m-1" key={trip.id}>
+                        <CardHeader>
+                            <CardTitle>{trip.destination}</CardTitle>
+                            <CardAction>
+                                <Link
+                                    href={{
+                                        pathname: '/about',
+                                        query: { name: 'test' },
+                                    }}
+                                >
+                                    About
+                                </Link>                                <PlusIcon /></CardAction>
+                        </CardHeader>
+                        <CardContent>
+                            <p>Card Content</p>
+                        </CardContent>
+                        <CardFooter>
+                            <p>Card Footer</p>
+                        </CardFooter>
+                    </Card>
+                ))}
             </div>
         </>
-    )
+    );
 }
