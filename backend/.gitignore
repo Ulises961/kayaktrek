@@ -1,0 +1,11 @@
+*.wiki
+*.bkp
+*.dtmp
+.vscode
+.pytest*
+.env
+.venv/
+__pycache__
+*.log*
+Pipfile.lock
+*.egg*
