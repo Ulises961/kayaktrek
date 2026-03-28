@@ -21,7 +21,7 @@ pyjwt = "*"
 flask-migrate = "*"
 alembic = "*"
 base = "*"
-
+uuid_extension="*"
 [dev-packages]
 
 [requires]
