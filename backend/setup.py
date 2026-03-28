@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="kayak-trip-planner",
+    name="kayak-expedition-planner",
     version="0.1",
     packages=find_packages(include=['Api', 'Models', 'Resources', 'Schemas', 'Services', 'Tests']),
     install_requires=[
@@ -29,6 +29,6 @@ setup(
         
     ],
     author="Ulises E. Sosa",
-    description="Kayak planner backend",
+    description="Kayak expedition planner backend",
     python_requires=">=3.12",
 )
