@@ -266,6 +266,8 @@ class TripService:
             raise ValueError(f"Invalid state '{new_state_value}'. Valid values: {[s.value for s in TripStateType]}")
 
         trip = TripService.get_trip_by_id(trip_id)
+        if not trip:
+            raise NoResultFound(f"Trip {trip_id} not found")
         trip.transition_state(new_state)
         db.session.commit()
         db.session.refresh(trip)
