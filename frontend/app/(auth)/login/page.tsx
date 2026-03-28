@@ -15,6 +15,7 @@ export default function LoginPage() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
+    mode: "onBlur",
   })
 
   const onSubmit = handleSubmit((data) => {

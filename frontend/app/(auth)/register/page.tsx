@@ -15,6 +15,7 @@ export default function RegisterPage() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
     resolver: zodResolver(RegisterSchema),
+    mode: "onBlur",
   })
 
   const onSubmit = handleSubmit((data) => {
