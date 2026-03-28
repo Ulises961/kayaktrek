@@ -1,15 +1,31 @@
 "use client"
 
-import { useActionState } from "react"
-import { register } from "@/lib/auth/actions"
+import { useActionState, useTransition } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { register as registerAction } from "@/lib/auth/actions"
+import { RegisterSchema, type RegisterInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 
 export default function RegisterPage() {
-  const [state, action, isPending] = useActionState(register, null)
+  const [serverState, formAction] = useActionState(registerAction, null)
+  const [isPending, startTransition] = useTransition()
 
-  const fieldErrors = state && !state.success ? state.fieldErrors : undefined
+  const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
+    resolver: zodResolver(RegisterSchema),
+  })
+
+  const onSubmit = handleSubmit((data) => {
+    const fd = new FormData()
+    fd.append("mail", data.mail)
+    fd.append("username", data.username)
+    fd.append("name", data.name)
+    fd.append("phone", data.phone)
+    fd.append("password", data.password)
+    startTransition(() => formAction(fd))
+  })
 
   return (
     <div className="flex flex-col gap-6 p-8 bg-white rounded-xl shadow-sm border border-slate-200">
@@ -18,14 +34,14 @@ export default function RegisterPage() {
         <p className="text-sm text-slate-500 mt-1">Start planning your expedition</p>
       </div>
 
-      <form action={action} className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="mail" className="text-sm font-medium text-slate-700">
             Email
           </label>
-          <Input id="mail" name="mail" type="email" autoComplete="email" />
-          {fieldErrors?.mail && (
-            <p className="text-xs text-red-600">{fieldErrors.mail[0]}</p>
+          <Input id="mail" type="email" autoComplete="email" {...register("mail")} />
+          {errors.mail && (
+            <p className="text-xs text-red-600">{errors.mail.message}</p>
           )}
         </div>
 
@@ -33,9 +49,9 @@ export default function RegisterPage() {
           <label htmlFor="username" className="text-sm font-medium text-slate-700">
             Username
           </label>
-          <Input id="username" name="username" type="text" autoComplete="username" />
-          {fieldErrors?.username && (
-            <p className="text-xs text-red-600">{fieldErrors.username[0]}</p>
+          <Input id="username" type="text" autoComplete="username" {...register("username")} />
+          {errors.username && (
+            <p className="text-xs text-red-600">{errors.username.message}</p>
           )}
         </div>
 
@@ -43,9 +59,9 @@ export default function RegisterPage() {
           <label htmlFor="name" className="text-sm font-medium text-slate-700">
             Full name
           </label>
-          <Input id="name" name="name" type="text" autoComplete="name" />
-          {fieldErrors?.name && (
-            <p className="text-xs text-red-600">{fieldErrors.name[0]}</p>
+          <Input id="name" type="text" autoComplete="name" {...register("name")} />
+          {errors.name && (
+            <p className="text-xs text-red-600">{errors.name.message}</p>
           )}
         </div>
 
@@ -53,9 +69,9 @@ export default function RegisterPage() {
           <label htmlFor="phone" className="text-sm font-medium text-slate-700">
             Phone
           </label>
-          <Input id="phone" name="phone" type="tel" autoComplete="tel" />
-          {fieldErrors?.phone && (
-            <p className="text-xs text-red-600">{fieldErrors.phone[0]}</p>
+          <Input id="phone" type="tel" autoComplete="tel" {...register("phone")} />
+          {errors.phone && (
+            <p className="text-xs text-red-600">{errors.phone.message}</p>
           )}
         </div>
 
@@ -63,14 +79,14 @@ export default function RegisterPage() {
           <label htmlFor="password" className="text-sm font-medium text-slate-700">
             Password
           </label>
-          <Input id="password" name="password" type="password" autoComplete="new-password" />
-          {fieldErrors?.password && (
-            <p className="text-xs text-red-600">{fieldErrors.password[0]}</p>
+          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          {errors.password && (
+            <p className="text-xs text-red-600">{errors.password.message}</p>
           )}
         </div>
 
-        {state && !state.success && !state.fieldErrors && (
-          <p className="text-sm text-red-600">{state.error}</p>
+        {serverState && !serverState.success && (
+          <p className="text-sm text-red-600">{serverState.error}</p>
         )}
 
         <Button type="submit" disabled={isPending} className="w-full">
