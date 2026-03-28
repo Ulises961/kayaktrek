@@ -3,13 +3,12 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { API_URL } from "@/lib/api/config"
+import { z } from "zod"
 import { LoginSchema, RegisterSchema } from "@/lib/auth/schemas"
-
-type FieldErrors = Partial<Record<string, string[]>>
 
 export type AuthResult =
   | { success: true }
-  | { success: false; error: string; fieldErrors?: FieldErrors }
+  | { success: false; error: string; fieldErrors?: ReturnType<typeof z.treeifyError> }
 
 async function setAuthCookies(accessToken: string, refreshToken: string) {
   const cookieStore = await cookies()
@@ -35,7 +34,7 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
     password: formData.get("password"),
   })
   if (!parsed.success) {
-    return { success: false, error: "Please fix the errors below.", fieldErrors: parsed.error.flatten().fieldErrors }
+    return { success: false, error: "Please fix the errors below.", fieldErrors: z.treeifyError(parsed.error) }
   }
 
   const { mail, password } = parsed.data
@@ -72,7 +71,7 @@ export async function register(_prevState: AuthResult | null, formData: FormData
     password: formData.get("password"),
   })
   if (!parsed.success) {
-    return { success: false, error: "Please fix the errors below.", fieldErrors: parsed.error.flatten().fieldErrors }
+    return { success: false, error: "Please fix the errors below.", fieldErrors: z.treeifyError(parsed.error) }
   }
 
   const { mail, username, name, phone, password } = parsed.data
