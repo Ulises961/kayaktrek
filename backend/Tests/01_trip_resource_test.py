@@ -44,8 +44,6 @@ def test_get_trip_by_id(client, auth_headers):
     data = _create_trip(client, auth_headers)
     response = client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers)
     assert response.status_code == 200
-    assert response.status_code == 200
-
 
 # --- State machine ---
 
