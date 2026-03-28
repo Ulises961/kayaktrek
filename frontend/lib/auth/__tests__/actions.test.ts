@@ -52,7 +52,7 @@ describe("login", () => {
 describe("register", () => {
   it("returns an error for duplicate email/username (409)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409 }))
-    const result = await register(null, formData({ mail: "a@b.com", username: "kayaker", name: "N", phone: "0", password: "Expedition#24" }))
+    const result = await register(null, formData({ mail: "a@b.com", username: "kayaker", name: "N", phone: "+34600000000", password: "Expedition#24" }))
     expect(result).toEqual({ success: false, error: expect.stringContaining("already in use") })
   })
 })

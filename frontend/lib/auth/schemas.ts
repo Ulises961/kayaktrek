@@ -13,7 +13,9 @@ export const RegisterSchema = z.object({
     .max(32, "Username must be at most 32 characters.")
     .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores."),
   name: z.string().min(1, "Name is required."),
-  phone: z.string().min(1, "Phone is required."),
+  phone: z
+    .string()
+    .regex(/^\+[1-9]\d{6,14}$/, "Use international format: +34600000000"),
   password: z
     .string()
     .min(12, "Password must be at least 12 characters.")

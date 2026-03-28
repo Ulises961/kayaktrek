@@ -78,6 +78,48 @@ describe("RegisterSchema", () => {
       const result = RegisterSchema.safeParse({ ...valid, phone: "" })
       expect(result.success).toBe(false)
     })
+
+    it("rejects a number without leading +", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "34600000000" })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a number with spaces", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "+34 600 000 000" })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a number with dashes", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "+34-600-000-000" })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a number that is too short", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "+34123" })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a number that is too long", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "+3" + "4".repeat(15) })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a country code starting with 0", () => {
+      const result = RegisterSchema.safeParse({ ...valid, phone: "+0034600000000" })
+      expect(result.success).toBe(false)
+    })
+
+    it("accepts a valid Spanish number", () => {
+      expect(RegisterSchema.safeParse({ ...valid, phone: "+34600000000" }).success).toBe(true)
+    })
+
+    it("accepts a valid US number", () => {
+      expect(RegisterSchema.safeParse({ ...valid, phone: "+12125551234" }).success).toBe(true)
+    })
+
+    it("accepts a valid UK number", () => {
+      expect(RegisterSchema.safeParse({ ...valid, phone: "+447911123456" }).success).toBe(true)
+    })
   })
 
   describe("password", () => {
