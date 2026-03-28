@@ -9,6 +9,8 @@ import Link from "next/link"
 export default function LoginPage() {
   const [state, action, isPending] = useActionState(login, null)
 
+  const fieldErrors = state && !state.success ? state.fieldErrors : undefined
+
   return (
     <div className="flex flex-col gap-6 p-8 bg-white rounded-xl shadow-sm border border-slate-200">
       <div>
@@ -21,17 +23,23 @@ export default function LoginPage() {
           <label htmlFor="mail" className="text-sm font-medium text-slate-700">
             Email
           </label>
-          <Input id="mail" name="mail" type="email" autoComplete="email" required />
+          <Input id="mail" name="mail" type="email" autoComplete="email" />
+          {fieldErrors?.mail && (
+            <p className="text-xs text-red-600">{fieldErrors.mail[0]}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-sm font-medium text-slate-700">
             Password
           </label>
-          <Input id="password" name="password" type="password" autoComplete="current-password" required />
+          <Input id="password" name="password" type="password" autoComplete="current-password" />
+          {fieldErrors?.password && (
+            <p className="text-xs text-red-600">{fieldErrors.password[0]}</p>
+          )}
         </div>
 
-        {state && !state.success && (
+        {state && !state.success && !state.fieldErrors && (
           <p className="text-sm text-red-600">{state.error}</p>
         )}
 

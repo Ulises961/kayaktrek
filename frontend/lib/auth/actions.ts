@@ -2,12 +2,14 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
+import { API_URL } from "@/lib/api/config"
+import { LoginSchema, RegisterSchema } from "@/lib/auth/schemas"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"
+type FieldErrors = Partial<Record<string, string[]>>
 
-type AuthResult =
+export type AuthResult =
   | { success: true }
-  | { success: false; error: string }
+  | { success: false; error: string; fieldErrors?: FieldErrors }
 
 async function setAuthCookies(accessToken: string, refreshToken: string) {
   const cookieStore = await cookies()
@@ -28,8 +30,15 @@ async function setAuthCookies(accessToken: string, refreshToken: string) {
 }
 
 export async function login(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const mail = formData.get("mail") as string
-  const password = formData.get("password") as string
+  const parsed = LoginSchema.safeParse({
+    mail: formData.get("mail"),
+    password: formData.get("password"),
+  })
+  if (!parsed.success) {
+    return { success: false, error: "Please fix the errors below.", fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+
+  const { mail, password } = parsed.data
 
   let res: Response
   try {
@@ -55,13 +64,19 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
 }
 
 export async function register(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const body = {
-    mail: formData.get("mail") as string,
-    username: formData.get("username") as string,
-    name: formData.get("name") as string,
-    phone: formData.get("phone") as string,
-    pwd: formData.get("password") as string,
+  const parsed = RegisterSchema.safeParse({
+    mail: formData.get("mail"),
+    username: formData.get("username"),
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+    password: formData.get("password"),
+  })
+  if (!parsed.success) {
+    return { success: false, error: "Please fix the errors below.", fieldErrors: parsed.error.flatten().fieldErrors }
   }
+
+  const { mail, username, name, phone, password } = parsed.data
+  const body = { mail, username, name, phone, pwd: password }
 
   let res: Response
   try {

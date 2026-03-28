@@ -2,8 +2,7 @@ import "server-only"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { refreshSession } from "@/lib/auth/actions"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"
+import { API_URL } from "@/lib/api/config"
 
 async function getAccessToken(): Promise<string | null> {
   const cookieStore = await cookies()
