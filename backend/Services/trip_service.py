@@ -10,7 +10,7 @@ from sqlalchemy.exc import NoResultFound
 from uuid import UUID
 
 from Models.user_has_trip import user_has_trip
-from Models.trip import Trip
+from Models.trip import Trip, TripStateType
 from Models.user import User
 from Models.user_has_invitation import user_has_invitation
 from Schemas.trip_schema import TripSchema
@@ -243,6 +243,34 @@ class TripService:
         invitations = user.invitations
         logger.info(f"Found {len(invitations)} invitations for user {user_id}")
         return invitations
+
+    @staticmethod
+    def transition_trip_state(trip_id: str, new_state_value: str) -> Trip:
+        """
+        Advance a trip's state forward along the state machine.
+
+        Args:
+            trip_id: The ID of the trip
+            new_state_value: The target state string (e.g. "planning")
+
+        Returns:
+            Updated Trip object
+
+        Raises:
+            ValueError: If the state value is invalid or the transition is not allowed
+            NoResultFound: If the trip doesn't exist
+        """
+        try:
+            new_state = TripStateType(new_state_value)
+        except (ValueError, KeyError, TypeError):
+            raise ValueError(f"Invalid state '{new_state_value}'. Valid values: {[s.value for s in TripStateType]}")
+
+        trip = TripService.get_trip_by_id(trip_id)
+        trip.transition_state(new_state)
+        db.session.commit()
+        db.session.refresh(trip)
+        logger.info(f"Trip {trip_id} transitioned to '{new_state_value}'")
+        return trip
 
     @staticmethod
     def handle_invitation(trip_id: str, accepted: bool) -> None:

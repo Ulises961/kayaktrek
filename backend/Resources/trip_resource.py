@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from http.client import HTTPException
+from werkzeug.exceptions import HTTPException
 import logging
 from sqlite3 import IntegrityError
 from uuid import UUID
@@ -105,6 +105,33 @@ def post():
     except Exception as e:
         logger.exception(f"Error creating trip: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+@trip_api.route("/<string:id>/state", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+def transition_state(id: str):
+    """
+    Transition a trip's state forward (draft → planning → happening → past).
+
+    Returns:
+        JSON response with updated trip and 200 status code
+    """
+    try:
+        body = request.get_json()
+        new_state = body.get("state") if body else None
+        if not new_state:
+            abort(HTTPStatus.BAD_REQUEST, description="'state' field is required")
+        trip = TripService.transition_trip_state(id, new_state)
+        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Trip {id} not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @trip_api.route("/<string:id>/update", methods=["POST"])
 @JWTService.authenticate_restful

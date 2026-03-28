@@ -1,5 +1,5 @@
 from marshmallow import Schema, fields, post_load, post_dump, pre_load, validates, ValidationError
-from Models.trip import Trip
+from Models.trip import Trip, TripStateType
 from Schemas.base_schema import BaseSchema
 from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
@@ -16,7 +16,7 @@ class TripSchema(BaseSchema):
     itinerary = fields.Nested(ItinerarySchema(exclude=['trip_id']), allow_none=True)
     pending_travellers = fields.Nested('UserSchema', exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items', 'endorsed_logs', 'logs'], many=True, allow_none=True)
     travellers = fields.Nested('UserSchema', exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items', 'endorsed_logs', 'logs'], many=True, allow_none=True, validate=lambda x: x is None or len(x) <= 50)
-    is_draft = fields.Boolean(allow_none=True)
+    state = fields.Enum(TripStateType, by_value=True, load_default=TripStateType.DRAFT)
     description = fields.String(allow_none=True)
     destination = fields.String(allow_none=True)
     date_from = fields.Date(allow_none=True)
