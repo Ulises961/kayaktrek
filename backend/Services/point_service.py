@@ -6,12 +6,13 @@ from sqlite3 import IntegrityError
 from typing import List, Optional, cast
 from uuid import UUID
 from camel_converter import dict_to_snake
+from geoalchemy2.functions import ST_DWithin, ST_Distance
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
 from Models.day import Day
 from Models.itinerary import Itinerary
-from Models.point import Point
+from Models.point import Point, PointType
 from Schemas.point_schema import PointSchema
 from Api.database import db
 
@@ -72,25 +73,34 @@ class PointService:
         return points
     
     @staticmethod
+    def _sync_geo(point: Point) -> None:
+        """Populate the GEOGRAPHY column from latitude/longitude when both are set."""
+        if point.latitude is not None and point.longitude is not None:
+            point.geo = f'SRID=4326;POINT({float(point.longitude)} {float(point.latitude)})'
+        else:
+            point.geo = None
+
+    @staticmethod
     def create_point(point_data: dict) -> Point:
         """
         Create a new point.
-        
+
         Args:
             point_data: Dictionary containing point information
-            
+
         Returns:
             Created Point object
-            
+
         Raises:
             ValidationError: If data is invalid
             IntegrityError: If database constraints are violated
         """
         logger.info(f"Creating new point")
         point: Point = cast(Point, PointSchema().load(point_data))
+        PointService._sync_geo(point)
         db.session.add(point)
         db.session.commit()
-        
+
         # Refresh to get relationships
         db.session.refresh(point)
         logger.info(f"Point {point.id} created successfully")
@@ -132,6 +142,8 @@ class PointService:
             existing_point.latitude = point_data['latitude']
         if 'longitude' in point_data:
             existing_point.longitude = point_data['longitude']
+        if 'latitude' in point_data and 'longitude' in point_data:
+            PointService._sync_geo(existing_point)
         if 'notes' in point_data:
             existing_point.notes = point_data['notes']
         if 'day_id' in point_data:
@@ -199,5 +211,27 @@ class PointService:
         return points
 
     @staticmethod
-    def get_points_in_range(range:float,long: float, lat:float)-> List[Point]:
-        return []
+    def get_points_in_range(range_km: float, longitude: float, latitude: float) -> List[dict]:
+        """
+        Return all INTEREST points within range_km of (longitude, latitude),
+        ordered by ascending distance, with distance_km attached.
+
+        Uses ST_DWithin on the GEOGRAPHY column (metres) with the GiST index,
+        then ST_Distance for the exact geodetic distance in the SELECT list.
+        """
+        center = f'SRID=4326;POINT({longitude} {latitude})'
+        range_m = range_km * 1000
+
+        rows = (
+            db.session.query(Point, ST_Distance(Point.geo, center).label('distance_m'))
+            .filter(Point.type == PointType.INTEREST)
+            .filter(Point.geo.isnot(None))
+            .filter(ST_DWithin(Point.geo, center, range_m))
+            .order_by('distance_m')
+            .all()
+        )
+
+        return [
+            {'point': point, 'distance_km': round(float(distance_m) / 1000, 3)}
+            for point, distance_m in rows
+        ]

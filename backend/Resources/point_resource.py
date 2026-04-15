@@ -31,14 +31,18 @@ def get_poi():
         JSON response with point data and 200 status code
     """
     try:
-        range: float =  request.args.get('range', 0.0, type=float)
+        range_km: float = request.args.get('range', 0.0, type=float)
         longitude: float = request.args.get('long', 0.0, type=float)
         latitude: float = request.args.get('lat', 0.0, type=float)
-        points:List[Point] = PointService.get_points_in_range(range,longitude, latitude)
+        results = PointService.get_points_in_range(range_km, longitude, latitude)
 
-        return jsonify([PointSchema().dump(point) for point in points])
+        schema = PointSchema()
+        return jsonify([
+            {**schema.dump(r['point']), 'distanceKm': r['distance_km']}
+            for r in results
+        ])
     except Exception as e:
-        logger.error(f"Error retrieving itineraries: {e}")
+        logger.error(f"Error retrieving POIs: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @point_api.route("/create", methods=["POST"])

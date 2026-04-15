@@ -1,7 +1,8 @@
 import uuid_extension
 
 from Api.database import db
-from sqlalchemy import UUID, Integer, Numeric, String, Text, Enum, ForeignKey, ForeignKeyConstraint
+from geoalchemy2 import Geography
+from sqlalchemy import UUID, Numeric, Text, Enum, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from Models.base_model import BaseModel
@@ -17,13 +18,17 @@ class PointType(enum.Enum):
     POSITION = 'position'
     INTEREST = 'interest'
 
-class Point (BaseModel):
+class Point(BaseModel):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'],['day.id'], name="day_foreign_key_in_point"),
+        ForeignKeyConstraint(['day_id'], ['day.id'], name="day_foreign_key_in_point"),
     )
 
-    latitude: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
-    longitude: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
+    geo = mapped_column(
+        Geography(geometry_type='POINT', srid=4326),
+        nullable=True,
+    )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     type: Mapped[Optional[PointType]] = mapped_column(Enum(PointType), nullable=True)
     day_id: Mapped[Optional[_UUID]] = mapped_column(UUID, nullable=True)
@@ -32,10 +37,12 @@ class Point (BaseModel):
     next: Mapped[Optional['Point']] = relationship(
         'Point',
         foreign_keys=[next_id],
-    remote_side='Point.id',  # Use string reference instead
-    uselist=False
-)
-    images: Mapped[List["Image"]] = relationship(secondary=PointHasImage, lazy="subquery", cascade='all, delete')
+        remote_side='Point.id',
+        uselist=False,
+    )
+    images: Mapped[List["Image"]] = relationship(
+        secondary=PointHasImage, lazy="subquery", cascade='all, delete'
+    )
 
     def __repr__(self):
         return f'<Point "({self.latitude}, {self.longitude}), type {self.type}">'
