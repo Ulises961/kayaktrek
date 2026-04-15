@@ -4,6 +4,8 @@ import pytest
 from sqlalchemy.exc import NoResultFound
 
 from Models.user import User
+from Models.trip_member import TripMember, MemberRoleType
+from uuid import UUID
 from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
@@ -104,6 +106,44 @@ def auth_headers(auth_token):
     """Return authorization headers for authenticated requests."""
     return {'Authorization': f'Bearer {auth_token}'}
 
+@pytest.fixture(scope='session')
+def auth_token_2(app, user_2):
+    """Get JWT token for the second test user."""
+    token = JWTService.generate_access_token(user_2.id, user_2.mail, user_2.admin)
+    return token
+
+@pytest.fixture(scope='session')
+def auth_headers_2(auth_token_2):
+    """Return authorization headers for the second test user."""
+    return {'Authorization': f'Bearer {auth_token_2}'}
+
+@pytest.fixture(scope='function')
+def outsider_headers(app, client):
+    """
+    Register a fresh user, yield their auth headers, then delete them.
+    Useful for tests that need a guaranteed non-member, independent of session state.
+    """
+    outsider_data = {
+        "mail": "outsider.tmp@example.com",
+        "pwd": "Outsider9$",
+        "phone": "+39099900002",
+        "name": "Outsider",
+        "username": "outsider_tmp",
+    }
+    client.post("/api/auth/register", json=outsider_data)
+    with app.app_context():
+        outsider = User.query.filter_by(mail="outsider.tmp@example.com").first()
+        token = JWTService.generate_access_token(outsider.id, outsider.mail, outsider.admin)
+        outsider_id = str(outsider.id)
+
+    yield {"Authorization": f"Bearer {token}"}
+
+    with app.app_context():
+        user = _db.session.query(User).filter_by(id=UUID(outsider_id)).first()
+        if user:
+            _db.session.delete(user)
+            _db.session.commit()
+
 @pytest.fixture(scope="function")
 def inventory_with_items(client, auth_headers, id):
     """Create an inventory with items for testing"""
@@ -184,6 +224,73 @@ def itinerary(client, auth_headers, trip_w_o_itinerary):
      # Cleanup: try to delete the itinerary
     try:
         client.delete(f"{ITINERARY_ENDPOINT}/{itinerary_data['id']}", headers=auth_headers)
+    except:
+        pass
+
+
+@pytest.fixture(scope="function")
+def trip_with_crew(app, client, auth_headers):
+    """
+    Creates a trip (user_1 = leader) and a fresh crew member.
+
+    Yields a dict:
+        {
+            "trip": <trip response dict>,
+            "leader_headers": <auth headers for user_1>,
+            "crew_headers": <auth headers for the crew user>,
+        }
+
+    Tears down both the crew user and the trip after the test.
+    """
+    # Create the trip (user_1 is the leader)
+    response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    trip_data = json.loads(response.data)
+    trip_id = trip_data["id"]
+
+    # Register a fresh crew user
+    crew_data = {
+        "mail": "crew.member@example.com",
+        "pwd": "CrewPass9$",
+        "phone": "+39099900003",
+        "name": "Crew",
+        "username": "crew_member_tmp",
+    }
+    client.post("/api/auth/register", json=crew_data)
+
+    with app.app_context():
+        crew_user = _db.session.query(User).filter_by(mail="crew.member@example.com").first()
+        crew_id = str(crew_user.id)
+        crew_token = JWTService.generate_access_token(crew_user.id, crew_user.mail, crew_user.admin)
+
+        # Directly insert crew membership (invitation flow is M3a)
+        membership = TripMember(
+            user_id=crew_user.id,
+            trip_id=UUID(trip_id),
+            role=MemberRoleType.CREW,
+        )
+        _db.session.add(membership)
+        _db.session.commit()
+
+    yield {
+        "trip": trip_data,
+        "leader_headers": auth_headers,
+        "crew_headers": {"Authorization": f"Bearer {crew_token}"},
+    }
+
+    # Cleanup crew user and trip
+    with app.app_context():
+        crew_user = _db.session.query(User).filter_by(id=UUID(crew_id)).first()
+        if crew_user:
+            _db.session.delete(crew_user)
+            _db.session.commit()
+
+    try:
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     except:
         pass
 

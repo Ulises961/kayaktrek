@@ -94,3 +94,45 @@ def test_transition_missing_state_field_is_rejected(client, auth_headers):
     data = _create_trip(client, auth_headers)
     response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={}, headers=auth_headers)
     assert response.status_code == 400
+
+
+# --- Member roles ---
+
+def test_creator_is_stored_as_leader(client, auth_headers):
+    data = _create_trip(client, auth_headers)
+    assert len(data["travellers"]) == 1
+    assert data["travellers"][0]["role"] == "leader"
+
+
+def test_non_member_cannot_transition_state(client, auth_headers, outsider_headers):
+    """A user who is not on the trip gets 403 from require_owner."""
+    data = _create_trip(client, auth_headers)
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{data['id']}/state",
+        json={"state": "planning"},
+        headers=outsider_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_leader_can_transition_state(client, auth_headers):
+    """Trip creator (leader) can advance the state."""
+    data = _create_trip(client, auth_headers)
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{data['id']}/state",
+        json={"state": "planning"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)["state"] == "planning"
+
+
+def test_crew_cannot_transition_state(client, trip_with_crew):
+    """A crew member (on the trip but not leader) is rejected by require_leader."""
+    trip_id = trip_with_crew["trip"]["id"]
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/state",
+        json={"state": "planning"},
+        headers=trip_with_crew["crew_headers"],
+    )
+    assert response.status_code == 403

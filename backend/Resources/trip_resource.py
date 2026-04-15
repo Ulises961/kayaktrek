@@ -7,7 +7,7 @@ from sqlalchemy.exc import NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
 from Schemas.trip_schema import TripSchema
 from Services.Middleware.auth_middleware import JWTService
-from Services.Middleware.privileges_middleware import require_owner
+from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
 
 logger = logging.getLogger(__name__)
@@ -109,6 +109,7 @@ def post():
 @trip_api.route("/<string:id>/state", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
+@require_leader()
 def transition_state(id: str):
     """
     Transition a trip's state forward (draft → planning → happening → past).

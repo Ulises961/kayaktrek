@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from Models.itinerary import Itinerary
     from Models.inventory import Inventory
     from Models.user import User
+    from Models.trip_member import TripMember
 
 
 class TripStateType(enum.Enum):
@@ -40,8 +41,15 @@ class Trip(BaseModel):
         uselist=False,
         cascade="all, delete,save-update",
     )
+    # Association object: full role-aware access
+    trip_members: Mapped[List["TripMember"]] = relationship(
+        "TripMember",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+    )
+    # Viewonly convenience relationship — use trip_members for mutations
     travellers: Mapped[List["User"]] = relationship(
-        secondary="user_has_trip", back_populates="trips"
+        secondary="trip_member", viewonly=True
     )
     pending_travellers: Mapped[List["User"]] = relationship(
         secondary="user_has_invitation", back_populates="invitations"

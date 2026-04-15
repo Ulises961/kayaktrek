@@ -11,7 +11,7 @@ from Models.user_has_itinerary import user_has_itinerary
 from Models.user_has_inventory import user_has_inventory
 from Models.user_has_items import user_has_items
 from Models.user_has_invitation import user_has_invitation
-from Models.user_has_trip import user_has_trip
+from Models.trip_member import TripMember
 from Models.user_endorses_log import user_endorses_log
 from Models.user_has_profile_picture import userHasProfilePicture
 from sqlalchemy import Integer, String, Boolean
@@ -45,8 +45,15 @@ class User(BaseModel):
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Association object: full role-aware access
+    trip_memberships: Mapped[List["TripMember"]] = relationship(
+        "TripMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    # Viewonly convenience relationship — use trip_memberships for mutations
     trips: Mapped[List["Trip"]] = relationship(
-        secondary=user_has_trip, back_populates="travellers"
+        secondary="trip_member", viewonly=True
     )
     invitations: Mapped[List["Trip"]] = relationship(
         secondary=user_has_invitation, back_populates="pending_travellers"

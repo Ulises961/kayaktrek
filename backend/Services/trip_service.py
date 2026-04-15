@@ -9,8 +9,8 @@ from flask import g
 from sqlalchemy.exc import NoResultFound
 from uuid import UUID
 
-from Models.user_has_trip import user_has_trip
 from Models.trip import Trip, TripStateType
+from Models.trip_member import TripMember, MemberRoleType
 from Models.user import User
 from Models.user_has_invitation import user_has_invitation
 from Schemas.trip_schema import TripSchema
@@ -109,12 +109,17 @@ class TripService:
 
 
         trip: Trip = TripSchema().load(trip_data)  # type: ignore
-        
-        # Add the creator as a traveller
-        if current_user:
-            trip.travellers.append(current_user)
-        
         db.session.add(trip)
+        db.session.flush()  # obtain trip.id before creating membership
+
+        # Add the creator as leader
+        if current_user:
+            membership = TripMember(
+                user_id=current_user.id,
+                trip_id=trip.id,
+                role=MemberRoleType.LEADER,
+            )
+            db.session.add(membership)
         db.session.commit()
 
         # Refresh to get relationships
@@ -180,22 +185,18 @@ class TripService:
             # Only remove the current user's association with the trip
             user_id = g.current_user_id
 
-            user = (
-                db.session.query(User)
-                .join(user_has_trip, User.id == user_has_trip.c.user_id)
-                .join(Trip, user_has_trip.c.trip_id == Trip.id)
-                .options(contains_eager(User.trips))
-                .filter(User.id == UUID(user_id), Trip.id == UUID(trip_id))
+            membership = (
+                db.session.query(TripMember)
+                .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
                 .first()
             )
 
-            if not user:
+            if not membership:
                 raise NoResultFound(
                     f"User {user_id} is not associated with trip {trip_id}"
                 )
 
-            # user.trips contains only the trip we want to remove
-            user.trips.pop()
+            db.session.delete(membership)
             db.session.commit()
 
             logger.info(f"Removed user {user_id} from trip {trip_id}")
@@ -324,9 +325,14 @@ class TripService:
             raise NoResultFound(f"Invitation expired or not found")
         
         if accepted:
-            # Remove from invitations and add to trips
+            # Remove from invitations and add as crew member
             user.invitations.remove(trip)
-            user.trips.append(trip)
+            membership = TripMember(
+                user_id=user.id,
+                trip_id=trip.id,
+                role=MemberRoleType.CREW,
+            )
+            db.session.add(membership)
             logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
         else:
             # Just remove from invitations

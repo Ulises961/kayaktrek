@@ -1,34 +1,50 @@
-from marshmallow import Schema, fields, post_load, post_dump, pre_load, validates, ValidationError
+from marshmallow import Schema, fields, post_load, validates, ValidationError
 from Models.trip import Trip, TripStateType
+from Models.trip_member import MemberRoleType
 from Schemas.base_schema import BaseSchema
 from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
 import uuid
 
 
+class TripMemberSchema(Schema):
+    """Serialises a TripMember (role + user snapshot) for the travellers list."""
+    role = fields.Enum(MemberRoleType, by_value=True, dump_default=MemberRoleType.CREW)
+    user = fields.Nested(
+        'UserSchema',
+        exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items',
+                 'endorsed_logs', 'logs'],
+        dump_only=True,
+    )
+
+
 class TripSchema(BaseSchema):
-    """ 
-    Trip Schema
-    used for loading/dumping Trip entities
     """
-    # Expose id as 'id' in API via data_key
+    Trip Schema — loading/dumping Trip entities.
+    """
     inventory = fields.Nested(InventorySchema(exclude=['trip_id']), allow_none=True)
     itinerary = fields.Nested(ItinerarySchema(exclude=['trip_id']), allow_none=True)
-    pending_travellers = fields.Nested('UserSchema', exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items', 'endorsed_logs', 'logs'], many=True, allow_none=True)
-    travellers = fields.Nested('UserSchema', exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items', 'endorsed_logs', 'logs'], many=True, allow_none=True, validate=lambda x: x is None or len(x) <= 50)
+    pending_travellers = fields.Nested(
+        'UserSchema',
+        exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items',
+                 'endorsed_logs', 'logs'],
+        many=True,
+        allow_none=True,
+    )
+    # Dump: serialise trip_members (includes role). Load: ignored — membership is
+    # managed by TripService, not set through the schema.
+    travellers = fields.Nested(
+        TripMemberSchema,
+        many=True,
+        attribute="trip_members",
+        dump_only=True,
+    )
     state = fields.Enum(TripStateType, by_value=True, load_default=TripStateType.DRAFT)
     description = fields.String(allow_none=True)
     destination = fields.String(allow_none=True)
     date_from = fields.Date(allow_none=True)
     date_to = fields.Date(allow_none=True)
-    
 
-    @validates('travellers')
-    def validate_travellers(self, value, **kwargs):
-        """Validate travellers list doesn't exceed reasonable limits."""
-        if value is not None and len(value) > 50:
-            raise ValidationError("A trip cannot have more than 50 travellers")
-    
     @post_load
     def make_trip(self, data, **kwargs):
         return Trip(**data)

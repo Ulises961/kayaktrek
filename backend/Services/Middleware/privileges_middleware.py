@@ -25,14 +25,48 @@ from Models.item import Item
 from Models.point import Point
 from Models.log import Log
 from Models.image import Image
-from Models.user_has_trip import user_has_trip
+from Models.trip_member import TripMember, MemberRoleType
 from Models.user_has_inventory import user_has_inventory
-from sqlalchemy import or_
 from Services.day_service import DayService
 from Services.itinerary_service import ItineraryService
 from Services.trip_service import TripService
 
 logger = logging.getLogger(__name__)
+
+
+def require_leader(id_param: str = "id"):
+    """
+    Decorator that requires the current user to be the leader of the trip.
+
+    Must be stacked after @require_owner('trip'), which already confirms membership.
+    Reads the trip id from the URL parameter named ``id_param``.
+
+    Returns 403 if the user is crew (not a leader).
+    """
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user_id = g.get("current_user_id")
+            trip_id = kwargs.get(id_param)
+            if not user_id or not trip_id:
+                abort(HTTPStatus.BAD_REQUEST, description="Trip id required")
+
+            membership = (
+                db.session.query(TripMember)
+                .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
+                .first()
+            )
+            if not membership or membership.role != MemberRoleType.LEADER:
+                abort(
+                    HTTPStatus.FORBIDDEN,
+                    description="Only trip leaders can perform this action",
+                )
+            return f(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def require_owner(
@@ -201,8 +235,8 @@ def _check_trip_ownership(user_id: str, trip_id: str) -> Optional[bool]:
     # Check if user is associated with trip
     result = (
         db.session.query(Trip)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Trip.id == trip.id, user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Trip.id == trip.id, TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -223,8 +257,8 @@ def _check_itinerary_ownership(user_id: str, itinerary_id: str) -> Optional[bool
     result = (
         db.session.query(Itinerary)
         .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Itinerary.id == itinerary.id, user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Itinerary.id == itinerary.id, TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -248,13 +282,13 @@ def _check_day_ownership(user_id: str, day_id: str) -> Optional[bool]:
     if result is not None:
         return True
     
-    # Check on trip itinerary 
+    # Check on trip itinerary
     result = (
         db.session.query(Day)
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Day.id == UUID(day_id), user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Day.id == UUID(day_id), TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -273,8 +307,8 @@ def _check_sea_ownership(user_id: str, sea_id: str) -> Optional[bool]:
         .join(Day, Sea.day_id == Day.id)
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Sea.day_id == sea_id, user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Sea.day_id == sea_id, TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -293,8 +327,8 @@ def _check_weather_ownership(user_id: str, weather_id: str) -> Optional[bool]:
         .join(Day, Weather.day_id == Day.id)
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Weather.day_id == weather_id, user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Weather.day_id == weather_id, TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -316,8 +350,8 @@ def _check_inventory_ownership(user_id: str, inventory_id: str) -> Optional[bool
     result = (
         db.session.query(Inventory)
         .join(Trip, Inventory.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Inventory.id == inventory_id, user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Inventory.id == inventory_id, TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -341,10 +375,10 @@ def _check_item_ownership(user_id: str, item_id: str) -> Optional[bool]:
         .join(inventory_items, Item.id == inventory_items.c.item_id)
         .join(Inventory, inventory_items.c.inventory_id == Inventory.id)
         .join(Trip, Inventory.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
+        .join(TripMember, Trip.id == TripMember.trip_id)
         .filter(
             Item.id == UUID(item_id),
-            or_(user_has_trip.c.user_id == UUID(user_id)),
+            TripMember.user_id == UUID(user_id),
         )
         .first()
     )
@@ -377,8 +411,8 @@ def _check_point_ownership(user_id: str, point_id: str) -> Optional[bool]:
         .join(Day, Point.day_id == Day.id)
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(user_has_trip, Trip.id == user_has_trip.c.trip_id)
-        .filter(Point.id == UUID(point_id), user_has_trip.c.user_id == UUID(user_id))
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Point.id == UUID(point_id), TripMember.user_id == UUID(user_id))
         .first()
     )
 
