@@ -11,6 +11,7 @@ from uuid import UUID
 
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
+from Schemas.trip_member_schema import TripMemberSchema
 from Models.user import User
 from Models.user_has_invitation import user_has_invitation
 from Schemas.trip_schema import TripSchema
@@ -114,11 +115,11 @@ class TripService:
 
         # Add the creator as leader
         if current_user:
-            membership = TripMember(
-                user_id=current_user.id,
-                trip_id=trip.id,
-                role=MemberRoleType.LEADER,
-            )
+            membership = TripMemberSchema().load({
+                'user_id': current_user.id,
+                'trip_id': trip.id,
+                'role': MemberRoleType.LEADER.value,
+            })
             db.session.add(membership)
         db.session.commit()
 
@@ -327,11 +328,11 @@ class TripService:
         if accepted:
             # Remove from invitations and add as crew member
             user.invitations.remove(trip)
-            membership = TripMember(
-                user_id=user.id,
-                trip_id=trip.id,
-                role=MemberRoleType.CREW,
-            )
+            membership = TripMemberSchema().load({
+                'user_id': user.id,
+                'trip_id': trip.id,
+                'role': MemberRoleType.CREW.value,
+            })
             db.session.add(membership)
             logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
         else:

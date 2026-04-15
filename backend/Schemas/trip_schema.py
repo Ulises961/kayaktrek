@@ -1,21 +1,10 @@
-from marshmallow import Schema, fields, post_load, validates, ValidationError
+from marshmallow import fields, post_load, validates, ValidationError
 from Models.trip import Trip, TripStateType
-from Models.trip_member import MemberRoleType
 from Schemas.base_schema import BaseSchema
 from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
+from Schemas.trip_member_schema import TripMemberSchema
 import uuid
-
-
-class TripMemberSchema(Schema):
-    """Serialises a TripMember (role + user snapshot) for the travellers list."""
-    role = fields.Enum(MemberRoleType, by_value=True, dump_default=MemberRoleType.CREW)
-    user = fields.Nested(
-        'UserSchema',
-        exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items',
-                 'endorsed_logs', 'logs'],
-        dump_only=True,
-    )
 
 
 class TripSchema(BaseSchema):
