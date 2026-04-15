@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool
 load_dotenv()
 
 class Config:
@@ -18,6 +19,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL", "sqlite:///:memory:")
     SECRET_KEY = os.getenv("TEST_SECRET_KEY", "test-secret-key")
     JWT_SECRET_KEY = os.getenv("TEST_JWT_SECRET_KEY", "test-jwt-secret-key")
+    SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     
 class StagingConfig(Config):
     DEVELOPMENT = True

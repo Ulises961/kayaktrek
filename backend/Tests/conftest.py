@@ -21,11 +21,14 @@ def app(request):
     ctx = app.app_context()
     ctx.push()
 
-    # db is already initialized in createApp(), no need to init again
+    # Drop any leftover state from a previous killed session, then rebuild
+    _db.drop_all()
     _db.create_all()
     
     def teardown():
+        _db.session.remove()   # close/rollback open session and release any held locks
         _db.drop_all()
+        _db.engine.dispose()
         ctx.pop()
 
     request.addfinalizer(teardown)
