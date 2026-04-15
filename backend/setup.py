@@ -19,14 +19,13 @@ setup(
         'pyjwt',
         'flask-migrate',
         'alembic',
-        'geoalchemy',
+        'geoalchemy2',
         'openmeteo-requests',
         'requests-cache', 
         'retry-requests', 
         'bleach',
         'camel-converter',
         'uuid_extension'
-        
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",
