@@ -25,7 +25,8 @@ setup(
         'retry-requests', 
         'bleach',
         'camel-converter',
-        'uuid_extension'
+        'uuid_extension',
+        'setuptools'
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",
