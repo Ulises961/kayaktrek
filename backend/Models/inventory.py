@@ -16,7 +16,7 @@ class Inventory(BaseModel):
         self.items = items
         self.__dict__.update(kwargs)
 
-    trip_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('trip.id'), nullable=True)
+    trip_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('trip.id'), nullable=True, unique=True)
     user_id:Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id'), nullable= False)
     items: Mapped[List["Item"]] = relationship(secondary=inventory_items, cascade='all,delete')
 

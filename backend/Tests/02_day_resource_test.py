@@ -9,14 +9,18 @@ import pytest
 
 @pytest.fixture
 def test_trip(client, auth_headers):
-    """Create a test trip and return its ID."""
-    trip_data = {
-        "itinerary": {"isPublic": True, "totalMiles": 25, "days": []},
-        "inventory": {}
-    }
+    """Create a test trip (no itinerary) and return its ID."""
+    trip_data = {"inventory": {}}
     response = client.post(f"{TRIP_ENDPOINT}/create", json=trip_data, headers=auth_headers)
     assert response.status_code == 201
-    return json.loads(response.data)['id']
+    trip_id = json.loads(response.data)['id']
+
+    yield trip_id
+
+    try:
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+    except Exception:
+        pass
 
 @pytest.fixture
 def test_itinerary_with_day(client, auth_headers, test_trip):

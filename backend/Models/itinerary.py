@@ -16,7 +16,7 @@ class Itinerary(BaseModel):
     expected_total_miles: Mapped[Optional[Numeric]] = mapped_column(
         Numeric, nullable=True
     )
-    trip_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("trip.id"), nullable=False)
+    trip_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("trip.id"), nullable=False, unique=True)
     user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id"), nullable=True)
     days: Mapped[List["Day"]] = relationship(
         lazy="select", cascade="all, delete,save-update"
