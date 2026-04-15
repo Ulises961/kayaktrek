@@ -12,7 +12,7 @@ python-dotenv
 pyjwt
 flask-migrate
 alembic
-geoalchemy
+geoalchemy2
 openmeteo-requests
 requests-cache 
 retry-requests 
