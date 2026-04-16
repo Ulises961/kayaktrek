@@ -53,6 +53,7 @@ class ItemService:
             IntegrityError: If database constraints are violated
         """
         logger.info("Creating new item")
+        item_data.pop("inventoryId", None)  # auth middleware metadata, not item data
         item = cast(Item, ItemSchema().load(item_data))
         db.session.add(item)
         db.session.commit()

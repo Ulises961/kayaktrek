@@ -13,7 +13,6 @@ from uuid import UUID
 
 from flask import abort, g, request
 from Api.database import db
-from Models.inventory_items import inventory_items
 from Models.user import User
 from Models.trip import Trip
 from Models.itinerary import Itinerary
@@ -359,31 +358,11 @@ def _check_inventory_ownership(user_id: str, inventory_id: str) -> Optional[bool
 
 
 def _check_item_ownership(user_id: str, item_id: str) -> Optional[bool]:
-    """Check if user owns the item through inventory/trip ownership."""
-    # First check if item exists
+    """Check if the current user is the owner of the item."""
     item = db.session.query(Item).filter_by(id=UUID(item_id)).first()
     if not item:
-        return None  # Item doesn't exist
-
-    # Second check user owns item
-    if item.user_id and item.user_id == UUID(user_id):
-        return True
-
-    # Third check trip inventory has item
-    result = (
-        db.session.query(Item)
-        .join(inventory_items, Item.id == inventory_items.c.item_id)
-        .join(Inventory, inventory_items.c.inventory_id == Inventory.id)
-        .join(Trip, Inventory.trip_id == Trip.id)
-        .join(TripMember, Trip.id == TripMember.trip_id)
-        .filter(
-            Item.id == UUID(item_id),
-            TripMember.user_id == UUID(user_id),
-        )
-        .first()
-    )
-
-    return result is not None
+        return None
+    return item.user_id == UUID(user_id) if item.user_id else False
 
 
 def _check_point_ownership(user_id: str, point_id: str) -> Optional[bool]:

@@ -1,23 +1,21 @@
 from flask import g
-from marshmallow import Schema, fields, post_dump, post_load, validates, ValidationError
+from marshmallow import fields, post_load, validates, ValidationError
+from uuid import UUID
 from Models.item import Item, ItemCategoryType
-from Models.user import User
-from Api.database import db
-from sqlalchemy.exc import NoResultFound
-import bleach
 import re
 
 from Schemas.base_schema import BaseSchema
 
 class ItemSchema(BaseSchema):
-    """ 
+    """
     Item Schema
     used for loading/dumping Item entities
     """
     category = fields.Enum(ItemCategoryType, by_value=True, required=True)
     checked = fields.Boolean(allow_none=True)
     name = fields.String(allow_none=False, required=True, validate=lambda x: 1 <= len(x.strip()) <= 255)
-    user_id = fields.UUID(allow_none=False, required=True)
+    # dump_only: stamped from auth context in @post_load, never accepted from client
+    user_id = fields.UUID(dump_only=True)
 
     @validates('name')
     def validate_name(self, value, **kwargs):
@@ -40,5 +38,6 @@ class ItemSchema(BaseSchema):
 
     @post_load
     def make_item(self, data, **kwargs):
+        data['user_id'] = UUID(str(g.current_user_id))
         return Item(**data)
     
