@@ -8,6 +8,7 @@ from Models.trip_member import MemberRoleType
 from Schemas.trip_member_schema import TripMemberSchema
 from uuid import UUID
 from Resources.inventory_resource import INVENTORY_ENDPOINT
+from Resources.item_resource import ITEM_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
@@ -148,56 +149,68 @@ def outsider_headers(app, client):
 
 @pytest.fixture(scope="function")
 def inventory_with_items(client, auth_headers, id):
-    """Create an inventory with items for testing"""
-    inventory_items = [
-        {"category": 'travel', "name": 'compass'}, 
-        {"category": "firstAid", "name": 'scissors'}
-    ]
-    inventory = {"items": inventory_items}
-    response = client.post(f"{INVENTORY_ENDPOINT}/create", headers=auth_headers, json=inventory)
-    assert response.status_code == 201
-    inventory_data = json.loads(response.data)
-    
-    yield inventory_data
-    
-    # Cleanup: try to delete the inventory
+    """Create a personal inventory with two items for testing.
+
+    Yields a dict:
+        {
+            "inventory": <inventory response dict>,
+            "items": [<item1 response dict>, <item2 response dict>],
+        }
+    """
+    inv_response = client.post(f"{INVENTORY_ENDPOINT}/create", headers=auth_headers, json={})
+    assert inv_response.status_code == 201
+    inv_data = json.loads(inv_response.data)
+    inventory_id = inv_data['id']
+
+    items = []
+    for payload in [
+        {"inventoryId": inventory_id, "category": "travel", "name": "compass"},
+        {"inventoryId": inventory_id, "category": "firstAid", "name": "scissors"},
+    ]:
+        r = client.post(f"{ITEM_ENDPOINT}/create", headers=auth_headers, json=payload)
+        assert r.status_code == 201
+        items.append(json.loads(r.data))
+
+    yield {"inventory": inv_data, "items": items}
+
+    for item in items:
+        try:
+            client.delete(f"{ITEM_ENDPOINT}/{item['id']}", headers=auth_headers)
+        except Exception:
+            pass
     try:
-        client.delete(f"{INVENTORY_ENDPOINT}/{inventory_data['id']}", headers=auth_headers)
-    except:
+        client.delete(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers)
+    except Exception:
         pass
 
 
 @pytest.fixture(scope='function')
 def empty_inventory(client, auth_headers, id):
-    """Create an empty inventory for testing"""
-    inventory = {"items": []}
-    response = client.post(f"{INVENTORY_ENDPOINT}/create", headers=auth_headers, json=inventory)
+    """Create an empty inventory for testing."""
+    response = client.post(f"{INVENTORY_ENDPOINT}/create", headers=auth_headers, json={})
     assert response.status_code == 201
     inventory_data = json.loads(response.data)
-    
+
     yield inventory_data
-    
-    # Cleanup: try to delete the inventory
+
     try:
         client.delete(f"{INVENTORY_ENDPOINT}/{inventory_data['id']}", headers=auth_headers)
-    except:
+    except Exception:
         pass
+
 
 @pytest.fixture(scope="function")
 def trip_w_o_itinerary(client, auth_headers):
-    inventory = {"items":
-                 [{"category": 'travel', "name": 'compass'}, {"category": "firstAid", "name": 'scissors'}]}
-    trip = {"inventory":inventory}
-    response = client.post(f"{TRIP_ENDPOINT}/create", json=trip, headers=auth_headers)
+    """Create a trip without an itinerary."""
+    response = client.post(f"{TRIP_ENDPOINT}/create", json={"inventory": {}}, headers=auth_headers)
     assert response.status_code == 201
     trip_data = json.loads(response.data)
-    
+
     yield trip_data
 
-     # Cleanup: try to delete the inventory
     try:
         client.delete(f"{TRIP_ENDPOINT}/{trip_data['id']}", headers=auth_headers)
-    except:
+    except Exception:
         pass
 
 @pytest.fixture(scope="function")

@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields, pre_load
+from marshmallow import Schema, fields, pre_load, EXCLUDE
 
 
 def camelcase(s):
@@ -9,9 +9,15 @@ def camelcase(s):
 class BaseSchema(Schema):
     """Schema that uses camel-case for its external representation
     and snake-case for its internal representation.
+
+    Unknown fields (including dump_only fields that appear in load payloads)
+    are silently dropped rather than raising a ValidationError.
     """
+    class Meta:
+        unknown = EXCLUDE
+
     id = fields.UUID(allow_none=True)
-    
+
     def on_bind_field(self, field_name, field_obj):
         field_obj.data_key = camelcase(field_obj.data_key or field_name)
 

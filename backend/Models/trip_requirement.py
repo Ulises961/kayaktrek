@@ -10,7 +10,7 @@ from Models.base_model import BaseModel
 
 if TYPE_CHECKING:
     from Models.item import Item
-    from Models.user import User
+    from Models.trip_member import TripMember
 
 
 class RequirementStatusType(enum.Enum):
@@ -28,9 +28,9 @@ requirement_contributors = Table(
         primary_key=True,
     ),
     Column(
-        "user_id",
+        "trip_member_id",
         UUID,
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("trip_member.id", ondelete="CASCADE"),
         primary_key=True,
     ),
 )
@@ -63,6 +63,6 @@ class TripRequirement(BaseModel):
     covering_item: Mapped[Optional["Item"]] = relationship(
         "Item", foreign_keys=[covering_item_id]
     )
-    contributors: Mapped[List["User"]] = relationship(
-        "User", secondary=requirement_contributors
+    contributors: Mapped[List["TripMember"]] = relationship(
+        "TripMember", secondary=requirement_contributors
     )

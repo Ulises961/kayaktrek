@@ -9,11 +9,12 @@ from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 
 from Models.inventory import Inventory
-from Models.item import Item
-from Models.user import User
+from Models.trip_requirement import TripRequirement, RequirementStatusType
+from Models.trip_member import TripMember
 from Schemas.inventory_schema import InventorySchema
+from Schemas.trip_requirement_schema import TripRequirementSchema
 from Api.database import db
-from Schemas.item_schema import ItemSchema
+from Models.item import Item
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,49 @@ class InventoryService:
         return inventory
 
     @staticmethod
+    def _get_requirement(inventory_id: str, req_id: str) -> TripRequirement:
+        req = db.session.query(TripRequirement).filter_by(
+            id=UUID(req_id), inventory_id=UUID(inventory_id)
+        ).first()
+        if not req:
+            raise NoResultFound(
+                f"Requirement {req_id} not found in inventory {inventory_id}"
+            )
+        return req
+
+    @staticmethod
+    def _get_trip_member(
+        inventory: Inventory, item_id: Optional[str] = None
+    ) -> TripMember:
+        """
+        Resolve the TripMember for the current user in the trip that owns this
+        inventory.  When item_id is provided the query also verifies that the
+        current user owns that item — contribution and ownership are confirmed
+        in a single round-trip.
+        """
+        if not inventory.trip_id:
+            raise ValueError("This operation requires a trip-linked inventory")
+
+
+        query = db.session.query(TripMember).filter(
+            TripMember.user_id == UUID(g.current_user_id),
+            TripMember.trip_id == inventory.trip_id,
+        )
+
+        if item_id is not None:
+            query = query.join(Item, Item.user_id == TripMember.user_id).filter(
+                Item.id == UUID(item_id)
+            )
+
+        member = query.first()
+        if not member:
+            raise NoResultFound(
+                "Current user is not a member of this trip"
+                + (" or does not own the specified item" if item_id else "")
+            )
+        return member
+
+    @staticmethod
     def get_inventories_by_user(user_id: str) -> List[Inventory]:
         """
         Retrieve all inventories for a user.
@@ -57,8 +101,7 @@ class InventoryService:
         """
         inventories = (
             db.session.query(Inventory)
-            .join(User)
-            .filter(Inventory.user_id == User.id, User.id == UUID(user_id))
+            .filter(Inventory.user_id == UUID(user_id))
             .all()
         )
         logger.info(f"Found {len(inventories)} inventories for user {user_id}")
@@ -80,16 +123,9 @@ class InventoryService:
             IntegrityError: If database constraints are violated
         """
         logger.info("Creating new inventory")
-        user_id = g.current_user_id
-        inventory_data.setdefault("user_id", user_id)
-        if (items := inventory_data.get("items", None)) is not None:
-            for item in items:
-                item.setdefault("user_id", user_id)
         inventory = cast(Inventory, InventorySchema().load(inventory_data))
-
         db.session.add(inventory)
         db.session.commit()
-
         db.session.refresh(inventory)
         logger.info(f"Inventory {inventory.id} created successfully")
         return inventory
@@ -111,30 +147,16 @@ class InventoryService:
             NoResultFound: If inventory doesn't exist
             IntegrityError: If database constraints are violated
         """
-        # Verify inventory exists
-        existing_inventory = InventoryService.get_inventory_by_id(inventory_id)
-        if not existing_inventory:
-            raise NoResultFound(f"Inventory with id {inventory_id} not found")
+        existing = InventoryService.get_inventory_by_id(inventory_id)
         logger.info(f"Updating inventory {inventory_id}")
-
+        inventory_data.setdefault("user_id", str(existing.user_id))
         try:
-            # Handle items separately if present
-            user_id = g.current_user_id
-            if "items" in inventory_data:
-                if items_json := inventory_data.get("items", []):
-                    for item_dict in items_json:
-                        item_dict.setdefault('user_id', user_id)
-            inventory_data.setdefault("user_id", user_id)
-
-            updated_inventory = InventorySchema().load(inventory_data)
-
-            merged_inventory = cast(Inventory, db.session.merge(updated_inventory))
+            updated = cast(Inventory, InventorySchema().load(inventory_data))
+            merged = cast(Inventory, db.session.merge(updated))
             db.session.commit()
-            db.session.refresh(merged_inventory)
-
+            db.session.refresh(merged)
             logger.info(f"Inventory {inventory_id} updated successfully")
-            return merged_inventory
-
+            return merged
         except IntegrityError as e:
             db.session.rollback()
             logger.exception(f"Integrity error updating inventory {inventory_id}: {e}")
@@ -153,13 +175,11 @@ class InventoryService:
             IntegrityError: If inventory has references that prevent deletion
         """
         inventory = InventoryService.get_inventory_by_id(inventory_id)
-
         try:
             logger.info(f"Deleting inventory {inventory_id}")
             db.session.delete(inventory)
             db.session.commit()
             logger.info(f"Inventory {inventory_id} deleted successfully")
-
         except IntegrityError as e:
             db.session.rollback()
             logger.error(f"Integrity error deleting inventory {inventory_id}: {e}")
@@ -168,3 +188,64 @@ class InventoryService:
                 params=None,
                 orig=e,
             )
+
+    # ------------------------------------------------------------------ #
+    # Requirements                                                         #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def add_requirement(inventory_id: str, req_data: dict) -> TripRequirement:
+        InventoryService.get_inventory_by_id(inventory_id)  # existence check
+        req_data['inventory_id'] = inventory_id
+        req = cast(TripRequirement, TripRequirementSchema().load(req_data))
+        db.session.add(req)
+        db.session.commit()
+        db.session.refresh(req)
+        logger.info(f"Requirement {req.id} added to inventory {inventory_id}")
+        return req
+
+    @staticmethod
+    def remove_requirement(inventory_id: str, req_id: str) -> None:
+        req = InventoryService._get_requirement(inventory_id, req_id)
+        db.session.delete(req)
+        db.session.commit()
+        logger.info(f"Requirement {req_id} removed from inventory {inventory_id}")
+
+    @staticmethod
+    def contribute_item(inventory_id: str, req_id: str, item_id: str) -> TripRequirement:
+        inventory = InventoryService.get_inventory_by_id(inventory_id)
+        req = InventoryService._get_requirement(inventory_id, req_id)
+        trip_member = InventoryService._get_trip_member(inventory)
+
+        req.covering_item_id = UUID(item_id)
+        if trip_member not in req.contributors:
+            req.contributors.append(trip_member)
+        req.status = RequirementStatusType.COVERED
+
+        db.session.commit()
+        db.session.refresh(req)
+        logger.info(
+            f"User {g.current_user_id} contributed item {item_id} "
+            f"to requirement {req_id}"
+        )
+        return req
+
+    @staticmethod
+    def unclaim_requirement(inventory_id: str, req_id: str) -> TripRequirement:
+        inventory = InventoryService.get_inventory_by_id(inventory_id)
+        req = InventoryService._get_requirement(inventory_id, req_id)
+        if (item_id := req.covering_item_id) is not None:
+            trip_member = InventoryService._get_trip_member(inventory, str(item_id))
+            if trip_member in req.contributors:
+                req.contributors.remove(trip_member)
+
+            if not req.contributors:
+                req.covering_item_id = None
+                req.status = RequirementStatusType.NEEDED
+
+            db.session.commit()
+            db.session.refresh(req)
+            logger.info(
+                f"User {g.current_user_id} unclaimed requirement {req_id}"
+            )
+        return req

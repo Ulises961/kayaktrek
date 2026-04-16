@@ -1,27 +1,28 @@
 from flask import g
-from marshmallow import Schema, fields, post_dump, post_load, validates, ValidationError
+from marshmallow import fields, post_load
+from uuid import UUID
 from Models.inventory import Inventory
-from Models.user import User
 from Schemas.base_schema import BaseSchema
-from Schemas.item_schema import ItemSchema
+from Schemas.trip_requirement_schema import TripRequirementSchema
+
 
 class InventorySchema(BaseSchema):
-    """ 
-    Inventory Schema
-    used for loading/dumping Inventory entities
     """
+    Inventory Schema — loading/dumping Inventory entities.
 
-    trip_id = fields.UUID(allow_none=True)
-    items = fields.List(fields.Nested(ItemSchema), allow_none=True, validate=lambda x: x is None or len(x) <= 1000)
-    user_id = fields.UUID(allow_none=False, required=True)
-
-    @validates('items')
-    def validate_items(self, value, **kwargs):
-        """Validate items list doesn't exceed reasonable limits."""
-        if value is not None and len(value) > 1000:
-            raise ValidationError("Inventory cannot contain more than 1000 items")
+    user_id is always stamped from the authenticated request context in
+    @post_load — clients can never supply or spoof it.
+    Requirements are managed exclusively through dedicated endpoints and are
+    never accepted in a client payload — dump_only enforces this.
+    """
+    trip_id = fields.UUID(allow_none=True, load_default=None)
+    user_id = fields.UUID(dump_only=True)
+    requirements = fields.List(
+        fields.Nested(TripRequirementSchema), dump_only=True
+    )
 
     @post_load
     def make_inventory(self, data, **kwargs):
+        data['user_id'] = UUID(str(g.current_user_id))
         return Inventory(**data)
     

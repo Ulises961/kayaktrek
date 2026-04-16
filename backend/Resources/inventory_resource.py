@@ -5,6 +5,7 @@ from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.inventory_schema import InventorySchema
+from Schemas.trip_requirement_schema import TripRequirementSchema
 from Services.inventory_service import InventoryService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
@@ -104,4 +105,90 @@ def delete_inventory(id: str):
         abort(HTTPStatus.CONFLICT, description="Cannot delete inventory due to existing references")
     except Exception as e:
         logger.error(f"Error deleting inventory: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@inventory_api.route("/<string:id>/requirements", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('inventory')
+def add_requirement(id: str):
+    """POST /api/inventory/<id>/requirements — Add a requirement to the inventory."""
+    try:
+        req = InventoryService.add_requirement(id, request.get_json())
+        return jsonify(TripRequirementSchema().dump(req)), HTTPStatus.CREATED
+    except HTTPException:
+        raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Inventory {id} not found")
+    except Exception as e:
+        logger.error(f"Error adding requirement: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@inventory_api.route("/<string:id>/requirements/<string:req_id>", methods=["DELETE"])
+@JWTService.authenticate_restful
+@require_owner('inventory')
+def remove_requirement(id: str, req_id: str):
+    """DELETE /api/inventory/<id>/requirements/<req_id> — Remove a requirement."""
+    try:
+        InventoryService.remove_requirement(id, req_id)
+        return jsonify({"message": "Requirement removed"}), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Requirement {req_id} not found")
+    except Exception as e:
+        logger.error(f"Error removing requirement: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@inventory_api.route(
+    "/<string:id>/requirements/<string:req_id>/contribute", methods=["POST"]
+)
+@JWTService.authenticate_restful
+@require_owner('inventory')
+@require_owner('item', id_param='itemId', from_body=True)
+def contribute_item(id: str, req_id: str):
+    """POST /api/inventory/<id>/requirements/<req_id>/contribute
+    Body: {"itemId": "<uuid>"}
+    Covers the requirement with the caller's personal item.
+    """
+    try:
+        body = request.get_json()
+        item_id = body.get("itemId")
+        if not item_id:
+            abort(HTTPStatus.BAD_REQUEST, description="itemId is required")
+        req = InventoryService.contribute_item(id, req_id, item_id)
+        return jsonify(TripRequirementSchema().dump(req)), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(f"Error contributing item: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@inventory_api.route(
+    "/<string:id>/requirements/<string:req_id>/contribute", methods=["DELETE"]
+)
+@JWTService.authenticate_restful
+@require_owner('inventory')
+def unclaim_requirement(id: str, req_id: str):
+    """DELETE /api/inventory/<id>/requirements/<req_id>/contribute
+    Removes the caller's contribution from the requirement.
+    """
+    try:
+        req = InventoryService.unclaim_requirement(id, req_id)
+        return jsonify(TripRequirementSchema().dump(req)), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(f"Error unclaiming requirement: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

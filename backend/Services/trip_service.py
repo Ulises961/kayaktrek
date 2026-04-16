@@ -92,14 +92,6 @@ class TripService:
         if current_user:
             current_user_id = current_user.id
             
-            # Set user_id for inventory and items if present
-            if 'inventory' in trip_data and trip_data['inventory'] is not None:
-                trip_data['inventory']['user_id'] = current_user_id
-                if 'items' in trip_data['inventory']:
-                    for item in trip_data['inventory']['items']:
-                        if 'user_id' not in item:
-                            item['user_id'] = current_user_id
-            
             if 'itinerary' in trip_data and trip_data['itinerary'] is not None:
                 trip_data['itinerary']['user_id'] = current_user_id
                 if 'days' in trip_data['itinerary']:
