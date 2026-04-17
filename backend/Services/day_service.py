@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 class DayService:
     _MUTABLE_FIELDS = frozenset({"day_number", "date"})
+    _MUTABLE_WEATHER_FIELDS = frozenset({"model"})
+    _MUTABLE_SEA_FIELDS = frozenset({"moon_phase", "high_tide", "low_tide"})
     @staticmethod
     def get_day_by_id(day_id: str) -> Day:
         """
@@ -196,15 +198,12 @@ class DayService:
         """
         if weather_data:  # Non-null weather data
             if day.weather:
-                # Update existing weather
-                for key, value in weather_data.items():
-                    if key == "day_id":
-                        continue
-                    if hasattr(day.weather, key):
-                        setattr(day.weather, key, value)
+                for field in DayService._MUTABLE_WEATHER_FIELDS:
+                    if field in weather_data:
+                        setattr(day.weather, field, weather_data[field])
             else:
-                # Create new weather
-                weather = Weather(**weather_data)
+                weather = Weather(**{k: v for k, v in weather_data.items() if k in DayService._MUTABLE_WEATHER_FIELDS})
+                weather.day_id = day.id
                 day.weather = weather
         else:  # Null weather data - remove association
             if day.weather:
@@ -222,23 +221,19 @@ class DayService:
         """
         if sea_data:  # Non-null sea data
             if day.sea:
-                # Update existing sea
-                for key, value in sea_data.items():
-                    if key == "day_id":
-                        continue
-                    if hasattr(day.sea, key):
-                        # Convert time string to time object if needed
-                        if key in ("high_tide", "low_tide") and isinstance(value, str):
+                for field in DayService._MUTABLE_SEA_FIELDS:
+                    if field in sea_data:
+                        value = sea_data[field]
+                        if field in ("high_tide", "low_tide") and isinstance(value, str):
                             value = time.fromisoformat(value)
-                        setattr(day.sea, key, value)
+                        setattr(day.sea, field, value)
             else:
-                # Create new sea
-                # Convert time strings if present
-                if "high_tide" in sea_data and isinstance(sea_data["high_tide"], str):
-                    sea_data["high_tide"] = time.fromisoformat(sea_data["high_tide"])
-                if "low_tide" in sea_data and isinstance(sea_data["low_tide"], str):
-                    sea_data["low_tide"] = time.fromisoformat(sea_data["low_tide"])
-                sea = Sea(**sea_data)
+                safe = {k: v for k, v in sea_data.items() if k in DayService._MUTABLE_SEA_FIELDS}
+                for field in ("high_tide", "low_tide"):
+                    if field in safe and isinstance(safe[field], str):
+                        safe[field] = time.fromisoformat(safe[field])
+                sea = Sea(**safe)
+                sea.day_id = day.id
                 day.sea = sea
         else:  # Null sea data - remove association
             if day.sea:
