@@ -12,6 +12,7 @@ from typing import Optional
 from uuid import UUID
 
 from flask import abort, g, request
+from sqlalchemy.exc import NoResultFound
 from Api.database import db
 from Models.user import User
 from Models.trip import Trip
@@ -218,6 +219,8 @@ def check_resource_ownership(resource_type: str, resource_id: str) -> Optional[b
             logger.error(f"Unknown resource type: {resource_type}")
             return False
 
+    except NoResultFound:
+        return None  # resource doesn't exist — let the endpoint return 404
     except Exception as e:
         logger.error(f"Error checking ownership: {e}")
         return False

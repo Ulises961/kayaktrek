@@ -124,12 +124,8 @@ def test_delete_trip_removes_itinerary(client, auth_headers):
     delete_response = client.delete(f"{TRIP_ENDPOINT}/{trip['id']}", headers=auth_headers)
     assert delete_response.status_code == 200
 
-    # The ownership middleware runs before the handler; when the itinerary no longer
-    # exists, get_itinerary_by_id raises NoResultFound which the middleware catches
-    # and maps to 403 (same behaviour documented in test_get_nonexistent_inventory).
-    # Either 403 or 404 confirms the row is gone.
     get_response = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
-    assert get_response.status_code in (403, 404)
+    assert get_response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
