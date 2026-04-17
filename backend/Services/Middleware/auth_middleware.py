@@ -131,9 +131,12 @@ class JWTService:
                         abort(401, description="Invalid token")
                     
                     user = UserService.get_user_by_id(data["user_id"])
-                
+
                     if not user:
                         return abort(HTTPStatus.UNAUTHORIZED)
+
+                    if not user.active:
+                        abort(HTTPStatus.FORBIDDEN, description="Account not yet activated — check your email")
 
                     g.current_user_mail = user.mail
                     g.current_user_id = str(user.id)

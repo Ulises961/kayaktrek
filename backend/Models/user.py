@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from Models.log import Log
     from Models.image import Image
     from Models.trip import Trip
+    from Models.auth_token import AuthToken
 
 
 class User(BaseModel):
@@ -70,6 +71,9 @@ class User(BaseModel):
     itineraries: Mapped[List["Itinerary"]] = relationship(secondary=user_has_itinerary)
     inventories: Mapped[List["Inventory"]] = relationship(secondary=user_has_inventory)
     items: Mapped[List["Item"]] = relationship(secondary=user_has_items)
+    auth_tokens: Mapped[List["AuthToken"]] = relationship(
+        "AuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return (

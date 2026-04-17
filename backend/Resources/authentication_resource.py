@@ -2,8 +2,10 @@ import logging
 
 from flask import Blueprint, request, jsonify, abort
 from http import HTTPStatus
+from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
+from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.user_service import UserService
 from Services.Middleware.auth_middleware import JWTService
@@ -70,6 +72,63 @@ def register_user():
         "refresh_token": refresh_token
     }
     return jsonify(response_object), HTTPStatus.CREATED
+
+
+@api.route("/api/auth/verify", methods=["GET"])
+def verify_account():
+    token = request.args.get("token")
+    if not token:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing token")
+    try:
+        user = AuthService.verify_account(token)
+        return jsonify({"status": "success", "message": "Account activated", "user": UserSchema().dump(user)}), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(e)
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
+
+
+@api.route("/api/auth/resend-verification", methods=["POST"])
+def resend_verification():
+    data = request.get_json()
+    if not data or not data.get("mail"):
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
+    try:
+        AuthService.resend_verification(data["mail"])
+        return jsonify({"status": "success", "message": "Verification email sent"}), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(e)
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend verification")
+
+
+@api.route("/api/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json()
+    if not data or not data.get("mail"):
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
+    # Always 200 — do not reveal whether the address is registered
+    AuthService.request_password_reset(data["mail"])
+    return jsonify({"status": "success", "message": "If that address is registered, a reset link has been sent"}), HTTPStatus.OK
+
+
+@api.route("/api/auth/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    if not data or not data.get("token") or not data.get("pwd"):
+        abort(HTTPStatus.BAD_REQUEST, description="Missing token or pwd")
+    try:
+        AuthService.reset_password(data["token"], data["pwd"])
+        return jsonify({"status": "success", "message": "Password updated"}), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(e)
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Password reset failed")
 
 
 @api.route("/api/auth/refresh", methods=["POST"])

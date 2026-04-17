@@ -1,12 +1,16 @@
 from flask import Flask
+from flask_mail import Mail
 import os
 
 from Api.config import config
 from Api.database import db
 from Api.logging_config import setup_logging
 from Api.error_handlers import register_error_handlers
+from Api.seed import seed_item_categories
 from dotenv import load_dotenv
 from flask_migrate import Migrate
+
+mail = Mail()
 
 
 from Resources.user_resource import user_api
@@ -51,9 +55,9 @@ def createApp(config_mode:str):
     app.register_blueprint(user_api)
 
     db.init_app(app)
+    mail.init_app(app)
     with app.app_context():
         db.create_all()
-        from Api.seed import seed_item_categories
         seed_item_categories()
 
     migrate = Migrate()

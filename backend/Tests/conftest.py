@@ -37,6 +37,16 @@ def app(request):
     request.addfinalizer(teardown)
     return app
 
+def _activate_user(mail: str) -> User:
+    """Directly activate a test user in the DB (bypasses email flow)."""
+    user = User.query.filter_by(mail=mail).first()
+    if not user:
+        raise NoResultFound(f"User {mail} not found after registration")
+    user.active = True
+    _db.session.commit()
+    return user
+
+
 @pytest.fixture(scope="session")
 def user_1(app):
     client = app.test_client()
@@ -50,13 +60,8 @@ def user_1(app):
     }
     response = client.post("/api/auth/register", json=user1)
     assert response.status_code == 201
-    
-    # Query the database directly for the public_id
-    user = User.query.filter_by(mail="test.user@gmail.com").first()
-    if not user:
-        raise NoResultFound()
-    
-    return user
+    return _activate_user("test.user@gmail.com")
+
 
 @pytest.fixture(scope="session")
 def user_2(app):
@@ -71,12 +76,7 @@ def user_2(app):
     }
     response = client.post("/api/auth/register", json=user2)
     assert response.status_code == 201
-    
-    # Query the database directly for the public_id
-    user = User.query.filter_by(mail="test1.user@gmail.com").first()
-    if not user:
-        raise NoResultFound()
-    return user
+    return _activate_user("test1.user@gmail.com")
 
 @pytest.fixture(scope='session')
 def client(app):
@@ -133,8 +133,7 @@ def outsider_headers(app, client):
     }
     client.post("/api/auth/register", json=outsider_data)
     with app.app_context():
-        outsider = User.query.filter_by(mail="outsider.tmp@example.com").first()
-        assert outsider is not None
+        outsider = _activate_user("outsider.tmp@example.com")
         token = JWTService.generate_access_token(str(outsider.id), outsider.mail, outsider.admin)
         outsider_id = str(outsider.id)
 
@@ -288,7 +287,7 @@ def trip_with_crew(app, client, auth_headers):
     client.post("/api/auth/register", json=crew_data)
 
     with app.app_context():
-        crew_user = _db.session.query(User).filter_by(mail="crew.member@example.com").first()
+        crew_user = _activate_user("crew.member@example.com")
         assert crew_user is not None
         crew_id = str(crew_user.id)
         crew_token = JWTService.generate_access_token(str(crew_user.id), crew_user.mail, crew_user.admin)
