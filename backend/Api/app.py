@@ -24,6 +24,7 @@ from Resources.log_resource import log_api
 
 from Resources.authentication_resource import api as authApi
 from Services.Utils.json_encoder import CustomJSONProvider
+from Api.celery_app import init_celery
 
 
 def createApp(config_mode:str):
@@ -65,6 +66,9 @@ def createApp(config_mode:str):
     register_error_handlers(app)
 
     app.json_provider_class = CustomJSONProvider
+
+    init_celery(app)
+
     return app
 
 

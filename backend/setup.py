@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="kayak-expedition-planner",
     version="0.1",
-    packages=find_packages(include=['Api', 'Models', 'Resources', 'Schemas', 'Services', 'Tests']),
+    packages=find_packages(include=['Api', 'Models', 'Resources', 'Schemas', 'Services', 'Tasks', 'Tests']),
     install_requires=[
         'path',
         'flake8',
@@ -26,7 +26,9 @@ setup(
         'bleach',
         'camel-converter',
         'uuid_extension',
-        'setuptools'
+        'setuptools',
+        'celery',
+        'kombu',
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",

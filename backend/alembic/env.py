@@ -1,62 +1,62 @@
+import os
 from logging.config import fileConfig
+from dotenv import load_dotenv
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
-from Models.day import Day
-from Models.image import Image
-from Models.inventory import Inventory
-from Models.item import Item
-from Models.itinerary import Itinerary
-from Models.log import Log
-from Models.point import Point
-from Models.sea import Sea
-from Models.sea_state import SeaState
-from Models.trip import Trip
-from Models.weather import Weather
-from Models.weather_state import WeatherState
-from Models.user import User
-
-from sqlalchemy.ext.declarative import declarative_base
-
-# Declarative base object
-Base = declarative_base()
-
+from sqlalchemy import engine_from_config
 
 from alembic import context
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+load_dotenv()
+
+# Alembic Config object — provides access to values in alembic.ini
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Override sqlalchemy.url from the environment so alembic.ini never needs
+# a hardcoded connection string.
+db_url = os.getenv("DEVELOPMENT_DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+
+# Set up loggers from the ini file
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
+# Import the Flask app and db so that target_metadata reflects the real schema.
+# All models must be imported here (directly or transitively) so SQLAlchemy
+# registers them on db.metadata before autogenerate inspects it.
+from Api.app import createApp
+from Api.database import db
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Import every model so its table is registered on db.metadata
+from Models.user import User                          # noqa: F401
+from Models.trip import Trip                          # noqa: F401
+from Models.trip_member import TripMember             # noqa: F401
+from Models.itinerary import Itinerary                # noqa: F401
+from Models.day import Day                            # noqa: F401
+from Models.point import Point                        # noqa: F401
+from Models.inventory import Inventory                # noqa: F401
+from Models.item import Item                          # noqa: F401
+from Models.item_category import ItemCategory         # noqa: F401
+from Models.trip_requirement import TripRequirement   # noqa: F401
+from Models.log import Log                            # noqa: F401
+from Models.image import Image                        # noqa: F401
+from Models.sea import Sea                            # noqa: F401
+from Models.sea_state import SeaState                 # noqa: F401
+from Models.weather import Weather                    # noqa: F401
+from Models.weather_state import WeatherState         # noqa: F401
+
+flask_app = createApp("development")
+
+with flask_app.app_context():
+    target_metadata = db.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
+    """Run migrations in 'offline' mode (no live DB connection required).
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
+    Emits SQL to stdout rather than executing it against a live database.
+    Useful for generating SQL scripts for review or manual application.
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -64,6 +64,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
     )
 
     with context.begin_transaction():
@@ -71,12 +72,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
+    """Run migrations in 'online' mode (connects to the live database)."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -85,7 +81,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():
