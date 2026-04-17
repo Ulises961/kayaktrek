@@ -1,7 +1,7 @@
 from http import HTTPStatus
-from http.client import HTTPException
+from werkzeug.exceptions import HTTPException
 import logging
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from typing import List
 from flask import Blueprint, abort, jsonify, request
 from Models.point import Point

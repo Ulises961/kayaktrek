@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from http.client import HTTPException
+from werkzeug.exceptions import HTTPException
 import logging
 from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy.exc import IntegrityError

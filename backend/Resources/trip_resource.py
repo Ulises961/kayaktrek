@@ -1,7 +1,7 @@
 from http import HTTPStatus
 from werkzeug.exceptions import HTTPException
 import logging
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound
 from flask import Blueprint, abort, g, jsonify, request

@@ -2,7 +2,7 @@
 Point Service - Business logic for point operations.
 """
 import logging
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional, cast
 from uuid import UUID
 from camel_converter import dict_to_snake
