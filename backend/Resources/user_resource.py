@@ -34,13 +34,18 @@ def get(id:str):
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@user_api.route("/<string:id>/update", methods=["POST", "PUT"])
+@user_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 def update_user(id: str):
     """
-    UserResource POST/PUT method. Updates an existing user.
+    PATCH /api/user/<id> — Partially update an existing user profile.
 
-    :return: User, 200 HTTP status code.
+    Accepts a JSON body with any subset of mutable user fields (name, surname, phone, username).
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+    Credential fields (mail, password) are managed through the auth endpoints, not here.
+
+    Returns:
+        200 with the updated user object, or 404 if not found.
     """
 
     try:

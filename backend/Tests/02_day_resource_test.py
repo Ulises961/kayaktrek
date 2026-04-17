@@ -81,7 +81,7 @@ def test_insert_weather_to_day(client, auth_headers, test_itinerary_with_day):
         "id": day_id,
         "weather": weather
     }
-    response = client.post(f"{DAY_ENDPOINT}/{day_id}/update", json=day, headers=auth_headers)
+    response = client.patch(f"{DAY_ENDPOINT}/{day_id}", json=day, headers=auth_headers)
     assert response.status_code == HTTPStatus.OK
 
 
@@ -100,7 +100,7 @@ def test_insert_sea_to_day(client, auth_headers, test_itinerary_with_day):
         "itineraryId": itinerary_id,
         "sea": sea
     }
-    response = client.post(f"{DAY_ENDPOINT}/{day_id}/update", json=day, headers=auth_headers)
+    response = client.patch(f"{DAY_ENDPOINT}/{day_id}", json=day, headers=auth_headers)
     assert response.status_code == HTTPStatus.OK
 
 
@@ -131,7 +131,7 @@ def test_update_day(client, auth_headers, test_itinerary_with_day):
     day_date = date.fromisoformat('2020-12-31').strftime("%Y-%m-%d")
     sea = None
     updated_day = {'id': day_id, 'date': day_date, 'itinerary_id': itinerary_id, 'dayNumber': 1, 'sea': sea} 
-    response = client.post(f"{DAY_ENDPOINT}/{day_id}/update", json=updated_day, headers=auth_headers)
+    response = client.patch(f"{DAY_ENDPOINT}/{day_id}", json=updated_day, headers=auth_headers)
     json_data = json.loads(response.data)
     print("json data ",json_data)
     assert json_data['sea'] == sea

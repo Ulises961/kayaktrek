@@ -49,11 +49,20 @@ def create_item():
         logger.error(f"Error creating item: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@item_api.route("/<string:id>/update", methods=["POST"])
+@item_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('item')
 def update_item(id: str):
-    """POST /api/item/<id>/update - Update existing item"""
+    """
+    PATCH /api/item/<id> — Partially update an existing item.
+
+    Accepts a JSON body with any subset of mutable item fields: name, checked, categoryId.
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+    Ownership fields (userId) are never overwritten by this endpoint.
+
+    Returns:
+        200 with the updated item object, or 404 if not found.
+    """
     try:
         logger.info(f"Update item {id} in db")
         item_data = request.get_json()

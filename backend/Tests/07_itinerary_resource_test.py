@@ -19,7 +19,7 @@ def test_update_itinerary(client, auth_headers, itinerary):
 
     itinerary = {**itinerary, "days": days, }
 
-    response = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/update", headers=auth_headers, json=itinerary)
+    response = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers, json=itinerary)
     updated_itinerary = json.loads(response.data)
 
     assert response.status_code == 200
@@ -38,7 +38,7 @@ def test_get_itinerary_by_id(client, auth_headers, itinerary):
 def test_remove_days_from_itinerary(client, auth_headers, itinerary):
     update_data = {"days": [], "tripId": itinerary["tripId"]}
 
-    response = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/update", headers=auth_headers, json=update_data)
+    response = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers, json=update_data)
     updated_itinerary = json.loads(response.data)
 
     assert len(updated_itinerary['days']) == 0

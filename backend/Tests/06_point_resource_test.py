@@ -57,8 +57,8 @@ def test_update_point(client, points, auth_headers):
     point_id = point["id"]
     point = {**point, "type": "stop"}
 
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point_id}/update", headers=auth_headers, json=point
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=point
     )
     assert response.status_code == 200
     assert json.loads(response.data)["type"] == "stop"
@@ -68,8 +68,8 @@ def test_link_points(client, points, auth_headers):
     [point, point_2, _, _] = points
     point["next"] = point_2
 
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point['id']}/update", headers=auth_headers, json=point
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers, json=point
     )
 
     assert json.loads(response.data) == {

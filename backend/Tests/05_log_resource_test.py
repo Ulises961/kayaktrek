@@ -59,7 +59,7 @@ def test_update_log(client, auth_headers, test_log):
     log_id = test_log['id']
     updated_data = {"hours": 15, "avgSea": 8}
     
-    response = client.post(f"{LOG_ENDPOINT}/{log_id}/update", headers=auth_headers, json=updated_data)
+    response = client.patch(f"{LOG_ENDPOINT}/{log_id}", headers=auth_headers, json=updated_data)
     assert response.status_code == 200
     
     data = json.loads(response.data)

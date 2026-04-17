@@ -70,11 +70,19 @@ def create_day():
         logger.error(f"Error creating day: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@day_api.route("/<string:id>/update", methods=['POST'])
+@day_api.route("/<string:id>", methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('day')
 def update_day(id: str):
-    """POST /api/day/update - Update existing day"""
+    """
+    PATCH /api/day/<id> — Partially update an existing day.
+
+    Accepts a JSON body with any subset of day fields (dayNumber, date, points).
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+
+    Returns:
+        200 with the updated day object, or 404 if not found.
+    """
     try:
         day_data = request.get_json()
         updated_day = DayService.update_day(id, day_data)

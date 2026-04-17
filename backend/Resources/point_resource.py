@@ -73,15 +73,20 @@ def create_point():
             db.session.rollback()
             abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@point_api.route("/<string:id>/update", methods=["POST"])
+@point_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("point")
 def update_point(id: str):
     """
-    PointResource PUT method. Updates an existing point.
-    
+    PATCH /api/point/<id> — Partially update an existing point.
+
+    Accepts a JSON body with any subset of mutable point fields
+    (name, latitude, longitude, type, etc.).
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+    The geo column is kept in sync with any updated latitude/longitude values.
+
     Returns:
-        JSON response with updated point and 200 status code
+        200 with the updated point object, or 404 if not found.
     """
     try:
         point_data = request.get_json()

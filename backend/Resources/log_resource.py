@@ -72,10 +72,20 @@ def post():
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@log_api.route("/<string:id>/update", methods=["POST"])
+@log_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
 def update_log(id: str):
+    """
+    PATCH /api/log/<id> — Partially update an existing paddling log.
+
+    Accepts a JSON body with any subset of mutable log fields.
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+    Authorship fields (userId) are never overwritten by this endpoint.
+
+    Returns:
+        200 with the updated log object, or 404 if not found.
+    """
     try:
         updated_log = LogService.update_log(id, request.get_json())
 

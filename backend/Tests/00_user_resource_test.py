@@ -19,7 +19,7 @@ def test_user_update_name(client, auth_headers, id):
     id = str(user["id"])
     user["name"] = "Updated Name"
     
-    response = client.post(f"{USER_ENDPOINT}/{id}/update", json=user, headers=auth_headers)
+    response = client.patch(f"{USER_ENDPOINT}/{id}", json=user, headers=auth_headers)
     assert response.status_code == 200
     assert json.loads(response.data)['id'] == id
     assert json.loads(response.data)['name'] == "Updated Name"
@@ -38,7 +38,7 @@ def test_update_user(client, auth_headers, id):
         'phone': originalUser['phone'],
         'pwd': 'testPassword6$'  # Include password to avoid NOT NULL constraint
     } 
-    response = client.post(f"{USER_ENDPOINT}/{id}/update", json=updatedUser, headers=auth_headers)
+    response = client.patch(f"{USER_ENDPOINT}/{id}", json=updatedUser, headers=auth_headers)
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data['name'] == "Ulises"

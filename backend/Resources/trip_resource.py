@@ -134,14 +134,19 @@ def transition_state(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@trip_api.route("/<string:id>/update", methods=["POST"])
+@trip_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
-def put(id: str):
+def update_trip(id: str):
     """
-    TripResource PUT method. Updates an existing trip.
+    PATCH /api/trip/<id> — Partially update an existing trip.
+
+    Accepts a JSON body with any subset of mutable trip fields
+    (destination, description, dateFrom, dateTo).
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+    State transitions must go through POST /api/trip/<id>/state instead.
 
     Returns:
-        JSON response with updated trip and 200 status code
+        200 with the updated trip object, or 404 if not found.
     """
     try:
         logger.info(f"Update trip {request.get_json()} in db")

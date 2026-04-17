@@ -41,8 +41,8 @@ def test_update_inventory(client, auth_headers, empty_inventory):
     """Test updating an inventory (no-op: re-submit same id)."""
     inventory_id = empty_inventory['id']
 
-    response = client.post(
-        f"{INVENTORY_ENDPOINT}/{inventory_id}/update",
+    response = client.patch(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}",
         headers=auth_headers,
         json={"id": inventory_id},
     )

@@ -66,11 +66,19 @@ def create_inventory():
         logger.error(f"Error creating inventory: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@inventory_api.route("/<string:id>/update", methods=["POST"])
+@inventory_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def update_inventory(id: str):
-    """POST /api/inventory/<id>/update - Update existing inventory"""
+    """
+    PATCH /api/inventory/<id> — Partially update an existing inventory.
+
+    Accepts a JSON body with any subset of mutable inventory fields.
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+
+    Returns:
+        200 with the updated inventory object, or 404 if not found.
+    """
     try:
         logger.info(f"Update inventory {id} in db")
         inventory_data = request.get_json()

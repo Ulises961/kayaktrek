@@ -68,11 +68,19 @@ def create_itinerary():
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
-@itinerary_api.route("/<string:id>/update", methods=["POST"])
+@itinerary_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
 def update_itinerary(id: str):
-    """POST /api/itinerary/<id>/update - Update existing itinerary"""
+    """
+    PATCH /api/itinerary/<id> — Partially update an existing itinerary.
+
+    Accepts a JSON body with any subset of mutable itinerary fields (isPublic, totalMiles).
+    Only the fields present in the body are applied; omitted fields are left unchanged.
+
+    Returns:
+        200 with the updated itinerary object, or 404 if not found.
+    """
     try:        
         itinerary_data = request.get_json()
         updated_itinerary = ItineraryService.update_itinerary(id, itinerary_data)

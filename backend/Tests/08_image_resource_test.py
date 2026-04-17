@@ -25,8 +25,8 @@ def test_add_profile_picture_to_user(client, auth_headers, id):
         }
     }
     
-    response = client.post(
-        f"{USER_ENDPOINT}/{id}/update",
+    response = client.patch(
+        f"{USER_ENDPOINT}/{id}",
         headers=auth_headers,
         json=user_data
     )
@@ -49,7 +49,7 @@ def test_update_user_profile_picture(client, auth_headers, id):
             "location": "/public/images/user/1/profile_pictures"
         }
     }
-    client.post(f"{USER_ENDPOINT}/{id}/update", headers=auth_headers, json=user_data)
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
     
     # Now update it
     updated_data = {
@@ -60,8 +60,8 @@ def test_update_user_profile_picture(client, auth_headers, id):
         }
     }
     
-    response = client.post(
-        f"{USER_ENDPOINT}/{id}/update",
+    response = client.patch(
+        f"{USER_ENDPOINT}/{id}",
         headers=auth_headers,
         json=updated_data
     )
@@ -82,7 +82,7 @@ def test_get_user_with_profile_picture(client, auth_headers, id):
             "location": "/public/images/user/1/profile_pictures"
         }
     }
-    client.post(f"{USER_ENDPOINT}/{id}/update", headers=auth_headers, json=user_data)
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
     
     # Retrieve the user
     response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
@@ -104,13 +104,13 @@ def test_remove_user_profile_picture(client, auth_headers, id):
             "location": "/public/images/user/1/profile_pictures"
         }
     }
-    client.post(f"{USER_ENDPOINT}/{id}/update", headers=auth_headers, json=user_data)
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
     
     # Remove it by setting to None
     updated_data = {"image": None}
     
-    response = client.post(
-        f"{USER_ENDPOINT}/{id}/update",
+    response = client.patch(
+        f"{USER_ENDPOINT}/{id}",
         headers=auth_headers,
         json=updated_data
     )
@@ -166,8 +166,8 @@ def test_add_single_image_to_point(client, auth_headers, point_with_day, itinera
         ]
     }
     
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point_id}/update",
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point_id}",
         headers=auth_headers,
         json=update_data
     )
@@ -203,8 +203,8 @@ def test_add_multiple_images_to_point(client, auth_headers, point_with_day, itin
         ]
     }
     
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point_id}/update",
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point_id}",
         headers=auth_headers,
         json=update_data
     )
@@ -232,7 +232,7 @@ def test_update_point_images(client, auth_headers, point_with_day, itinerary):
             }
         ]
     }
-    client.post(f"{POINT_ENDPOINT}/{point_id}/update", headers=auth_headers, json=initial_data)
+    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=initial_data)
     
     # Update with new images
     updated_data = {
@@ -250,8 +250,8 @@ def test_update_point_images(client, auth_headers, point_with_day, itinerary):
         ]
     }
     
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point_id}/update",
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point_id}",
         headers=auth_headers,
         json=updated_data
     )
@@ -279,7 +279,7 @@ def test_get_point_with_images(client, auth_headers, point_with_day, itinerary):
             }
         ]
     }
-    client.post(f"{POINT_ENDPOINT}/{point_id}/update", headers=auth_headers, json=update_data)
+    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=update_data)
     
     # Retrieve the point
     response = client.get(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
@@ -305,15 +305,15 @@ def test_remove_all_images_from_point(client, auth_headers, point_with_day, itin
             }
         ]
     }
-    client.post(f"{POINT_ENDPOINT}/{point_id}/update", headers=auth_headers, json=initial_data)
+    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=initial_data)
     
     # Remove all images
     updated_data = {
         "images": []
     }
     
-    response = client.post(
-        f"{POINT_ENDPOINT}/{point_id}/update",
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point_id}",
         headers=auth_headers,
         json=updated_data
     )
