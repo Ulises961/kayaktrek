@@ -5,14 +5,16 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional, cast
 from uuid import UUID
-from camel_converter import dict_to_snake
 from geoalchemy2.functions import ST_DWithin, ST_Distance
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
 from Models.day import Day
 from Models.itinerary import Itinerary
+from Models.image import Image
 from Models.point import Point, PointType
+from Schemas.base_schema import camelcase
+from Schemas.image_schema import ImageSchema
 from Schemas.point_schema import PointSchema
 from Api.database import db
 
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class PointService:
     """Service class for Point-related business logic."""
+    _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "notes"})
     
     @staticmethod
     def get_point_by_id(point_id: str) -> Optional[Point]:
@@ -128,50 +131,38 @@ class PointService:
             raise NoResultFound(f"Point {point_id} not found")
         
         logger.info(f"Updating point {point_id}")
-        
-        point_data = dict_to_snake(point_data)
-        # Update scalar fields if provided
-        if 'type' in point_data:
-            from Models.point import PointType
-            # Convert string to enum if needed
-            if isinstance(point_data['type'], str):
-                existing_point.type = PointType(point_data['type'])
-            else:
-                existing_point.type = point_data['type']
-        if 'latitude' in point_data:
-            existing_point.latitude = point_data['latitude']
-        if 'longitude' in point_data:
-            existing_point.longitude = point_data['longitude']
-        if 'latitude' in point_data and 'longitude' in point_data:
+
+        coords_changed = False
+        for field in PointService._MUTABLE_FIELDS:
+            key = camelcase(field)
+            if key in point_data:
+                value = point_data[key]
+                if field == "type" and isinstance(value, str):
+                    value = PointType(value)
+                setattr(existing_point, field, value)
+                if field in ("latitude", "longitude"):
+                    coords_changed = True
+
+        if coords_changed:
             PointService._sync_geo(existing_point)
-        if 'notes' in point_data:
-            existing_point.notes = point_data['notes']
-        if 'day_id' in point_data:
-            existing_point.day_id = UUID(point_data['day_id'])
-        if 'next_id' in point_data:
-            existing_point.next_id = UUID(point_data['next_id'])
-        if 'next' in point_data:
-            # Handle nested next point object
-            if point_data['next'] is None:
+
+        # next_id: route ordering — patchable directly; day_id is not (security)
+        if 'nextId' in point_data:
+            existing_point.next_id = UUID(point_data['nextId']) if point_data['nextId'] else None
+        elif 'next' in point_data:
+            next_val = point_data['next']
+            if next_val is None:
                 existing_point.next_id = None
-            elif isinstance(point_data['next'], dict):
-                existing_point.next_id = UUID(point_data['next'].get('id'))
+            elif isinstance(next_val, dict):
+                existing_point.next_id = UUID(next_val['id'])
             else:
-                existing_point.next_id = UUID(point_data['next'])
-            
-        # Handle images relationship
+                existing_point.next_id = UUID(next_val)
+
+        # Handle images relationship — nullable sub-collection
         if 'images' in point_data:
-            from Models.image import Image
-            from Schemas.image_schema import ImageSchema
-            
-            # Clear existing images
-            existing_point.images = []
-            
-            # Add new images
-            if point_data['images']:
-                for image_data in point_data['images']:
-                    image = cast(Image, ImageSchema().load(image_data))
-                    existing_point.images.append(image)
+            existing_point.images = [
+                cast(Image, ImageSchema().load(img)) for img in (point_data['images'] or [])
+            ]
         
         db.session.commit()
         db.session.refresh(existing_point)      

@@ -12,10 +12,13 @@ from sqlalchemy.exc import NoResultFound, IntegrityError
 from datetime import date, time
 import logging
 
+from Schemas.base_schema import camelcase
+
 logger = logging.getLogger(__name__)
 
 
 class DayService:
+    _MUTABLE_FIELDS = frozenset({"day_number", "date"})
     @staticmethod
     def get_day_by_id(day_id: str) -> Day:
         """
@@ -152,26 +155,22 @@ class DayService:
         if not existing_day:
             raise NoResultFound(f"Day with id {day_id} not found")
         
-        # Convert manually to snake
-        day_data = dict_to_snake(day_data)
-
         # Check if nested objects are present in the request (even if None)
         has_weather_key = "weather" in day_data
         has_sea_key = "sea" in day_data
 
-        # Extract nested objects
-        weather_data = day_data.pop("weather", None) if has_weather_key else None
-        sea_data = day_data.pop("sea", None) if has_sea_key else None
+        # Extract and convert nested sub-objects; helpers expect snake_case keys
+        weather_data = dict_to_snake(day_data["weather"]) if day_data.get("weather") else None
+        sea_data = dict_to_snake(day_data["sea"]) if day_data.get("sea") else None
 
-        # Update simple fields directly from day_data (skip id)
-        for key, value in day_data.items():
-            if key == "id" or key == "itinerary_id":
-                continue
-            if hasattr(existing_day, key):
-                # Convert date string to date object if needed
-                if key == "date" and isinstance(value, str):
+        # Update only whitelisted scalar fields
+        for field in DayService._MUTABLE_FIELDS:
+            key = camelcase(field)
+            if key in day_data:
+                value = day_data[key]
+                if field == "date" and isinstance(value, str):
                     value = date.fromisoformat(value)
-                setattr(existing_day, key, value)
+                setattr(existing_day, field, value)
 
         # Handle weather update/creation
         if has_weather_key:

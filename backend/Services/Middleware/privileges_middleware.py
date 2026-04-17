@@ -219,6 +219,8 @@ def check_resource_ownership(resource_type: str, resource_id: str) -> Optional[b
             logger.error(f"Unknown resource type: {resource_type}")
             return False
 
+    except ValueError:
+        abort(HTTPStatus.BAD_REQUEST, description="Invalid resource ID format")
     except NoResultFound:
         return None  # resource doesn't exist — let the endpoint return 404
     except Exception as e:
@@ -300,7 +302,7 @@ def _check_day_ownership(user_id: str, day_id: str) -> Optional[bool]:
 def _check_sea_ownership(user_id: str, sea_id: str) -> Optional[bool]:
     """Check if user owns the sea through day/itinerary/trip ownership."""
     # First check if sea exists
-    sea = db.session.query(Sea).filter_by(id=sea_id).first()
+    sea = db.session.query(Sea).filter_by(id=UUID(sea_id)).first()
     if not sea:
         return None  # Sea doesn't exist
 
@@ -310,7 +312,7 @@ def _check_sea_ownership(user_id: str, sea_id: str) -> Optional[bool]:
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
         .join(TripMember, Trip.id == TripMember.trip_id)
-        .filter(Sea.day_id == sea_id, TripMember.user_id == UUID(user_id))
+        .filter(Sea.day_id == UUID(sea_id), TripMember.user_id == UUID(user_id))
         .first()
     )
 
@@ -320,7 +322,7 @@ def _check_sea_ownership(user_id: str, sea_id: str) -> Optional[bool]:
 def _check_weather_ownership(user_id: str, weather_id: str) -> Optional[bool]:
     """Check if user owns the weather through day/itinerary/trip ownership."""
     # First check if weather exists
-    weather = db.session.query(Weather).filter_by(id=weather_id).first()
+    weather = db.session.query(Weather).filter_by(id=UUID(weather_id)).first()
     if not weather:
         return None  # Weather doesn't exist
 
@@ -330,7 +332,7 @@ def _check_weather_ownership(user_id: str, weather_id: str) -> Optional[bool]:
         .join(Itinerary, Day.itinerary_id == Itinerary.id)
         .join(Trip, Itinerary.trip_id == Trip.id)
         .join(TripMember, Trip.id == TripMember.trip_id)
-        .filter(Weather.day_id == weather_id, TripMember.user_id == UUID(user_id))
+        .filter(Weather.day_id == UUID(weather_id), TripMember.user_id == UUID(user_id))
         .first()
     )
 

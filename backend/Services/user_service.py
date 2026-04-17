@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, cast
 from uuid import UUID
 
-from camel_converter import dict_to_snake
 from Models.image import Image
 from Models.user import User
 from Api.database import db
@@ -9,11 +8,13 @@ from sqlalchemy.exc import NoResultFound, IntegrityError
 from flask_bcrypt import generate_password_hash
 import logging
 
+from Schemas.base_schema import camelcase
 from Schemas.image_schema import ImageSchema
 
 logger = logging.getLogger(__name__)
 
 class UserService:
+    _MUTABLE_FIELDS = frozenset({"username", "name", "surname", "phone"})
 
     @staticmethod
     def get_user_by_id(id: str) -> User:
@@ -44,30 +45,21 @@ class UserService:
         if not saved_user:
             raise NoResultFound(f"User with id {id} not found in db")
         
-        user_data = dict_to_snake(user_data)
-        
         try:
-            # Update fields directly on the existing user object
-            if 'mail' in user_data:
-                saved_user.mail = user_data['mail']
-            if 'name' in user_data:
-                saved_user.name = user_data['name']
-            if 'surname' in user_data:
-                saved_user.surname = user_data['surname']
-            if 'phone' in user_data:
-                saved_user.phone = user_data['phone']
-            if 'username' in user_data:
-                saved_user.username = user_data['username']
+            for field in UserService._MUTABLE_FIELDS:
+                key = camelcase(field)
+                if key in user_data:
+                    setattr(saved_user, field, user_data[key])
+
+            # Password requires explicit hashing — not a standard setattr field
             if 'pwd' in user_data:
                 saved_user.pwd = generate_password_hash(user_data['pwd']).decode("UTF-8")
-            if 'admin' in user_data:
-                saved_user.admin = user_data['admin']
+
+            # Profile image is a nullable sub-object
             if 'image' in user_data:
-                if image:= user_data.get("image", None) is None:
-                    saved_user.image = None
-                else:
-                    image = cast(Image, ImageSchema().load(user_data['image']))
-                    saved_user.image = image
+                image_data = user_data.get('image')
+                saved_user.image = cast(Image, ImageSchema().load(image_data)) if image_data else None
+
             db.session.commit()
             
             # Refresh to get latest state from database

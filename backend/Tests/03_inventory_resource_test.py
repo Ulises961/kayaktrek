@@ -69,9 +69,9 @@ def test_delete_inventory(client, auth_headers):
 
 
 def test_get_nonexistent_inventory(client, auth_headers):
-    """Test that an invalid UUID returns 403 (ownership check short-circuits)."""
+    """Test that a malformed UUID returns 400."""
     response = client.get(f"{INVENTORY_ENDPOINT}/99999", headers=auth_headers)
-    assert response.status_code == 403
+    assert response.status_code == 400
 
 
 def test_inventory_requires_auth(client):

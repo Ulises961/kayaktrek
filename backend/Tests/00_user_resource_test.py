@@ -27,23 +27,21 @@ def test_user_update_name(client, auth_headers, id):
 def test_update_user(client, auth_headers, id):
     response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
     originalUser = json.loads(response.data)
-    
-    # Include the password in the update payload
+
+    # mail is not patchable via this endpoint — it requires a dedicated flow
     updatedUser = {
-        'id': id,
-        'mail': "ulises.sosa@gmail.com",
         'name': 'Ulises',
         'surname': 'Sosa',
         'username': originalUser['username'],
         'phone': originalUser['phone'],
-        'pwd': 'testPassword6$'  # Include password to avoid NOT NULL constraint
-    } 
+        'pwd': 'testPassword6$',
+    }
     response = client.patch(f"{USER_ENDPOINT}/{id}", json=updatedUser, headers=auth_headers)
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data['name'] == "Ulises"
     assert data['surname'] == "Sosa"
-    assert data['mail'] == "ulises.sosa@gmail.com"
+    assert data['mail'] == originalUser['mail']  # mail unchanged
     assert data['id'] == originalUser["id"]
 
 def test_delete_user(client, auth_headers, id_2):

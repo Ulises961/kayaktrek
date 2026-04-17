@@ -9,13 +9,17 @@ from sqlalchemy.orm import selectinload
 from Models.user_has_itinerary import user_has_itinerary
 from Models.itinerary import Itinerary
 from Models.user import User
+from Schemas.base_schema import camelcase
 from Schemas.itinerary_shema import ItinerarySchema
+from Schemas.day_schema import DaySchema
 from Api.database import db
+from backend.Models.day import Day
 
 logger = logging.getLogger(__name__)
 
 
 class ItineraryService:
+    _MUTABLE_FIELDS = frozenset({"is_public", "total_miles", "expected_total_miles"})
     """Service class for Itinerary-related business logic."""
 
     @staticmethod
@@ -107,26 +111,22 @@ class ItineraryService:
         logger.info(f"Updating itinerary {id}")
 
         try:
-            # Load and validate the new data (schema will resolve id to db id)
-            updated_itinerary = cast(Itinerary, ItinerarySchema().load(itinerary_data))
+            for field in ItineraryService._MUTABLE_FIELDS:
+                key = camelcase(field)
+                if key in itinerary_data:
+                    setattr(existing_itinerary, field, itinerary_data[key])
 
-            # Update scalar fields
-            existing_itinerary.is_public = updated_itinerary.is_public
-            existing_itinerary.total_miles = updated_itinerary.total_miles
-            existing_itinerary.expected_total_miles = updated_itinerary.expected_total_miles
-            
-            # Delete old days and expunge them from session to avoid conflicts
-            for day in list(existing_itinerary.days):
-                db.session.delete(day)
-            db.session.flush()
-            
-           # Add new days
-            logger.info(f"Adding {len(updated_itinerary.days)} new days")
-            for day in updated_itinerary.days:
-                logger.info(f"Adding day {day.day_number} with date {day.date}")
-                day.itinerary_id = existing_itinerary.id
-                existing_itinerary.days.append(day)
-            
+            if "days" in itinerary_data:
+                for day in list(existing_itinerary.days):
+                    db.session.delete(day)
+                db.session.flush()
+
+                for day_data in (itinerary_data["days"] or []):
+                    day = cast(Day, DaySchema().load(day_data))
+                    day.itinerary_id = existing_itinerary.id
+                    existing_itinerary.days.append(day)
+                logger.info(f"Replaced days: {len(itinerary_data['days'] or [])} new days")
+
             db.session.commit()
             db.session.refresh(existing_itinerary)
 
