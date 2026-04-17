@@ -57,7 +57,7 @@ def createApp(config_mode:str):
         seed_item_categories()
 
     migrate = Migrate()
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, directory='alembic')
 
     # Configure logging
     setup_logging(app)
@@ -72,7 +72,9 @@ def createApp(config_mode:str):
     return app
 
 
+# Module-level app instance for Flask CLI (flask db migrate, flask run, etc.)
+load_dotenv()
+app = createApp(os.getenv("CONFIG_MODE", "development"))
+
 if __name__ == "__main__":
-    load_dotenv()
-    app = createApp(os.getenv("CONFIG_MODE", "development"))
     app.run(host=os.environ['FLASK_HOST'])

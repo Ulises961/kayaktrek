@@ -18,8 +18,9 @@ db_url = os.getenv("DEVELOPMENT_DATABASE_URL")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
-# Set up loggers from the ini file
-if config.config_file_name is not None:
+# Set up loggers from the ini file (only when the file actually exists —
+# Flask-Migrate sets config_file_name to a path that may not resolve)
+if config.config_file_name is not None and os.path.exists(config.config_file_name):
     fileConfig(config.config_file_name)
 
 # Import the Flask app and db so that target_metadata reflects the real schema.
@@ -51,6 +52,16 @@ flask_app = createApp("development")
 with flask_app.app_context():
     target_metadata = db.metadata
 
+# PostGIS and other extension-owned tables that Alembic must never touch.
+EXCLUDE_TABLES = {"spatial_ref_sys", "geometry_columns", "geography_columns", "raster_columns", "raster_overviews"}
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    """Filter out extension-owned tables from autogenerate comparison."""
+    if type_ == "table" and name in EXCLUDE_TABLES:
+        return False
+    return True
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode (no live DB connection required).
@@ -65,6 +76,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -84,6 +96,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            include_object=include_object,
         )
 
         with context.begin_transaction():
