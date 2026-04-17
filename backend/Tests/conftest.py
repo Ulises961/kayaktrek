@@ -4,10 +4,12 @@ import pytest
 from sqlalchemy.exc import NoResultFound
 
 from Models.user import User
+from Models.item_category import ItemCategory
 from Models.trip_member import MemberRoleType
 from Schemas.trip_member_schema import TripMemberSchema
 from uuid import UUID
 from Resources.inventory_resource import INVENTORY_ENDPOINT
+from Resources.item_category_resource import ITEM_CATEGORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
@@ -25,9 +27,6 @@ def app(request):
     ctx = app.app_context()
     ctx.push()
 
-    # Drop any leftover state from a previous killed session, then rebuild
-    _db.drop_all()
-    _db.create_all()
     
     def teardown():
         _db.session.remove()   # close/rollback open session and release any held locks
@@ -147,8 +146,19 @@ def outsider_headers(app, client):
             _db.session.delete(user)
             _db.session.commit()
 
+@pytest.fixture(scope="session")
+def category_ids(app):
+    """Return a slug→id mapping for all seeded item categories.
+
+    The app fixture already pushed an application context, so we query directly
+    without creating a nested context (which would open a separate session).
+    """
+    rows = _db.session.query(ItemCategory.slug, ItemCategory.id).all()
+    return {slug: str(cat_id) for slug, cat_id in rows}
+
+
 @pytest.fixture(scope="function")
-def inventory_with_items(client, auth_headers, id):
+def inventory_with_items(client, auth_headers, id, category_ids):
     """Create a personal inventory with two items for testing.
 
     Yields a dict:
@@ -164,8 +174,8 @@ def inventory_with_items(client, auth_headers, id):
 
     items = []
     for payload in [
-        {"inventoryId": inventory_id, "category": "travel", "name": "compass"},
-        {"inventoryId": inventory_id, "category": "firstAid", "name": "scissors"},
+        {"inventoryId": inventory_id, "categoryId": category_ids["travel"], "name": "compass"},
+        {"inventoryId": inventory_id, "categoryId": category_ids["first_aid"], "name": "scissors"},
     ]:
         r = client.post(f"{ITEM_ENDPOINT}/create", headers=auth_headers, json=payload)
         assert r.status_code == 201

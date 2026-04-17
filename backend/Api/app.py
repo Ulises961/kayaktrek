@@ -18,6 +18,7 @@ from Resources.point_resource import point_api
 
 from Resources.inventory_resource import inventory_api
 from Resources.item_resource import item_api
+from Resources.item_category_resource import item_category_api
 
 from Resources.log_resource import log_api
 
@@ -27,9 +28,9 @@ from Services.Utils.json_encoder import CustomJSONProvider
 
 def createApp(config_mode:str):
     """
-    Creates and configurates the Flask app, the logger to be used throughout  the application 
+    Creates and configurates the Flask app, the logger to be used throughout  the application
     and the database to use. Returns the configured app that is to be used in the main function.
-    
+
     Params:
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
     """
@@ -41,22 +42,25 @@ def createApp(config_mode:str):
     app.register_blueprint(day_api)
     app.register_blueprint(inventory_api)
     app.register_blueprint(item_api)
+    app.register_blueprint(item_category_api)
     app.register_blueprint(itinerary_api)
     app.register_blueprint(log_api)
     app.register_blueprint(trip_api)
     app.register_blueprint(point_api)
     app.register_blueprint(user_api)
-    
+
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        from Api.seed import seed_item_categories
+        seed_item_categories()
 
     migrate = Migrate()
-    migrate.init_app(app,db)
+    migrate.init_app(app, db)
 
     # Configure logging
     setup_logging(app)
-    
+
     # Register error handlers
     register_error_handlers(app)
 

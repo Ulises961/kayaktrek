@@ -4,14 +4,17 @@ Item Service - Business logic for item operations.
 import logging
 from typing import cast
 from uuid import UUID
-from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 
 from Models.item import Item
 from Schemas.item_schema import ItemSchema
 from Api.database import db
+from Schemas.base_schema import camelcase
 
 logger = logging.getLogger(__name__)
+
+# Fields a client is permitted to change on an existing item.
+_MUTABLE_FIELDS = {"name", "checked", "category_id"}
 
 
 class ItemService:
@@ -57,7 +60,6 @@ class ItemService:
         item = cast(Item, ItemSchema().load(item_data))
         db.session.add(item)
         db.session.commit()
-
         db.session.refresh(item)
         logger.info(f"Item {item.id} created successfully")
         return item
@@ -67,36 +69,33 @@ class ItemService:
         """
         Update an existing item.
 
+        Only fields in _MUTABLE_FIELDS are applied — ownership (user_id) and
+        identity (id) fields are never overwritten by an update path.
+
         Args:
             item_id: The ID of the item to update
-            item_data: Dictionary containing item information
+            item_data: Dictionary containing fields to update
 
         Returns:
             Updated Item object
 
         Raises:
-            ValidationError: If data is invalid
             NoResultFound: If item doesn't exist
             IntegrityError: If database constraints are violated
         """
-        # Verify item exists
-        existing_item = ItemService.get_item_by_id(item_id)
-        if not existing_item:
-            raise NoResultFound(f"Item with id {item_id} not found")
-        
+        item = ItemService.get_item_by_id(item_id)
+
         logger.info(f"Updating item {item_id}")
-        user_id = g.current_user_id
-        item_data.setdefault("user_id", user_id)
-        updated_item = cast(Item, ItemSchema().load(item_data))
+        for field in _MUTABLE_FIELDS:
+            key = camelcase(field)
+            if key in item_data:
+                setattr(item, field, item_data[key])
 
         try:
-            merged_item = db.session.merge(updated_item)
             db.session.commit()
-            db.session.refresh(merged_item)
-
+            db.session.refresh(item)
             logger.info(f"Item {item_id} updated successfully")
-            return merged_item
-
+            return item
         except IntegrityError as e:
             db.session.rollback()
             logger.error(f"Integrity error updating item {item_id}: {e}")
@@ -115,18 +114,16 @@ class ItemService:
             IntegrityError: If item has references that prevent deletion
         """
         item = ItemService.get_item_by_id(item_id)
-
         try:
             logger.info(f"Deleting item {item_id}")
             db.session.delete(item)
             db.session.commit()
             logger.info(f"Item {item_id} deleted successfully")
-
         except IntegrityError as e:
             db.session.rollback()
             logger.error(f"Integrity error deleting item {item_id}: {e}")
             raise IntegrityError(
                 f"Cannot delete item {item_id} due to existing references",
                 params=None,
-                orig=e
+                orig=e,
             )
