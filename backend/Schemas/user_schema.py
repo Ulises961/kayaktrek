@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, post_load, post_dump, validates, ValidationError, pre_load
 from Models.user import User
-from Schemas.base_schema import BaseSchema
+from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
 from Schemas.image_schema import ImageSchema
 import re
@@ -25,6 +25,13 @@ class UserSchema(BaseSchema):
     logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
     image = fields.Nested(ImageSchema, allow_none=True, dump_only=True)
     admin = fields.Bool(dump_only=True)
+
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        for key in ('name', 'surname'):
+            if key in data and data[key] is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+        return data
 
     @validates('username')
     def validate_username(self, value, **kwargs):
@@ -106,3 +113,23 @@ class UserSchema(BaseSchema):
     @post_load
     def make_user(self, data, **kwargs):
         return User(**data)
+
+
+class UserUpdateSchema(UserSchema):
+    """
+    Schema for PATCH /api/user/<id>.
+
+    All fields are optional — only present fields are validated.
+    mail is excluded: email changes require a dedicated verification flow.
+    pwd is accepted and validated here; the service handles hashing.
+    """
+    mail = fields.Email(dump_only=True)       # excluded from load input
+    pwd = fields.String(load_only=True, validate=lambda x: len(x) >= 8)
+    phone = fields.String(validate=lambda x: len(x) <= 20)
+    username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
+    name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
+    surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
+
+    @post_load
+    def make_user(self, data, **kwargs):
+        return {camelcase(k): v for k, v in data.items()}  # camelCase dict for the service

@@ -11,16 +11,16 @@ from Models.itinerary import Itinerary
 from Models.user import User
 from Schemas.base_schema import camelcase
 from Schemas.itinerary_shema import ItinerarySchema
+from Models.day import Day
 from Schemas.day_schema import DaySchema
 from Api.database import db
-from backend.Models.day import Day
 
 logger = logging.getLogger(__name__)
 
 
 class ItineraryService:
-    _MUTABLE_FIELDS = frozenset({"is_public", "total_miles", "expected_total_miles"})
     """Service class for Itinerary-related business logic."""
+    _MUTABLE_FIELDS = frozenset({"is_public", "total_miles", "expected_total_miles"})
 
     @staticmethod
     def get_itinerary_by_id(itinerary_id: str) -> Itinerary:

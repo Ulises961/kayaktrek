@@ -1,9 +1,10 @@
-from marshmallow import fields, post_load, validates, ValidationError
+from marshmallow import fields, post_load, pre_load, validates, ValidationError
 from Models.trip import Trip, TripStateType
-from Schemas.base_schema import BaseSchema
+from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_member_schema import TripMemberSchema
+import bleach
 import uuid
 
 
@@ -34,7 +35,43 @@ class TripSchema(BaseSchema):
     date_from = fields.Date(allow_none=True)
     date_to = fields.Date(allow_none=True)
 
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        for key in ('destination', 'description'):
+            if key in data and data[key] is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+        return data
+
+    @validates('destination')
+    def validate_destination(self, value, **kwargs):
+        if value is not None and len(value) > 255:
+            raise ValidationError("Destination cannot exceed 255 characters")
+
+    @validates('description')
+    def validate_description(self, value, **kwargs):
+        if value is not None and len(value) > 2000:
+            raise ValidationError("Description cannot exceed 2000 characters")
+
     @post_load
     def make_trip(self, data, **kwargs):
         return Trip(**data)
+
+
+class TripUpdateSchema(TripSchema):
+    """
+    Schema for PATCH /api/trip/<id>.
+    Validates scalar mutable fields only (destination, description, date_from, date_to).
+    Nested objects (inventory, itinerary, travellers) are excluded from load;
+    the resource handler merges validated scalars with the raw request.
+    state excluded — use POST /api/trip/<id>/state.
+    Returns a camelCase dict for the service layer.
+    """
+    state = fields.Enum(TripStateType, dump_only=True)
+    inventory = fields.Nested('InventorySchema', dump_only=True)
+    itinerary = fields.Nested('ItinerarySchema', dump_only=True)
+    pending_travellers = fields.Nested('UserSchema', many=True, dump_only=True)
+
+    @post_load
+    def make_trip(self, data, **kwargs):
+        return {camelcase(k): v for k, v in data.items()}
     

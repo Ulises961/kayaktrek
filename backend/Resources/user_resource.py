@@ -3,7 +3,8 @@ from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import NoResultFound
-from Schemas.user_schema import UserSchema
+from marshmallow import ValidationError
+from Schemas.user_schema import UserSchema, UserUpdateSchema
 from flask import Blueprint, jsonify, request, abort
 from Services.user_service import UserService
 from Services.Middleware.auth_middleware import JWTService
@@ -49,9 +50,14 @@ def update_user(id: str):
     """
 
     try:
-        user = UserService.update_user(id, request.get_json())
+        raw = request.get_json()
+        validated = UserUpdateSchema().load(raw)
+        user_data = {**raw, **validated}  # sanitized scalars override raw; image passes through
+        user = UserService.update_user(id, user_data)
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
-    
+
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
     except IntegrityError:

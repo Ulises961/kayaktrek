@@ -3,7 +3,8 @@ import logging
 from flask import Blueprint, jsonify, request, abort
 from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from Schemas.day_schema import DaySchema
+from marshmallow import ValidationError
+from Schemas.day_schema import DaySchema, DayUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.day_service import DayService
@@ -84,9 +85,13 @@ def update_day(id: str):
         200 with the updated day object, or 404 if not found.
     """
     try:
-        day_data = request.get_json()
+        raw = request.get_json()
+        validated = DayUpdateSchema().load(raw)
+        day_data = {**raw, **validated}  # sanitized scalars override raw; nested pass through
         updated_day = DayService.update_day(id, day_data)
         return jsonify(DaySchema().dump(updated_day)), HTTPStatus.OK
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
     except NoResultFound as e:

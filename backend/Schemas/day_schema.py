@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, post_load, pre_load, validates, ValidationError
 from Models.day import Day
-from Schemas.base_schema import BaseSchema
+from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.point_schema import PointSchema
 from Schemas.sea_schema import SeaSchema
 from Schemas.weather_schema import WeatherSchema
@@ -44,5 +44,25 @@ class DaySchema(BaseSchema):
             raise ValidationError("A day cannot have more than 100 points")
 
     @post_load
-    def make_day(self, data, **kwargs): 
-            return Day(**data)
+    def make_day(self, data, **kwargs):
+        return Day(**data)
+
+
+class DayUpdateSchema(DaySchema):
+    """
+    Schema for PATCH /api/day/<id>.
+    Validates scalar mutable fields only (day_number, date — both optional).
+    Nested objects (weather, sea, points) are excluded from load;
+    the resource handler merges validated scalars with the raw request.
+    Returns a camelCase dict for the service layer.
+    """
+    day_number = fields.Integer(validate=lambda x: 1 <= x <= 365)
+    date = fields.Date('%Y-%m-%d')
+    itinerary_id = fields.UUID(dump_only=True)
+    weather = fields.Nested('WeatherSchema', dump_only=True)
+    sea = fields.Nested('SeaSchema', dump_only=True)
+    points = fields.List(fields.Nested('PointSchema'), dump_only=True)
+
+    @post_load
+    def make_day(self, data, **kwargs):
+        return {camelcase(k): v for k, v in data.items()}

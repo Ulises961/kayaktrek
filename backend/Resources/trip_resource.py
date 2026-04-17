@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
-from Schemas.trip_schema import TripSchema
+from marshmallow import ValidationError
+from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
@@ -149,10 +150,13 @@ def update_trip(id: str):
         200 with the updated trip object, or 404 if not found.
     """
     try:
-        logger.info(f"Update trip {request.get_json()} in db")
-        trip_data = request.get_json()
+        raw = request.get_json()
+        validated = TripUpdateSchema().load(raw)
+        trip_data = {**raw, **validated}  # sanitized scalars override raw; nested pass through
         trip = TripService.update_trip(id, trip_data)
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
     except NoResultFound as e:

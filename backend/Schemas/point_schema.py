@@ -1,7 +1,7 @@
-from marshmallow import Schema, fields, post_load, validates, ValidationError, EXCLUDE
+from marshmallow import Schema, fields, post_load, pre_load, validates, ValidationError, EXCLUDE
 from Models.point import Point, PointType
 from Api.database import db
-from Schemas.base_schema import BaseSchema
+from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.image_schema import ImageSchema
 import bleach
 import re
@@ -24,6 +24,12 @@ class PointSchema(BaseSchema):
     nearby = fields.List(fields.Nested(lambda: PointSchema(
     ), allow_none=True, exclude=("next", "nearby")))
     images = fields.List(fields.Nested(ImageSchema, allow_none=True))
+
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        if 'notes' in data and data['notes'] is not None:
+            data['notes'] = bleach.clean(str(data['notes']).strip(), tags=[], strip=True)
+        return data
 
     @validates('type')
     def validate_type(self, value,  **kwargs):
@@ -55,17 +61,30 @@ class PointSchema(BaseSchema):
     
     @validates('notes')
     def validate_notes(self, value,  **kwargs):
-        """Validate and sanitize notes."""
-        if value is not None:
-            # Sanitize HTML but allow basic formatting
-            sanitized = bleach.clean(
-                value.strip(),
-                tags=['p', 'br', 'strong', 'em', 'u'],
-                strip=True
-            )
-            if len(sanitized) > 5000:
-                raise ValidationError("Notes cannot exceed 5000 characters")
+        """Validate notes length (sanitization happens in @pre_load)."""
+        if value is not None and len(value) > 5000:
+            raise ValidationError("Notes cannot exceed 5000 characters")
 
     @post_load
     def make_point(self, data, **kwargs):
         return Point(**data)
+
+
+class PointUpdateSchema(PointSchema):
+    """
+    Schema for PATCH /api/point/<id>.
+    Validates scalar mutable fields only (type, lat, lon, notes — all optional).
+    Nested objects (images, next, nearby) are excluded from load;
+    the resource handler merges validated scalars with the raw request.
+    day_id excluded — point reassignment requires a dedicated endpoint.
+    Returns a camelCase dict for the service layer.
+    """
+    type = fields.Enum(PointType, by_value=True)
+    day_id = fields.UUID(dump_only=True)
+    next = fields.Nested(lambda: PointSchema(), dump_only=True)
+    nearby = fields.List(fields.Nested(lambda: PointSchema()), dump_only=True)
+    images = fields.List(fields.Nested(ImageSchema), dump_only=True)
+
+    @post_load
+    def make_point(self, data, **kwargs):
+        return {camelcase(k): v for k, v in data.items()}

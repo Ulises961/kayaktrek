@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from typing import List
 from flask import Blueprint, abort, jsonify, request
 from Models.point import Point
-from Schemas.point_schema import PointSchema
+from marshmallow import ValidationError
+from Schemas.point_schema import PointSchema, PointUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.point_service import PointService
@@ -89,12 +90,16 @@ def update_point(id: str):
         200 with the updated point object, or 404 if not found.
     """
     try:
-        point_data = request.get_json()
+        raw = request.get_json()
+        validated = PointUpdateSchema().load(raw)
+        point_data = {**raw, **validated}  # sanitized scalars override raw; nested pass through
         point = PointService.update_point(id, point_data)
         return jsonify(PointSchema().dump(point)), HTTPStatus.OK
 
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
-            raise
+        raise
     except NoResultFound:
          abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
 
