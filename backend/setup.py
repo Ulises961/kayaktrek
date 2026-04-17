@@ -29,6 +29,7 @@ setup(
         'setuptools',
         'celery',
         'kombu',
+        'flask-mail',
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",

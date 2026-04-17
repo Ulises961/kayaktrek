@@ -22,6 +22,7 @@ flask-migrate = "*"
 alembic = "*"
 base = "*"
 uuid_extension="*"
+flask-mail = "*"
 [dev-packages]
 
 [requires]
