@@ -107,15 +107,17 @@ class ImageService:
             raise NoResultFound(f"Image with id {id} not found")
         logger.info(f"Updating image {id}")
 
-        updated_image = ImageSchema().load(image_data)
+        validated = cast(Image, ImageSchema().load(image_data))
+
+        existing_image.size = validated.size
+        existing_image.name = validated.name
+        existing_image.location = validated.location
 
         try:
-            merged_image = cast(Image, db.session.merge(updated_image))
             db.session.commit()
-            db.session.refresh(merged_image)
-
+            db.session.refresh(existing_image)
             logger.info(f"Image {id} updated successfully")
-            return merged_image
+            return existing_image
 
         except IntegrityError as e:
             db.session.rollback()

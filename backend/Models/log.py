@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Log(BaseModel):
     hours: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     avg_sea: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
-    user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('users.id'), nullable=True)
+    user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('users.id'), nullable=True, index=True)
     
     user_logs: Mapped[List["User"]] = relationship(back_populates='logs')
     user_endorsed_logs: Mapped[List["User"]] = relationship(secondary=user_endorses_log, back_populates='endorsed_logs')

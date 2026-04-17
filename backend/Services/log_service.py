@@ -4,10 +4,10 @@ Log Service - Business logic for log operations.
 import logging
 from typing import List, cast
 from uuid import UUID
-from camel_converter import dict_to_snake
-from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from sqlalchemy.orm import selectinload
+
+from Schemas.base_schema import camelcase
 
 from Models.log import Log
 from Models.user import User
@@ -73,7 +73,6 @@ class LogService:
             IntegrityError: If database constraints are violated
         """
         logger.info("Creating new log")
-        log_data.setdefault("user_id", g.current_user_id)
         log = cast(Log, LogSchema().load(log_data))
         db.session.add(log)
         db.session.commit()
@@ -99,23 +98,20 @@ class LogService:
             NoResultFound: If log doesn't exist
             IntegrityError: If database constraints are violated
         """
-        # Verify log exists
-        existing_log = LogService.get_log_by_id(id)
-        if not existing_log:
-            raise NoResultFound(f"Log with id {id} not found")
+        log = LogService.get_log_by_id(id)
         logger.info(f"Updating log {id}")
-        log_data = dict_to_snake(log_data)
-        log_data.setdefault("user_id", existing_log.user_id)
-        
-        updated_log = LogSchema().load(log_data)
+
+        _MUTABLE_FIELDS = {"hours", "avg_sea"}
+        for field in _MUTABLE_FIELDS:
+            key = camelcase(field)
+            if key in log_data:
+                setattr(log, field, log_data[key])
 
         try:
-            merged_log = cast(Log, db.session.merge(updated_log))
             db.session.commit()
-            db.session.refresh(merged_log)
-
+            db.session.refresh(log)
             logger.info(f"Log {id} updated successfully")
-            return merged_log
+            return log
 
         except IntegrityError as e:
             db.session.rollback()

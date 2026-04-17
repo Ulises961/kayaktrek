@@ -16,7 +16,7 @@ class BaseSchema(Schema):
     class Meta:
         unknown = EXCLUDE
 
-    id = fields.UUID(allow_none=True)
+    id = fields.UUID(dump_only=True)
 
     def on_bind_field(self, field_name, field_obj):
         field_obj.data_key = camelcase(field_obj.data_key or field_name)

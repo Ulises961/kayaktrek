@@ -16,7 +16,7 @@ class Day(BaseModel):
     __table_args__ = (UniqueConstraint("day_number", "itinerary_id", "date"),)
 
     day_number: Mapped[int] = mapped_column(Integer)
-    itinerary_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("itinerary.id"))
+    itinerary_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("itinerary.id"), index=True)
     date: Mapped[Date] = mapped_column(Date)
 
     # Relationships with proper Mapped[] syntax

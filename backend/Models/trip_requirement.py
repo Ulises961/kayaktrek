@@ -40,7 +40,7 @@ class TripRequirement(BaseModel):
     __tablename__ = "trip_requirement"
 
     inventory_id: Mapped[_UUID] = mapped_column(
-        UUID, ForeignKey("inventory.id", ondelete="CASCADE"), nullable=False
+        UUID, ForeignKey("inventory.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -50,7 +50,7 @@ class TripRequirement(BaseModel):
 
     # The personal item that covers this requirement slot (nullable until contributed)
     covering_item_id: Mapped[Optional[_UUID]] = mapped_column(
-        UUID, ForeignKey("item.id", ondelete="SET NULL"), nullable=True
+        UUID, ForeignKey("item.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -8,9 +8,9 @@ from Models.item_category import ItemCategory
 class Item(BaseModel):
 
     category_id: Mapped[Optional[_UUID]] = mapped_column(
-        UUID, ForeignKey('item_categories.id'), nullable=True
+        UUID, ForeignKey('item_categories.id'), nullable=True, index=True
     )
     category: Mapped[Optional["ItemCategory"]] = relationship("ItemCategory", lazy="joined")  # noqa: F821
     checked: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id'), nullable=False)
+    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id'), nullable=False, index=True)

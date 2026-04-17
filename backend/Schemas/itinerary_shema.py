@@ -25,7 +25,7 @@ class ItinerarySchema(BaseSchema):
         validate=lambda x: x is None or len(x) <= 365,
     )
     trip_id = fields.UUID(allow_none=True)
-    user_id = fields.UUID(allow_none=True)
+    user_id = fields.UUID(dump_only=True)
 
     @validates("total_miles")
     def validate_total_miles(self, value, **kwargs):
@@ -54,5 +54,6 @@ class ItinerarySchema(BaseSchema):
 
     @post_load
     def make_itinerary(self, data, **kwargs):
+        data["user_id"] = g.current_user_id
         return Itinerary(**data)
     

@@ -17,8 +17,7 @@ class LogSchema(BaseSchema):
     """
     hours = fields.Float(allow_none=True, validate=lambda x: x is None or (0 <= x <= 24))
     avg_sea = fields.Float(allow_none=True, validate=lambda x: x is None or (0 <= x <= 10))
-    user_id = fields.UUID(allow_none=False, required=True) 
-
+    user_id = fields.UUID(dump_only=True)
 
     @validates('hours')
     def validate_hours(self, value, **kwargs):
@@ -40,4 +39,5 @@ class LogSchema(BaseSchema):
 
     @post_load
     def make_log(self, data, **kwargs):
+        data["user_id"] = g.current_user_id
         return Log(**data)

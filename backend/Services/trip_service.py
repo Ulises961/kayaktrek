@@ -6,7 +6,7 @@ import logging
 from datetime import date
 from typing import List, Optional, cast
 from flask import g
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
 from Models.trip import Trip, TripStateType
@@ -18,7 +18,13 @@ from Schemas.trip_schema import TripSchema
 from Api.database import db
 from sqlalchemy.orm import selectinload, contains_eager
 from Services.user_service import UserService
+from Schemas.base_schema import camelcase
+
 logger = logging.getLogger(__name__)
+
+# Fields a client is permitted to change on an existing trip via PATCH.
+# state is excluded — transitions go through transition_trip_state() only.
+_MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to"}
 
 
 class TripService:
@@ -87,19 +93,7 @@ class TripService:
         """        
         logger.info(f"Creating new trip")
         
-        # Get the integer user ID from the id in g.current_user_id
         current_user = UserService.get_user_by_id(str(g.current_user_id))
-        if current_user:
-            current_user_id = current_user.id
-            
-            if 'itinerary' in trip_data and trip_data['itinerary'] is not None:
-                trip_data['itinerary']['user_id'] = current_user_id
-                if 'days' in trip_data['itinerary']:
-                    for day in trip_data['itinerary']['days']:
-                        if 'user_id' not in day:
-                            day['user_id'] = current_user_id
-        
-
 
         trip: Trip = TripSchema().load(trip_data)  # type: ignore
         db.session.add(trip)
@@ -135,21 +129,29 @@ class TripService:
             ValidationError: If data is invalid
             NoResultFound: If trip doesn't exist
         """
-                # Verify trip exists
         existing_trip = TripService.get_trip_by_id(trip_id)
         if not existing_trip:
-            raise NoResultFound(f"Trip {id} not found")
-        
-        trip: Trip = TripSchema().load(trip_data)  # type: ignore
-        logger.info(f"Updating trip {trip.id}")
-        db.session.merge(trip)
-        db.session.commit()
+            raise NoResultFound(f"Trip {trip_id} not found")
 
-        updated_trip = TripService.get_trip_by_id(str(trip.id))
-        if not updated_trip:
-            raise NoResultFound(f"Trip {trip.id} not found after update")
-        logger.info(f"Trip {trip.id} updated successfully")
-        return updated_trip
+        logger.info(f"Updating trip {trip_id}")
+
+        for field in _MUTABLE_FIELDS:
+            key = camelcase(field)
+            if key in trip_data:
+                value = trip_data[key]
+                if field in ("date_from", "date_to") and isinstance(value, str):
+                    value = date.fromisoformat(value)
+                setattr(existing_trip, field, value)
+
+        try:
+            db.session.commit()
+            db.session.refresh(existing_trip)
+            logger.info(f"Trip {trip_id} updated successfully")
+            return existing_trip
+        except IntegrityError as e:
+            db.session.rollback()
+            logger.error(f"Integrity error updating trip {trip_id}: {e}")
+            raise
 
     @staticmethod
     def delete_trip(trip_id: str, for_everyone: bool) -> None:

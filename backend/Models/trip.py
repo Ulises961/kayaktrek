@@ -55,7 +55,7 @@ class Trip(BaseModel):
         secondary="user_has_invitation", back_populates="invitations"
     )
     state: Mapped[TripStateType] = mapped_column(
-        Enum(TripStateType), nullable=False, default=TripStateType.DRAFT
+        Enum(TripStateType), nullable=False, default=TripStateType.DRAFT, index=True
     )
     destination: Mapped[String] = mapped_column(String, nullable=True)
     description: Mapped[String] = mapped_column(String, nullable=True)

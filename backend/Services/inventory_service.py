@@ -147,20 +147,12 @@ class InventoryService:
             NoResultFound: If inventory doesn't exist
             IntegrityError: If database constraints are violated
         """
+        # Inventory has no user-editable scalar fields — trip_id and user_id are
+        # set at creation and managed by the service layer. Requirements are handled
+        # through their own endpoints. Return the existing record unchanged.
         existing = InventoryService.get_inventory_by_id(inventory_id)
-        logger.info(f"Updating inventory {inventory_id}")
-        inventory_data.setdefault("user_id", str(existing.user_id))
-        try:
-            updated = cast(Inventory, InventorySchema().load(inventory_data))
-            merged = cast(Inventory, db.session.merge(updated))
-            db.session.commit()
-            db.session.refresh(merged)
-            logger.info(f"Inventory {inventory_id} updated successfully")
-            return merged
-        except IntegrityError as e:
-            db.session.rollback()
-            logger.exception(f"Integrity error updating inventory {inventory_id}: {e}")
-            raise
+        logger.info(f"Inventory {inventory_id} has no mutable fields; returning as-is")
+        return existing
 
     @staticmethod
     def delete_inventory(inventory_id: str) -> None:

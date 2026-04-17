@@ -31,7 +31,7 @@ class Point(BaseModel):
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     type: Mapped[Optional[PointType]] = mapped_column(Enum(PointType), nullable=True)
-    day_id: Mapped[Optional[_UUID]] = mapped_column(UUID, nullable=True)
+    day_id: Mapped[Optional[_UUID]] = mapped_column(UUID, nullable=True, index=True)
     next_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('point.id'), nullable=True)
 
     next: Mapped[Optional['Point']] = relationship(
