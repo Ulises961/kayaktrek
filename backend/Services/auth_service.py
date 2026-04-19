@@ -45,6 +45,8 @@ class AuthService:
         user = db.session.query(User).filter_by(mail=mail_addr, username=username).first()
         if not user:
             raise NoResultFound(f"User with mail {mail_addr} not found")
+        if not user.active:
+            raise PermissionError("Account not yet activated — check your email")
         if check_password_hash(user.pwd, password):
             return user
         return None
@@ -208,7 +210,12 @@ class AuthService:
             raise ValueError("Invalid token")
         if token.used:
             raise ValueError("Token has already been used")
-        if token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        expires_at = (
+            token.expires_at.astimezone(timezone.utc)
+            if token.expires_at.tzinfo is not None
+            else token.expires_at.replace(tzinfo=timezone.utc)
+        )
+        if expires_at < datetime.now(timezone.utc):
             raise ValueError("Token has expired")
 
         token.used = True

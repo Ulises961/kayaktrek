@@ -193,7 +193,12 @@ class TestAuthenticationEndpoints:
         
         register_response = client.post('/api/auth/register', json=user_data)
         assert register_response.status_code == 201
-        
+
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        assert user is not None
+        user.active = True
+        db.session.commit()
+
         # Now login
         login_data = {
             "mail": user_data['mail'],
@@ -229,7 +234,11 @@ class TestAuthenticationEndpoints:
         }
         
         client.post('/api/auth/register', json=user_data)
-        
+
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = True
+        db.session.commit()
+
         # Login with wrong password
         login_data = {
             "mail": user_data['mail'],

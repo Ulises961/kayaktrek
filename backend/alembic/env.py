@@ -46,6 +46,7 @@ from Models.sea import Sea                            # noqa: F401
 from Models.sea_state import SeaState                 # noqa: F401
 from Models.weather import Weather                    # noqa: F401
 from Models.weather_state import WeatherState         # noqa: F401
+from Models.auth_token import AuthToken               # noqa: F401
 
 flask_app = createApp("development")
 
