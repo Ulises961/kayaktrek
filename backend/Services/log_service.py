@@ -2,6 +2,7 @@
 Log Service - Business logic for log operations.
 """
 import logging
+import math
 from typing import List, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
@@ -41,21 +42,19 @@ class LogService:
         return log
 
     @staticmethod
-    def get_logs_by_user(user_id: str) -> List[Log]:
+    def get_logs_by_user(user_id: str, page: int = 1, per_page: int = 20) -> dict:
         """
-        Retrieve all logs created by a user.
-
-        Args:
-            user_id: The ID of the user
+        Retrieve a paginated page of logs created by a user.
 
         Returns:
-            List of Log objects
+            {"items": [...], "total": N, "page": P, "pages": P}
         """
-        user = db.session.query(User).options(selectinload(User.logs)).filter_by(id=UUID(user_id)).first()
-        if not user:
-            raise NoResultFound(f"User with id {user_id} not found in db")
-        logger.info(f"Found {len(user.logs)} logs for user {user_id}")
-        return user.logs
+        query = db.session.query(Log).filter_by(user_id=UUID(user_id))
+        total = query.count()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        pages = math.ceil(total / per_page) if total > 0 else 1
+        logger.info(f"Returning {len(items)} of {total} logs for user {user_id} (page {page})")
+        return {"items": items, "total": total, "page": page, "pages": pages}
 
     @staticmethod
     def create_log(log_data: dict) -> Log:

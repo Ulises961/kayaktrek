@@ -3,6 +3,7 @@ Trip Service - Business logic for trip operations.
 """
 
 import logging
+import math
 from datetime import date
 from typing import List, Optional, cast
 from flask import g
@@ -51,30 +52,29 @@ class TripService:
         return trip
 
     @staticmethod
-    def get_trips_by_user(user_id: str) -> List[Trip]:
+    def get_trips_by_user(user_id: str, page: int = 1, per_page: int = 20) -> dict:
         """
-        Retrieve all trips from the database.
-
-        Returns:
-            List of all Trip objects
+        Retrieve a paginated page of trips for a user.
 
         Raises:
-            NoResultFound: If no trips exist
+            NoResultFound: If the user does not exist
+        Returns:
+            {"items": [...], "total": N, "page": P, "pages": P}
         """
-        user = (
-            db.session.query(User)
-            .options(selectinload(User.trips))
-            .filter_by(id=UUID(user_id))
-            .first()
-        )
-
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
         if not user:
             raise NoResultFound(f"User with id {user_id} not found")
-        
-        trips = user.trips
-        logger.info(f"Found {len(trips)} trips for user {user_id}")
 
-        return trips
+        query = (
+            db.session.query(Trip)
+            .join(TripMember, TripMember.trip_id == Trip.id)
+            .filter(TripMember.user_id == UUID(user_id))
+        )
+        total = query.count()
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        pages = math.ceil(total / per_page) if total > 0 else 1
+        logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page})")
+        return {"items": items, "total": total, "page": page, "pages": pages}
 
     @staticmethod
     def create_trip(trip_data: dict) -> Trip:

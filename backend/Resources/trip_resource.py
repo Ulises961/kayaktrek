@@ -53,8 +53,16 @@ def get_all_user_trips(user_id: str):
     """
     try:
         logger.info(f"Retrieving all trips for user with id {user_id}")
-        trips = TripService.get_trips_by_user(user_id)
-        return jsonify([TripSchema().dump(trip) for trip in trips]), HTTPStatus.OK
+        page = request.args.get("page", 1, type=int)
+        per_page = min(request.args.get("per_page", 20, type=int), 100)
+        result = TripService.get_trips_by_user(user_id, page=page, per_page=per_page)
+        schema = TripSchema()
+        return jsonify({
+            "items": [schema.dump(trip) for trip in result["items"]],
+            "total": result["total"],
+            "page": result["page"],
+            "pages": result["pages"],
+        }), HTTPStatus.OK
 
     except HTTPException:
         raise

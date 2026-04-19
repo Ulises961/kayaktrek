@@ -37,7 +37,8 @@ def test_new_trip_defaults_to_draft_state(client, auth_headers):
 def test_get_all_trips(client, auth_headers, id):
     response = client.get(f"{TRIP_ENDPOINT}/{id}/all", headers=auth_headers)
     assert response.status_code == 200
-    assert isinstance(json.loads(response.data), list)
+    data = json.loads(response.data)
+    assert "items" in data and "total" in data
 
 
 def test_get_trip_by_id(client, auth_headers):

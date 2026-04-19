@@ -41,8 +41,9 @@ def test_get_all_logs(client, auth_headers, test_log):
     assert response.status_code == 200
     
     data = json.loads(response.data)
-    assert isinstance(data, list)
-    assert len(data) >= 1  # At least the test_log fixture
+    assert "items" in data
+    assert "total" in data
+    assert len(data["items"]) >= 1  # At least the test_log fixture
 
 
 def test_get_endorsed_logs(client, auth_headers):
@@ -81,5 +82,5 @@ def test_delete_log(client, auth_headers, ):
     # Verify deletion by checking all logs
     get_response = client.get(f"{LOG_ENDPOINT}/all", headers=auth_headers)
     data = json.loads(get_response.data)
-    log_ids = [log['id'] for log in data]
+    log_ids = [log['id'] for log in data["items"]]
     assert log_id not in log_ids

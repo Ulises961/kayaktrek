@@ -212,13 +212,15 @@ class PointService:
         """
         center = f'SRID=4326;POINT({longitude} {latitude})'
         range_m = range_km * 1000
+        distance_col = ST_Distance(Point.geo, center).label('distance_m')
 
         rows = (
-            db.session.query(Point, ST_Distance(Point.geo, center).label('distance_m'))
+            db.session.query(Point, distance_col)
             .filter(Point.type == PointType.INTEREST)
             .filter(Point.geo.isnot(None))
             .filter(ST_DWithin(Point.geo, center, range_m))
-            .order_by('distance_m')
+            .order_by(distance_col)
+            .limit(100)
             .all()
         )
 
