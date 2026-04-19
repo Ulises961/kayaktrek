@@ -22,3 +22,4 @@ setuptools
 bleach
 uuid_extension
 camel-converter
+flask-limiter

@@ -30,6 +30,7 @@ setup(
         'celery',
         'kombu',
         'flask-mail',
+        'flask-limiter'
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",

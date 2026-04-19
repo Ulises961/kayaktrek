@@ -4,6 +4,7 @@ import os
 
 from Api.config import config
 from Api.database import db
+from Api.limiter import limiter
 from Api.logging_config import setup_logging
 from Api.error_handlers import register_error_handlers
 from Api.seed import seed_item_categories
@@ -56,6 +57,7 @@ def createApp(config_mode:str):
 
     db.init_app(app)
     mail.init_app(app)
+    limiter.init_app(app)
     with app.app_context():
         db.create_all()
         seed_item_categories()

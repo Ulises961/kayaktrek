@@ -3,6 +3,7 @@ Centralized error handlers for the application.
 Register these handlers in the app factory.
 """
 from flask import jsonify
+from flask_limiter.errors import RateLimitExceeded
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError, NoResultFound
 from marshmallow import ValidationError
 from werkzeug.exceptions import HTTPException
@@ -83,6 +84,15 @@ def register_error_handlers(app):
             "message": f"Required field is missing: {str(error)}"
         }), 400
     
+    @app.errorhandler(RateLimitExceeded)
+    def handle_rate_limit(error):
+        """Handle rate limit breaches — always includes Retry-After."""
+        logger.info(f"HTTP exception: 429 - {error.description}")
+        response = jsonify({"error": "Too Many Requests", "message": error.description})
+        response.status_code = 429
+        response.headers["Retry-After"] = "60"
+        return response
+
     @app.errorhandler(HTTPException)
     def handle_http_exception(error):
         """Handle Flask/Werkzeug HTTP exceptions."""

@@ -19,6 +19,7 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.getenv("DEVELOPMENT_DATABASE_URL")
     SECRET_KEY = os.getenv("DEVELOPMENT_SECRET_KEY", "dev-secret-key-change-in-production")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-in-production")
+    RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
 class TestingConfig(Config):
     TESTING = True
@@ -29,6 +30,8 @@ class TestingConfig(Config):
     JWT_SECRET_KEY = os.getenv("TEST_JWT_SECRET_KEY", "test-jwt-secret-key-minimum-32-bytes!")
     SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     MAIL_SUPPRESS_SEND = True  # emails are silenced in tests
+    RATELIMIT_ENABLED = False
+    RATELIMIT_STORAGE_URI = "memory://"
     
 class StagingConfig(Config):
     DEVELOPMENT = True

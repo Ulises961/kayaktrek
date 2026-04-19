@@ -1,10 +1,12 @@
 import logging
 
 from flask import Blueprint, request, jsonify, abort
+from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
+from Api.limiter import limiter
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.user_service import UserService
@@ -14,7 +16,15 @@ logger = logging.getLogger(__name__)
 api = Blueprint("auth", __name__)
 
 
+def _resend_key():
+    data = request.get_json(silent=True) or {}
+    mail = data.get("mail")
+    return mail if mail else get_remote_address()
+
+
 @api.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per minute")
+@limiter.limit("50 per hour")
 def login_user():
     post_data = request.get_json()
     logger.info(f"Post data {post_data}")
@@ -48,12 +58,15 @@ def login_user():
         }
         return jsonify(response_object), HTTPStatus.UNAUTHORIZED
 
+    except PermissionError as e:
+        abort(HTTPStatus.FORBIDDEN, description=str(e))
     except Exception as e:
         logger.error(e)
         raise e
 
 
 @api.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per hour")
 def register_user():
     user_json = request.get_json()
 
@@ -90,6 +103,7 @@ def verify_account():
 
 
 @api.route("/api/auth/resend-verification", methods=["POST"])
+@limiter.limit("3 per hour", key_func=_resend_key)
 def resend_verification():
     data = request.get_json()
     if not data or not data.get("mail"):
@@ -107,6 +121,7 @@ def resend_verification():
 
 
 @api.route("/api/auth/forgot-password", methods=["POST"])
+@limiter.limit("5 per hour")
 def forgot_password():
     data = request.get_json()
     if not data or not data.get("mail"):
