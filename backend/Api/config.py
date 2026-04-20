@@ -17,8 +17,8 @@ class DevelopmentConfig(Config):
     DEVELOPMENT = True
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.getenv("DEVELOPMENT_DATABASE_URL")
-    SECRET_KEY = os.getenv("DEVELOPMENT_SECRET_KEY", "dev-secret-key-change-in-production")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-in-production")
+    SECRET_KEY = os.environ["DEVELOPMENT_SECRET_KEY"]
+    JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
 class TestingConfig(Config):
