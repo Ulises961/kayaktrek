@@ -12,6 +12,8 @@ Covers:
 import json
 import pytest
 
+from Api.database import db
+from Models.user import User
 from Resources.log_resource import LOG_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
@@ -102,8 +104,10 @@ def test_register_with_admin_true_is_not_admin(client):
     }
     response = client.post("/api/auth/register", json=payload)
     assert response.status_code == 201
-    data = json.loads(response.data)
-    assert data.get("admin") is False or data.get("admin") is None
+
+    user = User.query.filter_by(mail=payload["mail"]).first()
+    assert user is not None
+    assert user.admin is False
 
 
 # ---------------------------------------------------------------------------

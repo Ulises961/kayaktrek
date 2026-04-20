@@ -133,9 +133,9 @@ class TestAuthenticationEndpoints:
         assert response.status_code == 201
         data = response.get_json()
         assert data['status'] == 'success'
-        assert 'access_token' in data
-        assert 'refresh_token' in data
-        
+        assert 'access_token' not in data
+        assert 'refresh_token' not in data
+
         # Verify user was created
         user = User.query.filter_by(mail=new_user_data['mail']).first()
         assert user is not None
@@ -261,8 +261,8 @@ class TestAuthenticationEndpoints:
         }
         
         response = client.post('/api/auth/login', json=login_data)
-        
-        assert response.status_code == 404  # NoResultFound handler
+
+        assert response.status_code == 401
     
     def test_login_missing_body(self, client):
         """Test login with missing request body"""
@@ -273,7 +273,6 @@ class TestAuthenticationEndpoints:
     
     def test_refresh_token_valid(self, client):
         """Test refreshing access token with valid refresh token"""
-        # Register and login
         unique_suffix = uuid.uuid4().hex[:8]
         user_data = {
             "username": f"refreshuser_{unique_suffix}",
@@ -282,22 +281,20 @@ class TestAuthenticationEndpoints:
             "phone": f"+777777{random.randint(1000, 9999)}",
             "name": "Refresh"
         }
-        
-        login_response = client.post('/api/auth/register', json=user_data)
-        tokens = login_response.get_json()
-        refresh_token = tokens['refresh_token']
-        
-        # Use refresh token to get new access token
-        response = client.post('/api/auth/refresh', json={
-            "refresh_token": refresh_token
-        })
-        
+        client.post('/api/auth/register', json=user_data)
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = True
+        db.session.commit()
+
+        login_resp = client.post('/api/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
+        refresh_token = login_resp.get_json()['refresh_token']
+
+        response = client.post('/api/auth/refresh', json={"refresh_token": refresh_token})
+
         assert response.status_code == 200
         data = response.get_json()
         assert data['status'] == 'success'
         assert 'access_token' in data
-        
-        # Verify new access token is valid
         new_access_payload = JWTService.decode_token(data['access_token'])
         assert new_access_payload['token_type'] == 'access'
     
@@ -309,7 +306,6 @@ class TestAuthenticationEndpoints:
     
     def test_refresh_with_access_token(self, client):
         """Test refresh endpoint with access token instead of refresh token"""
-        # Get tokens
         unique_suffix = uuid.uuid4().hex[:8]
         user_data = {
             "username": f"wrongtoken_{unique_suffix}",
@@ -318,17 +314,17 @@ class TestAuthenticationEndpoints:
             "phone": f"+888888{random.randint(1000, 9999)}",
             "name": "Wrong"
         }
-        
-        login_response = client.post('/api/auth/register', json=user_data)
-        tokens = login_response.get_json()
-        access_token = tokens['access_token']  # Using wrong token type
-        
-        # Try to refresh with access token
-        response = client.post('/api/auth/refresh', json={
-            "refresh_token": access_token
-        })
-        
-        assert response.status_code == 401  # Should fail verification
+        client.post('/api/auth/register', json=user_data)
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = True
+        db.session.commit()
+
+        login_resp = client.post('/api/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
+        access_token = login_resp.get_json()['access_token']
+
+        response = client.post('/api/auth/refresh', json={"refresh_token": access_token})
+
+        assert response.status_code == 401
     
     def test_refresh_with_invalid_token(self, client):
         """Test refresh with completely invalid token"""

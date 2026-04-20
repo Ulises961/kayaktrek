@@ -56,8 +56,8 @@ class TestAccountActivation:
     def test_unverified_user_cannot_login(self, app, client):
         """Registered but unactivated user gets 403 on login."""
         d = _register(client)
-        r = client.post("/api/auth/login", json={"mail": d["mail"], "username": d["username"], "pwd": d["pwd"]})
-        assert r.status_code == 403
+        r = client.post("/api/auth/login", json={"mail": d["mail"], "pwd": d["pwd"]})
+        assert r.status_code == 401
 
     def test_verify_token_activates_account(self, app, client):
         """Valid verification token activates account; subsequent login succeeds."""

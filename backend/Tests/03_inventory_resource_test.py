@@ -77,4 +77,4 @@ def test_get_nonexistent_inventory(client, auth_headers):
 def test_inventory_requires_auth(client):
     """Test that inventory endpoints reject unauthenticated requests."""
     response = client.get(f"{INVENTORY_ENDPOINT}/some-id")
-    assert response.status_code == 403
+    assert response.status_code == 401
