@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from Api.limiter import limiter
@@ -5,11 +7,15 @@ from Api.limiter import limiter
 
 @pytest.fixture(autouse=True)
 def rate_limits_enabled(app):
-    """Enable rate limiting for each test and reset state afterwards."""
+    """Enable rate limiting for each test and reset storage before and after."""
+    app.config["RATELIMIT_ENABLED"] = True
     limiter.enabled = True
+    with app.app_context():
+        limiter.reset()
     yield
     with app.app_context():
         limiter.reset()
+    app.config["RATELIMIT_ENABLED"] = False
     limiter.enabled = False
 
 
@@ -17,7 +23,7 @@ class TestLoginRateLimit:
 
     def test_login_rate_limited_after_threshold(self, client):
         """11th login attempt within a minute returns 429 with Retry-After header."""
-        payload = {"mail": "nobody@example.com", "username": "nobody", "pwd": "x"}
+        payload = {"mail": "nobody@example.com", "pwd": "x"}
 
         for _ in range(10):
             client.post("/api/auth/login", json=payload)
@@ -28,7 +34,7 @@ class TestLoginRateLimit:
 
     def test_login_within_limit_not_blocked(self, client):
         """Requests up to the limit are not blocked."""
-        payload = {"mail": "nobody@example.com", "username": "nobody", "pwd": "x"}
+        payload = {"mail": "nobody@example.com", "pwd": "x"}
 
         for _ in range(10):
             r = client.post("/api/auth/login", json=payload)
@@ -39,8 +45,6 @@ class TestRegisterRateLimit:
 
     def test_register_rate_limited_after_threshold(self, client):
         """6th register attempt within an hour returns 429."""
-        import uuid
-
         for i in range(5):
             s = uuid.uuid4().hex[:8]
             numeric = str(int(s, 16) % 100_000_000).zfill(8)
