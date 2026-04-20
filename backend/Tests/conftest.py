@@ -16,6 +16,7 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
 from Api.app import createApp
 from Api.database import db as _db
+from Api.seed import seed_item_categories
 
 @pytest.fixture(scope='session')
 def app(request):
@@ -26,8 +27,9 @@ def app(request):
     # Establish an application context before running the tests.
     ctx = app.app_context()
     ctx.push()
+    _db.create_all()
+    seed_item_categories()
 
-    
     def teardown():
         _db.session.remove()   # close/rollback open session and release any held locks
         _db.drop_all()

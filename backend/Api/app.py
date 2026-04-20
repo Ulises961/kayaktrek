@@ -59,8 +59,8 @@ def createApp(config_mode:str):
     mail.init_app(app)
     limiter.init_app(app)
     with app.app_context():
-        db.create_all()
-        seed_item_categories()
+        if not app.config.get("TESTING"):
+            seed_item_categories()
 
     migrate = Migrate()
     migrate.init_app(app, db, directory='alembic')
