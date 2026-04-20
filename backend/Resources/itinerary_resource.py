@@ -18,7 +18,6 @@ itinerary_api = Blueprint("itinerary", __name__, url_prefix=ITINERARY_ENDPOINT)
 
 @itinerary_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-@require_owner('itinerary')
 def get_all_itineraries():
     """GET /api/itinerary - Retrieve all itineraries"""
     try:
@@ -34,7 +33,7 @@ def get_all_itineraries():
 
 @itinerary_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
-@require_owner('itinerary')
+@require_owner('itinerary', read_only=True)
 def get_itinerary(id: str):
     """GET /api/itinerary/<id> - Retrieve itinerary by ID"""
     logger.info(f"Retrieve itinerary with id {id}")
@@ -81,13 +80,15 @@ def update_itinerary(id: str):
     Returns:
         200 with the updated itinerary object, or 404 if not found.
     """
-    try:        
+    try:
         itinerary_data = request.get_json()
         updated_itinerary = ItineraryService.update_itinerary(id, itinerary_data)
         return jsonify(ItinerarySchema().dump(updated_itinerary)), HTTPStatus.OK
-        
+
     except HTTPException:
         raise
+    except PermissionError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except IntegrityError as e:

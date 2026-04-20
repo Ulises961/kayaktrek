@@ -104,10 +104,13 @@ class ItineraryService:
         """
         # Verify itinerary exists
         existing_itinerary = ItineraryService.get_itinerary_by_id(id)
-        
+
         if not existing_itinerary:
             raise NoResultFound(f"Itinerary with id {id} not found")
-        
+
+        if existing_itinerary.is_public:
+            raise PermissionError("Public itineraries are read-only. Clone it to make changes.")
+
         logger.info(f"Updating itinerary {id}")
 
         try:
