@@ -92,7 +92,7 @@ def require_leader(id_param: str = "id"):
 
 
 def require_owner(
-    resource_type, *, id_param="id", from_body=False, parent_resource=None
+    resource_type, *, id_param="id", from_body=False, parent_resource=None, read_only=False
 ):
     """
     Decorator to ensure user owns the resource or has access to it.
@@ -171,7 +171,7 @@ def require_owner(
 
             # Check if user owns or has access to the resource
             has_access = check_resource_ownership(
-                resource_type=check_type, resource_id=resource_id
+                resource_type=check_type, resource_id=resource_id, read_only=read_only
             )
 
             if has_access is None:
@@ -190,7 +190,7 @@ def require_owner(
     return decorator
 
 
-def check_resource_ownership(resource_type: str, resource_id: str) -> Optional[bool]:
+def check_resource_ownership(resource_type: str, resource_id: str, read_only: bool = False) -> Optional[bool]:
     """
     Check if a user has ownership or access rights to a specific resource.
 
@@ -211,7 +211,7 @@ def check_resource_ownership(resource_type: str, resource_id: str) -> Optional[b
             return _check_trip_ownership(g.current_user_id, resource_id)
 
         elif resource_type == "itinerary":
-            return _check_itinerary_ownership(g.current_user_id, resource_id)
+            return _check_itinerary_ownership(g.current_user_id, resource_id, read_only=read_only)
 
         elif resource_type == "day":
             return _check_day_ownership(g.current_user_id, resource_id)
@@ -269,15 +269,16 @@ def _check_trip_ownership(user_id: str, trip_id: str) -> Optional[bool]:
     return result is not None
 
 
-def _check_itinerary_ownership(user_id: str, itinerary_id: str) -> Optional[bool]:
+def _check_itinerary_ownership(user_id: str, itinerary_id: str, *, read_only: bool = False) -> Optional[bool]:
     """Check if user owns the itinerary through trip ownership."""
 
     # First check if itinerary exists
     itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
     if not itinerary:
         return None  # Itinerary doesn't exist
-    
-    if itinerary.is_public:
+
+    # Public itineraries are readable by anyone; mutations still require membership
+    if itinerary.is_public and read_only:
         return True
     
     result = (
