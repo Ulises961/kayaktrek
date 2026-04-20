@@ -1,18 +1,33 @@
-FROM python:3.10-slim-buster
+FROM python:3.12-slim AS base
 
-WORKDIR /python-docker
+# System deps required by psycopg2 and GeoAlchemy2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+WORKDIR /app
 
-# Thie is done because because psycopg2 would not install correclty
-# when useing the "pip3 install -r requirements.txt" command
-RUN apt-get update \
-    && apt-get -y install libpq-dev gcc \
-    && pip install psycopg2
+# --- dependency layer (rebuilt only when requirements.txt or setup.py change) ---
+FROM base AS builder
+COPY requirements.txt setup.py ./
+# Install all deps + the project itself in editable mode so intra-project imports resolve
+RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir -e .
 
-COPY . /usr/src/app
-COPY ./var/log/kayak-trip-planner.log /python-docker/var/log/kayak-trip-planner.log
+# --- runtime image ---
+FROM base AS runtime
 
+# Copy installed packages and console scripts from the builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-CMD [ "python3", "/usr/src/app/Api/app.py"]
+RUN useradd -m appuser
+USER appuser
+
+WORKDIR /app
+COPY --chown=appuser:appuser . .
+
+RUN chmod +x entrypoint.sh
+
+EXPOSE 5000
+
+ENTRYPOINT ["./entrypoint.sh"]
