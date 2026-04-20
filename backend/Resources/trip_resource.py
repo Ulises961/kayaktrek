@@ -51,6 +51,8 @@ def get_all_user_trips(user_id: str):
     Returns:
         JSON response with trip data and 200 status code
     """
+    if str(g.current_user_id) != user_id:
+        abort(HTTPStatus.FORBIDDEN, description="Access denied")
     try:
         logger.info(f"Retrieving all trips for user with id {user_id}")
         page = request.args.get("page", 1, type=int)
@@ -81,6 +83,8 @@ def get_all_user_invitations(user_id: str):
     Returns:
         JSON response with trip data and 200 status code
     """
+    if str(g.current_user_id) != user_id:
+        abort(HTTPStatus.FORBIDDEN, description="Access denied")
     try:
         logger.info(f"Retrieving trip with id {id}")
         trips = TripService.get_invitations_by_user(user_id)
@@ -145,6 +149,7 @@ def transition_state(id: str):
 
 @trip_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
+@require_owner("trip")
 def update_trip(id: str):
     """
     PATCH /api/trip/<id> — Partially update an existing trip.
@@ -160,7 +165,8 @@ def update_trip(id: str):
     try:
         raw = request.get_json()
         validated = TripUpdateSchema().load(raw)
-        trip_data = {**raw, **validated}  # sanitized scalars override raw; nested pass through
+        assert isinstance(validated, dict)
+        trip_data = {**raw, **validated}
         trip = TripService.update_trip(id, trip_data)
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValidationError as e:
@@ -174,6 +180,7 @@ def update_trip(id: str):
 
 @trip_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
+@require_owner("trip")
 def delete(id: str):
     """
     TripResource DELETE method. Deletes a trip by id.
@@ -182,7 +189,7 @@ def delete(id: str):
         Success message and 200 status code
     """
     try:
-        delete_to_all_participants = request.args.get("for_everyone",False, type=bool)
+        delete_to_all_participants = request.args.get("for_everyone", "false").lower() == "true"
         
         logger.info(f"Deleting trip {id}")
         TripService.delete_trip(id, delete_to_all_participants)
