@@ -44,10 +44,11 @@ def test_update_user(client, auth_headers, id):
     assert data['mail'] == originalUser['mail']  # mail unchanged
     assert data['id'] == originalUser["id"]
 
-def test_delete_user(client, auth_headers, id_2):
+def test_delete_user_forbidden_for_other_user(client, auth_headers, id_2):
+    """User cannot delete another user's account."""
     response = client.delete(
         f"{USER_ENDPOINT}/{id_2}",
         headers=auth_headers)
-    assert response.status_code == 200
+    assert response.status_code == 403
 
 

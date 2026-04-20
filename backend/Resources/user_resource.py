@@ -8,6 +8,7 @@ from Schemas.user_schema import UserSchema, UserUpdateSchema
 from flask import Blueprint, jsonify, request, abort
 from Services.user_service import UserService
 from Services.Middleware.auth_middleware import JWTService
+from Services.Middleware.privileges_middleware import require_self
 
 # It will print the name of this module when the main app is running
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
 
 @user_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
+@require_self()
 def get(id:str):
     """
     UserResource GET method. Retrieves the information related to the user with the passed id in the request
@@ -37,6 +39,7 @@ def get(id:str):
 
 @user_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
+@require_self()
 def update_user(id: str):
     """
     PATCH /api/user/<id> — Partially update an existing user profile.
@@ -67,6 +70,7 @@ def update_user(id: str):
 
 @user_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
+@require_self()
 def delete(id: str):
     try:
         UserService.delete_user(id)       

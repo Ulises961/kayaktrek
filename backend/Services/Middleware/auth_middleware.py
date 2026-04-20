@@ -1,13 +1,10 @@
 from functools import wraps
 from http import HTTPStatus
-from uuid import UUID
 import jwt
+from werkzeug.exceptions import HTTPException
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Dict
-import os
-from flask import current_app,abort, g, request
-from Models.user import User
-from Api.database import db
+from flask import current_app, abort, g, request
 from Services.user_service import UserService
 
 class JWTService:
@@ -55,21 +52,6 @@ class JWTService:
             raise ValueError("Invalid token")
         
     @staticmethod
-    def refresh_token(refresh_token: str) -> str:
-        """Refreshes a JWT token by generating a new one with extended expiration."""
-        payload = JWTService.decode_token(refresh_token)
-        if not payload:
-            raise ValueError("Invalid token, cannot refresh")
-        if payload['token_type'] != 'access':
-            raise ValueError("Only access tokens can be refreshed")
-        
-        user = User.query.get(UUID(payload['user_id']))
-
-        if not user:
-            raise ValueError("User not found")
-        return JWTService.generate_access_token(user.user_id, user.email, user.is_admin)
-    
-    @staticmethod
     def verify_token(token: str, token_type: str = 'access') -> Optional[Dict]:
         """
         Verify token and check its type.
@@ -94,31 +76,12 @@ class JWTService:
             return None
         
     @staticmethod
-    def authenticate_admin(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-
-            auth_header = request.headers.get('Authorization')
-            if not auth_header:
-                return abort(HTTPStatus.FORBIDDEN)
-            auth_token = auth_header.split(" ")[1]
-            data = JWTService.verify_token(auth_token)
-            if not data:
-                return abort(HTTPStatus.UNAUTHORIZED)
-            user = UserService.get_user_by_id(data["user_id"])
-            if not (user and user.active and user.admin):
-                return abort(HTTPStatus.UNAUTHORIZED)
-            return f(user, *args, **kwargs)
-
-        return decorated_function
-    
-    @staticmethod
     def authenticate_restful(f):
         @wraps(f)
         def decorator(*args, **kwargs):
             auth_header = request.headers.get("Authorization", None)
             if not auth_header:
-                    abort(HTTPStatus.FORBIDDEN, description="Valid token missing") 
+                abort(HTTPStatus.UNAUTHORIZED, description="Valid token missing")
             try:
                     # Extract token from "Bearer <token>" format
                     if auth_header.startswith("Bearer "):
@@ -141,8 +104,10 @@ class JWTService:
                     g.current_user_mail = user.mail
                     g.current_user_id = str(user.id)
 
-            except:
-                raise ValueError("Invalid token")
+            except HTTPException:
+                raise
+            except Exception:
+                abort(HTTPStatus.UNAUTHORIZED, description="Invalid token")
         
             return f(*args, **kwargs)
         return decorator

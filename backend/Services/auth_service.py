@@ -27,26 +27,24 @@ _TOKEN_EXPIRY_HOURS = {
 class AuthService:
 
     @staticmethod
-    def authenticate_user(mail_addr: str, username: str, password: str) -> Optional[User]:
+    def authenticate_user(password: str, mail_addr: Optional[str] = None, username: Optional[str] = None) -> Optional[User]:
         """
-        Authenticate a user by credentials.
-
-        Args:
-            mail: User's email address
-            username: User's username
-            password: Plain-text password to verify
+        Authenticate a user by password plus either email or username (one is required).
 
         Returns:
-            User object if credentials are valid, None if password doesn't match
-
-        Raises:
-            NoResultFound: If no user exists with the given mail/username
+            User object if credentials are valid and account is active, None otherwise.
         """
-        user = db.session.query(User).filter_by(mail=mail_addr, username=username).first()
-        if not user:
-            raise NoResultFound(f"User with mail {mail_addr} not found")
-        if not user.active:
-            raise PermissionError("Account not yet activated — check your email")
+        if not mail_addr and not username:
+            return None
+
+        query = db.session.query(User)
+        if mail_addr:
+            user = query.filter_by(mail=mail_addr).first()
+        else:
+            user = query.filter_by(username=username).first()
+
+        if not user or not user.active:
+            return None
         if check_password_hash(user.pwd, password):
             return user
         return None

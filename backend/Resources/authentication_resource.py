@@ -32,12 +32,15 @@ def login_user():
     if not post_data:
         raise ValueError("Missing request body")
 
-    mail = post_data.get("mail", None)
+    mail = post_data.get("mail")
     username = post_data.get("username")
     password = post_data.get("pwd")
 
+    if not password or (not mail and not username):
+        return jsonify({"status": "fail", "message": "Invalid credentials"}), HTTPStatus.UNAUTHORIZED
+
     try:
-        user = AuthService.authenticate_user(mail, username, password)
+        user = AuthService.authenticate_user(password, mail_addr=mail, username=username)
 
         if user:
             access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin)
@@ -75,14 +78,9 @@ def register_user():
 
     user = AuthService.register_user(user_json)
 
-    auth_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin)
-    refresh_token = JWTService.generate_refresh_token(str(user.id))
-
     response_object = {
         "status": "success",
-        "message": "Successfully registered.",
-        "access_token": auth_token,
-        "refresh_token": refresh_token
+        "message": "Account created. Check your email to verify your account before logging in.",
     }
     return jsonify(response_object), HTTPStatus.CREATED
 

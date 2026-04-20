@@ -34,6 +34,28 @@ from Services.trip_service import TripService
 logger = logging.getLogger(__name__)
 
 
+def require_self(id_param: str = "id"):
+    """
+    Decorator that requires the authenticated user to be the same user identified
+    by the URL parameter ``id_param``. Admins bypass the check.
+    """
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            current_user_id = g.get("current_user_id")
+            target_id = kwargs.get(id_param)
+            if not current_user_id:
+                abort(HTTPStatus.UNAUTHORIZED, description="Authentication required")
+            if current_user_id != target_id:
+                abort(HTTPStatus.FORBIDDEN, description="Access denied")
+            return f(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def require_leader(id_param: str = "id"):
     """
     Decorator that requires the current user to be the leader of the trip.

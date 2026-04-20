@@ -28,14 +28,15 @@ if TYPE_CHECKING:
 class User(BaseModel):
     __tablename__ = "users"
 
-    def __init__(self, pwd=None, endorsed_logs=[], logs=[], id=None, **kwargs):
+    def __init__(self, pwd=None, endorsed_logs=None, logs=None, id=None, **kwargs):
         if pwd:
             self.pwd = generate_password_hash(pwd).decode("UTF-8")
 
-        self.endorsed_logs = endorsed_logs
-        self.logs = logs
+        self.endorsed_logs = endorsed_logs if endorsed_logs is not None else []
+        self.logs = logs if logs is not None else []
 
-        self.__dict__.update(kwargs)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     mail: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     pwd: Mapped[str] = mapped_column(String(255), nullable=False)
