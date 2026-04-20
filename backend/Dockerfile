@@ -26,8 +26,6 @@ USER appuser
 WORKDIR /app
 COPY --chown=appuser:appuser . .
 
-RUN chmod +x entrypoint.sh
-
 EXPOSE 5000
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["sh", "entrypoint.sh"]

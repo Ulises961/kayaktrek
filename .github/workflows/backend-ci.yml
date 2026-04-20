@@ -37,7 +37,7 @@ jobs:
 
     env:
       CONFIG_MODE: testing
-      TEST_DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5432/kayak_test
+      DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5432/kayak_test
       SECRET_KEY: ci-secret-key-not-used-in-prod
       JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
 

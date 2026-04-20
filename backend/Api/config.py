@@ -1,7 +1,5 @@
 import os
-from dotenv import load_dotenv
 from sqlalchemy.pool import NullPool
-load_dotenv()
 
 class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = True
@@ -16,7 +14,7 @@ class Config:
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.getenv("DEVELOPMENT_DATABASE_URL")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
@@ -25,7 +23,7 @@ class TestingConfig(Config):
     TESTING = True
     DEVELOPMENT = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL", "sqlite:///:memory:")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///:memory:")
     SECRET_KEY = os.getenv("SECRET_KEY", "test-secret-key")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "test-jwt-secret-key-minimum-32-bytes!")
     SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
@@ -36,13 +34,13 @@ class TestingConfig(Config):
 class StagingConfig(Config):
     DEVELOPMENT = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.getenv("STAGING_DATABASE_URL")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.getenv("PRODUCTION_DATABASE_URL")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 config = {

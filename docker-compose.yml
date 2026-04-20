@@ -7,8 +7,8 @@ services:
       - "5672:5672"
       - "15672:15672"  # Management UI → http://localhost:15672  (guest/guest)
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}       
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -50,13 +50,19 @@ services:
     container_name: kayak_backend
     ports:
       - "127.0.0.1:5000:5000"
-    env_file:
-      - ./backend/.env
     environment:
       CONFIG_MODE: development
-      DEVELOPMENT_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
       RATELIMIT_STORAGE_URI: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}                   
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,12 +79,19 @@ services:
       target: runtime
     container_name: kayak_worker
     command: celery -A Api.celery_app worker --loglevel=info
-    env_file:
-      - ./backend/.env
     environment:
       CONFIG_MODE: development
-      DEVELOPMENT_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}         
     depends_on:
       postgres:
         condition: service_healthy
