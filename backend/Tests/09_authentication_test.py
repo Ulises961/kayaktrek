@@ -236,6 +236,8 @@ class TestAuthenticationEndpoints:
         client.post('/api/auth/register', json=user_data)
 
         user = User.query.filter_by(mail=user_data['mail']).first()
+        assert user is not None
+
         user.active = True
         db.session.commit()
 
@@ -283,6 +285,7 @@ class TestAuthenticationEndpoints:
         }
         client.post('/api/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
+        assert user is not None
         user.active = True
         db.session.commit()
 
@@ -316,6 +319,7 @@ class TestAuthenticationEndpoints:
         }
         client.post('/api/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
+        assert user is not None
         user.active = True
         db.session.commit()
 

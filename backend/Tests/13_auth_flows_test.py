@@ -63,6 +63,7 @@ class TestAccountActivation:
         """Valid verification token activates account; subsequent login succeeds."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
 
         r = client.get(f"/api/auth/verify?token={raw}")
@@ -76,6 +77,7 @@ class TestAccountActivation:
         """Expired verification token returns 400."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.VERIFICATION, expired=True)
 
         r = client.get(f"/api/auth/verify?token={raw}")
@@ -85,6 +87,7 @@ class TestAccountActivation:
         """Already-used verification token returns 400."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.VERIFICATION, used=True)
 
         r = client.get(f"/api/auth/verify?token={raw}")
@@ -94,6 +97,7 @@ class TestAccountActivation:
         """Valid token works once; second use returns 400."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
 
         client.get(f"/api/auth/verify?token={raw}")
@@ -119,6 +123,7 @@ class TestResendVerification:
         """Old unused tokens are invalidated; new token can activate account."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         old_raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
 
         r = client.post("/api/auth/resend-verification", json={"mail": d["mail"]})
@@ -126,6 +131,7 @@ class TestResendVerification:
 
         old_hash = hashlib.sha256(old_raw.encode()).hexdigest()
         old_token = db.session.query(AuthToken).filter_by(token_hash=old_hash).first()
+        assert old_token is not None
         assert old_token.used is True
 
     def test_old_token_no_longer_works_after_resend(self, app, client):
@@ -143,6 +149,7 @@ class TestResendVerification:
         """Resend for an already-active account returns 400."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         user.active = True
         db.session.commit()
 
@@ -177,6 +184,7 @@ class TestPasswordReset:
         """Valid reset token changes password; new password works for login."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         user.active = True
         db.session.commit()
         raw = _insert_token(user.id, AuthTokenType.RESET)
@@ -192,6 +200,7 @@ class TestPasswordReset:
         """Old password no longer works after a successful reset."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         user.active = True
         db.session.commit()
         raw = _insert_token(user.id, AuthTokenType.RESET)
@@ -204,6 +213,7 @@ class TestPasswordReset:
     def test_expired_reset_token_rejected(self, app, client):
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.RESET, expired=True)
 
         r = client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewPwd9$"})
@@ -212,6 +222,7 @@ class TestPasswordReset:
     def test_used_reset_token_rejected(self, app, client):
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.RESET, used=True)
 
         r = client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewPwd9$"})
@@ -220,6 +231,7 @@ class TestPasswordReset:
     def test_reset_token_cannot_be_reused(self, app, client):
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.RESET)
 
         client.post("/api/auth/reset-password", json={"token": raw, "pwd": "FirstNew9$"})
@@ -230,6 +242,7 @@ class TestPasswordReset:
         """A verification token cannot be used for a password reset."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
         raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
 
         r = client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewPwd9$"})
