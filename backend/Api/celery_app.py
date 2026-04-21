@@ -33,6 +33,13 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    # Use per-consumer QoS (global=False in basic.qos) — avoids the
+    # RabbitMQ global_qos deprecation warning introduced in RabbitMQ 3.12.
+    broker_transport_options={'global_qos': False},
+    # Disable remote control (celery inspect/control). Removes the transient
+    # non-exclusive pidbox queues that trigger the transient_nonexcl_queues
+    # deprecation warning in RabbitMQ 3.12+.
+    worker_enable_remote_control=False,
 )
 
 
