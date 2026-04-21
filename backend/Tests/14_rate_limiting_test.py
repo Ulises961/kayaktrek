@@ -1,22 +1,37 @@
 import uuid
 
+import flask
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import STRATEGIES
 
 from Api.limiter import limiter
 
 
 @pytest.fixture(autouse=True)
 def rate_limits_enabled(app):
-    """Enable rate limiting for each test and reset storage before and after."""
-    app.config["RATELIMIT_ENABLED"] = True
+    """Enable rate limiting for each test and reset storage before and after.
+
+    TestingConfig sets RATELIMIT_ENABLED=False so init_app exits early, leaving
+    several attributes unset. We replicate exactly what init_app would have done
+    so the limiter behaves identically to production during these tests.
+    """
+    storage = MemoryStorage()
+    limiter._storage = storage
+    limiter._limiter = STRATEGIES["fixed-window"](storage)
+    limiter._request_identifier = lambda: flask.request.endpoint or ""
     limiter.enabled = True
-    with app.app_context():
-        limiter.reset()
+    limiter.initialized = True
+    app.config["RATELIMIT_ENABLED"] = True
+
     yield
-    with app.app_context():
-        limiter.reset()
-    app.config["RATELIMIT_ENABLED"] = False
+
     limiter.enabled = False
+    limiter.initialized = False
+    limiter._request_identifier = None
+    app.config["RATELIMIT_ENABLED"] = False
+    limiter._storage = None
+    limiter._limiter = None
 
 
 class TestLoginRateLimit:
