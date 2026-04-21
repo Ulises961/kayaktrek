@@ -1,4 +1,4 @@
-from marshmallow import fields, post_load, pre_load, validates, ValidationError
+from marshmallow import fields, post_load, pre_load, validates, validates_schema, ValidationError
 from Models.trip import Trip, TripStateType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.itinerary_shema import ItinerarySchema
@@ -51,6 +51,13 @@ class TripSchema(BaseSchema):
     def validate_description(self, value, **kwargs):
         if value is not None and len(value) > 2000:
             raise ValidationError("Description cannot exceed 2000 characters")
+
+    @validates_schema
+    def validate_dates(self, data, **kwargs):
+        date_from = data.get('date_from')
+        date_to = data.get('date_to')
+        if date_from and date_to and date_to < date_from:
+            raise ValidationError("date_to must be on or after date_from", field_name="date_to")
 
     @post_load
     def make_trip(self, data, **kwargs):

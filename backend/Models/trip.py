@@ -1,9 +1,10 @@
 import enum
 import uuid
+from datetime import date
 
 import uuid_extension
 from Api.database import db
-from sqlalchemy import Enum, String
+from sqlalchemy import Date, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, TYPE_CHECKING
 
@@ -59,6 +60,8 @@ class Trip(BaseModel):
     )
     destination: Mapped[String] = mapped_column(String, nullable=True)
     description: Mapped[String] = mapped_column(String, nullable=True)
+    date_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    date_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     def transition_state(self, new_state: TripStateType) -> None:
         """Advance the trip state forward. Raises ValueError for invalid transitions."""
