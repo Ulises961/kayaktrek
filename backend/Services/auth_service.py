@@ -9,9 +9,8 @@ from flask import current_app
 from flask_bcrypt import check_password_hash, generate_password_hash
 from flask_mail import Message
 from sqlalchemy.exc import NoResultFound, IntegrityError
-
-from Api.app import mail
 from Api.database import db
+from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
 from Schemas.user_schema import UserSchema
