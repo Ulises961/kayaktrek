@@ -1,6 +1,7 @@
 path
 flake8
 pytest
+pytest-dotenv
 flask
 celery
 kombu
@@ -23,5 +24,6 @@ bleach
 uuid_extension
 camel-converter
 flask-limiter
+redis>=3.0
 flask-mail
 gunicorn

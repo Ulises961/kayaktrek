@@ -1,5 +1,8 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy.pool import NullPool
+
+load_dotenv()
 
 class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = True

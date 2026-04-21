@@ -19,7 +19,7 @@ services:
     image: postgis/postgis:16-3.4-alpine
     container_name: kayak_postgres
     ports:
-      - "127.0.0.1:5432:5432"   # host-localhost only; not exposed to LAN
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kayak}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -27,7 +27,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kayak}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kayak} -d ${POSTGRES_DB:-kayak_dev}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,6 +42,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  migrate:
+    build:
+      context: ./backend
+      target: runtime
+    container_name: kayak_migrate
+    command: alembic upgrade head
+    environment:
+      CONFIG_MODE: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: "no"
 
   backend:
     build:
@@ -62,16 +80,16 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}                   
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend:/app   # live-reload in dev; remove for prod-like builds
+      - ./backend:/app
 
   worker:
     build:
@@ -91,10 +109,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}         
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
 

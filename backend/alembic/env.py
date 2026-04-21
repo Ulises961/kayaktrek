@@ -2,6 +2,7 @@ import os
 from logging.config import fileConfig
 from dotenv import load_dotenv
 
+from flask import Flask
 from sqlalchemy import pool
 from sqlalchemy import engine_from_config
 
@@ -12,9 +13,8 @@ load_dotenv()
 # Alembic Config object — provides access to values in alembic.ini
 config = context.config
 
-# Override sqlalchemy.url from the environment so alembic.ini never needs
-# a hardcoded connection string.
-db_url = os.getenv("DEVELOPMENT_DATABASE_URL")
+# Set sqlalchemy.url from the environment so alembic.ini never needs a hardcoded string.
+db_url = os.getenv("DATABASE_URL") or os.getenv("DEVELOPMENT_DATABASE_URL")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
@@ -23,11 +23,14 @@ if db_url:
 if config.config_file_name is not None and os.path.exists(config.config_file_name):
     fileConfig(config.config_file_name)
 
-# Import the Flask app and db so that target_metadata reflects the real schema.
-# All models must be imported here (directly or transitively) so SQLAlchemy
-# registers them on db.metadata before autogenerate inspects it.
-from Api.app import createApp
+# Build a minimal Flask app just to initialise SQLAlchemy and collect metadata.
+# Avoids spinning up mail, limiter, Celery, etc., which require live services.
 from Api.database import db
+
+_app = Flask(__name__)
+_app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///:memory:"
+_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(_app)
 
 # Import every model so its table is registered on db.metadata
 from Models.user import User                          # noqa: F401
@@ -48,9 +51,7 @@ from Models.weather import Weather                    # noqa: F401
 from Models.weather_state import WeatherState         # noqa: F401
 from Models.auth_token import AuthToken               # noqa: F401
 
-flask_app = createApp("development")
-
-with flask_app.app_context():
+with _app.app_context():
     target_metadata = db.metadata
 
 # PostGIS and other extension-owned tables that Alembic must never touch.

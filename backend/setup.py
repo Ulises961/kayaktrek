@@ -32,6 +32,8 @@ setup(
         'flask-mail',
         'flask-limiter',
         'gunicorn',
+        'pytest-dotenv',
+        'redis>=3.0',
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",
