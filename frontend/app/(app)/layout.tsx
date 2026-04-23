@@ -1,5 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/common/app-sidebar"
+import { ThemeToggle } from "@/components/common/theme-toggle"
+import { Separator } from "@/components/ui/separator"
 import React from "react"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -9,12 +11,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex overflow-auto min-h-screen w-full p-1">
         <div className="w-full h-screen flex flex-col">
           {/* Nav bar */}
-          <div className="h-auto border-b border-slate-200 flex flex-row items-center mb-10">
+          <header className="h-12 border-b border-border flex flex-row items-center gap-2 px-2 mb-6 shrink-0">
             <SidebarTrigger />
-            <div className="flex-1" />
-            {/* User menu — placeholder until M3a */}
-            <div className="w-8 h-8 rounded-full bg-slate-200 mr-2" />
-          </div>
+            <Separator orientation="vertical" className="h-4" />
+            {/* Breadcrumb — each page renders its own via slot pattern */}
+            <div id="breadcrumb-slot" className="flex-1 flex items-center" />
+            <ThemeToggle />
+          </header>
           {children}
         </div>
       </main>
