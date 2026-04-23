@@ -255,6 +255,97 @@ def itinerary(client, auth_headers, trip_w_o_itinerary):
 
 
 @pytest.fixture(scope="function")
+def trip_with_invitation(client, auth_headers, user_2, auth_headers_2):
+    """
+    Creates a trip (user_1=leader) with a pending invitation to user_2.
+
+    Yields a dict:
+        {
+            "trip": <trip response dict>,
+            "leader_headers": <auth headers for user_1>,
+            "invitee_headers": <auth headers for user_2>,
+            "invitee_id": <user_2 id string>,
+        }
+    """
+    response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    trip_data = json.loads(response.data)
+    trip_id = trip_data["id"]
+
+    inv_response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invite",
+        json={"userId": str(user_2.id)},
+        headers=auth_headers,
+    )
+    assert inv_response.status_code == 201
+
+    yield {
+        "trip": trip_data,
+        "leader_headers": auth_headers,
+        "invitee_headers": auth_headers_2,
+        "invitee_id": str(user_2.id),
+    }
+
+    try:
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    except Exception:
+        pass
+
+
+@pytest.fixture(scope="function")
+def trip_with_user2_as_crew(client, auth_headers, user_2, auth_headers_2):
+    """
+    Creates a trip (user_1=leader), invites user_2, and has user_2 accept.
+
+    Yields a dict:
+        {
+            "trip": <trip response dict>,
+            "leader_headers": <auth headers for user_1>,
+            "crew_headers": <auth headers for user_2>,
+            "crew_id": <user_2 id string>,
+        }
+    """
+    response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    trip_data = json.loads(response.data)
+    trip_id = trip_data["id"]
+
+    inv_response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invite",
+        json={"userId": str(user_2.id)},
+        headers=auth_headers,
+    )
+    assert inv_response.status_code == 201
+
+    accept_response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invitation",
+        json={"accepted": True},
+        headers=auth_headers_2,
+    )
+    assert accept_response.status_code == 200
+
+    yield {
+        "trip": trip_data,
+        "leader_headers": auth_headers,
+        "crew_headers": auth_headers_2,
+        "crew_id": str(user_2.id),
+    }
+
+    try:
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    except Exception:
+        pass
+
+
+@pytest.fixture(scope="function")
 def trip_with_crew(app, client, auth_headers):
     """
     Creates a trip (user_1 = leader) and a fresh crew member.

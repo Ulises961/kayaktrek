@@ -178,6 +178,102 @@ def update_trip(id: str):
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
+@trip_api.route("/<string:id>/invite", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def invite_user(id: str):
+    """
+    POST /api/trip/<id>/invite — Leader invites a user to the trip.
+
+    Body: {"userId": "<uuid>"}
+    Returns 201 with the invitation, 404 if trip/user not found, 409 if already invited or member.
+    """
+    try:
+        body = request.get_json()
+        invitee_id = body.get("userId") if body else None
+        if not invitee_id:
+            abort(HTTPStatus.BAD_REQUEST, description="'userId' field is required")
+        TripService.invite_user(id, invitee_id)
+        return jsonify({"message": "Invitation sent"}), HTTPStatus.CREATED
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/invite/<string:invitee_id>", methods=["DELETE"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def cancel_invitation(id: str, invitee_id: str):
+    """
+    DELETE /api/trip/<id>/invite/<invitee_id> — Leader cancels a pending invitation.
+
+    Returns 200 on success, 404 if no pending invitation exists.
+    """
+    try:
+        TripService.cancel_invitation(id, invitee_id)
+        return jsonify({"message": "Invitation cancelled"}), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/invitation", methods=["POST"])
+@JWTService.authenticate_restful
+def handle_invitation(id: str):
+    """
+    POST /api/trip/<id>/invitation — Current user accepts or declines their invitation.
+
+    Body: {"accepted": true | false}
+    Returns 200 on success, 404 if no valid invitation found.
+    """
+    try:
+        body = request.get_json()
+        if body is None or "accepted" not in body:
+            abort(HTTPStatus.BAD_REQUEST, description="'accepted' field is required")
+        TripService.handle_invitation(id, bool(body["accepted"]))
+        action = "accepted" if body["accepted"] else "declined"
+        return jsonify({"message": f"Invitation {action}"}), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/<string:user_id>", methods=["DELETE"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def remove_member(id: str, user_id: str):
+    """
+    DELETE /api/trip/<id>/member/<user_id> — Leader removes a crew member from the trip.
+
+    Returns 200 on success, 404 if user is not a member, 409 if target is the leader.
+    """
+    try:
+        TripService.remove_member(id, user_id)
+        return jsonify({"message": "Member removed"}), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @trip_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
