@@ -1,7 +1,4 @@
-import uuid
 
-import uuid_extension
-from Api.database import db
 from flask_bcrypt import generate_password_hash
 from Models.base_model import BaseModel
 from Models.inventory import Inventory
@@ -10,11 +7,10 @@ from Models.itinerary import Itinerary
 from Models.user_has_itinerary import user_has_itinerary
 from Models.user_has_inventory import user_has_inventory
 from Models.user_has_items import user_has_items
-from Models.user_has_invitation import user_has_invitation
 from Models.trip_member import TripMember
 from Models.user_endorses_log import user_endorses_log
 from Models.user_has_profile_picture import userHasProfilePicture
-from sqlalchemy import Integer, String, Boolean
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 
@@ -23,6 +19,7 @@ if TYPE_CHECKING:
     from Models.image import Image
     from Models.trip import Trip
     from Models.auth_token import AuthToken
+    from Models.invitation import Invitation
 
 
 class User(BaseModel):
@@ -57,8 +54,10 @@ class User(BaseModel):
     trips: Mapped[List["Trip"]] = relationship(
         secondary="trip_member", viewonly=True
     )
-    invitations: Mapped[List["Trip"]] = relationship(
-        secondary=user_has_invitation, back_populates="pending_travellers"
+    received_invitations: Mapped[List["Invitation"]] = relationship(
+        "Invitation",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
     endorsed_logs: Mapped[List["Log"]] = relationship(
         secondary=user_endorses_log, back_populates="user_endorsed_logs"

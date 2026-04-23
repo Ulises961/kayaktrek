@@ -1,12 +1,10 @@
 import enum
-import uuid
 from datetime import date
-
-import uuid_extension
-from Api.database import db
-from sqlalchemy import Date, Enum, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, TYPE_CHECKING
+
+from sqlalchemy import Date, Enum, String
+from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel
 
@@ -15,6 +13,7 @@ if TYPE_CHECKING:
     from Models.inventory import Inventory
     from Models.user import User
     from Models.trip_member import TripMember
+    from Models.invitation import Invitation
 
 
 class TripStateType(enum.Enum):
@@ -52,9 +51,15 @@ class Trip(BaseModel):
     travellers: Mapped[List["User"]] = relationship(
         secondary="trip_member", viewonly=True
     )
-    pending_travellers: Mapped[List["User"]] = relationship(
-        secondary="user_has_invitation", back_populates="invitations"
+    invitations: Mapped[List["Invitation"]] = relationship(
+        "Invitation",
+        back_populates="trip",
+        cascade="all, delete-orphan",
     )
+    # Proxy: exposes the invited User objects via the invitations collection.
+    # TripSchema.pending_travellers uses this attribute — keeps serialisation unchanged.
+    pending_travellers = association_proxy("invitations", "user")
+
     state: Mapped[TripStateType] = mapped_column(
         Enum(TripStateType), nullable=False, default=TripStateType.DRAFT, index=True
     )

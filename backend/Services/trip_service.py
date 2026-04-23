@@ -4,20 +4,20 @@ Trip Service - Business logic for trip operations.
 
 import logging
 import math
-from datetime import date
-from typing import List, Optional, cast
+from datetime import date, timedelta
+from typing import List, Optional
 from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
-from Schemas.trip_member_schema import TripMemberSchema
+from Models.invitation import Invitation
 from Models.user import User
-from Models.user_has_invitation import user_has_invitation
+from Schemas.trip_member_schema import TripMemberSchema
 from Schemas.trip_schema import TripSchema
 from Api.database import db
-from sqlalchemy.orm import selectinload, contains_eager
+from sqlalchemy.orm import selectinload
 from Services.user_service import UserService
 from Schemas.base_schema import camelcase
 
@@ -27,25 +27,29 @@ logger = logging.getLogger(__name__)
 # state is excluded — transitions go through transition_trip_state() only.
 _MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to"}
 
+_INVITATION_TTL_DAYS = 7
+
 
 class TripService:
     """Service class for Trip-related business logic."""
 
     @staticmethod
-    def get_trip_by_id(id: str) -> Optional[Trip]:
+    def get_trip_by_id(id: str, eager: bool = True) -> Trip:
         """
         Retrieve a trip by its id (UUID).
-
-        Args:
-            id: The id of the trip to retrieve
-
-        Returns:
-            Trip object if found
 
         Raises:
             NoResultFound: If trip doesn't exist
         """
-        trip = db.session.query(Trip).filter_by(id=UUID(id)).first()
+        query = db.session.query(Trip)
+        if eager:
+            query = query.options(
+                selectinload(Trip.trip_members).selectinload(TripMember.user),
+                selectinload(Trip.invitations).selectinload(Invitation.user),
+                selectinload(Trip.inventory),
+                selectinload(Trip.itinerary),
+            )
+        trip = query.filter_by(id=UUID(id)).first()
         if not trip:
             logger.warning(f"Trip with id {id} not found")
             raise NoResultFound(f"Trip {id} not found in database")
@@ -69,6 +73,12 @@ class TripService:
             db.session.query(Trip)
             .join(TripMember, TripMember.trip_id == Trip.id)
             .filter(TripMember.user_id == UUID(user_id))
+            .options(
+                selectinload(Trip.trip_members).selectinload(TripMember.user),
+                selectinload(Trip.invitations).selectinload(Invitation.user),
+                selectinload(Trip.inventory),
+                selectinload(Trip.itinerary),
+            )
         )
         total = query.count()
         items = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -91,7 +101,7 @@ class TripService:
             ValidationError: If data is invalid
             IntegrityError: If database constraints are violated
         """        
-        logger.info(f"Creating new trip")
+        logger.info("Creating new trip")
         
         current_user = UserService.get_user_by_id(str(g.current_user_id))
 
@@ -126,12 +136,9 @@ class TripService:
             Updated Trip object
 
         Raises:
-            ValidationError: If data is invalid
             NoResultFound: If trip doesn't exist
         """
         existing_trip = TripService.get_trip_by_id(trip_id)
-        if not existing_trip:
-            raise NoResultFound(f"Trip {trip_id} not found")
 
         logger.info(f"Updating trip {trip_id}")
 
@@ -156,17 +163,16 @@ class TripService:
     @staticmethod
     def delete_trip(trip_id: str, for_everyone: bool) -> None:
         """
-        Delete a trip by its ID.
+        Delete a trip or remove the current user from it.
 
-        Args:
-            trip_id: The ID of the trip to delete
-            for_everyone: If True, delete the trip entirely. If False, only remove current user's association.
+        If for_everyone is True the whole trip is deleted.
+        If False, only the current user's membership is removed; if no
+        members remain afterwards the trip is also deleted.
 
         Raises:
-            NoResultFound: If trip doesn't exist
+            NoResultFound: If trip doesn't exist or user isn't a member
         """
         trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
-
         if not trip:
             raise NoResultFound(f"Trip with id {trip_id} not found")
 
@@ -179,21 +185,16 @@ class TripService:
         else:
             # Only remove the current user's association with the trip
             user_id = g.current_user_id
-
             membership = (
                 db.session.query(TripMember)
                 .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
                 .first()
             )
-
             if not membership:
-                raise NoResultFound(
-                    f"User {user_id} is not associated with trip {trip_id}"
-                )
+                raise NoResultFound(f"User {user_id} is not associated with trip {trip_id}")
 
             db.session.delete(membership)
             db.session.commit()
-
             logger.info(f"Removed user {user_id} from trip {trip_id}")
 
             # Delete the trip if no users remain (business logic decision)
@@ -205,11 +206,9 @@ class TripService:
                 logger.info(f"Trip {trip_id} had no remaining users and was deleted")
 
     @staticmethod
-    def get_invitations_by_user(
-        user_id: str, include_expired: bool = False
-    ) -> List[Trip]:
+    def get_invitations_by_user(user_id: str, include_expired: bool = False) -> List[Trip]:
         """
-        Retrieve all invitations to trips received by the user
+         Retrieve all invitations to trips received by the user
 
         Args:
             user_id: The ID of the invited user
@@ -218,27 +217,143 @@ class TripService:
 
         Returns:
             List of Trip objects referenced in the invitation
+        Raises:
+            NoResultFound: If the user doesn't exist
         """
-        query = (
-            db.session.query(User)
-            .join(user_has_invitation, User.id == user_has_invitation.c.user_id)
-            .join(Trip, user_has_invitation.c.trip_id == Trip.id)
-            .options(contains_eager(User.invitations))
-            .filter(User.id == UUID(user_id))
-        )
-
-        # Filter by expiration date if requested
-        if not include_expired:
-            query = query.filter(user_has_invitation.c.expiration_date >= date.today())
-
-        user = query.first()
-
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
-        invitations = user.invitations
+        query = (
+            db.session.query(Invitation)
+            .options(
+                selectinload(Invitation.trip).options(
+                    selectinload(Trip.trip_members).selectinload(TripMember.user),
+                    selectinload(Trip.invitations).selectinload(Invitation.user),
+                    selectinload(Trip.inventory),
+                    selectinload(Trip.itinerary),
+                )
+            )
+            .filter(Invitation.user_id == UUID(user_id))
+        )
+        if not include_expired:
+            query = query.filter(Invitation.expires_at >= date.today())
+
+        invitations = query.all()
         logger.info(f"Found {len(invitations)} invitations for user {user_id}")
-        return invitations
+        return [inv.trip for inv in invitations]
+
+    @staticmethod
+    def invite_user(trip_id: str, invitee_id: str) -> Invitation:
+        """
+        Create an invitation for invitee_id to join trip_id.
+
+        Raises:
+            NoResultFound: If the trip or invitee doesn't exist
+            ValueError: If invitee is already a member or has a pending invitation
+        """
+        # Query to check existence, if not found the called method raises an exception that bubbles up to the error handler
+        TripService.get_trip_by_id(trip_id, eager=False)
+
+        invitee = db.session.query(User).filter_by(id=UUID(invitee_id)).first()
+        if not invitee:
+            raise NoResultFound(f"User {invitee_id} not found")
+
+        already_member = db.session.query(TripMember).filter_by(
+            user_id=UUID(invitee_id), trip_id=UUID(trip_id)
+        ).first()
+        if already_member:
+            raise ValueError(f"User {invitee_id} is already a member of trip {trip_id}")
+
+        existing = db.session.query(Invitation).filter_by(
+            user_id=UUID(invitee_id), trip_id=UUID(trip_id)
+        ).first()
+        if existing and not existing.is_expired:
+            raise ValueError(f"User {invitee_id} already has a pending invitation to trip {trip_id}")
+        if existing:
+            db.session.delete(existing)
+
+        invitation = Invitation()
+        invitation.user_id = UUID(invitee_id)
+        invitation.trip_id = UUID(trip_id)
+        invitation.expires_at = date.today() + timedelta(days=_INVITATION_TTL_DAYS)
+        db.session.add(invitation)
+        db.session.commit()
+
+        logger.info(f"User {invitee_id} invited to trip {trip_id}")
+        return invitation
+
+    @staticmethod
+    def handle_invitation(trip_id: str, accepted: bool) -> None:
+        """
+        Accept or decline a trip invitation for the current user.
+
+        Raises:
+            NoResultFound: If invitation doesn't exist or has expired
+        """
+        user_id = g.current_user_id
+
+        invitation = db.session.query(Invitation).filter_by(
+            user_id=UUID(user_id), trip_id=UUID(trip_id)
+        ).first()
+
+        if not invitation or invitation.is_expired:
+            raise NoResultFound(f"No valid invitation found for user {user_id} to trip {trip_id}")
+
+        if accepted:
+            membership = TripMemberSchema().load({
+                'user_id': invitation.user_id,
+                'trip_id': invitation.trip_id,
+                'role': MemberRoleType.CREW.value,
+            })
+            db.session.add(membership)
+            logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
+        else:
+            logger.info(f"User {user_id} declined invitation to trip {trip_id}")
+
+        db.session.delete(invitation)
+        db.session.commit()
+
+    @staticmethod
+    def cancel_invitation(trip_id: str, invitee_id: str) -> None:
+        """
+        Cancel a pending invitation (leader action).
+
+        Raises:
+            NoResultFound: If no pending invitation exists
+        """
+        invitation = db.session.query(Invitation).filter_by(
+            user_id=UUID(invitee_id), trip_id=UUID(trip_id)
+        ).first()
+
+        if not invitation:
+            raise NoResultFound(f"No invitation found for user {invitee_id} to trip {trip_id}")
+
+        db.session.delete(invitation)
+        db.session.commit()
+        logger.info(f"Invitation for user {invitee_id} to trip {trip_id} cancelled")
+
+    @staticmethod
+    def remove_member(trip_id: str, user_id: str) -> None:
+        """
+        Remove a crew member from a trip (leader action).
+
+        Raises:
+            NoResultFound: If the user isn't a member of the trip
+            ValueError: If attempting to remove the leader
+        """
+        membership = db.session.query(TripMember).filter_by(
+            user_id=UUID(user_id), trip_id=UUID(trip_id)
+        ).first()
+
+        if not membership:
+            raise NoResultFound(f"User {user_id} is not a member of trip {trip_id}")
+        if membership.role == MemberRoleType.LEADER:
+            raise ValueError("Cannot remove the trip leader")
+
+        db.session.delete(membership)
+        db.session.commit()
+        logger.info(f"Removed user {user_id} from trip {trip_id}")
 
     @staticmethod
     def transition_trip_state(trip_id: str, new_state_value: str) -> Trip:
@@ -262,76 +377,8 @@ class TripService:
             raise ValueError(f"Invalid state '{new_state_value}'. Valid values: {[s.value for s in TripStateType]}")
 
         trip = TripService.get_trip_by_id(trip_id)
-        if not trip:
-            raise NoResultFound(f"Trip {trip_id} not found")
         trip.transition_state(new_state)
         db.session.commit()
         db.session.refresh(trip)
         logger.info(f"Trip {trip_id} transitioned to '{new_state_value}'")
         return trip
-
-    @staticmethod
-    def handle_invitation(trip_id: str, accepted: bool) -> None:
-        """
-        Accept or reject a trip invitation.
-        
-        Args:
-            trip_id: The ID of the trip for the invitation
-            accepted: True to accept, False to reject
-            
-        Raises:
-            NoResultFound: If invitation doesn't exist or has expired
-        """
-        user_id = g.current_user_id
-        
-        # Query user with the specific invitation (filters by expiration in the join)
-        user = (
-            db.session.query(User)
-            .join(user_has_invitation, User.id == user_has_invitation.c.user_id)
-            .join(Trip, user_has_invitation.c.trip_id == Trip.id)
-            .options(contains_eager(User.invitations))
-            .filter(
-                User.id == UUID(user_id),
-                Trip.id == UUID(trip_id)
-            )
-            .first()
-        )
-        
-        if not user:
-            raise NoResultFound(f"No invitation found for user {user_id} to trip {trip_id}")
-        
-        # Check if user.invitations contains the trip (loaded via contains_eager)
-        if not user.invitations:
-            raise NoResultFound(f"Invitation not found")
-        
-        trip = user.invitations[0]  # Should only be one trip due to filter
-        
-        # Get the invitation record to check expiration
-        invitation_record = (
-            db.session.execute(
-                user_has_invitation.select().where(
-                    user_has_invitation.c.user_id == user.id,
-                    user_has_invitation.c.trip_id == trip_id
-                )
-            ).first()
-        )
-        
-        if not invitation_record or invitation_record.expiration_date < date.today():
-            raise NoResultFound(f"Invitation expired or not found")
-        
-        if accepted:
-            # Remove from invitations and add as crew member
-            user.invitations.remove(trip)
-            membership = TripMemberSchema().load({
-                'user_id': user.id,
-                'trip_id': trip.id,
-                'role': MemberRoleType.CREW.value,
-            })
-            db.session.add(membership)
-            logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
-        else:
-            # Just remove from invitations
-            user.invitations.remove(trip)
-            logger.info(f"User {user_id} rejected invitation to trip {trip_id}")
-        
-        db.session.commit()
