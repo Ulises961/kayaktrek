@@ -3,6 +3,9 @@ import { TravellerSchema } from "./user";
 import { InventorySchema } from "./inventory";
 import { ItinerarySchema } from "./itinerary";
 
+export const TRIP_STATES = ["draft", "planning", "happening", "past"] as const;
+export type TripState = typeof TRIP_STATES[number];
+
 export const TripSchema = z.object({
   id: z.uuidv7().optional(),
   isDraft: z.boolean().optional(),
