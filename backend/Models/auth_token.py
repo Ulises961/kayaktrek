@@ -27,7 +27,10 @@ class AuthToken(BaseModel):
         UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
-    type: Mapped[AuthTokenType] = mapped_column(Enum(AuthTokenType), nullable=False)
+    type: Mapped[AuthTokenType] = mapped_column(
+        Enum(AuthTokenType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

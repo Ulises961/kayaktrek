@@ -61,7 +61,10 @@ class Trip(BaseModel):
     pending_travellers = association_proxy("invitations", "user")
 
     state: Mapped[TripStateType] = mapped_column(
-        Enum(TripStateType), nullable=False, default=TripStateType.DRAFT, index=True
+        Enum(TripStateType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=TripStateType.DRAFT,
+        index=True,
     )
     destination: Mapped[String] = mapped_column(String, nullable=True)
     description: Mapped[String] = mapped_column(String, nullable=True)

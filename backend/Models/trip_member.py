@@ -23,7 +23,10 @@ class TripMember(BaseModel):
 
     user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     trip_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("trip.id", ondelete="CASCADE"), nullable=False, index=True)
-    role: Mapped[MemberRoleType] = mapped_column(Enum(MemberRoleType), nullable=False)
+    role: Mapped[MemberRoleType] = mapped_column(
+        Enum(MemberRoleType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+    )
 
     user: Mapped["User"] = relationship(back_populates="trip_memberships", passive_deletes=True)
     trip: Mapped["Trip"] = relationship(back_populates="trip_members", passive_deletes=True)

@@ -55,7 +55,7 @@ class TripRequirement(BaseModel):
 
     checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[RequirementStatusType] = mapped_column(
-        Enum(RequirementStatusType),
+        Enum(RequirementStatusType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
         default=RequirementStatusType.NEEDED,
     )
