@@ -4,8 +4,8 @@ import type { Size } from "@/lib/types/ui"
 
 interface UserAvatarProps {
   name: string
-  surname?: string
-  imageUrl?: string
+  surname?: string | null
+  imageUrl?: string | null
   size?: Size
   className?: string
 }

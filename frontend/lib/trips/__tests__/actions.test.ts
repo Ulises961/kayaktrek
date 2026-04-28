@@ -8,7 +8,7 @@ vi.mock("@/lib/api/client", () => ({
 
 import { revalidatePath } from "next/cache"
 import { apiPost, apiDelete } from "@/lib/api/client"
-import { inviteUser, cancelInvitation, handleInvitation } from "../actions"
+import { inviteUser, cancelInvitation, handleInvitation, createTrip } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const USER_ID = "01952f1a-0000-7000-8000-000000000020"
@@ -83,6 +83,34 @@ describe("handleInvitation", () => {
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("403"))
     const result = await handleInvitation(TRIP_ID, true)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("createTrip", () => {
+  const FIELDS = { destination: "Costa Brava", description: "5 days", dateFrom: "2026-07-01", dateTo: "2026-07-05" }
+
+  it("posts to /api/trip/create with the provided fields", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ id: TRIP_ID })
+    await createTrip(FIELDS)
+    expect(apiPost).toHaveBeenCalledWith("/api/trip/create", FIELDS)
+  })
+
+  it("returns success: true with the new tripId", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ id: TRIP_ID })
+    const result = await createTrip(FIELDS)
+    expect(result).toEqual({ success: true, tripId: TRIP_ID })
+  })
+
+  it("works with no fields (empty draft)", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ id: TRIP_ID })
+    const result = await createTrip({})
+    expect(result).toEqual({ success: true, tripId: TRIP_ID })
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
+    const result = await createTrip(FIELDS)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })
