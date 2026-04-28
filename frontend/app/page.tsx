@@ -1,9 +1,13 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import MapLoader from "@/components/map/map-loader"
+import { getSession } from "@/lib/auth/session"
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await getSession()
+  if (session) redirect("/dashboard")
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* Full-screen map */}
