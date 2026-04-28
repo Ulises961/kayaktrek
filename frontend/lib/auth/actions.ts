@@ -44,7 +44,7 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
     res = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mail, password }),
+      body: JSON.stringify({ mail, pwd: password }),
     })
   } catch {
     return { success: false, error: "Could not reach the server. Please try again." }
@@ -95,9 +95,7 @@ export async function register(_prevState: AuthResult | null, formData: FormData
     return { success: false, error: "Something went wrong. Please try again." }
   }
 
-  const { access_token, refresh_token } = await res.json()
-  await setAuthCookies(access_token, refresh_token)
-  redirect("/dashboard")
+  redirect("/login?registered=1")
 }
 
 export async function logout() {
