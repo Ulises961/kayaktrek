@@ -10,7 +10,7 @@ import { LogsSchema } from "./log";
 // circular schema dependencies.
 export const TravellerSchema = z.object({
   id: z.uuidv7().optional(),
-  mail: z.string().email(),
+  mail: z.email(),
   username: z.string(),
   name: z.string(),
   surname: z.string().optional(),
@@ -22,7 +22,7 @@ export const TravellerSchema = z.object({
 // Full user as returned by /api/user/:id
 export const UserSchema = z.object({
   id: z.uuidv7().optional(),
-  mail: z.string().email(),
+  mail: z.email(),
   username: z.string(),
   name: z.string(),
   surname: z.string().optional(),
