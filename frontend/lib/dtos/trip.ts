@@ -9,15 +9,15 @@ export type TripState = (typeof TRIP_STATES)[number]
 
 export const TripSchema = z.object({
   id: z.uuidv7().optional(),
-  state: z.enum(TRIP_STATES).optional(),
-  description: z.string().optional(),
-  destination: z.string().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-  inventory: InventorySchema.optional(),
-  itinerary: ItinerarySchema.optional(),
-  travellers: z.array(TripMemberSchema).optional(),
-  pendingTravellers: z.array(TravellerSchema).optional(),
+  state: z.enum(TRIP_STATES).nullish(),
+  description: z.string().nullish(),
+  destination: z.string().nullish(),
+  dateFrom: z.string().nullish(),
+  dateTo: z.string().nullish(),
+  inventory: InventorySchema.nullish(),
+  itinerary: ItinerarySchema.nullish(),
+  travellers: z.array(TripMemberSchema).nullish(),
+  pendingTravellers: z.array(TravellerSchema).nullish(),
 })
 
 export const TripPageSchema = z.object({

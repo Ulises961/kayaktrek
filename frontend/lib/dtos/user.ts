@@ -13,10 +13,10 @@ export const TravellerSchema = z.object({
   mail: z.email(),
   username: z.string(),
   name: z.string(),
-  surname: z.string().optional(),
-  phone: z.string(),
-  admin: z.boolean().optional(),
-  image: ImageSchema.optional(),
+  surname: z.string().nullish(),
+  phone: z.string().nullish(),
+  admin: z.boolean().nullish(),
+  image: ImageSchema.nullish(),
 });
 
 // Full user as returned by /api/user/:id
@@ -25,15 +25,15 @@ export const UserSchema = z.object({
   mail: z.email(),
   username: z.string(),
   name: z.string(),
-  surname: z.string().optional(),
-  phone: z.string(),
-  admin: z.boolean().optional(),
-  image: ImageSchema.optional(),
-  itineraries: ItinerariesSchema.optional(),
-  inventories: InventoriesSchema.optional(),
-  items: ItemsSchema.optional(),
-  endorsedLogs: LogsSchema.optional(),
-  logs: LogsSchema.optional(),
+  surname: z.string().nullish(),
+  phone: z.string().nullish(),
+  admin: z.boolean().nullish(),
+  image: ImageSchema.nullish(),
+  itineraries: ItinerariesSchema.nullish(),
+  inventories: InventoriesSchema.nullish(),
+  items: ItemsSchema.nullish(),
+  endorsedLogs: LogsSchema.nullish(),
+  logs: LogsSchema.nullish(),
 });
 
 export type Traveller = z.infer<typeof TravellerSchema>;

@@ -8,25 +8,25 @@ export type PointType = z.infer<typeof PointTypeSchema>;
 // separately with z.lazy() to break the recursion.
 export type Point = {
   id?: string;
-  latitude?: number;
-  longitude?: number;
-  notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   type: PointType;
-  dayId?: string;
-  next?: Point;
-  images?: z.infer<typeof ImageSchema>[];
+  dayId?: string | null;
+  next?: Point | null;
+  images?: z.infer<typeof ImageSchema>[] | null;
 };
 
 export const PointSchema: z.ZodType<Point> = z.lazy(() =>
   z.object({
     id: z.uuidv7().optional(),
-    latitude: z.number().min(-90).max(90).optional(),
-    longitude: z.number().min(-180).max(180).optional(),
-    notes: z.string().optional(),
+    latitude: z.number().min(-90).max(90).nullish(),
+    longitude: z.number().min(-180).max(180).nullish(),
+    notes: z.string().nullish(),
     type: PointTypeSchema,
-    dayId: z.uuidv7().optional(),
-    next: PointSchema.optional(),
-    images: z.array(ImageSchema).optional(),
+    dayId: z.uuidv7().nullish(),
+    next: PointSchema.nullish(),
+    images: z.array(ImageSchema).nullish(),
   })
 );
 
