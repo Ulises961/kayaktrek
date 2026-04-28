@@ -1,6 +1,6 @@
 'use client'
 import clsx from "clsx";
-import { LifeBuoyIcon, NewspaperIcon } from "lucide-react";
+import { LifeBuoyIcon, NewspaperIcon, MailIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation"
 import { GlobeAmericasIcon } from "../icons/heroicons-globe-americas";
 import { UserGroupIcon } from "../icons/heroicons-user-group";
@@ -13,6 +13,7 @@ export function NavigationItems() {
 
     const menuItems = [
         { title: "Trips", url: "/trips", icon: GlobeAmericasIcon },
+        { title: "Invitations", url: "/invitations", icon: MailIcon },
         { title: "Inventory", url: "#", icon: LifeBuoyIcon },
         { title: "Buddies", url: "#", icon: UserGroupIcon },
         { title: "Logs", url: "#", icon: NewspaperIcon }
