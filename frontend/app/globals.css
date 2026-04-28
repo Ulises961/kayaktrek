@@ -121,6 +121,10 @@
   --state-past-bg:          oklch(0.899 0.012 248);
   --state-past-fg:          oklch(0.48 0.018 248);
 
+  /* Card shadows — blue-tinted depth */
+  --card-shadow:       0 1px 3px oklch(0.43 0.165 243 / 0.08), 0 4px 12px oklch(0.43 0.165 243 / 0.06);
+  --card-shadow-hover: 0 4px 8px oklch(0.43 0.165 243 / 0.12), 0 8px 24px oklch(0.43 0.165 243 / 0.08);
+
   /* Chart — ocean-inspired data visualisation palette */
   --chart-1: oklch(0.646 0.165 243);   /* ocean blue */
   --chart-2: oklch(0.62 0.13 184);     /* sea teal */
@@ -182,6 +186,9 @@
   --state-past-fg:          oklch(0.56 0.014 248);
 
   /* Chart */
+  --card-shadow:       0 1px 3px oklch(0 0 0 / 0.3), 0 4px 12px oklch(0 0 0 / 0.25);
+  --card-shadow-hover: 0 4px 8px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
+
   --chart-1: oklch(0.64 0.125 225);
   --chart-2: oklch(0.62 0.13 175);
   --chart-3: oklch(0.76 0.155 80);
@@ -195,5 +202,17 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  [data-slot="card"] {
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  [data-slot="card"]:has(a:hover),
+  a:hover > [data-slot="card"] {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-1px);
   }
 }
