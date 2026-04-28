@@ -18,6 +18,13 @@ Usage (inside a task):
 import os
 from celery import Celery
 from dotenv import load_dotenv
+from kombu.transport.pyamqp import Transport as _AMQPTransport
+
+# Kombu returns False for RabbitMQ >= 3.3, which causes Celery to call
+# basic_qos with global_=True (channel-level QoS). RabbitMQ 3.12 deprecated
+# that flag. Returning True here makes Celery use global_=False (per-consumer
+# QoS), which RabbitMQ >= 3.3 implements correctly.
+_AMQPTransport.qos_semantics_matches_spec = lambda self, connection: True
 
 load_dotenv()
 
@@ -33,9 +40,6 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # Use per-consumer QoS (global=False in basic.qos) — avoids the
-    # RabbitMQ global_qos deprecation warning introduced in RabbitMQ 3.12.
-    broker_transport_options={'global_qos': False},
     # Disable remote control (celery inspect/control). Removes the transient
     # non-exclusive pidbox queues that trigger the transient_nonexcl_queues
     # deprecation warning in RabbitMQ 3.12+.
