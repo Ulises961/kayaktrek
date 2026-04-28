@@ -1,6 +1,7 @@
 *.wiki
 *.bkp
 *.dtmp
+ROADMAP.md
 .vscode
 .pytest*
 .env
