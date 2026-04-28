@@ -1,86 +1,31 @@
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import CurrentPageTitle from "@/components/common/current-page-title";
-import { Trip, TripsSchema } from "@/lib/dtos/trip";
-import z from "zod";
-import { PlusIcon } from "lucide-react";
-import Link from "next/link";
-
-
-
-async function fetchTrips(): Promise<string> {
-    await new Promise((resolve) => {
-        setTimeout(() => {
-            resolve;
-        }, 5000); // Simulate 5-second delay
-    });
-    return JSON.stringify([
-        {
-            destination: "Greece",
-            from: "10/11/2026",
-            to: "17/11/2026",
-            buddies: [
-                { nome: "carlo", avatar: "avatar", skill: "advanced" },
-                { nome: "mario", avatar: "avatar", skill: "advanced" },
-                { nome: "giulia", avatar: "avatar", skill: "advanced" },
-            ],
-        },
-        {
-            destination: "Greece",
-            from: "10/11/2026",
-            to: "17/11/2026",
-            buddies: [
-                { nome: "carlo", avatar: "avatar", skill: "advanced" },
-                { nome: "mario", avatar: "avatar", skill: "advanced" },
-                { nome: "giulia", avatar: "avatar", skill: "advanced" },
-            ],
-        },
-        {
-            destination: "Greece",
-            from: "10/11/2026",
-            to: "17/11/2026",
-            buddies: [
-                { nome: "carlo", avatar: "avatar", skill: "advanced" },
-                { nome: "mario", avatar: "avatar", skill: "advanced" },
-                { nome: "giulia", avatar: "avatar", skill: "advanced" },
-            ],
-        },
-    ])
-}
-
+import { getSession } from "@/lib/auth/session"
+import { apiGet } from "@/lib/api/client"
+import { TripPageSchema } from "@/lib/dtos/trip"
+import { TripCard } from "@/components/common/trip-card"
+import CurrentPageTitle from "@/components/common/current-page-title"
+import { redirect } from "next/navigation"
 
 export default async function Page() {
+  const session = await getSession()
+  if (!session) redirect("/login")
 
+  const raw = await apiGet(`/api/trip/${session.userId}/all`)
+  const { items: trips, total } = TripPageSchema.parse(raw)
 
-    let trips: Array<Trip> = await TripsSchema.parseAsync(fetchTrips());
-    const navigate = () => { };
-    return (
-        <>
-            <CurrentPageTitle />
-
-            <div className="w-full bg-blue-500">
-                {trips.map((trip, index) => (
-                    <Card className="w-full m-1" key={trip.id}>
-                        <CardHeader>
-                            <CardTitle>{trip.destination}</CardTitle>
-                            <CardAction>
-                                <Link
-                                    href={{
-                                        pathname: '/about',
-                                        query: { name: 'test' },
-                                    }}
-                                >
-                                    About
-                                </Link>                                <PlusIcon /></CardAction>
-                        </CardHeader>
-                        <CardContent>
-                            <p>Card Content</p>
-                        </CardContent>
-                        <CardFooter>
-                            <p>Card Footer</p>
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
-        </>
-    );
+  return (
+    <>
+      <CurrentPageTitle />
+      {total === 0 ? (
+        <p className="text-muted-foreground text-sm mt-8 text-center">
+          No trips yet. Create one to get started.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3 mt-4">
+          {trips.map((trip) => (
+            <TripCard key={trip.id} trip={trip} />
+          ))}
+        </div>
+      )}
+    </>
+  )
 }
