@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { apiGet } from "@/lib/api/client"
 import { TripPageSchema } from "@/lib/dtos/trip"
 import { TripCard } from "@/components/common/trip-card"
+import { NewTripDialog } from "@/components/trips/new-trip-dialog"
 import { NoTripsIllustration } from "@/components/illustrations/no-trips"
 import CurrentPageTitle from "@/components/common/current-page-title"
 import { redirect } from "next/navigation"
@@ -15,7 +16,10 @@ export default async function Page() {
 
   return (
     <>
-      <CurrentPageTitle />
+      <div className="flex items-center justify-between mb-4">
+        <CurrentPageTitle />
+        <NewTripDialog />
+      </div>
       {total === 0 ? (
         <div className="flex flex-col items-center gap-4 mt-16 text-center">
           <NoTripsIllustration className="w-56 opacity-80" />

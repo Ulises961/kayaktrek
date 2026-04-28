@@ -4,6 +4,23 @@ import { revalidatePath } from "next/cache"
 import { apiPost, apiDelete } from "@/lib/api/client"
 
 export type TripActionResult = { success: true } | { success: false; error: string }
+export type CreateTripResult = { success: true; tripId: string } | { success: false; error: string }
+
+interface TripFields {
+  destination?: string
+  description?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export async function createTrip(fields: TripFields): Promise<CreateTripResult> {
+  try {
+    const trip = await apiPost<{ id: string }>("/api/trip/create", fields)
+    return { success: true, tripId: trip.id }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to create trip." }
+  }
+}
 
 export async function inviteUser(tripId: string, userId: string): Promise<TripActionResult> {
   try {
