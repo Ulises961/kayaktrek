@@ -1,18 +1,21 @@
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { PageBreadcrumb } from "@/components/common/page-breadcrumb"
 import { ThemeToggle } from "@/components/common/theme-toggle"
+import { TripCard } from "@/components/common/trip-card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { TRIP_STATES } from "@/lib/dtos/trip"
+import { WindIcon, WavesIcon, MapPinIcon, UsersIcon, RadioIcon } from "lucide-react"
+import type { Trip } from "@/lib/dtos/trip"
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-[-0.01em]">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         <Separator className="mt-2" />
       </div>
       {children}
@@ -20,187 +23,274 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function TokenSwatch({ name, variable }: { name: string; variable: string }) {
-  return (
-    <div className="flex flex-col gap-1.5 min-w-[100px]">
-      <div
-        className="h-12 w-full rounded-md border border-border"
-        style={{ background: `var(${variable})` }}
-      />
-      <p className="text-xs text-muted-foreground font-mono leading-tight">{name}</p>
-      <p className="text-xs text-muted-foreground font-mono leading-tight opacity-60">{variable}</p>
-    </div>
-  )
+function Label({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">{children}</p>
 }
+
+// ── mock data ─────────────────────────────────────────────────────────────────
+
+const MOCK_TRIPS: Trip[] = [
+  {
+    id: "01952f1a-0000-7000-8000-000000000001",
+    destination: "Lofoten Archipelago",
+    state: "happening",
+    dateFrom: "2026-06-14",
+    dateTo: "2026-06-28",
+    travellers: [
+      { id: "01952f1a-0000-7000-8000-000000000011", role: "leader", user: { id: "01952f1a-0000-7000-8000-000000000021", mail: "u@example.com", username: "ulises", name: "Ulises", surname: "Sosa", phone: "+34600000001" } },
+      { id: "01952f1a-0000-7000-8000-000000000012", role: "crew",   user: { id: "01952f1a-0000-7000-8000-000000000022", mail: "c@example.com", username: "carlo",  name: "Carlo",  phone: "+39600000002" } },
+      { id: "01952f1a-0000-7000-8000-000000000013", role: "crew",   user: { id: "01952f1a-0000-7000-8000-000000000023", mail: "g@example.com", username: "giulia", name: "Giulia", surname: "Rossi", phone: "+39600000003" } },
+    ],
+  },
+  {
+    id: "01952f1a-0000-7000-8000-000000000002",
+    destination: "Sardinia — Gulf of Orosei",
+    state: "planning",
+    dateFrom: "2026-08-02",
+    dateTo: "2026-08-07",
+    travellers: [
+      { id: "01952f1a-0000-7000-8000-000000000014", role: "leader", user: { id: "01952f1a-0000-7000-8000-000000000021", mail: "u@example.com", username: "ulises", name: "Ulises", surname: "Sosa", phone: "+34600000001" } },
+    ],
+  },
+  {
+    id: "01952f1a-0000-7000-8000-000000000003",
+    destination: "Costa Brava Circuit",
+    state: "draft",
+    travellers: [],
+  },
+  {
+    id: "01952f1a-0000-7000-8000-000000000004",
+    destination: "Azores Crossing",
+    state: "past",
+    dateFrom: "2025-09-01",
+    dateTo: "2025-09-12",
+    travellers: [
+      { id: "01952f1a-0000-7000-8000-000000000015", role: "leader", user: { id: "01952f1a-0000-7000-8000-000000000021", mail: "u@example.com", username: "ulises", name: "Ulises", surname: "Sosa", phone: "+34600000001" } },
+      { id: "01952f1a-0000-7000-8000-000000000016", role: "crew",   user: { id: "01952f1a-0000-7000-8000-000000000022", mail: "c@example.com", username: "carlo",  name: "Carlo",  phone: "+39600000002" } },
+    ],
+  },
+]
+
+// ── page ──────────────────────────────────────────────────────────────────────
 
 export default function DesignPage() {
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-12">
-      <div className="flex items-center justify-between">
+    <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col gap-14">
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Design System</h1>
-          <p className="text-muted-foreground mt-1">Visual reference for all theming tokens and shared components.</p>
+          <h1 className="text-3xl font-bold tracking-[-0.01em]">Design Lab</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Component and token showcase. Toggle light / dark to verify both modes.
+          </p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2 shrink-0">
+          <ThemeToggle />
+        </div>
       </div>
 
-      {/* Breadcrumbs */}
-      <Section title="Breadcrumb">
-        <PageBreadcrumb crumbs={[
-          { label: "Trips", href: "/trips" },
-          { label: "Lofoten 2027", href: "/trips/abc" },
-          { label: "Detail" },
-        ]} />
-      </Section>
-
-      {/* Color tokens */}
-      <Section title="Color tokens">
-        <div className="flex flex-wrap gap-4">
-          <TokenSwatch name="background"    variable="--background" />
-          <TokenSwatch name="foreground"    variable="--foreground" />
-          <TokenSwatch name="card"          variable="--card" />
-          <TokenSwatch name="primary"       variable="--primary" />
-          <TokenSwatch name="primary-fg"    variable="--primary-foreground" />
-          <TokenSwatch name="secondary"     variable="--secondary" />
-          <TokenSwatch name="muted"         variable="--muted" />
-          <TokenSwatch name="muted-fg"      variable="--muted-foreground" />
-          <TokenSwatch name="accent"        variable="--accent" />
-          <TokenSwatch name="destructive"   variable="--destructive" />
-          <TokenSwatch name="border"        variable="--border" />
-        </div>
-        <p className="text-sm text-muted-foreground">State colors</p>
-        <div className="flex flex-wrap gap-4">
-          <TokenSwatch name="draft-bg"      variable="--state-draft-bg" />
-          <TokenSwatch name="draft-fg"      variable="--state-draft-fg" />
-          <TokenSwatch name="planning-bg"   variable="--state-planning-bg" />
-          <TokenSwatch name="planning-fg"   variable="--state-planning-fg" />
-          <TokenSwatch name="happening-bg"  variable="--state-happening-bg" />
-          <TokenSwatch name="happening-fg"  variable="--state-happening-fg" />
-          <TokenSwatch name="past-bg"       variable="--state-past-bg" />
-          <TokenSwatch name="past-fg"       variable="--state-past-fg" />
-        </div>
-        <p className="text-sm text-muted-foreground">Chart palette</p>
-        <div className="flex flex-wrap gap-4">
-          {[1, 2, 3, 4, 5].map(n => (
-            <TokenSwatch key={n} name={`chart-${n}`} variable={`--chart-${n}`} />
-          ))}
-        </div>
-      </Section>
-
-      {/* Typography */}
-      <Section title="Typography">
+      {/* ── 1. Trip list ─────────────────────────────────────────────────────── */}
+      <Section title="1 — Trip list" subtitle="Real TripCard component. All four states. Hover a card to see lift.">
         <div className="flex flex-col gap-3">
-          <h1 className="text-4xl font-bold">Heading 1 — Kayak Expedition</h1>
-          <h2 className="text-3xl font-bold">Heading 2 — Kayak Expedition</h2>
-          <h3 className="text-2xl font-semibold">Heading 3 — Kayak Expedition</h3>
-          <h4 className="text-xl font-semibold">Heading 4 — Kayak Expedition</h4>
-          <p className="text-base">Body — The route follows the coastline from Henningsvær to Nusfjord over six days, passing sea stacks and sheltered coves.</p>
-          <p className="text-sm text-muted-foreground">Small muted — Last updated 3 days ago</p>
-          <code className="text-sm font-mono bg-muted px-2 py-1 rounded-md w-fit">code — GET /api/trip/:id</code>
-        </div>
-      </Section>
-
-      {/* Buttons */}
-      <Section title="Buttons">
-        <div className="flex flex-wrap gap-3 items-center">
-          <Button>Default</Button>
-          <Button variant="secondary">Secondary</Button>
-          <Button variant="outline">Outline</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button variant="destructive">Destructive</Button>
-          <Button disabled>Disabled</Button>
-        </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <Button size="sm">Small</Button>
-          <Button size="default">Default</Button>
-          <Button size="lg">Large</Button>
-        </div>
-      </Section>
-
-      {/* State badges */}
-      <Section title="State badges">
-        <div className="flex flex-wrap gap-3 items-center">
-          {TRIP_STATES.map(state => (
-            <StateBadge key={state} state={state} />
+          {MOCK_TRIPS.map((trip) => (
+            <TripCard key={trip.id} trip={trip} />
           ))}
         </div>
       </Section>
 
-      {/* User avatars */}
-      <Section title="User avatars">
-        <div className="flex flex-wrap gap-6 items-end">
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar name="Ulises" surname="Sosa" size="sm" />
-            <span className="text-xs text-muted-foreground">sm</span>
+      {/* ── 2. Live expedition panel ─────────────────────────────────────────── */}
+      <Section title="2 — Live expedition panel" subtitle="What the active trip card looks like mid-paddle.">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-1">Active expedition</p>
+                <CardTitle className="text-lg tracking-[-0.01em]">Lofoten Archipelago</CardTitle>
+              </div>
+              <StateBadge state="happening" />
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+
+            {/* Progress */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Day 3 of 14</span>
+                <span className="text-muted-foreground font-mono text-xs">21%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                <div className="h-full w-[21%] rounded-full bg-[var(--foam)]" />
+              </div>
+            </div>
+
+            {/* Conditions */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-0.5 p-3 rounded-md bg-[var(--surface-3,var(--muted))]">
+                <Label>Wind</Label>
+                <p className="font-mono text-sm font-medium">12 kn NW</p>
+              </div>
+              <div className="flex flex-col gap-0.5 p-3 rounded-md bg-[var(--surface-3,var(--muted))]">
+                <Label>Swell</Label>
+                <p className="font-mono text-sm font-medium">0.8 m · 7 s</p>
+              </div>
+              <div className="flex flex-col gap-0.5 p-3 rounded-md bg-[var(--surface-3,var(--muted))]">
+                <Label>Position</Label>
+                <p className="font-mono text-sm font-medium">68°14′N 14°30′E</p>
+              </div>
+              <div className="flex flex-col gap-0.5 p-3 rounded-md bg-[var(--surface-3,var(--muted))]">
+                <Label>Next stop</Label>
+                <p className="text-sm font-medium">Nusfjord · 8 km</p>
+              </div>
+            </div>
+
+            {/* Crew + action */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {MOCK_TRIPS[0].travellers?.map((m) => (
+                    <UserAvatar key={m.id} name={m.user.name} surname={m.user.surname} size="sm" className="ring-2 ring-background" />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">3 crew</span>
+              </div>
+              <Button size="sm" className="bg-[var(--foam)] text-white hover:bg-[var(--foam)]/90 gap-1.5">
+                <RadioIcon className="size-3.5" />
+                Live tracking
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+
+      {/* ── 3. Primary actions ───────────────────────────────────────────────── */}
+      <Section title="3 — Button semantics" subtitle="Each role has one colour. No exceptions.">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label>CTA — sunset accent</Label>
+            <div className="flex gap-2">
+              <Button className="bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent)]/90">
+                Start expedition
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar name="Ulises" surname="Sosa" size="md" />
-            <span className="text-xs text-muted-foreground">md</span>
+          <div className="flex flex-col gap-1.5">
+            <Label>Live / motion — foam</Label>
+            <div className="flex gap-2">
+              <Button className="bg-[var(--foam)] text-white hover:bg-[var(--foam)]/90">
+                Track live
+              </Button>
+              <Button className="bg-[var(--foam)] text-white hover:bg-[var(--foam)]/90" size="sm">
+                Share position
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar name="Ulises" surname="Sosa" size="lg" />
-            <span className="text-xs text-muted-foreground">lg</span>
+          <div className="flex flex-col gap-1.5">
+            <Label>Structure — primary</Label>
+            <div className="flex gap-2">
+              <Button>Invite crew</Button>
+              <Button variant="outline">View route</Button>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">Back</Button>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar name="Carlo" size="md" />
-            <span className="text-xs text-muted-foreground">no surname</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar
-              name="Giulia"
-              surname="Rossi"
-              size="md"
-              imageUrl="https://i.pravatar.cc/150?img=47"
-            />
-            <span className="text-xs text-muted-foreground">with image</span>
+          <div className="flex flex-col gap-1.5">
+            <Label>Destructive</Label>
+            <div className="flex gap-2">
+              <Button variant="destructive">Leave trip</Button>
+            </div>
           </div>
         </div>
       </Section>
 
-      {/* Cards */}
-      <Section title="Cards">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lofoten 2027</CardTitle>
-              <CardDescription>Norway · 14 Jun — 28 Jun</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">A six-day sea kayak traverse of the Lofoten archipelago in midsummer.</p>
-            </CardContent>
-            <CardFooter className="gap-2">
-              <StateBadge state="planning" />
-              <span className="text-xs text-muted-foreground ml-auto">3 crew</span>
-            </CardFooter>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Sardinia Sprint</CardTitle>
-              <CardDescription>Italy · 2 Aug — 7 Aug</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Short coastal circuit around the Gulf of Orosei.</p>
-            </CardContent>
-            <CardFooter className="gap-2">
-              <StateBadge state="draft" />
-              <span className="text-xs text-muted-foreground ml-auto">solo</span>
-            </CardFooter>
-          </Card>
+      {/* ── 4. State system ──────────────────────────────────────────────────── */}
+      <Section title="4 — Trip states">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {(["draft", "planning", "happening", "past"] as const).map((state) => {
+            const meta = {
+              draft:     { desc: "Idea captured, nothing confirmed yet.",       icon: MapPinIcon },
+              planning:  { desc: "Route set, crew invited, logistics underway.", icon: UsersIcon },
+              happening: { desc: "Expedition is live. Crew on water.",           icon: RadioIcon },
+              past:      { desc: "Trip completed. Logs and photos archived.",    icon: WavesIcon },
+            }[state]
+            const Icon = meta.icon
+            return (
+              <div key={state} className="flex items-start gap-3 p-4 rounded-lg border border-border bg-[var(--surface-2,var(--muted))]">
+                <Icon className="size-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div className="flex flex-col gap-1">
+                  <StateBadge state={state} />
+                  <p className="text-xs text-muted-foreground mt-1">{meta.desc}</p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </Section>
 
-      {/* Inputs */}
-      <Section title="Inputs">
-        <div className="flex flex-col gap-3 max-w-sm">
-          <Input placeholder="Destination" />
-          <Input placeholder="Disabled" disabled />
-          <Input placeholder="Email" type="email" />
-          <div className="flex flex-col gap-1">
-            <Input placeholder="With error" className="border-destructive focus-visible:ring-destructive" />
-            <p className="text-xs text-destructive">This field is required</p>
+      {/* ── 5. Surface layers ────────────────────────────────────────────────── */}
+      <Section title="5 — Surface depth" subtitle="Three levels create water-depth layering.">
+        <div className="flex flex-col gap-2 rounded-xl border border-border p-2 bg-background">
+          <p className="text-xs text-muted-foreground px-2 pt-1">background</p>
+          <div className="rounded-lg border border-border p-2 bg-[var(--surface-3,var(--muted))]">
+            <p className="text-xs text-muted-foreground px-2 pb-1">surface-3 — inset panels</p>
+            <div className="rounded-md border border-border p-2 bg-[var(--surface-2,var(--secondary))]">
+              <p className="text-xs text-muted-foreground px-2 pb-1">surface-2 — mid layer</p>
+              <div className="rounded-md border border-border p-4 bg-[var(--surface-1,var(--card))] flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">surface-1 — card / top</span>
+                <StateBadge state="planning" />
+              </div>
+            </div>
           </div>
         </div>
       </Section>
+
+      {/* ── 6. Foam color ────────────────────────────────────────────────────── */}
+      <Section title="6 — Foam color" subtitle="Live / motion signal color.">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-[var(--foam)] shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">--foam</span>
+              <span className="text-xs text-muted-foreground font-mono">oklch(0.66 0.14 185) in V2</span>
+            </div>
+          </div>
+          <div className="h-2 rounded-full bg-[var(--foam-soft,var(--secondary))] overflow-hidden">
+            <div className="h-full w-2/3 rounded-full bg-[var(--foam)]" />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" className="bg-[var(--foam)] text-white hover:bg-[var(--foam)]/90">
+              <RadioIcon className="size-3.5" /> Live
+            </Button>
+            <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium bg-[var(--foam-soft,var(--secondary))] text-[var(--foam)]">
+              ● On route
+            </span>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── 7. Typography ────────────────────────────────────────────────────── */}
+      <Section title="7 — Typography hierarchy">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-4xl font-bold tracking-[-0.01em]">Route: Henningsvær → Nusfjord</h1>
+          <h2 className="text-2xl font-semibold tracking-[-0.01em]">Day 3 — Kabelvåg to Svolvær</h2>
+          <p className="text-base">The route follows the outer coast, exposed to NW swell. Conditions moderate. Estimated paddle time 4–5 hours including breaks at the sea stacks.</p>
+          <p className="text-sm text-muted-foreground">Last synced 8 minutes ago · 3 crew active</p>
+          <div className="flex flex-wrap gap-4 pt-1">
+            <div className="flex flex-col gap-0.5">
+              <Label>Coordinates</Label>
+              <span className="font-mono text-sm">68°14′12″N  14°29′47″E</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <Label>Wind</Label>
+              <span className="font-mono text-sm">12 kn · 315°</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <Label>Distance today</Label>
+              <span className="font-mono text-sm">18.4 km</span>
+            </div>
+          </div>
+        </div>
+      </Section>
+
     </div>
   )
 }

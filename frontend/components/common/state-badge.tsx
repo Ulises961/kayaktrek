@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import type { TripState } from "@/lib/dtos/trip"
 
 const stateBadgeVariants = cva(
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+  "inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] border border-current opacity-90",
   {
     variants: {
       state: {
@@ -33,7 +33,7 @@ interface StateBadgeProps extends VariantProps<typeof stateBadgeVariants> {
 
 export function StateBadge({ state, className }: StateBadgeProps) {
   return (
-    <span className={cn(stateBadgeVariants({ state }), className)}>
+    <span data-slot="state-badge" className={cn(stateBadgeVariants({ state }), className)}>
       {labels[state]}
     </span>
   )
