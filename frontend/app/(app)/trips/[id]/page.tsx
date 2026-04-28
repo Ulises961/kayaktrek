@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
+import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { StateBadge } from "@/components/common/state-badge"
 import { CrewList } from "@/components/common/crew-list"
 import { UserAvatar } from "@/components/common/user-avatar"
+import { InviteForm } from "@/components/trips/invite-form"
+import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
 import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 
 function daysBetween(from: string, to: string) {
   return Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000)
@@ -22,8 +26,11 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
     notFound()
   }
 
+  const session = await getSession()
   const { destination, state, dateFrom, dateTo, description, travellers = [], pendingTravellers = [] } = trip
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
+  const leader = travellers.find((m) => m.role === "leader")
+  const isLeader = !!session && !!leader && leader.user.id === session.userId
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -70,34 +77,54 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             Crew ({travellers.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <CrewList members={travellers} />
           {travellers.length === 0 && (
             <p className="text-sm text-muted-foreground">No crew members yet.</p>
           )}
+
+          {isLeader && (
+            <>
+              <Separator />
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Invite by user ID
+                </p>
+                <InviteForm tripId={id} />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* Pending invitations */}
-      {pendingTravellers.length > 0 && (
+      {/* Pending invitations — visible to leader only */}
+      {isLeader && (pendingTravellers.length > 0 || true) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <UsersIcon className="size-4" />
-              Pending invitations ({pendingTravellers.length})
+              Pending invitations
+              {pendingTravellers.length > 0 && (
+                <span className="text-muted-foreground font-normal">({pendingTravellers.length})</span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="flex flex-col gap-2">
-              {pendingTravellers.map((user) => (
-                <li key={user.id} className="flex items-center gap-3">
-                  <UserAvatar name={user.name} surname={user.surname} size="md" />
-                  <span className="flex-1 text-sm font-medium">
-                    {[user.name, user.surname].filter(Boolean).join(" ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {pendingTravellers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No pending invitations.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {pendingTravellers.map((user) => (
+                  <li key={user.id} className="flex items-center gap-3">
+                    <UserAvatar name={user.name} surname={user.surname} size="md" />
+                    <span className="flex-1 text-sm font-medium">
+                      {[user.name, user.surname].filter(Boolean).join(" ")}
+                    </span>
+                    <CancelInvitationButton tripId={id} inviteeId={user.id!} />
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}
