@@ -20,6 +20,7 @@ const mockCookieStore = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(cookies).mockResolvedValue(mockCookieStore as any)
 })
 

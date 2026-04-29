@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { noHtmlTags } from "@/lib/dtos/validators"
+import { noHtmlTags } from "@/lib/validators"
 
 export const LoginSchema = z.object({
   mail: z.string().email("Enter a valid email address."),

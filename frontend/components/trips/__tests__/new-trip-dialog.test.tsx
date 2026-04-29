@@ -12,6 +12,7 @@ import { NewTripDialog } from "../new-trip-dialog"
 const mockPush = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(useRouter).mockReturnValue({ push: mockPush } as any)
 })
 
