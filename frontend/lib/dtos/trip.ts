@@ -3,6 +3,7 @@ import { TravellerSchema } from "./user"
 import { TripMemberSchema } from "./trip-member"
 import { InventorySchema } from "./inventory"
 import { ItinerarySchema } from "./itinerary"
+import { noHtmlTags, isoDateField } from "./validators"
 
 export const TRIP_STATES = ["draft", "planning", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]
@@ -27,18 +28,12 @@ export const TripPageSchema = z.object({
   pages: z.number(),
 })
 
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.")
-  .or(z.literal(""))
-  .optional()
-
 export const TripFieldsSchema = z
   .object({
-    destination: z.string().max(200, "Destination must be at most 200 characters.").optional(),
-    description: z.string().max(2000, "Description must be at most 2000 characters.").optional(),
-    dateFrom: isoDate,
-    dateTo: isoDate,
+    destination: z.string().max(200, "Destination must be at most 200 characters.").refine(noHtmlTags.check, noHtmlTags.message).optional(),
+    description: z.string().max(2000, "Description must be at most 2000 characters.").refine(noHtmlTags.check, noHtmlTags.message).optional(),
+    dateFrom: isoDateField,
+    dateTo: isoDateField,
   })
   .refine(
     (d) => {
@@ -48,7 +43,12 @@ export const TripFieldsSchema = z
     { message: "End date must be on or after the start date.", path: ["dateTo"] }
   )
 
+export const InviteUserSchema = z.object({
+  userId: z.uuidv7("Enter a valid user ID."),
+})
+
 export type Trip = z.infer<typeof TripSchema>
+export type InviteUserFields = z.infer<typeof InviteUserSchema>
 export type TripPage = z.infer<typeof TripPageSchema>
 export type TripFields = z.infer<typeof TripFieldsSchema>
 export const TripsSchema = z.array(TripSchema)
