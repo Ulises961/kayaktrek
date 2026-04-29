@@ -22,16 +22,14 @@ export function NavigationItems() {
     return (
         <>
             {menuItems.map(item => (
-                <SidebarMenuItem
-                    key={item.title}
-                    className={clsx({
-                        'bg-sky-100 text-blue-600': pathname === item.url
-                    })}
-                >
+                <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                         onClick={() => router.push(item.url)}
                         isActive={pathname === item.url}
-                        className="xl:h-10 xl:[&>svg]:size-5 2xl:h-11 2xl:[&>svg]:size-6 3xl:h-12 3xl:[&>svg]:size-7"
+                        className={clsx(
+                            "xl:h-10 xl:[&>svg]:size-5 2xl:h-11 2xl:[&>svg]:size-6 3xl:h-12 3xl:[&>svg]:size-7",
+                            { "bg-sky-100 text-blue-600 hover:bg-sky-100 hover:text-blue-600": pathname === item.url }
+                        )}
                     >
                         <item.icon />
                         <span className="mx-1 2xl:text-base">{item.title}</span>
