@@ -2,6 +2,7 @@
 *.bkp
 *.dtmp
 ROADMAP.md
+storage/
 .vscode
 .pytest*
 .env

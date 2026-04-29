@@ -34,6 +34,8 @@ setup(
         'gunicorn',
         'pytest-dotenv',
         'redis>=3.0',
+        'boto3',
+        'python-magic',
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",
