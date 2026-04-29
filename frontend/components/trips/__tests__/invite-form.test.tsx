@@ -10,6 +10,7 @@ import { inviteUser } from "@/lib/trips/actions"
 import { InviteForm } from "../invite-form"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
+const VALID_USER_ID = "01952f1a-0000-7000-8000-000000000099"
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -20,15 +21,15 @@ describe("InviteForm", () => {
     expect(screen.getByRole("button", { name: /invite/i })).toBeDefined()
   })
 
-  it("calls inviteUser with tripId and the entered value on submit", async () => {
+  it("calls inviteUser with tripId and the entered userId on submit", async () => {
     vi.mocked(inviteUser).mockResolvedValue({ success: true })
     render(<InviteForm tripId={TRIP_ID} />)
 
-    await userEvent.type(screen.getByRole("textbox"), "bob-uuid")
+    await userEvent.type(screen.getByRole("textbox"), VALID_USER_ID)
     await userEvent.click(screen.getByRole("button", { name: /invite/i }))
 
     await waitFor(() => {
-      expect(inviteUser).toHaveBeenCalledWith(TRIP_ID, "bob-uuid")
+      expect(inviteUser).toHaveBeenCalledWith(TRIP_ID, VALID_USER_ID)
     })
   })
 
@@ -37,24 +38,29 @@ describe("InviteForm", () => {
     render(<InviteForm tripId={TRIP_ID} />)
 
     const input = screen.getByRole("textbox")
-    await userEvent.type(input, "bob-uuid")
+    await userEvent.type(input, VALID_USER_ID)
     await userEvent.click(screen.getByRole("button", { name: /invite/i }))
 
     await waitFor(() => expect((input as HTMLInputElement).value).toBe(""))
+  })
+
+  it("shows a validation error for an invalid user ID format", async () => {
+    render(<InviteForm tripId={TRIP_ID} />)
+
+    await userEvent.type(screen.getByRole("textbox"), "not-a-uuid")
+    await userEvent.click(screen.getByRole("button", { name: /invite/i }))
+
+    await waitFor(() => expect(screen.getByText(/valid user ID/i)).toBeDefined())
+    expect(inviteUser).not.toHaveBeenCalled()
   })
 
   it("shows an error message when the action returns success: false", async () => {
     vi.mocked(inviteUser).mockResolvedValue({ success: false, error: "User not found." })
     render(<InviteForm tripId={TRIP_ID} />)
 
-    await userEvent.type(screen.getByRole("textbox"), "unknown")
+    await userEvent.type(screen.getByRole("textbox"), VALID_USER_ID)
     await userEvent.click(screen.getByRole("button", { name: /invite/i }))
 
     await waitFor(() => expect(screen.getByText("User not found.")).toBeDefined())
-  })
-
-  it("disables the button when the input is empty", () => {
-    render(<InviteForm tripId={TRIP_ID} />)
-    expect(screen.getByRole("button", { name: /invite/i })).toBeDisabled()
   })
 })

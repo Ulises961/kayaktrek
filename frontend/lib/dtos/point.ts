@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ImageSchema } from "./image";
+import { noHtmlTags } from "./validators";
 
 export const PointTypeSchema = z.enum(["stop", "position", "interest"]);
 export type PointType = z.infer<typeof PointTypeSchema>;
@@ -22,7 +23,7 @@ export const PointSchema: z.ZodType<Point> = z.lazy(() =>
     id: z.uuidv7().optional(),
     latitude: z.number().min(-90).max(90).nullish(),
     longitude: z.number().min(-180).max(180).nullish(),
-    notes: z.string().nullish(),
+    notes: z.string().max(1000, "Notes must be at most 1000 characters.").refine(noHtmlTags.check, noHtmlTags.message).nullish(),
     type: PointTypeSchema,
     dayId: z.uuidv7().nullish(),
     next: PointSchema.nullish(),

@@ -7,11 +7,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-
-export interface Crumb {
-  label: string
-  href?: string
-}
+import type { Crumb } from "@/lib/types/ui"
 
 interface PageBreadcrumbProps {
   crumbs: Crumb[]

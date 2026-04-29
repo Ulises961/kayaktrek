@@ -1,7 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { inviteUser } from "@/lib/trips/actions"
+import { InviteUserSchema, type InviteUserFields } from "@/lib/dtos/trip"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -10,37 +13,32 @@ interface InviteFormProps {
 }
 
 export function InviteForm({ tripId }: InviteFormProps) {
-  const [userId, setUserId] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<InviteUserFields>({
+    resolver: zodResolver(InviteUserSchema),
+  })
+
+  const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
-      const result = await inviteUser(tripId, userId.trim())
+      const result = await inviteUser(tripId, data.userId)
       if (result.success) {
-        setUserId("")
+        reset()
       } else {
-        setError(result.error)
+        setError("userId", { message: result.error })
       }
     })
-  }
+  })
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+    <form onSubmit={onSubmit} className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <Input
-          placeholder="User ID"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          disabled={isPending}
-        />
-        <Button type="submit" disabled={!userId.trim() || isPending}>
+        <Input placeholder="User ID" disabled={isPending} {...register("userId")} />
+        <Button type="submit" disabled={isPending}>
           {isPending ? "Inviting…" : "Invite"}
         </Button>
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {errors.userId && <p className="text-sm text-destructive">{errors.userId.message}</p>}
     </form>
   )
 }
