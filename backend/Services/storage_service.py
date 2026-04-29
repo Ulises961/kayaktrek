@@ -9,6 +9,11 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
+# There is intentionally no `get` method here. The URL returned by `upload()`
+# is a direct MinIO link; the frontend uses it in <img src> without any backend
+# proxy. The backend only owns the write path (upload + delete) and presigned
+# URL generation for private objects.
+
 _ENDPOINT = os.environ.get("STORAGE_ENDPOINT", "http://localhost:9000")
 _PUBLIC_URL = os.environ.get("STORAGE_PUBLIC_URL", "http://localhost:9000")
 _ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY", "kayak")

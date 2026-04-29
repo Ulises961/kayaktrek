@@ -1,8 +1,7 @@
-from marshmallow import Schema, fields, post_load, post_dump, validates, ValidationError, pre_load
+from marshmallow import fields, post_load, validates, ValidationError, pre_load
 from Models.user import User
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
-from Schemas.image_schema import ImageSchema
 import re
 import bleach
 
@@ -23,7 +22,7 @@ class UserSchema(BaseSchema):
     items = fields.List(fields.Nested('ItemSchema', allow_none=True), dump_only=True)
     endorsed_logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
     logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
-    image = fields.Nested(ImageSchema, allow_none=True, dump_only=True)
+    avatar_url = fields.String(allow_none=True, dump_only=True)
     admin = fields.Bool(dump_only=True)
 
     @pre_load
@@ -123,8 +122,8 @@ class UserUpdateSchema(UserSchema):
     mail is excluded: email changes require a dedicated verification flow.
     pwd is accepted and validated here; the service handles hashing.
     """
-    mail = fields.Email(dump_only=True)       # excluded from load input
-    pwd = fields.String(load_only=True, validate=lambda x: len(x) >= 8)
+    mail = fields.Email(dump_only=True)   # excluded from load; email changes need a dedicated flow
+    pwd = fields.String(load_only=True)   # optional on PATCH; full strength rules via inherited @validates
     phone = fields.String(validate=lambda x: len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
