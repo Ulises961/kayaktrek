@@ -3,7 +3,7 @@ import { TravellerSchema } from "./user"
 import { TripMemberSchema } from "./trip-member"
 import { InventorySchema } from "./inventory"
 import { ItinerarySchema } from "./itinerary"
-import { noHtmlTags, isoDateField } from "./validators"
+import { noHtmlTags, isoDateField } from "../validators"
 
 export const TRIP_STATES = ["draft", "planning", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]

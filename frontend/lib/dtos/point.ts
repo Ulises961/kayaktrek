@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ImageSchema } from "./image";
-import { noHtmlTags } from "./validators";
+import { noHtmlTags } from "../validators";
 
 export const PointTypeSchema = z.enum(["stop", "position", "interest"]);
 export type PointType = z.infer<typeof PointTypeSchema>;
