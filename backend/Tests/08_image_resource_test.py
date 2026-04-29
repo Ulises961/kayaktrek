@@ -11,7 +11,6 @@ import json
 import pytest
 
 from Resources.point_resource import POINT_ENDPOINT
-from Resources.itinerary_resource import ITINERARY_ENDPOINT
 
 _FAKE_IMAGE = b"\xff\xd8\xff" + b"X" * 600   # JPEG magic bytes + padding, > 512 B
 _MOCK_URL = "http://minio:9000/kayak/point-images/fake-uuid"

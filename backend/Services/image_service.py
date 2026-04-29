@@ -2,14 +2,14 @@ import logging
 from typing import List
 from uuid import UUID
 
-from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.exc import NoResultFound
 import uuid_extension
 
 from Models.image import Image
 from Models.point import Point
 from Models.point_has_image import PointHasImage
 from Schemas.image_schema import ImageSchema
-from Services.storage_service import StorageService, StorageValidationError
+from Services.storage_service import StorageService
 from Api.database import db
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,7 @@ class ImageService:
                 "size": len(file_bytes),
                 "location": url,
             })
+            assert isinstance(image, Image)
             db.session.add(image)
             point.images.append(image)
             db.session.commit()

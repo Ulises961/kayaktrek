@@ -1,32 +1,33 @@
 from unittest.mock import patch
 import io
 import json
-import uuid
 
 from Resources.user_resource import USER_ENDPOINT
+
 
 def test_user_missing_arguments(client):
     new_user_json = {"mail": "test2.user@gmail.com"}
     response = client.post("/api/auth/register", json=new_user_json)
-    assert response.status_code == 422  # Should fail due to missing required fields
+    assert response.status_code == 422
+
 
 def test_get_user(client, auth_headers, id):
-    response = client.get(
-        f"{USER_ENDPOINT}/{id}",
-        headers=auth_headers)
+    response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
     assert response.status_code == 200
     assert json.loads(response.data)['name'] == "Test User"
+
 
 def test_user_update_name(client, auth_headers, id):
     response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
     user = json.loads(response.data)
     id = str(user["id"])
     user["name"] = "Updated Name"
-    
+
     response = client.patch(f"{USER_ENDPOINT}/{id}", json=user, headers=auth_headers)
     assert response.status_code == 200
     assert json.loads(response.data)['id'] == id
     assert json.loads(response.data)['name'] == "Updated Name"
+
 
 def test_update_user(client, auth_headers, id):
     response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
@@ -45,14 +46,13 @@ def test_update_user(client, auth_headers, id):
     data = json.loads(response.data)
     assert data['name'] == "Ulises"
     assert data['surname'] == "Sosa"
-    assert data['mail'] == originalUser['mail']  # mail unchanged
+    assert data['mail'] == originalUser['mail']
     assert data['id'] == originalUser["id"]
+
 
 def test_delete_user_forbidden_for_other_user(client, auth_headers, id_2):
     """User cannot delete another user's account."""
-    response = client.delete(
-        f"{USER_ENDPOINT}/{id_2}",
-        headers=auth_headers)
+    response = client.delete(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers)
     assert response.status_code == 403
 
 
@@ -117,11 +117,13 @@ def test_search_returns_no_password(client, auth_headers, user_2):
 # POST /api/user/me/avatar  &  DELETE /api/user/me/avatar
 # ============================================================================
 
-_FAKE_AVATAR = b"\xff\xd8\xff" + b"X" * 600   # starts with JPEG magic bytes, > 512 B
+_FAKE_AVATAR = b"\xff\xd8\xff" + b"X" * 600  # JPEG magic bytes + padding, > 512 B
+
 
 def test_upload_avatar_success(client, auth_headers):
     """A valid multipart upload sets avatar_url on the user."""
-    with patch("Services.user_service.StorageService.upload", return_value="http://minio/avatars/test.jpg"), \
+    with patch("Services.user_service.StorageService.upload",
+               return_value="http://minio/avatars/test.jpg"), \
          patch("Services.user_service.StorageService.delete"):
         response = client.post(
             f"{USER_ENDPOINT}/me/avatar",
@@ -147,7 +149,8 @@ def test_upload_avatar_no_file_returns_400(client, auth_headers):
 def test_upload_avatar_storage_validation_error_returns_400(client, auth_headers):
     """StorageValidationError (e.g. wrong MIME type) surfaces as 400."""
     from Services.storage_service import StorageValidationError
-    with patch("Services.user_service.StorageService.upload", side_effect=StorageValidationError("bad mime")):
+    with patch("Services.user_service.StorageService.upload",
+               side_effect=StorageValidationError("bad mime")):
         response = client.post(
             f"{USER_ENDPOINT}/me/avatar",
             data={"file": (io.BytesIO(_FAKE_AVATAR), "avatar.jpg")},
@@ -159,7 +162,8 @@ def test_upload_avatar_storage_validation_error_returns_400(client, auth_headers
 
 def test_delete_avatar_success(client, auth_headers):
     """Deleting the avatar clears avatar_url and returns 204."""
-    with patch("Services.user_service.StorageService.upload", return_value="http://minio/avatars/test.jpg"), \
+    with patch("Services.user_service.StorageService.upload",
+               return_value="http://minio/avatars/test.jpg"), \
          patch("Services.user_service.StorageService.delete"):
         client.post(
             f"{USER_ENDPOINT}/me/avatar",
@@ -169,5 +173,3 @@ def test_delete_avatar_success(client, auth_headers):
         )
         response = client.delete(f"{USER_ENDPOINT}/me/avatar", headers=auth_headers)
     assert response.status_code == 204
-
-

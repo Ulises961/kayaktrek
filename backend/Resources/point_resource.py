@@ -3,7 +3,6 @@ from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, jsonify, request
-from Models.point import Point
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
 from Schemas.image_schema import ImageSchema
@@ -20,15 +19,15 @@ POINT_ENDPOINT = "/api/point"
 point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 
 
-## TODO: PoI points need to run as a separate microservice that can be cached and served
-## TODO:  When a PoI is created then is shared to kafka or MQrabbit and saved into the db
-## TODO: Check permissions to create or modify points from parent entity itinerary
+# TODO: POI points need to run as a separate microservice that can be cached and served
+# TODO: When a PoI is created it is shared to RabbitMQ and saved into the db
+# TODO: Check permissions to create or modify points from parent entity itinerary
 @point_api.route("/pois", methods=["GET"])
 @JWTService.authenticate_restful
 def get_poi():
     """
     PointResource GET method. Retrieves point(s) of interest.
-        
+
     Returns:
         JSON response with point data and 200 status code
     """
@@ -40,12 +39,13 @@ def get_poi():
 
         schema = PointSchema()
         return jsonify([
-            {**schema.dump(r['point']), 'distanceKm': r['distance_km']}
+            {**schema.dump(r['point']), 'distanceKm': r['distance_km']}  # type: ignore[arg-type]
             for r in results
         ])
     except Exception as e:
         logger.error(f"Error retrieving POIs: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @point_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
@@ -63,17 +63,16 @@ def create_point():
         return jsonify(PointSchema().dump(point)), HTTPStatus.CREATED
 
     except HTTPException:
-            raise
+        raise
     except IntegrityError as e:
-        logger.error(
-            f"Integrity Error, this point is already in the database. Error: {e}"
-        )
+        logger.error(f"Integrity Error creating point: {e}")
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, message="Database integrity violated")
     except Exception as e:
-            logger.error(f"Error creating point: {e}")
-            db.session.rollback()
-            abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+        logger.error(f"Error creating point: {e}")
+        db.session.rollback()
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @point_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
@@ -93,7 +92,7 @@ def update_point(id: str):
     try:
         raw = request.get_json()
         validated = PointUpdateSchema().load(raw)
-        point_data = {**raw, **validated}  # sanitized scalars override raw; nested pass through
+        point_data = {**raw, **validated}  # type: ignore[arg-type]
         point = PointService.update_point(id, point_data)
         return jsonify(PointSchema().dump(point)), HTTPStatus.OK
 
@@ -102,12 +101,12 @@ def update_point(id: str):
     except HTTPException:
         raise
     except NoResultFound:
-         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-
+        abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
     except Exception as e:
-        logger.error(f"Error creating point: {e}")
+        logger.error(f"Error updating point: {e}")
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @point_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
@@ -115,34 +114,34 @@ def update_point(id: str):
 def get_point(id: str):
     """
     PointResource GET method. Retrieves a single point by ID.
-    
+
     Args:
         id: Point ID to retrieve
-        
+
     Returns:
         JSON response with point data and 200 status code
     """
     try:
         point = PointService.get_point_by_id(id)
         return jsonify(PointSchema().dump(point)), HTTPStatus.OK
-    
+
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    
     except Exception as e:
         logger.error(f"Error retrieving point: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
+
 @point_api.route("/<string:id>", methods=["DELETE"])
-@JWTService.authenticate_restful     
-@require_owner("point") 
+@JWTService.authenticate_restful
+@require_owner("point")
 def delete(id: str):
     """
     PointResource DELETE method. Deletes a point by ID.
-    
+
     Args:
         id: Point ID to delete
-        
+
     Returns:
         Success message and 200 status code
     """
@@ -151,15 +150,10 @@ def delete(id: str):
         PointService.delete_point(id)
         return {"message": "Deletion successful"}, 200
 
-    
     except HTTPException:
-            raise
-    except NoResultFound as e:
-        logger.error(
-            f"Integrity Error, this point is already in the database. Error: {e}"
-        )
+        raise
+    except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, message=f"Point with id {id} not found")
-
     except Exception as e:
         logger.error(f"Error deleting point: {e}")
         db.session.rollback()
@@ -232,4 +226,3 @@ def delete_image(id: str, image_id: str):
         logger.error("Error deleting image %s from point %s: %s", image_id, id, e)
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
-

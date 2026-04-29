@@ -5,7 +5,6 @@ from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_member_schema import TripMemberSchema
 import bleach
-import uuid
 
 
 class TripSchema(BaseSchema):
@@ -82,4 +81,3 @@ class TripUpdateSchema(TripSchema):
     @post_load
     def make_trip(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}
-    

@@ -11,7 +11,7 @@ import logging
 from Models.user import User
 from Api.database import db
 from Schemas.base_schema import camelcase
-from Services.storage_service import StorageService, StorageValidationError
+from Services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class UserService:
             db.session.query(User)
             .filter(
                 User.id != UUID(str(g.current_user_id)),
-                User.active == True,
+                User.active.is_(True),
                 User.mail.ilike(pattern),
             )
             .limit(limit)
@@ -157,8 +157,8 @@ class UserService:
             raise
 
         if old_url:
+            old_key = old_url.split("/avatars/")[-1]
             try:
-                old_key = old_url.split("/avatars/")[-1]
                 StorageService.delete(old_key, kind="avatar")
             except Exception as e:
                 logger.error(

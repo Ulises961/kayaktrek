@@ -113,7 +113,10 @@ def update_user(id: str):
     """
     try:
         raw = request.get_json()
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
         validated = UserUpdateSchema().load(raw)
+        assert isinstance(validated, dict)
         user = UserService.update_user(id, validated)
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
 
