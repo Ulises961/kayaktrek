@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
@@ -7,7 +8,10 @@ import { CrewList } from "@/components/common/crew-list"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InviteForm } from "@/components/trips/invite-form"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
-import { CalendarIcon, ClockIcon, MapPinIcon, UsersIcon } from "lucide-react"
+import { AdvanceStateButton } from "@/components/trips/advance-state-button"
+import { DeleteTripButton } from "@/components/trips/delete-trip-button"
+import { CalendarIcon, ClockIcon, MapPinIcon, PencilIcon, UsersIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 
@@ -41,7 +45,20 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold">{destination ?? "Untitled trip"}</h1>
-          {state && <StateBadge state={state} />}
+          <div className="flex items-center gap-2 shrink-0">
+            {state && <StateBadge state={state} />}
+            {isLeader && (
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/trips/${id}/edit`}>
+                  <PencilIcon className="size-4" />
+                  Edit
+                </Link>
+              </Button>
+            )}
+            {isLeader && state && state !== "past" && (
+              <AdvanceStateButton tripId={id} currentState={state} />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -80,7 +97,12 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <CrewList members={travellers} />
+          <CrewList
+            members={travellers}
+            tripId={isLeader ? id : undefined}
+            isLeader={isLeader}
+            leaderId={leader?.user.id}
+          />
           {travellers.length === 0 && (
             <p className="text-sm text-muted-foreground">No crew members yet.</p>
           )}
@@ -100,7 +122,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
       </Card>
 
       {/* Pending invitations — visible to leader only */}
-      {isLeader && (pendingTravellers.length > 0 || true) && (
+      {isLeader && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -143,6 +165,19 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
           <p className="text-sm text-muted-foreground">Map-first itinerary builder coming in M4.</p>
         </CardContent>
       </Card>
+
+      {/* Danger zone — leader only */}
+      {isLeader && (
+        <div className="flex flex-col gap-3 border border-destructive/30 rounded-lg p-4">
+          <p className="text-sm font-medium text-destructive">Danger zone</p>
+          <p className="text-sm text-muted-foreground">
+            Permanently delete this trip and all its data. This cannot be undone.
+          </p>
+          <div>
+            <DeleteTripButton tripId={id} destination={destination} />
+          </div>
+        </div>
+      )}
 
     </div>
   )
