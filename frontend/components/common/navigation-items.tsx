@@ -31,9 +31,10 @@ export function NavigationItems() {
                     <SidebarMenuButton
                         onClick={() => router.push(item.url)}
                         isActive={pathname === item.url}
+                        className="xl:h-10 xl:[&>svg]:size-5 2xl:h-11 2xl:[&>svg]:size-6 3xl:h-12 3xl:[&>svg]:size-7"
                     >
                         <item.icon />
-                        <span className="mx-1">{item.title}</span>
+                        <span className="mx-1 2xl:text-base">{item.title}</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             ))}

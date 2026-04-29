@@ -21,9 +21,9 @@ export default async function Page() {
         <NewTripDialog />
       </div>
       {total === 0 ? (
-        <div className="flex flex-col items-center gap-4 mt-16 text-center">
-          <NoTripsIllustration className="w-56 opacity-80" />
-          <p className="text-muted-foreground text-sm">
+        <div className="flex flex-col items-center gap-6 mt-16 xl:mt-24 text-center">
+          <NoTripsIllustration className="w-56 xl:w-80 2xl:w-96 3xl:w-[32rem] opacity-80" />
+          <p className="text-muted-foreground text-sm xl:text-base 2xl:text-lg">
             No trips yet. Create one to get started.
           </p>
         </div>

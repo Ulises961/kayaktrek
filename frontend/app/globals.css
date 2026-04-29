@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --breakpoint-3xl: 120rem; /* 1920px */
+}
+
 /*
  * Tailwind semantic aliases — maps CSS custom properties to Tailwind color utilities.
  * Keep in sync with lib/tokens.ts (the cross-platform source of truth).
@@ -249,5 +253,24 @@
   a:hover > [data-slot="card"] {
     box-shadow: var(--card-shadow-hover);
     transform: translateY(-1px);
+  }
+}
+
+/* Responsive sidebar width — overrides the inline style set by SidebarProvider */
+@media (width >= 80rem) {   /* xl: 1280px */
+  [data-slot="sidebar-wrapper"] {
+    --sidebar-width: 18rem !important;
+  }
+}
+@media (width >= 96rem) {   /* 2xl: 1536px */
+  [data-slot="sidebar-wrapper"] {
+    --sidebar-width: 20rem !important;
+    --sidebar-width-icon: 3.5rem !important;
+  }
+}
+@media (width >= 120rem) {  /* 3xl: 1920px */
+  [data-slot="sidebar-wrapper"] {
+    --sidebar-width: 22rem !important;
+    --sidebar-width-icon: 4rem !important;
   }
 }
