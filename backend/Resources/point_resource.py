@@ -1,17 +1,18 @@
 from http import HTTPStatus
 from werkzeug.exceptions import HTTPException
 import logging
-from sqlalchemy.exc import IntegrityError
-from typing import List
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, jsonify, request
 from Models.point import Point
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
+from Schemas.image_schema import ImageSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.point_service import PointService
+from Services.image_service import ImageService
+from Services.storage_service import StorageValidationError
 from Api.database import db
-from sqlalchemy.exc import NoResultFound
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,74 @@ def delete(id: str):
 
     except Exception as e:
         logger.error(f"Error deleting point: {e}")
+        db.session.rollback()
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@point_api.route("/<string:id>/images", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("point")
+def upload_image(id: str):
+    """
+    Upload an image and attach it to a point.
+
+    Args:
+        id: Point ID to attach the image to
+
+    Returns:
+        JSON response with the created image and 201 status code
+
+    Raises:
+        400: If no file is provided or the file fails validation
+        404: If the point does not exist
+    """
+    if "file" not in request.files:
+        abort(HTTPStatus.BAD_REQUEST, description="No file provided")
+
+    file = request.files["file"]
+    if not file.filename:
+        abort(HTTPStatus.BAD_REQUEST, description="File has no name")
+
+    try:
+        file_bytes = file.read()
+        image = ImageService.upload_for_point(id, file_bytes, file.filename)
+        return jsonify(ImageSchema().dump(image)), HTTPStatus.CREATED
+
+    except StorageValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
+    except Exception as e:
+        logger.error("Error uploading image for point %s: %s", id, e)
+        db.session.rollback()
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@point_api.route("/<string:id>/images/<string:image_id>", methods=["DELETE"])
+@JWTService.authenticate_restful
+@require_owner("point")
+def delete_image(id: str, image_id: str):
+    """
+    Detach and permanently delete an image from a point.
+
+    Args:
+        id: Point ID the image is attached to
+        image_id: Image ID to delete
+
+    Returns:
+        204 No Content on success
+
+    Raises:
+        404: If the point or image does not exist
+    """
+    try:
+        ImageService.delete_from_point(image_id, id)
+        return "", HTTPStatus.NO_CONTENT
+
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        logger.error("Error deleting image %s from point %s: %s", image_id, id, e)
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

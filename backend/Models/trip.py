@@ -23,6 +23,13 @@ class TripStateType(enum.Enum):
     PAST = "past"
 
 
+class TripDifficultyType(enum.Enum):
+    EASY = "easy"
+    MODERATE = "moderate"
+    DEMANDING = "demanding"
+    EXPERT = "expert"
+
+
 _VALID_TRANSITIONS = {
     TripStateType.DRAFT: TripStateType.PLANNING,
     TripStateType.PLANNING: TripStateType.HAPPENING,
@@ -60,6 +67,10 @@ class Trip(BaseModel):
     # TripSchema.pending_travellers uses this attribute — keeps serialisation unchanged.
     pending_travellers = association_proxy("invitations", "user")
 
+    difficulty: Mapped[Optional[TripDifficultyType]] = mapped_column(
+        Enum(TripDifficultyType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )
     state: Mapped[TripStateType] = mapped_column(
         Enum(TripStateType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,

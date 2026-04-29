@@ -1,5 +1,5 @@
 from marshmallow import fields, post_load, pre_load, validates, validates_schema, ValidationError
-from Models.trip import Trip, TripStateType
+from Models.trip import Trip, TripDifficultyType, TripStateType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.itinerary_shema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
@@ -30,6 +30,7 @@ class TripSchema(BaseSchema):
         dump_only=True,
     )
     state = fields.Enum(TripStateType, by_value=True, load_default=TripStateType.DRAFT)
+    difficulty = fields.Enum(TripDifficultyType, by_value=True, allow_none=True, load_default=None)
     description = fields.String(allow_none=True)
     destination = fields.String(allow_none=True)
     date_from = fields.Date(allow_none=True)
