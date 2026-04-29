@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { login, register, logout } from "../actions"
+import { login, register, logout, forgotPassword, resetPassword } from "../actions"
 
 const mockCookieStore = {
   set: vi.fn(),
@@ -63,6 +63,58 @@ describe("logout", () => {
     expect(mockCookieStore.delete).toHaveBeenCalledWith("access_token")
     expect(mockCookieStore.delete).toHaveBeenCalledWith("refresh_token")
     expect(redirect).toHaveBeenCalledWith("/")
+  })
+})
+
+describe("forgotPassword", () => {
+  it("returns success when the server responds (any status)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }))
+    const result = await forgotPassword(null, formData({ mail: "a@b.com" }))
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns success even when the server returns non-ok (mirrors backend always-200 intent)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429 }))
+    const result = await forgotPassword(null, formData({ mail: "a@b.com" }))
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await forgotPassword(null, formData({ mail: "a@b.com" }))
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+  })
+
+  it("returns an error for an invalid email", async () => {
+    const result = await forgotPassword(null, formData({ mail: "not-an-email" }))
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+const VALID_PASSWORD = "Expedition#24"
+
+describe("resetPassword", () => {
+  it("redirects to /login?reset=1 on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }))
+    await resetPassword(null, formData({ token: "tok", password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD }))
+    expect(redirect).toHaveBeenCalledWith("/login?reset=1")
+  })
+
+  it("returns an error for an invalid or expired token (400)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }))
+    const result = await resetPassword(null, formData({ token: "bad", password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD }))
+    expect(result).toEqual({ success: false, error: expect.stringContaining("expired") })
+  })
+
+  it("returns an error when passwords do not match", async () => {
+    const result = await resetPassword(null, formData({ token: "tok", password: VALID_PASSWORD, confirmPassword: "different" }))
+    expect(result).toEqual({ success: false, error: expect.stringContaining("match") })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await resetPassword(null, formData({ token: "tok", password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD }))
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
   })
 })
 

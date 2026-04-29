@@ -26,5 +26,29 @@ export const RegisterSchema = z.object({
     .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character."),
 })
 
+export const ForgotPasswordSchema = z.object({
+  mail: z.string().email("Enter a valid email address."),
+})
+
+export const ResetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Missing token."),
+    password: z
+      .string()
+      .min(12, "Password must be at least 12 characters.")
+      .max(128, "Password must be at most 128 characters.")
+      .regex(/[a-z]/, "At least one lowercase letter.")
+      .regex(/[A-Z]/, "At least one uppercase letter.")
+      .regex(/[0-9]/, "At least one number.")
+      .regex(/[^a-zA-Z0-9]/, "At least one special character."),
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  })
+
 export type LoginInput = z.infer<typeof LoginSchema>
 export type RegisterInput = z.infer<typeof RegisterSchema>
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>

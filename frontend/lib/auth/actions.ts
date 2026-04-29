@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { API_URL } from "@/lib/api/config"
 import { z } from "zod"
-import { LoginSchema, RegisterSchema } from "@/lib/auth/schemas"
+import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema } from "@/lib/auth/schemas"
 
 export type AuthResult =
   | { success: true }
@@ -96,6 +96,53 @@ export async function register(_prevState: AuthResult | null, formData: FormData
   }
 
   redirect("/login?registered=1")
+}
+
+export async function forgotPassword(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+  const parsed = ForgotPasswordSchema.safeParse({ mail: formData.get("mail") })
+  if (!parsed.success) {
+    return { success: false, error: "Enter a valid email address." }
+  }
+
+  try {
+    await fetch(`${API_URL}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mail: parsed.data.mail }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  return { success: true }
+}
+
+export async function resetPassword(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+  const parsed = ResetPasswordSchema.safeParse({
+    token: formData.get("token"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Please fix the errors below." }
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}/api/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: parsed.data.token, pwd: parsed.data.password }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  if (!res.ok) {
+    return { success: false, error: "Invalid or expired reset link." }
+  }
+
+  redirect("/login?reset=1")
 }
 
 export async function logout() {
