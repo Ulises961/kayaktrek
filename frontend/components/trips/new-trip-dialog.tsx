@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { createTrip } from "@/lib/trips/actions"
+import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,40 +16,29 @@ import { PlusIcon } from "lucide-react"
 export function NewTripDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [destination, setDestination] = useState("")
-  const [description, setDescription] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  function reset() {
-    setDestination("")
-    setDescription("")
-    setDateFrom("")
-    setDateTo("")
-    setError(null)
-  }
+  const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<TripFields>({
+    resolver: zodResolver(TripFieldsSchema),
+  })
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+  const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
       const result = await createTrip({
-        destination: destination.trim() || undefined,
-        description: description.trim() || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        destination: data.destination?.trim() || undefined,
+        description: data.description?.trim() || undefined,
+        dateFrom: data.dateFrom || undefined,
+        dateTo: data.dateTo || undefined,
       })
       if (result.success) {
         setOpen(false)
         reset()
         router.push(`/trips/${result.tripId}`)
       } else {
-        setError(result.error)
+        setError("root", { message: result.error })
       }
     })
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>
@@ -60,47 +52,28 @@ export function NewTripDialog() {
         <DialogHeader>
           <DialogTitle>New trip</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Input
-              placeholder="Destination"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              disabled={isPending}
-            />
+            <Input placeholder="Destination" disabled={isPending} {...register("destination")} />
+            {errors.destination && <p className="text-xs text-destructive">{errors.destination.message}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Textarea
-              placeholder="Description (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isPending}
-              rows={3}
-            />
+            <Textarea placeholder="Description (optional)" rows={3} disabled={isPending} {...register("description")} />
+            {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateFrom">From</Label>
-              <Input
-                id="dateFrom"
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                disabled={isPending}
-              />
+              <Input id="dateFrom" type="date" disabled={isPending} {...register("dateFrom")} />
+              {errors.dateFrom && <p className="text-xs text-destructive">{errors.dateFrom.message}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateTo">To</Label>
-              <Input
-                id="dateTo"
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                disabled={isPending}
-              />
+              <Input id="dateTo" type="date" disabled={isPending} {...register("dateTo")} />
+              {errors.dateTo && <p className="text-xs text-destructive">{errors.dateTo.message}</p>}
             </div>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? "Creating…" : "Create"}

@@ -1,4 +1,5 @@
 import { UserAvatar } from "@/components/common/user-avatar"
+import { RemoveMemberButton } from "@/components/trips/remove-member-button"
 import { cn } from "@/lib/utils"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
@@ -14,9 +15,12 @@ const roleLabel: Record<"leader" | "crew", string> = {
 
 interface CrewListProps {
   members: TripMember[]
+  tripId?: string
+  isLeader?: boolean
+  leaderId?: string
 }
 
-export function CrewList({ members }: CrewListProps) {
+export function CrewList({ members, tripId, isLeader, leaderId }: CrewListProps) {
   if (members.length === 0) return null
 
   return (
@@ -24,6 +28,7 @@ export function CrewList({ members }: CrewListProps) {
       {members.map((member) => {
         const { user, role } = member
         const displayName = [user.name, user.surname].filter(Boolean).join(" ")
+        const canRemove = isLeader && tripId && user.id && user.id !== leaderId
 
         return (
           <li key={member.id} className="flex items-center gap-3">
@@ -32,6 +37,9 @@ export function CrewList({ members }: CrewListProps) {
             <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", roleStyles[role])}>
               {roleLabel[role]}
             </span>
+            {canRemove && (
+              <RemoveMemberButton tripId={tripId} userId={user.id!} displayName={displayName} />
+            )}
           </li>
         )
       })}
