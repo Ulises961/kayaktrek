@@ -27,7 +27,9 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   }
 
   const session = await getSession()
-  const { destination, state, dateFrom, dateTo, description, travellers = [], pendingTravellers = [] } = trip
+  const { destination, state, dateFrom, dateTo, description } = trip
+  const travellers = trip.travellers ?? []
+  const pendingTravellers = trip.pendingTravellers ?? []
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
   const leader = travellers.find((m) => m.role === "leader")
   const isLeader = !!session && !!leader && leader.user.id === session.userId

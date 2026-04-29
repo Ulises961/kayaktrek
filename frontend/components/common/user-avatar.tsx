@@ -26,7 +26,7 @@ export function UserAvatar({ name, surname, imageUrl, size = "md", className }: 
   return (
     <Avatar size={sizeMap[size]} className={cn(className)}>
       {imageUrl && <AvatarImage src={imageUrl} alt={`${name} ${surname ?? ""}`.trim()} />}
-      <AvatarFallback>{initials(name, surname)}</AvatarFallback>
+      <AvatarFallback>{initials(name, surname ?? undefined)}</AvatarFallback>
     </Avatar>
   )
 }
