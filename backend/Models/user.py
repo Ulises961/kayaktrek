@@ -9,14 +9,12 @@ from Models.user_has_inventory import user_has_inventory
 from Models.user_has_items import user_has_items
 from Models.trip_member import TripMember
 from Models.user_endorses_log import user_endorses_log
-from Models.user_has_profile_picture import userHasProfilePicture
 from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from Models.log import Log
-    from Models.image import Image
     from Models.trip import Trip
     from Models.auth_token import AuthToken
     from Models.invitation import Invitation
@@ -41,6 +39,7 @@ class User(BaseModel):
     username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     surname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -63,11 +62,6 @@ class User(BaseModel):
         secondary=user_endorses_log, back_populates="user_endorsed_logs"
     )
     logs: Mapped[List["Log"]] = relationship(back_populates="user_logs")
-    image: Mapped[Optional["Image"]] = relationship(
-        secondary=userHasProfilePicture,
-        uselist=False,
-        cascade="all, delete,save-update",
-    )
     itineraries: Mapped[List["Itinerary"]] = relationship(secondary=user_has_itinerary)
     inventories: Mapped[List["Inventory"]] = relationship(secondary=user_has_inventory)
     items: Mapped[List["Item"]] = relationship(secondary=user_has_items)

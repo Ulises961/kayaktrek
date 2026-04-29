@@ -1,337 +1,155 @@
 """
-Image Resource Tests - Testing image manipulation through parent resources (User and Point).
+Image Resource Tests — point image upload and removal via MinIO-backed storage.
 
-These tests verify that images can be properly managed through their parent resources
-rather than directly, ensuring proper ownership and relationship handling.
+StorageService is mocked throughout: tests verify HTTP behaviour and DB state,
+not object storage internals.
 """
 
-import pytest
-from Resources.user_resource import USER_ENDPOINT
-from Resources.point_resource import POINT_ENDPOINT
+from unittest.mock import patch
+import io
 import json
+import pytest
 
+from Resources.point_resource import POINT_ENDPOINT
 
-# ============================================================================
-# User Profile Picture Tests
-# ============================================================================
+_FAKE_IMAGE = b"\xff\xd8\xff" + b"X" * 600   # JPEG magic bytes + padding, > 512 B
+_MOCK_URL = "http://minio:9000/kayak/point-images/fake-uuid"
 
-def test_add_profile_picture_to_user(client, auth_headers, id):
-    """Test adding a profile picture to a user through user endpoint."""
-    user_data = {
-        "image": {
-            "size": 2.5,
-            "name": "profile_photo.jpg",
-            "location": "/public/images/user/1/profile_pictures"
-        }
-    }
-    
-    response = client.patch(
-        f"{USER_ENDPOINT}/{id}",
-        headers=auth_headers,
-        json=user_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert response_data['image'] is not None
-    assert response_data['image']['name'] == 'profile_photo.jpg'
-    assert response_data['image']['size'] == 2.5
-    assert response_data['image']['location'] == '/public/images/user/1/profile_pictures'
-
-
-def test_update_user_profile_picture(client, auth_headers, id):
-    """Test updating a user's profile picture through user endpoint."""
-    # First add a profile picture
-    user_data = {
-        "image": {
-            "size": 3.0,
-            "name": "old_profile.png",
-            "location": "/public/images/user/1/profile_pictures"
-        }
-    }
-    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
-    
-    # Now update it
-    updated_data = {
-        "image": {
-            "size": 4.5,
-            "name": "new_profile.jpg",
-            "location": "/public/images/user/1/profile_pictures"
-        }
-    }
-    
-    response = client.patch(
-        f"{USER_ENDPOINT}/{id}",
-        headers=auth_headers,
-        json=updated_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert response_data['image']['name'] == 'new_profile.jpg'
-    assert response_data['image']['size'] == 4.5
-
-
-def test_get_user_with_profile_picture(client, auth_headers, id):
-    """Test retrieving a user's profile picture through user endpoint."""
-    # First add a profile picture
-    user_data = {
-        "image": {
-            "size": 1.8,
-            "name": "avatar.png",
-            "location": "/public/images/user/1/profile_pictures"
-        }
-    }
-    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
-    
-    # Retrieve the user
-    response = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert response_data['image'] is not None
-    assert response_data['image']['name'] == 'avatar.png'
-    assert response_data['image']['size'] == 1.8
-
-
-def test_remove_user_profile_picture(client, auth_headers, id):
-    """Test removing a user's profile picture through user endpoint."""
-    # First add a profile picture
-    user_data = {
-        "image": {
-            "size": 2.0,
-            "name": "temp_profile.jpg",
-            "location": "/public/images/user/1/profile_pictures"
-        }
-    }
-    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json=user_data)
-    
-    # Remove it by setting to None
-    updated_data = {"image": None}
-    
-    response = client.patch(
-        f"{USER_ENDPOINT}/{id}",
-        headers=auth_headers,
-        json=updated_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert response_data['image'] is None
-
-
-# ============================================================================
-# Point Images Tests
-# ============================================================================
 
 @pytest.fixture(scope="function")
-def point_with_day(client, auth_headers, itinerary):
-    """Create a point for testing image associations."""
-    point_data = {
-        "dayId": itinerary['days'][0]['id'],
-        "type": "interest",
-        "latitude": 45.4642,
-        "longitude": 9.1900,
-        "notes": "Beautiful scenic point"
-
-    }
+def point(client, auth_headers, itinerary):
+    """Create a point attached to the first day of the test itinerary."""
     response = client.post(
         f"{POINT_ENDPOINT}/create",
         headers=auth_headers,
-        json=point_data
+        json={
+            "dayId": itinerary["days"][0]["id"],
+            "type": "interest",
+            "latitude": 41.9028,
+            "longitude": 12.4964,
+            "notes": "Test point",
+        },
     )
     assert response.status_code == 201
-    point = json.loads(response.data)
-    
-    yield point
-    
-    # Cleanup
+    point_data = json.loads(response.data)
+
+    yield point_data
+
     try:
-        client.delete(f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers)
+        client.delete(f"{POINT_ENDPOINT}/{point_data['id']}", headers=auth_headers)
     except Exception:
         pass
 
 
-def test_add_single_image_to_point(client, auth_headers, point_with_day, itinerary):
-    """Test adding a single image to a point through point endpoint."""
-    point_id = point_with_day['id']
-    
-    update_data = {
-        "images": [
-            {
-                "size": 5.2,
-                "name": "scenic_view.jpg",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    
-    response = client.patch(
-        f"{POINT_ENDPOINT}/{point_id}",
+# ============================================================================
+# POST /api/point/<id>/images
+# ============================================================================
+
+def test_upload_image_to_point(client, auth_headers, point):
+    """A valid multipart upload attaches an image to the point."""
+    with patch("Services.image_service.StorageService.upload", return_value=_MOCK_URL), \
+         patch("Services.image_service.StorageService.delete"):
+        response = client.post(
+            f"{POINT_ENDPOINT}/{point['id']}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data["location"] == _MOCK_URL
+    assert data["name"] == "photo.jpg"
+    assert data["size"] == len(_FAKE_IMAGE)
+
+
+def test_upload_image_persists_in_point(client, auth_headers, point):
+    """After upload the image URL is returned when fetching the point."""
+    with patch("Services.image_service.StorageService.upload", return_value=_MOCK_URL), \
+         patch("Services.image_service.StorageService.delete"):
+        client.post(
+            f"{POINT_ENDPOINT}/{point['id']}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+
+    response = client.get(f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    images = json.loads(response.data).get("images", [])
+    assert any(img["location"] == _MOCK_URL for img in images)
+
+
+def test_upload_image_no_file_returns_400(client, auth_headers, point):
+    """Request without a file field returns 400."""
+    response = client.post(
+        f"{POINT_ENDPOINT}/{point['id']}/images",
+        data={},
+        content_type="multipart/form-data",
         headers=auth_headers,
-        json=update_data
     )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert len(response_data['images']) == 1
-    assert response_data['images'][0]['name'] == 'scenic_view.jpg'
-    assert response_data['images'][0]['size'] == 5.2
+    assert response.status_code == 400
 
 
-def test_add_multiple_images_to_point(client, auth_headers, point_with_day, itinerary):
-    """Test adding multiple images to a point through point endpoint."""
-    point_id = point_with_day['id']
-    
-    update_data = {
-        "images": [
-            {
-                "size": 3.1,
-                "name": "photo1.jpg",
-                "location": "/public/images/points/1/photos"
-            },
-            {
-                "size": 4.8,
-                "name": "photo2.png",
-                "location": "/public/images/points/1/photos"
-            },
-            {
-                "size": 2.3,
-                "name": "photo3.jpg",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    
-    response = client.patch(
-        f"{POINT_ENDPOINT}/{point_id}",
-        headers=auth_headers,
-        json=update_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert len(response_data['images']) == 3
-    image_names = [img['name'] for img in response_data['images']]
-    assert 'photo1.jpg' in image_names
-    assert 'photo2.png' in image_names
-    assert 'photo3.jpg' in image_names
+def test_upload_image_storage_validation_error_returns_400(client, auth_headers, point):
+    """StorageValidationError (e.g. wrong MIME or size) surfaces as 400."""
+    from Services.storage_service import StorageValidationError
+    with patch("Services.image_service.StorageService.upload", side_effect=StorageValidationError("bad mime")):
+        response = client.post(
+            f"{POINT_ENDPOINT}/{point['id']}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert response.status_code == 400
 
 
-def test_update_point_images(client, auth_headers, point_with_day, itinerary):
-    """Test updating images on a point through point endpoint."""
-    point_id = point_with_day['id']
-    
-    # First add some images
-    initial_data = {
-        "images": [
-            {
-                "size": 2.0,
-                "name": "old_photo.jpg",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=initial_data)
-    
-    # Update with new images
-    updated_data = {
-        "images": [
-            {
-                "size": 5.5,
-                "name": "new_photo1.jpg",
-                "location": "/public/images/points/1/photos"
-            },
-            {
-                "size": 3.2,
-                "name": "new_photo2.png",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    
-    response = client.patch(
-        f"{POINT_ENDPOINT}/{point_id}",
-        headers=auth_headers,
-        json=updated_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert len(response_data['images']) == 2
-    image_names = [img['name'] for img in response_data['images']]
-    assert 'new_photo1.jpg' in image_names
-    assert 'new_photo2.png' in image_names
-    assert 'old_photo.jpg' not in image_names
+def test_upload_image_nonexistent_point_returns_404(client, auth_headers):
+    """Uploading to a non-existent point returns 404."""
+    fake_id = "01952f1a-0000-7000-8000-000000000099"
+    with patch("Services.image_service.StorageService.upload", return_value=_MOCK_URL):
+        response = client.post(
+            f"{POINT_ENDPOINT}/{fake_id}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert response.status_code == 404
 
 
-def test_get_point_with_images(client, auth_headers, point_with_day, itinerary):
-    """Test retrieving a point with its images through point endpoint."""
-    point_id = point_with_day['id']
-    
-    # First add images
-    update_data = {
-        "images": [
-            {
-                "size": 6.7,
-                "name": "landscape.jpg",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=update_data)
-    
-    # Retrieve the point
-    response = client.get(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert len(response_data['images']) == 1
-    assert response_data['images'][0]['name'] == 'landscape.jpg'
-    assert response_data['images'][0]['size'] == 6.7
+# ============================================================================
+# DELETE /api/point/<id>/images/<image_id>
+# ============================================================================
+
+def test_delete_image_from_point(client, auth_headers, point):
+    """Deleting an image returns 204 and removes it from the point."""
+    with patch("Services.image_service.StorageService.upload", return_value=_MOCK_URL), \
+         patch("Services.image_service.StorageService.delete"):
+        upload = client.post(
+            f"{POINT_ENDPOINT}/{point['id']}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+        image_id = json.loads(upload.data)["id"]
+
+        response = client.delete(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+            headers=auth_headers,
+        )
+    assert response.status_code == 204
+
+    # Confirm the image is gone from the point
+    get_response = client.get(f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers)
+    images = json.loads(get_response.data).get("images", [])
+    assert all(img["id"] != image_id for img in images)
 
 
-def test_remove_all_images_from_point(client, auth_headers, point_with_day, itinerary):
-    """Test removing all images from a point through point endpoint."""
-    point_id = point_with_day['id']
-    
-    # First add images
-    initial_data = {
-        "images": [
-            {
-                "size": 4.0,
-                "name": "temp_photo.jpg",
-                "location": "/public/images/points/1/photos"
-            }
-        ]
-    }
-    client.patch(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers, json=initial_data)
-    
-    # Remove all images
-    updated_data = {
-        "images": []
-    }
-    
-    response = client.patch(
-        f"{POINT_ENDPOINT}/{point_id}",
-        headers=auth_headers,
-        json=updated_data
-    )
-    
-    assert response.status_code == 200
-    response_data = json.loads(response.data)
-    assert len(response_data['images']) == 0
-
-
-def test_point_deleted_removes_images(client, auth_headers, point_with_day):
-    """Test that deleting a point properly handles its associated images."""
-    point_id = point_with_day['id']
-    
-    # Delete the point
-    response = client.delete(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
-    
-    assert response.status_code == 200
-    
-    # Verify point is gone
-    get_response = client.get(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
-    assert get_response.status_code == 404
+def test_delete_image_nonexistent_returns_404(client, auth_headers, point):
+    """Deleting an image that does not exist returns 404."""
+    fake_id = "01952f1a-0000-7000-8000-000000000088"
+    with patch("Services.image_service.StorageService.delete"):
+        response = client.delete(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{fake_id}",
+            headers=auth_headers,
+        )
+    assert response.status_code == 404

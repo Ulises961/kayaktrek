@@ -1,29 +1,29 @@
-from marshmallow import Schema, fields, post_load, post_dump, validates, ValidationError, pre_load
+from marshmallow import fields, post_load, validates, ValidationError, pre_load
 from Models.user import User
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
-from Schemas.image_schema import ImageSchema
 import re
 import bleach
 
+
 class UserSchema(BaseSchema):
-    """ 
+    """
     User Schema
     used for loading/dumping User entities
     """
     mail = fields.Email(required=True, validate=lambda x: len(x) <= 255)
     pwd = fields.String(required=True, load_only=True, validate=lambda x: len(x) >= 8)
-    phone = fields.String(required=True, validate=lambda x: len(x) <= 20)  
-    username = fields.String(required=True, validate=lambda x: 3 <= len(x.strip()) <= 50)  
-    name = fields.String(required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)  
-    surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)  
+    phone = fields.String(required=True, validate=lambda x: len(x) <= 20)
+    username = fields.String(required=True, validate=lambda x: 3 <= len(x.strip()) <= 50)
+    name = fields.String(required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)
+    surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
     trips = fields.List(fields.Nested('TripSchema', allow_none=True), dump_only=True)
     itineraries = fields.List(fields.Nested('ItinerarySchema', allow_none=True), dump_only=True)
     inventories = fields.List(fields.Nested('InventorySchema', allow_none=True), dump_only=True)
     items = fields.List(fields.Nested('ItemSchema', allow_none=True), dump_only=True)
     endorsed_logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
     logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
-    image = fields.Nested(ImageSchema, allow_none=True, dump_only=True)
+    avatar_url = fields.String(allow_none=True, dump_only=True)
     admin = fields.Bool(dump_only=True)
 
     @pre_load
@@ -45,7 +45,7 @@ class UserSchema(BaseSchema):
                 raise ValidationError(
                     "Username can only contain letters, numbers, underscores, and hyphens"
                 )
-    
+
     @validates('phone')
     def validate_phone(self, value, **kwargs):
         """Validate phone number format."""
@@ -58,8 +58,7 @@ class UserSchema(BaseSchema):
                 raise ValidationError("Phone number must contain only digits")
             if len(cleaned) < 7 or len(cleaned) > 15:
                 raise ValidationError("Phone number must be between 7 and 15 digits")
-    
-    
+
     @validates('name')
     def validate_name(self, value, **kwargs):
         """Validate and sanitize name."""
@@ -72,7 +71,7 @@ class UserSchema(BaseSchema):
                 raise ValidationError("Name cannot exceed 100 characters")
             if re.search(r'[<>"\';\[\]{}]', sanitized):
                 raise ValidationError("Name contains invalid characters")
-    
+
     @validates('surname')
     def validate_surname(self, value, **kwargs):
         """Validate and sanitize surname."""
@@ -83,7 +82,7 @@ class UserSchema(BaseSchema):
                 raise ValidationError("Surname cannot exceed 100 characters")
             if re.search(r'[<>"\';\[\]{}]', sanitized):
                 raise ValidationError("Surname contains invalid characters")
-    
+
     @validates('mail')
     def validate_mail(self, value, **kwargs):
         """Validate email format and length."""
@@ -94,7 +93,7 @@ class UserSchema(BaseSchema):
             email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
             if not email_pattern.match(value):
                 raise ValidationError("Invalid email format")
-    
+
     @validates('pwd')
     def validate_pwd(self, value, **kwargs):
         """Validate password strength."""
@@ -106,7 +105,7 @@ class UserSchema(BaseSchema):
             # Check for at least one letter and one number
             if not re.search(r'[a-zA-Z]', value) or not re.search(r'[0-9]', value):
                 raise ValidationError("Password must contain at least one letter and one number")
-           # Check for at least one special character
+            # Check for at least one special character
             if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
                 raise ValidationError("Password must contain at least one special character")
 
@@ -123,8 +122,8 @@ class UserUpdateSchema(UserSchema):
     mail is excluded: email changes require a dedicated verification flow.
     pwd is accepted and validated here; the service handles hashing.
     """
-    mail = fields.Email(dump_only=True)       # excluded from load input
-    pwd = fields.String(load_only=True, validate=lambda x: len(x) >= 8)
+    mail = fields.Email(dump_only=True)   # excluded from load; email changes need a dedicated flow
+    pwd = fields.String(load_only=True)   # optional on PATCH; full strength rules via inherited @validates
     phone = fields.String(validate=lambda x: len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)

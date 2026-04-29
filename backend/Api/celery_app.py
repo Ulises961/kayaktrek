@@ -15,8 +15,11 @@ Usage (inside a task):
     def my_task():
         ...
 """
+import logging
 import os
+
 from celery import Celery
+from celery.signals import after_setup_logger
 from dotenv import load_dotenv
 from kombu.transport.pyamqp import Transport as _AMQPTransport
 
@@ -45,6 +48,13 @@ celery_app.conf.update(
     # deprecation warning in RabbitMQ 3.12+.
     worker_enable_remote_control=False,
 )
+
+
+@after_setup_logger.connect
+def _configure_celery_logger(logger, **kwargs):
+    root = logging.getLogger()
+    logger.handlers = root.handlers
+    logger.setLevel(root.level)
 
 
 def init_celery(app):

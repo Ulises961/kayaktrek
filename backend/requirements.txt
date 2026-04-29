@@ -27,3 +27,5 @@ flask-limiter
 redis>=3.0
 flask-mail
 gunicorn
+boto3
+python-magic
