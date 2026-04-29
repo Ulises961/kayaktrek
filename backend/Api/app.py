@@ -1,4 +1,6 @@
-from flask import Flask
+import uuid
+
+from flask import Flask, g, request
 from flask_migrate import Migrate
 
 from Api.config import config
@@ -23,7 +25,7 @@ from Resources.log_resource import log_api
 from Resources.authentication_resource import api as authApi
 
 
-def createApp(config_mode:str):
+def createApp(config_mode: str):
     """
     Creates and configurates the Flask app, the logger to be used throughout  the application
     and the database to use. Returns the configured app that is to be used in the main function.
@@ -58,6 +60,10 @@ def createApp(config_mode:str):
 
     # Configure logging
     setup_logging(app)
+
+    @app.before_request
+    def attach_request_id():
+        g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
 
     # Register error handlers
     register_error_handlers(app)
