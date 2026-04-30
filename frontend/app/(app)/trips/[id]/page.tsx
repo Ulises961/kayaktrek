@@ -10,6 +10,8 @@ import { InviteForm } from "@/components/trips/invite-form"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
+import { DifficultyBadge } from "@/components/trips/difficulty-badge"
+import { DifficultySelect } from "@/components/trips/difficulty-select"
 import { CalendarIcon, ClockIcon, MapPinIcon, PencilIcon, UsersIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,7 +33,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   }
 
   const session = await getSession()
-  const { destination, state, dateFrom, dateTo, description } = trip
+  const { destination, state, dateFrom, dateTo, description, difficulty } = trip
   const travellers = trip.travellers ?? []
   const pendingTravellers = trip.pendingTravellers ?? []
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
@@ -47,6 +49,10 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
           <h1 className="text-2xl font-semibold">{destination ?? "Untitled trip"}</h1>
           <div className="flex items-center gap-2 shrink-0">
             {state && <StateBadge state={state} />}
+            {isLeader
+              ? <DifficultySelect tripId={id} value={difficulty} />
+              : <DifficultyBadge difficulty={difficulty} />
+            }
             {isLeader && (
               <Button asChild variant="ghost" size="sm">
                 <Link href={`/trips/${id}/edit`}>

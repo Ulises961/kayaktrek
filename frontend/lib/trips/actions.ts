@@ -12,6 +12,7 @@ interface TripFields {
   description?: string
   dateFrom?: string
   dateTo?: string
+  difficulty?: string | null
 }
 
 export async function createTrip(fields: TripFields): Promise<CreateTripResult> {
