@@ -1,8 +1,8 @@
 FROM python:3.12-slim AS base
 
-# System deps required by psycopg2 and GeoAlchemy2
+# System deps required by psycopg2, GeoAlchemy2, and python-magic
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
