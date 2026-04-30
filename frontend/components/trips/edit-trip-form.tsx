@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { updateTrip } from "@/lib/trips/actions"
 import { TripFieldsSchema, type Trip, type TripFields } from "@/lib/dtos/trip"
@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/common/date-picker"
 
 export function EditTripForm({ trip }: { trip: Trip }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, formState: { errors } } = useForm<TripFields>({
+  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<TripFields>({
     resolver: zodResolver(TripFieldsSchema),
     defaultValues: {
       destination: trip.destination ?? "",
@@ -66,12 +67,24 @@ export function EditTripForm({ trip }: { trip: Trip }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="dateFrom">From</Label>
-          <Input id="dateFrom" type="date" disabled={isPending} {...register("dateFrom")} />
+          <Label>From</Label>
+          <Controller
+            name="dateFrom"
+            control={control}
+            render={({ field }) => (
+              <DatePicker value={field.value} onChange={field.onChange} disabled={isPending} />
+            )}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="dateTo">To</Label>
-          <Input id="dateTo" type="date" disabled={isPending} {...register("dateTo")} />
+          <Label>To</Label>
+          <Controller
+            name="dateTo"
+            control={control}
+            render={({ field }) => (
+              <DatePicker value={field.value} onChange={field.onChange} disabled={isPending} />
+            )}
+          />
         </div>
       </div>
 

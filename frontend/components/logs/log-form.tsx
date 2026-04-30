@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LogFieldsSchema, type LogFields, type Log } from "@/lib/dtos/log"
 import { createLog, updateLog } from "@/lib/logs/actions"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/common/date-picker"
 
 interface LogFormProps {
   log?: Log
@@ -20,7 +21,7 @@ export function LogForm({ log }: LogFormProps) {
   const [isPending, startTransition] = useTransition()
   const isEdit = !!log?.id
 
-  const { register, handleSubmit, setError, formState: { errors } } = useForm<LogFields>({
+  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<LogFields, unknown, LogFields>({
     resolver: zodResolver(LogFieldsSchema),
     defaultValues: {
       date: log?.date ?? "",
@@ -57,7 +58,18 @@ export function LogForm({ log }: LogFormProps) {
     <form onSubmit={onSubmit} className="flex flex-col gap-5 max-w-lg">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="date">Date</Label>
-        <Input id="date" type="date" disabled={isPending} {...register("date")} />
+        <Controller
+          name="date"
+          control={control}
+          render={({ field }) => (
+            <DatePicker
+              id="date"
+              value={field.value as string | undefined}
+              onChange={field.onChange}
+              disabled={isPending}
+            />
+          )}
+        />
         {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
       </div>
 
