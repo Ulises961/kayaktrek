@@ -21,7 +21,7 @@ export function LogForm({ log }: LogFormProps) {
   const [isPending, startTransition] = useTransition()
   const isEdit = !!log?.id
 
-  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<LogFields, unknown, LogFields>({
+  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<LogFields>({
     resolver: zodResolver(LogFieldsSchema),
     defaultValues: {
       date: log?.date ?? "",
@@ -84,7 +84,7 @@ export function LogForm({ log }: LogFormProps) {
             max={24}
             placeholder="0–24"
             disabled={isPending}
-            {...register("hours")}
+            {...register("hours", { valueAsNumber: true })}
           />
           {errors.hours && <p className="text-sm text-destructive">{errors.hours.message}</p>}
         </div>
@@ -98,7 +98,7 @@ export function LogForm({ log }: LogFormProps) {
             min={0}
             placeholder="km"
             disabled={isPending}
-            {...register("distance")}
+            {...register("distance", { valueAsNumber: true })}
           />
           {errors.distance && <p className="text-sm text-destructive">{errors.distance.message}</p>}
         </div>
@@ -114,7 +114,7 @@ export function LogForm({ log }: LogFormProps) {
           max={12}
           placeholder="0 = calm · 12 = hurricane"
           disabled={isPending}
-          {...register("avgSea")}
+          {...register("avgSea", { valueAsNumber: true })}
         />
         {errors.avgSea && <p className="text-sm text-destructive">{errors.avgSea.message}</p>}
       </div>
