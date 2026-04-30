@@ -1,20 +1,17 @@
 import Link from "next/link"
 import { apiGet } from "@/lib/api/client"
-import { LogPageSchema } from "@/lib/dtos/log"
-import { LogCard } from "@/components/logs/log-card"
+import { LogPageSchema, LogsSchema } from "@/lib/dtos/log"
+import { LogsTabs } from "@/components/logs/logs-tabs"
 import { Button } from "@/components/ui/button"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
-  let data
-  try {
-    const raw = await apiGet("/api/log/all?per_page=100")
-    data = LogPageSchema.parse(raw)
-  } catch {
-    data = { items: [], total: 0, page: 1, pages: 1 }
-  }
+  const [pageData, endorsedData] = await Promise.all([
+    apiGet("/api/log/all?per_page=100").then((r) => LogPageSchema.parse(r)).catch(() => ({ items: [], total: 0, page: 1, pages: 1 })),
+    apiGet("/api/log/endorsed").then((r) => LogsSchema.parse(r)).catch(() => []),
+  ])
 
-  const { items } = data
+  const { items } = pageData
 
   const totalHours = items.reduce((sum, l) => sum + (l.hours ?? 0), 0)
   const totalDistance = items.reduce((sum, l) => sum + (l.distance ?? 0), 0)
@@ -59,15 +56,7 @@ export default async function LogsPage() {
         </div>
       )}
 
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No logs yet. Record your first session.</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {items.map((log) => (
-            <LogCard key={log.id} log={log} />
-          ))}
-        </div>
-      )}
+      <LogsTabs myLogs={items} endorsedLogs={endorsedData} />
     </div>
   )
 }
