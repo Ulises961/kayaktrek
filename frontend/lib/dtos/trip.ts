@@ -8,9 +8,13 @@ import { noHtmlTags, isoDateField } from "../validators"
 export const TRIP_STATES = ["draft", "planning", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]
 
+export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
+export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]
+
 export const TripSchema = z.object({
   id: z.uuidv7().optional(),
   state: z.enum(TRIP_STATES).nullish(),
+  difficulty: z.enum(TRIP_DIFFICULTIES).nullish(),
   description: z.string().nullish(),
   destination: z.string().nullish(),
   dateFrom: z.string().nullish(),
