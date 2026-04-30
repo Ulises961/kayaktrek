@@ -95,6 +95,25 @@ describe("TripSchema", () => {
   })
 })
 
+describe("TripSchema difficulty", () => {
+  it("accepts all valid difficulty values", () => {
+    for (const difficulty of ["easy", "moderate", "demanding", "expert"] as const) {
+      const result = TripSchema.safeParse({ ...TRIP_FIXTURE, difficulty })
+      expect(result.success).toBe(true)
+    }
+  })
+
+  it("accepts null difficulty", () => {
+    const result = TripSchema.safeParse({ ...TRIP_FIXTURE, difficulty: null })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an invalid difficulty", () => {
+    const result = TripSchema.safeParse({ ...TRIP_FIXTURE, difficulty: "challenging" })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("TripPageSchema", () => {
   const page = {
     items: [TRIP_FIXTURE],

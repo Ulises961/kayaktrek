@@ -80,6 +80,18 @@ def post():
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
+@log_api.route("/<string:id>", methods=["GET"])
+@JWTService.authenticate_restful
+@require_owner('log', id_param='id')
+def get_log(id: str):
+    try:
+        log = LogService.get_log_by_id(id)
+        return jsonify(LogSchema().dump(log)), HTTPStatus.OK
+    except Exception as e:
+        logger.error(f"Error retrieving log: {e}")
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+
+
 @log_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')

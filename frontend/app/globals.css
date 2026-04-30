@@ -235,7 +235,34 @@
   --chart-5: oklch(0.66 0.185 320);
 }
 
+/* ── State-visual animation keyframes ───────────────────────────────────────
+ * Used by components/illustrations/state-visual.tsx.
+ * All three are domain-neutral: the SVG primitives supply the meaning.
+ * ── */
+@keyframes sv-oscillate {
+  0%, 100% { transform: translateY(0px);  }
+  50%       { transform: translateY(-6px); }
+}
+/* Erratic bearing loss — used on the compass needle and broken route half */
+@keyframes sv-disrupt {
+  0%, 100% { transform: translate(0px,  0px); }
+  25%      { transform: translate(-2px, 1px); }
+  50%      { transform: translate(2px, -2px); }
+  75%      { transform: translate(-1px, 2px); }
+}
+/* Compass needle searching for north */
+@keyframes sv-needle {
+  0%, 100% { transform: rotate(0deg);   }
+  20%      { transform: rotate(24deg);  }
+  45%      { transform: rotate(-19deg); }
+  65%      { transform: rotate(13deg);  }
+  85%      { transform: rotate(-8deg);  }
+}
+
 @layer base {
+  html {
+    font-size: 112.5%; /* 18px base — scales all rem values proportionally */
+  }
   * {
     @apply border-border outline-ring/50;
   }
