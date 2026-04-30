@@ -16,7 +16,7 @@ export function NavigationItems() {
         { title: "Invitations", url: "/invitations", icon: MailIcon },
         { title: "Inventory", url: "#", icon: LifeBuoyIcon },
         { title: "Buddies", url: "#", icon: UserGroupIcon },
-        { title: "Logs", url: "#", icon: NewspaperIcon }
+        { title: "Logs", url: "/logs", icon: NewspaperIcon }
     ];
 
     return (
