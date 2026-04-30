@@ -1,3 +1,4 @@
+import { StateVisual } from "@/components/illustrations/state-visual"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
@@ -264,6 +265,33 @@ export default function DesignPage() {
               ● On route
             </span>
           </div>
+        </div>
+      </Section>
+
+      {/* ── 8. State visuals ─────────────────────────────────────────────────── */}
+      <Section
+        title="8 — State visuals"
+        subtitle="Domain-anchored grammar: compass · waypoints · route · paddle · horizon. All five states — toggle dark mode to verify both themes."
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(["empty", "loading", "not-found", "error", "success"] as const).map((state) => {
+            const meta = {
+              empty:     { label: "Empty",       desc: "Paddle ready — no voyages yet."        },
+              loading:   { label: "Loading",     desc: "Navigating toward something."           },
+              "not-found": { label: "404",        desc: "Destination doesn't exist."            },
+              error:     { label: "500",         desc: "Lost bearing — system failure."         },
+              success:   { label: "Success",     desc: "Route resolved. Flag planted."          },
+            }[state]
+            return (
+              <div key={state} className="flex flex-col gap-2 rounded-xl border border-border p-3 bg-[var(--surface-2,var(--muted))]">
+                <StateVisual state={state} className="rounded-lg overflow-hidden" />
+                <div className="flex flex-col gap-0.5 px-1 pb-1">
+                  <p className="text-sm font-semibold">{meta.label}</p>
+                  <p className="text-xs text-muted-foreground">{meta.desc}</p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </Section>
 
