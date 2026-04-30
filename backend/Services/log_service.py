@@ -100,7 +100,7 @@ class LogService:
         log = LogService.get_log_by_id(id)
         logger.info(f"Updating log {id}")
 
-        _MUTABLE_FIELDS = {"hours", "avg_sea"}
+        _MUTABLE_FIELDS = {"hours", "avg_sea", "distance", "date", "notes"}
         for field in _MUTABLE_FIELDS:
             key = camelcase(field)
             if key in log_data:
