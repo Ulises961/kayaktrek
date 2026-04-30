@@ -4,7 +4,7 @@ import { isoDateField } from "../validators"
 export const LogSchema = z.object({
   id: z.uuidv7().optional(),
   userId: z.uuidv7().nullish(),
-  date: isoDateField.nullish(),//z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD format.").nullish(),
+  date: isoDateField.nullish(),
   hours: z.number().min(0).max(24).nullish(),
   avgSea: z.number().int().min(0).max(12).nullish(),
   distance: z.number().min(0).nullish(),
@@ -20,5 +20,14 @@ export const LogPageSchema = z.object({
 
 export const LogsSchema = z.array(LogSchema)
 
+export const LogFieldsSchema = z.object({
+  date: isoDateField.optional(),
+  hours: z.coerce.number().min(0, "Min 0").max(24, "Max 24 hours").optional(),
+  avgSea: z.coerce.number().int().min(0, "Min 0").max(12, "Max 12 (Beaufort)").optional(),
+  distance: z.coerce.number().min(0, "Must be positive").optional(),
+  notes: z.string().max(2000, "Max 2000 characters").optional(),
+})
+
 export type Log = z.infer<typeof LogSchema>
 export type LogPage = z.infer<typeof LogPageSchema>
+export type LogFields = z.infer<typeof LogFieldsSchema>

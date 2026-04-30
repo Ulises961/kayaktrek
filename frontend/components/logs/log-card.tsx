@@ -1,6 +1,7 @@
+import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { SeaStateChip } from "./sea-state-chip"
-import { CalendarIcon, ClockIcon, RouteIcon } from "lucide-react"
+import { CalendarIcon, ClockIcon, PencilIcon, RouteIcon } from "lucide-react"
 import type { Log } from "@/lib/dtos/log"
 
 interface LogCardProps {
@@ -33,6 +34,12 @@ export function LogCard({ log }: LogCardProps) {
         )}
 
         {avgSea != null && <SeaStateChip value={avgSea} />}
+
+        {log.id && (
+          <Link href={`/logs/${log.id}/edit`} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
+            <PencilIcon className="size-4" />
+          </Link>
+        )}
       </CardContent>
     </Card>
   )
