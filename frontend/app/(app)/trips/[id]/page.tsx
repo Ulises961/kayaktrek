@@ -8,6 +8,7 @@ import { CrewList } from "@/components/common/crew-list"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InviteForm } from "@/components/trips/invite-form"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
+import { MileageSummary } from "@/components/itinerary/mileage-summary"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { DifficultyBadge } from "@/components/trips/difficulty-badge"
@@ -159,7 +160,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
         </Card>
       )}
 
-      {/* Itinerary — M4 */}
+      {/* Itinerary */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -167,7 +168,11 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             Itinerary
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <MileageSummary
+            planned={trip.itinerary?.expectedTotalMiles ?? null}
+            actual={trip.itinerary?.totalMiles ?? null}
+          />
           <p className="text-sm text-muted-foreground">Map-first itinerary builder coming in M4.</p>
         </CardContent>
       </Card>
