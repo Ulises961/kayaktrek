@@ -29,3 +29,4 @@ flask-mail
 gunicorn
 boto3
 python-magic
+cryptography
