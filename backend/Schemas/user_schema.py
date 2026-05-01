@@ -26,6 +26,19 @@ class UserSchema(BaseSchema):
     avatar_url = fields.String(allow_none=True, dump_only=True)
     admin = fields.Bool(dump_only=True)
 
+    vessel_make = fields.String(allow_none=True)
+    vessel_model = fields.String(allow_none=True)
+    vessel_length_cm = fields.Integer(allow_none=True)
+    vessel_color_primary = fields.String(allow_none=True)
+    vessel_color_secondary = fields.String(allow_none=True)
+    emergency_contact_name = fields.String(allow_none=True)
+    emergency_contact_phone = fields.String(allow_none=True)
+    emergency_contact_relationship = fields.String(allow_none=True)
+
+    # Consent timestamp only — ciphertext fields are never exposed via API
+    medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
+    deletion_requested_at = fields.DateTime(allow_none=True, dump_only=True)
+
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('name', 'surname'):
@@ -121,13 +134,18 @@ class UserUpdateSchema(UserSchema):
     All fields are optional — only present fields are validated.
     mail is excluded: email changes require a dedicated verification flow.
     pwd is accepted and validated here; the service handles hashing.
+    Medical notes fields are excluded — managed via dedicated consent endpoints.
     """
-    mail = fields.Email(dump_only=True)   # excluded from load; email changes need a dedicated flow
-    pwd = fields.String(load_only=True)   # optional on PATCH; full strength rules via inherited @validates
+    mail = fields.Email(dump_only=True)
+    pwd = fields.String(load_only=True)
     phone = fields.String(validate=lambda x: len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
+
+    # Medical notes and consent fields are not mutable through this schema
+    medical_notes_consent_at = fields.DateTime(dump_only=True)
+    deletion_requested_at = fields.DateTime(dump_only=True)
 
     @post_load
     def make_user(self, data, **kwargs):

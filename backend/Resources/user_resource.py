@@ -10,6 +10,7 @@ from Services.user_service import UserService
 from Services.storage_service import StorageValidationError
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_self
+from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,108 @@ def update_user(id: str):
         abort(HTTPStatus.CONFLICT, description=f"Error updating user with id {id}")
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"Error: {e}")
+
+
+@user_api.route("/me/password", methods=["PATCH"])
+@JWTService.authenticate_restful
+def change_password():
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        current_pwd = raw.get("currentPwd")
+        new_pwd = raw.get("newPwd")
+        if not current_pwd or not new_pwd:
+            abort(HTTPStatus.BAD_REQUEST, description="currentPwd and newPwd are required")
+        UserService.change_password(str(g.current_user_id), current_pwd, new_pwd)
+        return "", HTTPStatus.NO_CONTENT
+
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/re-auth", methods=["POST"])
+@JWTService.authenticate_restful
+def re_auth():
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        if not UserService.verify_password(str(g.current_user_id), raw["password"]):
+            abort(HTTPStatus.UNAUTHORIZED, description="Password incorrect")
+        token = JWTService.generate_elevated_token(str(g.current_user_id))
+        return jsonify({"elevatedToken": token}), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/medical-consent", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def grant_medical_consent():
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        plaintext = raw.get("medicalNotes", "").strip()
+        password = raw.get("password")
+        if not plaintext:
+            abort(HTTPStatus.BAD_REQUEST, description="medicalNotes is required")
+        if not password:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required for encryption")
+        user = UserService.grant_medical_consent(str(g.current_user_id), plaintext, password)
+        return jsonify(UserSchema().dump(user)), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/medical-consent", methods=["DELETE"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def revoke_medical_consent():
+    try:
+        UserService.revoke_medical_consent(str(g.current_user_id))
+        return "", HTTPStatus.NO_CONTENT
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/medical-notes", methods=["GET"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def get_medical_notes():
+    try:
+        password = request.args.get("password") or (request.get_json() or {}).get("password")
+        if not password:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        plaintext = UserService.get_medical_notes(str(g.current_user_id), password)
+        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except InvalidTag:
+        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/avatar", methods=["POST"])
