@@ -2,6 +2,7 @@ from marshmallow import fields, post_load, validates, ValidationError, pre_load
 from Models.user import User
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
+from Schemas.user_certification_schema import UserCertificationSchema
 import re
 import bleach
 
@@ -34,6 +35,8 @@ class UserSchema(BaseSchema):
     emergency_contact_name = fields.String(allow_none=True)
     emergency_contact_phone = fields.String(allow_none=True)
     emergency_contact_relationship = fields.String(allow_none=True)
+
+    certifications = fields.List(fields.Nested(UserCertificationSchema), dump_only=True)
 
     # Consent timestamp only — ciphertext fields are never exposed via API
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)

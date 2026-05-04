@@ -147,6 +147,8 @@ def change_password():
         UserService.change_password(str(g.current_user_id), current_pwd, new_pwd)
         return "", HTTPStatus.NO_CONTENT
 
+    except HTTPException:
+        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
@@ -225,6 +227,8 @@ def get_medical_notes():
         plaintext = UserService.get_medical_notes(str(g.current_user_id), password)
         return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
 
+    except HTTPException:
+        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except InvalidTag:
