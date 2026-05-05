@@ -11,6 +11,8 @@ from Models.base_model import BaseModel
 class AuthTokenType(enum.Enum):
     VERIFICATION = "verification"
     RESET = "reset"
+    DATA_EXPORT = "data_export"
+    DELETION_CANCEL = "deletion_cancel"
 
 
 class AuthToken(BaseModel):

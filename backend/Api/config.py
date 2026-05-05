@@ -13,6 +13,7 @@ class Config:
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "noreply@kayakplanner.app")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
 
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
