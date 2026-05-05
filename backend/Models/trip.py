@@ -21,6 +21,7 @@ class TripStateType(enum.Enum):
     PLANNING = "planning"
     HAPPENING = "happening"
     PAST = "past"
+    ARCHIVED = "archived"
 
 
 class TripDifficultyType(enum.Enum):

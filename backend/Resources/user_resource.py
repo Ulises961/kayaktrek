@@ -5,12 +5,22 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from marshmallow import ValidationError
 from flask import Blueprint, jsonify, request, abort, g
 
+import hashlib
+import os
+
+from flask import current_app, send_file
+
 from Schemas.user_schema import UserSchema, UserUpdateSchema
 from Services.user_service import UserService
 from Services.storage_service import StorageValidationError
+from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
-from Services.Middleware.privileges_middleware import require_self
+from Services.Middleware.privileges_middleware import require_self, require_admin
+from Api.limiter import limiter
+from Models.auth_token import AuthTokenType
 from cryptography.exceptions import InvalidTag
+from Tasks.data_export import export_user_data
+from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
@@ -294,12 +304,127 @@ def delete_avatar():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_api.route("/me/data-export", methods=["POST"])
+@JWTService.authenticate_restful
+@limiter.limit("1 per day", key_func=lambda: str(g.current_user_id))
+def request_data_export():
+    """
+    Queue a GDPR data export for the authenticated user (Art. 15 / 20).
+    The user will receive an email with a one-time download link (24 h TTL).
+
+    Rate limited to 1 request per day per user.
+
+    Returns:
+        202 Accepted
+    """
+    export_user_data.delay(str(g.current_user_id), request_id=g.get("request_id"))
+    return "", HTTPStatus.ACCEPTED
+
+
+@user_api.route("/me/data-export/<string:token>", methods=["GET"])
+def download_data_export(token: str):
+    """
+    Stream and then delete a previously generated data export file.
+    The token is single-use; the file is removed after download.
+
+    Returns:
+        200 with the JSON file as an attachment
+        400 if the token is invalid / expired / already used
+        404 if the file is missing (already downloaded or task not yet complete)
+    """
+    try:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        AuthService._consume_token(token, AuthTokenType.DATA_EXPORT)
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+
+    exports_dir = os.path.join(current_app.root_path, "static", "exports")
+    filepath = os.path.join(exports_dir, f"{token_hash}.json")
+
+    if not os.path.isfile(filepath):
+        abort(HTTPStatus.NOT_FOUND, description="Export file not found or already downloaded")
+
+    response = send_file(filepath, as_attachment=True, download_name="kayak-planner-export.json")
+
+    try:
+        os.remove(filepath)
+    except OSError as e:
+        logger.error("export_file_cleanup_failed", extra={"filepath": filepath, "error": str(e)})
+
+    return response
+
+
+@user_api.route("/me", methods=["DELETE"])
+@JWTService.authenticate_restful
+def request_deletion():
+    """
+    Begin the GDPR erasure grace period (Art. 17).
+
+    Deactivates the account, revokes all sessions, and emails a cancellation
+    link valid for 30 days. The user cannot log in during this period.
+
+    Returns:
+        202 Accepted
+    """
+    try:
+        user = UserService.get_current_user()
+        raw_token = UserService.request_deletion(str(user.id))
+
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+        cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
+
+        send_template_email(
+            user.mail,
+            "Your Kayak Planner account deletion request",
+            "deletion_request",
+            name=user.name,
+            cancel_url=cancel_url,
+            support_email=support_email,
+        )
+
+        return "", HTTPStatus.ACCEPTED
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="User not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/deletion-request", methods=["DELETE"])
+def cancel_deletion():
+    """
+    Cancel a pending account deletion using the emailed token.
+    No authentication required — the token is the credential.
+
+    Query param:
+        token: raw DELETION_CANCEL token from the cancellation email
+
+    Returns:
+        200 on success
+        400 if token is invalid / expired / already used
+    """
+    token = request.args.get("token", "").strip()
+    if not token:
+        abort(HTTPStatus.BAD_REQUEST, description="token query parameter is required")
+
+    try:
+        UserService.cancel_deletion(token)
+        return jsonify({"message": "Account deletion cancelled. You can log in again."}), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="User not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-@require_self()
+@require_admin()
 def delete(id: str):
     """
-    Permanently delete a user account.
+    Admin-only: immediately hard-delete a user account, bypassing the grace period.
 
     Args:
         id: UUID of the user to delete

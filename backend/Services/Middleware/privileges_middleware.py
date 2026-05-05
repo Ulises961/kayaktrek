@@ -34,6 +34,25 @@ from Services.trip_service import TripService
 logger = logging.getLogger(__name__)
 
 
+def require_admin():
+    """
+    Decorator that allows only admin users to call the endpoint.
+    Looks up the user from the DB; admins bypass all ownership checks.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            current_user_id = g.get("current_user_id")
+            if not current_user_id:
+                abort(HTTPStatus.UNAUTHORIZED, description="Authentication required")
+            user = db.session.query(User).filter_by(id=UUID(current_user_id)).first()
+            if not user or not user.admin:
+                abort(HTTPStatus.FORBIDDEN, description="Admin access required")
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def require_self(id_param: str = "id"):
     """
     Decorator that requires the authenticated user to be the same user identified
