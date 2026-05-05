@@ -1,0 +1,13 @@
+Hi {{ name }},
+
+We received a request to permanently delete your Kayak Planner account. Your account is now dormant and you cannot log in during this period.
+
+If this was a mistake, cancel the deletion within 30 days:
+{{ cancel_url }}
+
+After 30 days your data will be permanently deleted and cannot be recovered.
+
+If you did not make this request, contact support immediately at {{ support_email }}.
+
+---
+Kayak Planner · {{ support_email }}

@@ -1,0 +1,11 @@
+Hi {{ name }},
+
+Welcome to Kayak Planner! Please verify your email address to activate your account.
+
+Verify your account:
+{{ verify_url }}
+
+This link expires in 24 hours. If you did not create an account, you can safely ignore this email.
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}
