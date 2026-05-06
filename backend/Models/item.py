@@ -24,4 +24,4 @@ class Item(BaseModel):
         Enum(ItemStatusType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=True,
     )
-    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id'), nullable=False, index=True)
+    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id', ondelete="CASCADE"), nullable=False, index=True)

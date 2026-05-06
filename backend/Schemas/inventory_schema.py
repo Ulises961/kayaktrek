@@ -23,6 +23,10 @@ class InventorySchema(BaseSchema):
 
     @post_load
     def make_inventory(self, data, **kwargs):
-        data['user_id'] = UUID(str(g.current_user_id))
+        # Stamp user ownership only for personal (non-trip) inventories.
+        # When trip_id is excluded from the schema (nested inside TripSchema),
+        # or when trip_id is explicitly provided, the inventory belongs to the trip.
+        if "trip_id" in self.fields and data.get("trip_id") is None:
+            data['user_id'] = UUID(str(g.current_user_id))
         return Inventory(**data)
     

@@ -392,6 +392,16 @@ class TripService:
 
         trip = TripService.get_trip_by_id(trip_id)
         trip.transition_state(new_state)
+
+        # Release user ownership on itinerary and inventory on the first transition out
+        # of draft. Those user_id columns are only meaningful for personal/draft objects;
+        # once a trip moves to planning both objects belong to the trip.
+        if new_state == TripStateType.PLANNING:
+            if trip.itinerary:
+                trip.itinerary.user_id = None
+            if trip.inventory:
+                trip.inventory.user_id = None
+
         db.session.commit()
         db.session.refresh(trip)
         logger.info(f"Trip {trip_id} transitioned to '{new_state_value}'")
