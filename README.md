@@ -1,5 +1,8 @@
 # Kayak Expedition Planner
 
+[![Backend CI](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/backend-ci.yml)
+[![codecov](https://codecov.io/gh/Ulises961/kayak-expedition-planner/graph/badge.svg)](https://codecov.io/gh/Ulises961/kayak-expedition-planner)
+
 A platform for planning, running, and sharing multi-day kayak expeditions — built for kayakers by kayakers.
 
 ## What it does

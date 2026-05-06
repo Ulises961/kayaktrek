@@ -1,6 +1,7 @@
 path
 flake8
 pytest
+pytest-cov
 pytest-dotenv
 flask
 celery
