@@ -43,7 +43,11 @@ class AuthService:
         else:
             user = query.filter_by(username=username).first()
 
-        if not user or not user.active:
+        if not user:
+            return None
+        if user.deletion_requested_at is not None:
+            raise PermissionError("deletion_pending")
+        if not user.active:
             return None
         if check_password_hash(user.pwd, password):
             return user

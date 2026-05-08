@@ -51,7 +51,7 @@ export function LoginForm() {
           <label htmlFor="mail" className="text-sm font-medium text-slate-700">
             Email
           </label>
-          <Input id="mail" type="email" autoComplete="email" {...register("mail")} />
+          <Input id="mail" type="email" autoComplete="email" suppressHydrationWarning {...register("mail")} />
           {errors.mail && (
             <p className="text-xs text-red-600">{errors.mail.message}</p>
           )}
@@ -73,7 +73,20 @@ export function LoginForm() {
         </div>
 
         {serverState && !serverState.success && (
-          <p className="text-sm text-red-600">{serverState.error}</p>
+          serverState.code === "deletion_pending" ? (
+            <div className="flex flex-col gap-2 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-amber-800 font-medium">This account is scheduled for deletion.</p>
+              <p className="text-amber-700">
+                Check your email for a cancellation link, or{" "}
+                <Link href="/cancel-deletion" className="underline underline-offset-2 hover:text-amber-900">
+                  request a new one here
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-red-600">{serverState.error}</p>
+          )
         )}
 
         <Button type="submit" disabled={isPending} className="w-full">

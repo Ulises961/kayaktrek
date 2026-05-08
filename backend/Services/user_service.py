@@ -346,6 +346,30 @@ class UserService:
         logger.info("deletion_cancelled", extra={"user_id": str(token.user_id)})
 
     @staticmethod
+    def resend_deletion_cancel(mail_addr: str) -> Optional[tuple]:
+        """
+        Invalidate any existing DELETION_CANCEL tokens and issue a new one.
+
+        Returns (raw_token, user_name) if a pending deletion exists for the
+        given email, or None if the email is unknown or has no pending deletion.
+        Returning None (rather than raising) prevents account enumeration.
+        """
+        user = db.session.query(User).filter_by(mail=mail_addr).first()
+        if not user or not user.deletion_requested_at:
+            return None
+
+        db.session.query(AuthToken).filter_by(
+            user_id=user.id,
+            type=AuthTokenType.DELETION_CANCEL,
+            used=False,
+        ).update({"used": True})
+        db.session.commit()
+
+        raw_token = AuthService._create_token(user.id, AuthTokenType.DELETION_CANCEL)
+        logger.info("deletion_cancel_resent", extra={"user_id": str(user.id)})
+        return raw_token, user.name
+
+    @staticmethod
     def delete_user(id: str) -> None:
         """
         Permanently delete a user and clean up their avatar from storage.

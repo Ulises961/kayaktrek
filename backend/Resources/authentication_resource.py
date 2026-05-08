@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort, current_app
 from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from marshmallow import ValidationError
@@ -9,6 +9,7 @@ from sqlalchemy.exc import NoResultFound
 from Api.limiter import limiter
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
+from Services.mail_service import send_template_email
 from Services.user_service import UserService
 from Services.Middleware.auth_middleware import JWTService
 
@@ -27,7 +28,6 @@ def _resend_key():
 @limiter.limit("50 per hour")
 def login_user():
     post_data = request.get_json()
-    logger.info(f"Post data {post_data}")
 
     if not post_data:
         raise ValueError("Missing request body")
@@ -62,6 +62,8 @@ def login_user():
         return jsonify(response_object), HTTPStatus.UNAUTHORIZED
 
     except PermissionError as e:
+        if str(e) == "deletion_pending":
+            return jsonify({"status": "fail", "code": "deletion_pending", "message": "This account is scheduled for deletion."}), HTTPStatus.FORBIDDEN
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except Exception as e:
         logger.error(e)
@@ -116,6 +118,34 @@ def resend_verification():
     except Exception as e:
         logger.error(e)
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend verification")
+
+
+@api.route("/api/auth/resend-deletion-cancel", methods=["POST"])
+@limiter.limit("3 per hour", key_func=_resend_key)
+def resend_deletion_cancel():
+    data = request.get_json()
+    if not data or not data.get("mail"):
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
+    try:
+        result = UserService.resend_deletion_cancel(data["mail"])
+        if result:
+            raw_token, user_name = result
+            frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+            support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+            cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
+            send_template_email(
+                data["mail"],
+                "Your Kayak Planner account deletion request",
+                "deletion_request",
+                name=user_name,
+                cancel_url=cancel_url,
+                support_email=support_email,
+            )
+        # Always return 200 — do not reveal whether the account exists
+        return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK
+    except Exception as e:
+        logger.error("resend_deletion_cancel_failed", extra={"error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend cancellation email")
 
 
 @api.route("/api/auth/forgot-password", methods=["POST"])

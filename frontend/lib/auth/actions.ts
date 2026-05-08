@@ -8,7 +8,7 @@ import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema 
 
 export type AuthResult =
   | { success: true }
-  | { success: false; error: string; fieldErrors?: ReturnType<typeof z.treeifyError> }
+  | { success: false; error: string; code?: string; fieldErrors?: ReturnType<typeof z.treeifyError> }
 
 async function setAuthCookies(accessToken: string, refreshToken: string) {
   const cookieStore = await cookies()
@@ -50,7 +50,14 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
     return { success: false, error: "Could not reach the server. Please try again." }
   }
 
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    if (body?.code === "deletion_pending") {
+      return { success: false, error: "This account is scheduled for deletion.", code: "deletion_pending" }
+    }
+    return { success: false, error: "Access denied." }
+  }
+  if (res.status === 401) {
     return { success: false, error: "Invalid email or password." }
   }
   if (!res.ok) {

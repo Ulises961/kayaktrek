@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from flask import Flask, g, request
@@ -35,7 +36,10 @@ def createApp(config_mode: str):
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
     """
 
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"),
+    )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
     app.register_blueprint(authApi)
