@@ -152,6 +152,38 @@ export async function resetPassword(_prevState: AuthResult | null, formData: For
   redirect("/login?reset=1")
 }
 
+export async function cancelDeletion(token: string): Promise<AuthResult> {
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}/api/user/me/deletion-request?token=${encodeURIComponent(token)}`, {
+      method: "DELETE",
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { success: false, error: body?.description ?? "The cancellation link is invalid or has expired." }
+  }
+
+  return { success: true }
+}
+
+export async function resendDeletionCancel(mail: string): Promise<AuthResult> {
+  try {
+    await fetch(`${API_URL}/api/auth/resend-deletion-cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mail }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  return { success: true }
+}
+
 export async function logout() {
   const cookieStore = await cookies()
   cookieStore.delete("access_token")

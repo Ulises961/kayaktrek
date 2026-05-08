@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { API_URL } from "@/lib/api/config"
+import { cancelDeletion, resendDeletionCancel } from "@/lib/auth/actions"
 
 export function CancelDeletionForm() {
   const searchParams = useSearchParams()
@@ -23,24 +23,13 @@ export function CancelDeletionForm() {
 
   function handleCancel() {
     startTransition(async () => {
-      try {
-        const res = await fetch(
-          `${API_URL}/api/user/me/deletion-request?token=${encodeURIComponent(token)}`,
-          { method: "DELETE" }
-        )
-        if (res.ok) {
-          setStatus("success")
-          setMessage("Your account deletion has been cancelled. You can now log in again.")
-        } else {
-          // Inner catch: body may not be JSON (plain text, empty, HTML error page)
-          const body = await res.json().catch(() => ({}))
-          setStatus("error")
-          setMessage(body?.description ?? "The cancellation link is invalid or has expired.")
-          setShowResend(true)
-        }
-      } catch {
+      const result = await cancelDeletion(token)
+      if (result.success) {
+        setStatus("success")
+        setMessage("Your account deletion has been cancelled. You can now log in again.")
+      } else {
         setStatus("error")
-        setMessage("Could not reach the server. Please try again.")
+        setMessage(result.error)
         setShowResend(true)
       }
     })
@@ -49,16 +38,12 @@ export function CancelDeletionForm() {
   function handleResend() {
     if (!email) return
     startTransition(async () => {
-      try {
-        await fetch(`${API_URL}/api/auth/resend-deletion-cancel`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mail: email }),
-        })
+      const result = await resendDeletionCancel(email)
+      if (result.success) {
         setStatus("resent")
-      } catch {
+      } else {
         setStatus("error")
-        setMessage("Could not reach the server. Please try again.")
+        setMessage(result.error)
       }
     })
   }

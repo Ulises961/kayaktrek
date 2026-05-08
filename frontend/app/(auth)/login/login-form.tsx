@@ -47,7 +47,7 @@ export function LoginForm() {
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" suppressHydrationWarning>
           <label htmlFor="mail" className="text-sm font-medium text-slate-700">
             Email
           </label>
@@ -57,7 +57,7 @@ export function LoginForm() {
           )}
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" suppressHydrationWarning>
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="text-sm font-medium text-slate-700">
               Password
