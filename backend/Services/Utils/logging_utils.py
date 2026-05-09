@@ -3,6 +3,14 @@ import logging
 
 from flask import g
 
+# Standard LogRecord attributes that should not be treated as extra context fields.
+_STANDARD_RECORD_ATTRS = frozenset({
+    "args", "created", "exc_info", "exc_text", "filename", "funcName",
+    "levelname", "levelno", "lineno", "message", "module", "msecs", "msg",
+    "name", "pathname", "process", "processName", "relativeCreated",
+    "stack_info", "taskName", "thread", "threadName",
+})
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -14,10 +22,10 @@ class JsonFormatter(logging.Formatter):
         }
         if record.exc_info:
             entry["exc_info"] = self.formatException(record.exc_info)
-        for field in ("request_id", "task_id"):
-            value = getattr(record, field, None)
-            if value is not None:
-                entry[field] = value
+        # Capture all extra={} fields passed to the logger call.
+        for key, value in record.__dict__.items():
+            if key not in _STANDARD_RECORD_ATTRS and not key.startswith("_"):
+                entry[key] = value
         return json.dumps(entry)
 
 

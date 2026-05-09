@@ -41,6 +41,9 @@ def setup_logging(app) -> None:
     logging.getLogger("werkzeug").setLevel(
         logging.INFO if app.config.get("DEBUG") else logging.WARNING
     )
-    logging.getLogger("sqlalchemy.engine").setLevel(
-        logging.INFO if app.config.get("DEBUG") else logging.WARNING
-    )
+    # SQLAlchemy is noisy at INFO (every query). Keep at WARNING unless
+    # SQL_ECHO=true is explicitly set in the environment for a debug session.
+    sql_level = logging.DEBUG if os.getenv("SQL_ECHO") == "true" else logging.WARNING
+    logging.getLogger("sqlalchemy.engine").setLevel(sql_level)
+    logging.getLogger("sqlalchemy.pool").setLevel(sql_level)
+    logging.getLogger("sqlalchemy.dialects").setLevel(sql_level)

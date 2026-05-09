@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from flask import Flask, g, request
@@ -23,6 +24,7 @@ from Resources.item_resource import item_api
 from Resources.item_category_resource import item_category_api
 from Resources.log_resource import log_api
 from Resources.authentication_resource import api as authApi
+from Resources.user_certification_resource import user_certification_api
 
 
 def createApp(config_mode: str):
@@ -34,7 +36,10 @@ def createApp(config_mode: str):
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
     """
 
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"),
+    )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
     app.register_blueprint(authApi)
@@ -47,6 +52,7 @@ def createApp(config_mode: str):
     app.register_blueprint(trip_api)
     app.register_blueprint(point_api)
     app.register_blueprint(user_api)
+    app.register_blueprint(user_certification_api)
 
     db.init_app(app)
     mail.init_app(app)

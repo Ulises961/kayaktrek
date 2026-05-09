@@ -36,6 +36,7 @@ setup(
         'redis>=3.0',
         'boto3',
         'python-magic',
+        'cryptography',
     ],
     author="Ulises E. Sosa",
     description="Kayak expedition planner backend",

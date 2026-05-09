@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Literal
@@ -64,6 +65,19 @@ def _client():
     )
 
 
+_PUBLIC_READ_POLICY = json.dumps({
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {"AWS": ["*"]},
+            "Action": ["s3:GetObject"],
+            "Resource": [f"arn:aws:s3:::{_BUCKET}/*"],
+        }
+    ],
+})
+
+
 def _ensure_bucket(client) -> None:
     try:
         client.head_bucket(Bucket=_BUCKET)
@@ -73,6 +87,8 @@ def _ensure_bucket(client) -> None:
             logger.info("Created storage bucket '%s'", _BUCKET)
         else:
             raise
+    # Idempotent — ensures objects are publicly readable via direct URL.
+    client.put_bucket_policy(Bucket=_BUCKET, Policy=_PUBLIC_READ_POLICY)
 
 
 class StorageValidationError(ValueError):

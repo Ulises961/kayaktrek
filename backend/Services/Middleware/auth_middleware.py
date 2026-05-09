@@ -76,6 +76,39 @@ class JWTService:
             return None
         
     @staticmethod
+    def generate_elevated_token(user_id: str) -> str:
+        """Short-lived token (5 min) gating sensitive data access and destructive actions.
+        Guards against session hijacking. Upgrades to TOTP when MFA is introduced."""
+        payload = {
+            'user_id': str(user_id),
+            'purpose': 'sensitive_access',
+            'token_type': 'elevated',
+            'iat': datetime.now(timezone.utc),
+            'exp': datetime.now(timezone.utc) + timedelta(minutes=5),
+        }
+        return JWTService.generate_token(payload)
+
+    @staticmethod
+    def require_elevated_token(f):
+        """Decorator: verifies X-Elevated-Token header carries a valid elevated JWT
+        issued for the same user as the active session."""
+        @wraps(f)
+        def decorator(*args, **kwargs):
+            token = request.headers.get("X-Elevated-Token")
+            if not token:
+                abort(HTTPStatus.FORBIDDEN, description="Re-authentication required")
+            try:
+                payload = JWTService.decode_token(token)
+                if payload.get("token_type") != "elevated" or payload.get("purpose") != "sensitive_access":
+                    abort(HTTPStatus.FORBIDDEN, description="Invalid elevated token")
+                if str(payload.get("user_id")) != str(g.current_user_id):
+                    abort(HTTPStatus.FORBIDDEN, description="Elevated token user mismatch")
+            except ValueError:
+                abort(HTTPStatus.FORBIDDEN, description="Elevated token expired or invalid")
+            return f(*args, **kwargs)
+        return decorator
+
+    @staticmethod
     def authenticate_restful(f):
         @wraps(f)
         def decorator(*args, **kwargs):

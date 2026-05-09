@@ -1,0 +1,11 @@
+[run]
+source = .
+omit =
+    Tests/*
+    alembic/*
+    wsgi.py
+    setup.py
+
+[report]
+show_missing = true
+skip_covered = false

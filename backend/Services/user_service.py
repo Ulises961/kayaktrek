@@ -1,23 +1,38 @@
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from cryptography.exceptions import InvalidTag
 from flask import g
-from flask_bcrypt import generate_password_hash
+from flask_bcrypt import check_password_hash, generate_password_hash
 
 from sqlalchemy.exc import NoResultFound, IntegrityError
 import uuid_extension
 import logging
 
 from Models.user import User
+from Models.trip_member import TripMember
 from Api.database import db
 from Schemas.base_schema import camelcase
+from Services.crypto_service import encrypt, decrypt
 from Services.storage_service import StorageService
+from Models.auth_token import AuthTokenType
+from Services.auth_service import AuthService
+from uuid import UUID
+from Models.auth_token import AuthToken, AuthTokenType
+from Services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
 
 class UserService:
-    _MUTABLE_FIELDS = frozenset({"username", "name", "surname", "phone"})
+    _MUTABLE_FIELDS = frozenset({
+        "username", "name", "surname", "phone",
+        "vessel_make", "vessel_model", "vessel_length_cm",
+        "vessel_color_primary", "vessel_color_secondary",
+        "emergency_contact_name", "emergency_contact_phone",
+        "emergency_contact_relationship",
+    })
 
     @staticmethod
     def get_user_by_id(id: str) -> User:
@@ -200,6 +215,159 @@ class UserService:
 
         db.session.refresh(user)
         return user
+
+    @staticmethod
+    def change_password(id: str, current_pwd: str, new_pwd: str) -> None:
+        """
+        Verify current password then replace with the new one.
+
+        Raises:
+            NoResultFound: If user does not exist
+            ValueError: If current password does not match
+        """
+        user = UserService.get_user_by_id(id)
+        if not check_password_hash(user.pwd, current_pwd):
+            raise ValueError("Current password is incorrect")
+        user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
+        db.session.commit()
+        logger.info("password_changed", extra={"user_id": id})
+
+    @staticmethod
+    def verify_password(id: str, password: str) -> bool:
+        """Return True if the given password matches the stored hash."""
+        user = UserService.get_user_by_id(id)
+        return check_password_hash(user.pwd, password)
+
+    @staticmethod
+    def grant_medical_consent(id: str, plaintext: str, password: str) -> User:
+        """
+        Encrypt medical notes with a user-derived key and record consent timestamp.
+        Requires the caller to have already verified their identity (elevated token).
+
+        Raises:
+            NoResultFound: If user does not exist
+        """
+        user = UserService.get_user_by_id(id)
+        ciphertext, nonce, salt = encrypt(plaintext, password)
+        user.medical_notes_ciphertext = ciphertext
+        user.medical_notes_nonce = nonce
+        user.medical_notes_salt = salt
+        user.medical_notes_consent_at = datetime.now(timezone.utc)
+        db.session.commit()
+        db.session.refresh(user)
+        logger.info("medical_consent_granted", extra={"user_id": id})
+        return user
+
+    @staticmethod
+    def revoke_medical_consent(id: str) -> None:
+        """
+        Clear medical notes from the User record and all TripMember rows for this user.
+        GDPR Art. 7(3): data cannot be retained after consent withdrawal.
+
+        Raises:
+            NoResultFound: If user does not exist
+        """
+        user = UserService.get_user_by_id(id)
+        user.medical_notes_ciphertext = None
+        user.medical_notes_nonce = None
+        user.medical_notes_salt = None
+        user.medical_notes_consent_at = None
+        db.session.query(TripMember).filter_by(user_id=user.id).update({
+            "medical_notes": None,
+            "medical_notes_consent_at": None,
+        })
+        db.session.commit()
+        logger.info("medical_consent_revoked", extra={"user_id": id})
+
+    @staticmethod
+    def get_medical_notes(id: str, password: str) -> str:
+        """
+        Decrypt and return medical notes. Requires re-auth password.
+
+        Raises:
+            NoResultFound: If user does not exist
+            ValueError: If no medical notes are stored or decryption fails
+        """
+        user = UserService.get_user_by_id(id)
+        if not user.medical_notes_ciphertext:
+            raise ValueError("No medical notes stored")
+        try:
+            return decrypt(
+                user.medical_notes_ciphertext,
+                user.medical_notes_nonce, # type: ignore 
+                user.medical_notes_salt, # type: ignore 
+                password,
+            )
+        except InvalidTag:
+            raise ValueError("Decryption failed — password may be incorrect")
+
+    @staticmethod
+    def request_deletion(id: str) -> str:
+        """
+        Begin the GDPR erasure grace period for a user.
+
+        Sets deletion_requested_at, deactivates the account, revokes all auth
+        tokens (immediate logout), and returns a raw DELETION_CANCEL token so
+        the caller can email a cancellation link.
+
+        Raises:
+            NoResultFound: If the user does not exist
+        """
+        user = UserService.get_user_by_id(id)
+        user.deletion_requested_at = datetime.now(timezone.utc)
+        user.active = False
+        db.session.query(AuthToken).filter_by(user_id=user.id).delete()
+        db.session.commit()
+
+        raw_token = AuthService._create_token(user.id, AuthTokenType.DELETION_CANCEL)
+        logger.info("deletion_requested", extra={"user_id": id})
+        return raw_token
+
+    @staticmethod
+    def cancel_deletion(raw_token: str) -> None:
+        """
+        Cancel a pending erasure request using the emailed cancellation token.
+
+        Verifies the DELETION_CANCEL token, re-activates the account, and clears
+        deletion_requested_at. The user must log in again normally after this.
+
+        Raises:
+            ValueError: If the token is invalid, expired, or already used
+            NoResultFound: If the user no longer exists
+        """
+
+        token = AuthService._consume_token(raw_token, AuthTokenType.DELETION_CANCEL)
+        user = db.session.query(User).filter_by(id=token.user_id).first()
+        if not user:
+            raise NoResultFound("User not found")
+        user.deletion_requested_at = None
+        user.active = True
+        db.session.commit()
+        logger.info("deletion_cancelled", extra={"user_id": str(token.user_id)})
+
+    @staticmethod
+    def resend_deletion_cancel(mail_addr: str) -> Optional[tuple]:
+        """
+        Invalidate any existing DELETION_CANCEL tokens and issue a new one.
+
+        Returns (raw_token, user_name) if a pending deletion exists for the
+        given email, or None if the email is unknown or has no pending deletion.
+        Returning None (rather than raising) prevents account enumeration.
+        """
+        user = db.session.query(User).filter_by(mail=mail_addr).first()
+        if not user or not user.deletion_requested_at:
+            return None
+
+        db.session.query(AuthToken).filter_by(
+            user_id=user.id,
+            type=AuthTokenType.DELETION_CANCEL,
+            used=False,
+        ).update({"used": True})
+        db.session.commit()
+
+        raw_token = AuthService._create_token(user.id, AuthTokenType.DELETION_CANCEL)
+        logger.info("deletion_cancel_resent", extra={"user_id": str(user.id)})
+        return raw_token, user.name
 
     @staticmethod
     def delete_user(id: str) -> None:

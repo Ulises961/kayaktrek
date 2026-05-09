@@ -54,6 +54,11 @@ class ItinerarySchema(BaseSchema):
 
     @post_load
     def make_itinerary(self, data, **kwargs):
-        data["user_id"] = g.current_user_id
+        # Stamp user ownership only for personal (non-trip) itineraries.
+        # trip_id absent from self.fields means we're nested inside TripSchema;
+        # trip_id present in data means standalone creation with an explicit trip link.
+        # Either way, the itinerary belongs to the trip, not the user.
+        if "trip_id" in self.fields and data.get("trip_id") is None:
+            data["user_id"] = g.current_user_id
         return Itinerary(**data)
     

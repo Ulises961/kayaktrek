@@ -6,10 +6,14 @@ from uuid import UUID
 from sqlalchemy.exc import NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
 from marshmallow import ValidationError
+from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
+from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
+from Services.trip_member_service import TripMemberService
+from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +274,56 @@ def remove_member(id: str, user_id: str):
         raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me", methods=["GET"])
+@JWTService.authenticate_restful
+def get_my_membership(id: str):
+    try:
+        membership = TripMemberService.get_my_membership(id)
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me", methods=["PATCH"])
+@JWTService.authenticate_restful
+def update_my_float_plan(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        validated = TripMemberUpdateSchema().load(raw)
+        membership = TripMemberService.update_my_float_plan(id, validated)
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-notes", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def share_medical_notes(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        membership = TripMemberService.share_medical_notes(id, raw["password"])
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except InvalidTag:
+        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

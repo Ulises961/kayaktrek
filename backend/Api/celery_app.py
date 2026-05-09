@@ -34,7 +34,11 @@ load_dotenv()
 celery_app = Celery(
     "kayak_expedition_planner",
     broker=os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
-    include=["Tasks.ping"],
+    include=[
+        "Tasks.ping",
+        "Tasks.data_export",
+        "Tasks.erasure",
+    ],
 )
 
 celery_app.conf.update(
@@ -43,10 +47,13 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # Disable remote control (celery inspect/control). Removes the transient
-    # non-exclusive pidbox queues that trigger the transient_nonexcl_queues
-    # deprecation warning in RabbitMQ 3.12+.
     worker_enable_remote_control=False,
+    beat_schedule={
+        "daily-gdpr-erasure": {
+            "task": "Tasks.erasure.run_erasure",
+            "schedule": 86400,  # every 24 hours
+        },
+    },
 )
 
 

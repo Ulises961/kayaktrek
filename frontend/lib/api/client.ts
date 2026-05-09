@@ -53,3 +53,22 @@ export async function apiDelete(path: string): Promise<void> {
   const res = await apiFetch(path, { method: "DELETE" })
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
+
+// Multipart upload — omits Content-Type so the browser sets the boundary.
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const token = await getAccessToken()
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    body: formData,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (res.status === 401) {
+    const refreshed = await refreshSession()
+    if (refreshed) return apiUpload(path, formData)
+    redirect("/login")
+  }
+  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  return res.json() as Promise<T>
+}

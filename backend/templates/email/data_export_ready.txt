@@ -1,0 +1,11 @@
+Hi {{ name }},
+
+Your Kayak Planner data export is ready. Download it using the link below within 24 hours — this link works once.
+
+Download your data:
+{{ download_url }}
+
+The file contains your profile, trips, logs, certifications, and all other personal data we hold.
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

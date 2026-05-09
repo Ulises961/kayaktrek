@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class Inventory(BaseModel):
     trip_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('trip.id'), nullable=True, unique=True)
-    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id'), nullable=False)
+    user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('users.id', ondelete="CASCADE"), nullable=True)
     requirements: Mapped[List["TripRequirement"]] = relationship(
         "TripRequirement", cascade="all, delete-orphan", lazy="subquery"
     )

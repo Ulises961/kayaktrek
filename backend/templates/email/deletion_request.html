@@ -1,0 +1,47 @@
+{% extends "email/base.html" %}
+
+{% block subject %}Your Kayak Planner account deletion request{% endblock %}
+
+{% block body %}
+<p style="margin:0 0 16px;font-size:16px;color:#1e293b;">Hi {{ name }},</p>
+<p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+  We received a request to permanently delete your account. Your account is now <strong>dormant</strong> —
+  you cannot log in during this period.
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;background-color:#fff7ed;border-left:4px solid #f97316;border-radius:4px;">
+  <tr>
+    <td style="padding:16px;">
+      <p style="margin:0;font-size:14px;color:#9a3412;line-height:1.6;">
+        After <strong>30 days</strong> your data will be permanently deleted and cannot be recovered.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 16px;font-size:15px;color:#475569;">
+  If this was a mistake, cancel the deletion using the button below:
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+  <tr>
+    <td style="background-color:#dc2626;border-radius:6px;">
+      <a href="{{ cancel_url }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+        Cancel account deletion
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 8px;font-size:13px;color:#94a3b8;">
+  Or copy this link into your browser:
+</p>
+<p style="margin:0 0 24px;font-size:13px;color:#64748b;word-break:break-all;">
+  {{ cancel_url }}
+</p>
+
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+  If you did not make this request, contact support immediately at
+  <a href="mailto:{{ support_email }}" style="color:#64748b;">{{ support_email }}</a>.
+</p>
+{% endblock %}

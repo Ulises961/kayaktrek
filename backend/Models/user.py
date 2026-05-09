@@ -9,7 +9,8 @@ from Models.user_has_inventory import user_has_inventory
 from Models.user_has_items import user_has_items
 from Models.trip_member import TripMember
 from Models.user_endorses_log import user_endorses_log
-from sqlalchemy import String, Boolean
+from datetime import datetime
+from sqlalchemy import String, Boolean, Integer, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from Models.trip import Trip
     from Models.auth_token import AuthToken
     from Models.invitation import Invitation
+    from Models.user_certification import UserCertification
 
 
 class User(BaseModel):
@@ -43,6 +45,33 @@ class User(BaseModel):
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Vessel defaults — pre-fill TripMember on invitation acceptance
+    vessel_make: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    vessel_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    vessel_length_cm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    vessel_color_primary: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    vessel_color_secondary: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Emergency contact defaults
+    emergency_contact_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    emergency_contact_relationship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Encrypted at rest with a user-derived key (PBKDF2-HMAC-SHA256 → AES-256-GCM).
+    # Server never stores the plaintext or the derived key — only ciphertext, nonce, and salt.
+    # Re-auth (password) is the decryption instrument. Requires prior consent to save.
+    # When the user confirms their float plan for a trip, the server derives the key from
+    # the re-auth password, decrypts in memory, and copies plaintext to TripMember
+    # (server-side AES-GCM from that point — user has explicitly shared it).
+    # Revoking consent nulls both this record and all TripMember rows for this user.
+    medical_notes_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    medical_notes_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    medical_notes_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # GDPR: erasure grace period — set on deletion request, hard-deleted after 30 days
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Association object: full role-aware access
     trip_memberships: Mapped[List["TripMember"]] = relationship(
         "TripMember",
@@ -67,6 +96,9 @@ class User(BaseModel):
     items: Mapped[List["Item"]] = relationship(secondary=user_has_items)
     auth_tokens: Mapped[List["AuthToken"]] = relationship(
         "AuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    certifications: Mapped[List["UserCertification"]] = relationship(
+        "UserCertification", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self):

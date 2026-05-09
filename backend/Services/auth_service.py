@@ -7,19 +7,20 @@ from uuid import UUID
 
 from flask import current_app
 from flask_bcrypt import check_password_hash, generate_password_hash
-from flask_mail import Message
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from Api.database import db
-from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
 from Schemas.user_schema import UserSchema
+from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_EXPIRY_HOURS = {
     AuthTokenType.VERIFICATION: 24,
     AuthTokenType.RESET: 1,
+    AuthTokenType.DATA_EXPORT: 24,
+    AuthTokenType.DELETION_CANCEL: 24 * 30,  # 30-day grace window
 }
 
 
@@ -42,7 +43,11 @@ class AuthService:
         else:
             user = query.filter_by(username=username).first()
 
-        if not user or not user.active:
+        if not user:
+            return None
+        if user.deletion_requested_at is not None:
+            raise PermissionError("deletion_pending")
+        if not user.active:
             return None
         if check_password_hash(user.pwd, password):
             return user
@@ -143,16 +148,15 @@ class AuthService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.RESET)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         reset_url = f"{frontend_url}/auth/reset-password?token={raw_token}"
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
-        AuthService._send_email(
-            to=user.mail,
-            subject="Reset your Kayak Planner password",
-            body=(
-                f"Hi {user.name},\n\n"
-                f"Click the link below to reset your password (valid for 1 hour):\n\n"
-                f"{reset_url}\n\n"
-                "If you did not request this, ignore this email."
-            ),
+        send_template_email(
+            user.mail,
+            "Reset your Kayak Planner password",
+            "password_reset",
+            name=user.name,
+            reset_url=reset_url,
+            support_email=support_email,
         )
 
     @staticmethod
@@ -224,23 +228,13 @@ class AuthService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.VERIFICATION)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         verify_url = f"{frontend_url}/auth/verify?token={raw_token}"
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
-        AuthService._send_email(
-            to=user.mail,
-            subject="Verify your Kayak Planner account",
-            body=(
-                f"Hi {user.name},\n\n"
-                f"Click the link below to activate your account (valid for 24 hours):\n\n"
-                f"{verify_url}\n\n"
-                "If you did not create this account, ignore this email."
-            ),
+        send_template_email(
+            user.mail,
+            "Verify your Kayak Planner account",
+            "account_verification",
+            name=user.name,
+            verify_url=verify_url,
+            support_email=support_email,
         )
-
-    @staticmethod
-    def _send_email(to: str, subject: str, body: str) -> None:
-        try:
-            msg = Message(subject=subject, recipients=[to], body=body)
-            mail.send(msg)
-        except Exception as e:
-            # Log but do not surface mail failures to the caller — token is already stored
-            logger.error(f"Failed to send email to {to}: {e}")
