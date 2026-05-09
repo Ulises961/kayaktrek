@@ -1,0 +1,210 @@
+import { notFound } from "next/navigation"
+import Link from "next/link"
+import { apiGet } from "@/lib/api/client"
+import { UserSchema } from "@/lib/dtos/user"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { PageBreadcrumb } from "@/components/common/page-breadcrumb"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { DeleteAccountButton } from "@/components/profile/delete-account-button"
+import { DataExportButton } from "@/components/profile/data-export-button"
+import {
+  MailIcon,
+  PhoneIcon,
+  PencilIcon,
+  AnchorIcon,
+  ShieldAlertIcon,
+  RulerIcon,
+  PaletteIcon,
+  UserIcon,
+  LockIcon,
+} from "lucide-react"
+
+export default async function ProfilePage() {
+  let user
+  try {
+    const raw = await apiGet("/api/user/me")
+    user = UserSchema.parse(raw)
+  } catch {
+    notFound()
+  }
+
+  const hasVessel = user.vesselMake || user.vesselModel || user.vesselLengthCm || user.vesselColorPrimary
+  const hasEmergency = user.emergencyContactName || user.emergencyContactPhone
+
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl">
+      <PageBreadcrumb crumbs={[{ label: "Profile" }]} />
+
+      {/* Header */}
+      <div className="flex items-start gap-5">
+        <UserAvatar
+          name={user.name}
+          surname={user.surname}
+          imageUrl={user.avatarUrl}
+          size="lg"
+        />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-semibold truncate">
+            {[user.name, user.surname].filter(Boolean).join(" ")}
+          </h1>
+          <p className="text-sm text-muted-foreground">@{user.username}</p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/profile/edit">
+              <PencilIcon className="size-4" />
+              Edit profile
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/profile/change-password">
+              <LockIcon className="size-4" />
+              Password
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Contact */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserIcon className="size-4" />
+            Contact
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <MailIcon className="size-4 text-muted-foreground shrink-0" />
+            <span>{user.mail}</span>
+          </div>
+          {user.phone && (
+            <div className="flex items-center gap-2 text-sm">
+              <PhoneIcon className="size-4 text-muted-foreground shrink-0" />
+              <span>{user.phone}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Vessel */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AnchorIcon className="size-4" />
+            Vessel defaults
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasVessel ? (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {user.vesselMake && (
+                <>
+                  <dt className="text-muted-foreground">Make</dt>
+                  <dd>{user.vesselMake}</dd>
+                </>
+              )}
+              {user.vesselModel && (
+                <>
+                  <dt className="text-muted-foreground">Model</dt>
+                  <dd>{user.vesselModel}</dd>
+                </>
+              )}
+              {user.vesselLengthCm && (
+                <>
+                  <dt className="text-muted-foreground flex items-center gap-1">
+                    <RulerIcon className="size-3" /> Length
+                  </dt>
+                  <dd>{user.vesselLengthCm} cm</dd>
+                </>
+              )}
+              {(user.vesselColorPrimary || user.vesselColorSecondary) && (
+                <>
+                  <dt className="text-muted-foreground flex items-center gap-1">
+                    <PaletteIcon className="size-3" /> Colours
+                  </dt>
+                  <dd>
+                    {[user.vesselColorPrimary, user.vesselColorSecondary]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No vessel details yet.{" "}
+              <Link href="/profile/edit" className="underline underline-offset-2 hover:text-foreground">
+                Add them
+              </Link>{" "}
+              to pre-fill float plans when you join trips.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Emergency contact */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldAlertIcon className="size-4" />
+            Emergency contact
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasEmergency ? (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {user.emergencyContactName && (
+                <>
+                  <dt className="text-muted-foreground">Name</dt>
+                  <dd>{user.emergencyContactName}</dd>
+                </>
+              )}
+              {user.emergencyContactRelationship && (
+                <>
+                  <dt className="text-muted-foreground">Relationship</dt>
+                  <dd>{user.emergencyContactRelationship}</dd>
+                </>
+              )}
+              {user.emergencyContactPhone && (
+                <>
+                  <dt className="text-muted-foreground">Phone</dt>
+                  <dd>{user.emergencyContactPhone}</dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No emergency contact yet.{" "}
+              <Link href="/profile/edit" className="underline underline-offset-2 hover:text-foreground">
+                Add one
+              </Link>{" "}
+              — it will be included in your float plans.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Privacy */}
+      <div className="flex flex-col gap-3">
+        <Separator />
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Privacy</p>
+        <div className="flex flex-col gap-2">
+          <DataExportButton />
+        </div>
+        <div className="flex flex-col gap-3 border border-destructive/30 rounded-lg p-4 mt-2">
+          <p className="text-sm font-medium text-destructive">Danger zone</p>
+          <p className="text-sm text-muted-foreground">
+            Request deletion of your account. You will have 30 days to cancel before all your
+            personal data is permanently removed.
+          </p>
+          <div>
+            <DeleteAccountButton />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

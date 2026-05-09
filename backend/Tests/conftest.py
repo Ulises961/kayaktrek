@@ -1,6 +1,7 @@
 from datetime import date
 import json
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import NoResultFound
 
 from Models.user import User
@@ -27,6 +28,9 @@ def app(request):
     # Establish an application context before running the tests.
     ctx = app.app_context()
     ctx.push()
+    with _db.engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+        conn.commit()
     _db.create_all()
     seed_item_categories()
 

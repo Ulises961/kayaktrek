@@ -1,6 +1,7 @@
 path
 flake8
 pytest
+pytest-cov
 pytest-dotenv
 flask
 celery
@@ -29,3 +30,4 @@ flask-mail
 gunicorn
 boto3
 python-magic
+cryptography
