@@ -4,8 +4,8 @@ import { useEffect, useState, useTransition } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { cancelDeletion, resendDeletionCancel } from "@/lib/auth/actions"
+import Link from "next/link"
 
 export function CancelDeletionForm() {
   const searchParams = useSearchParams()
@@ -51,19 +51,15 @@ export function CancelDeletionForm() {
   if (status === "success") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-          {message}
-        </p>
-        <Button asChild variant="outline" size="sm">
-          <a href="/login">Sign in</a>
-        </Button>
+        <p className="auth-notice auth-notice-success">{message}</p>
+        <Link href="/login" className="auth-link text-[11px]">Sign in</Link>
       </div>
     )
   }
 
   if (status === "resent") {
     return (
-      <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+      <p className="auth-notice auth-notice-success">
         If that email has a pending deletion request, a new cancellation link is on its way.
       </p>
     )
@@ -72,13 +68,9 @@ export function CancelDeletionForm() {
   if (showResend) {
     return (
       <div className="flex flex-col gap-4">
-        {message && (
-          <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-            {message}
-          </p>
-        )}
+        {message && <p className="auth-notice auth-notice-error">{message}</p>}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">Email address</Label>
+          <label htmlFor="email" className="auth-label">Email address</label>
           <Input
             id="email"
             type="email"
@@ -86,9 +78,10 @@ export function CancelDeletionForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isPending}
+            className="auth-input"
           />
         </div>
-        <Button disabled={isPending || !email} onClick={handleResend}>
+        <Button disabled={isPending || !email} onClick={handleResend} className="auth-btn">
           {isPending ? "Sending…" : "Resend cancellation email"}
         </Button>
       </div>
@@ -97,10 +90,10 @@ export function CancelDeletionForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-slate-600">
+      <p className="text-[11px] text-[oklch(0.52_0.065_240)]">
         Click below to cancel your deletion request and restore your account.
       </p>
-      <Button disabled={isPending} onClick={handleCancel}>
+      <Button disabled={isPending} onClick={handleCancel} className="auth-btn">
         {isPending ? "Cancelling…" : "Cancel account deletion"}
       </Button>
     </div>

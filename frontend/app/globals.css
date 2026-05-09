@@ -71,9 +71,6 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-
   --radius-sm:  calc(var(--radius) - 4px);
   --radius-md:  calc(var(--radius) - 2px);
   --radius-lg:  var(--radius);
@@ -259,6 +256,23 @@
   85%      { transform: rotate(-8deg);  }
 }
 
+/* Nautical chart grid — used by auth layout background */
+@keyframes chart-drift {
+  0%   { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 100px 100px, 100px 100px, 20px 20px, 20px 20px; }
+}
+
+.chart-grid {
+  background-color: oklch(0.155 0.04 245); /* ocean-900 */
+  background-image:
+    linear-gradient(oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
+    linear-gradient(oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  animation: chart-drift 120s linear infinite;
+}
+
 @layer base {
   html {
     font-size: 112.5%; /* 18px base — scales all rem values proportionally */
@@ -268,10 +282,107 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans), sans-serif;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display), serif;
   }
 }
 
 @layer components {
+  /* ── Auth surfaces ──────────────────────────────────────────────────────── */
+  .auth-card {
+    overflow: hidden;
+    border-radius: 2px;
+    background: white;
+    box-shadow: 0 8px 40px oklch(0.155 0.04 245 / 0.55);
+  }
+  .auth-card-accent {
+    height: 3px;
+    background: linear-gradient(
+      to right,
+      oklch(0.43 0.165 243),
+      oklch(0.64 0.125 225),
+      oklch(0.62 0.13 184)
+    );
+  }
+  .auth-heading {
+    font-family: var(--font-display), serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: oklch(0.155 0.04 245);
+  }
+  .auth-subheading {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: oklch(0.52 0.065 240);
+  }
+  .auth-label {
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: oklch(0.52 0.065 240);
+  }
+  .auth-input {
+    border-radius: 2px;
+    border-color: oklch(0.865 0.042 218);
+    background-color: oklch(0.975 0.004 220);
+    font-size: 0.875rem;
+  }
+  .auth-input:focus-visible {
+    --tw-ring-color: oklch(0.43 0.165 243);
+  }
+  .auth-btn {
+    width: 100%;
+    border-radius: 2px;
+    background-color: oklch(0.43 0.165 243);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+  }
+  .auth-btn:hover {
+    background-color: oklch(0.38 0.165 243);
+  }
+  .auth-btn:active {
+    transform: scale(0.99);
+  }
+  .auth-link {
+    color: oklch(0.43 0.165 243);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .auth-link:hover {
+    color: oklch(0.38 0.165 243);
+  }
+  .auth-notice {
+    border-radius: 2px;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  .auth-notice-success {
+    background-color: oklch(0.97 0.04 155);
+    border: 1px solid oklch(0.88 0.08 155);
+    color: oklch(0.38 0.1 155);
+  }
+  .auth-notice-error {
+    background-color: oklch(0.97 0.02 25);
+    border: 1px solid oklch(0.88 0.06 25);
+    color: oklch(0.45 0.15 25);
+  }
+  .auth-notice-warning {
+    background-color: oklch(0.97 0.04 75);
+    border: 1px solid oklch(0.88 0.08 75);
+    color: oklch(0.45 0.12 75);
+  }
+
+  /* ── App cards ──────────────────────────────────────────────────────────── */
   [data-slot="card"] {
     box-shadow: var(--card-shadow);
     transition: box-shadow 0.2s ease, transform 0.2s ease;

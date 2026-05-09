@@ -8,6 +8,7 @@ import { login } from "@/lib/auth/actions"
 import { LoginSchema, type LoginInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
 export function LoginForm() {
@@ -30,76 +31,84 @@ export function LoginForm() {
   })
 
   return (
-    <div className="flex flex-col gap-6 p-8 bg-white rounded-xl shadow-sm border border-slate-200">
+    <AuthCard>
       {registered && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+        <p className="auth-notice auth-notice-success">
           Account created — check your email to verify before signing in.
         </p>
       )}
       {passwordReset && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+        <p className="auth-notice auth-notice-success">
           Password updated — you can now sign in with your new password.
         </p>
       )}
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Sign in</h1>
-        <p className="text-sm text-slate-500 mt-1">Welcome back</p>
-      </div>
+
+      <AuthCardHeading title="Sign in" subtitle="Welcome back" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1" suppressHydrationWarning>
-          <label htmlFor="mail" className="text-sm font-medium text-slate-700">
-            Email
-          </label>
-          <Input id="mail" type="email" autoComplete="email" suppressHydrationWarning {...register("mail")} />
+
+        <div className="flex flex-col gap-1.5" suppressHydrationWarning>
+          <label htmlFor="mail" className="auth-label">Email</label>
+          <Input
+            id="mail"
+            type="email"
+            autoComplete="email"
+            suppressHydrationWarning
+            className="auth-input"
+            {...register("mail")}
+          />
           {errors.mail && (
-            <p className="text-xs text-red-600">{errors.mail.message}</p>
+            <p className="text-[11px] text-red-600">{errors.mail.message}</p>
           )}
         </div>
 
-        <div className="flex flex-col gap-1" suppressHydrationWarning>
+        <div className="flex flex-col gap-1.5" suppressHydrationWarning>
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <Link href="/forgot-password" className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2">
+            <label htmlFor="password" className="auth-label">Password</label>
+            <Link href="/forgot-password" className="text-[10px] tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]">
               Forgot password?
             </Link>
           </div>
-          <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            className="auth-input"
+            {...register("password")}
+          />
           {errors.password && (
-            <p className="text-xs text-red-600">{errors.password.message}</p>
+            <p className="text-[11px] text-red-600">{errors.password.message}</p>
           )}
         </div>
 
         {serverState && !serverState.success && (
           serverState.code === "deletion_pending" ? (
-            <div className="flex flex-col gap-2 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-              <p className="text-amber-800 font-medium">This account is scheduled for deletion.</p>
-              <p className="text-amber-700">
+            <div className="auth-notice auth-notice-warning flex flex-col gap-1.5">
+              <p className="font-medium">This account is scheduled for deletion.</p>
+              <p>
                 Check your email for a cancellation link, or{" "}
-                <Link href="/cancel-deletion" className="underline underline-offset-2 hover:text-amber-900">
+                <Link href="/cancel-deletion" className="auth-link">
                   request a new one here
                 </Link>
                 .
               </p>
             </div>
           ) : (
-            <p className="text-sm text-red-600">{serverState.error}</p>
+            <p className="text-[11px] text-red-600">{serverState.error}</p>
           )
         )}
 
-        <Button type="submit" disabled={isPending} className="w-full">
+        <Button type="submit" disabled={isPending} className="auth-btn mt-1">
           {isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
-      <p className="text-sm text-center text-slate-500">
+      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
         No account?{" "}
-        <Link href="/register" className="text-slate-900 font-medium underline underline-offset-2">
-          Sign up
+        <Link href="/register" className="auth-link">
+          Create one
         </Link>
       </p>
-    </div>
+    </AuthCard>
   )
 }

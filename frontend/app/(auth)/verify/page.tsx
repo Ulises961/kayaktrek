@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/api/config"
+import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
 export default async function VerifyPage({
@@ -10,10 +11,10 @@ export default async function VerifyPage({
 
   if (!token) {
     return (
-      <div className="flex flex-col gap-4 p-8 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
-        <h1 className="text-xl font-semibold text-slate-900">Verification failed</h1>
-        <p className="text-sm text-slate-500">Missing verification token.</p>
-      </div>
+      <AuthCard>
+        <AuthCardHeading title="Verification failed" />
+        <p className="text-[11px] text-[oklch(0.52_0.065_240)]">Missing verification token.</p>
+      </AuthCard>
     )
   }
 
@@ -36,29 +37,18 @@ export default async function VerifyPage({
 
   if (success) {
     return (
-      <div className="flex flex-col gap-4 p-8 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
-        <h1 className="text-xl font-semibold text-slate-900">Email verified</h1>
-        <p className="text-sm text-slate-500">Your account is now active.</p>
-        <Link
-          href="/login"
-          className="text-sm font-medium text-slate-900 underline underline-offset-2"
-        >
-          Sign in
-        </Link>
-      </div>
+      <AuthCard>
+        <AuthCardHeading title="Email verified" subtitle="Your account is now active." />
+        <Link href="/login" className="auth-link text-[11px]">Sign in</Link>
+      </AuthCard>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4 p-8 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
-      <h1 className="text-xl font-semibold text-slate-900">Verification failed</h1>
-      <p className="text-sm text-slate-500">{errorMessage}</p>
-      <Link
-        href="/login"
-        className="text-sm font-medium text-slate-900 underline underline-offset-2"
-      >
-        Back to sign in
-      </Link>
-    </div>
+    <AuthCard>
+      <AuthCardHeading title="Verification failed" />
+      <p className="auth-notice auth-notice-error">{errorMessage}</p>
+      <Link href="/login" className="auth-link text-[11px]">Back to sign in</Link>
+    </AuthCard>
   )
 }
