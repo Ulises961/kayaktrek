@@ -1,7 +1,7 @@
-from marshmallow import fields, validates, ValidationError
+import bleach
+from marshmallow import fields, post_load, validates, ValidationError
 
 from Schemas.base_schema import BaseSchema
-from Schemas.shuttle_assignment_schema import ShuttleAssignmentSchema
 
 
 class LogisticsSchema(BaseSchema):
@@ -15,9 +15,17 @@ class LogisticsSchema(BaseSchema):
     shore_contact_relationship = fields.String(allow_none=True, load_default=None)
     shuttle_notes = fields.String(allow_none=True, load_default=None)
     shuttle_meeting_time = fields.String(allow_none=True, load_default=None)
-    shuttle_assignments = fields.List(fields.Nested(ShuttleAssignmentSchema), dump_only=True)
 
     @validates("shore_contact_phone")
     def validate_phone(self, value, **kwargs):
         if value is not None and len(value) > 20:
             raise ValidationError("Phone number cannot exceed 20 characters")
+
+    @post_load
+    def sanitize(self, data, **kwargs):
+        for field in ("departure_point", "arrival_point", "travel_notes",
+                      "shore_contact_name", "shore_contact_relationship",
+                      "shuttle_notes", "shuttle_meeting_time"):
+            if data.get(field):
+                data[field] = bleach.clean(str(data[field]).strip(), tags=[], strip=True)
+        return data

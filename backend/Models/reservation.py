@@ -1,5 +1,5 @@
 import enum
-from datetime import datew
+from datetime import date
 from uuid import UUID as _UUID
 from typing import Optional, TYPE_CHECKING
 

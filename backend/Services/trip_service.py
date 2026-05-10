@@ -14,8 +14,8 @@ from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.user import User
-from Models.reservation import Reservation
-from Models.document import Document
+from Models.travel_document import TravelDocument
+from Models.shuttle_vehicle import ShuttleVehicle
 from Schemas.trip_member_schema import TripMemberSchema
 from Schemas.trip_schema import TripSchema
 from Api.database import db
@@ -371,12 +371,16 @@ class TripService:
             trip_id=UUID(trip_id), role=MemberRoleType.LEADER
         ).first()
         if leader:
-            db.session.query(Reservation).filter_by(
+            db.session.query(TravelDocument).filter_by(
                 trip_id=UUID(trip_id), owner_id=UUID(user_id)
             ).update({"owner_id": leader.user_id})
-            db.session.query(Document).filter_by(
-                trip_id=UUID(trip_id), owner_id=UUID(user_id)
-            ).update({"owner_id": leader.user_id})
+            # Transfer vehicle arrangement; if they were driver_id, set to null.
+            db.session.query(ShuttleVehicle).filter_by(
+                trip_id=UUID(trip_id), arranged_by_id=membership.id
+            ).update({"arranged_by_id": leader.id})
+            db.session.query(ShuttleVehicle).filter_by(
+                trip_id=UUID(trip_id), driver_id=membership.id
+            ).update({"driver_id": None})
 
         db.session.delete(membership)
         db.session.commit()

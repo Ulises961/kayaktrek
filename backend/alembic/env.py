@@ -54,9 +54,9 @@ from Models.invitation import Invitation              # noqa: F401
 from Models.user_certification import UserCertification          # noqa: F401
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
 from Models.logistics import Logistics                # noqa: F401
-from Models.reservation import Reservation            # noqa: F401
-from Models.document import Document                  # noqa: F401
-from Models.shuttle_assignment import ShuttleAssignment  # noqa: F401
+from Models.travel_document import TravelDocument     # noqa: F401
+from Models.shuttle_vehicle import ShuttleVehicle     # noqa: F401
+from Models.shuttle_passenger import ShuttlePassenger # noqa: F401
 
 with _app.app_context():
     target_metadata = db.metadata

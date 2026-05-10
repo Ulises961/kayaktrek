@@ -27,14 +27,6 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                type_=sa.DateTime(timezone=True),
                existing_nullable=False)
-    op.alter_column('document', 'created',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
-    op.alter_column('document', 'updated',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
     op.alter_column('image', 'created',
                existing_type=postgresql.TIMESTAMP(),
                type_=sa.DateTime(timezone=True),
@@ -115,22 +107,6 @@ def upgrade() -> None:
                type_=sa.DateTime(timezone=True),
                existing_nullable=False)
     op.alter_column('point', 'updated',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
-    op.alter_column('reservation', 'created',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
-    op.alter_column('reservation', 'updated',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
-    op.alter_column('shuttle_assignment', 'created',
-               existing_type=postgresql.TIMESTAMP(),
-               type_=sa.DateTime(timezone=True),
-               existing_nullable=False)
-    op.alter_column('shuttle_assignment', 'updated',
                existing_type=postgresql.TIMESTAMP(),
                type_=sa.DateTime(timezone=True),
                existing_nullable=False)
@@ -215,22 +191,6 @@ def downgrade() -> None:
                existing_type=sa.DateTime(timezone=True),
                type_=postgresql.TIMESTAMP(),
                existing_nullable=False)
-    op.alter_column('shuttle_assignment', 'updated',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
-    op.alter_column('shuttle_assignment', 'created',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
-    op.alter_column('reservation', 'updated',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
-    op.alter_column('reservation', 'created',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
     op.alter_column('point', 'updated',
                existing_type=sa.DateTime(timezone=True),
                type_=postgresql.TIMESTAMP(),
@@ -311,14 +271,6 @@ def downgrade() -> None:
                type_=postgresql.TIMESTAMP(),
                existing_nullable=False)
     op.alter_column('image', 'created',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
-    op.alter_column('document', 'updated',
-               existing_type=sa.DateTime(timezone=True),
-               type_=postgresql.TIMESTAMP(),
-               existing_nullable=False)
-    op.alter_column('document', 'created',
                existing_type=sa.DateTime(timezone=True),
                type_=postgresql.TIMESTAMP(),
                existing_nullable=False)

@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from Models.trip_member import TripMember
     from Models.invitation import Invitation
     from Models.logistics import Logistics
-    from Models.reservation import Reservation
-    from Models.document import Document
+    from Models.travel_document import TravelDocument
+    from Models.shuttle_vehicle import ShuttleVehicle
 
 
 class TripStateType(enum.Enum):
@@ -48,13 +48,13 @@ class Trip(BaseModel):
         uselist=False,
         cascade="all, delete-orphan",
     )
-    reservations: Mapped[List["Reservation"]] = relationship(
-        "Reservation",
+    travel_documents: Mapped[List["TravelDocument"]] = relationship(
+        "TravelDocument",
         back_populates="trip",
         cascade="all, delete-orphan",
     )
-    documents: Mapped[List["Document"]] = relationship(
-        "Document",
+    shuttle_vehicles: Mapped[List["ShuttleVehicle"]] = relationship(
+        "ShuttleVehicle",
         back_populates="trip",
         cascade="all, delete-orphan",
     )

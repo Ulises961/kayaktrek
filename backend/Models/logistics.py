@@ -1,5 +1,5 @@
 from uuid import UUID as _UUID
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import UUID, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,7 +8,6 @@ from Models.base_model import BaseModel
 
 if TYPE_CHECKING:
     from Models.trip import Trip
-    from Models.shuttle_assignment import ShuttleAssignment
 
 
 class Logistics(BaseModel):
@@ -37,8 +36,3 @@ class Logistics(BaseModel):
     shuttle_meeting_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     trip: Mapped["Trip"] = relationship(back_populates="logistics")
-    shuttle_assignments: Mapped[List["ShuttleAssignment"]] = relationship(
-        "ShuttleAssignment",
-        back_populates="logistics",
-        cascade="all, delete-orphan",
-    )

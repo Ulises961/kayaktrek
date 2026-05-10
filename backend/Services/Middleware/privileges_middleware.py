@@ -26,9 +26,8 @@ from Models.point import Point
 from Models.log import Log
 from Models.image import Image
 from Models.trip_member import TripMember, MemberRoleType
-from Models.reservation import Reservation
-from Models.document import Document
-from Models.shuttle_assignment import ShuttleAssignment
+from Models.travel_document import TravelDocument
+from Models.shuttle_vehicle import ShuttleVehicle
 from Models.logistics import Logistics
 from Models.user_has_inventory import user_has_inventory
 from Services.day_service import DayService
@@ -260,14 +259,11 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
         elif resource_type == "image":
             return _check_image_ownership(g.current_user_id, str(resource_id))
 
-        elif resource_type == "reservation":
-            return _check_reservation_access(g.current_user_id, str(resource_id))
+        elif resource_type == "travel_document":
+            return _check_travel_document_access(g.current_user_id, str(resource_id))
 
-        elif resource_type == "document":
-            return _check_document_access(g.current_user_id, str(resource_id))
-
-        elif resource_type == "shuttle_assignment":
-            return _check_shuttle_assignment_access(g.current_user_id, str(resource_id))
+        elif resource_type == "shuttle_vehicle":
+            return _check_shuttle_vehicle_access(g.current_user_id, str(resource_id))
 
         else:
             logger.error(f"Unknown resource type: {resource_type}")
@@ -495,37 +491,23 @@ def _check_image_ownership(user_id: str, image_id: str) -> Optional[bool]:
     return False
 
 
-def _check_reservation_access(user_id: str, reservation_id: str) -> Optional[bool]:
-    reservation = db.session.query(Reservation).filter_by(id=UUID(reservation_id)).first()
-    if not reservation:
+def _check_travel_document_access(user_id: str, document_id: str) -> Optional[bool]:
+    doc = db.session.query(TravelDocument).filter_by(id=UUID(document_id)).first()
+    if not doc:
         return None
     return (
         db.session.query(TripMember)
-        .filter_by(user_id=UUID(user_id), trip_id=reservation.trip_id)
+        .filter_by(user_id=UUID(user_id), trip_id=doc.trip_id)
         .first()
     ) is not None
 
 
-def _check_document_access(user_id: str, document_id: str) -> Optional[bool]:
-    document = db.session.query(Document).filter_by(id=UUID(document_id)).first()
-    if not document:
+def _check_shuttle_vehicle_access(user_id: str, vehicle_id: str) -> Optional[bool]:
+    vehicle = db.session.query(ShuttleVehicle).filter_by(id=UUID(vehicle_id)).first()
+    if not vehicle:
         return None
     return (
         db.session.query(TripMember)
-        .filter_by(user_id=UUID(user_id), trip_id=document.trip_id)
-        .first()
-    ) is not None
-
-
-def _check_shuttle_assignment_access(user_id: str, assignment_id: str) -> Optional[bool]:
-    assignment = db.session.query(ShuttleAssignment).filter_by(id=UUID(assignment_id)).first()
-    if not assignment:
-        return None
-    logistics = db.session.query(Logistics).filter_by(id=assignment.logistics_id).first()
-    if not logistics:
-        return None
-    return (
-        db.session.query(TripMember)
-        .filter_by(user_id=UUID(user_id), trip_id=logistics.trip_id)
+        .filter_by(user_id=UUID(user_id), trip_id=vehicle.trip_id)
         .first()
     ) is not None

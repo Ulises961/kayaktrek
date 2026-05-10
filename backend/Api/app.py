@@ -26,13 +26,14 @@ from Resources.log_resource import log_api
 from Resources.authentication_resource import api as authApi
 from Resources.user_certification_resource import user_certification_api
 from Resources.logistics_resource import logistics_api
-from Resources.reservation_resource import reservation_api
-from Resources.document_resource import document_api
+from Resources.travel_document_resource import travel_document_api
 from Resources.shuttle_resource import shuttle_api
 
-# user_has_profile_picture has no resource — import directly so SQLAlchemy metadata
-# is complete for drop_all ordering in tests.
+# Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
+from Models.travel_document import TravelDocument  # noqa: F401
+from Models.shuttle_vehicle import ShuttleVehicle  # noqa: F401
+from Models.shuttle_passenger import ShuttlePassenger  # noqa: F401
 
 
 def createApp(config_mode: str):
@@ -62,8 +63,7 @@ def createApp(config_mode: str):
     app.register_blueprint(user_api)
     app.register_blueprint(user_certification_api)
     app.register_blueprint(logistics_api)
-    app.register_blueprint(reservation_api)
-    app.register_blueprint(document_api)
+    app.register_blueprint(travel_document_api)
     app.register_blueprint(shuttle_api)
 
     db.init_app(app)
