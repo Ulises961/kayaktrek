@@ -51,6 +51,12 @@ from Models.weather import Weather                    # noqa: F401
 from Models.weather_state import WeatherState         # noqa: F401
 from Models.auth_token import AuthToken               # noqa: F401
 from Models.invitation import Invitation              # noqa: F401
+from Models.user_certification import UserCertification          # noqa: F401
+from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
+from Models.logistics import Logistics                # noqa: F401
+from Models.reservation import Reservation            # noqa: F401
+from Models.document import Document                  # noqa: F401
+from Models.shuttle_assignment import ShuttleAssignment  # noqa: F401
 
 with _app.app_context():
     target_metadata = db.metadata

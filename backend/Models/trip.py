@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from Models.user import User
     from Models.trip_member import TripMember
     from Models.invitation import Invitation
+    from Models.logistics import Logistics
+    from Models.reservation import Reservation
+    from Models.document import Document
 
 
 class TripStateType(enum.Enum):
@@ -39,6 +42,22 @@ _VALID_TRANSITIONS = {
 
 
 class Trip(BaseModel):
+    logistics: Mapped[Optional["Logistics"]] = relationship(
+        "Logistics",
+        back_populates="trip",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    reservations: Mapped[List["Reservation"]] = relationship(
+        "Reservation",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        "Document",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+    )
     inventory: Mapped[Optional["Inventory"]] = relationship(
         foreign_keys="Inventory.trip_id",
         uselist=False,

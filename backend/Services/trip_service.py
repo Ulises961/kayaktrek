@@ -14,6 +14,8 @@ from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.user import User
+from Models.reservation import Reservation
+from Models.document import Document
 from Schemas.trip_member_schema import TripMemberSchema
 from Schemas.trip_schema import TripSchema
 from Api.database import db
@@ -365,9 +367,20 @@ class TripService:
         if membership.role == MemberRoleType.LEADER:
             raise ValueError("Cannot remove the trip leader")
 
+        leader = db.session.query(TripMember).filter_by(
+            trip_id=UUID(trip_id), role=MemberRoleType.LEADER
+        ).first()
+        if leader:
+            db.session.query(Reservation).filter_by(
+                trip_id=UUID(trip_id), owner_id=UUID(user_id)
+            ).update({"owner_id": leader.user_id})
+            db.session.query(Document).filter_by(
+                trip_id=UUID(trip_id), owner_id=UUID(user_id)
+            ).update({"owner_id": leader.user_id})
+
         db.session.delete(membership)
         db.session.commit()
-        logger.info(f"Removed user {user_id} from trip {trip_id}")
+        logger.info("member_removed", extra={"trip_id": trip_id, "user_id": user_id})
 
     @staticmethod
     def transition_trip_state(trip_id: str, new_state_value: str) -> Trip:
