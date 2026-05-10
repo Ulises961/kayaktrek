@@ -32,9 +32,9 @@ Write access is split by the nature of the resource:
 
 | Resource | Reason |
 |----------|--------|
-| `Reservation` | The member who booked the hotel or ferry enters it — they hold the confirmation number |
-| `Document` | The member who obtained the permit or licence enters it |
-| `ShuttleAssignment` | "I'm driving" — a member assigns themselves or updates their own row |
+| `TravelDocument` | The member who made the booking or obtained the permit enters it — they hold the confirmation number or the file |
+| `ShuttleVehicle` | Any crew member can create a vehicle and becomes `arranged_by`; they set capacity (seats, kayak spots) and either set themselves as driver or supply external driver name/contact |
+| `ShuttlePassenger` | Any crew member can add themselves to a vehicle; the arranging member or leader can remove a passenger |
 | `TripMember` float plan fields | Personal safety data; only the member themselves can set it |
 | Personal inventory contributions | The member confirms they are bringing an item |
 | `shuttle_notes` and `shuttle_meeting_time` on `Logistics` | Operational coordination, not structural |
@@ -77,15 +77,33 @@ deferred indefinitely; the coordination overhead is not justified at this stage.
 - Consistent with inventory model (member contributions already work this way)
 
 **Negative / trade-offs**
-- A crew member can add a reservation and then leave the trip — the orphaned reservation
+- A crew member can add a `TravelDocument` and then leave the trip — the orphaned record
   remains. The leader must clean it up. Acceptable; the leader has delete authority.
 - `shuttle_notes` is writable by any crew member, but `shore_contact_*` is leader-only.
   This is an intentional split within the `Logistics` record — enforce at the field level
   in the service layer, not at the resource level.
+- `TravelDocument` file attachments (MinIO objects) must be cleaned up when a record is
+  deleted. The service layer is responsible for removing the object before the DB row.
+- The shuttle model is vehicle-first: `ShuttleVehicle` (capacity + organiser) with nested
+  `ShuttlePassenger` rows. This lets the UI answer capacity questions (seats remaining,
+  kayaks covered, unassigned members) without any derived storage.
+- `driver_id` is nullable: when a trip member drives, `driver_id` points to them; when
+  the shuttle is external (taxi, transfer company, non-member friend), `driver_id` is
+  null and `driver_name` / `driver_contact` hold the external party's details.
+  `arranged_by_id` is always non-nullable — a trip member is always accountable for the
+  vehicle entry.
+- An external shuttle and a `TravelDocument(type=transport)` can coexist for the same
+  physical vehicle: use `TravelDocument` when the booking confirmation and receipt are
+  what matter; use `ShuttleVehicle` when seat/kayak assignments and passenger groupings
+  are what matter. The user decides which granularity they need.
 
 **Risks / open questions**
 - **Itinerary**: resolve option (a) vs (b) before M4 ships. Record the decision here.
-- **Document ownership transfer**: if the member who entered a document leaves the trip,
-  transfer ownership to the leader automatically.
+- **TravelDocument ownership transfer**: if the member who entered a document leaves the
+  trip, transfer ownership (and attachment responsibility) to the leader automatically.
+- **ShuttleVehicle member departure**: if the `arranged_by` member leaves the trip,
+  transfer vehicle ownership to the leader. If they were also `driver_id`, set
+  `driver_id = null` (the vehicle effectively becomes externally driven until the leader
+  reassigns it). Their `ShuttlePassenger` row is removed automatically.
 - **Conflict on `Logistics` structural fields**: two leaders cannot exist simultaneously,
   so concurrent edits are unlikely. No conflict resolution needed now.

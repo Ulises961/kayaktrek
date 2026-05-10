@@ -2,7 +2,7 @@
 
 **Status**: accepted  
 **Date**: 2025-01-01  
-**Updated**: 2026-05-09 — logistics editability rules added
+**Updated**: 2026-05-10 — Reservation/Document merged into TravelDocument; editability rule updated accordingly
 
 ## Context
 
@@ -34,15 +34,17 @@ Rules:
 
 ### Logistics editability
 
-Logistics data (the `Logistics` record, `Reservation`, `Document`, `ShuttleAssignment`) follows a **date-based editability rule** rather than a blanket state lock:
+Logistics data (the `Logistics` record, `TravelDocument`, `ShuttleAssignment`) follows a **date-based editability rule** rather than a blanket state lock:
 
-- **`Reservation` and `Document`**: editable by the trip leader until their scheduled date (`reservation.date`, `document.expiry_date`) has passed. A hotel reservation can still be amended the morning of check-in; a flight booking can be updated until departure day. Once the date has passed the record becomes read-only.
-- **`Logistics` record** (departure/arrival points, shore contact, shuttle info): editable during `draft` and `planning`. Remains editable through `happening` for operational adjustments (e.g. updating the shore contact's phone number mid-trip). Becomes read-only at `past`.
-- **`ShuttleAssignment`**: follows the same rule as the `Logistics` record — editable until the trip transitions to `past`.
+- **`TravelDocument`**: editable until the earliest relevant date that is set has passed. `date` covers bookings (check-in, departure); `expiry_date` covers permits and insurance. If only one is set, that date governs. If neither is set, the document is editable until the trip reaches `past`. A hotel booking can still be amended the morning of check-in; a park permit can be corrected until it expires. Once the governing date has passed the record becomes read-only.
+- **`Logistics` record** (departure/arrival points, shore contact, shuttle info): editable during `draft`, `planning`, and `happening` for operational adjustments (e.g. updating the shore contact's phone number mid-trip). Becomes read-only at `past`.
+- **`ShuttleVehicle` and `ShuttlePassenger`**: follow the same rule as the `Logistics` record — editable until the trip transitions to `past`. Capacity fields (`seats_available`, `kayak_spots`) may need updating right up to departure day as plans change.
 
 Rationale: logistics items have their own temporal lifecycle independent of the trip state. Blocking edits at `happening` would prevent legitimate last-minute corrections (ferries delayed, accommodation changed). The trip state machine governs the expedition lifecycle; individual item dates govern their own editability window.
 
-Enforcement: the service layer checks `item.date >= today()` before allowing mutations on `Reservation` and `Document`. The frontend hides edit controls on expired items and shows a read-only badge.
+Enforcement: the service layer evaluates `min(date, expiry_date) >= today()` (ignoring null fields) before allowing mutations on `TravelDocument`. The frontend hides edit controls on expired items and shows a read-only badge.
+
+**Note — M3f model consolidation (2026-05-10):** `Reservation` and `Document` were originally planned as separate entities. They were merged into a single `TravelDocument` entity before implementation. The original distinction was an implementation artifact: a ferry ticket is simultaneously a reservation and a document. The unified type enum (`accommodation | transport | insurance | permit | other`) covers all cases. One `TravelDocument` record maps to one file attachment; multiple files for one booking are modelled as separate records.
 
 ## Consequences
 
@@ -54,7 +56,7 @@ Enforcement: the service layer checks `item.date >= today()` before allowing mut
 
 **Negative / trade-offs**
 - No rollback: if a leader advances the state by mistake, there is no self-service undo. An admin operation would be needed to correct it.
-- Date-based editability requires the service layer to compare against `today()` on every mutation — introduce a `LogisticsItem.is_editable()` helper to centralise this check and avoid clock-skew bugs.
+- Date-based editability requires the service layer to compare against `today()` on every mutation — introduce a `TravelDocument.is_editable()` helper to centralise this check and avoid clock-skew bugs.
 
 **Risks / open questions**
 - `archived` state is not yet surfaced in the UI — decide whether archived trips appear in the crew members' trip lists (they should, as read-only history)
