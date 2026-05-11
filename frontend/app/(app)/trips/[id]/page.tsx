@@ -3,11 +3,17 @@ import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
+import { LogisticsSchema } from "@/lib/dtos/logistics"
+import { TravelDocumentSchema } from "@/lib/dtos/travel-document"
+import { ShuttleVehicleSchema } from "@/lib/dtos/shuttle-vehicle"
 import { StateBadge } from "@/components/common/state-badge"
 import { CrewList } from "@/components/common/crew-list"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InviteForm } from "@/components/trips/invite-form"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
+import { LogisticsCard } from "@/components/logistics/logistics-card"
+import { TravelDocumentsSection } from "@/components/logistics/travel-documents-section"
+import { ShuttleSection } from "@/components/logistics/shuttle-section"
 import { MileageSummary } from "@/components/itinerary/mileage-summary"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
@@ -34,12 +40,26 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   }
 
   const session = await getSession()
+
+  // Fetch logistics data in parallel — failures are non-fatal (sections show empty state)
+  const today = new Date().toISOString().slice(0, 10)
+  const [logisticsResult, documentsResult, vehiclesResult] = await Promise.allSettled([
+    apiGet(`/api/logistics/${id}`).then((raw) => LogisticsSchema.parse(raw)).catch(() => null),
+    apiGet(`/api/travel-document/${id}/all`).then((raw) => (raw as unknown[]).map((d) => TravelDocumentSchema.parse(d))).catch(() => []),
+    apiGet(`/api/shuttle/${id}/all`).then((raw) => (raw as unknown[]).map((v) => ShuttleVehicleSchema.parse(v))).catch(() => []),
+  ])
+  const logistics      = logisticsResult.status === "fulfilled" ? logisticsResult.value : null
+  const travelDocuments = documentsResult.status === "fulfilled" ? documentsResult.value : []
+  const shuttleVehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : []
+
   const { destination, state, dateFrom, dateTo, description, difficulty } = trip
   const travellers = trip.travellers ?? []
   const pendingTravellers = trip.pendingTravellers ?? []
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
   const leader = travellers.find((m) => m.role === "leader")
   const isLeader = !!session && !!leader && leader.user.id === session.userId
+  const currentMember = session ? travellers.find((m) => m.user.id === session.userId) : undefined
+  const isMember = !!currentMember
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -159,6 +179,36 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
           </CardContent>
         </Card>
       )}
+
+      {/* Logistics */}
+      <LogisticsCard
+        logistics={logistics}
+        isLeader={isLeader}
+        isMember={isMember}
+        tripId={id}
+      />
+
+      {/* Travel Documents */}
+      <TravelDocumentsSection
+        documents={travelDocuments}
+        today={today}
+        tripId={isMember ? id : undefined}
+        currentUserId={session?.userId}
+        leaderId={leader?.user.id}
+        isMember={isMember}
+      />
+
+      {/* Shuttle */}
+      <ShuttleSection
+        logistics={logistics}
+        vehicles={shuttleVehicles}
+        members={travellers}
+        tripId={isMember ? id : undefined}
+        currentUserId={session?.userId}
+        currentMemberId={currentMember?.id}
+        leaderId={leader?.user.id}
+        isMember={isMember}
+      />
 
       {/* Itinerary */}
       <Card>
