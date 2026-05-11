@@ -53,10 +53,11 @@ interface VehicleCardProps {
   currentUserId?: string
   currentMemberId?: string
   leaderId?: string
+  alreadyAssigned: Set<string>
   onEdit: () => void
 }
 
-function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId, leaderId, onEdit }: VehicleCardProps) {
+function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId, leaderId, alreadyAssigned, onEdit }: VehicleCardProps) {
   const memberById = Object.fromEntries(members.map((m) => [m.id, m]))
 
   const driverMember = vehicle.driverId ? memberById[vehicle.driverId] : null
@@ -74,8 +75,8 @@ function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId,
     currentUserId === leaderId
   )
 
-  const isPassenger = !!currentMemberId && vehicle.passengers.some((p) => p.tripMemberId === currentMemberId)
-  const canJoin = !!currentMemberId && !isPassenger && !!tripId && !!vehicle.id
+  const isArranger = !!currentMemberId && vehicle.arrangedById === currentMemberId
+  const canJoin = !!currentMemberId && !alreadyAssigned.has(currentMemberId) && !isArranger && !!tripId && !!vehicle.id
   const canRemovePassenger = (passengerId: string) =>
     !!tripId && !!vehicle.id && (passengerId === currentMemberId || canManageVehicle)
 
@@ -204,6 +205,7 @@ export function ShuttleSection({ logistics, vehicles, members, tripId, currentUs
                   currentUserId={currentUserId}
                   currentMemberId={currentMemberId}
                   leaderId={leaderId}
+                  alreadyAssigned={passengerMemberIds}
                   onEdit={() => setEditingVehicleId(v.id ?? null)}
                 />
               ))}

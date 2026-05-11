@@ -1,6 +1,6 @@
 "use client"
 
-import { AnchorIcon, CarIcon, MapPinIcon, PhoneIcon, ShieldAlertIcon } from "lucide-react"
+import { AnchorIcon, CarIcon, PhoneIcon, ShieldAlertIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EditLogisticsDialog } from "./edit-logistics-dialog"
 import type { Logistics } from "@/lib/dtos/logistics"
@@ -45,47 +45,10 @@ export function LogisticsCard({ logistics, isLeader, tripId }: LogisticsCardProp
       <CardContent className="flex flex-col gap-5">
         {!logistics ? (
           <p className="text-sm text-muted-foreground">
-            Logistics not yet set up — departure point, shore contact, and travel notes will appear here.
+            Logistics not yet set up — shore contact and shuttle details will appear here.
           </p>
         ) : (
           <>
-            {/* Departure → Arrival */}
-            <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-              <div className="flex flex-col gap-1">
-                <FieldLabel>
-                  <MapPinIcon className="inline size-3 mr-0.5 -mt-px" />
-                  Departure
-                </FieldLabel>
-                <FieldValue dim={!logistics.departurePoint}>
-                  {logistics.departurePoint ?? "Not set"}
-                </FieldValue>
-              </div>
-
-              <div className="flex items-center pt-[22px] text-muted-foreground/40 select-none">
-                <span className="text-xs">——→</span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <FieldLabel>
-                  <MapPinIcon className="inline size-3 mr-0.5 -mt-px" />
-                  Arrival
-                </FieldLabel>
-                <FieldValue dim={!logistics.arrivalPoint}>
-                  {logistics.arrivalPoint ?? "Not set"}
-                </FieldValue>
-              </div>
-            </div>
-
-            {/* Travel notes */}
-            {logistics.travelNotes && (
-              <div className="flex flex-col gap-1">
-                <FieldLabel>Travel notes</FieldLabel>
-                <p className="text-sm text-foreground/80 leading-relaxed pl-3 border-l-2 border-border">
-                  {logistics.travelNotes}
-                </p>
-              </div>
-            )}
-
             {/* Shore contact */}
             {(logistics.shoreContactName || logistics.shoreContactEmail || logistics.shoreContactPhone) && (
               <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20 p-3 flex flex-col gap-2">

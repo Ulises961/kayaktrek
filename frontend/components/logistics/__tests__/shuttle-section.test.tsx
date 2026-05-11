@@ -41,9 +41,6 @@ const VEHICLE: ShuttleVehicle = {
 const LOGISTICS_WITH_TIME: Logistics = {
   id: "01952f1a-0000-7000-8000-000000000050",
   tripId: "01952f1a-0000-7000-8000-000000000001",
-  departurePoint: null,
-  arrivalPoint: null,
-  travelNotes: null,
   shoreContactName: null,
   shoreContactEmail: null,
   shoreContactPhone: null,
@@ -102,5 +99,54 @@ describe("ShuttleSection", () => {
   it("shows seats available", () => {
     render(<ShuttleSection logistics={null} vehicles={[VEHICLE]} members={MEMBERS} />)
     expect(screen.getByText(/4/)).toBeDefined()
+  })
+
+  it("does not show join button for the vehicle arranger", () => {
+    // MEMBER_A arranged the vehicle — should not see a join button for it
+    render(
+      <ShuttleSection
+        logistics={null}
+        vehicles={[VEHICLE]}
+        members={MEMBERS}
+        tripId="01952f1a-0000-7000-8000-000000000001"
+        currentMemberId={MEMBER_A_ID}
+      />
+    )
+    expect(screen.queryByRole("button", { name: /join/i })).toBeNull()
+  })
+
+  it("does not show join button for a member already in another vehicle", () => {
+    const secondVehicle: ShuttleVehicle = {
+      ...VEHICLE,
+      id: "01952f1a-0000-7000-8000-000000000031",
+      arrangedById: MEMBER_B_ID,
+      passengers: [],
+    }
+    // MEMBER_A is a passenger in VEHICLE, so should not be able to join secondVehicle
+    render(
+      <ShuttleSection
+        logistics={null}
+        vehicles={[VEHICLE, secondVehicle]}
+        members={MEMBERS}
+        tripId="01952f1a-0000-7000-8000-000000000001"
+        currentMemberId={MEMBER_A_ID}
+      />
+    )
+    expect(screen.queryByRole("button", { name: /join/i })).toBeNull()
+  })
+
+  it("shows join button for an unassigned non-arranger member", () => {
+    const vehicleWithNoPassengers: ShuttleVehicle = { ...VEHICLE, passengers: [] }
+    // MEMBER_B is not a passenger and not the arranger — should see join
+    render(
+      <ShuttleSection
+        logistics={null}
+        vehicles={[vehicleWithNoPassengers]}
+        members={MEMBERS}
+        tripId="01952f1a-0000-7000-8000-000000000001"
+        currentMemberId={MEMBER_B_ID}
+      />
+    )
+    expect(screen.getByRole("button", { name: /join/i })).toBeDefined()
   })
 })

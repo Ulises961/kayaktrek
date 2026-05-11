@@ -8,7 +8,6 @@ import { upsertLogistics } from "@/lib/logistics/actions"
 import { LogisticsFieldsSchema, type LogisticsFields, type Logistics } from "@/lib/dtos/logistics"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 
@@ -32,9 +31,6 @@ export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogPr
   const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<LogisticsFields>({
     resolver: zodResolver(LogisticsFieldsSchema),
     defaultValues: {
-      departurePoint: logistics?.departurePoint ?? "",
-      arrivalPoint: logistics?.arrivalPoint ?? "",
-      travelNotes: logistics?.travelNotes ?? "",
       shoreContactName: logistics?.shoreContactName ?? "",
       shoreContactEmail: logistics?.shoreContactEmail ?? "",
       shoreContactPhone: logistics?.shoreContactPhone ?? "",
@@ -45,9 +41,6 @@ export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogPr
   function handleOpen(v: boolean) {
     setOpen(v)
     if (!v) reset({
-      departurePoint: logistics?.departurePoint ?? "",
-      arrivalPoint: logistics?.arrivalPoint ?? "",
-      travelNotes: logistics?.travelNotes ?? "",
       shoreContactName: logistics?.shoreContactName ?? "",
       shoreContactEmail: logistics?.shoreContactEmail ?? "",
       shoreContactPhone: logistics?.shoreContactPhone ?? "",
@@ -86,43 +79,6 @@ export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogPr
           </DialogHeader>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
-            {/* Departure / Arrival */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="departurePoint">Departure point</FieldLabel>
-                <Input
-                  id="departurePoint"
-                  placeholder="Departure point"
-                  disabled={isPending}
-                  {...register("departurePoint")}
-                />
-                {errors.departurePoint && <p className="text-xs text-destructive">{errors.departurePoint.message}</p>}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="arrivalPoint">Arrival point</FieldLabel>
-                <Input
-                  id="arrivalPoint"
-                  placeholder="Arrival point"
-                  disabled={isPending}
-                  {...register("arrivalPoint")}
-                />
-                {errors.arrivalPoint && <p className="text-xs text-destructive">{errors.arrivalPoint.message}</p>}
-              </div>
-            </div>
-
-            {/* Travel notes */}
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="travelNotes">Travel notes</FieldLabel>
-              <Textarea
-                id="travelNotes"
-                placeholder="Route notes, weather considerations, navigation hazards…"
-                rows={3}
-                disabled={isPending}
-                {...register("travelNotes")}
-              />
-              {errors.travelNotes && <p className="text-xs text-destructive">{errors.travelNotes.message}</p>}
-            </div>
-
             {/* Shore contact */}
             <div className="flex flex-col gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20 p-3">
               <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">

@@ -15,9 +15,6 @@ const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const LOGISTICS_FIXTURE = {
   id: "01952f1a-0000-7000-8000-000000000001",
   tripId: TRIP_ID,
-  departurePoint: "La Escala",
-  arrivalPoint: "Cadaqués",
-  travelNotes: null,
   shoreContactName: "Maria",
   shoreContactEmail: "maria@example.com",
   shoreContactPhone: null,
@@ -38,7 +35,7 @@ describe("getLogistics", () => {
   it("returns parsed logistics on success", async () => {
     vi.mocked(apiGet).mockResolvedValue(LOGISTICS_FIXTURE)
     const result = await getLogistics(TRIP_ID)
-    expect(result).toMatchObject({ departurePoint: "La Escala" })
+    expect(result).toMatchObject({ shoreContactName: "Maria" })
   })
 
   it("returns null when the API returns an empty object (not yet created)", async () => {
@@ -51,8 +48,8 @@ describe("getLogistics", () => {
 describe("upsertLogistics", () => {
   it("PUTs to the correct path", async () => {
     vi.mocked(apiPut).mockResolvedValue(LOGISTICS_FIXTURE)
-    await upsertLogistics(TRIP_ID, { departurePoint: "La Escala" })
-    expect(apiPut).toHaveBeenCalledWith(`/api/logistics/${TRIP_ID}`, { departurePoint: "La Escala" })
+    await upsertLogistics(TRIP_ID, { shoreContactName: "Maria" })
+    expect(apiPut).toHaveBeenCalledWith(`/api/logistics/${TRIP_ID}`, { shoreContactName: "Maria" })
   })
 
   it("revalidates the trip path on success", async () => {

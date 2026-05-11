@@ -4,9 +4,6 @@ import { noHtmlTags } from "../validators"
 export const LogisticsSchema = z.object({
   id: z.uuidv7().optional(),
   tripId: z.uuidv7().optional(),
-  departurePoint: z.string().nullish(),
-  arrivalPoint: z.string().nullish(),
-  travelNotes: z.string().nullish(),
   shoreContactName: z.string().nullish(),
   shoreContactEmail: z.string().nullish(),
   shoreContactPhone: z.string().nullish(),
@@ -16,9 +13,6 @@ export const LogisticsSchema = z.object({
 })
 
 export const LogisticsFieldsSchema = z.object({
-  departurePoint: z.string().max(500).refine(noHtmlTags.check, noHtmlTags.message).optional(),
-  arrivalPoint: z.string().max(500).refine(noHtmlTags.check, noHtmlTags.message).optional(),
-  travelNotes: z.string().max(2000).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   shoreContactName: z.string().max(200).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   shoreContactEmail: z
     .string()

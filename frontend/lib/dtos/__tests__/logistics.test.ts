@@ -4,9 +4,6 @@ import { LogisticsSchema, LogisticsFieldsSchema } from "../logistics"
 const VALID_LOGISTICS = {
   id: "01952f1a-0000-7000-8000-000000000001",
   tripId: "01952f1a-0000-7000-8000-000000000002",
-  departurePoint: "La Escala harbour",
-  arrivalPoint: "Cadaqués cove",
-  travelNotes: "Avoid the cape if north wind > 20kn",
   shoreContactName: "Maria García",
   shoreContactEmail: "maria@example.com",
   shoreContactPhone: "+34600000000",
@@ -20,7 +17,7 @@ describe("LogisticsSchema", () => {
     const result = LogisticsSchema.safeParse(VALID_LOGISTICS)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.departurePoint).toBe("La Escala harbour")
+      expect(result.data.shoreContactName).toBe("Maria García")
     }
   })
 
@@ -32,8 +29,6 @@ describe("LogisticsSchema", () => {
   it("accepts null for all nullable fields", () => {
     const result = LogisticsSchema.safeParse({
       ...VALID_LOGISTICS,
-      departurePoint: null,
-      arrivalPoint: null,
       shoreContactName: null,
       shoreContactEmail: null,
     })
@@ -44,9 +39,6 @@ describe("LogisticsSchema", () => {
 describe("LogisticsFieldsSchema", () => {
   it("accepts valid leader fields", () => {
     const result = LogisticsFieldsSchema.safeParse({
-      departurePoint: "La Escala",
-      arrivalPoint: "Cadaqués",
-      travelNotes: "Check tide tables",
       shoreContactName: "Maria",
       shoreContactEmail: "maria@example.com",
       shoreContactPhone: "+34600000000",

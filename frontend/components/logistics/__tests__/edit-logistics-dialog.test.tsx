@@ -13,9 +13,6 @@ const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const LOGISTICS: Logistics = {
   id: "01952f1a-0000-7000-8000-000000000002",
   tripId: TRIP_ID,
-  departurePoint: "La Escala harbour",
-  arrivalPoint: "Cadaqués cove",
-  travelNotes: "Avoid the cape if north wind > 20kn",
   shoreContactName: "Maria García",
   shoreContactEmail: "maria@example.com",
   shoreContactPhone: "+34600000000",
@@ -42,16 +39,16 @@ describe("EditLogisticsDialog", () => {
     expect(screen.getByRole("dialog")).toBeDefined()
   })
 
-  it("pre-fills departure point from existing logistics", async () => {
-    await openDialog()
-    const input = screen.getByPlaceholderText(/departure/i)
-    expect((input as HTMLInputElement).value).toBe("La Escala harbour")
-  })
-
   it("pre-fills shore contact name from existing logistics", async () => {
     await openDialog()
     const input = screen.getByPlaceholderText(/shore contact name/i)
     expect((input as HTMLInputElement).value).toBe("Maria García")
+  })
+
+  it("uses empty strings when logistics is null", async () => {
+    await openDialog(null)
+    const input = screen.getByPlaceholderText(/shore contact name/i)
+    expect((input as HTMLInputElement).value).toBe("")
   })
 
   it("calls upsertLogistics on submit", async () => {
@@ -66,11 +63,5 @@ describe("EditLogisticsDialog", () => {
     await openDialog()
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() => expect(screen.getByText("Server error.")).toBeDefined())
-  })
-
-  it("uses empty strings when logistics is null", async () => {
-    await openDialog(null)
-    const input = screen.getByPlaceholderText(/departure/i)
-    expect((input as HTMLInputElement).value).toBe("")
   })
 })
