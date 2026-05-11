@@ -24,7 +24,6 @@ const LOGISTICS_FIXTURE = {
   shoreContactRelationship: null,
   shuttleNotes: null,
   shuttleMeetingTime: null,
-  shuttleAssignments: [],
 }
 
 beforeEach(() => vi.clearAllMocks())

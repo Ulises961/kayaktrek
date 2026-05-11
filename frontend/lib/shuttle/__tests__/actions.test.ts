@@ -10,100 +10,153 @@ vi.mock("@/lib/api/client", () => ({
 
 import { revalidatePath } from "next/cache"
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
-import { getShuttleAssignments, createShuttleAssignment, updateShuttleAssignment, deleteShuttleAssignment } from "../actions"
+import {
+  getShuttleVehicles,
+  createShuttleVehicle,
+  updateShuttleVehicle,
+  deleteShuttleVehicle,
+  addShuttlePassenger,
+  removeShuttlePassenger,
+} from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
-const ASSIGNMENT_ID = "01952f1a-0000-7000-8000-000000000020"
+const VEHICLE_ID = "01952f1a-0000-7000-8000-000000000020"
 const MEMBER_ID = "01952f1a-0000-7000-8000-000000000030"
 
-const ASSIGNMENT_FIXTURE = {
-  id: ASSIGNMENT_ID,
-  logisticsId: "01952f1a-0000-7000-8000-000000000040",
-  tripMemberId: MEMBER_ID,
-  role: "driver",
+const VEHICLE_FIXTURE = {
+  id: VEHICLE_ID,
+  tripId: TRIP_ID,
+  arrangedById: MEMBER_ID,
+  driverId: MEMBER_ID,
+  driverName: null,
+  driverContact: null,
+  seatsAvailable: 4,
+  kayakSpots: 2,
   vehicleDescription: "White Toyota",
   pickupPoint: "Harbour road",
+  passengers: [],
 }
 
 beforeEach(() => vi.clearAllMocks())
 
-describe("getShuttleAssignments", () => {
+describe("getShuttleVehicles", () => {
   it("fetches from the correct path", async () => {
-    vi.mocked(apiGet).mockResolvedValue([ASSIGNMENT_FIXTURE])
-    await getShuttleAssignments(TRIP_ID)
+    vi.mocked(apiGet).mockResolvedValue([VEHICLE_FIXTURE])
+    await getShuttleVehicles(TRIP_ID)
     expect(apiGet).toHaveBeenCalledWith(`/api/shuttle/${TRIP_ID}/all`)
   })
 
-  it("returns an array of assignments", async () => {
-    vi.mocked(apiGet).mockResolvedValue([ASSIGNMENT_FIXTURE])
-    const result = await getShuttleAssignments(TRIP_ID)
+  it("returns an array of vehicles with passengers", async () => {
+    vi.mocked(apiGet).mockResolvedValue([VEHICLE_FIXTURE])
+    const result = await getShuttleVehicles(TRIP_ID)
     expect(result).toHaveLength(1)
-    expect(result[0].role).toBe("driver")
+    expect(result[0].seatsAvailable).toBe(4)
+    expect(result[0].passengers).toEqual([])
   })
 })
 
-describe("createShuttleAssignment", () => {
+describe("createShuttleVehicle", () => {
   it("posts to the correct path", async () => {
-    vi.mocked(apiPost).mockResolvedValue(ASSIGNMENT_FIXTURE)
-    await createShuttleAssignment(TRIP_ID, { tripMemberId: MEMBER_ID, role: "driver" })
-    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/${TRIP_ID}/create`, { tripMemberId: MEMBER_ID, role: "driver" })
+    vi.mocked(apiPost).mockResolvedValue(VEHICLE_FIXTURE)
+    await createShuttleVehicle(TRIP_ID, { seatsAvailable: 4, kayakSpots: 2 })
+    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/${TRIP_ID}/create`, { seatsAvailable: 4, kayakSpots: 2 })
   })
 
   it("revalidates the trip path on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(ASSIGNMENT_FIXTURE)
-    await createShuttleAssignment(TRIP_ID, { tripMemberId: MEMBER_ID, role: "driver" })
+    vi.mocked(apiPost).mockResolvedValue(VEHICLE_FIXTURE)
+    await createShuttleVehicle(TRIP_ID, {})
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
   })
 
   it("returns success: true on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(ASSIGNMENT_FIXTURE)
-    const result = await createShuttleAssignment(TRIP_ID, { tripMemberId: MEMBER_ID, role: "driver" })
+    vi.mocked(apiPost).mockResolvedValue(VEHICLE_FIXTURE)
+    const result = await createShuttleVehicle(TRIP_ID, {})
     expect(result).toEqual({ success: true })
   })
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("400"))
-    const result = await createShuttleAssignment(TRIP_ID, { tripMemberId: MEMBER_ID, role: "driver" })
+    const result = await createShuttleVehicle(TRIP_ID, {})
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })
 
-describe("updateShuttleAssignment", () => {
-  it("patches the correct assignment", async () => {
-    vi.mocked(apiPatch).mockResolvedValue(ASSIGNMENT_FIXTURE)
-    await updateShuttleAssignment(TRIP_ID, ASSIGNMENT_ID, { vehicleDescription: "Blue VW" })
-    expect(apiPatch).toHaveBeenCalledWith(`/api/shuttle/${ASSIGNMENT_ID}`, { vehicleDescription: "Blue VW" })
+describe("updateShuttleVehicle", () => {
+  it("patches the correct vehicle", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(VEHICLE_FIXTURE)
+    await updateShuttleVehicle(TRIP_ID, VEHICLE_ID, { vehicleDescription: "Blue VW" })
+    expect(apiPatch).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}`, { vehicleDescription: "Blue VW" })
   })
 
   it("revalidates the trip path on success", async () => {
-    vi.mocked(apiPatch).mockResolvedValue(ASSIGNMENT_FIXTURE)
-    await updateShuttleAssignment(TRIP_ID, ASSIGNMENT_ID, {})
+    vi.mocked(apiPatch).mockResolvedValue(VEHICLE_FIXTURE)
+    await updateShuttleVehicle(TRIP_ID, VEHICLE_ID, {})
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
   })
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPatch).mockRejectedValue(new Error("403"))
-    const result = await updateShuttleAssignment(TRIP_ID, ASSIGNMENT_ID, {})
+    const result = await updateShuttleVehicle(TRIP_ID, VEHICLE_ID, {})
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })
 
-describe("deleteShuttleAssignment", () => {
+describe("deleteShuttleVehicle", () => {
   it("sends DELETE to the correct path", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
-    await deleteShuttleAssignment(TRIP_ID, ASSIGNMENT_ID)
-    expect(apiDelete).toHaveBeenCalledWith(`/api/shuttle/${ASSIGNMENT_ID}`)
+    await deleteShuttleVehicle(TRIP_ID, VEHICLE_ID)
+    expect(apiDelete).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}`)
   })
 
   it("revalidates the trip path on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
-    await deleteShuttleAssignment(TRIP_ID, ASSIGNMENT_ID)
+    await deleteShuttleVehicle(TRIP_ID, VEHICLE_ID)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
   })
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("404"))
-    const result = await deleteShuttleAssignment(TRIP_ID, ASSIGNMENT_ID)
+    const result = await deleteShuttleVehicle(TRIP_ID, VEHICLE_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("addShuttlePassenger", () => {
+  it("posts to the correct path with tripMemberId", async () => {
+    vi.mocked(apiPost).mockResolvedValue({})
+    await addShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}/passenger`, { tripMemberId: MEMBER_ID })
+  })
+
+  it("revalidates the trip path on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({})
+    await addShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    const result = await addShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("removeShuttlePassenger", () => {
+  it("sends DELETE to the correct path", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await removeShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
+    expect(apiDelete).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}/passenger/${MEMBER_ID}`)
+  })
+
+  it("revalidates the trip path on success", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await removeShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("404"))
+    const result = await removeShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })

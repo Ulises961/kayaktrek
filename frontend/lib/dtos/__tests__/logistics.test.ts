@@ -13,16 +13,6 @@ const VALID_LOGISTICS = {
   shoreContactRelationship: "Partner",
   shuttleNotes: "Meet at the trailhead after landing",
   shuttleMeetingTime: "17:00",
-  shuttleAssignments: [
-    {
-      id: "01952f1a-0000-7000-8000-000000000003",
-      logisticsId: "01952f1a-0000-7000-8000-000000000001",
-      tripMemberId: "01952f1a-0000-7000-8000-000000000004",
-      role: "driver",
-      vehicleDescription: "White Toyota",
-      pickupPoint: "Harbour road",
-    },
-  ],
 }
 
 describe("LogisticsSchema", () => {
@@ -31,7 +21,6 @@ describe("LogisticsSchema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.departurePoint).toBe("La Escala harbour")
-      expect(result.data.shuttleAssignments).toHaveLength(1)
     }
   })
 
@@ -49,13 +38,6 @@ describe("LogisticsSchema", () => {
       shoreContactEmail: null,
     })
     expect(result.success).toBe(true)
-  })
-
-  it("defaults shuttleAssignments to empty array when absent", () => {
-    const { shuttleAssignments: _, ...noAssignments } = VALID_LOGISTICS
-    const result = LogisticsSchema.safeParse(noAssignments)
-    expect(result.success).toBe(true)
-    if (result.success) expect(result.data.shuttleAssignments).toEqual([])
   })
 })
 

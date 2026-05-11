@@ -1,5 +1,4 @@
 import { z } from "zod"
-import { ShuttleAssignmentSchema } from "./shuttle-assignment"
 import { noHtmlTags } from "../validators"
 
 export const LogisticsSchema = z.object({
@@ -14,7 +13,6 @@ export const LogisticsSchema = z.object({
   shoreContactRelationship: z.string().nullish(),
   shuttleNotes: z.string().nullish(),
   shuttleMeetingTime: z.string().nullish(),
-  shuttleAssignments: z.array(ShuttleAssignmentSchema).default([]),
 })
 
 export const LogisticsFieldsSchema = z.object({
