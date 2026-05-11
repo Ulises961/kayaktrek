@@ -71,28 +71,25 @@ class TestLogisticsUpsert:
     def test_leader_can_create_logistics(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         payload = {
-            "departurePoint": "Kayak launch, Portree",
-            "arrivalPoint": "Kylerhea slipway",
             "shoreContactName": "Alice",
             "shoreContactPhone": "+441234567890",
         }
         r = client.put(f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"], json=payload)
         assert r.status_code == 200
         data = json.loads(r.data)
-        assert data["departurePoint"] == "Kayak launch, Portree"
         assert data["shoreContactName"] == "Alice"
         assert "id" in data
 
     def test_put_is_idempotent(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         first = client.put(f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"],
-                           json={"departurePoint": "A"})
+                           json={"shoreContactName": "Alice"})
         second = client.put(f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"],
-                            json={"departurePoint": "B"})
+                            json={"shoreContactName": "Bob"})
         assert first.status_code == 200
         assert second.status_code == 200
         assert json.loads(first.data)["id"] == json.loads(second.data)["id"]
-        assert json.loads(second.data)["departurePoint"] == "B"
+        assert json.loads(second.data)["shoreContactName"] == "Bob"
 
     def test_crew_can_update_shuttle_notes(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -105,17 +102,6 @@ class TestLogisticsUpsert:
         )
         assert r.status_code == 200
         assert json.loads(r.data)["shuttleNotes"] == "Meet at the pub car park"
-
-    def test_crew_cannot_update_departure_point(self, client, trip_with_user2_as_crew):
-        trip_id = trip_with_user2_as_crew["trip"]["id"]
-        client.put(f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"],
-                   json={"departurePoint": "Original"})
-        r = client.put(
-            f"{LOGISTICS_ENDPOINT}/{trip_id}",
-            headers=trip_with_user2_as_crew["crew_headers"],
-            json={"departurePoint": "Hijacked"},
-        )
-        assert r.status_code == 403
 
     def test_non_member_gets_403(self, client, outsider_headers, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]

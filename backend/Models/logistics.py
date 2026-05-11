@@ -20,11 +20,6 @@ class Logistics(BaseModel):
         UUID, ForeignKey("trip.id", ondelete="CASCADE"), nullable=False
     )
 
-    # TODO M4: replace departure_point/arrival_point strings with FK refs to Point.id
-    departure_point: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    arrival_point: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    travel_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
     shore_contact_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     shore_contact_email: Mapped[Optional[str]] = mapped_column(String(254), nullable=True)
     shore_contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

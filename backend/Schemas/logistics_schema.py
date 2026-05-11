@@ -6,9 +6,6 @@ from Schemas.base_schema import BaseSchema
 
 class LogisticsSchema(BaseSchema):
     trip_id = fields.UUID(dump_only=True)
-    departure_point = fields.String(allow_none=True, load_default=None)
-    arrival_point = fields.String(allow_none=True, load_default=None)
-    travel_notes = fields.String(allow_none=True, load_default=None)
     shore_contact_name = fields.String(allow_none=True, load_default=None)
     shore_contact_email = fields.Email(allow_none=True, load_default=None)
     shore_contact_phone = fields.String(allow_none=True, load_default=None)
@@ -23,8 +20,7 @@ class LogisticsSchema(BaseSchema):
 
     @post_load
     def sanitize(self, data, **kwargs):
-        for field in ("departure_point", "arrival_point", "travel_notes",
-                      "shore_contact_name", "shore_contact_relationship",
+        for field in ("shore_contact_name", "shore_contact_relationship",
                       "shuttle_notes", "shuttle_meeting_time"):
             if data.get(field):
                 data[field] = bleach.clean(str(data[field]).strip(), tags=[], strip=True)

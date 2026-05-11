@@ -28,7 +28,7 @@ class TestingConfig(Config):
     TESTING = True
     DEVELOPMENT = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///:memory:")
+    SQLALCHEMY_DATABASE_URI = os.getenv("TESTING_DATABASE_URL", os.getenv("DATABASE_URL", "sqlite:///:memory:"))
     SECRET_KEY = os.getenv("SECRET_KEY", "test-secret-key")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "test-jwt-secret-key-minimum-32-bytes!")
     SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}

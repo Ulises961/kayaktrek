@@ -13,7 +13,6 @@ from Schemas.base_schema import camelcase
 logger = logging.getLogger(__name__)
 
 _LEADER_FIELDS = frozenset({
-    "departure_point", "arrival_point", "travel_notes",
     "shore_contact_name", "shore_contact_email",
     "shore_contact_phone", "shore_contact_relationship",
 })
@@ -36,8 +35,8 @@ class LogisticsService:
         """
         Create or update the Logistics record for a trip.
 
-        Leader-only fields (departure_point, arrival_point, shore_contact_*,
-        travel_notes) raise PermissionError if a crew member tries to set them.
+        Leader-only fields (shore_contact_*) raise PermissionError if a crew member
+        tries to set them.
         shuttle_notes and shuttle_meeting_time are writable by any crew member.
 
         Raises:
