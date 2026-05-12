@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { FileIcon, PlusIcon } from "lucide-react"
-import { createTravelDocument } from "@/lib/travel-documents/actions"
+import { FileIcon, PaperclipIcon, PlusIcon, XIcon } from "lucide-react"
+import { createTravelDocument, uploadTravelDocumentAttachment } from "@/lib/travel-documents/actions"
 import { TravelDocumentFieldsSchema, TRAVEL_DOCUMENT_TYPES, type TravelDocumentFields } from "@/lib/dtos/travel-document"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,6 +39,8 @@ interface AddDocumentDialogProps {
 export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { register, handleSubmit, setValue, watch, setError, reset, formState: { errors } } = useForm<TravelDocumentFields>({
     resolver: zodResolver(TravelDocumentFieldsSchema),
@@ -47,17 +49,36 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
 
   function handleOpen(v: boolean) {
     setOpen(v)
-    if (!v) reset({ type: "accommodation" })
+    if (!v) {
+      reset({ type: "accommodation" })
+      setPendingFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  function clearFile() {
+    setPendingFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
       const result = await createTravelDocument(tripId, data)
-      if (result.success) {
-        setOpen(false)
-      } else {
+      if (!result.success) {
         setError("root", { message: result.error })
+        return
       }
+      if (pendingFile && result.document.id) {
+        const formData = new FormData()
+        formData.append("file", pendingFile)
+        const uploadResult = await uploadTravelDocumentAttachment(tripId, result.document.id, formData)
+        if (!uploadResult.success) {
+          setError("root", { message: "Document saved, but the file could not be uploaded. Add it from the edit dialog." })
+          setOpen(false)
+          return
+        }
+      }
+      setOpen(false)
     })
   })
 
@@ -112,7 +133,7 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                 <FieldLabel>Date</FieldLabel>
                 <DatePicker
                   value={watch("date") ?? ""}
-                  onChange={(v) => setValue("date", v)}
+                  onChange={(v) => setValue("date", v, { shouldValidate: true })}
                   placeholder="Service date"
                   disabled={isPending}
                 />
@@ -121,10 +142,11 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                 <FieldLabel>Expiry date</FieldLabel>
                 <DatePicker
                   value={watch("expiryDate") ?? ""}
-                  onChange={(v) => setValue("expiryDate", v)}
+                  onChange={(v) => setValue("expiryDate", v, { shouldValidate: true })}
                   placeholder="Expiry date"
                   disabled={isPending}
                 />
+                {errors.expiryDate && <p className="text-xs text-destructive">{errors.expiryDate.message}</p>}
               </div>
             </div>
 
@@ -158,6 +180,47 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                 disabled={isPending}
                 {...register("notes")}
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel>Attachment (optional)</FieldLabel>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="sr-only"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isPending}
+                >
+                  <PaperclipIcon className="size-3.5" />
+                  Choose file
+                </Button>
+                {pendingFile ? (
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-xs text-muted-foreground truncate">{pendingFile.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-5 shrink-0"
+                      onClick={clearFile}
+                      disabled={isPending}
+                    >
+                      <XIcon className="size-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No file chosen</span>
+                )}
+              </div>
             </div>
 
             {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}

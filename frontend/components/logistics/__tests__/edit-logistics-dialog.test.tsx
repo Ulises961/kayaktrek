@@ -25,13 +25,13 @@ beforeEach(() => vi.clearAllMocks())
 
 async function openDialog(logistics: Logistics | null = LOGISTICS) {
   render(<EditShoreContactDialog tripId={TRIP_ID} logistics={logistics} />)
-  await userEvent.click(screen.getByRole("button", { name: /edit logistics/i }))
+  await userEvent.click(screen.getByRole("button", { name: /edit contact/i }))
 }
 
 describe("EditLogisticsDialog", () => {
   it("renders a trigger button", () => {
     render(<EditShoreContactDialog tripId={TRIP_ID} logistics={null} />)
-    expect(screen.getByRole("button", { name: /edit logistics/i })).toBeDefined()
+    expect(screen.getByRole("button", { name: /edit contact/i })).toBeDefined()
   })
 
   it("opens the dialog on click", async () => {

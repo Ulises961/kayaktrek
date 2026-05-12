@@ -5,9 +5,10 @@ import userEvent from "@testing-library/user-event"
 vi.mock("@/lib/travel-documents/actions", () => ({
   createTravelDocument: vi.fn(),
   updateTravelDocument: vi.fn(),
+  uploadTravelDocumentAttachment: vi.fn(),
 }))
 
-import { createTravelDocument, updateTravelDocument } from "@/lib/travel-documents/actions"
+import { createTravelDocument, updateTravelDocument, uploadTravelDocumentAttachment } from "@/lib/travel-documents/actions"
 import { AddDocumentDialog } from "../add-document-dialog"
 import { EditDocumentDialog } from "../edit-document-dialog"
 import type { TravelDocument } from "@/lib/dtos/travel-document"
@@ -49,11 +50,14 @@ describe("AddDocumentDialog", () => {
     expect(screen.getByPlaceholderText(/document name/i)).toBeDefined()
   })
 
+  it("has a file picker", async () => {
+    render(<AddDocumentDialog tripId={TRIP_ID} />)
+    await userEvent.click(screen.getByRole("button", { name: /add document/i }))
+    expect(screen.getByRole("button", { name: /choose file/i })).toBeDefined()
+  })
+
   it("calls createTravelDocument on submit with name and type", async () => {
-    vi.mocked(createTravelDocument).mockResolvedValue({
-      success: true,
-      document: DOCUMENT,
-    })
+    vi.mocked(createTravelDocument).mockResolvedValue({ success: true, document: DOCUMENT })
     render(<AddDocumentDialog tripId={TRIP_ID} />)
     await userEvent.click(screen.getByRole("button", { name: /add document/i }))
     await userEvent.type(screen.getByPlaceholderText(/document name/i), "Ferry La Escala")
@@ -64,6 +68,37 @@ describe("AddDocumentDialog", () => {
         expect.objectContaining({ name: "Ferry La Escala" })
       )
     )
+  })
+
+  it("uploads the file after creating the document when a file is selected", async () => {
+    vi.mocked(createTravelDocument).mockResolvedValue({ success: true, document: DOCUMENT })
+    vi.mocked(uploadTravelDocumentAttachment).mockResolvedValue({ success: true })
+
+    render(<AddDocumentDialog tripId={TRIP_ID} />)
+    await userEvent.click(screen.getByRole("button", { name: /add document/i }))
+    await userEvent.type(screen.getByPlaceholderText(/document name/i), "Ferry La Escala")
+
+    const file = new File(["content"], "ticket.pdf", { type: "application/pdf" })
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(fileInput, file)
+
+    await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
+    await waitFor(() => {
+      expect(createTravelDocument).toHaveBeenCalled()
+      expect(uploadTravelDocumentAttachment).toHaveBeenCalledWith(TRIP_ID, DOC_ID, expect.any(FormData))
+    })
+  })
+
+  it("skips upload when no file is selected", async () => {
+    vi.mocked(createTravelDocument).mockResolvedValue({ success: true, document: DOCUMENT })
+
+    render(<AddDocumentDialog tripId={TRIP_ID} />)
+    await userEvent.click(screen.getByRole("button", { name: /add document/i }))
+    await userEvent.type(screen.getByPlaceholderText(/document name/i), "Ferry La Escala")
+    await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
+
+    await waitFor(() => expect(createTravelDocument).toHaveBeenCalled())
+    expect(uploadTravelDocumentAttachment).not.toHaveBeenCalled()
   })
 
   it("shows an error when createTravelDocument fails", async () => {

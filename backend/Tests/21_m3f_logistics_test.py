@@ -166,6 +166,15 @@ class TestTravelDocumentCreate:
                         json={"name": "No type"})
         assert r.status_code == 422
 
+    def test_expiry_before_date_returns_422(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        r = client.post(
+            f"{TRAVEL_DOCUMENT_ENDPOINT}/{trip_id}/create",
+            headers=trip_with_user2_as_crew["leader_headers"],
+            json={"type": "insurance", "name": "Policy", "date": "2026-08-15", "expiryDate": "2026-07-01"},
+        )
+        assert r.status_code == 422
+
 
 class TestTravelDocumentUpdate:
 
@@ -198,6 +207,17 @@ class TestTravelDocumentUpdate:
                          headers=trip_with_user2_as_crew["crew_headers"],
                          json={"name": "Hacked"})
         assert r.status_code == 403
+
+    def test_expiry_before_date_returns_422(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
+                          date="2026-09-01")
+        r = client.patch(
+            f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
+            headers=trip_with_user2_as_crew["leader_headers"],
+            json={"expiryDate": "2026-08-01"},
+        )
+        assert r.status_code == 422
 
 
 class TestTravelDocumentDelete:

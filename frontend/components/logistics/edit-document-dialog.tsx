@@ -111,7 +111,7 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                 <FieldLabel>Date</FieldLabel>
                 <DatePicker
                   value={watch("date") ?? ""}
-                  onChange={(v) => setValue("date", v)}
+                  onChange={(v) => setValue("date", v, { shouldValidate: true })}
                   placeholder="Service date"
                   disabled={isPending}
                 />
@@ -120,10 +120,11 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                 <FieldLabel>Expiry date</FieldLabel>
                 <DatePicker
                   value={watch("expiryDate") ?? ""}
-                  onChange={(v) => setValue("expiryDate", v)}
+                  onChange={(v) => setValue("expiryDate", v, { shouldValidate: true })}
                   placeholder="Expiry date"
                   disabled={isPending}
                 />
+                {errors.expiryDate && <p className="text-xs text-destructive">{errors.expiryDate.message}</p>}
               </div>
             </div>
 

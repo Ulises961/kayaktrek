@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ExternalLinkIcon, PencilIcon, ReceiptIcon } from "lucide-react"
+import { DownloadIcon, ExternalLinkIcon, PaperclipIcon, PencilIcon, ReceiptIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddDocumentDialog } from "./add-document-dialog"
 import { EditDocumentDialog } from "./edit-document-dialog"
 import { DeleteDocumentButton } from "./delete-document-button"
-import { AttachmentActions } from "./attachment-actions"
+import { getTravelDocumentAttachmentUrl } from "@/lib/travel-documents/actions"
 import { TRAVEL_DOCUMENT_TYPES, type TravelDocument, type TravelDocumentType } from "@/lib/dtos/travel-document"
 
 interface TravelDocumentsSectionProps {
@@ -68,6 +68,27 @@ function StatusBadge({ status, expiryDate }: { status: DocStatus; expiryDate?: s
   )
 }
 
+// ── Attachment download link ─────────────────────────────────────────────────
+
+function AttachmentDownload({ documentId }: { documentId: string }) {
+  async function handleDownload() {
+    const result = await getTravelDocumentAttachmentUrl(documentId)
+    if (result.success) window.open(result.url, "_blank")
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <PaperclipIcon className="size-3" />
+      <DownloadIcon className="size-3" />
+      Download
+    </button>
+  )
+}
+
 // ── Document row ─────────────────────────────────────────────────────────────
 
 interface DocumentRowProps {
@@ -123,20 +144,17 @@ function DocumentRow({ doc, today, canEdit, onEdit, tripId }: DocumentRowProps) 
           )}
         </div>
 
-        {doc.url && (
-          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-0.5">
-            <ExternalLinkIcon className="size-3" />
-            Open booking
-          </a>
-        )}
-        {doc.id && (
-          <AttachmentActions
-            tripId={tripId}
-            documentId={doc.id}
-            attachmentPath={doc.attachmentPath ?? null}
-            canEdit={canEdit}
-          />
-        )}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+          {doc.url && (
+            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              <ExternalLinkIcon className="size-3" />
+              Open booking
+            </a>
+          )}
+          {doc.attachmentPath && doc.id && (
+            <AttachmentDownload documentId={doc.id} />
+          )}
+        </div>
       </div>
     </div>
   )

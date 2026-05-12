@@ -1,5 +1,5 @@
 import bleach
-from marshmallow import fields, post_load, validates, ValidationError
+from marshmallow import fields, post_load, validates, validates_schema, ValidationError
 
 from Models.travel_document import TravelDocument, TravelDocumentType
 from Schemas.base_schema import BaseSchema
@@ -22,6 +22,16 @@ class TravelDocumentSchema(BaseSchema):
     def validate_name(self, value, **kwargs):
         if not value or not value.strip():
             raise ValidationError("Name cannot be empty")
+
+    @validates_schema
+    def validate_date_order(self, data, **kwargs):
+        date = data.get("date")
+        expiry_date = data.get("expiry_date")
+        if date and expiry_date and expiry_date < date:
+            raise ValidationError(
+                "Expiry date must be on or after the document date.",
+                field_name="expiry_date",
+            )
 
     @post_load
     def sanitize_and_make(self, data, **kwargs):

@@ -64,7 +64,7 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <PencilIcon className="size-3.5" />
-          Edit Shore Contact
+          Edit contact
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg overflow-hidden p-0">

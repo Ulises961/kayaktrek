@@ -3,6 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 import logging
 
+from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
 from Api.database import db
@@ -100,6 +101,23 @@ class TravelDocumentService:
                 if field == "type" and value is not None:
                     value = TravelDocumentType(value)
                 setattr(doc, field, value)
+
+        def _as_date(v):
+            if v is None:
+                return None
+            if isinstance(v, date):
+                return v
+            try:
+                return date.fromisoformat(str(v))
+            except ValueError:
+                return None
+
+        d = _as_date(doc.date)
+        exp = _as_date(doc.expiry_date)
+        if d and exp and exp < d:
+            raise ValidationError(
+                {"expiry_date": ["Expiry date must be on or after the document date."]}
+            )
 
         db.session.commit()
         db.session.refresh(doc)
