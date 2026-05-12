@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
+import Link from "next/link"
 import { format } from "date-fns"
-import { AnchorIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
+import { AnchorIcon, ArrowLeftIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
@@ -176,10 +177,17 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
     <div className="flex flex-col gap-6 max-w-2xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="flex flex-col gap-1">
+          <Link
+            href={`/trips/${id}`}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors print:hidden w-fit"
+          >
+            <ArrowLeftIcon className="size-3" />
+            Back to trip
+          </Link>
           <h1 className="text-2xl font-bold tracking-tight">Float Plan</h1>
-          <p className="text-base font-medium mt-0.5">{trip.destination ?? "Unnamed expedition"}</p>
-          <p className="text-sm text-muted-foreground mt-0.5">{dateLabel}</p>
+          <p className="text-base font-medium">{trip.destination ?? "Unnamed expedition"}</p>
+          <p className="text-sm text-muted-foreground">{dateLabel}</p>
         </div>
         <PrintButton />
       </div>
