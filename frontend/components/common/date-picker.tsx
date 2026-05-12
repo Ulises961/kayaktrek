@@ -34,12 +34,12 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal",
+            "w-full justify-start text-left font-normal overflow-hidden",
             !selected && "text-muted-foreground"
           )}
         >
           <CalendarIcon className="mr-2 size-4 shrink-0" />
-          {selected ? format(selected, "d MMM yyyy") : placeholder}
+          <span className="truncate">{selected ? format(selected, "d MMM yyyy") : placeholder}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

@@ -33,7 +33,7 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm" disabled={isPending}>
+        <Button variant="destructive" size="sm" disabled={isPending} className="w-full sm:w-auto sm:self-start">
           Delete trip
         </Button>
       </AlertDialogTrigger>
