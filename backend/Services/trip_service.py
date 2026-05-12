@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Fields a client is permitted to change on an existing trip via PATCH.
 # state is excluded — transitions go through transition_trip_state() only.
-_MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to"}
+_MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to", "difficulty"}
 
 _INVITATION_TTL_DAYS = 7
 
