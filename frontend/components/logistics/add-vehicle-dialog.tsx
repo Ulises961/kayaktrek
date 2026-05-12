@@ -65,7 +65,7 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <PlusIcon className="size-3.5" />
           Add vehicle
         </Button>

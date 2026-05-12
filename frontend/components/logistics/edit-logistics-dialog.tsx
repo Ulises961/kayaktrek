@@ -24,7 +24,7 @@ function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.Re
   )
 }
 
-export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogProps) {
+export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -62,9 +62,9 @@ export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogPr
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <PencilIcon className="size-3.5" />
-          Edit logistics
+          Edit Shore Contact
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg overflow-hidden p-0">
@@ -74,16 +74,13 @@ export function EditLogisticsDialog({ tripId, logistics }: EditLogisticsDialogPr
           <DialogHeader className="mb-5">
             <DialogTitle className="flex items-center gap-2 text-base">
               <AnchorIcon className="size-4 text-[#d97706]" />
-              Edit logistics
+              Edit Shore Contact
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
             {/* Shore contact */}
             <div className="flex flex-col gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20 p-3">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
-                Shore contact
-              </span>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <FieldLabel htmlFor="shoreContactName">Shore contact name</FieldLabel>

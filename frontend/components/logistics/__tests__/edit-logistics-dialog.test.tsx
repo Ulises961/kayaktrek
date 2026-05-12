@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event"
 vi.mock("@/lib/logistics/actions", () => ({ upsertLogistics: vi.fn() }))
 
 import { upsertLogistics } from "@/lib/logistics/actions"
-import { EditLogisticsDialog } from "../edit-logistics-dialog"
+import { EditShoreContactDialog } from "../edit-logistics-dialog"
 import type { Logistics } from "@/lib/dtos/logistics"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -24,13 +24,13 @@ const LOGISTICS: Logistics = {
 beforeEach(() => vi.clearAllMocks())
 
 async function openDialog(logistics: Logistics | null = LOGISTICS) {
-  render(<EditLogisticsDialog tripId={TRIP_ID} logistics={logistics} />)
+  render(<EditShoreContactDialog tripId={TRIP_ID} logistics={logistics} />)
   await userEvent.click(screen.getByRole("button", { name: /edit logistics/i }))
 }
 
 describe("EditLogisticsDialog", () => {
   it("renders a trigger button", () => {
-    render(<EditLogisticsDialog tripId={TRIP_ID} logistics={null} />)
+    render(<EditShoreContactDialog tripId={TRIP_ID} logistics={null} />)
     expect(screen.getByRole("button", { name: /edit logistics/i })).toBeDefined()
   })
 

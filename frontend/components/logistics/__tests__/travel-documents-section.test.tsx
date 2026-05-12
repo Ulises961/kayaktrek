@@ -63,9 +63,9 @@ describe("TravelDocumentsSection", () => {
     expect(link).toBeDefined()
   })
 
-  it("shows an attachment indicator when attachmentPath is set", () => {
+  it("shows a download button when attachmentPath is set", () => {
     render(<TravelDocumentsSection documents={[makeDoc({ attachmentPath: "trips/abc/doc1/voucher.pdf" })]} today={TODAY} />)
-    expect(screen.getByText(/attachment/i)).toBeDefined()
+    expect(screen.getByText(/download/i)).toBeDefined()
   })
 
   it("groups documents by type — shows both type headings when both present", () => {

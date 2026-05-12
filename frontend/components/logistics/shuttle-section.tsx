@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { CarIcon, MapPinIcon, PencilIcon, UserIcon, UsersIcon } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { AddVehicleDialog } from "./add-vehicle-dialog"
@@ -60,7 +59,14 @@ interface VehicleCardProps {
 function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId, leaderId, alreadyAssigned, onEdit }: VehicleCardProps) {
   const memberById = Object.fromEntries(members.map((m) => [m.id, m]))
 
-  const driverMember = vehicle.driverId ? memberById[vehicle.driverId] : null
+  const arrangerMember = vehicle.arrangedById ? memberById[vehicle.arrangedById] : null
+
+  const driverMember = vehicle.driverId
+    ? memberById[vehicle.driverId]
+    : !vehicle.driverName
+      ? arrangerMember
+      : null
+
   const driverName = driverMember
     ? [driverMember.user.name, driverMember.user.surname].filter(Boolean).join(" ")
     : vehicle.driverName ?? null
@@ -71,8 +77,7 @@ function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId,
   }).filter(Boolean) as { id: string; name: string }[]
 
   const canManageVehicle = !!currentUserId && (
-    (memberById[vehicle.arrangedById ?? ""]?.user.id === currentUserId) ||
-    currentUserId === leaderId
+    arrangerMember?.user.id === currentUserId || currentUserId === leaderId
   )
 
   const isArranger = !!currentMemberId && vehicle.arrangedById === currentMemberId
@@ -81,72 +86,80 @@ function VehicleCard({ vehicle, members, tripId, currentUserId, currentMemberId,
     !!tripId && !!vehicle.id && (passengerId === currentMemberId || canManageVehicle)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CarIcon className="size-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">{vehicle.vehicleDescription ?? "Vehicle"}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {vehicle.pickupPoint && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
-              <MapPinIcon className="size-3" />
-              {vehicle.pickupPoint}
-            </span>
-          )}
-          {canManageVehicle && (
-            <>
-              <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={onEdit}>
-                <PencilIcon className="size-3.5" />
-              </Button>
-              {tripId && vehicle.id && (
-                <DeleteVehicleButton
-                  tripId={tripId}
-                  vehicleId={vehicle.id}
-                  vehicleDescription={vehicle.vehicleDescription}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
+    <div className="flex gap-3 py-2.5 first:pt-0 last:pb-0">
+      <div className="w-0.5 rounded-full shrink-0 self-stretch bg-muted-foreground/25" />
 
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground w-12 shrink-0">Driver</span>
-        {driverName ? (
-          <span className="text-sm">{driverName}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground/60 italic">No driver set</span>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <CapacityDots total={vehicle.seatsAvailable} filled={passengers.length} label="Seats" />
-        <CapacityDots total={vehicle.kayakSpots} filled={vehicle.kayakSpots ?? 0} label="Kayaks" />
-      </div>
-
-      {(passengers.length > 0 || canJoin) && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Passengers</span>
-          <div className="flex flex-wrap gap-1 items-center">
-            {passengers.map((p) => (
-              <span
-                key={p.id}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
-              >
-                <UserIcon className="size-2.5" />
-                {p.name}
-                {canRemovePassenger(p.id) && tripId && vehicle.id && (
-                  <RemovePassengerButton tripId={tripId} vehicleId={vehicle.id} memberId={p.id} />
-                )}
+      <div className="flex flex-col gap-2 min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CarIcon className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium">{vehicle.vehicleDescription ?? "Vehicle"}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {vehicle.pickupPoint && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
+                <MapPinIcon className="size-3" />
+                {vehicle.pickupPoint}
               </span>
-            ))}
-            {canJoin && tripId && vehicle.id && currentMemberId && (
-              <JoinVehicleButton tripId={tripId} vehicleId={vehicle.id} currentMemberId={currentMemberId} />
+            )}
+            {canManageVehicle && (
+              <>
+                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={onEdit}>
+                  <PencilIcon className="size-3.5" />
+                </Button>
+                {tripId && vehicle.id && (
+                  <DeleteVehicleButton
+                    tripId={tripId}
+                    vehicleId={vehicle.id}
+                    vehicleDescription={vehicle.vehicleDescription}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
-      )}
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground w-12 shrink-0">
+            Driver
+          </span>
+          {driverName ? (
+            <span className="text-sm">{driverName}</span>
+          ) : (
+            <span className="text-sm text-muted-foreground/60 italic">No driver set</span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <CapacityDots total={vehicle.seatsAvailable} filled={passengers.length} label="Seats" />
+          <CapacityDots total={vehicle.kayakSpots} filled={passengers.length} label="Kayaks" />
+        </div>
+
+        {(passengers.length > 0 || canJoin) && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Passengers
+            </span>
+            <div className="flex flex-wrap gap-1 items-center">
+              {passengers.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                >
+                  <UserIcon className="size-2.5" />
+                  {p.name}
+                  {canRemovePassenger(p.id) && tripId && vehicle.id && (
+                    <RemovePassengerButton tripId={tripId} vehicleId={vehicle.id} memberId={p.id} />
+                  )}
+                </span>
+              ))}
+              {canJoin && tripId && vehicle.id && currentMemberId && (
+                <JoinVehicleButton tripId={tripId} vehicleId={vehicle.id} currentMemberId={currentMemberId} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -158,85 +171,80 @@ export function ShuttleSection({ logistics, vehicles, members, tripId, currentUs
   const editingVehicle = vehicles.find((v) => v.id === editingVehicleId) ?? null
 
   const passengerMemberIds = new Set(vehicles.flatMap((v) => v.passengers.map((p) => p.tripMemberId)))
-  const unassigned = members.filter((m) => m.id && !passengerMemberIds.has(m.id))
+  const arrangerMemberIds = new Set(vehicles.map((v) => v.arrangedById).filter((id): id is string => !!id))
+  const unassigned = members.filter(
+    (m) => m.id && !passengerMemberIds.has(m.id) && !arrangerMemberIds.has(m.id)
+  )
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CarIcon className="size-4" />
-              Shuttle
-              {vehicles.length > 0 && (
-                <span className="text-muted-foreground font-normal">({vehicles.length} {vehicles.length === 1 ? "vehicle" : "vehicles"})</span>
-              )}
-            </CardTitle>
-            {isMember && tripId && <AddVehicleDialog tripId={tripId} members={members} />}
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {(logistics?.shuttleMeetingTime || logistics?.shuttleNotes) && (
-            <div className="flex flex-col gap-2">
-              {logistics.shuttleMeetingTime && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Meet at</span>
-                  <span className="text-sm font-medium tabular-nums">{logistics.shuttleMeetingTime}</span>
-                </div>
-              )}
-              {logistics.shuttleNotes && (
-                <p className="text-sm text-foreground/80 pl-3 border-l-2 border-border leading-relaxed">
-                  {logistics.shuttleNotes}
-                </p>
-              )}
+      {isMember && tripId && (
+        <div className="flex justify-end mb-3">
+          <AddVehicleDialog tripId={tripId} members={members} />
+        </div>
+      )}
+
+      {(logistics?.shuttleMeetingTime || logistics?.shuttleNotes) && (
+        <div className="flex flex-col gap-2 mb-3">
+          {logistics.shuttleMeetingTime && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Meet at
+              </span>
+              <span className="text-sm font-medium tabular-nums">{logistics.shuttleMeetingTime}</span>
             </div>
           )}
+          {logistics.shuttleNotes && (
+            <p className="text-sm text-foreground/80 pl-3 border-l-2 border-border leading-relaxed">
+              {logistics.shuttleNotes}
+            </p>
+          )}
+        </div>
+      )}
 
-          {vehicles.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No vehicles added yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {vehicles.map((v) => (
-                <VehicleCard
-                  key={v.id}
-                  vehicle={v}
-                  members={members}
-                  tripId={tripId}
-                  currentUserId={currentUserId}
-                  currentMemberId={currentMemberId}
-                  leaderId={leaderId}
-                  alreadyAssigned={passengerMemberIds}
-                  onEdit={() => setEditingVehicleId(v.id ?? null)}
-                />
+      {vehicles.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No vehicles added yet.</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {vehicles.map((v) => (
+            <VehicleCard
+              key={v.id}
+              vehicle={v}
+              members={members}
+              tripId={tripId}
+              currentUserId={currentUserId}
+              currentMemberId={currentMemberId}
+              leaderId={leaderId}
+              alreadyAssigned={passengerMemberIds}
+              onEdit={() => setEditingVehicleId(v.id ?? null)}
+            />
+          ))}
+        </div>
+      )}
+
+      {vehicles.length > 0 && unassigned.length > 0 && (
+        <>
+          <Separator className="my-3" />
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <UsersIcon className="size-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Not yet assigned ({unassigned.length})
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {unassigned.map((m) => (
+                <span
+                  key={m.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  {[m.user.name, m.user.surname].filter(Boolean).join(" ")}
+                </span>
               ))}
             </div>
-          )}
-
-          {vehicles.length > 0 && unassigned.length > 0 && (
-            <>
-              <Separator />
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <UsersIcon className="size-3.5 text-muted-foreground" />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Not yet assigned ({unassigned.length})
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {unassigned.map((m) => {
-                    const name = [m.user.name, m.user.surname].filter(Boolean).join(" ")
-                    return (
-                      <span key={m.id} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
-                        {name}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </>
+      )}
 
       {editingVehicle && tripId && (
         <EditVehicleDialog

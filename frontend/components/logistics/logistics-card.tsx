@@ -2,7 +2,7 @@
 
 import { AnchorIcon, CarIcon, PhoneIcon, ShieldAlertIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { EditLogisticsDialog } from "./edit-logistics-dialog"
+import { EditShoreContactDialog } from "./edit-logistics-dialog"
 import type { Logistics } from "@/lib/dtos/logistics"
 
 interface LogisticsCardProps {
@@ -38,7 +38,7 @@ export function LogisticsCard({ logistics, isLeader, tripId }: LogisticsCardProp
             Logistics
           </CardTitle>
           {isLeader && tripId && (
-            <EditLogisticsDialog tripId={tripId} logistics={logistics} />
+            <EditShoreContactDialog tripId={tripId} logistics={logistics} />
           )}
         </div>
       </CardHeader>

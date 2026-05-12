@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { FileIcon } from "lucide-react"
 import { updateTravelDocument } from "@/lib/travel-documents/actions"
 import { TravelDocumentFieldsSchema, TRAVEL_DOCUMENT_TYPES, type TravelDocumentFields, type TravelDocument } from "@/lib/dtos/travel-document"
+import { AttachmentActions } from "@/components/logistics/attachment-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -157,6 +158,18 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                 {...register("notes")}
               />
             </div>
+
+            {document.id && (
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel>Attachment</FieldLabel>
+                <AttachmentActions
+                  tripId={tripId}
+                  documentId={document.id}
+                  attachmentPath={document.attachmentPath ?? null}
+                  canEdit={true}
+                />
+              </div>
+            )}
 
             {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
 

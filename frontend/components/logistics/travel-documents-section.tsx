@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { ExternalLinkIcon, FileIcon, PaperclipIcon, PencilIcon, ReceiptIcon } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ExternalLinkIcon, PencilIcon, ReceiptIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddDocumentDialog } from "./add-document-dialog"
 import { EditDocumentDialog } from "./edit-document-dialog"
 import { DeleteDocumentButton } from "./delete-document-button"
+import { AttachmentActions } from "./attachment-actions"
 import { TRAVEL_DOCUMENT_TYPES, type TravelDocument, type TravelDocumentType } from "@/lib/dtos/travel-document"
 
 interface TravelDocumentsSectionProps {
@@ -75,7 +75,7 @@ interface DocumentRowProps {
   today: string
   canEdit: boolean
   onEdit: () => void
-  tripId?: string
+  tripId: string
 }
 
 function DocumentRow({ doc, today, canEdit, onEdit, tripId }: DocumentRowProps) {
@@ -123,20 +123,20 @@ function DocumentRow({ doc, today, canEdit, onEdit, tripId }: DocumentRowProps) 
           )}
         </div>
 
-        <div className="flex items-center gap-3 mt-0.5">
-          {doc.url && (
-            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-              <ExternalLinkIcon className="size-3" />
-              Open booking
-            </a>
-          )}
-          {doc.attachmentPath && (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <PaperclipIcon className="size-3" />
-              Attachment
-            </span>
-          )}
-        </div>
+        {doc.url && (
+          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-0.5">
+            <ExternalLinkIcon className="size-3" />
+            Open booking
+          </a>
+        )}
+        {doc.id && (
+          <AttachmentActions
+            tripId={tripId}
+            documentId={doc.id}
+            attachmentPath={doc.attachmentPath ?? null}
+            canEdit={canEdit}
+          />
+        )}
       </div>
     </div>
   )
@@ -155,46 +155,36 @@ export function TravelDocumentsSection({ documents, today, tripId, currentUserId
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileIcon className="size-4" />
-              Travel Documents
-              {documents.length > 0 && (
-                <span className="text-muted-foreground font-normal">({documents.length})</span>
-              )}
-            </CardTitle>
-            {isMember && tripId && <AddDocumentDialog tripId={tripId} />}
+      <div className="flex flex-col gap-0">
+        {isMember && tripId && (
+          <div className="flex justify-end mb-3">
+            <AddDocumentDialog tripId={tripId} />
           </div>
-        </CardHeader>
-        <CardContent>
-          {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No travel documents added yet — bookings, permits, and insurance go here.
-            </p>
-          ) : (
-            <div className="divide-y divide-border">
-              {TRAVEL_DOCUMENT_TYPES.filter((t) => documents.some((d) => d.type === t)).map((type) => (
-                <div key={type} className="py-2.5 first:pt-0 last:pb-0">
-                  {documents.filter((d) => d.type === type).map((doc) => (
-                    <DocumentRow
-                      key={doc.id}
-                      doc={doc}
-                      today={today}
-                      canEdit={canEdit(doc)}
-                      onEdit={() => setEditingDocId(doc.id ?? null)}
-                      tripId={tripId}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+        {documents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No travel documents added yet — bookings, permits, and insurance go here.
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {TRAVEL_DOCUMENT_TYPES.filter((t) => documents.some((d) => d.type === t)).map((type) => (
+              <div key={type} className="py-2.5 first:pt-0 last:pb-0">
+                {documents.filter((d) => d.type === type).map((doc) => (
+                  <DocumentRow
+                    key={doc.id}
+                    doc={doc}
+                    today={today}
+                    canEdit={canEdit(doc)}
+                    onEdit={() => setEditingDocId(doc.id ?? null)}
+                    tripId={tripId ?? ""}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Edit dialog — rendered outside the card to avoid z-index issues */}
       {editingDoc && tripId && (
         <EditDocumentDialog
           tripId={tripId}
