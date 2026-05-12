@@ -4,7 +4,7 @@ import { Fragment, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { CalendarIcon, PencilIcon, UsersIcon, XIcon } from "lucide-react"
+import { AnchorIcon, CalendarIcon, PencilIcon, UsersIcon, XIcon } from "lucide-react"
 import {
   TRIP_DIFFICULTIES,
   TRIP_STATES,
@@ -18,6 +18,7 @@ import { StateBadge } from "@/components/common/state-badge"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { DatePicker } from "@/components/common/date-picker"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -332,6 +333,20 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
                 </div>
               </>
             )}
+
+            {/* Float plan */}
+            <Separator />
+            <div className="flex flex-col gap-2">
+              <FieldLabel>Float plan</FieldLabel>
+              <div>
+                <Button variant="outline" size="sm" asChild className="w-full sm:w-auto sm:self-start">
+                  <Link href={`/trips/${trip.id}/float-plan`}>
+                    <AnchorIcon className="size-3.5" />
+                    View float plan
+                  </Link>
+                </Button>
+              </div>
+            </div>
 
             {/* Delete */}
             <Separator />
