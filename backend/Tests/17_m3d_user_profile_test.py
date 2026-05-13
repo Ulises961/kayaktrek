@@ -121,12 +121,13 @@ def test_grant_medical_consent_success(client, auth_headers):
 
 
 # =============================================================================
-# GET /api/user/me/medical-notes
+# POST /api/user/me/medical-notes
 # =============================================================================
 
 def test_get_medical_notes_requires_elevated_token(client, auth_headers):
-    response = client.get(
-        f"{USER_ENDPOINT}/me/medical-notes?password={_USER_PWD}",
+    response = client.post(
+        f"{USER_ENDPOINT}/me/medical-notes",
+        json={"password": _USER_PWD},
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -134,8 +135,15 @@ def test_get_medical_notes_requires_elevated_token(client, auth_headers):
 
 def test_get_medical_notes_success(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
-    response = client.get(
-        f"{USER_ENDPOINT}/me/medical-notes?password={_USER_PWD}",
+    client.post(
+        f"{USER_ENDPOINT}/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        headers=headers,
+    )
+    headers = _elevated_headers(client, auth_headers)
+    response = client.post(
+        f"{USER_ENDPOINT}/me/medical-notes",
+        json={"password": _USER_PWD},
         headers=headers,
     )
     assert response.status_code == 200
@@ -144,8 +152,9 @@ def test_get_medical_notes_success(client, auth_headers):
 
 def test_get_medical_notes_wrong_password(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
-    response = client.get(
-        f"{USER_ENDPOINT}/me/medical-notes?password=wrongPassword1$",
+    response = client.post(
+        f"{USER_ENDPOINT}/me/medical-notes",
+        json={"password": "wrongPassword1$"},
         headers=headers,
     )
     assert response.status_code in (400, 401)
