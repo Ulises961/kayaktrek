@@ -111,10 +111,11 @@ export async function getMedicalNotes(elevatedToken: string, password: string): 
     )
     return { success: true, notes: data.medicalNotes ?? null }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : ""
+    const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("400")) return { success: true, notes: null }
+    if (msg.includes("401")) return { success: false, error: "Could not decrypt notes — notes may have been saved with a different password." }
     if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
-    return { success: false, error: "Failed to load medical notes." }
+    return { success: false, error: `Failed to load medical notes (${msg}).` }
   }
 }
 

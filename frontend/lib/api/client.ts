@@ -37,7 +37,8 @@ export async function apiGet<T>(path: string, extraHeaders?: Record<string, stri
 }
 
 export async function apiPost<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<T> {
-  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body), headers: extraHeaders })
+  const retry = !extraHeaders
+  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body), headers: extraHeaders }, retry)
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
   return res.json() as Promise<T>
 }
@@ -56,7 +57,8 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiDelete(path: string, extraHeaders?: Record<string, string>): Promise<void> {
-  const res = await apiFetch(path, { method: "DELETE", headers: extraHeaders })
+  const retry = !extraHeaders
+  const res = await apiFetch(path, { method: "DELETE", headers: extraHeaders }, retry)
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 
