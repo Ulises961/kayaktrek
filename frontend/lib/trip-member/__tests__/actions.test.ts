@@ -4,11 +4,12 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
+  apiPost: vi.fn(),
 }))
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPatch } from "@/lib/api/client"
-import { getMyMembership, updateMyFloatPlan } from "../actions"
+import { apiGet, apiPatch, apiPost } from "@/lib/api/client"
+import { getMyMembership, updateMyFloatPlan, shareMedicalNotes } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 
@@ -95,5 +96,45 @@ describe("updateMyFloatPlan", () => {
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPatch).mockRejectedValue(new Error("403"))
     expect(await updateMyFloatPlan(TRIP_ID, FLOAT_PLAN_FIELDS)).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+const ELEVATED_TOKEN = "eyJ.elevated.token"
+const PASSWORD = "MyPass1!"
+
+describe("shareMedicalNotes", () => {
+  it("POSTs to the correct path with password in body and elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue({})
+    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith(
+      `/api/trip/${TRIP_ID}/member/me/medical-notes`,
+      { password: PASSWORD },
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("revalidates the edit page on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({})
+    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan/edit`)
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({})
+    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true })
+  })
+
+  it("returns a user-friendly error on 400 (no notes stored)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/trip/.../member/me/medical-notes failed: 400"))
+    const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(result).toEqual({ success: false, error: expect.stringContaining("profile") })
+  })
+
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST ... failed: 403"))
+    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 })

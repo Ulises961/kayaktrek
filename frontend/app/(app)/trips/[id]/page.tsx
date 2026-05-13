@@ -54,6 +54,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             today={today}
             isLeader={isLeader}
             isMember={isMember}
+            currentMember={currentMember}
             currentMemberId={currentMember?.id}
             currentUserId={session?.userId}
             leaderId={leader?.user.id}

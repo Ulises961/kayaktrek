@@ -12,6 +12,7 @@ import type { Trip } from "@/lib/dtos/trip"
 import type { Logistics } from "@/lib/dtos/logistics"
 import type { TravelDocument } from "@/lib/dtos/travel-document"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
+import type { TripMember } from "@/lib/dtos/trip-member"
 
 const TABS = ["crew", "logistics", "itinerary", "items"] as const
 type TabId = (typeof TABS)[number]
@@ -25,6 +26,7 @@ interface TripDetailTabsProps {
   today: string
   isLeader: boolean
   isMember: boolean
+  currentMember?: TripMember
   currentMemberId?: string
   currentUserId?: string
   leaderId?: string
@@ -39,6 +41,7 @@ export function TripDetailTabs({
   today,
   isLeader,
   isMember,
+  currentMember,
   currentMemberId,
   currentUserId,
   leaderId,
@@ -85,6 +88,7 @@ export function TripDetailTabs({
           trip={trip}
           isLeader={isLeader}
           leaderId={leaderId}
+          currentMember={currentMember}
         />
       </TabsContent>
 
