@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Any, Dict, cast
 from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -36,7 +37,20 @@ def get_trip(id: str):
     try:
         logger.info(f"Retrieving trip with id {id}")
         trip = TripService.get_trip_by_id(id)
-        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+        data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
+
+        current_user_id = str(g.current_user_id)
+        is_leader = any(
+            str(t.get("user", {}).get("id")) == current_user_id and t.get("role") == "leader"
+            for t in data.get("travellers", [])
+        )
+        if not is_leader:
+            for t in data.get("travellers", []):
+                if str(t.get("user", {}).get("id")) != current_user_id:
+                    t["medicalNotes"] = None
+                    t["medicalNotesConsentAt"] = None
+
+        return jsonify(data), HTTPStatus.OK
 
     except HTTPException:
         raise
@@ -297,7 +311,7 @@ def update_my_float_plan(id: str):
         raw = request.get_json()
         if not isinstance(raw, dict):
             abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
-        validated = TripMemberUpdateSchema().load(raw)
+        validated = cast(dict, TripMemberUpdateSchema().load(raw))
         membership = TripMemberService.update_my_float_plan(id, validated)
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except ValidationError as e:

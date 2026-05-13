@@ -111,12 +111,24 @@ class TripService:
         db.session.add(trip)
         db.session.flush()  # obtain trip.id before creating membership
 
-        # Add the creator as leader
+        # Add the creator as leader, snapshotting their profile vessel/emergency defaults
         if current_user:
+            prefill = {}
+            for field in (
+                "vessel_make", "vessel_model", "vessel_length_cm",
+                "vessel_color_primary", "vessel_color_secondary",
+                "emergency_contact_name", "emergency_contact_phone",
+                "emergency_contact_relationship",
+            ):
+                value = getattr(current_user, field, None)
+                if value is not None:
+                    prefill[field] = value
+
             membership = TripMemberSchema().load({
                 'user_id': current_user.id,
                 'trip_id': trip.id,
                 'role': MemberRoleType.LEADER.value,
+                **prefill,
             })
             db.session.add(membership)
         db.session.commit()
