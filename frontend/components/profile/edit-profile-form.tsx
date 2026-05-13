@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { AnchorIcon, ShieldAlertIcon, UserIcon, CameraIcon, Trash2Icon, HeartPulseIcon } from "lucide-react"
-import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
+import { AnchorIcon, ShieldAlertIcon, UserIcon, CameraIcon, Trash2Icon } from "lucide-react"
 
 interface EditProfileFormProps {
   user: User
@@ -234,15 +233,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
       </div>
     </form>
 
-    <Separator />
-
-    {/* Medical notes — separate from the main form; manages its own re-auth state */}
-    <div className="flex flex-col gap-4 max-w-lg">
-      <p className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-        <HeartPulseIcon className="size-4" /> Private health information
-      </p>
-      <MedicalNotesSection hasStoredNotes={!!user.medicalNotesConsentAt} />
-    </div>
     </>
   )
 }

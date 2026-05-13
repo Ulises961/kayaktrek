@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { LockIcon, LockOpenIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,10 +11,10 @@ interface MedicalNotesSectionProps {
   hasStoredNotes: boolean
 }
 
-type Phase = "locked" | "unlocked"
+type Phase = "idle" | "authenticating" | "editing"
 
 export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps) {
-  const [phase, setPhase] = useState<Phase>("locked")
+  const [phase, setPhase] = useState<Phase>("idle")
   const [password, setPassword] = useState("")
   const [elevatedToken, setElevatedToken] = useState<string | null>(null)
   const [notes, setNotes] = useState("")
@@ -24,7 +23,7 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
   const [savedOk, setSavedOk] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  function handleUnlock() {
+  function handleDecrypt() {
     setError(null)
     startTransition(async () => {
       const authResult = await reAuth(password)
@@ -35,7 +34,7 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
 
       setElevatedToken(authResult.elevatedToken)
       setNotes(notesResult.notes ?? "")
-      setPhase("unlocked")
+      setPhase("editing")
     })
   }
 
@@ -59,12 +58,12 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
       setNotes("")
       setElevatedToken(null)
       setPassword("")
-      setPhase("locked")
+      setPhase("idle")
     })
   }
 
-  function handleLock() {
-    setPhase("locked")
+  function handleDone() {
+    setPhase("idle")
     setElevatedToken(null)
     setPassword("")
     setNotes("")
@@ -72,16 +71,32 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
     setSavedOk(false)
   }
 
-  if (phase === "locked") {
+  function handleCancel() {
+    setPhase("idle")
+    setPassword("")
+    setError(null)
+  }
+
+  if (phase === "idle") {
+    return (
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          {hasNotes
+            ? "Notes stored — encrypted on your account."
+            : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
+        </p>
+        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setPhase("authenticating")}>
+          {hasNotes ? "Edit" : "Add notes"}
+        </Button>
+      </div>
+    )
+  }
+
+  if (phase === "authenticating") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-          <LockIcon className="size-4" /> Medical notes
-        </p>
-        <p className="text-xs text-muted-foreground -mt-2">
-          {hasNotes
-            ? "Notes are stored encrypted. Enter your password to view or edit them."
-            : "Store private medical information (allergies, medications, blood type) encrypted on your account. You can share it with trip leaders on a per-trip basis."}
+        <p className="text-sm text-muted-foreground">
+          Enter your password to decrypt your notes.
         </p>
         <div className="flex gap-2 items-end max-w-sm">
           <div className="flex-1 flex flex-col gap-1.5">
@@ -91,51 +106,47 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && password) handleUnlock() }}
+              onKeyDown={(e) => { if (e.key === "Enter" && password) handleDecrypt() }}
               disabled={isPending}
               autoComplete="current-password"
+              autoFocus
             />
           </div>
-          <Button type="button" onClick={handleUnlock} disabled={isPending || !password}>
-            {isPending ? "Unlocking…" : "Unlock"}
+          <Button type="button" onClick={handleDecrypt} disabled={isPending || !password}>
+            {isPending ? "Decrypting…" : "Continue"}
           </Button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
+        <button type="button" onClick={handleCancel} className="text-xs text-muted-foreground hover:text-foreground w-fit">
+          Cancel
+        </button>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-          <LockOpenIcon className="size-4" /> Medical notes
-          <span className="text-xs font-normal text-green-600 dark:text-green-400">unlocked</span>
-        </p>
-        <Button type="button" variant="ghost" size="sm" onClick={handleLock} disabled={isPending}>
-          Lock
-        </Button>
-      </div>
-
       <Textarea
         value={notes}
         onChange={(e) => { setNotes(e.target.value); setSavedOk(false) }}
         placeholder="Allergies, medications, blood type, conditions relevant to rescue crews…"
-        rows={4}
+        rows={5}
         disabled={isPending}
+        autoFocus
       />
-
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <Button type="button" onClick={handleSave} disabled={isPending || !notes.trim()}>
-          {isPending ? "Saving…" : "Save notes"}
+          {isPending ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" variant="outline" onClick={handleDone} disabled={isPending}>
+          Done
         </Button>
         {hasNotes && (
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={isPending}>
+          <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={handleDelete} disabled={isPending}>
             Delete notes
           </Button>
         )}
       </div>
-
       {error && <p className="text-xs text-destructive">{error}</p>}
       {savedOk && <p className="text-xs text-green-600 dark:text-green-400">Saved.</p>}
     </div>

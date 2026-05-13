@@ -9,12 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
+import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
 import {
   MailIcon,
   PhoneIcon,
   PencilIcon,
   AnchorIcon,
   ShieldAlertIcon,
+  HeartPulseIcon,
   RulerIcon,
   PaletteIcon,
   UserIcon,
@@ -44,6 +46,7 @@ export default async function ProfilePage() {
           surname={user.surname}
           imageUrl={user.avatarUrl}
           size="lg"
+          className="!size-16"
         />
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-semibold truncate">
@@ -184,6 +187,19 @@ export default async function ProfilePage() {
               — it will be included in your float plans.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Medical notes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <HeartPulseIcon className="size-4" />
+            Medical notes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MedicalNotesSection hasStoredNotes={!!user.medicalNotesConsentAt} />
         </CardContent>
       </Card>
 
