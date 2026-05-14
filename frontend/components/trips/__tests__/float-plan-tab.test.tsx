@@ -9,6 +9,8 @@ vi.mock("@/lib/trip-member/actions", () => ({
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
   getMedicalNotes: vi.fn(),
+  grantMedicalConsent: vi.fn(),
+  revokeMedicalConsent: vi.fn(),
 }))
 
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
@@ -36,7 +38,7 @@ const BASE_MEMBER: TripMember = {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe("FloatPlanTab", () => {
+describe("FloatPlanTab — viewing state", () => {
   it("shows amber banner when floatPlanConfirmedAt is null", () => {
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
     expect(screen.getByText(/review.*float plan/i)).toBeDefined()
@@ -48,21 +50,47 @@ describe("FloatPlanTab", () => {
     expect(screen.queryByText(/review.*float plan/i)).toBeNull()
   })
 
-  it("pre-fills vessel make from currentMember", () => {
+  it("shows vessel make and model in read-only view", () => {
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
-    const input = screen.getByLabelText(/make/i) as HTMLInputElement
-    expect(input.value).toBe("Wilderness Systems")
+    expect(screen.getByText("Wilderness Systems Tempest 170")).toBeDefined()
   })
 
-  it("pre-fills emergency contact name from currentMember", () => {
+  it("shows emergency contact name in read-only view", () => {
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
-    const input = screen.getByLabelText(/^name$/i) as HTMLInputElement
-    expect(input.value).toBe("Bob Smith")
+    expect(screen.getByText("Bob Smith")).toBeDefined()
   })
 
-  it("calls updateMyFloatPlan with tripId and form values on submit", async () => {
+  it("does not show form inputs by default", () => {
+    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    expect(screen.queryByLabelText(/make/i)).toBeNull()
+  })
+
+  it("shows an Edit button", () => {
+    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    expect(screen.getByRole("button", { name: /edit/i })).toBeDefined()
+  })
+})
+
+describe("FloatPlanTab — editing state", () => {
+  it("shows form inputs after clicking Edit", async () => {
+    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+    expect(screen.getByLabelText(/make/i)).toBeDefined()
+    expect((screen.getByLabelText(/make/i) as HTMLInputElement).value).toBe("Wilderness Systems")
+  })
+
+  it("returns to read-only on Cancel", async () => {
+    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
+    expect(screen.queryByLabelText(/make/i)).toBeNull()
+    expect(screen.getByText("Wilderness Systems Tempest 170")).toBeDefined()
+  })
+
+  it("calls updateMyFloatPlan and returns to read-only on Save", async () => {
     vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: true })
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
     await waitFor(() =>
       expect(updateMyFloatPlan).toHaveBeenCalledWith(
@@ -70,19 +98,15 @@ describe("FloatPlanTab", () => {
         expect.objectContaining({ vesselMake: "Wilderness Systems" })
       )
     )
+    await waitFor(() => expect(screen.queryByLabelText(/make/i)).toBeNull())
   })
 
-  it("shows saved confirmation after successful save", async () => {
-    vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: true })
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
-    await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
-    await waitFor(() => expect(screen.getByText(/saved/i)).toBeDefined())
-  })
-
-  it("shows error message when save fails", async () => {
+  it("shows error and stays in editing on save failure", async () => {
     vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: false, error: "Failed to update float plan." })
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
     await waitFor(() => expect(screen.getByText("Failed to update float plan.")).toBeDefined())
+    expect(screen.getByLabelText(/make/i)).toBeDefined()
   })
 })

@@ -5,8 +5,10 @@ import { AnchorIcon, ArrowLeftIcon, ShieldAlertIcon, UserIcon } from "lucide-rea
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
-import { LogisticsSchema, type Logistics } from "@/lib/dtos/logistics"
+import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { PrintButton } from "@/components/trips/print-button"
+import { CopyLinkButton } from "@/components/trips/copy-link-button"
+import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 function formatDate(iso: string | null | undefined) {
@@ -35,27 +37,6 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-muted-foreground w-36 shrink-0">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
-  )
-}
-
-function ShoreContactBlock({ logistics }: { logistics: Logistics | null }) {
-  const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } = logistics ?? {}
-  const hasAny = shoreContactName || shoreContactEmail || shoreContactPhone
-
-  return (
-    <section className="rounded-lg border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
-      <SectionHeading icon={<AnchorIcon className="size-3.5 text-[#d97706]" />}>Shore Contact</SectionHeading>
-      {hasAny ? (
-        <div className="flex flex-col gap-1.5">
-          <FieldRow label="Name" value={shoreContactName} />
-          <FieldRow label="Relationship" value={shoreContactRelationship} />
-          <FieldRow label="Phone" value={shoreContactPhone} />
-          <FieldRow label="Email" value={shoreContactEmail} />
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground italic">No shore contact recorded.</p>
-      )}
-    </section>
   )
 }
 
@@ -127,10 +108,14 @@ function MemberCard({ member }: { member: TripMember }) {
         </div>
       )}
 
-      {member.floatPlanConfirmedAt && (
+      {member.floatPlanConfirmedAt ? (
         <p className="text-[10px] text-muted-foreground">
           Float plan confirmed {formatDate(member.floatPlanConfirmedAt)}
         </p>
+      ) : (
+        <span className="self-start text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
+          Not confirmed
+        </span>
       )}
     </div>
   )
@@ -189,7 +174,10 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
           <p className="text-base font-medium">{trip.destination ?? "Unnamed expedition"}</p>
           <p className="text-sm text-muted-foreground">{dateLabel}</p>
         </div>
-        <PrintButton />
+        <div className="flex gap-2 print:hidden">
+          <CopyLinkButton />
+          <PrintButton />
+        </div>
       </div>
 
       <div className="rounded-md border border-border bg-muted/40 px-4 py-2 flex items-center gap-2 print:hidden">
@@ -205,7 +193,13 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
       </p>
 
       {/* Shore Contact */}
-      <ShoreContactBlock logistics={logistics} />
+      <section className="rounded-lg border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
+        <SectionHeading icon={<AnchorIcon className="size-3.5 text-[#d97706]" />}>Shore Contact</SectionHeading>
+        <p className="text-xs text-muted-foreground mb-3 -mt-1">
+          Person who receives this float plan before departure.
+        </p>
+        <ShoreContactForm tripId={id} logistics={logistics} />
+      </section>
 
       {/* Crew Manifest */}
       <section>
