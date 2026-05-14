@@ -88,7 +88,7 @@ describe("TripDetailTabs", () => {
   it("shows logistics content when logistics tab is active", async () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
     await userEvent.click(screen.getByRole("tab", { name: /logistics/i }))
-    expect(screen.getByText(/shore contact/i)).toBeDefined()
+    expect(screen.getByText(/travel documents/i)).toBeDefined()
   })
 
   it("replaces URL when a tab is clicked", async () => {

@@ -88,7 +88,6 @@ export function TripDetailTabs({
           trip={trip}
           isLeader={isLeader}
           leaderId={leaderId}
-          currentMember={currentMember}
         />
       </TabsContent>
 
