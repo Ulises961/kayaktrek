@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 
 export type TripActionResult = { success: true } | { success: false; error: string }
 export type CreateTripResult = { success: true; tripId: string } | { success: false; error: string }
@@ -20,6 +20,7 @@ export async function createTrip(fields: TripFields): Promise<CreateTripResult> 
     const trip = await apiPost<{ id: string }>("/api/trip/create", fields)
     return { success: true, tripId: trip.id }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to create trip." }
   }
 }
@@ -30,6 +31,7 @@ export async function updateTrip(tripId: string, fields: TripFields): Promise<Tr
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update trip." }
   }
 }
@@ -40,6 +42,7 @@ export async function advanceState(tripId: string, targetState: string): Promise
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to advance trip state." }
   }
 }
@@ -50,6 +53,7 @@ export async function removeMember(tripId: string, userId: string): Promise<Trip
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to remove member." }
   }
 }
@@ -58,6 +62,7 @@ export async function deleteTrip(tripId: string): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}`)
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete trip." }
   }
   redirect("/trips")
@@ -69,6 +74,7 @@ export async function inviteUser(tripId: string, userId: string): Promise<TripAc
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to send invitation." }
   }
 }
@@ -79,6 +85,7 @@ export async function cancelInvitation(tripId: string, inviteeId: string): Promi
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to cancel invitation." }
   }
 }
@@ -89,6 +96,7 @@ export async function handleInvitation(tripId: string, accepted: boolean): Promi
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to respond to invitation." }
   }
 }

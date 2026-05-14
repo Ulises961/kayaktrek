@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPatch, apiPost, apiDelete, isRedirectError } from "@/lib/api/client"
 import { TripMemberSchema } from "@/lib/dtos/trip-member"
 import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 
@@ -36,6 +36,7 @@ export async function updateMyFloatPlan(
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update float plan." }
   }
 }
@@ -53,6 +54,7 @@ export async function getTripMedicalNotes(
     )
     return { success: true, notes: data.medicalNotes ?? null }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("401")) return { success: false, error: "Could not decrypt notes — they may have been saved with a different password." }
     if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
@@ -74,6 +76,7 @@ export async function setTripMedicalNotes(
     )
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
     return { success: false, error: "Failed to save medical notes." }
@@ -88,6 +91,7 @@ export async function revokeTripMedicalNotes(
     await apiDelete(`/api/trip/${tripId}/member/me/medical-consent`, { "X-Elevated-Token": elevatedToken })
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
     return { success: false, error: "Failed to delete medical notes." }
@@ -108,6 +112,7 @@ export async function shareMedicalNotes(
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("400")) return { success: false, error: "Please save notes before sharing with the trip leader." }
     if (msg.includes("401")) return { success: false, error: "Could not decrypt notes — they may have been saved with a different password." }

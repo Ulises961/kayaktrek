@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPut } from "@/lib/api/client"
+import { apiGet, apiPut, isRedirectError } from "@/lib/api/client"
 import { LogisticsSchema, type Logistics, type LogisticsFields } from "@/lib/dtos/logistics"
 
 export type LogisticsActionResult = { success: true } | { success: false; error: string }
@@ -18,6 +18,7 @@ export async function upsertLogistics(tripId: string, fields: Partial<LogisticsF
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to save logistics." }
   }
 }
