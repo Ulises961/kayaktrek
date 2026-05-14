@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
+import { UserSchema } from "@/lib/dtos/user"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { TravelDocumentSchema } from "@/lib/dtos/travel-document"
 import { ShuttleVehicleSchema } from "@/lib/dtos/shuttle-vehicle"
@@ -23,20 +24,36 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   const session = await getSession()
   const today = new Date().toISOString().slice(0, 10)
 
-  const [logisticsResult, documentsResult, vehiclesResult] = await Promise.allSettled([
-    apiGet(`/api/logistics/${id}`).then((raw) => LogisticsSchema.parse(raw)).catch(() => null),
-    apiGet(`/api/travel-document/${id}/all`).then((raw) => (raw as unknown[]).map((d) => TravelDocumentSchema.parse(d))).catch(() => []),
-    apiGet(`/api/shuttle/${id}/all`).then((raw) => (raw as unknown[]).map((v) => ShuttleVehicleSchema.parse(v))).catch(() => []),
-  ])
-  const logistics       = logisticsResult.status === "fulfilled" ? logisticsResult.value : null
-  const travelDocuments = documentsResult.status === "fulfilled" ? documentsResult.value : []
-  const shuttleVehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : []
-
   const travellers = trip.travellers ?? []
   const leader = travellers.find((m) => m.role === "leader")
   const isLeader = !!session && !!leader && leader.user.id === session.userId
   const currentMember = session ? travellers.find((m) => m.user.id === session.userId) : undefined
   const isMember = !!currentMember
+
+  const [logisticsResult, documentsResult, vehiclesResult, profileResult] = await Promise.allSettled([
+    apiGet(`/api/logistics/${id}`).then((raw) => LogisticsSchema.parse(raw)).catch(() => null),
+    apiGet(`/api/travel-document/${id}/all`).then((raw) => (raw as unknown[]).map((d) => TravelDocumentSchema.parse(d))).catch(() => []),
+    apiGet(`/api/shuttle/${id}/all`).then((raw) => (raw as unknown[]).map((v) => ShuttleVehicleSchema.parse(v))).catch(() => []),
+    isMember ? apiGet("/api/user/me").then((raw) => UserSchema.parse(raw)).catch(() => null) : Promise.resolve(null),
+  ])
+  const logistics       = logisticsResult.status === "fulfilled" ? logisticsResult.value : null
+  const travelDocuments = documentsResult.status === "fulfilled" ? documentsResult.value : []
+  const shuttleVehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : []
+  const userProfile     = profileResult.status === "fulfilled" ? profileResult.value : null
+
+  // Merge TripMember snapshot with User profile fallback for float plan pre-fill.
+  // TripMember data always wins; profile fills gaps (e.g. profile updated after trip creation).
+  const mergedCurrentMember = currentMember && userProfile ? {
+    ...currentMember,
+    vesselMake:                    currentMember.vesselMake                    ?? userProfile.vesselMake,
+    vesselModel:                   currentMember.vesselModel                   ?? userProfile.vesselModel,
+    vesselLengthCm:                currentMember.vesselLengthCm                ?? userProfile.vesselLengthCm,
+    vesselColorPrimary:            currentMember.vesselColorPrimary            ?? userProfile.vesselColorPrimary,
+    vesselColorSecondary:          currentMember.vesselColorSecondary          ?? userProfile.vesselColorSecondary,
+    emergencyContactName:          currentMember.emergencyContactName          ?? userProfile.emergencyContactName,
+    emergencyContactPhone:         currentMember.emergencyContactPhone         ?? userProfile.emergencyContactPhone,
+    emergencyContactRelationship:  currentMember.emergencyContactRelationship  ?? userProfile.emergencyContactRelationship,
+  } : currentMember
 
   return (
     <div className="flex flex-col gap-4 max-w-2xl">
@@ -54,7 +71,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             today={today}
             isLeader={isLeader}
             isMember={isMember}
-            currentMember={currentMember}
+            currentMember={mergedCurrentMember}
             currentMemberId={currentMember?.id}
             currentUserId={session?.userId}
             leaderId={leader?.user.id}

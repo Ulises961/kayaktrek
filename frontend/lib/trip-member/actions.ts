@@ -50,7 +50,7 @@ export async function shareMedicalNotes(
       { password },
       { "X-Elevated-Token": elevatedToken }
     )
-    revalidatePath(`/trips/${tripId}/float-plan/edit`)
+    revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -113,10 +113,10 @@ describe("shareMedicalNotes", () => {
     )
   })
 
-  it("revalidates the edit page on success", async () => {
+  it("revalidates the trip page on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
     await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan/edit`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
   })
 
   it("returns success: true on success", async () => {

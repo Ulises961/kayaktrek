@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AnchorIcon, MapPinIcon, PackageIcon, UsersIcon } from "lucide-react"
+import { AnchorIcon, ClipboardListIcon, MapPinIcon, PackageIcon, UsersIcon } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { CrewTab } from "@/components/trips/tabs/crew-tab"
+import { FloatPlanTab } from "@/components/trips/tabs/float-plan-tab"
 import { LogisticsTab } from "@/components/trips/tabs/logistics-tab"
 import { ItineraryTab } from "@/components/trips/tabs/itinerary-tab"
 import { ItemsTab } from "@/components/trips/tabs/items-tab"
@@ -14,7 +15,7 @@ import type { TravelDocument } from "@/lib/dtos/travel-document"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
-const TABS = ["crew", "logistics", "itinerary", "items"] as const
+const TABS = ["crew", "float-plan", "logistics", "itinerary", "items"] as const
 type TabId = (typeof TABS)[number]
 
 interface TripDetailTabsProps {
@@ -68,6 +69,12 @@ export function TripDetailTabs({
           <UsersIcon className="size-3.5 mr-1.5" />
           Crew
         </TabsTrigger>
+        {currentMember && (
+          <TabsTrigger value="float-plan" variant="underline" className="whitespace-nowrap">
+            <ClipboardListIcon className="size-3.5 mr-1.5" />
+            Float plan
+          </TabsTrigger>
+        )}
         <TabsTrigger value="logistics" variant="underline" className="whitespace-nowrap">
           <AnchorIcon className="size-3.5 mr-1.5" />
           Logistics
@@ -90,6 +97,12 @@ export function TripDetailTabs({
           leaderId={leaderId}
         />
       </TabsContent>
+
+      {currentMember && (
+        <TabsContent value="float-plan" className="p-6 pt-5">
+          <FloatPlanTab tripId={tripId} currentMember={currentMember} />
+        </TabsContent>
+      )}
 
       <TabsContent value="logistics" className="p-6 pt-5">
         <LogisticsTab

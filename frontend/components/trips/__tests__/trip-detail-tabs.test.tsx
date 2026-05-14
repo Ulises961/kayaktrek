@@ -19,9 +19,18 @@ vi.mock("@/lib/shuttle/actions", () => ({
   addShuttlePassenger: vi.fn(),
   removeShuttlePassenger: vi.fn(),
 }))
+vi.mock("@/lib/trip-member/actions", () => ({
+  updateMyFloatPlan: vi.fn(),
+  shareMedicalNotes: vi.fn(),
+}))
+vi.mock("@/lib/profile/actions", () => ({
+  reAuth: vi.fn(),
+  getMedicalNotes: vi.fn(),
+}))
 
 import { TripDetailTabs } from "../trip-detail-tabs"
 import type { Trip } from "@/lib/dtos/trip"
+import type { TripMember } from "@/lib/dtos/trip-member"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 
@@ -59,13 +68,40 @@ const BASE_PROPS = {
 
 beforeEach(() => vi.clearAllMocks())
 
+const CURRENT_MEMBER: TripMember = {
+  id: "01952f1a-0000-7000-8000-000000000010",
+  role: "leader",
+  user: { id: "01952f1a-0000-7000-8000-000000000011", mail: "ana@example.com", username: "ana", name: "Ana", surname: "Font" },
+  vesselMake: null,
+  vesselModel: null,
+  vesselLengthCm: null,
+  vesselColorPrimary: null,
+  vesselColorSecondary: null,
+  emergencyContactName: null,
+  emergencyContactPhone: null,
+  emergencyContactRelationship: null,
+  medicalNotes: null,
+  medicalNotesConsentAt: null,
+  floatPlanConfirmedAt: "2026-05-01T10:00:00",
+}
+
 describe("TripDetailTabs", () => {
-  it("renders all four tab triggers", () => {
+  it("renders crew, logistics, itinerary, and items tab triggers", () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
     expect(screen.getByRole("tab", { name: /crew/i })).toBeDefined()
     expect(screen.getByRole("tab", { name: /logistics/i })).toBeDefined()
     expect(screen.getByRole("tab", { name: /itinerary/i })).toBeDefined()
     expect(screen.getByRole("tab", { name: /items/i })).toBeDefined()
+  })
+
+  it("shows float plan tab trigger when currentMember is provided", () => {
+    render(<TripDetailTabs {...BASE_PROPS} currentMember={CURRENT_MEMBER} />)
+    expect(screen.getByRole("tab", { name: /float plan/i })).toBeDefined()
+  })
+
+  it("does not show float plan tab trigger when currentMember is absent", () => {
+    render(<TripDetailTabs {...BASE_PROPS} currentMember={undefined} />)
+    expect(screen.queryByRole("tab", { name: /float plan/i })).toBeNull()
   })
 
   it("shows crew content by default", () => {
