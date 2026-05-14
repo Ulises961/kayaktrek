@@ -5,16 +5,17 @@ import userEvent from "@testing-library/user-event"
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
   getMedicalNotes: vi.fn(),
-  grantMedicalConsent: vi.fn(),
-  revokeMedicalConsent: vi.fn(),
 }))
 vi.mock("@/lib/trip-member/actions", () => ({
   updateMyFloatPlan: vi.fn(),
+  getTripMedicalNotes: vi.fn(),
+  setTripMedicalNotes: vi.fn(),
+  revokeTripMedicalNotes: vi.fn(),
   shareMedicalNotes: vi.fn(),
 }))
 
-import { reAuth, getMedicalNotes, grantMedicalConsent, revokeMedicalConsent } from "@/lib/profile/actions"
-import { shareMedicalNotes } from "@/lib/trip-member/actions"
+import { reAuth, getMedicalNotes } from "@/lib/profile/actions"
+import { getTripMedicalNotes, setTripMedicalNotes, revokeTripMedicalNotes, shareMedicalNotes } from "@/lib/trip-member/actions"
 import { FloatPlanMedicalTabSection } from "../float-plan-medical-tab-section"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -23,13 +24,25 @@ const PASSWORD = "MyPass1!"
 
 beforeEach(() => vi.clearAllMocks())
 
-async function openToEdit(hasStoredNotes = false) {
+// Helper: authenticate and reach the editing phase.
+// - hasStoredTripNotes: whether TripMember already has encrypted notes
+// - profileNotes: if truthy and no trip notes, the profile seed value
+async function openToEdit({
+  hasStoredTripNotes = false,
+  profileNotes = null as string | null,
+} = {}) {
   vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
+  vi.mocked(getTripMedicalNotes).mockResolvedValue({
+    success: true,
+    notes: hasStoredTripNotes ? "Allergic to penicillin" : null,
+  })
   vi.mocked(getMedicalNotes).mockResolvedValue({
     success: true,
-    notes: hasStoredNotes ? "Allergic to penicillin" : null,
+    notes: profileNotes,
   })
-  await userEvent.click(screen.getByRole("button", { name: hasStoredNotes ? /edit/i : /add notes/i }))
+
+  const btnName = hasStoredTripNotes ? /edit/i : /add notes/i
+  await userEvent.click(screen.getByRole("button", { name: btnName }))
   await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
   await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
@@ -85,63 +98,83 @@ describe("FloatPlanMedicalTabSection — authenticating state", () => {
   })
 })
 
-describe("FloatPlanMedicalTabSection — editing state", () => {
+describe("FloatPlanMedicalTabSection — editing state, note loading", () => {
+  it("pre-fills existing trip notes into the textarea", async () => {
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
+    await openToEdit({ hasStoredTripNotes: true })
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Allergic to penicillin")
+  })
+
+  it("seeds from profile notes when no trip notes exist", async () => {
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
+    await openToEdit({ hasStoredTripNotes: false, profileNotes: "Profile blood type O+" })
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Profile blood type O+")
+  })
+
+  it("shows empty textarea when no trip notes and no profile notes", async () => {
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
+    await openToEdit({ hasStoredTripNotes: false, profileNotes: null })
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("")
+  })
+})
+
+describe("FloatPlanMedicalTabSection — editing state, save / delete / share", () => {
   it("shows a Save button in the editing phase", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
-    await openToEdit(false)
+    await openToEdit()
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDefined()
   })
 
-  it("calls grantMedicalConsent with token, notes, and password on Save", async () => {
-    vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
+  it("calls setTripMedicalNotes with tripId, notes, token, and password on Save", async () => {
+    vi.mocked(setTripMedicalNotes).mockResolvedValue({ success: true })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
-    await openToEdit(false)
+    await openToEdit()
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() =>
-      expect(grantMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN, "Blood type A+", PASSWORD)
+      expect(setTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, "Blood type A+", ELEVATED_TOKEN, PASSWORD)
     )
   })
 
   it("shows saved confirmation after Save", async () => {
-    vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
+    vi.mocked(setTripMedicalNotes).mockResolvedValue({ success: true })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() => expect(screen.getByText(/saved/i)).toBeDefined())
   })
 
   it("shows Delete button when notes are already stored", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     expect(screen.getByRole("button", { name: /delete/i })).toBeDefined()
   })
 
   it("does not show Delete button when no notes are stored", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
-    await openToEdit(false)
+    await openToEdit({ hasStoredTripNotes: false })
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull()
   })
 
-  it("calls revokeMedicalConsent and returns to idle on Delete", async () => {
-    vi.mocked(revokeMedicalConsent).mockResolvedValue({ success: true })
+  it("calls revokeTripMedicalNotes and returns to idle on Delete", async () => {
+    vi.mocked(revokeTripMedicalNotes).mockResolvedValue({ success: true })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /delete/i }))
-    await waitFor(() => expect(revokeMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN))
+    await waitFor(() => expect(revokeTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN))
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
   })
 
   it("shows a Share with trip leader button", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     expect(screen.getByRole("button", { name: /share with.*leader/i })).toBeDefined()
   })
 
   it("calls shareMedicalNotes with tripId, token, and password when Share is clicked", async () => {
     vi.mocked(shareMedicalNotes).mockResolvedValue({ success: true })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /share with.*leader/i }))
     await waitFor(() =>
       expect(shareMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
@@ -151,7 +184,7 @@ describe("FloatPlanMedicalTabSection — editing state", () => {
   it("shows shared confirmation after successful share", async () => {
     vi.mocked(shareMedicalNotes).mockResolvedValue({ success: true })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /share with.*leader/i }))
     await waitFor(() => expect(screen.getByText(/shared with.*leader/i)).toBeDefined())
   })
@@ -159,7 +192,7 @@ describe("FloatPlanMedicalTabSection — editing state", () => {
   it("shows error when share fails", async () => {
     vi.mocked(shareMedicalNotes).mockResolvedValue({ success: false, error: "Session expired. Please try again." })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
-    await openToEdit(true)
+    await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /share with.*leader/i }))
     await waitFor(() => expect(screen.getByText("Session expired. Please try again.")).toBeDefined())
   })

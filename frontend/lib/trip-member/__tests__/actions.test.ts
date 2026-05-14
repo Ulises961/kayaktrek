@@ -5,11 +5,19 @@ vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
+  apiDelete: vi.fn(),
 }))
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPatch, apiPost } from "@/lib/api/client"
-import { getMyMembership, updateMyFloatPlan, shareMedicalNotes } from "../actions"
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api/client"
+import {
+  getMyMembership,
+  updateMyFloatPlan,
+  getTripMedicalNotes,
+  setTripMedicalNotes,
+  revokeTripMedicalNotes,
+  shareMedicalNotes,
+} from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 
@@ -34,6 +42,9 @@ const FLOAT_PLAN_FIELDS = {
   emergencyContactName: "Grace Hopper",
   emergencyContactPhone: "+34600000002",
 }
+
+const ELEVATED_TOKEN = "eyJ.elevated.token"
+const PASSWORD = "MyPass1!"
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -99,15 +110,90 @@ describe("updateMyFloatPlan", () => {
   })
 })
 
-const ELEVATED_TOKEN = "eyJ.elevated.token"
-const PASSWORD = "MyPass1!"
+describe("getTripMedicalNotes", () => {
+  it("POSTs to the correct path with password and elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin." })
+    await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith(
+      `/api/trip/${TRIP_ID}/member/me/medical-notes`,
+      { password: PASSWORD },
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns the notes string on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin." })
+    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(result).toEqual({ success: true, notes: "Allergic to penicillin." })
+  })
+
+  it("returns null notes when none are stored", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: null })
+    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    expect(result).toEqual({ success: true, notes: null })
+  })
+
+  it("returns success: false on 403 (token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("403"))
+    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({
+      success: false, error: expect.any(String),
+    })
+  })
+})
+
+describe("setTripMedicalNotes", () => {
+  it("POSTs to the correct path with notes, password and elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ hasTripMedicalNotes: true })
+    await setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith(
+      `/api/trip/${TRIP_ID}/member/me/medical-consent`,
+      { medicalNotes: "my notes", password: PASSWORD },
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ hasTripMedicalNotes: true })
+    expect(await setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true })
+  })
+
+  it("returns success: false on error", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("400"))
+    expect(await setTripMedicalNotes(TRIP_ID, "", ELEVATED_TOKEN, PASSWORD)).toEqual({
+      success: false, error: expect.any(String),
+    })
+  })
+})
+
+describe("revokeTripMedicalNotes", () => {
+  it("DELETEs the correct path with elevated header", async () => {
+    vi.mocked(apiDelete).mockResolvedValue({})
+    await revokeTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)
+    expect(apiDelete).toHaveBeenCalledWith(
+      `/api/trip/${TRIP_ID}/member/me/medical-consent`,
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiDelete).mockResolvedValue({})
+    expect(await revokeTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({ success: true })
+  })
+
+  it("returns success: false on error", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
+    expect(await revokeTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({
+      success: false, error: expect.any(String),
+    })
+  })
+})
 
 describe("shareMedicalNotes", () => {
-  it("POSTs to the correct path with password in body and elevated header", async () => {
+  it("POSTs to the share endpoint with password and elevated header", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
     await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
     expect(apiPost).toHaveBeenCalledWith(
-      `/api/trip/${TRIP_ID}/member/me/medical-notes`,
+      `/api/trip/${TRIP_ID}/member/me/share-medical-notes`,
       { password: PASSWORD },
       { "X-Elevated-Token": ELEVATED_TOKEN }
     )
@@ -124,17 +210,16 @@ describe("shareMedicalNotes", () => {
     expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true })
   })
 
-  it("returns a user-friendly error on 400 (no notes stored)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/trip/.../member/me/medical-notes failed: 400"))
+  it("returns a user-friendly error on 400 (no trip notes stored)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("400"))
     const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({ success: false, error: expect.stringContaining("profile") })
+    expect(result).toEqual({ success: false, error: expect.stringMatching(/save.*notes/i) })
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("POST ... failed: 403"))
+    vi.mocked(apiPost).mockRejectedValue(new Error("403"))
     expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({
-      success: false,
-      error: expect.any(String),
+      success: false, error: expect.any(String),
     })
   })
 })

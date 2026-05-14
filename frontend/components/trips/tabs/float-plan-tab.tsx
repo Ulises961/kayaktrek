@@ -210,7 +210,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
         </p>
         <FloatPlanMedicalTabSection
           tripId={tripId}
-          hasStoredNotes={!!currentMember.medicalNotes}
+          hasStoredNotes={!!currentMember.hasTripMedicalNotes}
           sharedAt={currentMember.medicalNotesConsentAt ?? null}
         />
       </div>

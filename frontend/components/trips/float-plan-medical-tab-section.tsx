@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { reAuth, getMedicalNotes, grantMedicalConsent, revokeMedicalConsent } from "@/lib/profile/actions"
-import { shareMedicalNotes } from "@/lib/trip-member/actions"
+import { reAuth, getMedicalNotes } from "@/lib/profile/actions"
+import { getTripMedicalNotes, setTripMedicalNotes, revokeTripMedicalNotes, shareMedicalNotes } from "@/lib/trip-member/actions"
 
 interface FloatPlanMedicalTabSectionProps {
   tripId: string
@@ -39,11 +39,22 @@ export function FloatPlanMedicalTabSection({
       const authResult = await reAuth(password)
       if (!authResult.success) { setError(authResult.error); return }
 
-      const notesResult = await getMedicalNotes(authResult.elevatedToken, password)
-      if (!notesResult.success) { setError(notesResult.error); return }
+      const token = authResult.elevatedToken
 
-      setElevatedToken(authResult.elevatedToken)
-      setNotes(notesResult.notes ?? "")
+      // Try trip-level notes first; fall back to profile seed if none stored
+      const tripResult = await getTripMedicalNotes(tripId, token, password)
+      if (!tripResult.success) { setError(tripResult.error); return }
+
+      let initialNotes = tripResult.notes ?? ""
+      if (!initialNotes) {
+        const profileResult = await getMedicalNotes(token, password)
+        if (profileResult.success) {
+          initialNotes = profileResult.notes ?? ""
+        }
+      }
+
+      setElevatedToken(token)
+      setNotes(initialNotes)
       setPhase("editing")
     })
   }
@@ -52,7 +63,7 @@ export function FloatPlanMedicalTabSection({
     setError(null)
     setSavedOk(false)
     startTransition(async () => {
-      const result = await grantMedicalConsent(elevatedToken!, notes, password)
+      const result = await setTripMedicalNotes(tripId, notes, elevatedToken!, password)
       if (!result.success) { setError(result.error); return }
       setHasNotes(true)
       setSavedOk(true)
@@ -62,7 +73,7 @@ export function FloatPlanMedicalTabSection({
   function handleDelete() {
     setError(null)
     startTransition(async () => {
-      const result = await revokeMedicalConsent(elevatedToken!)
+      const result = await revokeTripMedicalNotes(tripId, elevatedToken!)
       if (!result.success) { setError(result.error); return }
       setHasNotes(false)
       setIsShared(false)
@@ -106,7 +117,7 @@ export function FloatPlanMedicalTabSection({
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
             {hasNotes
-              ? "Notes stored — encrypted on your account."
+              ? "Notes stored — encrypted for this trip."
               : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
           </p>
           <Button
