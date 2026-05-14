@@ -30,15 +30,22 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
   return res
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const res = await apiFetch(path)
+export async function apiGet<T>(path: string, extraHeaders?: Record<string, string>): Promise<T> {
+  const res = await apiFetch(path, { headers: extraHeaders })
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
   return res.json() as Promise<T>
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body) })
+export async function apiPost<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+  const retry = !extraHeaders
+  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body), headers: extraHeaders }, retry)
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  return res.json() as Promise<T>
+}
+
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const res = await apiFetch(path, { method: "PUT", body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
   return res.json() as Promise<T>
 }
 
@@ -49,8 +56,9 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function apiDelete(path: string): Promise<void> {
-  const res = await apiFetch(path, { method: "DELETE" })
+export async function apiDelete(path: string, extraHeaders?: Record<string, string>): Promise<void> {
+  const retry = !extraHeaders
+  const res = await apiFetch(path, { method: "DELETE", headers: extraHeaders }, retry)
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 

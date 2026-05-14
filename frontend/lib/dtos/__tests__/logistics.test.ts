@@ -1,0 +1,66 @@
+import { describe, it, expect } from "vitest"
+import { LogisticsSchema, LogisticsFieldsSchema } from "../logistics"
+
+const VALID_LOGISTICS = {
+  id: "01952f1a-0000-7000-8000-000000000001",
+  tripId: "01952f1a-0000-7000-8000-000000000002",
+  shoreContactName: "Maria García",
+  shoreContactEmail: "maria@example.com",
+  shoreContactPhone: "+34600000000",
+  shoreContactRelationship: "Partner",
+  shuttleNotes: "Meet at the trailhead after landing",
+  shuttleMeetingTime: "17:00",
+}
+
+describe("LogisticsSchema", () => {
+  it("parses a fully populated logistics object", () => {
+    const result = LogisticsSchema.safeParse(VALID_LOGISTICS)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.shoreContactName).toBe("Maria García")
+    }
+  })
+
+  it("accepts an empty object (logistics not yet created)", () => {
+    const result = LogisticsSchema.safeParse({})
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts null for all nullable fields", () => {
+    const result = LogisticsSchema.safeParse({
+      ...VALID_LOGISTICS,
+      shoreContactName: null,
+      shoreContactEmail: null,
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe("LogisticsFieldsSchema", () => {
+  it("accepts valid leader fields", () => {
+    const result = LogisticsFieldsSchema.safeParse({
+      shoreContactName: "Maria",
+      shoreContactEmail: "maria@example.com",
+      shoreContactPhone: "+34600000000",
+      shoreContactRelationship: "Partner",
+      shuttleNotes: "Meet at 17:00",
+      shuttleMeetingTime: "17:00",
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts an empty object (all fields optional)", () => {
+    const result = LogisticsFieldsSchema.safeParse({})
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an invalid email for shore contact", () => {
+    const result = LogisticsFieldsSchema.safeParse({ shoreContactEmail: "not-an-email" })
+    expect(result.success).toBe(false)
+  })
+
+  it("allows empty string for shoreContactEmail (field cleared)", () => {
+    const result = LogisticsFieldsSchema.safeParse({ shoreContactEmail: "" })
+    expect(result.success).toBe(true)
+  })
+})

@@ -41,10 +41,14 @@ class TripMember(BaseModel):
     emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     emergency_contact_relationship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    # Populated when user confirms float plan: server decrypts User.medical_notes in memory
-    # (using re-auth password) and stores plaintext here under server-side AES-GCM.
-    # User explicitly acknowledges sharing with the trip leader at confirmation time.
-    # Nulled cascade when user revokes medical consent on their User record.
+    # Per-trip encrypted medical notes — independent copy, not derived from User profile at read time.
+    # User authenticates with their password to read or edit these; they are stored AES-GCM encrypted.
+    medical_notes_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    medical_notes_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    # Leader-visible plaintext copy — written only when member explicitly shares (share-medical-notes endpoint).
+    # Nulled when member revokes trip-level medical consent.
     medical_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     medical_notes_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

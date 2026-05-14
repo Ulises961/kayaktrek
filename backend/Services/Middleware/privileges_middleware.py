@@ -26,6 +26,9 @@ from Models.point import Point
 from Models.log import Log
 from Models.image import Image
 from Models.trip_member import TripMember, MemberRoleType
+from Models.travel_document import TravelDocument
+from Models.shuttle_vehicle import ShuttleVehicle
+from Models.logistics import Logistics
 from Models.user_has_inventory import user_has_inventory
 from Services.day_service import DayService
 from Services.itinerary_service import ItineraryService
@@ -256,6 +259,12 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
         elif resource_type == "image":
             return _check_image_ownership(g.current_user_id, str(resource_id))
 
+        elif resource_type == "travel_document":
+            return _check_travel_document_access(g.current_user_id, str(resource_id))
+
+        elif resource_type == "shuttle_vehicle":
+            return _check_shuttle_vehicle_access(g.current_user_id, str(resource_id))
+
         else:
             logger.error(f"Unknown resource type: {resource_type}")
             return False
@@ -480,3 +489,25 @@ def _check_image_ownership(user_id: str, image_id: str) -> Optional[bool]:
             return True
 
     return False
+
+
+def _check_travel_document_access(user_id: str, document_id: str) -> Optional[bool]:
+    doc = db.session.query(TravelDocument).filter_by(id=UUID(document_id)).first()
+    if not doc:
+        return None
+    return (
+        db.session.query(TripMember)
+        .filter_by(user_id=UUID(user_id), trip_id=doc.trip_id)
+        .first()
+    ) is not None
+
+
+def _check_shuttle_vehicle_access(user_id: str, vehicle_id: str) -> Optional[bool]:
+    vehicle = db.session.query(ShuttleVehicle).filter_by(id=UUID(vehicle_id)).first()
+    if not vehicle:
+        return None
+    return (
+        db.session.query(TripMember)
+        .filter_by(user_id=UUID(user_id), trip_id=vehicle.trip_id)
+        .first()
+    ) is not None

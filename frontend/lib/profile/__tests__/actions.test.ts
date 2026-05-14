@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }))
 vi.mock("@/lib/api/client", () => ({
+  apiGet: vi.fn(),
   apiPatch: vi.fn(),
   apiDelete: vi.fn(),
   apiPost: vi.fn(),
@@ -12,7 +13,7 @@ vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import {
   updateProfile,
@@ -21,6 +22,10 @@ import {
   changePassword,
   requestDataExport,
   requestAccountDeletion,
+  reAuth,
+  getMedicalNotes,
+  grantMedicalConsent,
+  revokeMedicalConsent,
 } from "../actions"
 
 const USER_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -203,5 +208,111 @@ describe("requestAccountDeletion", () => {
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("404"))
     expect(await requestAccountDeletion()).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+const ELEVATED_TOKEN = "eyJ.elevated.token"
+const PASSWORD = "MyPass1!"
+
+describe("reAuth", () => {
+  it("posts to /api/user/me/re-auth with the password", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ elevatedToken: ELEVATED_TOKEN })
+    await reAuth(PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith("/api/user/me/re-auth", { password: PASSWORD })
+  })
+
+  it("returns success: true with the elevated token", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ elevatedToken: ELEVATED_TOKEN })
+    expect(await reAuth(PASSWORD)).toEqual({ success: true, elevatedToken: ELEVATED_TOKEN })
+  })
+
+  it("returns a user-friendly error on 401", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/re-auth failed: 401"))
+    expect(await reAuth(PASSWORD)).toEqual({ success: false, error: "Password incorrect." })
+  })
+
+  it("returns a generic error on other failures", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
+    expect(await reAuth(PASSWORD)).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("getMedicalNotes", () => {
+  it("POSTs to /api/user/me/medical-notes with password in body and elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin" })
+    await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith(
+      "/api/user/me/medical-notes",
+      { password: PASSWORD },
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns success: true with notes on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin" })
+    expect(await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)).toEqual({
+      success: true,
+      notes: "Allergic to penicillin",
+    })
+  })
+
+  it("returns success: true with null notes on 400 (no notes stored yet)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-notes failed: 400"))
+    expect(await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true, notes: null })
+  })
+
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-notes failed: 403"))
+    const result = await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("grantMedicalConsent", () => {
+  it("POSTs to /api/user/me/medical-consent with elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ id: USER_ID, mail: "ada@example.com", username: "ada", name: "Ada" })
+    await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith(
+      "/api/user/me/medical-consent",
+      { medicalNotes: "notes", password: PASSWORD },
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ id: USER_ID, mail: "ada@example.com", username: "ada", name: "Ada" })
+    expect(await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)).toEqual({ success: true })
+  })
+
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-consent failed: 403"))
+    expect(await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+})
+
+describe("revokeMedicalConsent", () => {
+  it("sends DELETE to /api/user/me/medical-consent with elevated header", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await revokeMedicalConsent(ELEVATED_TOKEN)
+    expect(apiDelete).toHaveBeenCalledWith(
+      "/api/user/me/medical-consent",
+      { "X-Elevated-Token": ELEVATED_TOKEN }
+    )
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    expect(await revokeMedicalConsent(ELEVATED_TOKEN)).toEqual({ success: true })
+  })
+
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("DELETE /api/user/me/medical-consent failed: 403"))
+    expect(await revokeMedicalConsent(ELEVATED_TOKEN)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 })

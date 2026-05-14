@@ -80,6 +80,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
   }
 
   return (
+    <>
     <form onSubmit={onSubmit} className="flex flex-col gap-8 max-w-lg">
 
       {/* Avatar */}
@@ -231,5 +232,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
         </Button>
       </div>
     </form>
+
+    </>
   )
 }

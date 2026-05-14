@@ -31,13 +31,6 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>
-                        Actions
-                    </SidebarGroupLabel>
-                    <SidebarGroupAction>
-                        <Plus />
-                    </SidebarGroupAction>
-
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <NavigationItems />

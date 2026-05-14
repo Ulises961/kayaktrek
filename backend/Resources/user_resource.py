@@ -226,12 +226,12 @@ def revoke_medical_consent():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@user_api.route("/me/medical-notes", methods=["GET"])
+@user_api.route("/me/medical-notes", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_medical_notes():
     try:
-        password = request.args.get("password") or (request.get_json() or {}).get("password")
+        password = (request.get_json() or {}).get("password")
         if not password:
             abort(HTTPStatus.BAD_REQUEST, description="password is required")
         plaintext = UserService.get_medical_notes(str(g.current_user_id), password)

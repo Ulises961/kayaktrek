@@ -46,7 +46,7 @@ export function AdvanceStateButton({ tripId, currentState }: AdvanceStateButtonP
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isPending}>
+        <Button variant="outline" size="sm" disabled={isPending} className="w-full sm:w-auto sm:self-start">
           {next.label}
         </Button>
       </AlertDialogTrigger>

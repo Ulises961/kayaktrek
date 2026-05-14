@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class UserCertification(BaseModel):
     __tablename__ = "user_certifications"
 
-    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     organization: Mapped[str] = mapped_column(String(100), nullable=False)
     award: Mapped[str] = mapped_column(String(200), nullable=False)
     membership_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

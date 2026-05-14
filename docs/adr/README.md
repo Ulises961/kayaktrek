@@ -28,3 +28,5 @@ New decisions go in a new numbered file. Existing ADRs are not edited to reflect
 | [015](015-offline-first-mobile.md) | Offline-first mobile — sync protocol, conflict resolution, and map SDK | proposed |
 | [016](016-self-hosted-architecture.md) | Self-hosted architecture — own the stack, update management, redundancy | accepted |
 | [017](017-external-gps-device-integration.md) | External GPS device integration — Bluetooth and satellite communicator feeds | proposed |
+| [018](018-float-plan-model.md) | Float plan — aggregate HTML view, consent-gated medical visibility | accepted |
+| [019](019-trip-collaboration-model.md) | Trip collaboration model — leader authority vs crew contribution | accepted |

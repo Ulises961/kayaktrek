@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Any, Dict, cast
 from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -36,7 +37,20 @@ def get_trip(id: str):
     try:
         logger.info(f"Retrieving trip with id {id}")
         trip = TripService.get_trip_by_id(id)
-        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+        data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
+
+        current_user_id = str(g.current_user_id)
+        is_leader = any(
+            str(t.get("user", {}).get("id")) == current_user_id and t.get("role") == "leader"
+            for t in data.get("travellers", [])
+        )
+        if not is_leader:
+            for t in data.get("travellers", []):
+                if str(t.get("user", {}).get("id")) != current_user_id:
+                    t["medicalNotes"] = None
+                    t["medicalNotesConsentAt"] = None
+
+        return jsonify(data), HTTPStatus.OK
 
     except HTTPException:
         raise
@@ -297,7 +311,7 @@ def update_my_float_plan(id: str):
         raw = request.get_json()
         if not isinstance(raw, dict):
             abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
-        validated = TripMemberUpdateSchema().load(raw)
+        validated = cast(dict, TripMemberUpdateSchema().load(raw))
         membership = TripMemberService.update_my_float_plan(id, validated)
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except ValidationError as e:
@@ -309,6 +323,55 @@ def update_my_float_plan(id: str):
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def get_trip_medical_notes(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        plaintext = TripMemberService.get_trip_medical_notes(id, raw["password"])
+        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+    except InvalidTag:
+        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-consent", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def set_trip_medical_notes(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw or "medicalNotes" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="medicalNotes and password are required")
+        membership = TripMemberService.set_trip_medical_notes(id, raw["medicalNotes"], raw["password"])
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-consent", methods=["DELETE"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def revoke_trip_medical_notes(id: str):
+    try:
+        membership = TripMemberService.revoke_trip_medical_notes(id)
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def share_medical_notes(id: str):

@@ -14,6 +14,8 @@ from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.user import User
+from Models.travel_document import TravelDocument
+from Models.shuttle_vehicle import ShuttleVehicle
 from Schemas.trip_member_schema import TripMemberSchema
 from Schemas.trip_schema import TripSchema
 from Api.database import db
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Fields a client is permitted to change on an existing trip via PATCH.
 # state is excluded — transitions go through transition_trip_state() only.
-_MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to"}
+_MUTABLE_FIELDS = {"destination", "description", "date_from", "date_to", "difficulty"}
 
 _INVITATION_TTL_DAYS = 7
 
@@ -109,12 +111,24 @@ class TripService:
         db.session.add(trip)
         db.session.flush()  # obtain trip.id before creating membership
 
-        # Add the creator as leader
+        # Add the creator as leader, snapshotting their profile vessel/emergency defaults
         if current_user:
+            prefill = {}
+            for field in (
+                "vessel_make", "vessel_model", "vessel_length_cm",
+                "vessel_color_primary", "vessel_color_secondary",
+                "emergency_contact_name", "emergency_contact_phone",
+                "emergency_contact_relationship",
+            ):
+                value = getattr(current_user, field, None)
+                if value is not None:
+                    prefill[field] = value
+
             membership = TripMemberSchema().load({
                 'user_id': current_user.id,
                 'trip_id': trip.id,
                 'role': MemberRoleType.LEADER.value,
+                **prefill,
             })
             db.session.add(membership)
         db.session.commit()
@@ -365,9 +379,24 @@ class TripService:
         if membership.role == MemberRoleType.LEADER:
             raise ValueError("Cannot remove the trip leader")
 
+        leader = db.session.query(TripMember).filter_by(
+            trip_id=UUID(trip_id), role=MemberRoleType.LEADER
+        ).first()
+        if leader:
+            db.session.query(TravelDocument).filter_by(
+                trip_id=UUID(trip_id), owner_id=UUID(user_id)
+            ).update({"owner_id": leader.user_id})
+            # Transfer vehicle arrangement; if they were driver_id, set to null.
+            db.session.query(ShuttleVehicle).filter_by(
+                trip_id=UUID(trip_id), arranged_by_id=membership.id
+            ).update({"arranged_by_id": leader.id})
+            db.session.query(ShuttleVehicle).filter_by(
+                trip_id=UUID(trip_id), driver_id=membership.id
+            ).update({"driver_id": None})
+
         db.session.delete(membership)
         db.session.commit()
-        logger.info(f"Removed user {user_id} from trip {trip_id}")
+        logger.info("member_removed", extra={"trip_id": trip_id, "user_id": user_id})
 
     @staticmethod
     def transition_trip_state(trip_id: str, new_state_value: str) -> Trip:

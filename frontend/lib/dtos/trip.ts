@@ -38,6 +38,7 @@ export const TripFieldsSchema = z
     description: z.string().max(2000, "Description must be at most 2000 characters.").refine(noHtmlTags.check, noHtmlTags.message).optional(),
     dateFrom: isoDateField,
     dateTo: isoDateField,
+    difficulty: z.enum(TRIP_DIFFICULTIES).nullish(),
   })
   .refine(
     (d) => {

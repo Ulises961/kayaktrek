@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
-import { apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import type { ProfileFormValues } from "@/lib/dtos/user"
 
@@ -85,5 +85,64 @@ export async function requestAccountDeletion(): Promise<ProfileActionResult> {
     return { success: true }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to request account deletion." }
+  }
+}
+
+export type ReAuthResult = { success: true; elevatedToken: string } | { success: false; error: string }
+export type MedicalNotesResult = { success: true; notes: string | null } | { success: false; error: string }
+
+export async function reAuth(password: string): Promise<ReAuthResult> {
+  try {
+    const data = await apiPost<{ elevatedToken: string }>("/api/user/me/re-auth", { password })
+    return { success: true, elevatedToken: data.elevatedToken }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("401")) return { success: false, error: "Password incorrect." }
+    return { success: false, error: "Re-authentication failed." }
+  }
+}
+
+export async function getMedicalNotes(elevatedToken: string, password: string): Promise<MedicalNotesResult> {
+  try {
+    const data = await apiPost<{ medicalNotes: string | null }>(
+      "/api/user/me/medical-notes",
+      { password },
+      { "X-Elevated-Token": elevatedToken }
+    )
+    return { success: true, notes: data.medicalNotes ?? null }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes("400")) return { success: true, notes: null }
+    if (msg.includes("401")) return { success: false, error: "Could not decrypt notes — notes may have been saved with a different password." }
+    if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
+    return { success: false, error: `Failed to load medical notes (${msg}).` }
+  }
+}
+
+export async function grantMedicalConsent(
+  elevatedToken: string,
+  medicalNotes: string,
+  password: string
+): Promise<ProfileActionResult> {
+  try {
+    await apiPost("/api/user/me/medical-consent", { medicalNotes, password }, { "X-Elevated-Token": elevatedToken })
+    revalidatePath("/profile")
+    return { success: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
+    return { success: false, error: "Failed to save medical notes." }
+  }
+}
+
+export async function revokeMedicalConsent(elevatedToken: string): Promise<ProfileActionResult> {
+  try {
+    await apiDelete("/api/user/me/medical-consent", { "X-Elevated-Token": elevatedToken })
+    revalidatePath("/profile")
+    return { success: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
+    return { success: false, error: "Failed to revoke medical consent." }
   }
 }

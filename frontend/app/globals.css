@@ -412,3 +412,14 @@
     --sidebar-width-icon: 4rem !important;
   }
 }
+
+@media print {
+  [data-sidebar="sidebar"],
+  [data-slot="sidebar-gap"],
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}
