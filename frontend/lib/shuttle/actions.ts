@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { ShuttleVehicleSchema, type ShuttleVehicle, type ShuttleVehicleFields } from "@/lib/dtos/shuttle-vehicle"
 
 export type ShuttleActionResult = { success: true } | { success: false; error: string }
@@ -17,6 +17,7 @@ export async function createShuttleVehicle(tripId: string, fields: Partial<Shutt
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to create vehicle." }
   }
 }
@@ -27,6 +28,7 @@ export async function updateShuttleVehicle(tripId: string, vehicleId: string, fi
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update vehicle." }
   }
 }
@@ -37,6 +39,7 @@ export async function deleteShuttleVehicle(tripId: string, vehicleId: string): P
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete vehicle." }
   }
 }
@@ -47,6 +50,7 @@ export async function addShuttlePassenger(tripId: string, vehicleId: string, tri
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to add passenger." }
   }
 }
@@ -57,6 +61,7 @@ export async function removeShuttlePassenger(tripId: string, vehicleId: string, 
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
+    if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to remove passenger." }
   }
 }

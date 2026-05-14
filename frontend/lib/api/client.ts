@@ -1,4 +1,5 @@
 import "server-only"
+export { isRedirectError } from "next/dist/client/components/redirect-error"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { refreshSession } from "@/lib/auth/actions"

@@ -7,6 +7,7 @@ vi.mock("@/lib/api/client", () => ({
   apiPatch: vi.fn(),
   apiDelete: vi.fn(),
   apiUpload: vi.fn(),
+  isRedirectError: vi.fn().mockReturnValue(false),
 }))
 
 import { revalidatePath } from "next/cache"

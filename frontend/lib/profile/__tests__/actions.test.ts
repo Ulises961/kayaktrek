@@ -8,6 +8,7 @@ vi.mock("@/lib/api/client", () => ({
   apiDelete: vi.fn(),
   apiPost: vi.fn(),
   apiUpload: vi.fn(),
+  isRedirectError: vi.fn().mockReturnValue(false),
 }))
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
