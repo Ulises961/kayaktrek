@@ -64,26 +64,26 @@ export function TripDetailTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
-      <TabsList variant="underline" className="w-full justify-start overflow-x-auto px-6 mb-0 border-b border-border rounded-none">
-        <TabsTrigger value="crew" variant="underline" className="whitespace-nowrap">
+      <TabsList className="w-full justify-start overflow-x-auto px-6 mb-0 border-b border-border rounded-none">
+        <TabsTrigger value="crew" className="whitespace-nowrap">
           <UsersIcon className="size-3.5 mr-1.5" />
           Crew
         </TabsTrigger>
         {currentMember && (
-          <TabsTrigger value="float-plan" variant="underline" className="whitespace-nowrap">
+          <TabsTrigger value="float-plan" className="whitespace-nowrap">
             <ClipboardListIcon className="size-3.5 mr-1.5" />
             Float plan
           </TabsTrigger>
         )}
-        <TabsTrigger value="logistics" variant="underline" className="whitespace-nowrap">
+        <TabsTrigger value="logistics" className="whitespace-nowrap">
           <AnchorIcon className="size-3.5 mr-1.5" />
           Logistics
         </TabsTrigger>
-        <TabsTrigger value="itinerary" variant="underline" className="whitespace-nowrap">
+        <TabsTrigger value="itinerary" className="whitespace-nowrap">
           <MapPinIcon className="size-3.5 mr-1.5" />
           Itinerary
         </TabsTrigger>
-        <TabsTrigger value="items" variant="underline" className="whitespace-nowrap">
+        <TabsTrigger value="items" className="whitespace-nowrap">
           <PackageIcon className="size-3.5 mr-1.5" />
           Items
         </TabsTrigger>

@@ -167,7 +167,7 @@ describe("setTripMedicalNotes", () => {
 
 describe("revokeTripMedicalNotes", () => {
   it("DELETEs the correct path with elevated header", async () => {
-    vi.mocked(apiDelete).mockResolvedValue({})
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
     await revokeTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)
     expect(apiDelete).toHaveBeenCalledWith(
       `/api/trip/${TRIP_ID}/member/me/medical-consent`,
@@ -176,7 +176,7 @@ describe("revokeTripMedicalNotes", () => {
   })
 
   it("returns success: true on success", async () => {
-    vi.mocked(apiDelete).mockResolvedValue({})
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
     expect(await revokeTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({ success: true })
   })
 
