@@ -325,6 +325,55 @@ def update_my_float_plan(id: str):
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
+def get_trip_medical_notes(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        plaintext = TripMemberService.get_trip_medical_notes(id, raw["password"])
+        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+    except InvalidTag:
+        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-consent", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def set_trip_medical_notes(id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw or "medicalNotes" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="medicalNotes and password are required")
+        membership = TripMemberService.set_trip_medical_notes(id, raw["medicalNotes"], raw["password"])
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-consent", methods=["DELETE"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def revoke_trip_medical_notes(id: str):
+    try:
+        membership = TripMemberService.revoke_trip_medical_notes(id)
+        return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
 def share_medical_notes(id: str):
     try:
         raw = request.get_json()
