@@ -202,17 +202,17 @@ def update_trip(id: str):
 @require_leader()
 def invite_user(id: str):
     """
-    POST /api/trip/<id>/invite — Leader invites a user to the trip.
+    POST /api/trip/<id>/invite — Leader invites a user to the trip by exact email address.
 
-    Body: {"userId": "<uuid>"}
-    Returns 201 with the invitation, 404 if trip/user not found, 409 if already invited or member.
+    Body: {"email": "<email>"}
+    Returns 201 with the invitation, 404 if no account found, 409 if already invited or member.
     """
     try:
         body = request.get_json()
-        invitee_id = body.get("userId") if body else None
-        if not invitee_id:
-            abort(HTTPStatus.BAD_REQUEST, description="'userId' field is required")
-        TripService.invite_user(id, invitee_id)
+        email = body.get("email") if body else None
+        if not email:
+            abort(HTTPStatus.BAD_REQUEST, description="'email' field is required")
+        TripService.invite_user_by_email(id, email)
         return jsonify({"message": "Invitation sent"}), HTTPStatus.CREATED
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))

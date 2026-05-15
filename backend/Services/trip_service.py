@@ -294,8 +294,22 @@ class TripService:
         db.session.add(invitation)
         db.session.commit()
 
-        logger.info(f"User {invitee_id} invited to trip {trip_id}")
+        logger.info("user_invited", extra={"invitee_id": invitee_id, "trip_id": trip_id})
         return invitation
+
+    @staticmethod
+    def invite_user_by_email(trip_id: str, email: str) -> Invitation:
+        """
+        Look up a user by exact email address and invite them to the trip.
+
+        Raises:
+            NoResultFound: If no active user has that email, or the trip doesn't exist
+            ValueError: If the user is already a member or has a pending invitation
+        """
+        invitee = db.session.query(User).filter_by(mail=email.strip().lower()).first()
+        if not invitee:
+            raise NoResultFound("No account found for that email address")
+        return TripService.invite_user(trip_id, str(invitee.id))
 
     @staticmethod
     def handle_invitation(trip_id: str, accepted: bool) -> None:

@@ -16,31 +16,32 @@ import { inviteUser, cancelInvitation, handleInvitation, createTrip, updateTrip,
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const USER_ID = "01952f1a-0000-7000-8000-000000000020"
+const USER_EMAIL = "paddler@example.com"
 
 beforeEach(() => vi.clearAllMocks())
 
 describe("inviteUser", () => {
-  it("posts to the correct path with userId in the body", async () => {
+  it("posts to the correct path with email in the body", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_ID)
-    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite`, { userId: USER_ID })
+    await inviteUser(TRIP_ID, USER_EMAIL)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite`, { email: USER_EMAIL })
   })
 
   it("revalidates the trip detail path on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_ID)
+    await inviteUser(TRIP_ID, USER_EMAIL)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
   })
 
   it("returns success: true on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    const result = await inviteUser(TRIP_ID, USER_ID)
+    const result = await inviteUser(TRIP_ID, USER_EMAIL)
     expect(result).toEqual({ success: true })
   })
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("409"))
-    const result = await inviteUser(TRIP_ID, USER_ID)
+    const result = await inviteUser(TRIP_ID, USER_EMAIL)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })

@@ -21,24 +21,24 @@ export function InviteForm({ tripId }: InviteFormProps) {
 
   const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
-      const result = await inviteUser(tripId, data.userId)
+      const result = await inviteUser(tripId, data.email)
       if (result.success) {
         reset()
       } else {
-        setError("userId", { message: result.error })
+        setError("email", { message: result.error })
       }
     })
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-2">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <Input placeholder="User ID" disabled={isPending} {...register("userId")} />
+        <Input type="email" placeholder="Email address" disabled={isPending} {...register("email")} />
         <Button type="submit" disabled={isPending}>
           {isPending ? "Inviting…" : "Invite"}
         </Button>
       </div>
-      {errors.userId && <p className="text-sm text-destructive">{errors.userId.message}</p>}
+      {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
     </form>
   )
 }
