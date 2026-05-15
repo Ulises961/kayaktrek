@@ -47,9 +47,12 @@ class TripMember(BaseModel):
     medical_notes_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
-    # Leader-visible plaintext copy — written only when member explicitly shares (share-medical-notes endpoint).
-    # Nulled when member revokes trip-level medical consent.
-    medical_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Leader-visible copy encrypted with the leader's X25519 public key (ECIES, ADR-023).
+    # Written by share_medical_notes(); nulled by revoke_trip_medical_notes().
+    # The leader decrypts on demand by providing their password — never stored as plaintext.
+    medical_notes_leader_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    medical_notes_leader_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    medical_notes_leader_ephemeral_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     medical_notes_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Set on any successful PATCH to this member's float plan fields
