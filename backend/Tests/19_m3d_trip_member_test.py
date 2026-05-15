@@ -332,6 +332,7 @@ def _set_and_share_trip_notes(client, auth_headers, trip_id, notes, password):
                 json={"password": password}, headers=h)
 
 
+@pytest.mark.xfail(reason="§5 M3g: share_medical_notes rewired to ECIES; GET /trip/:id will expose has_leader_medical_notes flag, not plaintext")
 def test_leader_sees_all_medical_notes_in_trip_get(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
     """Leader can see all travellers' medicalNotes in GET /trip/:id."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -353,6 +354,7 @@ def test_leader_sees_all_medical_notes_in_trip_get(client, auth_headers, auth_he
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=h2)
 
 
+@pytest.mark.xfail(reason="§5 M3g: share_medical_notes rewired to ECIES; crew plaintext-visibility model changes in §5/§6")
 def test_crew_member_sees_only_own_medical_notes_in_trip_get(client, auth_headers, auth_headers_2, trip_with_user2_as_crew, user_2):
     """Crew member sees their own medicalNotes but not other members' in GET /trip/:id."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -397,7 +399,7 @@ def test_crew_profile_snapshot_copied_on_accept(client, auth_headers, auth_heade
     trip_id = json.loads(resp.data)["id"]
 
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite",
-                json={"userId": str(user_2.id)}, headers=auth_headers)
+                json={"email": user_2.mail}, headers=auth_headers)
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/invitation",
                 json={"accepted": True}, headers=auth_headers_2)
 

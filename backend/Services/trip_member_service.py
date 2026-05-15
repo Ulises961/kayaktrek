@@ -115,8 +115,10 @@ class TripMemberService:
         membership.medical_notes_ciphertext = None
         membership.medical_notes_nonce = None
         membership.medical_notes_salt = None
-        membership.medical_notes = None
         membership.medical_notes_consent_at = None
+        membership.medical_notes_leader_ciphertext = None
+        membership.medical_notes_leader_nonce = None
+        membership.medical_notes_leader_ephemeral_key = None
         db.session.commit()
         db.session.refresh(membership)
         logger.info("trip_medical_notes_revoked", extra={

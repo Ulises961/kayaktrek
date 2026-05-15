@@ -123,6 +123,9 @@ def test_contribute_item(client, auth_headers, trip_with_crew):
     assert data['status'] == "covered"
     assert data['coveringItemId'] == item_id
     assert len(data['contributors']) == 1
+    contributor = data['contributors'][0]
+    assert contributor.get('id') is not None
+    assert contributor.get('username') is not None, "contributor must be a User, not a TripMember stub"
 
     # Cleanup item
     client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)

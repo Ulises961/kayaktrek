@@ -14,7 +14,7 @@ from Models.user import User
 from Models.trip_member import TripMember
 from Api.database import db
 from Schemas.base_schema import camelcase
-from Services.crypto_service import encrypt, decrypt
+from Services.crypto_service import encrypt, decrypt, generate_keypair
 from Services.storage_service import StorageService
 from Models.auth_token import AuthTokenType
 from Services.auth_service import AuthService
@@ -220,6 +220,7 @@ class UserService:
     def change_password(id: str, current_pwd: str, new_pwd: str) -> None:
         """
         Verify current password then replace with the new one.
+        If the user has an X25519 keypair, re-encrypts the private key under the new password.
 
         Raises:
             NoResultFound: If user does not exist
@@ -229,8 +230,44 @@ class UserService:
         if not check_password_hash(user.pwd, current_pwd):
             raise ValueError("Current password is incorrect")
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
+        if user.public_key:
+            private_key_b64 = decrypt(
+                user.private_key_ciphertext,  # type: ignore
+                user.private_key_nonce,  # type: ignore
+                user.private_key_salt,  # type: ignore
+                current_pwd,
+            )
+            pk_ct, pk_nonce, pk_salt = encrypt(private_key_b64, new_pwd)
+            user.private_key_ciphertext = pk_ct
+            user.private_key_nonce = pk_nonce
+            user.private_key_salt = pk_salt
         db.session.commit()
         logger.info("password_changed", extra={"user_id": id})
+
+    @staticmethod
+    def generate_keypair_for_user(id: str, password: str) -> "User":
+        """
+        Generate an X25519 keypair for an existing user without one.
+        No-op if the user already has a keypair (returns unchanged user).
+
+        Raises:
+            NoResultFound: If user does not exist
+            ValueError: If password does not match
+        """
+        user = UserService.get_user_by_id(id)
+        if user.public_key:
+            return user
+        if not check_password_hash(user.pwd, password):
+            raise ValueError("Password is incorrect")
+        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(password)
+        user.public_key = public_key_b64
+        user.private_key_ciphertext = pk_ct
+        user.private_key_nonce = pk_nonce
+        user.private_key_salt = pk_salt
+        db.session.commit()
+        db.session.refresh(user)
+        logger.info("keypair_generated", extra={"user_id": id})
+        return user
 
     @staticmethod
     def verify_password(id: str, password: str) -> bool:
@@ -273,8 +310,13 @@ class UserService:
         user.medical_notes_salt = None
         user.medical_notes_consent_at = None
         db.session.query(TripMember).filter_by(user_id=user.id).update({
-            "medical_notes": None,
+            "medical_notes_ciphertext": None,
+            "medical_notes_nonce": None,
+            "medical_notes_salt": None,
             "medical_notes_consent_at": None,
+            "medical_notes_leader_ciphertext": None,
+            "medical_notes_leader_nonce": None,
+            "medical_notes_leader_ephemeral_key": None,
         })
         db.session.commit()
         logger.info("medical_consent_revoked", extra={"user_id": id})

@@ -42,6 +42,12 @@ class UserSchema(BaseSchema):
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
     deletion_requested_at = fields.DateTime(allow_none=True, dump_only=True)
 
+    # Presence flag — clients use this to show the keypair-generation prompt
+    has_keypair = fields.Method("get_has_keypair", dump_only=True)
+
+    def get_has_keypair(self, obj):
+        return getattr(obj, "public_key", None) is not None
+
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('name', 'surname'):
