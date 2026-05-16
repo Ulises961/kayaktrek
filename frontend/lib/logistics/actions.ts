@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPut, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPost, apiPut, isRedirectError } from "@/lib/api/client"
 import { LogisticsSchema, type Logistics, type LogisticsFields } from "@/lib/dtos/logistics"
 
 export type LogisticsActionResult = { success: true } | { success: false; error: string }
@@ -20,5 +20,27 @@ export async function upsertLogistics(tripId: string, fields: Partial<LogisticsF
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to save logistics." }
+  }
+}
+
+export async function generateFloatPlanShare(tripId: string): Promise<{ success: true; logistics: Logistics } | { success: false; error: string }> {
+  try {
+    const raw = await apiPost<unknown>(`/api/logistics/${tripId}/share`, {})
+    const logistics = LogisticsSchema.parse(raw)
+    revalidatePath(`/trips/${tripId}/float-plan`)
+    return { success: true, logistics }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to generate share link." }
+  }
+}
+
+export async function sendFloatPlanShareEmail(tripId: string): Promise<LogisticsActionResult> {
+  try {
+    await apiPost(`/api/logistics/${tripId}/share/email`, {})
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to send email." }
   }
 }
