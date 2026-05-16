@@ -31,7 +31,6 @@ const BASE_MEMBER: TripMember = {
   emergencyContactName: "Bob Smith",
   emergencyContactPhone: "+1555555555",
   emergencyContactRelationship: "Partner",
-  medicalNotes: null,
   medicalNotesConsentAt: null,
   floatPlanConfirmedAt: null,
 }

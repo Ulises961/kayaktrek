@@ -80,7 +80,6 @@ const CURRENT_MEMBER: TripMember = {
   emergencyContactName: null,
   emergencyContactPhone: null,
   emergencyContactRelationship: null,
-  medicalNotes: null,
   medicalNotesConsentAt: null,
   floatPlanConfirmedAt: "2026-05-01T10:00:00",
 }
