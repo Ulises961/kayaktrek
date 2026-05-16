@@ -419,7 +419,7 @@ class TripService:
 
         Args:
             trip_id: The ID of the trip
-            new_state_value: The target state string (e.g. "planning")
+            new_state_value: The target state string (e.g. "happening")
 
         Returns:
             Updated Trip object
@@ -436,10 +436,10 @@ class TripService:
         trip = TripService.get_trip_by_id(trip_id)
         trip.transition_state(new_state)
 
-        # Release user ownership on itinerary and inventory on the first transition out
-        # of draft. Those user_id columns are only meaningful for personal/draft objects;
-        # once a trip moves to planning both objects belong to the trip.
-        if new_state == TripStateType.PLANNING:
+        # Release user ownership on itinerary and inventory when the expedition starts.
+        # Those user_id columns are only meaningful while building; once happening
+        # both objects belong to the trip, not the individual.
+        if new_state == TripStateType.HAPPENING:
             if trip.itinerary:
                 trip.itinerary.user_id = None
             if trip.inventory:
