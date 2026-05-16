@@ -255,10 +255,10 @@ class UserService:
             ValueError: If password does not match
         """
         user = UserService.get_user_by_id(id)
-        if user.public_key:
-            return user
         if not check_password_hash(user.pwd, password):
-            raise ValueError("Password is incorrect")
+            raise PermissionError("Password is incorrect")
+        if user.public_key:
+            raise ValueError("keypair_already_exists")
         public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(password)
         user.public_key = public_key_b64
         user.private_key_ciphertext = pk_ct
