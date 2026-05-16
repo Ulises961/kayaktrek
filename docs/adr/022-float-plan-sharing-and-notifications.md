@@ -252,10 +252,28 @@ snapshot schema above.
   on domain configuration that must be verified before launch.
 
 **Open questions / deferred**
-- **Token expiry on trip close**: should `share_token` be nulled when the trip transitions
-  to `past`? Reasonable — deferred to M8 alongside the Celery beat task.
-- **Float plan completeness warning**: warn the leader if any crew member is missing vessel
-  or emergency contact data before generating. Not in M3g scope (ADR-018 open question).
 - **Revocation notice**: if a crew member revokes medical consent after snapshot generation,
   no automated action occurs. UI copy on the revocation confirmation should note that the
   leader may wish to regenerate the float plan link. Post-M3g polish.
+- **Token revocation by leader**: no explicit invalidation mechanism beyond regeneration
+  (which replaces the token). If the shore contact changes mid-expedition the leader must
+  regenerate and re-send. A dedicated "Invalidate link" action could be added post-launch
+  without schema changes (null the `share_token` column).
+- **Float plan completeness warning**: warn the leader if any crew member is missing vessel
+  or emergency contact data before generating. Not in M3g scope (ADR-018 open question).
+
+### Token lifetime — decided
+
+`share_token` expires **30 days after `trip.dateTo`** (or 30 days after generation if
+`dateTo` is null). After expiry the public endpoint returns 404.
+
+Rationale: rescue coordination and post-trip debriefs rarely extend beyond a month. An
+indefinitely-valid token is a lingering PII exposure (vessel descriptions, emergency contact
+phone numbers) for every trip ever run. 30 days is generous for any realistic follow-up
+while bounding the exposure window.
+
+Implementation: a `share_token_expires_at` column on `Logistics` (nullable datetime, UTC).
+Set at generation time to `max(dateTo, generated_at) + 30 days`. The public endpoint checks
+this column and returns 404 if expired — no Celery task required. Expired tokens are not
+automatically nulled; they simply become invalid. A Celery periodic task may clean them up
+in future, but is not required for correctness.
