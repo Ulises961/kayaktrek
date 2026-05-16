@@ -12,6 +12,7 @@ from Models.logistics import Logistics
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Schemas.base_schema import camelcase
+from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +181,8 @@ class LogisticsService:
 
         logistics = db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
         if logistics is None:
-            logistics = Logistics(trip_id=UUID(trip_id))
+            logistics = Logistics()
+            logistics.trip_id = UUID(trip_id)
             db.session.add(logistics)
 
         snapshot = LogisticsService.build_snapshot(trip_id)
@@ -202,3 +204,59 @@ class LogisticsService:
         db.session.refresh(logistics)
         logger.info("float_plan_share_generated", extra={"trip_id": trip_id, "user_id": user_id})
         return logistics
+
+    @staticmethod
+    def send_share_email(trip_id: str, user_id: str, frontend_url: str) -> None:
+        """
+        Send the float_plan_share email to the shore contact.
+        Leader-only. Requires share_token and shore_contact_email to exist.
+
+        Raises:
+            NoResultFound: trip not found or user not a member
+            PermissionError: caller is not the leader
+            ValueError("no_token"): share link not yet generated
+            ValueError("no_shore_contact_email"): shore contact email not set
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if not trip:
+            raise NoResultFound(f"Trip {trip_id} not found")
+
+        membership = (
+            db.session.query(TripMember)
+            .options(joinedload(TripMember.user))
+            .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
+            .first()
+        )
+        if not membership or membership.role != MemberRoleType.LEADER:
+            raise PermissionError("Only the trip leader can email the shore contact")
+
+        logistics = db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
+        if not logistics or not logistics.share_token:
+            raise ValueError("no_token")
+        if not logistics.shore_contact_email:
+            raise ValueError("no_shore_contact_email")
+
+        leader = membership.user
+        leader_name = leader.name + (f" {leader.surname}" if leader.surname else "")
+
+        if trip.date_from and trip.date_to:
+            date_label = f"{trip.date_from.isoformat()} – {trip.date_to.isoformat()}"
+        elif trip.date_from:
+            date_label = f"from {trip.date_from.isoformat()}"
+        else:
+            date_label = "dates TBC"
+
+        float_plan_url = f"{frontend_url}/float-plan/{logistics.share_token}"
+        subject = f"Float plan — {trip.destination or 'kayak expedition'} ({date_label})"
+
+        send_template_email(
+            to=logistics.shore_contact_email,
+            subject=subject,
+            template="float_plan_share",
+            leader_name=leader_name,
+            destination=trip.destination or "kayak expedition",
+            date_label=date_label,
+            float_plan_url=float_plan_url,
+            support_email="support@kayakplanner.app",
+        )
+        logger.info("float_plan_share_email_sent", extra={"trip_id": trip_id, "user_id": user_id})
