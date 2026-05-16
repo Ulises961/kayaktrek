@@ -25,16 +25,18 @@ class TripMemberSchema(BaseSchema):
     emergency_contact_phone = fields.String(allow_none=True)
     emergency_contact_relationship = fields.String(allow_none=True)
 
-    # Leader-visible plaintext; dump_only — access controlled at service/resource layer
-    medical_notes = fields.String(allow_none=True, dump_only=True)
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
     float_plan_confirmed_at = fields.DateTime(allow_none=True, dump_only=True)
 
-    # Computed flag — never expose raw ciphertext in API responses
+    # Computed flags — never expose raw ciphertext in API responses
     has_trip_medical_notes = fields.Method("get_has_trip_medical_notes", dump_only=True)
+    has_leader_medical_notes = fields.Method("get_has_leader_medical_notes", dump_only=True)
 
     def get_has_trip_medical_notes(self, obj):
         return obj.medical_notes_ciphertext is not None
+
+    def get_has_leader_medical_notes(self, obj):
+        return obj.medical_notes_leader_ciphertext is not None
 
     @post_load
     def make_trip_member(self, data, **kwargs):

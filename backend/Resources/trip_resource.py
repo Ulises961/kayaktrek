@@ -391,6 +391,28 @@ def share_medical_notes(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def read_member_medical_notes(id: str, member_id: str):
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        plaintext = TripMemberService.read_shared_medical_notes(id, member_id, raw["password"])
+        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+    except PermissionError:
+        abort(HTTPStatus.FORBIDDEN, description="Only the trip leader can read shared medical notes")
+    except ValueError as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except InvalidTag:
+        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Member not found in this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @trip_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")

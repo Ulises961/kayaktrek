@@ -6,11 +6,11 @@ from flask import g
 from sqlalchemy.exc import NoResultFound
 import logging
 
-from Models.trip_member import TripMember
+from Models.trip_member import TripMember, MemberRoleType
 from Models.user import User
 from Api.database import db
 from Schemas.base_schema import camelcase
-from Services.crypto_service import decrypt, encrypt
+from Services.crypto_service import decrypt, encrypt, encrypt_for_recipient, decrypt_as_recipient
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +129,12 @@ class TripMemberService:
     @staticmethod
     def share_medical_notes(trip_id: str, password: str) -> TripMember:
         """
-        Decrypt the member's trip-level notes and write plaintext to the leader-visible column.
-        The elevated token proves the user authenticated; the password is required to decrypt.
+        Decrypt the member's trip-level notes with their password, then ECIES-encrypt
+        the plaintext for the trip leader's public key.
 
         Raises:
             NoResultFound: If the user is not a member of the trip
-            ValueError: If no trip notes are stored
+            ValueError: If no trip notes are stored, or the leader has no keypair
         """
         membership = TripMemberService.get_my_membership(trip_id)
         if not membership.medical_notes_ciphertext:
@@ -142,12 +142,27 @@ class TripMemberService:
 
         plaintext = decrypt(
             membership.medical_notes_ciphertext,
-            membership.medical_notes_nonce,
-            membership.medical_notes_salt,
+            membership.medical_notes_nonce,  # type: ignore
+            membership.medical_notes_salt,  # type: ignore
             password,
         )
 
-        membership.medical_notes = plaintext
+        leader = (
+            db.session.query(User)
+            .join(TripMember, TripMember.user_id == User.id)
+            .filter(
+                TripMember.trip_id == UUID(trip_id),
+                TripMember.role == MemberRoleType.LEADER,
+            )
+            .first()
+        )
+        if not leader or not leader.public_key:
+            raise ValueError("Trip leader has not set up their encryption keypair yet")
+
+        ct, nonce, ephemeral = encrypt_for_recipient(plaintext, leader.public_key)
+        membership.medical_notes_leader_ciphertext = ct
+        membership.medical_notes_leader_nonce = nonce
+        membership.medical_notes_leader_ephemeral_key = ephemeral
         membership.medical_notes_consent_at = datetime.now(timezone.utc)
         membership.float_plan_confirmed_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -156,3 +171,43 @@ class TripMemberService:
             "user_id": str(g.current_user_id), "trip_id": trip_id,
         })
         return membership
+
+    @staticmethod
+    def read_shared_medical_notes(trip_id: str, member_id: str, leader_password: str) -> str:
+        """
+        Decrypt the ECIES-encrypted leader copy of a member's medical notes.
+        Caller must be the trip leader.
+
+        Raises:
+            NoResultFound: If the trip or member does not exist
+            PermissionError: If the caller is not the leader
+            ValueError: If no notes have been shared, or the leader has no keypair
+            cryptography.exceptions.InvalidTag: If leader_password is wrong
+        """
+        caller_membership = TripMemberService.get_my_membership(trip_id)
+        if caller_membership.role != MemberRoleType.LEADER:
+            raise PermissionError("Only the trip leader can read shared medical notes")
+
+        target_membership = (
+            db.session.query(TripMember)
+            .filter_by(trip_id=UUID(trip_id), user_id=UUID(member_id))
+            .first()
+        )
+        if not target_membership:
+            raise NoResultFound(f"No membership found for member {member_id} in trip {trip_id}")
+        if not target_membership.medical_notes_leader_ciphertext:
+            raise ValueError("No shared medical notes for this member")
+
+        leader = db.session.query(User).filter_by(id=UUID(str(g.current_user_id))).first()
+        if not leader or not leader.private_key_ciphertext:
+            raise ValueError("Leader keypair not found — generate your keypair first")
+
+        return decrypt_as_recipient(
+            target_membership.medical_notes_leader_ciphertext,
+            target_membership.medical_notes_leader_nonce,  # type: ignore
+            target_membership.medical_notes_leader_ephemeral_key,  # type: ignore
+            leader.private_key_ciphertext,
+            leader.private_key_nonce,  # type: ignore
+            leader.private_key_salt,  # type: ignore
+            leader_password,
+        )
