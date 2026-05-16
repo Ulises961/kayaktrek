@@ -49,7 +49,7 @@ export const TripFieldsSchema = z
   )
 
 export const InviteUserSchema = z.object({
-  userId: z.uuidv7("Enter a valid user ID."),
+  email: z.string().email("Enter a valid email address."),
 })
 
 export type Trip = z.infer<typeof TripSchema>

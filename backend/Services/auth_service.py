@@ -12,6 +12,7 @@ from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
 from Schemas.user_schema import UserSchema
+from Services.crypto_service import generate_keypair
 from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,13 @@ class AuthService:
         if not user:
             raise ValueError("User generated incorrectly")
 
+        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(user_json.get("pwd"))
+        user.public_key = public_key_b64
+        user.private_key_ciphertext = pk_ct
+        user.private_key_nonce = pk_nonce
+        user.private_key_salt = pk_salt
+        db.session.commit()
+
         AuthService._send_verification_email(user)
         logger.info(f"New user registered: {user.username}")
         return user
@@ -147,7 +155,7 @@ class AuthService:
 
         raw_token = AuthService._create_token(user.id, AuthTokenType.RESET)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-        reset_url = f"{frontend_url}/auth/reset-password?token={raw_token}"
+        reset_url = f"{frontend_url}/reset-password?token={raw_token}"
         support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
@@ -227,7 +235,7 @@ class AuthService:
     def _send_verification_email(user: User) -> None:
         raw_token = AuthService._create_token(user.id, AuthTokenType.VERIFICATION)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-        verify_url = f"{frontend_url}/auth/verify?token={raw_token}"
+        verify_url = f"{frontend_url}/verify?token={raw_token}"
         support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(

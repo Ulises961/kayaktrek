@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { AnchorIcon, ArrowLeftIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
+import React from "react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
@@ -9,7 +10,7 @@ import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { PrintButton } from "@/components/trips/print-button"
 import { CopyLinkButton } from "@/components/trips/copy-link-button"
 import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
-import type { TripMember } from "@/lib/dtos/trip-member"
+import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—"
@@ -40,86 +41,6 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function VesselBlock({ member }: { member: TripMember }) {
-  const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } = member
-  const hasVessel = vesselMake || vesselModel || vesselLengthCm || vesselColorPrimary
-
-  if (!hasVessel) return <p className="text-sm text-muted-foreground italic">No vessel info recorded.</p>
-
-  const colors = [vesselColorPrimary, vesselColorSecondary].filter(Boolean).join(" / ")
-
-  return (
-    <div className="flex flex-col gap-1">
-      <FieldRow label="Make / Model" value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null} />
-      <FieldRow label="Length" value={formatLength(vesselLengthCm)} />
-      <FieldRow label="Colour" value={colors || null} />
-    </div>
-  )
-}
-
-function EmergencyBlock({ member }: { member: TripMember }) {
-  const { emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = member
-  const hasEmergency = emergencyContactName || emergencyContactPhone
-
-  if (!hasEmergency) return <p className="text-sm text-muted-foreground italic">No emergency contact recorded.</p>
-
-  return (
-    <div className="flex flex-col gap-1">
-      <FieldRow label="Name" value={emergencyContactName} />
-      <FieldRow label="Relationship" value={emergencyContactRelationship} />
-      <FieldRow label="Phone" value={emergencyContactPhone} />
-    </div>
-  )
-}
-
-function MemberCard({ member }: { member: TripMember }) {
-  const fullName = [member.user.name, member.user.surname].filter(Boolean).join(" ")
-  const showMedical = !!member.medicalNotesConsentAt && !!member.medicalNotes
-
-  return (
-    <div className="rounded-lg border border-border p-4 flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <UserIcon className="size-4 text-muted-foreground shrink-0" />
-          <span className="font-semibold">{fullName}</span>
-          {member.user.mail && <span className="text-xs text-muted-foreground">{member.user.mail}</span>}
-        </div>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded">
-          {member.role}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Vessel</p>
-          <VesselBlock member={member} />
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Emergency Contact</p>
-          <EmergencyBlock member={member} />
-        </div>
-      </div>
-
-      {showMedical && (
-        <div className="rounded border border-destructive/30 bg-destructive/5 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-destructive mb-1">Medical Notes</p>
-          <p className="text-sm whitespace-pre-wrap">{member.medicalNotes}</p>
-          <p className="text-[10px] text-muted-foreground mt-1.5">Consent given {formatDate(member.medicalNotesConsentAt)}</p>
-        </div>
-      )}
-
-      {member.floatPlanConfirmedAt ? (
-        <p className="text-[10px] text-muted-foreground">
-          Float plan confirmed {formatDate(member.floatPlanConfirmedAt)}
-        </p>
-      ) : (
-        <span className="self-start text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
-          Not confirmed
-        </span>
-      )}
-    </div>
-  )
-}
 
 export default async function FloatPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -206,11 +127,7 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
         <SectionHeading icon={<UserIcon className="size-3.5" />}>
           Crew Manifest ({sortedCrew.length})
         </SectionHeading>
-        <div className="flex flex-col gap-3">
-          {sortedCrew.map((member) => (
-            <MemberCard key={member.id ?? member.user.id} member={member} />
-          ))}
-        </div>
+        <FloatPlanCrewManifest crew={sortedCrew} tripId={id} />
       </section>
     </div>
   )

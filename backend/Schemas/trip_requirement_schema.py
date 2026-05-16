@@ -22,6 +22,7 @@ class TripRequirementSchema(BaseSchema):
             exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items',
                      'endorsed_logs', 'logs'],
         ),
+        attribute='contributor_users',
         dump_only=True,
         load_default=list,
     )

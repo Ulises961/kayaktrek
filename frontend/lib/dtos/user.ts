@@ -48,6 +48,8 @@ export const UserSchema = z.object({
   // Consent + GDPR timestamps (ISO strings, never raw medical notes)
   medicalNotesConsentAt: z.string().nullish(),
   deletionRequestedAt: z.string().nullish(),
+  // Keypair presence flag (M3g)
+  hasKeypair: z.boolean().nullish(),
 });
 
 export type Traveller = z.infer<typeof TravellerSchema>;

@@ -11,6 +11,7 @@ from Models.base_model import BaseModel
 if TYPE_CHECKING:
     from Models.item import Item
     from Models.trip_member import TripMember
+    from Models.user import User
 
 
 class RequirementStatusType(enum.Enum):
@@ -66,3 +67,7 @@ class TripRequirement(BaseModel):
     contributors: Mapped[List["TripMember"]] = relationship(
         "TripMember", secondary=requirement_contributors
     )
+
+    @property
+    def contributor_users(self) -> List["User"]:
+        return [m.user for m in self.contributors]

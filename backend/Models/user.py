@@ -69,6 +69,15 @@ class User(BaseModel):
     medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # X25519 keypair — public key stored in plaintext; private key AES-GCM encrypted with
+    # the user's password (same PBKDF2+AES-GCM pattern as medical_notes_ciphertext).
+    # Generated at registration. Used to encrypt TripMember leader-visible medical notes
+    # so they are never stored as plaintext in the DB. See ADR-023.
+    public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    private_key_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    private_key_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    private_key_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
     # GDPR: erasure grace period — set on deletion request, hard-deleted after 30 days
     deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

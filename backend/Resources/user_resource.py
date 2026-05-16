@@ -167,6 +167,28 @@ def change_password():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_api.route("/me/generate-keypair", methods=["POST"])
+@JWTService.authenticate_restful
+def generate_keypair():
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or "password" not in raw:
+            abort(HTTPStatus.BAD_REQUEST, description="password is required")
+        UserService.generate_keypair_for_user(str(g.current_user_id), raw["password"])
+        return jsonify({"hasKeypair": True}), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except PermissionError:
+        abort(HTTPStatus.UNAUTHORIZED, description="Password incorrect")
+    except ValueError:
+        abort(HTTPStatus.CONFLICT, description="Keypair already exists")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_api.route("/me/re-auth", methods=["POST"])
 @JWTService.authenticate_restful
 def re_auth():

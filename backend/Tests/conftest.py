@@ -282,7 +282,7 @@ def trip_with_invitation(client, auth_headers, user_2, auth_headers_2):
 
     inv_response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invite",
-        json={"userId": str(user_2.id)},
+        json={"email": user_2.mail},
         headers=auth_headers,
     )
     assert inv_response.status_code == 201
@@ -292,6 +292,7 @@ def trip_with_invitation(client, auth_headers, user_2, auth_headers_2):
         "leader_headers": auth_headers,
         "invitee_headers": auth_headers_2,
         "invitee_id": str(user_2.id),
+        "invitee_email": user_2.mail,
     }
 
     try:
@@ -324,7 +325,7 @@ def trip_with_user2_as_crew(client, auth_headers, user_2, auth_headers_2):
 
     inv_response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invite",
-        json={"userId": str(user_2.id)},
+        json={"email": user_2.mail},
         headers=auth_headers,
     )
     assert inv_response.status_code == 201
@@ -341,6 +342,7 @@ def trip_with_user2_as_crew(client, auth_headers, user_2, auth_headers_2):
         "leader_headers": auth_headers,
         "crew_headers": auth_headers_2,
         "crew_id": str(user_2.id),
+        "crew_email": user_2.mail,
     }
 
     try:

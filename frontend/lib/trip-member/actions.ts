@@ -8,6 +8,7 @@ import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 export type FloatPlanActionResult = { success: true } | { success: false; error: string }
 export type ShareMedicalNotesResult = { success: true } | { success: false; error: string }
 export type TripMedicalNotesResult = { success: true; notes: string | null } | { success: false; error: string }
+export type ReadMemberNotesResult = { success: true; medicalNotes: string } | { success: false; error: string }
 
 export async function getMyMembership(tripId: string): Promise<TripMember | null> {
   try {
@@ -95,6 +96,31 @@ export async function revokeTripMedicalNotes(
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes("403")) return { success: false, error: "Session expired. Please lock and unlock again." }
     return { success: false, error: "Failed to delete medical notes." }
+  }
+}
+
+export async function readMemberMedicalNotes(
+  tripId: string,
+  memberId: string,
+  password: string
+): Promise<ReadMemberNotesResult> {
+  try {
+    // Elevated token required by the endpoint — re-auth inline with the same password
+    const reAuthData = await apiPost<{ elevatedToken: string }>("/api/user/me/re-auth", { password })
+    const elevatedToken = reAuthData.elevatedToken
+    const data = await apiPost<{ medicalNotes: string }>(
+      `/api/trip/${tripId}/member/${memberId}/medical-notes`,
+      { password },
+      { "X-Elevated-Token": elevatedToken }
+    )
+    return { success: true, medicalNotes: data.medicalNotes }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes("401")) return { success: false, error: "Incorrect password." }
+    if (msg.includes("403")) return { success: false, error: "Only the trip leader can read shared notes." }
+    if (msg.includes("404")) return { success: false, error: "No shared notes for this member." }
+    return { success: false, error: "Failed to read medical notes." }
   }
 }
 

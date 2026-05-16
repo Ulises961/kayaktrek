@@ -242,7 +242,7 @@ def test_invite_user_returns_201(client, auth_headers, user_2):
     data = _create_trip(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{data['id']}/invite",
-        json={"userId": str(user_2.id)},
+        json={"email": user_2.mail},
         headers=auth_headers,
     )
     assert response.status_code == 201
@@ -260,7 +260,7 @@ def test_invite_already_member_returns_409(client, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invite",
-        json={"userId": trip_with_user2_as_crew["crew_id"]},
+        json={"email": trip_with_user2_as_crew["crew_email"]},
         headers=trip_with_user2_as_crew["leader_headers"],
     )
     assert response.status_code == 409
@@ -270,7 +270,7 @@ def test_duplicate_pending_invitation_returns_409(client, trip_with_invitation):
     trip_id = trip_with_invitation["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invite",
-        json={"userId": trip_with_invitation["invitee_id"]},
+        json={"email": trip_with_invitation["invitee_email"]},
         headers=trip_with_invitation["leader_headers"],
     )
     assert response.status_code == 409
@@ -280,7 +280,7 @@ def test_non_leader_cannot_invite(client, trip_with_invitation):
     trip_id = trip_with_invitation["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invite",
-        json={"userId": trip_with_invitation["invitee_id"]},
+        json={"email": trip_with_invitation["invitee_email"]},
         headers=trip_with_invitation["invitee_headers"],
     )
     assert response.status_code == 403

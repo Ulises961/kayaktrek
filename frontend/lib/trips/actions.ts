@@ -68,9 +68,9 @@ export async function deleteTrip(tripId: string): Promise<TripActionResult> {
   redirect("/trips")
 }
 
-export async function inviteUser(tripId: string, userId: string): Promise<TripActionResult> {
+export async function inviteUser(tripId: string, email: string): Promise<TripActionResult> {
   try {
-    await apiPost(`/api/trip/${tripId}/invite`, { userId })
+    await apiPost(`/api/trip/${tripId}/invite`, { email })
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {

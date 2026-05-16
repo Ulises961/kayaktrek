@@ -14,9 +14,9 @@ export const TripMemberSchema = z.object({
   emergencyContactName: z.string().nullish(),
   emergencyContactPhone: z.string().nullish(),
   emergencyContactRelationship: z.string().nullish(),
-  medicalNotes: z.string().nullish(),
   medicalNotesConsentAt: z.string().nullish(),
   hasTripMedicalNotes: z.boolean().optional(),
+  hasLeaderMedicalNotes: z.boolean().optional(),
   floatPlanConfirmedAt: z.string().nullish(),
 })
 

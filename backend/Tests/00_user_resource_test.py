@@ -60,6 +60,64 @@ def test_delete_user_forbidden_for_other_user(client, auth_headers, id_2):
 # GET /api/user/me
 # ============================================================================
 
+# ============================================================================
+# POST /api/user/me/generate-keypair
+# ============================================================================
+
+_USER_PWD = "testPassword6$"
+
+
+def test_generate_keypair_returns_has_keypair_true(client, auth_headers):
+    """Calling generate-keypair returns hasKeypair: true."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/generate-keypair",
+        json={"password": _USER_PWD},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409, (
+        "Users registered in tests already have a keypair from register_user(); "
+        "a second call must return 409"
+    )
+
+
+def test_generate_keypair_wrong_password_returns_401(client, auth_headers):
+    """Wrong password is rejected with 401."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/generate-keypair",
+        json={"password": "wrong-password"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 401
+
+
+def test_generate_keypair_missing_password_returns_400(client, auth_headers):
+    """Missing password field returns 400."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/generate-keypair",
+        json={},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_generate_keypair_requires_auth(client):
+    """Unauthenticated request is rejected."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/generate-keypair",
+        json={"password": _USER_PWD},
+    )
+    assert response.status_code in (401, 403)
+
+
+def test_get_me_exposes_has_keypair(client, auth_headers):
+    """GET /me includes hasKeypair reflecting whether the keypair is set."""
+    response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert "hasKeypair" in data
+    assert isinstance(data["hasKeypair"], bool)
+    assert data["hasKeypair"] is True  # registered users get a keypair at sign-up
+
 def test_get_me_returns_current_user(client, auth_headers):
     """Authenticated user receives their own profile."""
     response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
