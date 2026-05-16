@@ -144,6 +144,19 @@ export async function grantMedicalConsent(
   }
 }
 
+export async function generateKeypair(password: string): Promise<ProfileActionResult> {
+  try {
+    await apiPost("/api/user/me/generate-keypair", { password })
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("401")) return { success: false, error: "Password incorrect." }
+    if (msg.includes("409")) return { success: true }
+    return { success: false, error: "Failed to set up encryption keypair." }
+  }
+}
+
 export async function revokeMedicalConsent(elevatedToken: string): Promise<ProfileActionResult> {
   try {
     await apiDelete("/api/user/me/medical-consent", { "X-Elevated-Token": elevatedToken })

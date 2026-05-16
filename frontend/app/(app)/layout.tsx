@@ -1,10 +1,25 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/common/app-sidebar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
+import { KeypairPromptBanner } from "@/components/common/keypair-prompt-banner"
 import { Separator } from "@/components/ui/separator"
+import { apiGet } from "@/lib/api/client"
+import { UserSchema } from "@/lib/dtos/user"
 import React from "react"
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+async function getHasKeypair(): Promise<boolean> {
+  try {
+    const raw = await apiGet("/api/user/me")
+    const user = UserSchema.parse(raw)
+    return user.hasKeypair ?? true
+  } catch {
+    return true
+  }
+}
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const hasKeypair = await getHasKeypair()
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -18,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div id="breadcrumb-slot" className="flex-1 flex items-center" />
             <ThemeToggle />
           </header>
+          <KeypairPromptBanner hasKeypair={hasKeypair} />
           <div className="flex-1 p-6 overflow-auto">
             {children}
           </div>
