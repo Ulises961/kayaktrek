@@ -30,6 +30,23 @@ def _require_editable(trip: Trip) -> None:
 class LogisticsService:
 
     @staticmethod
+    def get_by_token(token: str) -> dict:
+        """
+        Return the float plan snapshot for a valid, non-expired share token.
+
+        Raises:
+            NoResultFound: token unknown or snapshot not yet generated
+            ValueError("share_link_expired"): token exists but past its expiry date
+        """
+        logistics = db.session.query(Logistics).filter_by(share_token=token).first()
+        if not logistics or logistics.float_plan_snapshot is None:
+            raise NoResultFound("Float plan link not found")
+        now = datetime.now(timezone.utc)
+        if logistics.share_token_expires_at and logistics.share_token_expires_at < now:
+            raise ValueError("share_link_expired")
+        return logistics.float_plan_snapshot
+
+    @staticmethod
     def get(trip_id: str) -> Optional[Logistics]:
         return db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
 
