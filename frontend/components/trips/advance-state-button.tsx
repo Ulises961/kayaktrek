@@ -18,8 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const TRANSITIONS: Record<TripState, { state: TripState; label: string; description: string } | null> = {
-  draft:     { state: "planning",  label: "Start planning",   description: "The trip moves to planning. This cannot be undone." },
-  planning:  { state: "happening", label: "Begin expedition", description: "The expedition is now underway. This cannot be undone." },
+  building:  { state: "happening", label: "Begin expedition", description: "The expedition is now underway. This cannot be undone." },
   happening: { state: "past",      label: "Mark as past",     description: "The trip will be marked as completed. This cannot be undone." },
   past:      null,
 }

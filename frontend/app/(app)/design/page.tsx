@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { WindIcon, WavesIcon, MapPinIcon, UsersIcon, RadioIcon } from "lucide-react"
-import type { Trip } from "@/lib/dtos/trip"
+import { TRIP_STATES, TRIP_STATE_LABELS, type Trip } from "@/lib/dtos/trip"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ const MOCK_TRIPS: Trip[] = [
   {
     id: "01952f1a-0000-7000-8000-000000000002",
     destination: "Sardinia — Gulf of Orosei",
-    state: "planning",
+    state: "building",
     dateFrom: "2026-08-02",
     dateTo: "2026-08-07",
     travellers: [
@@ -56,7 +56,7 @@ const MOCK_TRIPS: Trip[] = [
   {
     id: "01952f1a-0000-7000-8000-000000000003",
     destination: "Costa Brava Circuit",
-    state: "draft",
+    state: "building",
     travellers: [],
   },
   {
@@ -206,20 +206,19 @@ export default function DesignPage() {
       {/* ── 4. State system ──────────────────────────────────────────────────── */}
       <Section title="4 — Trip states">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(["draft", "planning", "happening", "past"] as const).map((state) => {
-            const meta = {
-              draft:     { desc: "Idea captured, nothing confirmed yet.",       icon: MapPinIcon },
-              planning:  { desc: "Route set, crew invited, logistics underway.", icon: UsersIcon },
-              happening: { desc: "Expedition is live. Crew on water.",           icon: RadioIcon },
-              past:      { desc: "Trip completed. Logs and photos archived.",    icon: WavesIcon },
-            }[state]
-            const Icon = meta.icon
+          {TRIP_STATES.map((state) => {
+            const meta: Record<typeof state, { desc: string; icon: React.ElementType }> = {
+              building:  { desc: "Crew invited, logistics underway.",         icon: UsersIcon },
+              happening: { desc: "Expedition is live. Crew on water.",         icon: RadioIcon },
+              past:      { desc: "Trip completed. Logs and photos archived.",  icon: WavesIcon },
+            }
+            const { desc, icon: Icon } = meta[state]
             return (
               <div key={state} className="flex items-start gap-3 p-4 rounded-lg border border-border bg-[var(--surface-2,var(--muted))]">
                 <Icon className="size-4 mt-0.5 text-muted-foreground shrink-0" />
                 <div className="flex flex-col gap-1">
                   <StateBadge state={state} />
-                  <p className="text-xs text-muted-foreground mt-1">{meta.desc}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
                 </div>
               </div>
             )
@@ -237,7 +236,7 @@ export default function DesignPage() {
               <p className="text-xs text-muted-foreground px-2 pb-1">surface-2 — mid layer</p>
               <div className="rounded-md border border-border p-4 bg-[var(--surface-1,var(--card))] flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">surface-1 — card / top</span>
-                <StateBadge state="planning" />
+                <StateBadge state="building" />
               </div>
             </div>
           </div>

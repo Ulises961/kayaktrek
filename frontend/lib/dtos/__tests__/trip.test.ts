@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { TripMemberSchema } from "../trip-member"
-import { TripSchema, TripPageSchema } from "../trip"
+import { TripSchema, TripPageSchema, TRIP_STATES } from "../trip"
 
 const MEMBER_USER = {
   id: "01952f1a-0000-7000-8000-000000000001",
@@ -25,7 +25,7 @@ const CREW_MEMBER = {
 
 const TRIP_FIXTURE = {
   id: "01952f1a-0000-7000-8000-000000000010",
-  state: "planning",
+  state: "building",
   destination: "Costa Brava",
   description: "Five days along the coast",
   dateFrom: "2026-07-01",
@@ -69,7 +69,7 @@ describe("TripSchema", () => {
   })
 
   it("accepts all valid states", () => {
-    for (const state of ["draft", "planning", "happening", "past"] as const) {
+    for (const state of TRIP_STATES) {
       const result = TripSchema.safeParse({ ...TRIP_FIXTURE, state })
       expect(result.success).toBe(true)
     }

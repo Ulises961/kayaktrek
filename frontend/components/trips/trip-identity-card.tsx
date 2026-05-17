@@ -8,6 +8,7 @@ import { AnchorIcon, CalendarIcon, PencilIcon, UsersIcon, XIcon } from "lucide-r
 import {
   TRIP_DIFFICULTIES,
   TRIP_STATES,
+  TRIP_STATE_LABELS,
   TripFieldsSchema,
   type Trip,
   type TripFields,
@@ -33,17 +34,10 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 }
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  easy:      "text-green-600 dark:text-green-400",
-  moderate:  "text-amber-600 dark:text-amber-400",
+  easy: "text-green-600 dark:text-green-400",
+  moderate: "text-amber-600 dark:text-amber-400",
   demanding: "text-orange-600 dark:text-orange-400",
-  expert:    "text-red-600 dark:text-red-400",
-}
-
-const STATE_LABELS: Record<TripState, string> = {
-  draft: "Draft",
-  planning: "Planning",
-  happening: "Happening",
-  past: "Past",
+  expert: "text-red-600 dark:text-red-400",
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,29 +58,26 @@ function StateTimeline({ currentState }: { currentState: TripState }) {
         <Fragment key={s}>
           <div className="flex flex-col items-center gap-1.5 shrink-0">
             <div
-              className={`size-3.5 rounded-full border-2 transition-colors ${
-                i === currentIndex
+              className={`size-3.5 rounded-full border-2 transition-colors ${i === currentIndex
                   ? "bg-primary border-primary"
                   : i < currentIndex
                     ? "bg-primary/30 border-primary/30"
                     : "bg-background border-border"
-              }`}
+                }`}
             />
             <span
-              className={`text-[10px] capitalize leading-none ${
-                i === currentIndex
+              className={`text-[10px] capitalize leading-none ${i === currentIndex
                   ? "text-foreground font-semibold"
                   : "text-muted-foreground"
-              }`}
+                }`}
             >
-              {STATE_LABELS[s]}
+              {TRIP_STATE_LABELS[s]}
             </span>
           </div>
           {i < TRIP_STATES.length - 1 && (
             <div
-              className={`flex-1 h-0 min-w-4 mt-[5px] border-t border-dashed ${
-                i < currentIndex ? "border-primary/40" : "border-border"
-              }`}
+              className={`flex-1 h-0 min-w-4 mt-[5px] border-t border-dashed ${i < currentIndex ? "border-primary/40" : "border-border"
+                }`}
             />
           )}
         </Fragment>
@@ -111,9 +102,9 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
   const days =
     trip.dateFrom && trip.dateTo
       ? Math.round(
-          (new Date(trip.dateTo).getTime() - new Date(trip.dateFrom).getTime()) /
-            86_400_000
-        )
+        (new Date(trip.dateTo).getTime() - new Date(trip.dateFrom).getTime()) /
+        86_400_000
+      )
       : null
 
   const { register, handleSubmit, control, reset, setError, formState: { errors } } =
@@ -181,6 +172,7 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Edit trip"
                 className="size-7 text-muted-foreground"
                 onClick={() => (isEditing ? handleCancel() : setIsEditing(true))}
               >
@@ -198,8 +190,8 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
             <FieldLabel>
               <CalendarIcon className="inline size-3 mr-0.5 -mt-px" />
               {" "}Dates   {days !== null && (
-                      <span className="text-xs text-muted-foreground ml-1.5">({days} days)</span>
-                    )}
+                <span className="text-xs text-muted-foreground ml-1.5">({days} days)</span>
+              )}
             </FieldLabel>
             {isEditing ? (
               <div className="flex flex-col gap-2">
