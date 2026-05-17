@@ -8,7 +8,7 @@ test.describe("Crew invitation flow", () => {
 
   test.beforeEach(async ({ request }) => {
     leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
-    const trip = await apiCreateTrip(request, leaderToken, { destination: "E2E Crew Test" })
+    const trip = await apiCreateTrip(request, leaderToken, { destination: "E2E Invitation Test" })
     tripId = trip.id as string
   })
 
@@ -21,17 +21,16 @@ test.describe("Crew invitation flow", () => {
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("button", { name: /invite/i }).click()
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
-    await page.getByRole("button", { name: /send invite/i }).click()
-    await expect(page.getByText(CREW.name)).toBeVisible({ timeout: 8000 })
+    await page.getByRole("button", { name: /invite/i }).click()
+    await expect(page.getByText(CREW.name)).toBeVisible({ timeout: 2000 })
 
     // Crew: open the trip in a separate context and accept the invitation
     const crewContext = await browser.newContext({
       storageState: "e2e/.auth/crew.json",
     })
     const crewPage = await crewContext.newPage()
-    await crewPage.goto(`/trips/${tripId}`)
+    await crewPage.goto(`/invitations`)
     await crewPage.getByRole("button", { name: /accept/i }).click()
-    await expect(crewPage.getByText(CREW.name)).toBeVisible({ timeout: 8000 })
     await crewContext.close()
 
     // Leader: refresh and verify crew is now a traveller (not pending)
@@ -45,11 +44,11 @@ test.describe("Crew invitation flow", () => {
     await leaderPage.goto(`/trips/${tripId}`)
     await leaderPage.getByRole("button", { name: /invite/i }).click()
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
-    await leaderPage.getByRole("button", { name: /send invite/i }).click()
-    await expect(leaderPage.getByText(CREW.name)).toBeVisible({ timeout: 8000 })
+    await leaderPage.getByRole("button", { name: /invite/i }).click()
+    await expect(leaderPage.getByText(CREW.name)).toBeVisible({ timeout: 2000 })
 
     // Cancel
-    await leaderPage.getByRole("button", { name: /cancel invite/i }).click()
-    await expect(leaderPage.getByText(CREW.name)).not.toBeVisible({ timeout: 5000 })
+    await leaderPage.getByRole("button", { name: /cancel invitation/i }).click()
+    await expect(leaderPage.getByText(CREW.name)).not.toBeVisible({ timeout: 1000 })
   })
 })

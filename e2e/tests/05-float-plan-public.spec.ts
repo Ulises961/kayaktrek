@@ -33,7 +33,7 @@ test.describe("Public float plan viewer", () => {
 
     await page.goto(`/float-plan/${shareToken}`)
     await expect(page.getByText("E2E Share Test")).toBeVisible()
-    await expect(page.getByText(/crew/i)).toBeVisible()
+    await expect(page.getByRole("heading", { name: /crew manifest/i })).toBeVisible()
     await context.close()
   })
 

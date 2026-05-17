@@ -29,19 +29,14 @@ test.describe("Member removal", () => {
     await page.getByText(CREW.name).hover()
     await page.getByRole("button", { name: /remove/i }).click()
     await page.getByRole("button", { name: /confirm/i }).click()
-    await expect(page.getByText(CREW.name)).not.toBeVisible({ timeout: 8000 })
+    await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible({ timeout: 1000 })
 
     // Crew: attempt to navigate to the trip — should get 403 or redirect
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    const response = await crewPage.goto(`/trips/${tripId}`)
-    // Either redirected away or gets a not-found / forbidden page
-    const isForbidden =
-      response?.status() === 403 ||
-      response?.status() === 404 ||
-      crewPage.url().includes("/dashboard") ||
-      crewPage.url().includes("/login")
-    expect(isForbidden).toBeTruthy()
+    await crewPage.goto(`/trips/${tripId}`)
+    // Next.js renders the not-found page inline (200 status, same URL) when the API returns 403
+    await expect(crewPage.getByRole("heading", { name: /destination not found/i })).toBeVisible()
     await crewContext.close()
   })
 })

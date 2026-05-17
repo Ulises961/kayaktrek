@@ -10,8 +10,12 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
   test.beforeEach(async ({ request }) => {
     leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
 
-    // Set vessel info on the leader's profile via API
-    await request.patch(`${API_URL}/api/user/profile`, {
+    // Get leader's user ID, then set vessel info on their profile via API
+    const meRes = await request.get(`${API_URL}/api/user/me`, {
+      headers: { Authorization: `Bearer ${leaderToken}` },
+    })
+    const me = await meRes.json()
+    await request.patch(`${API_URL}/api/user/${me.id}`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
       data: {
         vesselMake: "Seabird",
@@ -34,7 +38,7 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     await page.getByRole("tab", { name: /logistics/i }).click()
     await page.getByRole("tab", { name: /float plan/i }).click()
 
-    // Leader's vessel should appear in crew manifest
+    // Leader's vessel should appear in the float plan tab
     await expect(page.getByText("Seabird")).toBeVisible()
     await expect(page.getByText("Meridian")).toBeVisible()
   })
@@ -59,7 +63,7 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     await crewPage.getByRole("tab", { name: /logistics/i }).click()
     await crewPage.getByRole("tab", { name: /float plan/i }).click()
 
-    await crewPage.getByRole("button", { name: /edit vessel/i }).click()
+    await crewPage.getByRole("button", { name: "Edit", exact: true }).click()
     await crewPage.getByLabel(/make/i).fill("Prijon")
     await crewPage.getByLabel(/model/i).fill("Barracuda")
     await crewPage.getByRole("button", { name: /save/i }).click()

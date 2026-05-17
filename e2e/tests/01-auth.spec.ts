@@ -18,7 +18,7 @@ test("login with wrong password shows error", async ({ page }) => {
   await page.getByLabel("Password").fill("WrongPassword1!")
   await page.getByRole("button", { name: "Sign in" }).click()
   await expect(page).toHaveURL(/login/)
-  await expect(page.locator("p.text-red-600").first()).toBeVisible({ timeout: 5000 })
+  await expect(page.getByTestId("auth-error")).toBeVisible({ timeout: 2000 })
 })
 
 test("unauthenticated access to dashboard redirects to login", async ({ page }) => {

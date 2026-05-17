@@ -5,7 +5,7 @@ import type { Trip } from "@/lib/dtos/trip"
 
 const BASE_TRIP: Trip = {
   id: "01952f1a-0000-7000-8000-000000000010",
-  state: "planning",
+  state: "building",
   destination: "Costa Brava",
   dateFrom: "2026-07-01",
   dateTo: "2026-07-05",
@@ -36,7 +36,7 @@ describe("TripCard", () => {
 
   it("renders the state badge", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    expect(screen.getByText("Planning")).toBeDefined()
+    expect(screen.getByText("Building")).toBeDefined()
   })
 
   it("renders the date range", () => {

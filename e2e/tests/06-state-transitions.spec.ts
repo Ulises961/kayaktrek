@@ -27,7 +27,7 @@ test.describe("Trip state transitions", () => {
     await page.getByRole("button", { name: /begin expedition/i }).click()
     // Confirmation dialog
     await page.getByRole("button", { name: /confirm/i }).click()
-    await expect(page.getByText(/happening/i)).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('[data-slot="state-badge"]').filter({ hasText: /happening/i })).toBeVisible({ timeout: 1000 })
   })
 
   test("leader advances happening → past via UI", async ({ page, request }) => {
@@ -44,7 +44,7 @@ test.describe("Trip state transitions", () => {
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("button", { name: /mark as past/i }).click()
     await page.getByRole("button", { name: /confirm/i }).click()
-    await expect(page.getByText(/past/i)).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('[data-slot="state-badge"]').filter({ hasText: /past/i })).toBeVisible({ timeout: 1000 })
   })
 
   test("crew cannot transition state", async ({ browser, request }) => {

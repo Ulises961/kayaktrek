@@ -34,30 +34,35 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     await crewPage.goto(`/trips/${tripId}`)
     await crewPage.getByRole("tab", { name: /logistics/i }).click()
     await crewPage.getByRole("tab", { name: /float plan/i }).click()
-    await crewPage.getByRole("button", { name: /add medical notes/i }).click()
-    await crewPage.getByLabel(/medical notes/i).fill("Allergic to penicillin")
-    await crewPage.getByRole("button", { name: /save/i }).click()
-    await expect(crewPage.getByText(/medical notes saved/i).or(
-      crewPage.getByText(/encrypted/i)
-    )).toBeVisible({ timeout: 8000 })
+
+    // "Add notes" triggers the re-auth flow
+    await crewPage.getByRole("button", { name: /add notes/i }).click()
+    // Re-auth: enter password and continue
+    await crewPage.getByLabel(/password/i).fill(CREW_PWD)
+    await crewPage.getByRole("button", { name: /continue/i }).click()
+    // Textarea is now shown — fill in medical notes
+    await crewPage.getByPlaceholder(/allergies/i).fill("Allergic to penicillin")
+    // Save
+    await crewPage.getByRole("button", { name: /^save$/i }).click()
+    await expect(crewPage.getByText("Saved.")).toBeVisible({ timeout: 1000 })
+    // Share with trip leader so they can decrypt
+    await crewPage.getByRole("button", { name: /share with trip leader/i }).click()
     await crewContext.close()
 
-    // Leader: sees encrypted indicator, then decrypts
+    // Leader: navigate to the float plan page where the crew manifest lives
     const leaderContext = await browser.newContext({ storageState: "e2e/.auth/leader.json" })
     const leaderPage = await leaderContext.newPage()
-    await leaderPage.goto(`/trips/${tripId}`)
-    await leaderPage.getByRole("tab", { name: /logistics/i }).click()
-    await leaderPage.getByRole("tab", { name: /float plan/i }).click()
+    await leaderPage.goto(`/trips/${tripId}/float-plan`)
 
-    // Encrypted badge or icon should be visible for crew member's notes
-    await expect(leaderPage.getByText(/encrypted/i)).toBeVisible({ timeout: 5000 })
+    // "View medical notes" button is visible for the crew member who shared their notes
+    await expect(leaderPage.getByRole("button", { name: /view medical notes/i })).toBeVisible({ timeout: 1000 })
 
-    // Leader decrypts by providing their password
-    await leaderPage.getByRole("button", { name: /decrypt/i }).click()
-    await leaderPage.getByLabel(/password/i).fill(LEADER.pwd)
-    await leaderPage.getByRole("button", { name: /confirm/i }).click()
+    // Click to trigger the password dialog
+    await leaderPage.getByRole("button", { name: /view medical notes/i }).click()
+    await leaderPage.getByRole("dialog").locator("[type=password]").fill(LEADER.pwd)
+    await leaderPage.getByRole("button", { name: /view notes/i }).click()
 
-    await expect(leaderPage.getByText("Allergic to penicillin")).toBeVisible({ timeout: 8000 })
+    await expect(leaderPage.getByText("Allergic to penicillin")).toBeVisible({ timeout: 2000 })
     await leaderContext.close()
   })
 })
