@@ -94,7 +94,7 @@ export function LoginForm() {
               </p>
             </div>
           ) : (
-            <p className="text-[11px] text-red-600">{serverState.error}</p>
+            <p className="text-[11px] text-red-600" data-testid="auth-error">{serverState.error}</p>
           )
         )}
 
