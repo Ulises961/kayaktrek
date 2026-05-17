@@ -6,7 +6,9 @@ from http import HTTPStatus
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
+from Api.database import db
 from Api.limiter import limiter
+from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
@@ -85,6 +87,27 @@ def register_user():
         "message": "Account created. Check your email to verify your account before logging in.",
     }
     return jsonify(response_object), HTTPStatus.CREATED
+
+
+@api.route("/api/auth/activate-test", methods=["POST"])
+def activate_test_user():
+    """Bypass email verification for E2E tests. Only available in development/testing."""
+    if not current_app.config.get("DEVELOPMENT") and not current_app.config.get("TESTING"):
+        abort(HTTPStatus.NOT_FOUND)
+    data = request.get_json(silent=True) or {}
+    mail = data.get("mail")
+    if not mail:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
+    try:
+        user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
+        if not user:
+            abort(HTTPStatus.NOT_FOUND, description="User not found")
+        user.active = True
+        db.session.commit()
+        return jsonify({"status": "activated"}), HTTPStatus.OK
+    except Exception as e:
+        logger.error("activate_test_user_failed", extra={"error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 @api.route("/api/auth/verify", methods=["GET"])
