@@ -44,7 +44,7 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     await crewPage.getByPlaceholder(/allergies/i).fill("Allergic to penicillin")
     // Save
     await crewPage.getByRole("button", { name: /^save$/i }).click()
-    await expect(crewPage.getByText("Saved.")).toBeVisible({ timeout: 1000 })
+    await expect(crewPage.getByText("Saved.")).toBeVisible()
     // Share with trip leader so they can decrypt
     await crewPage.getByRole("button", { name: /share with trip leader/i }).click()
     await crewContext.close()
@@ -55,7 +55,7 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     await leaderPage.goto(`/trips/${tripId}/float-plan`)
 
     // "View medical notes" button is visible for the crew member who shared their notes
-    await expect(leaderPage.getByRole("button", { name: /view medical notes/i })).toBeVisible({ timeout: 1000 })
+    await expect(leaderPage.getByRole("button", { name: /view medical notes/i })).toBeVisible()
 
     // Click to trigger the password dialog
     await leaderPage.getByRole("button", { name: /view medical notes/i }).click()

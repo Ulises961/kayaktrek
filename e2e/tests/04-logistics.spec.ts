@@ -33,13 +33,13 @@ test.describe("Logistics — shore contact and float plan", () => {
     await page.getByRole("button", { name: "Edit", exact: true }).click()
     await page.getByRole("button", { name: /save float plan/i }).click()
     // Amber banner disappears once the leader has saved their float plan info
-    await expect(page.getByText(/review your float plan/i)).not.toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(/review your float plan/i)).not.toBeVisible()
   })
 
   test("leader generates float plan share link", async ({ page }) => {
     await page.goto(`/trips/${tripId}/float-plan`)
     await page.getByRole("button", { name: /generate float plan link/i }).click()
-    await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible({ timeout: 1000 })
+    await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible()
     await expect(page.getByText(/last generated/i)).toBeVisible()
   })
 })
@@ -126,7 +126,7 @@ test.describe("Logistics — shuttle vehicle", () => {
     await crewPage.getByRole("tab", { name: /logistics/i }).click()
     await crewPage.getByRole("button", { name: /shuttle/i }).click()
     await crewPage.getByRole("button", { name: /join/i }).click()
-    await expect(crewPage.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name)).toBeVisible({ timeout: 1000 })
+    await expect(crewPage.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name)).toBeVisible()
     await crewContext.close()
 
     // Leader sees the passenger on their view

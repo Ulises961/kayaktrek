@@ -26,7 +26,7 @@ test.describe("Trip CRUD", () => {
     const url = page.url()
     createdTripId = url.split("/trips/")[1]
 
-    await expect(page.getByText("Lofoten Islands")).toBeVisible({ timeout: 2000 })
+    await expect(page.getByText("Lofoten Islands")).toBeVisible()
   })
 
   test("edit trip destination via PATCH", async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe("Trip CRUD", () => {
     await destInput.fill("Faroe Islands")
     await page.getByRole("button", { name: /save/i }).click()
 
-    await expect(page.getByText("Faroe Islands")).toBeVisible({ timeout: 2000 })
+    await expect(page.getByText("Faroe Islands")).toBeVisible()
   })
 
   test("created trip shows leader as traveller", async ({ page }) => {

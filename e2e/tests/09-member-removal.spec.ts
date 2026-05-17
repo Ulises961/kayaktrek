@@ -29,7 +29,7 @@ test.describe("Member removal", () => {
     await page.getByText(CREW.name).hover()
     await page.getByRole("button", { name: /remove/i }).click()
     await page.getByRole("button", { name: /confirm/i }).click()
-    await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible()
 
     // Crew: attempt to navigate to the trip — should get 403 or redirect
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })

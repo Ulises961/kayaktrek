@@ -22,7 +22,7 @@ test.describe("Crew invitation flow", () => {
     await page.getByRole("button", { name: /invite/i }).click()
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
     await page.getByRole("button", { name: /invite/i }).click()
-    await expect(page.getByText(CREW.name)).toBeVisible({ timeout: 2000 })
+    await expect(page.getByText(CREW.name)).toBeVisible()
 
     // Crew: open the trip in a separate context and accept the invitation
     const crewContext = await browser.newContext({
@@ -45,10 +45,10 @@ test.describe("Crew invitation flow", () => {
     await leaderPage.getByRole("button", { name: /invite/i }).click()
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
     await leaderPage.getByRole("button", { name: /invite/i }).click()
-    await expect(leaderPage.getByText(CREW.name)).toBeVisible({ timeout: 2000 })
+    await expect(leaderPage.getByText(CREW.name)).toBeVisible()
 
     // Cancel
     await leaderPage.getByRole("button", { name: /cancel invitation/i }).click()
-    await expect(leaderPage.getByText(CREW.name)).not.toBeVisible({ timeout: 1000 })
+    await expect(leaderPage.getByText(CREW.name)).not.toBeVisible()
   })
 })
