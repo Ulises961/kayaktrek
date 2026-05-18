@@ -5,6 +5,7 @@ import logging
 
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
+from werkzeug.utils import secure_filename
 
 from Api.database import db
 from Models.travel_document import TravelDocument, TravelDocumentType
@@ -171,7 +172,8 @@ class TravelDocumentService:
         if doc.attachment_path:
             StorageService.delete(doc.attachment_path, "document")
 
-        object_key = f"{doc.trip_id}/{document_id}/{filename}"
+        safe_name = secure_filename(filename) or "attachment"
+        object_key = f"{doc.trip_id}/{document_id}/{safe_name}"
         StorageService.upload(file_bytes, object_key, "document")
         doc.attachment_path = object_key
 
