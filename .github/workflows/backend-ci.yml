@@ -24,7 +24,7 @@ jobs:
           POSTGRES_PASSWORD: kayak_test_password
           POSTGRES_DB: kayak_test
         ports:
-          - 5432:5432
+          - 5434:5432
         options: >-
           --health-cmd "pg_isready -U kayak"
           --health-interval 10s
@@ -37,7 +37,7 @@ jobs:
 
     env:
       CONFIG_MODE: testing
-      DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5432/kayak_test
+      DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5434/kayak_test
       SECRET_KEY: ci-secret-key-not-used-in-prod
       JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
 
