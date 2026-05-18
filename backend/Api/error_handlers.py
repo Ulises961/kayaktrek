@@ -36,14 +36,9 @@ def register_error_handlers(app):
         """Handle database integrity constraint violations."""
         db.session.rollback()
         logger.error(f"Database integrity error: {str(error)}")
-        
-        # Extract useful error message
-        error_msg = str(error.orig) if hasattr(error, 'orig') else str(error)
-        
         return jsonify({
             "error": "Integrity Error",
             "message": "Database constraint violation. This may be due to duplicate or invalid data.",
-            "detail": error_msg
         }), 400
     
     @app.errorhandler(ValidationError)
