@@ -16,6 +16,7 @@ export async function upsertLogistics(tripId: string, fields: Partial<LogisticsF
   try {
     await apiPut(`/api/logistics/${tripId}`, fields)
     revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/float-plan`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
