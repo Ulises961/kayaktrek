@@ -10,6 +10,8 @@ export const LogisticsSchema = z.object({
   shoreContactRelationship: z.string().nullish(),
   shuttleNotes: z.string().nullish(),
   shuttleMeetingTime: z.string().nullish(),
+  shareToken: z.string().nullish(),
+  snapshotGeneratedAt: z.string().nullish(),
 })
 
 export const LogisticsFieldsSchema = z.object({

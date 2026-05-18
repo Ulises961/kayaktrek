@@ -5,8 +5,14 @@ import { InventorySchema } from "./inventory"
 import { ItinerarySchema } from "./itinerary"
 import { noHtmlTags, isoDateField } from "../validators"
 
-export const TRIP_STATES = ["draft", "planning", "happening", "past"] as const
+export const TRIP_STATES = ["building", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]
+
+export const TRIP_STATE_LABELS: Record<TripState, string> = {
+  building:  "Building",
+  happening: "Happening",
+  past:      "Past",
+}
 
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
 export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]

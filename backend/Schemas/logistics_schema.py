@@ -12,6 +12,13 @@ class LogisticsSchema(BaseSchema):
     shore_contact_relationship = fields.String(allow_none=True, load_default=None)
     shuttle_notes = fields.String(allow_none=True, load_default=None)
     shuttle_meeting_time = fields.String(allow_none=True, load_default=None)
+    share_token = fields.String(dump_only=True, allow_none=True)
+    snapshot_generated_at = fields.Method("get_snapshot_generated_at", dump_only=True)
+
+    def get_snapshot_generated_at(self, obj):
+        if obj.float_plan_snapshot:
+            return obj.float_plan_snapshot.get("generatedAt")
+        return None
 
     @validates("shore_contact_phone")
     def validate_phone(self, value, **kwargs):

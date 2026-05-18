@@ -1,14 +1,18 @@
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 import logging
 
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.orm import joinedload
 
 from Api.database import db
 from Models.logistics import Logistics
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Schemas.base_schema import camelcase
+from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +29,23 @@ def _require_editable(trip: Trip) -> None:
 
 
 class LogisticsService:
+
+    @staticmethod
+    def get_by_token(token: str) -> dict:
+        """
+        Return the float plan snapshot for a valid, non-expired share token.
+
+        Raises:
+            NoResultFound: token unknown or snapshot not yet generated
+            ValueError("share_link_expired"): token exists but past its expiry date
+        """
+        logistics = db.session.query(Logistics).filter_by(share_token=token).first()
+        if not logistics or logistics.float_plan_snapshot is None:
+            raise NoResultFound("Float plan link not found")
+        now = datetime.now(timezone.utc)
+        if logistics.share_token_expires_at and logistics.share_token_expires_at < now:
+            raise ValueError("share_link_expired")
+        return logistics.float_plan_snapshot
 
     @staticmethod
     def get(trip_id: str) -> Optional[Logistics]:
@@ -79,3 +100,163 @@ class LogisticsService:
         db.session.refresh(logistics)
         logger.info("logistics_upserted", extra={"trip_id": trip_id, "user_id": user_id})
         return logistics
+
+    @staticmethod
+    def build_snapshot(trip_id: str) -> dict:
+        """
+        Build the frozen float plan snapshot blob (ADR-022 schema).
+        Medical notes are excluded entirely.
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if not trip:
+            raise NoResultFound(f"Trip {trip_id} not found")
+
+        logistics = db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
+
+        members = (
+            db.session.query(TripMember)
+            .filter_by(trip_id=UUID(trip_id))
+            .options(joinedload(TripMember.user))
+            .all()
+        )
+
+        crew = []
+        for m in members:
+            u = m.user
+            full_name = u.name + (f" {u.surname}" if u.surname else "")
+            crew.append({
+                "name": full_name,
+                "mail": u.mail,
+                "role": m.role.value,
+                "floatPlanConfirmedAt": m.float_plan_confirmed_at.isoformat() if m.float_plan_confirmed_at else None,
+                "vessel": {
+                    "make": m.vessel_make,
+                    "model": m.vessel_model,
+                    "lengthCm": m.vessel_length_cm,
+                    "colorPrimary": m.vessel_color_primary,
+                    "colorSecondary": m.vessel_color_secondary,
+                },
+                "emergencyContact": {
+                    "name": m.emergency_contact_name,
+                    "phone": m.emergency_contact_phone,
+                    "relationship": m.emergency_contact_relationship,
+                },
+            })
+
+        shore_contact = None
+        if logistics:
+            shore_contact = {
+                "name": logistics.shore_contact_name,
+                "email": logistics.shore_contact_email,
+                "phone": logistics.shore_contact_phone,
+                "relationship": logistics.shore_contact_relationship,
+            }
+
+        return {
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "trip": {
+                "destination": trip.destination,
+                "dateFrom": trip.date_from.isoformat() if trip.date_from else None,
+                "dateTo": trip.date_to.isoformat() if trip.date_to else None,
+            },
+            "shoreContact": shore_contact,
+            "crew": crew,
+        }
+
+    @staticmethod
+    def generate_share(trip_id: str, user_id: str) -> Logistics:
+        """
+        Generate (or regenerate) the float plan share token and snapshot.
+        Leader-only. Previous token is immediately invalidated.
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if not trip:
+            raise NoResultFound(f"Trip {trip_id} not found")
+
+        membership = db.session.query(TripMember).filter_by(
+            user_id=UUID(user_id), trip_id=UUID(trip_id)
+        ).first()
+        if not membership or membership.role != MemberRoleType.LEADER:
+            raise PermissionError("Only the trip leader can generate the float plan link")
+
+        logistics = db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
+        if logistics is None:
+            logistics = Logistics()
+            logistics.trip_id = UUID(trip_id)
+            db.session.add(logistics)
+
+        snapshot = LogisticsService.build_snapshot(trip_id)
+
+        now = datetime.now(timezone.utc)
+        if trip.date_to:
+            date_to_aware = datetime(
+                trip.date_to.year, trip.date_to.month, trip.date_to.day, tzinfo=timezone.utc
+            )
+            expires_at = max(date_to_aware, now) + timedelta(days=15)
+        else:
+            expires_at = now + timedelta(days=15)
+
+        logistics.share_token = secrets.token_urlsafe(32)
+        logistics.float_plan_snapshot = snapshot
+        logistics.share_token_expires_at = expires_at
+
+        db.session.commit()
+        db.session.refresh(logistics)
+        logger.info("float_plan_share_generated", extra={"trip_id": trip_id, "user_id": user_id})
+        return logistics
+
+    @staticmethod
+    def send_share_email(trip_id: str, user_id: str, frontend_url: str) -> None:
+        """
+        Send the float_plan_share email to the shore contact.
+        Leader-only. Requires share_token and shore_contact_email to exist.
+
+        Raises:
+            NoResultFound: trip not found or user not a member
+            PermissionError: caller is not the leader
+            ValueError("no_token"): share link not yet generated
+            ValueError("no_shore_contact_email"): shore contact email not set
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if not trip:
+            raise NoResultFound(f"Trip {trip_id} not found")
+
+        membership = (
+            db.session.query(TripMember)
+            .options(joinedload(TripMember.user))
+            .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
+            .first()
+        )
+        if not membership or membership.role != MemberRoleType.LEADER:
+            raise PermissionError("Only the trip leader can email the shore contact")
+
+        logistics = db.session.query(Logistics).filter_by(trip_id=UUID(trip_id)).first()
+        if not logistics or not logistics.share_token:
+            raise ValueError("no_token")
+        if not logistics.shore_contact_email:
+            raise ValueError("no_shore_contact_email")
+
+        leader = membership.user
+        leader_name = leader.name + (f" {leader.surname}" if leader.surname else "")
+
+        if trip.date_from and trip.date_to:
+            date_label = f"{trip.date_from.isoformat()} – {trip.date_to.isoformat()}"
+        elif trip.date_from:
+            date_label = f"from {trip.date_from.isoformat()}"
+        else:
+            date_label = "dates TBC"
+
+        float_plan_url = f"{frontend_url}/float-plan/{logistics.share_token}"
+        subject = f"Float plan — {trip.destination or 'kayak expedition'} ({date_label})"
+
+        send_template_email(
+            to=logistics.shore_contact_email,
+            subject=subject,
+            template="float_plan_share",
+            leader_name=leader_name,
+            destination=trip.destination or "kayak expedition",
+            date_label=date_label,
+            float_plan_url=float_plan_url,
+            support_email="support@kayakplanner.app",
+        )
+        logger.info("float_plan_share_email_sent", extra={"trip_id": trip_id, "user_id": user_id})

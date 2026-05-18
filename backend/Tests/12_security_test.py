@@ -72,7 +72,7 @@ def test_patch_trip_cannot_change_state(client, auth_headers):
     )
     assert trip_response.status_code == 201
     trip = json.loads(trip_response.data)
-    assert trip["state"] == "draft"
+    assert trip["state"] == "building"
 
     patch_response = client.patch(
         f"{TRIP_ENDPOINT}/{trip['id']}",
@@ -82,7 +82,7 @@ def test_patch_trip_cannot_change_state(client, auth_headers):
     assert patch_response.status_code == 200
     patched = json.loads(patch_response.data)
     # state must not have changed; destination should be updated
-    assert patched["state"] == "draft"
+    assert patched["state"] == "building"
     assert patched["destination"] == "Azores"
 
     client.delete(f"{TRIP_ENDPOINT}/{trip['id']}", headers=auth_headers)

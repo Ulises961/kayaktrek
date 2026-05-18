@@ -1,0 +1,14 @@
+{{ leader_name }} has shared a float plan with you.
+
+Expedition: {{ destination }}
+Dates: {{ date_label }}
+
+This float plan contains vessel descriptions and emergency contacts for everyone on the expedition. Keep it somewhere accessible.
+
+If {{ leader_name }} has not checked in by the expected return date and you cannot reach them, contact the relevant local emergency services and provide this information.
+
+View float plan:
+{{ float_plan_url }}
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

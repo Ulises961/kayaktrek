@@ -1,0 +1,78 @@
+{% extends "email/base.html" %}
+
+{% block subject %}Check-in overdue — {{ destination }}{% endblock %}
+
+{% block body %}
+<p style="margin:0 0 16px;font-size:16px;color:#1e293b;font-weight:bold;">
+  Check-in overdue — {{ checkpoint_name }}
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;background-color:#fffbeb;border-left:4px solid #d97706;border-radius:0 6px 6px 0;">
+  <tr>
+    <td style="padding:16px 20px;">
+      <p style="margin:0 0 8px;font-size:15px;color:#1e293b;line-height:1.6;">
+        A check-in was expected for <strong>{{ checkpoint_name }}</strong> by <strong>{{ expected_by }}</strong> and has not been recorded.
+      </p>
+      <p style="margin:0;font-size:15px;color:#475569;line-height:1.6;">
+        This may be due to limited connectivity in a remote area. If you are unable to make contact within a reasonable time, consider alerting the relevant local authorities.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;background-color:#f0f9ff;border-left:4px solid #0c4a6e;border-radius:0 6px 6px 0;">
+  <tr>
+    <td style="padding:16px 20px;">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#0c4a6e;text-transform:uppercase;letter-spacing:0.5px;">Expedition</p>
+      <p style="margin:0 0 12px;font-size:15px;color:#1e293b;">{{ destination }}</p>
+      <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#0c4a6e;text-transform:uppercase;letter-spacing:0.5px;">Dates</p>
+      <p style="margin:0;font-size:15px;color:#1e293b;">{{ date_label }}</p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 12px;font-size:15px;font-weight:bold;color:#1e293b;">Emergency contacts</p>
+
+{% for member in crew %}
+<table cellpadding="0" cellspacing="0" style="margin:0 0 12px;width:100%;border:1px solid #e2e8f0;border-radius:6px;">
+  <tr>
+    <td style="padding:14px 16px;">
+      <p style="margin:0 0 4px;font-size:14px;font-weight:bold;color:#1e293b;">
+        {{ member.name }}
+        <span style="font-weight:normal;color:#64748b;font-size:13px;">({{ member.role }})</span>
+      </p>
+      {% if member.emergencyContact.name %}
+      <p style="margin:0;font-size:14px;color:#475569;">
+        Emergency contact: <strong>{{ member.emergencyContact.name }}</strong>
+        {% if member.emergencyContact.relationship %} &middot; {{ member.emergencyContact.relationship }}{% endif %}
+        {% if member.emergencyContact.phone %} &middot; {{ member.emergencyContact.phone }}{% endif %}
+      </p>
+      {% else %}
+      <p style="margin:0;font-size:14px;color:#94a3b8;">No emergency contact provided.</p>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+{% endfor %}
+
+<p style="margin:24px 0 12px;font-size:15px;color:#475569;line-height:1.6;">
+  The full float plan (vessel descriptions and further details) is available at the link below.
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+  <tr>
+    <td style="background-color:#0c4a6e;border-radius:6px;">
+      <a href="{{ float_plan_url }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+        View float plan
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 8px;font-size:13px;color:#94a3b8;">
+  Or copy this link into your browser:
+</p>
+<p style="margin:0;font-size:13px;color:#64748b;word-break:break-all;">
+  {{ float_plan_url }}
+</p>
+{% endblock %}

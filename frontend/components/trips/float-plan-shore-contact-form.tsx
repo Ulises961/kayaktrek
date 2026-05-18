@@ -13,6 +13,7 @@ import { LogisticsFieldsSchema, type Logistics } from "@/lib/dtos/logistics"
 
 const ShoreContactFormSchema = LogisticsFieldsSchema.pick({
   shoreContactName: true,
+  shoreContactEmail: true,
   shoreContactPhone: true,
   shoreContactRelationship: true,
 })
@@ -42,6 +43,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
     resolver: zodResolver(ShoreContactFormSchema),
     defaultValues: {
       shoreContactName: logistics?.shoreContactName ?? "",
+      shoreContactEmail: logistics?.shoreContactEmail ?? "",
       shoreContactPhone: logistics?.shoreContactPhone ?? "",
       shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
     },
@@ -55,6 +57,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
   function handleCancel() {
     reset({
       shoreContactName: logistics?.shoreContactName ?? "",
+      shoreContactEmail: logistics?.shoreContactEmail ?? "",
       shoreContactPhone: logistics?.shoreContactPhone ?? "",
       shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
     })
@@ -72,8 +75,8 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
   }
 
   if (!isEditing) {
-    const { shoreContactName, shoreContactPhone, shoreContactRelationship } = logistics ?? {}
-    const hasAny = shoreContactName || shoreContactPhone
+    const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } = logistics ?? {}
+    const hasAny = shoreContactName || shoreContactPhone || shoreContactEmail
 
     return (
       <div className="flex items-start justify-between gap-4">
@@ -83,6 +86,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
               <FieldRow label="Name" value={shoreContactName} />
               <FieldRow label="Relationship" value={shoreContactRelationship} />
               <FieldRow label="Phone" value={shoreContactPhone} />
+              <FieldRow label="Email" value={shoreContactEmail} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground italic">No shore contact recorded.</p>
@@ -98,10 +102,14 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scName">Name</Label>
           <Input id="scName" disabled={isPending} {...register("shoreContactName")} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="scEmail">Email</Label>
+          <Input id="scEmail" type="email" disabled={isPending} {...register("shoreContactEmail")} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scPhone">Phone</Label>

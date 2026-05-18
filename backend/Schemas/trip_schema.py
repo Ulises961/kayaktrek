@@ -28,7 +28,7 @@ class TripSchema(BaseSchema):
         attribute="trip_members",
         dump_only=True,
     )
-    state = fields.Enum(TripStateType, by_value=True, load_default=TripStateType.DRAFT)
+    state = fields.Enum(TripStateType, by_value=True, load_default=TripStateType.BUILDING)
     difficulty = fields.Enum(TripDifficultyType, by_value=True, allow_none=True, load_default=None)
     description = fields.String(allow_none=True)
     destination = fields.String(allow_none=True)

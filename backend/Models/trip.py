@@ -20,8 +20,7 @@ if TYPE_CHECKING:
 
 
 class TripStateType(enum.Enum):
-    DRAFT = "draft"
-    PLANNING = "planning"
+    BUILDING = "building"
     HAPPENING = "happening"
     PAST = "past"
     ARCHIVED = "archived"
@@ -35,8 +34,7 @@ class TripDifficultyType(enum.Enum):
 
 
 _VALID_TRANSITIONS = {
-    TripStateType.DRAFT: TripStateType.PLANNING,
-    TripStateType.PLANNING: TripStateType.HAPPENING,
+    TripStateType.BUILDING: TripStateType.HAPPENING,
     TripStateType.HAPPENING: TripStateType.PAST,
 }
 
@@ -94,7 +92,7 @@ class Trip(BaseModel):
     state: Mapped[TripStateType] = mapped_column(
         Enum(TripStateType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
-        default=TripStateType.DRAFT,
+        default=TripStateType.BUILDING,
         index=True,
     )
     destination: Mapped[String] = mapped_column(String, nullable=True)

@@ -1,7 +1,9 @@
+from datetime import datetime
 from uuid import UUID as _UUID
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import UUID, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import UUID, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel
@@ -29,5 +31,11 @@ class Logistics(BaseModel):
     # Per-member assignments (who drives which car) are in ShuttleAssignment.
     shuttle_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     shuttle_meeting_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+
+    share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
+    float_plan_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    share_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     trip: Mapped["Trip"] = relationship(back_populates="logistics")

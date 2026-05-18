@@ -1,16 +1,16 @@
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
-import { AnchorIcon, ArrowLeftIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
+import { AnchorIcon, ArrowLeftIcon, LinkIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
 import React from "react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { PrintButton } from "@/components/trips/print-button"
-import { CopyLinkButton } from "@/components/trips/copy-link-button"
 import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
+import { FloatPlanShareSection } from "@/components/trips/float-plan-share-section"
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—"
@@ -96,7 +96,6 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
           <p className="text-sm text-muted-foreground">{dateLabel}</p>
         </div>
         <div className="flex gap-2 print:hidden">
-          <CopyLinkButton />
           <PrintButton />
         </div>
       </div>
@@ -120,6 +119,15 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
           Person who receives this float plan before departure.
         </p>
         <ShoreContactForm tripId={id} logistics={logistics} />
+      </section>
+
+      {/* Share link */}
+      <section className="rounded-lg border border-border bg-muted/30 p-4 print:hidden">
+        <SectionHeading icon={<LinkIcon className="size-3.5" />}>Share</SectionHeading>
+        <p className="text-xs text-muted-foreground mb-3 -mt-1">
+          Generate a read-only link for your shore contact. The link contains vessel descriptions and emergency contacts — no medical notes.
+        </p>
+        <FloatPlanShareSection tripId={id} logistics={logistics} />
       </section>
 
       {/* Crew Manifest */}

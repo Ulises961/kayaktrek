@@ -37,7 +37,7 @@ const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const TRIP: Trip = {
   id: TRIP_ID,
   destination: "Isle of Skye",
-  state: "planning",
+  state: "building",
   dateFrom: "2026-07-01",
   dateTo: "2026-07-07",
   description: "A coastal circumnavigation",

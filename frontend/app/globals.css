@@ -422,4 +422,10 @@
   main {
     padding: 0 !important;
   }
+
+  /* Float plan public page — preserve colour intent on print */
+  .fp-crew-card {
+    page-break-inside: avoid;
+    border-color: #ccc !important;
+  }
 }

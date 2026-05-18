@@ -33,9 +33,9 @@ def test_insert_trip_w_o_itinerary(client, auth_headers):
     assert response.status_code == 201
 
 
-def test_new_trip_defaults_to_draft_state(client, auth_headers):
+def test_new_trip_defaults_to_building_state(client, auth_headers):
     data = _create_trip(client, auth_headers)
-    assert data["state"] == "draft"
+    assert data["state"] == "building"
 
 
 def test_get_all_trips(client, auth_headers, id):
@@ -52,16 +52,8 @@ def test_get_trip_by_id(client, auth_headers):
 
 # --- State machine ---
 
-def test_transition_draft_to_planning(client, auth_headers):
+def test_transition_building_to_happening(client, auth_headers):
     data = _create_trip(client, auth_headers)
-    response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "planning"}, headers=auth_headers)
-    assert response.status_code == 200
-    assert json.loads(response.data)["state"] == "planning"
-
-
-def test_transition_planning_to_happening(client, auth_headers):
-    data = _create_trip(client, auth_headers)
-    client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "planning"}, headers=auth_headers)
     response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "happening"}, headers=auth_headers)
     assert response.status_code == 200
     assert json.loads(response.data)["state"] == "happening"
@@ -69,7 +61,6 @@ def test_transition_planning_to_happening(client, auth_headers):
 
 def test_transition_happening_to_past(client, auth_headers):
     data = _create_trip(client, auth_headers)
-    client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "planning"}, headers=auth_headers)
     client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "happening"}, headers=auth_headers)
     response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "past"}, headers=auth_headers)
     assert response.status_code == 200
@@ -78,14 +69,14 @@ def test_transition_happening_to_past(client, auth_headers):
 
 def test_transition_skipping_state_is_rejected(client, auth_headers):
     data = _create_trip(client, auth_headers)
-    response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "happening"}, headers=auth_headers)
+    response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "past"}, headers=auth_headers)
     assert response.status_code == 400
 
 
 def test_transition_backward_is_rejected(client, auth_headers):
     data = _create_trip(client, auth_headers)
-    client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "planning"}, headers=auth_headers)
-    response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "draft"}, headers=auth_headers)
+    client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "happening"}, headers=auth_headers)
+    response = client.post(f"{TRIP_ENDPOINT}/{data['id']}/state", json={"state": "building"}, headers=auth_headers)
     assert response.status_code == 400
 
 
@@ -114,7 +105,7 @@ def test_non_member_cannot_transition_state(client, auth_headers, outsider_heade
     data = _create_trip(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{data['id']}/state",
-        json={"state": "planning"},
+        json={"state": "happening"},
         headers=outsider_headers,
     )
     assert response.status_code == 403
@@ -125,11 +116,11 @@ def test_leader_can_transition_state(client, auth_headers):
     data = _create_trip(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{data['id']}/state",
-        json={"state": "planning"},
+        json={"state": "happening"},
         headers=auth_headers,
     )
     assert response.status_code == 200
-    assert json.loads(response.data)["state"] == "planning"
+    assert json.loads(response.data)["state"] == "happening"
 
 
 def test_crew_cannot_transition_state(client, trip_with_crew):
@@ -137,7 +128,7 @@ def test_crew_cannot_transition_state(client, trip_with_crew):
     trip_id = trip_with_crew["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/state",
-        json={"state": "planning"},
+        json={"state": "happening"},
         headers=trip_with_crew["crew_headers"],
     )
     assert response.status_code == 403
@@ -189,7 +180,7 @@ def test_patch_trip_ignores_unknown_fields(client, auth_headers):
     assert response.status_code == 200
     body = json.loads(response.data)
     assert body["destination"] == "Iceland"
-    assert body["state"] == "draft"
+    assert body["state"] == "building"
 
 
 def test_non_member_cannot_patch_trip(client, auth_headers, outsider_headers):
