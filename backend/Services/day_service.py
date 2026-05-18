@@ -37,10 +37,8 @@ class DayService:
         day = (
             db.session.query(Day)
             .options(
-                selectinload(Day.sea),
-                selectinload(Sea.sea_states),
-                selectinload(Day.weather),
-                selectinload(Weather.weather_states),
+                selectinload(Day.sea).selectinload(Sea.sea_states),
+                selectinload(Day.weather).selectinload(Weather.weather_states),
             )
             .filter_by(id=UUID(day_id))
             .first()
