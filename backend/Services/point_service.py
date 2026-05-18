@@ -13,12 +13,18 @@ from Models.day import Day
 from Models.itinerary import Itinerary
 from Models.image import Image
 from Models.point import Point, PointType
+from Models.trip import Trip, TripStateType
 from Schemas.base_schema import camelcase
 from Schemas.image_schema import ImageSchema
 from Schemas.point_schema import PointSchema
 from Api.database import db
 
 logger = logging.getLogger(__name__)
+
+
+def _require_editable(trip: Trip) -> None:
+    if trip.state in (TripStateType.PAST, TripStateType.ARCHIVED):
+        raise ValueError("Cannot modify an itinerary on a completed trip")
 
 
 class PointService:
@@ -100,6 +106,13 @@ class PointService:
         """
         logger.info(f"Creating new point")
         point: Point = cast(Point, PointSchema().load(point_data))
+        day = db.session.query(Day).filter_by(id=point.day_id).first()
+        if day:
+            itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
+            if itinerary and itinerary.trip_id:
+                trip = db.session.query(Trip).filter_by(id=itinerary.trip_id).first()
+                if trip:
+                    _require_editable(trip)
         PointService._sync_geo(point)
         db.session.add(point)
         db.session.commit()

@@ -71,6 +71,8 @@ def create_day():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity error creating day: {e}")
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")

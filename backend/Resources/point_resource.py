@@ -66,6 +66,8 @@ def create_point():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity Error creating point: {e}")
         db.session.rollback()
