@@ -16,6 +16,12 @@ on:
       - "e2e/**"
       - ".github/workflows/e2e-ci.yml"
 
+# CI ports are offset from the dev stack (5000/3000) so act runs don't clash
+# with a live local environment.
+env:
+  CI_BACKEND_PORT: 5100
+  CI_FRONTEND_PORT: 3100
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -66,8 +72,13 @@ jobs:
           DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5435/kayak_e2e
           SECRET_KEY: ci-secret-key-not-used-in-prod
           JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
-          FRONTEND_URL: http://localhost:3000
-        run: flask run --host=0.0.0.0 --port=5000 &
+          FRONTEND_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
+        run: |
+          fuser -k "${CI_BACKEND_PORT}/tcp" 2>/dev/null || true
+          setsid nohup flask run --host=0.0.0.0 --port=${{ env.CI_BACKEND_PORT }} > /tmp/flask.log 2>&1 &
+          FLASK_PID=$!
+          sleep 3
+          kill -0 $FLASK_PID 2>/dev/null || { cat /tmp/flask.log; exit 1; }
 
       # --- Frontend ---
       - name: Set up pnpm
@@ -89,14 +100,20 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000
+          NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
         run: pnpm build
 
       - name: Start frontend
         working-directory: frontend
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000
-        run: pnpm start &
+          NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
+          PORT: ${{ env.CI_FRONTEND_PORT }}
+        run: |
+          fuser -k "${CI_FRONTEND_PORT}/tcp" 2>/dev/null || true
+          setsid nohup pnpm start > /tmp/frontend.log 2>&1 &
+          FRONTEND_PID=$!
+          sleep 5
+          kill -0 $FRONTEND_PID 2>/dev/null || { cat /tmp/frontend.log; exit 1; }
 
       # --- E2E ---
       - name: Install Playwright
@@ -106,13 +123,13 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Wait for services
-        run: npx --yes wait-on http-get://localhost:5000 http://localhost:3000 --timeout 60000
+        run: npx --yes wait-on tcp:localhost:${{ env.CI_BACKEND_PORT }} http://localhost:${{ env.CI_FRONTEND_PORT }} --timeout 60000
 
       - name: Run E2E tests
         working-directory: e2e
         env:
-          E2E_BASE_URL: http://localhost:3000
-          E2E_API_URL: http://localhost:5000
+          E2E_BASE_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
+          E2E_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
         run: npm test
 
       - name: Upload Playwright report
