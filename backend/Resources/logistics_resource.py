@@ -32,7 +32,8 @@ def get_logistics(trip_id: str):
 @require_owner("trip", id_param="trip_id")
 def upsert_logistics(trip_id: str):
     try:
-        logistics = LogisticsService.upsert(trip_id, request.get_json(silent=True) or {}, g.current_user_id)
+        body = LogisticsSchema().load(request.get_json(silent=True) or {})
+        logistics = LogisticsService.upsert(trip_id, body, g.current_user_id)
         return jsonify(LogisticsSchema().dump(logistics)), HTTPStatus.OK
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))

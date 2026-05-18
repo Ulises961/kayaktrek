@@ -57,7 +57,7 @@ def read_by_key():
 
 @day_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-@require_owner('day', parent_resource=('itinerary', 'itinerary_id'), from_body=True)
+@require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_day():
     """POST /api/day - Create new day"""
     try:

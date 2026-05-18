@@ -62,6 +62,8 @@ def create_point():
         point = PointService.create_point(point_data)
         return jsonify(PointSchema().dump(point)), HTTPStatus.CREATED
 
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
     except IntegrityError as e:
