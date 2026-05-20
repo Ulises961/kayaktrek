@@ -52,6 +52,12 @@ class ItinerarySchema(BaseSchema):
 
   
 
+    @post_dump
+    def exclude_day_zero(self, data, **kwargs):
+        if data.get("days"):
+            data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
+        return data
+
     @post_load
     def make_itinerary(self, data, **kwargs):
         # Stamp user ownership only for personal (non-trip) itineraries.

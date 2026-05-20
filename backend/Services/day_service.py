@@ -24,7 +24,7 @@ def _require_editable(trip: Trip) -> None:
 
 
 class DayService:
-    _MUTABLE_FIELDS = frozenset({"day_number", "date"})
+    _MUTABLE_FIELDS = frozenset({"day_number", "date", "start_point_id", "end_point_id"})
     _MUTABLE_WEATHER_FIELDS = frozenset({"model"})
     _MUTABLE_SEA_FIELDS = frozenset({"moon_phase", "high_tide", "low_tide"})
     @staticmethod
@@ -68,7 +68,7 @@ class DayService:
         days = (
             db.session.query(Day)
             .join(Itinerary, Day.itinerary_id == Itinerary.id)
-            .filter(Itinerary.id == UUID(itinerary_id))
+            .filter(Itinerary.id == UUID(itinerary_id), Day.day_number != 0)
             .all()
         )
         return days

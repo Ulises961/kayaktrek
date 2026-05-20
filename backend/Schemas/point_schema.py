@@ -76,7 +76,7 @@ class PointUpdateSchema(PointSchema):
     Validates scalar mutable fields only (type, lat, lon, notes — all optional).
     Nested objects (images, next, nearby) are excluded from load;
     the resource handler merges validated scalars with the raw request.
-    day_id excluded — point reassignment requires a dedicated endpoint.
+    day_id excluded — point reassignment is handled by the day assign endpoint.
     Returns a camelCase dict for the service layer.
     """
     type = fields.Enum(PointType, by_value=True)

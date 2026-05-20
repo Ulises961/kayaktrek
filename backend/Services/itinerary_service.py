@@ -79,10 +79,14 @@ class ItineraryService:
         logger.info("Creating new itinerary")
         itinerary = cast(Itinerary, ItinerarySchema().load(itinerary_data))
         db.session.add(itinerary)
+        db.session.flush()
+
+        day0 = Day(day_number=0, itinerary_id=itinerary.id, date=None)
+        db.session.add(day0)
         db.session.commit()
 
         db.session.refresh(itinerary)
-        logger.info(f"Itinerary {itinerary.id} created successfully")
+        logger.info(f"Itinerary {itinerary.id} created with Day 0 staging area")
         return itinerary
 
     @staticmethod
