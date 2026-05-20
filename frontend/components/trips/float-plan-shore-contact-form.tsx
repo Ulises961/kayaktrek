@@ -38,7 +38,12 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [displayed, setDisplayed] = useState<Partial<ShoreContactFormValues>>(logistics ?? {})
+  const [displayed, setDisplayed] = useState<ShoreContactFormValues>({
+    shoreContactName: logistics?.shoreContactName ?? "",
+    shoreContactEmail: logistics?.shoreContactEmail ?? "",
+    shoreContactPhone: logistics?.shoreContactPhone ?? "",
+    shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
+  })
 
   const { register, handleSubmit, reset } = useForm<ShoreContactFormValues>({
     resolver: zodResolver(ShoreContactFormSchema),
@@ -78,7 +83,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
 
   if (!isEditing) {
     const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } = displayed
-    const hasAny = shoreContactName || shoreContactPhone || shoreContactEmail
+    const hasAny = shoreContactName || shoreContactPhone || shoreContactEmail || shoreContactRelationship
 
     return (
       <div className="flex items-start justify-between gap-4">
