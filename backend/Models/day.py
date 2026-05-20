@@ -13,11 +13,13 @@ if TYPE_CHECKING:
 
 
 class Day(BaseModel):
-    __table_args__ = (UniqueConstraint("day_number", "itinerary_id", "date"),)
+    __table_args__ = (UniqueConstraint("day_number", "itinerary_id"),)
 
     day_number: Mapped[int] = mapped_column(Integer)
     itinerary_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("itinerary.id"), index=True)
-    date: Mapped[Date] = mapped_column(Date)
+    date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
+    start_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
+    end_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships with proper Mapped[] syntax
     points: Mapped[Optional[List["Point"]]] = relationship(foreign_keys="Point.day_id")
