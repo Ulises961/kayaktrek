@@ -134,6 +134,12 @@ class JWTService:
                     if not user.active:
                         abort(HTTPStatus.FORBIDDEN, description="Account not yet activated — check your email")
 
+                    iat = data.get("iat")
+                    if iat and user.password_changed_at:
+                        token_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+                        if token_issued_at < user.password_changed_at:
+                            abort(HTTPStatus.UNAUTHORIZED, description="Token invalidated by password change — please log in again")
+
                     g.current_user_mail = user.mail
                     g.current_user_id = str(user.id)
 

@@ -1,4 +1,5 @@
-from marshmallow import fields, post_load
+import bleach
+from marshmallow import fields, post_load, pre_load
 from Models.trip_member import TripMember, MemberRoleType
 from Schemas.base_schema import BaseSchema, camelcase
 
@@ -43,6 +44,12 @@ class TripMemberSchema(BaseSchema):
         return TripMember(**data)
 
 
+_MEMBER_TEXT_FIELDS = (
+    "vesselMake", "vesselModel", "vesselColorPrimary", "vesselColorSecondary",
+    "emergencyContactName", "emergencyContactPhone", "emergencyContactRelationship",
+)
+
+
 class TripMemberUpdateSchema(BaseSchema):
     """Load-only schema for PATCH /api/trip/:id/member/me.
     All fields optional; role is excluded — members cannot change their own role.
@@ -55,6 +62,13 @@ class TripMemberUpdateSchema(BaseSchema):
     emergency_contact_name = fields.String(allow_none=True)
     emergency_contact_phone = fields.String(allow_none=True)
     emergency_contact_relationship = fields.String(allow_none=True)
+
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        for key in _MEMBER_TEXT_FIELDS:
+            if data.get(key) is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+        return data
 
     @post_load
     def to_dict(self, data, **kwargs):

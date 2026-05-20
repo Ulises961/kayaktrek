@@ -191,6 +191,7 @@ def generate_keypair():
 
 @user_api.route("/me/re-auth", methods=["POST"])
 @JWTService.authenticate_restful
+@limiter.limit("10 per minute", key_func=lambda: str(g.current_user_id))
 def re_auth():
     try:
         raw = request.get_json()

@@ -115,3 +115,54 @@ class TestResendVerificationRateLimit:
 
         r = client.post("/api/auth/resend-verification", json={"mail": "addr_b@example.com"})
         assert r.status_code != 429
+
+
+class TestResendDeletionCancelRateLimit:
+
+    def test_resend_deletion_cancel_rate_limited_per_email(self, client):
+        """4th resend-deletion-cancel for the same email returns 429."""
+        for _ in range(3):
+            client.post("/api/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
+
+        r = client.post("/api/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
+        assert r.status_code == 429
+        assert "Retry-After" in r.headers
+
+    def test_resend_deletion_cancel_different_emails_not_cross_limited(self, client):
+        """Limit is per-email: exhausting the limit for one address does not
+        affect a different address."""
+        for _ in range(3):
+            client.post("/api/auth/resend-deletion-cancel", json={"mail": "del_a@example.com"})
+
+        r = client.post("/api/auth/resend-deletion-cancel", json={"mail": "del_b@example.com"})
+        assert r.status_code != 429
+
+
+class TestReAuthRateLimit:
+
+    def test_re_auth_rate_limited_after_threshold(self, client, auth_headers):
+        """11th re-auth attempt within a minute returns 429."""
+        for _ in range(10):
+            client.post(
+                "/api/user/me/re-auth",
+                json={"password": "wrong"},
+                headers=auth_headers,
+            )
+
+        r = client.post(
+            "/api/user/me/re-auth",
+            json={"password": "wrong"},
+            headers=auth_headers,
+        )
+        assert r.status_code == 429
+        assert "Retry-After" in r.headers
+
+    def test_re_auth_within_limit_not_blocked(self, client, auth_headers):
+        """Requests up to the limit are not blocked."""
+        for _ in range(10):
+            r = client.post(
+                "/api/user/me/re-auth",
+                json={"password": "wrong"},
+                headers=auth_headers,
+            )
+            assert r.status_code != 429

@@ -5,6 +5,7 @@ from camel_converter import dict_to_snake
 from Models.day import Day
 from Models.itinerary import Itinerary
 from Models.sea import Sea
+from Models.trip import Trip, TripStateType
 from Models.weather import Weather
 from Api.database import db
 from sqlalchemy.orm import selectinload
@@ -15,6 +16,11 @@ import logging
 from Schemas.base_schema import camelcase
 
 logger = logging.getLogger(__name__)
+
+
+def _require_editable(trip: Trip) -> None:
+    if trip.state in (TripStateType.PAST, TripStateType.ARCHIVED):
+        raise ValueError("Cannot modify an itinerary on a completed trip")
 
 
 class DayService:
@@ -37,10 +43,8 @@ class DayService:
         day = (
             db.session.query(Day)
             .options(
-                selectinload(Day.sea),
-                selectinload(Sea.sea_states),
-                selectinload(Day.weather),
-                selectinload(Weather.weather_states),
+                selectinload(Day.sea).selectinload(Sea.sea_states),
+                selectinload(Day.weather).selectinload(Weather.weather_states),
             )
             .filter_by(id=UUID(day_id))
             .first()
@@ -132,6 +136,11 @@ class DayService:
         Returns:
             Created day object
         """
+        itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
+        if itinerary and itinerary.trip_id:
+            trip = db.session.query(Trip).filter_by(id=itinerary.trip_id).first()
+            if trip:
+                _require_editable(trip)
         db.session.add(day)
         db.session.commit()
         db.session.refresh(day)

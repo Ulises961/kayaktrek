@@ -24,6 +24,7 @@ def read_by_itinerary(itinerary_id: str):
 
 @day_api.route("/<string:id>", methods=['GET'])
 @JWTService.authenticate_restful
+@require_owner('day')
 def read_by_id(id: str):
     try:
         day = DayService.get_day_by_id(id)
@@ -56,14 +57,22 @@ def read_by_key():
 
 @day_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-@require_owner('day', parent_resource=('itinerary', 'itinerary_id'), from_body=True)
+@require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_day():
     """POST /api/day - Create new day"""
     try:
-        created_day = DayService.create_day(request.get_json())
+        body = request.get_json()
+        if not isinstance(body, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        day = DaySchema().load(body)
+        created_day = DayService.create_day(day)
         return jsonify(DaySchema().dump(created_day)), HTTPStatus.CREATED
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity error creating day: {e}")
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")

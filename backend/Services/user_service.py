@@ -230,6 +230,7 @@ class UserService:
         if not check_password_hash(user.pwd, current_pwd):
             raise ValueError("Current password is incorrect")
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
+        user.password_changed_at = datetime.now(timezone.utc)
         if user.public_key:
             private_key_b64 = decrypt(
                 user.private_key_ciphertext,  # type: ignore

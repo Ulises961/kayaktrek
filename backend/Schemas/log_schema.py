@@ -1,5 +1,5 @@
 from flask import g
-from marshmallow import fields, post_load, validates, ValidationError
+from marshmallow import fields, post_load, pre_load, validates, ValidationError
 import bleach
 
 from Models.log import Log
@@ -13,6 +13,12 @@ class LogSchema(BaseSchema):
     date = fields.Date(allow_none=True)
     notes = fields.String(allow_none=True)
     user_id = fields.UUID(dump_only=True)
+
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        if data.get("notes") is not None:
+            data["notes"] = bleach.clean(str(data["notes"]).strip(), tags=[], strip=True)
+        return data
 
     @validates('hours')
     def validate_hours(self, value, **kwargs):
@@ -34,10 +40,8 @@ class LogSchema(BaseSchema):
 
     @validates('notes')
     def validate_notes(self, value, **kwargs):
-        if value is not None:
-            cleaned = bleach.clean(str(value).strip(), tags=[], strip=True)
-            if len(cleaned) > 2000:
-                raise ValidationError("Notes cannot exceed 2000 characters")
+        if value is not None and len(value) > 2000:
+            raise ValidationError("Notes cannot exceed 2000 characters")
 
     @post_load
     def make_log(self, data, **kwargs):

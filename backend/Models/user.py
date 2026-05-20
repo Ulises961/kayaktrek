@@ -81,6 +81,10 @@ class User(BaseModel):
     # GDPR: erasure grace period — set on deletion request, hard-deleted after 30 days
     deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Token revocation: tokens issued before this timestamp are rejected.
+    # Stamped on every password change so stolen access tokens cannot outlive the window.
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Association object: full role-aware access
     trip_memberships: Mapped[List["TripMember"]] = relationship(
         "TripMember",

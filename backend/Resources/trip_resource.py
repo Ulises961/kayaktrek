@@ -308,7 +308,7 @@ def get_my_membership(id: str):
 @JWTService.authenticate_restful
 def update_my_float_plan(id: str):
     try:
-        raw = request.get_json()
+        raw = request.get_json(silent=True, force=True) or {}
         if not isinstance(raw, dict):
             abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
         validated = cast(dict, TripMemberUpdateSchema().load(raw))
@@ -318,6 +318,8 @@ def update_my_float_plan(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except HTTPException:
+        raise
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
