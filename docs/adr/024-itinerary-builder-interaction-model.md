@@ -38,11 +38,14 @@ This matches how experienced paddlers plan on paper or chart-table.
 ### 2. Day 0 as a staging area
 
 All newly-dropped points are assigned to **Day 0** (`day_number = 0`) at creation time.
-Day 0 is an internal implementation detail — it never appears in the UI. It is created
-automatically in the same database transaction as the itinerary.
+Day 0 is an internal implementation detail — it never appears in the UI as a named day.
+It is created automatically in the same database transaction as the itinerary.
 
-`GET /api/day/itinerary/:itineraryId` filters out `day_number = 0` so Day 0 is invisible
-to all frontend consumers except the raw point fetch used by the map to render all points.
+`GET /api/day/itinerary/:itineraryId` filters out `day_number = 0`.
+`GET /api/itinerary/:id` exposes Day 0 via an `include_staging = True` instance flag set
+on `ItinerarySchema` at the map builder endpoint only. All other callers (trip detail
+nested itinerary, list view) receive the schema without the flag and Day 0 is stripped
+by the `@post_dump exclude_day_zero` hook.
 
 Unassigned points (Day 0 points) are rendered as grey markers. As points are bracketed
 into numbered days they move from grey to the day's auto-assigned colour.
@@ -127,18 +130,95 @@ The itinerary has no `status` or `is_draft` field. Every mutation (point drop, d
 bracket assignment) is persisted immediately via server actions. Returning to
 `/itinerary/[id]` fetches the current backend state and restores the exact map state.
 
-**Draft detection heuristic** (frontend only): if Day 0 still has unassigned points the
-itinerary is treated as a draft. The Itinerary tab on the trip detail page shows
-"Draft — continue in map builder" when `day0.points.length > 0`, and the full summary
-(miles, days) when Day 0 is empty.
+**Draft detection heuristic** (frontend only): the Itinerary tab on the trip detail page
+receives the itinerary without Day 0 (Day 0 is stripped from the nested itinerary
+response). If `days.length === 0` the itinerary has no assigned days → draft state →
+show "Draft — continue in map builder". If `days.length > 0` → show the full summary
+(miles, days count, "Open map builder" link).
 
-No schema change required. The heuristic is cheap and correct for all realistic states.
+No schema change required. The heuristic does not require the frontend to know about
+Day 0 or query its points — it simply checks whether any numbered days exist.
 
 ### 8. Day colours
 
 Days are auto-assigned colours from a fixed maritime palette cycle (slate-blue, teal,
 amber, coral, violet, …). Colours are purely for visual separation of days on the map.
 They carry no semantic meaning and are not user-configurable.
+
+### 9. Minimal map popover on drop
+
+When the user clicks the map to drop a point, a **minimal popover** appears at the click
+site. It contains:
+
+- **Three type chips**: stop · position · interest (mutually exclusive; `position` is
+  pre-selected).
+- **Undo button**: removes the point that was just created and dismisses the popover.
+
+Nothing else. No name field, no notes, no coordinates display.
+
+**Rationale**: introducing a rich form at the moment of drop breaks the flow of route
+tracing. The user is in route-drawing mode — they want to stamp points quickly, not fill
+in metadata. All point editing (name, notes, photos, POI search, type change, delete)
+happens in the sidebar accordion after the point is created. The type chip is the only
+exception because it affects the visual immediately (glyph, icon) and is needed before
+the point is committed.
+
+Escape key or clicking elsewhere dismisses the popover without removing the point (the
+type defaulted to `position`). The undo button is the explicit "I didn't mean to click"
+escape hatch.
+
+### 10. Accordion point list in Drop points sidebar
+
+The right sidebar in Drop points mode shows all Day 0 points as a **single-expand
+accordion**. Expanding one item collapses the previously open one.
+
+| State | Contents |
+|-------|----------|
+| Collapsed | Point number · name (or `—` if unnamed) · type glyph |
+| Expanded | Type chips (editable) · name field · notes textarea · image gallery · "Find nearby POIs" (interest type only) · delete button |
+
+**Map ↔ sidebar sync**: clicking a marker on the map expands the corresponding accordion
+item and scrolls to it. Clicking an accordion item header selects and centers the
+corresponding marker.
+
+**Rationale**: a flat list wastes sidebar space and exposes too much metadata at once.
+An accordion surfaces the essentials (number, name, type) in the collapsed state and
+reveals the full detail panel in-place on demand, without a separate slide-in drawer.
+The "Find nearby POIs" action is embedded in the expanded item rather than a separate §7
+step — the accordion provides the natural container.
+
+### 11. Marker visual style
+
+**Standard marker**: white fill + colored stroke ring. The ring colour is the day colour
+(maritime palette). Day 0 / unassigned points use grey.
+
+**Boundary marker** (point that is simultaneously the end of Day N and the start of Day
+N+1): two half-circle rings, left half Day N's colour, right half Day N+1's colour, white
+center fill.
+
+**Rationale for ring-only colour**: coloring only the ring rather than filling the marker
+body improves contrast against both light tile backgrounds and satellite imagery; the white
+center keeps the marker legible at small sizes. The ring also visually communicates
+"boundary between two things" more clearly than a solid split-fill.
+
+**Fallback**: if the ring style reads poorly at scale or on certain tile layers the fill
+can be added (ring colour at 40% opacity) without changing the component contract — the
+`DivIcon` template allows both.
+
+### 12. Distance unit toggle
+
+Distance labels (segment polyline tooltips and stats strip totals) support **nautical
+miles (nm) and kilometres (km)**. A toggle in the top bar stats strip switches units.
+Values convert numerically on toggle (1 nm = 1.852 km).
+
+**Default**: nm. Kayak coastal expeditions are typically planned in nautical miles.
+
+**Rationale for in-UI toggle over user preference**: a user preference (stored in profile)
+is better long-term, but requires M7 and a profile settings page. For M4, a stateless
+in-UI toggle gives the user control now. The toggle state is kept in component state
+(`useState`) and does not persist across sessions — acceptable for a planning tool.
+Migration path: in M7, seed the toggle from the user's preferred unit preference and
+remove the local state.
 
 ---
 
