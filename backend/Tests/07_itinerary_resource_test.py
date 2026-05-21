@@ -30,10 +30,17 @@ def test_update_itinerary(client, auth_headers, itinerary):
 def test_get_itinerary_by_id(client, auth_headers, itinerary):
     response = client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers)
     retrieved_itinerary = json.loads(response.data)
-    assert retrieved_itinerary['days'][0]['dayNumber'] == 1
-    assert retrieved_itinerary['days'][0]['date'] == "2020-12-31"
-    assert len(retrieved_itinerary['days']) == 2
+    days = retrieved_itinerary['days']
+    day_numbers = {d['dayNumber'] for d in days}
+
     assert response.status_code == 200
+    # Day 0 (staging area) is included in the map builder endpoint
+    assert len(days) == 3
+    assert 0 in day_numbers
+    assert 1 in day_numbers
+    assert 2 in day_numbers
+    day1 = next(d for d in days if d['dayNumber'] == 1)
+    assert day1['date'] == "2020-12-31"
 
 def test_remove_days_from_itinerary(client, auth_headers, itinerary):
     update_data = {"days": [], "tripId": itinerary["tripId"]}

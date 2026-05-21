@@ -43,7 +43,9 @@ def get_itinerary(id: str):
     if not itinerary:
         abort(HTTPStatus.NOT_FOUND, description=f"Itinerary with id {id} not found")
     
-    return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.OK
+    schema = ItinerarySchema()
+    schema.include_staging = True
+    return jsonify(schema.dump(itinerary)), HTTPStatus.OK
 
 @itinerary_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
@@ -52,7 +54,9 @@ def create_itinerary():
     """POST /api/itinerary/create - Create new itinerary"""
     try:
         itinerary = ItineraryService.create_itinerary(request.get_json())
-        return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.CREATED
+        schema = ItinerarySchema()
+        schema.include_staging = True
+        return jsonify(schema.dump(itinerary)), HTTPStatus.CREATED
         
     except HTTPException as e:
         logger.exception(f"Integrity error creating itinerary: {e}")

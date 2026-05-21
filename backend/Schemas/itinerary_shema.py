@@ -50,11 +50,11 @@ class ItinerarySchema(BaseSchema):
         if value is not None and len(value) > 365:
             raise ValidationError("Itinerary cannot have more than 365 days")
 
-  
-
     @post_dump
     def exclude_day_zero(self, data, **kwargs):
-        if data.get("days"):
+        # Set schema.include_staging = True before dumping to keep Day 0 in the response.
+        # The map builder endpoint needs staging-area points; all other callers strip Day 0.
+        if not getattr(self, "include_staging", False) and data.get("days"):
             data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
         return data
 
@@ -67,4 +67,3 @@ class ItinerarySchema(BaseSchema):
         if "trip_id" in self.fields and data.get("trip_id") is None:
             data["user_id"] = g.current_user_id
         return Itinerary(**data)
-    
