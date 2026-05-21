@@ -12,6 +12,7 @@ export type Point = {
   latitude?: number | null;
   longitude?: number | null;
   notes?: string | null;
+  name?: string | null;
   type: PointType;
   dayId?: string | null;
   next?: Point | null;
@@ -24,6 +25,7 @@ export const PointSchema: z.ZodType<Point> = z.lazy(() =>
     latitude: z.number().min(-90).max(90).nullish(),
     longitude: z.number().min(-180).max(180).nullish(),
     notes: z.string().max(1000, "Notes must be at most 1000 characters.").refine(noHtmlTags.check, noHtmlTags.message).nullish(),
+    name: z.string().max(200, "Name must be at most 200 characters.").refine(noHtmlTags.check, noHtmlTags.message).nullish(),
     type: PointTypeSchema,
     dayId: z.uuidv7().nullish(),
     next: PointSchema.nullish(),
