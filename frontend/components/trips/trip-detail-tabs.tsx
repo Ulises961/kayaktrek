@@ -121,7 +121,7 @@ export function TripDetailTabs({
       </TabsContent>
 
       <TabsContent value="itinerary" className="p-6 pt-5">
-        <ItineraryTab />
+        <ItineraryTab tripId={tripId} itinerary={trip.itinerary} isLeader={isLeader} />
       </TabsContent>
 
       <TabsContent value="items" className="p-6 pt-5">
