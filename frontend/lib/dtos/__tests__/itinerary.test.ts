@@ -157,6 +157,18 @@ describe("DaySchema", () => {
   })
 })
 
+describe("DaySchema — Day 0 (staging area)", () => {
+  it("accepts dayNumber 0", () => {
+    const result = DaySchema.safeParse({ ...DAY_FIXTURE, dayNumber: 0, date: null })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects a negative dayNumber", () => {
+    const result = DaySchema.safeParse({ ...DAY_FIXTURE, dayNumber: -1 })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("ItinerarySchema", () => {
   it("parses a full itinerary fixture", () => {
     const result = ItinerarySchema.safeParse(ITINERARY_FIXTURE)

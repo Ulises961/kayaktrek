@@ -5,7 +5,7 @@ import { SeaSchema } from "./sea";
 
 export const DaySchema = z.object({
   id: z.uuidv7().optional(),
-  dayNumber: z.number().int().min(1).max(365),
+  dayNumber: z.number().int().min(0).max(365),
   itineraryId: z.uuidv7().nullish(),
   date: z.string().nullish(),
   startPointId: z.uuidv7().nullish(),
