@@ -1,6 +1,6 @@
 "use client"
 import Link from "next/link"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, Undo2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type MapMode = "drop" | "assign"
@@ -15,6 +15,7 @@ type MapTopBarProps = {
   totalDistance: number
   dayCount: number
   isSaving?: boolean
+  onRemoveLastWaypoint?: () => void
 }
 
 export function MapTopBar({
@@ -27,6 +28,7 @@ export function MapTopBar({
   totalDistance,
   dayCount,
   isSaving = false,
+  onRemoveLastWaypoint,
 }: MapTopBarProps) {
   const displayDistance =
     distanceUnit === "nm"
@@ -71,6 +73,17 @@ export function MapTopBar({
 
       {/* Stats strip */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground shrink-0">
+        {mode === "drop" && onRemoveLastWaypoint && (
+          <button
+            onClick={onRemoveLastWaypoint}
+            aria-label="Remove last waypoint"
+            className="flex items-center gap-1 text-xs hover:text-foreground transition-colors"
+          >
+            <Undo2Icon className="size-3.5" />
+            <span>Remove last waypoint</span>
+          </button>
+        )}
+
         <span className="flex items-center gap-1.5">
           <span>{displayDistance}</span>
           <span className="flex rounded border border-border overflow-hidden text-xs">
