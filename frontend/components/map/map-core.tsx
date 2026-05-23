@@ -1,11 +1,10 @@
 "use client"
 import { memo, useCallback, useState } from "react"
-import { MapContainer, TileLayer, Polyline, Tooltip } from "react-leaflet"
+import { MapContainer, TileLayer, Polyline, Tooltip, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import type { Point, PointType } from "@/lib/dtos/point"
+import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import type { MapMode } from "./map-top-bar"
-import { MapClickHandler } from "./map-click-handler"
 import { PointMarker } from "./point-marker"
 import { haversineNm, formatDistance } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
@@ -57,6 +56,17 @@ function buildSegments(
     })
   }
   return segments
+}
+
+// ── MapEvents ─────────────────────────────────────────────────────────────────
+
+function MapEvents({ mode, onMapClick }: { mode: MapMode; onMapClick: (lat: number, lng: number) => Promise<void> }) {
+  useMapEvents({
+    click(e) {
+      if (mode === "drop") onMapClick(e.latlng.lat, e.latlng.lng)
+    },
+  })
+  return null
 }
 
 // ── ConnectedMarker ───────────────────────────────────────────────────────────
@@ -134,7 +144,7 @@ export default function MapCore({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <MapClickHandler mode={mode} onMapClick={onMapClick} />
+        <MapEvents mode={mode} onMapClick={onMapClick} />
 
         {segments.map((seg) => (
           <Polyline key={seg.key} positions={seg.positions} color={seg.color} weight={2.5} opacity={0.85}>
