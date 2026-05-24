@@ -55,13 +55,18 @@ function buildSegments(
     const a = resolvePosition(ordered[i], drag)
     const b = resolvePosition(ordered[i + 1], drag)
     const pointId = ordered[i].id
-    const isPreview = pointId != null && slidePreviewIds.has(pointId) && slideColor != null
+    const nextPointId = ordered[i + 1].id
+    // A leg is preview-colored only when BOTH endpoints are in the preview set.
+    // This prevents the outgoing leg from the hovered point from being colored.
+    const isPreview = pointId != null && nextPointId != null
+      && slidePreviewIds.has(pointId) && slidePreviewIds.has(nextPointId)
+      && slideColor != null
     const dayNumA = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
     const dayNumB = dayNumberById.get(ordered[i + 1].dayId ?? undefined) ?? 0
-    // Use the higher day number across the segment so crossing into a new day
-    // immediately takes that day's colour (boundary point belongs to Day N but
-    // the leg leading into Day N+1 should render in Day N+1's colour).
-    const dayNum = Math.max(dayNumA, dayNumB)
+    // If either endpoint is unassigned (Day 0), the leg is unassigned.
+    // Otherwise use the higher day number so that boundary points (belonging
+    // to Day N) render the outgoing leg in Day N+1's colour.
+    const dayNum = (dayNumA === 0 || dayNumB === 0) ? 0 : Math.max(dayNumA, dayNumB)
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
@@ -221,10 +226,17 @@ export default function MapCore({
         <MapEvents mode={mode} onMapClick={onMapClick} />
 
         {segments.map((seg) => (
-          <Polyline key={seg.key} positions={seg.positions} color={seg.color} weight={2.5} opacity={0.85}>
-            <Tooltip permanent direction="top" className="distance-label">
-              {seg.distLabel} {distanceUnit}
-            </Tooltip>
+          <Polyline key={`${seg.key}-${seg.color}`} positions={seg.positions} color={seg.color} weight={2.5} opacity={0.85}>
+            {!dragState && (
+              <Tooltip
+                key={`${seg.positions[0][0]},${seg.positions[0][1]}-${seg.positions[1][0]},${seg.positions[1][1]}`}
+                permanent
+                direction="top"
+                className="distance-label"
+              >
+                {seg.distLabel} {distanceUnit}
+              </Tooltip>
+            )}
           </Polyline>
         ))}
 

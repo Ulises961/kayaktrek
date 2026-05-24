@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 
 type DayDateInputProps = {
   isoValue: string | null | undefined
@@ -53,6 +54,7 @@ type DaySidebarProps = {
   onEditDay: (dayId: string) => void
   onDeleteDay: (dayId: string) => void
   onDateChange: (dayId: string, date: string) => void
+  onAddDay: () => void
 }
 
 function getPointLabel(id: string | null | undefined, points: Point[], pointOrder: string[]): string {
@@ -120,24 +122,22 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-foreground">Day {day.dayNumber}</span>
-        {!isActiveSlide && (
-          <div className="flex items-center gap-1">
-            <button
-              aria-label="Edit day"
-              onClick={() => onEditDay(day.id!)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
-            >
-              Edit
-            </button>
-            <button
-              aria-label="Delete day"
-              onClick={() => onDeleteDay(day.id!)}
-              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-0.5">
+          <button
+            aria-label="Reassign day"
+            onClick={() => onEditDay(day.id!)}
+            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            aria-label="Delete day"
+            onClick={() => onDeleteDay(day.id!)}
+            className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded hover:bg-muted"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
 
       <DayDateInput isoValue={day.date} dayId={day.id!} onDateChange={onDateChange} />
@@ -185,6 +185,7 @@ export function DaySidebar({
   onEditDay,
   onDeleteDay,
   onDateChange,
+  onAddDay,
 }: DaySidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
@@ -210,13 +211,22 @@ export function DaySidebar({
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Days
           </span>
-          <button
-            aria-label="Collapse days sidebar"
-            onClick={() => setCollapsed(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-          >
-            ›
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              aria-label="Add day"
+              onClick={onAddDay}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              aria-label="Collapse days sidebar"
+              onClick={() => setCollapsed(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+            >
+              ›
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">

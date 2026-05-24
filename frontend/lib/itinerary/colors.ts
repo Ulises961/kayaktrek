@@ -1,7 +1,7 @@
 export const DAY_COLORS = [
   "#2272b6", // ocean500 — slate-blue
-  "#2aa8a0", // foam400 — teal
   "#f59e0b", // sunset400 — amber
+  "#2aa8a0", // foam400 — teal
   "#f97316", // coral/orange
   "#8b5cf6", // violet
   "#ec4899", // pink

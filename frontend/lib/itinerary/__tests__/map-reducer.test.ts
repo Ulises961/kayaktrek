@@ -311,19 +311,53 @@ describe("DAY_REMOVE", () => {
 
 describe("POINTS_ASSIGN", () => {
   it("updates dayId on all matching points", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa", "bbb"] })
+    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa", "bbb"], day0Id: DAY0_ID, startPointId: null })
     expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "bbb")?.dayId).toBe(DAY1_ID)
   })
 
-  it("leaves non-matching points unchanged", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"] })
+  it("leaves non-matching points unchanged when no prior assignment exists", () => {
+    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"], day0Id: DAY0_ID, startPointId: null })
     expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY0_ID)
   })
 
   it("does not change pointOrder", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"] })
+    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"], day0Id: DAY0_ID, startPointId: null })
     expect(next.pointOrder).toEqual(BASE.pointOrder)
+  })
+
+  it("reverts previously-assigned points outside the new range back to day0", () => {
+    const state: MapState = {
+      ...BASE,
+      points: [pt("aaa", DAY1_ID), pt("bbb", DAY1_ID), pt("ccc", DAY1_ID)],
+    }
+    const next = mapReducer(state, {
+      type: "POINTS_ASSIGN",
+      dayId: DAY1_ID,
+      pointIds: ["bbb"],
+      day0Id: DAY0_ID,
+      startPointId: "aaa",
+    })
+    expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
+    expect(next.points.find((p) => p.id === "bbb")?.dayId).toBe(DAY1_ID)
+    expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY0_ID)
+  })
+
+  it("preserves point type when reverting out-of-range points", () => {
+    const stopPoint: Point = { ...pt("ccc", DAY1_ID), type: "stop" }
+    const state: MapState = {
+      ...BASE,
+      points: [pt("aaa", DAY1_ID), pt("bbb", DAY1_ID), stopPoint],
+    }
+    const next = mapReducer(state, {
+      type: "POINTS_ASSIGN",
+      dayId: DAY1_ID,
+      pointIds: ["bbb"],
+      day0Id: DAY0_ID,
+      startPointId: "aaa",
+    })
+    expect(next.points.find((p) => p.id === "ccc")?.type).toBe("stop")
+    expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY0_ID)
   })
 })
 

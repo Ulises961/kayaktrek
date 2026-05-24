@@ -197,6 +197,45 @@ class DayService:
         return existing_day
 
     @staticmethod
+    def assign_points(day_id: str, start_point_id: str, end_point_id: str) -> None:
+        """
+        Assign all points in the linked-list range [start_point_id, end_point_id]
+        to the given day by updating their day_id.
+
+        Walks next_id pointers from start to end; raises ValueError if end is not
+        reachable from start within the itinerary's point list.
+        """
+        from Models.point import Point as PointModel
+        from uuid import UUID
+
+        day = db.session.get(Day, UUID(day_id))
+        if not day:
+            raise NoResultFound(f"Day with id {day_id} not found")
+
+        start_uuid = UUID(start_point_id)
+        end_uuid = UUID(end_point_id)
+
+        current = db.session.get(PointModel, start_uuid)
+        if not current:
+            raise NoResultFound(f"Point {start_point_id} not found")
+
+        visited: set = set()
+        while current is not None:
+            if current.id in visited:
+                raise ValueError("Cycle detected in point linked list")
+            visited.add(current.id)
+            current.day_id = UUID(day_id)
+            if current.id == end_uuid:
+                break
+            if current.next_id is None:
+                raise ValueError(f"End point {end_point_id} not reachable from {start_point_id}")
+            current = db.session.get(PointModel, current.next_id)
+        else:
+            raise ValueError(f"End point {end_point_id} not reachable from {start_point_id}")
+
+        db.session.commit()
+
+    @staticmethod
     def _update_weather(day: Day, weather_data: Optional[Dict[str, Any]]) -> None:
         """
         Update or create weather data for a day.

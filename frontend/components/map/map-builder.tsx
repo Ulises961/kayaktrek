@@ -219,7 +219,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
     const rangeIds = state.pointOrder.slice(startIdx, endIdx + 1)
 
-    dispatch({ type: "POINTS_ASSIGN", dayId, pointIds: rangeIds })
+    dispatch({ type: "POINTS_ASSIGN", dayId, pointIds: rangeIds, day0Id: day0Id!, startPointId: boundaryPointId })
     dispatch({ type: "SLIDE_COMMIT" })
     dispatch({ type: "DAY_UPDATE", id: dayId, fields: { startPointId: boundaryPointId, endPointId } })
 
@@ -230,40 +230,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     dispatch({ type: "SAVING_START" })
     await updateDay(dayId, { startPointId: boundaryPointId, endPointId })
     dispatch({ type: "SAVING_END" })
-
-    // Auto-start next day if unassigned Day 0 points remain.
-    const rangeSet = new Set(rangeIds)
-    const hasRemainingDay0 = state.points.some(
-      (p) => p.dayId === day0Id && p.id && !rangeSet.has(p.id)
-    )
-    if (!hasRemainingDay0 || !itinerary.id) return
-
-    const nextDayNumber = state.days.length + 1
-    dispatch({ type: "SAVING_START" })
-    const newDayResult = await createDay(itinerary.id, nextDayNumber)
-    dispatch({ type: "SAVING_END" })
-
-    if (!newDayResult.success) return
-    const newDay = newDayResult.day
-
-    dispatch({ type: "DAY_ADD", day: newDay })
-
-    // Update the new day's startPointId to the boundary reference.
-    dispatch({ type: "SAVING_START" })
-    await updateDay(newDay.id!, { startPointId: endPointId })
-    dispatch({ type: "SAVING_END" })
-    dispatch({ type: "DAY_UPDATE", id: newDay.id!, fields: { startPointId: endPointId } })
-
-    // Pre-fill slide: boundary = endPointId, firstAssignable = next point after it.
-    const boundaryIdx = state.pointOrder.indexOf(endPointId)
-    const firstAfterBoundary = state.pointOrder[boundaryIdx + 1] ?? null
-    dispatch({
-      type: "SLIDE_START",
-      dayId: newDay.id!,
-      boundaryPointId: endPointId,
-      firstAssignableId: firstAfterBoundary,
-    })
-  }, [mode, state.slideState, state.pointOrder, state.points, state.days, day0Id, itinerary.id])
+  }, [mode, state.slideState, state.pointOrder, state.points, day0Id])
 
   const handleMarkerHover = useCallback((pointId: string) => {
     if (state.slideState?.boundaryPointId != null) {
@@ -312,6 +279,34 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     dispatch({ type: "SAVING_END" })
   }, [])
 
+  const handleAddDay = useCallback(async () => {
+    if (!itinerary.id) return
+    const nextDayNumber = state.days.length + 1
+    dispatch({ type: "SAVING_START" })
+    const result = await createDay(itinerary.id, nextDayNumber)
+    dispatch({ type: "SAVING_END" })
+    if (!result.success) return
+    dispatch({ type: "DAY_ADD", day: result.day })
+    // Find the last endpoint across all assigned days to pre-fill the boundary.
+    const lastDay = [...state.days].sort((a, b) => a.dayNumber - b.dayNumber).at(-1)
+    const boundaryPointId = lastDay?.endPointId ?? null
+    const firstAssignableId = boundaryPointId
+      ? (state.pointOrder[state.pointOrder.indexOf(boundaryPointId) + 1] ?? null)
+      : null
+    dispatch({
+      type: "SLIDE_START",
+      dayId: result.day.id!,
+      boundaryPointId,
+      firstAssignableId,
+    })
+    if (boundaryPointId) {
+      dispatch({ type: "SAVING_START" })
+      await updateDay(result.day.id!, { startPointId: boundaryPointId })
+      dispatch({ type: "SAVING_END" })
+      dispatch({ type: "DAY_UPDATE", id: result.day.id!, fields: { startPointId: boundaryPointId } })
+    }
+  }, [itinerary.id, state.days, state.pointOrder])
+
   const hasDay0Points = state.points.some((p) => p.dayId === day0Id)
 
   return (
@@ -352,6 +347,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
             onEditDay={handleEditDay}
             onDeleteDay={handleDeleteDay}
             onDateChange={handleDateChange}
+            onAddDay={handleAddDay}
           />
         )}
         {pendingPoint && mode === "drop" && (

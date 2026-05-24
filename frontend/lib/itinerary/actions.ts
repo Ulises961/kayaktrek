@@ -99,7 +99,7 @@ export async function updateDay(
 
 export async function deleteDay(id: string): Promise<DeleteActionResult> {
   try {
-    await apiDelete<unknown>(`/api/day/${id}`)
+    await apiDelete(`/api/day/${id}`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

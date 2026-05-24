@@ -36,7 +36,7 @@ export type MapAction =
   | { type: "DAY_ADD"; day: Day }
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
   | { type: "DAY_REMOVE"; id: string; day0Id: string }
-  | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[] }
+  | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[]; day0Id: string; startPointId: string | null }
   | { type: "SLIDE_START"; dayId: string; boundaryPointId: string | null; firstAssignableId: string | null }
   | { type: "SLIDE_HOVER"; hoveredPointId: string }
   | { type: "SLIDE_COMMIT" }
@@ -121,13 +121,19 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
       }
     }
 
-    case "POINTS_ASSIGN":
+    case "POINTS_ASSIGN": {
+      const assignSet = new Set(action.pointIds)
+      const keepSet = new Set(action.pointIds)
+      if (action.startPointId) keepSet.add(action.startPointId)
       return {
         ...state,
-        points: state.points.map((p) =>
-          p.id && action.pointIds.includes(p.id) ? { ...p, dayId: action.dayId } : p
-        ),
+        points: state.points.map((p) => {
+          if (p.id && assignSet.has(p.id)) return { ...p, dayId: action.dayId }
+          if (p.dayId === action.dayId && p.id && !keepSet.has(p.id)) return { ...p, dayId: action.day0Id }
+          return p
+        }),
       }
+    }
 
     case "SLIDE_START":
       return {

@@ -36,6 +36,7 @@ const defaultProps = {
   onEditDay: vi.fn(),
   onDeleteDay: vi.fn(),
   onDateChange: vi.fn(),
+  onAddDay: vi.fn(),
 }
 
 describe("DaySidebar", () => {
@@ -93,10 +94,21 @@ describe("DaySidebar", () => {
     expect(screen.getByText(/click a marker/i)).toBeTruthy()
   })
 
-  it("calls onEditDay with the day id when Edit is clicked", () => {
+  it("shows reassign and delete buttons on the last day in a multi-day list", () => {
+    const D2_ID = "01952f1a-0000-7000-8000-000000000011"
+    const day2: Day = { id: D2_ID, dayNumber: 2, itineraryId: ITIN_ID, startPointId: P2_ID, endPointId: P3_ID }
+    render(<DaySidebar {...defaultProps} days={[day1, day2]} />)
+    // Two reassign buttons — one per day; both should be present
+    const reassignButtons = screen.getAllByRole("button", { name: /reassign/i })
+    const deleteButtons = screen.getAllByRole("button", { name: /delete day/i })
+    expect(reassignButtons).toHaveLength(2)
+    expect(deleteButtons).toHaveLength(2)
+  })
+
+  it("calls onEditDay with the day id when reassign is clicked", () => {
     const onEditDay = vi.fn()
     render(<DaySidebar {...defaultProps} onEditDay={onEditDay} />)
-    fireEvent.click(screen.getByRole("button", { name: /edit/i }))
+    fireEvent.click(screen.getByRole("button", { name: /reassign/i }))
     expect(onEditDay).toHaveBeenCalledWith(D1_ID)
   })
 
@@ -121,6 +133,13 @@ describe("DaySidebar", () => {
     const input = container.querySelector("input[placeholder='DD/MM/YYYY']") as HTMLInputElement
     fireEvent.change(input, { target: { value: "01/06" } })
     expect(onDateChange).not.toHaveBeenCalled()
+  })
+
+  it("calls onAddDay when the add day button is clicked", () => {
+    const onAddDay = vi.fn()
+    render(<DaySidebar {...defaultProps} onAddDay={onAddDay} />)
+    fireEvent.click(screen.getByRole("button", { name: /add day/i }))
+    expect(onAddDay).toHaveBeenCalledOnce()
   })
 
   it("hides day cards after collapse toggle and shows them again on expand", () => {
