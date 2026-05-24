@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createTrip } from "@/lib/trips/actions"
 import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/common/date-picker"
 import { PlusIcon } from "lucide-react"
 
 export function NewTripDialog() {
@@ -18,7 +19,7 @@ export function NewTripDialog() {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<TripFields>({
+  const { register, handleSubmit, setError, reset, control, formState: { errors } } = useForm<TripFields>({
     resolver: zodResolver(TripFieldsSchema),
   })
 
@@ -64,12 +65,24 @@ export function NewTripDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateFrom">From</Label>
-              <Input id="dateFrom" type="date" disabled={isPending} {...register("dateFrom")} />
+              <Controller
+                name="dateFrom"
+                control={control}
+                render={({ field }) => (
+                  <DatePicker id="dateFrom" value={field.value} onChange={field.onChange} disabled={isPending} />
+                )}
+              />
               {errors.dateFrom && <p className="text-xs text-destructive">{errors.dateFrom.message}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateTo">To</Label>
-              <Input id="dateTo" type="date" disabled={isPending} {...register("dateTo")} />
+              <Controller
+                name="dateTo"
+                control={control}
+                render={({ field }) => (
+                  <DatePicker id="dateTo" value={field.value} onChange={field.onChange} disabled={isPending} />
+                )}
+              />
               {errors.dateTo && <p className="text-xs text-destructive">{errors.dateTo.message}</p>}
             </div>
           </div>
