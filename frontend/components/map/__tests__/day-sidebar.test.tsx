@@ -4,6 +4,7 @@ import { DaySidebar } from "../day-sidebar"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
 import type { SlideState } from "@/lib/itinerary/map-reducer"
+import { SlidePhase } from "@/lib/types/ui"
 
 const ITIN_ID = "01952f1a-0000-7000-8000-000000000001"
 const D1_ID = "01952f1a-0000-7000-8000-000000000010"
@@ -33,10 +34,16 @@ const defaultProps = {
   pointOrder,
   slideState: null as SlideState | null,
   distanceUnit: "nm" as const,
+  activePointId: null as string | null,
+  onActivePointChange: vi.fn(),
+  onPointChange: vi.fn(),
   onEditDay: vi.fn(),
+  onEditDayStart: vi.fn(),
   onDeleteDay: vi.fn(),
   onDateChange: vi.fn(),
   onAddDay: vi.fn(),
+  onSaveSlide: vi.fn(),
+  onCancelSlide: vi.fn(),
 }
 
 describe("DaySidebar", () => {
@@ -57,12 +64,13 @@ describe("DaySidebar", () => {
 
   it("shows point name in END slot when point has a name", () => {
     render(<DaySidebar {...defaultProps} />)
-    expect(screen.getByText("Harbour")).toBeTruthy()
+    expect(screen.getAllByText("Harbour").length).toBeGreaterThan(0)
   })
 
   it("shows hovered point label in END slot during slide for the active day", () => {
     const slideState: SlideState = {
       dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
       boundaryPointId: P1_ID,
       firstAssignableId: P1_ID,
       hoveredPointId: P3_ID,
@@ -74,6 +82,7 @@ describe("DaySidebar", () => {
   it("shows slide prompt in END slot when slide is active but nothing hovered yet", () => {
     const slideState: SlideState = {
       dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
       boundaryPointId: P1_ID,
       firstAssignableId: P1_ID,
       hoveredPointId: null,
@@ -85,6 +94,7 @@ describe("DaySidebar", () => {
   it("shows click prompt in START slot when day1 has no boundary yet", () => {
     const slideState: SlideState = {
       dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
       boundaryPointId: null,
       firstAssignableId: null,
       hoveredPointId: null,
@@ -92,6 +102,106 @@ describe("DaySidebar", () => {
     const day: Day = { id: D1_ID, dayNumber: 1, itineraryId: ITIN_ID }
     render(<DaySidebar {...defaultProps} days={[day]} slideState={slideState} />)
     expect(screen.getByText(/click a marker/i)).toBeTruthy()
+  })
+
+  it("shows pick_start prompt in START slot during pick_start phase", () => {
+    const slideState: SlideState = {
+      dayId: D1_ID,
+      phase: SlidePhase.PickStart,
+      boundaryPointId: null,
+      firstAssignableId: null,
+      hoveredPointId: null,
+    }
+    render(<DaySidebar {...defaultProps} slideState={slideState} />)
+    expect(screen.getByText(/click to set start/i)).toBeTruthy()
+  })
+
+  it("shows hovered point label in START slot during pick_start hover", () => {
+    const slideState: SlideState = {
+      dayId: D1_ID,
+      phase: SlidePhase.PickStart,
+      boundaryPointId: null,
+      firstAssignableId: null,
+      hoveredPointId: P3_ID,
+    }
+    render(<DaySidebar {...defaultProps} slideState={slideState} />)
+    expect(screen.getByText("Point 3")).toBeTruthy()
+  })
+
+  it("shows Save and Cancel buttons when slide is active", () => {
+    const slideState: SlideState = {
+      dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
+      boundaryPointId: P1_ID,
+      firstAssignableId: P1_ID,
+      hoveredPointId: null,
+    }
+    render(<DaySidebar {...defaultProps} slideState={slideState} />)
+    expect(screen.getByRole("button", { name: /save/i })).toBeTruthy()
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy()
+  })
+
+  it("calls onSaveSlide with day id when Save is clicked", () => {
+    const onSaveSlide = vi.fn()
+    const slideState: SlideState = {
+      dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
+      boundaryPointId: P1_ID,
+      firstAssignableId: P1_ID,
+      hoveredPointId: P3_ID,
+    }
+    render(<DaySidebar {...defaultProps} slideState={slideState} onSaveSlide={onSaveSlide} />)
+    fireEvent.click(screen.getByRole("button", { name: /save/i }))
+    expect(onSaveSlide).toHaveBeenCalledWith(D1_ID)
+  })
+
+  it("calls onCancelSlide with day id when Cancel is clicked", () => {
+    const onCancelSlide = vi.fn()
+    const slideState: SlideState = {
+      dayId: D1_ID,
+      phase: SlidePhase.PickEnd,
+      boundaryPointId: P1_ID,
+      firstAssignableId: P1_ID,
+      hoveredPointId: null,
+    }
+    render(<DaySidebar {...defaultProps} slideState={slideState} onCancelSlide={onCancelSlide} />)
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
+    expect(onCancelSlide).toHaveBeenCalledWith(D1_ID)
+  })
+
+  it("hides edit-start pencil on Day 1 (start is always the first dropped point)", () => {
+    render(<DaySidebar {...defaultProps} />)
+    expect(screen.queryByRole("button", { name: /edit start/i })).toBeNull()
+  })
+
+  it("shows edit-start pencil on Day 2+ when not in slide mode", () => {
+    const D2_ID = "01952f1a-0000-7000-8000-000000000011"
+    const day2: Day = { id: D2_ID, dayNumber: 2, itineraryId: ITIN_ID, startPointId: P2_ID, endPointId: P3_ID }
+    render(<DaySidebar {...defaultProps} days={[day1, day2]} />)
+    expect(screen.getByRole("button", { name: /edit start/i })).toBeTruthy()
+  })
+
+  it("calls onEditDayStart with the day id when start pencil is clicked on Day 2+", () => {
+    const D2_ID = "01952f1a-0000-7000-8000-000000000011"
+    const day2: Day = { id: D2_ID, dayNumber: 2, itineraryId: ITIN_ID, startPointId: P2_ID, endPointId: P3_ID }
+    const onEditDayStart = vi.fn()
+    render(<DaySidebar {...defaultProps} days={[day1, day2]} onEditDayStart={onEditDayStart} />)
+    fireEvent.click(screen.getByRole("button", { name: /edit start/i }))
+    expect(onEditDayStart).toHaveBeenCalledWith(D2_ID)
+  })
+
+  it("hides edit-start pencil when slide mode is active", () => {
+    const D2_ID = "01952f1a-0000-7000-8000-000000000011"
+    const day2: Day = { id: D2_ID, dayNumber: 2, itineraryId: ITIN_ID, startPointId: P2_ID, endPointId: P3_ID }
+    const slideState: SlideState = {
+      dayId: D2_ID,
+      phase: SlidePhase.PickEnd,
+      boundaryPointId: P2_ID,
+      firstAssignableId: P3_ID,
+      hoveredPointId: null,
+    }
+    render(<DaySidebar {...defaultProps} days={[day1, day2]} slideState={slideState} />)
+    expect(screen.queryByRole("button", { name: /edit start/i })).toBeNull()
   })
 
   it("shows reassign and delete buttons on the last day in a multi-day list", () => {

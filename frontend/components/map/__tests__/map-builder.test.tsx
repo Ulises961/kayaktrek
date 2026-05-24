@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const { mockUseCollapseSidebar } = vi.hoisted(() => ({
@@ -17,8 +17,19 @@ vi.mock("next/dynamic", () => ({
     },
 }))
 
+vi.mock("@/lib/itinerary/actions", () => ({
+  createDay: vi.fn().mockResolvedValue({ success: false }),
+  updateDay: vi.fn().mockResolvedValue({ success: true }),
+  deleteDay: vi.fn().mockResolvedValue({ success: true }),
+  createPoint: vi.fn().mockResolvedValue({ success: false }),
+  updatePoint: vi.fn().mockResolvedValue({ success: true }),
+  deletePoint: vi.fn().mockResolvedValue({ success: true }),
+  assignPointsToDay: vi.fn().mockResolvedValue({ success: true }),
+}))
+
 import { MapBuilder } from "../map-builder"
 import type { Itinerary } from "@/lib/dtos/itinerary"
+import * as actions from "@/lib/itinerary/actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000030"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000020"
@@ -80,5 +91,40 @@ describe("MapBuilder", () => {
   it("shows 0 days for an empty itinerary", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
     expect(screen.getByText("0 days")).toBeInTheDocument()
+  })
+
+  it("auto-assigns Day 1 start to the first point in pointOrder when switching to assign mode", async () => {
+    const DAY1_ID = "01952f1a-0000-7000-8000-000000000011"
+    const DAY0_ID = "01952f1a-0000-7000-8000-000000000010"
+    const PT_FIRST = "01952f1a-0000-7000-8000-000000000021"
+    const PT_SECOND = "01952f1a-0000-7000-8000-000000000022"
+
+    vi.mocked(actions.createDay).mockResolvedValueOnce({
+      success: true,
+      day: { id: DAY1_ID, dayNumber: 1, itineraryId: ITINERARY_ID },
+    })
+
+    const itinerary: Itinerary = {
+      ...ITINERARY,
+      days: [{
+        id: DAY0_ID,
+        dayNumber: 0,
+        itineraryId: ITINERARY_ID,
+        points: [
+          { id: PT_FIRST, type: "position", dayId: DAY0_ID, nextId: PT_SECOND },
+          { id: PT_SECOND, type: "position", dayId: DAY0_ID },
+        ],
+      }],
+    }
+
+    render(<MapBuilder itinerary={itinerary} tripId={TRIP_ID} tripName="Test" />)
+    await userEvent.click(screen.getByRole("button", { name: "Assign days" }))
+
+    await waitFor(() => {
+      expect(actions.updateDay).toHaveBeenCalledWith(
+        DAY1_ID,
+        expect.objectContaining({ startPointId: PT_FIRST }),
+      )
+    })
   })
 })

@@ -1,6 +1,8 @@
 "use client"
 import { useState } from "react"
 import { Pencil, Plus, Trash2 } from "lucide-react"
+import { SlidePhase } from "@/lib/types/ui"
+import { PointAccordionItem } from "./point-accordion-item"
 
 type DayDateInputProps = {
   isoValue: string | null | undefined
@@ -51,10 +53,16 @@ type DaySidebarProps = {
   pointOrder: string[]
   slideState: SlideState | null
   distanceUnit: "nm" | "km"
+  activePointId: string | null
+  onActivePointChange: (id: string | null) => void
+  onPointChange: (id: string, fields: Partial<Point>) => void
   onEditDay: (dayId: string) => void
+  onEditDayStart: (dayId: string) => void
   onDeleteDay: (dayId: string) => void
   onDateChange: (dayId: string, date: string) => void
   onAddDay: () => void
+  onSaveSlide: (dayId: string) => void
+  onCancelSlide: (dayId: string) => void
 }
 
 function getPointLabel(id: string | null | undefined, points: Point[], pointOrder: string[]): string {
@@ -85,12 +93,18 @@ type DayCardProps = {
   pointOrder: string[]
   slideState: SlideState | null
   distanceUnit: "nm" | "km"
+  activePointId: string | null
+  onActivePointChange: (id: string | null) => void
+  onPointChange: (id: string, fields: Partial<Point>) => void
   onEditDay: (dayId: string) => void
+  onEditDayStart: (dayId: string) => void
   onDeleteDay: (dayId: string) => void
   onDateChange: (dayId: string, date: string) => void
+  onSaveSlide: (dayId: string) => void
+  onCancelSlide: (dayId: string) => void
 }
 
-function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay, onDeleteDay, onDateChange }: DayCardProps) {
+function DayCard({ day, points, pointOrder, slideState, distanceUnit, activePointId, onActivePointChange, onPointChange, onEditDay, onEditDayStart, onDeleteDay, onDateChange, onSaveSlide, onCancelSlide }: DayCardProps) {
   const color = getDayColor(day.dayNumber)
   const isActiveSlide = slideState?.dayId === day.id
   const dayPointCount = points.filter((p) => p.dayId === day.id).length
@@ -100,20 +114,27 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
   let endLabel: string
 
   if (isActiveSlide && slideState) {
-    startLabel = slideState.boundaryPointId
-      ? getPointLabel(slideState.boundaryPointId, points, pointOrder)
-      : "Click a marker to start"
-    if (slideState.hoveredPointId) {
-      endLabel = getPointLabel(slideState.hoveredPointId, points, pointOrder)
-    } else if (slideState.boundaryPointId) {
-      endLabel = "Hover a marker to preview"
+    if (slideState.phase === SlidePhase.PickStart) {
+      startLabel = slideState.hoveredPointId
+        ? getPointLabel(slideState.hoveredPointId, points, pointOrder)
+        : "Click to set start"
+      endLabel = getPointLabel(day.endPointId, points, pointOrder)
     } else {
-      endLabel = "—"
+      startLabel = slideState.boundaryPointId
+        ? getPointLabel(slideState.boundaryPointId, points, pointOrder)
+        : "Click a marker to start"
+      endLabel = slideState.hoveredPointId
+        ? getPointLabel(slideState.hoveredPointId, points, pointOrder)
+        : slideState.boundaryPointId
+          ? "Hover a marker to preview"
+          : "—"
     }
   } else {
     startLabel = getPointLabel(day.startPointId, points, pointOrder)
     endLabel = getPointLabel(day.endPointId, points, pointOrder)
   }
+
+  const showStartPencil = day.dayNumber > 1 && !isActiveSlide && !!day.startPointId
 
   return (
     <div
@@ -147,13 +168,24 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
           <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground w-10 shrink-0">
             Start
           </span>
-          <span className="text-xs text-foreground truncate">{startLabel}</span>
+          <span className={`text-xs truncate ${isActiveSlide && slideState?.phase === SlidePhase.PickStart ? "text-muted-foreground italic" : "text-foreground"}`}>
+            {startLabel}
+          </span>
+          {showStartPencil && (
+            <button
+              aria-label="Edit start point"
+              onClick={() => onEditDayStart(day.id!)}
+              className="text-muted-foreground hover:text-foreground transition-colors ml-0.5 shrink-0"
+            >
+              <Pencil size={10} />
+            </button>
+          )}
         </div>
         <div className="flex gap-2 items-baseline">
           <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground w-10 shrink-0">
             End
           </span>
-          <span className={`text-xs truncate ${isActiveSlide ? "text-muted-foreground italic" : "text-foreground"}`}>
+          <span className={`text-xs truncate ${isActiveSlide && slideState?.phase === SlidePhase.PickEnd ? "text-muted-foreground italic" : "text-foreground"}`}>
             {endLabel}
           </span>
         </div>
@@ -164,7 +196,7 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
         {dayPointCount > 0 && ` · ${dayPointCount} pt${dayPointCount !== 1 ? "s" : ""}`}
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 mb-2">
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
           ~Weather
         </span>
@@ -172,6 +204,46 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
           ~Sea
         </span>
       </div>
+
+      {isActiveSlide && (
+        <div className="flex gap-1.5">
+          <button
+            aria-label="Save slide"
+            onClick={() => onSaveSlide(day.id!)}
+            className="flex-1 text-xs py-1 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Save
+          </button>
+          <button
+            aria-label="Cancel slide"
+            onClick={() => onCancelSlide(day.id!)}
+            className="flex-1 text-xs py-1 rounded border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {dayPointCount > 0 && (
+        <div className="mt-2 border-t border-border/30 pt-1">
+          {pointOrder
+            .filter((id) => points.find((p) => p.id === id)?.dayId === day.id)
+            .map((id, idx) => {
+              const point = points.find((p) => p.id === id)!
+              return (
+                <PointAccordionItem
+                  key={id}
+                  point={point}
+                  index={pointOrder.indexOf(id) + 1}
+                  isOpen={activePointId === id}
+                  onToggle={() => onActivePointChange(activePointId === id ? null : id)}
+                  onPointChange={onPointChange}
+                  onDelete={() => {}}
+                />
+              )
+            })}
+        </div>
+      )}
     </div>
   )
 }
@@ -182,10 +254,16 @@ export function DaySidebar({
   pointOrder,
   slideState,
   distanceUnit,
+  activePointId,
+  onActivePointChange,
+  onPointChange,
   onEditDay,
+  onEditDayStart,
   onDeleteDay,
   onDateChange,
   onAddDay,
+  onSaveSlide,
+  onCancelSlide,
 }: DaySidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
@@ -246,9 +324,15 @@ export function DaySidebar({
                   pointOrder={pointOrder}
                   slideState={slideState}
                   distanceUnit={distanceUnit}
+                  activePointId={activePointId}
+                  onActivePointChange={onActivePointChange}
+                  onPointChange={onPointChange}
                   onEditDay={onEditDay}
+                  onEditDayStart={onEditDayStart}
                   onDeleteDay={onDeleteDay}
                   onDateChange={onDateChange}
+                  onSaveSlide={onSaveSlide}
+                  onCancelSlide={onCancelSlide}
                 />
               ))
           )}

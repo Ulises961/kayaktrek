@@ -7,9 +7,11 @@ import type { MapMode } from "./map-top-bar"
 import type { MapCoreProps } from "./map-core"
 import { PointDropPanel } from "./point-drop-panel"
 import { DaySidebar } from "./day-sidebar"
+import { DropSidebar } from "./drop-sidebar"
 import type { Itinerary } from "@/lib/dtos/itinerary"
-import type { PointType } from "@/lib/dtos/point"
+import type { Point, PointType } from "@/lib/dtos/point"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
+import { SlidePhase } from "@/lib/types/ui"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import {
@@ -20,6 +22,7 @@ import {
   updateDay,
   deleteDay,
   assignPointsToDay,
+  fetchPois,
 } from "@/lib/itinerary/actions"
 
 const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.ComponentType<MapCoreProps>
@@ -35,6 +38,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
   const [mode, setMode] = useState<MapMode>("drop")
   const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
+  const [activePointId, setActivePointId] = useState<string | null>(null)
+  const [poiResults, setPoiResults] = useState<Point[]>([])
 
   const day0 = itinerary.days?.find((d) => d.dayNumber === 0)
   const day0Id = day0?.id
@@ -98,6 +103,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     if (!itinerary.id) return
 
     if (state.days.length === 0) {
+      // Day 1 always starts from the first dropped point.
+      const firstPointId = state.pointOrder[0] ?? null
       dispatch({ type: "SAVING_START" })
       const result = await createDay(itinerary.id, 1)
       dispatch({ type: "SAVING_END" })
@@ -106,9 +113,20 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
         dispatch({
           type: "SLIDE_START",
           dayId: result.day.id!,
-          boundaryPointId: null,
-          firstAssignableId: null,
+          phase: SlidePhase.PickEnd,
+          boundaryPointId: firstPointId,
+          firstAssignableId: firstPointId,
         })
+        if (firstPointId && result.day.id) {
+          dispatch({ type: "POINT_UPDATE", id: firstPointId, fields: { type: "stop" } })
+          dispatch({ type: "SAVING_START" })
+          await Promise.all([
+            updateDay(result.day.id, { startPointId: firstPointId }),
+            updatePoint(firstPointId, { type: "stop" }),
+          ])
+          dispatch({ type: "SAVING_END" })
+          dispatch({ type: "DAY_UPDATE", id: result.day.id, fields: { startPointId: firstPointId } })
+        }
       }
     } else {
       // Re-entering assign mode: resume slide on the last unfinished day.
@@ -117,6 +135,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
         dispatch({
           type: "SLIDE_START",
           dayId: lastDay.id!,
+          phase: SlidePhase.PickEnd,
           boundaryPointId: lastDay.startPointId ?? null,
           firstAssignableId: lastDay.startPointId
             ? (state.pointOrder[state.pointOrder.indexOf(lastDay.startPointId) + 1] ?? null)
@@ -191,24 +210,32 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
   const handleMarkerClick = useCallback(async (pointId: string) => {
     if (mode !== "assign" || !state.slideState) return
-    const { dayId, boundaryPointId, firstAssignableId } = state.slideState
+    const { dayId, phase, boundaryPointId, firstAssignableId } = state.slideState
 
-    if (boundaryPointId === null) {
-      // Day 1: user picks the start point.
+    if (phase === SlidePhase.PickStart) {
+      // User is repositioning the start of a Day 2+ boundary.
+      const activeDay = state.days.find((d) => d.id === dayId)
+      const prevDay = activeDay ? state.days.find((d) => d.dayNumber === activeDay.dayNumber - 1) : undefined
+      const firstAssignable = state.pointOrder[state.pointOrder.indexOf(pointId) + 1] ?? null
       dispatch({
         type: "SLIDE_START",
         dayId,
+        phase: SlidePhase.PickEnd,
         boundaryPointId: pointId,
-        firstAssignableId: pointId,
+        firstAssignableId: firstAssignable,
       })
       dispatch({ type: "SAVING_START" })
-      await updateDay(dayId, { startPointId: pointId })
+      await Promise.all([
+        updateDay(dayId, { startPointId: pointId }),
+        prevDay?.id ? updateDay(prevDay.id, { endPointId: pointId }) : Promise.resolve(),
+      ])
       dispatch({ type: "SAVING_END" })
       dispatch({ type: "DAY_UPDATE", id: dayId, fields: { startPointId: pointId } })
+      if (prevDay?.id) dispatch({ type: "DAY_UPDATE", id: prevDay.id, fields: { endPointId: pointId } })
       return
     }
 
-    // Commit: lock the hovered point as the end.
+    // PickEnd: commit the hovered point as the day's end.
     const endPointId = pointId
     const assignStart = firstAssignableId
     if (!assignStart) return
@@ -223,23 +250,29 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     dispatch({ type: "SLIDE_COMMIT" })
     dispatch({ type: "DAY_UPDATE", id: dayId, fields: { startPointId: boundaryPointId, endPointId } })
 
-    dispatch({ type: "SAVING_START" })
-    await assignPointsToDay(dayId, assignStart, endPointId)
-    dispatch({ type: "SAVING_END" })
+    // Auto-type the end boundary point as a stop.
+    dispatch({ type: "POINT_UPDATE", id: endPointId, fields: { type: "stop" } })
 
     dispatch({ type: "SAVING_START" })
-    await updateDay(dayId, { startPointId: boundaryPointId, endPointId })
+    await Promise.all([
+      assignPointsToDay(dayId, assignStart, endPointId),
+      updateDay(dayId, { startPointId: boundaryPointId, endPointId }),
+      updatePoint(endPointId, { type: "stop" }),
+    ])
     dispatch({ type: "SAVING_END" })
-  }, [mode, state.slideState, state.pointOrder, state.points, day0Id])
+  }, [mode, state.slideState, state.pointOrder, state.days, day0Id])
 
   const handleMarkerHover = useCallback((pointId: string) => {
-    if (state.slideState?.boundaryPointId != null) {
+    if (!state.slideState) return
+    const { phase, boundaryPointId } = state.slideState
+    if (phase === SlidePhase.PickStart || boundaryPointId != null) {
       dispatch({ type: "SLIDE_HOVER", hoveredPointId: pointId })
     }
-  }, [state.slideState?.boundaryPointId])
+  }, [state.slideState])
 
   // ── day sidebar handlers ──────────────────────────────────────────────────────
 
+  // Reassign end: re-enter pick_end from the current start boundary.
   const handleEditDay = useCallback((dayId: string) => {
     const day = state.days.find((d) => d.id === dayId)
     if (!day?.startPointId) return
@@ -248,10 +281,75 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     dispatch({
       type: "SLIDE_START",
       dayId,
+      phase: SlidePhase.PickEnd,
       boundaryPointId: day.startPointId,
       firstAssignableId: firstAssignable,
     })
   }, [state.days, state.pointOrder])
+
+  // Edit start: enter pick_start so the user can reposition the Day N / Day N-1 boundary.
+  const handleEditDayStart = useCallback((dayId: string) => {
+    dispatch({
+      type: "SLIDE_START",
+      dayId,
+      phase: SlidePhase.PickStart,
+      boundaryPointId: null,
+      firstAssignableId: null,
+    })
+  }, [])
+
+  const handleSaveSlide = useCallback(async (dayId: string) => {
+    if (!state.slideState || !day0Id) return
+    const { phase, boundaryPointId, hoveredPointId, firstAssignableId } = state.slideState
+    const activeDay = state.days.find((d) => d.id === dayId)
+    if (!activeDay) return
+
+    const finalStart = phase === SlidePhase.PickStart ? boundaryPointId : boundaryPointId
+    const finalEnd = hoveredPointId ?? activeDay.endPointId ?? null
+
+    if (!finalStart) {
+      // Nothing picked yet — just exit.
+      dispatch({ type: "SLIDE_COMMIT" })
+      return
+    }
+
+    const effectiveFirstAssignable = phase === SlidePhase.PickStart
+      ? (state.pointOrder[state.pointOrder.indexOf(finalStart) + 1] ?? finalStart)
+      : (firstAssignableId ?? finalStart)
+
+    const startIdx = state.pointOrder.indexOf(effectiveFirstAssignable)
+    const endIdx = finalEnd ? state.pointOrder.indexOf(finalEnd) : -1
+    if (startIdx !== -1 && endIdx >= startIdx) {
+      const rangeIds = state.pointOrder.slice(startIdx, endIdx + 1)
+      dispatch({ type: "POINTS_ASSIGN", dayId, pointIds: rangeIds, day0Id, startPointId: finalStart })
+      dispatch({ type: "DAY_UPDATE", id: dayId, fields: { startPointId: finalStart, endPointId: finalEnd } })
+      dispatch({ type: "POINT_UPDATE", id: finalEnd!, fields: { type: "stop" } })
+      dispatch({ type: "SAVING_START" })
+      await Promise.all([
+        assignPointsToDay(dayId, effectiveFirstAssignable, finalEnd!),
+        updateDay(dayId, { startPointId: finalStart, endPointId: finalEnd }),
+        updatePoint(finalEnd!, { type: "stop" }),
+      ])
+      dispatch({ type: "SAVING_END" })
+    } else if (finalStart) {
+      // Only start changed (no end picked yet) — persist start only.
+      dispatch({ type: "DAY_UPDATE", id: dayId, fields: { startPointId: finalStart } })
+      dispatch({ type: "SAVING_START" })
+      await updateDay(dayId, { startPointId: finalStart })
+      dispatch({ type: "SAVING_END" })
+    }
+    dispatch({ type: "SLIDE_COMMIT" })
+  }, [state.slideState, state.days, state.pointOrder, day0Id])
+
+  const handleCancelSlide = useCallback((dayId: string) => {
+    const day = state.days.find((d) => d.id === dayId)
+    dispatch({
+      type: "SLIDE_CANCEL",
+      restore: day?.startPointId && day0Id
+        ? { dayId, startPointId: day.startPointId, endPointId: day.endPointId ?? null, day0Id }
+        : undefined,
+    })
+  }, [state.days, day0Id])
 
   const handleDeleteDay = useCallback(async (dayId: string) => {
     if (!day0Id) return
@@ -296,6 +394,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     dispatch({
       type: "SLIDE_START",
       dayId: result.day.id!,
+      phase: SlidePhase.PickEnd,
       boundaryPointId,
       firstAssignableId,
     })
@@ -306,6 +405,41 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
       dispatch({ type: "DAY_UPDATE", id: result.day.id!, fields: { startPointId: boundaryPointId } })
     }
   }, [itinerary.id, state.days, state.pointOrder])
+
+  // ── drop-mode sidebar handlers ───────────────────────────────────────────────
+
+  const handleDropModeMarkerClick = useCallback((pointId: string) => {
+    setActivePointId((prev) => (prev === pointId ? null : pointId))
+  }, [])
+
+  const handlePointChange = useCallback(async (pointId: string, fields: Partial<Point>) => {
+    dispatch({ type: "POINT_UPDATE", id: pointId, fields })
+    dispatch({ type: "SAVING_START" })
+    await updatePoint(pointId, fields as Parameters<typeof updatePoint>[1])
+    dispatch({ type: "SAVING_END" })
+  }, [])
+
+  const handlePointDeleteFromSidebar = useCallback(async (pointId: string) => {
+    setActivePointId((prev) => (prev === pointId ? null : prev))
+    dispatch({ type: "POINT_REMOVE", id: pointId })
+    dispatch({ type: "SAVING_START" })
+    await deletePoint(pointId)
+    dispatch({ type: "SAVING_END" })
+  }, [])
+
+  const handleFetchPois = useCallback(async (point: Point) => {
+    if (!point.latitude || !point.longitude) return
+    const results = await fetchPois(point.latitude, point.longitude, 5)
+    setPoiResults(results)
+  }, [])
+
+  const handlePoiSelect = useCallback(async (pointId: string, name: string) => {
+    dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name } })
+    dispatch({ type: "SAVING_START" })
+    await updatePoint(pointId, { name })
+    dispatch({ type: "SAVING_END" })
+    setPoiResults([])
+  }, [])
 
   const hasDay0Points = state.points.some((p) => p.dayId === day0Id)
 
@@ -334,9 +468,22 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
           onMapClick={handleMapClick}
           onMarkerDragEnd={handleMarkerDragEnd}
           onMarkerDragMove={handleMarkerDragMove}
-          onMarkerClick={mode === "assign" ? handleMarkerClick : undefined}
+          onMarkerClick={mode === "assign" ? handleMarkerClick : handleDropModeMarkerClick}
           onMarkerHover={mode === "assign" ? handleMarkerHover : undefined}
         />
+        {mode === "drop" && (
+          <DropSidebar
+            points={state.points}
+            pointOrder={state.pointOrder}
+            activePointId={activePointId}
+            onActivePointChange={setActivePointId}
+            onPointChange={handlePointChange}
+            onPointDelete={handlePointDeleteFromSidebar}
+            onFetchPois={handleFetchPois}
+            poiResults={poiResults}
+            onPoiSelect={handlePoiSelect}
+          />
+        )}
         {mode === "assign" && (
           <DaySidebar
             days={state.days}
@@ -344,10 +491,16 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
             pointOrder={state.pointOrder}
             slideState={state.slideState}
             distanceUnit={distanceUnit}
+            activePointId={activePointId}
+            onActivePointChange={setActivePointId}
+            onPointChange={handlePointChange}
             onEditDay={handleEditDay}
+            onEditDayStart={handleEditDayStart}
             onDeleteDay={handleDeleteDay}
             onDateChange={handleDateChange}
             onAddDay={handleAddDay}
+            onSaveSlide={handleSaveSlide}
+            onCancelSlide={handleCancelSlide}
           />
         )}
         {pendingPoint && mode === "drop" && (

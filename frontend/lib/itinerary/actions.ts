@@ -1,8 +1,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
-import { PointSchema } from "@/lib/dtos/point"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
+import { PointSchema, PointsSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
@@ -50,7 +50,7 @@ export async function createPoint(
 
 export async function updatePoint(
   id: string,
-  fields: Partial<{ type: PointType; latitude: number; longitude: number }>
+  fields: Partial<{ type: PointType; latitude: number; longitude: number; name: string | null; notes: string | null }>
 ): Promise<PointActionResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/point/${id}`, fields)
@@ -104,6 +104,15 @@ export async function deleteDay(id: string): Promise<DeleteActionResult> {
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete day." }
+  }
+}
+
+export async function fetchPois(lat: number, lng: number, range = 5): Promise<Point[]> {
+  try {
+    const raw = await apiGet<unknown[]>(`/api/point/pois?lat=${lat}&long=${lng}&range=${range}`)
+    return PointsSchema.parse(raw)
+  } catch {
+    return []
   }
 }
 

@@ -1,9 +1,11 @@
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
+import { SlidePhase } from "@/lib/types/ui"
 import { walkList } from "./linked-list"
 
 export type SlideState = {
   dayId: string
+  phase: SlidePhase
   // FK stored as Day.startPointId. null = waiting for Day 1 first click.
   // For Day 2+: pre-filled with the previous day's end (boundary point).
   boundaryPointId: string | null
@@ -37,10 +39,10 @@ export type MapAction =
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
   | { type: "DAY_REMOVE"; id: string; day0Id: string }
   | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[]; day0Id: string; startPointId: string | null }
-  | { type: "SLIDE_START"; dayId: string; boundaryPointId: string | null; firstAssignableId: string | null }
+  | { type: "SLIDE_START"; dayId: string; phase: SlidePhase; boundaryPointId: string | null; firstAssignableId: string | null }
   | { type: "SLIDE_HOVER"; hoveredPointId: string }
   | { type: "SLIDE_COMMIT" }
-  | { type: "SLIDE_CANCEL" }
+  | { type: "SLIDE_CANCEL"; restore?: { dayId: string; startPointId: string; endPointId: string | null; day0Id: string } }
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
   switch (action.type) {
@@ -140,6 +142,7 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         ...state,
         slideState: {
           dayId: action.dayId,
+          phase: action.phase,
           boundaryPointId: action.boundaryPointId,
           firstAssignableId: action.firstAssignableId,
           hoveredPointId: null,
@@ -156,8 +159,27 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
     case "SLIDE_COMMIT":
       return { ...state, slideState: null }
 
-    case "SLIDE_CANCEL":
-      return { ...state, slideState: null }
+    case "SLIDE_CANCEL": {
+      if (!action.restore) return { ...state, slideState: null }
+      const { dayId, startPointId, endPointId, day0Id } = action.restore
+      const startIdx = state.pointOrder.indexOf(startPointId)
+      const endIdx = endPointId ? state.pointOrder.indexOf(endPointId) : -1
+      const keepIds = new Set(
+        endIdx >= startIdx && endIdx >= 0
+          ? state.pointOrder.slice(startIdx, endIdx + 1)
+          : [startPointId]
+      )
+      return {
+        ...state,
+        points: state.points.map((p) => {
+          if (!p.id) return p
+          if (keepIds.has(p.id)) return { ...p, dayId }
+          if (p.dayId === dayId) return { ...p, dayId: day0Id }
+          return p
+        }),
+        slideState: null,
+      }
+    }
   }
 }
 
