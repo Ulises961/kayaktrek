@@ -139,10 +139,36 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
 }
 
 export function initialMapState(points: Point[], days: Day[] = []): MapState {
-  const ordered = walkList(points.filter((p) => p.id))
+  const withId = points.filter((p) => p.id)
+  const walked = walkList(withId)
+  // If walkList recovered fewer than half the points the linked list is absent/broken
+  // (all next_id null). Fall back to UUID v7 lexicographic sort which preserves
+  // insertion order because UUID v7 encodes a millisecond timestamp in the high bits.
+  const ordered = walked.length >= Math.ceil(withId.length / 2)
+    ? walked
+    : [...withId].sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""))
+  const pointOrder = ordered.map((p) => p.id!)
+
+  // Reassign dayId for points that fall within a numbered day's [startPointId, endPointId] range.
+  // The DB stores all points under Day 0 (staging); numbered days record only boundary FKs.
+  const reassigned = new Map<string, string>()
+  const sortedDays = [...days].filter((d) => d.dayNumber > 0).sort((a, b) => a.dayNumber - b.dayNumber)
+  for (const day of sortedDays) {
+    if (!day.id || !day.startPointId) continue
+    const startIdx = pointOrder.indexOf(day.startPointId)
+    const endIdx = day.endPointId ? pointOrder.indexOf(day.endPointId) : -1
+    if (startIdx === -1) continue
+    const stop = endIdx >= startIdx ? endIdx : pointOrder.length - 1
+    for (let i = startIdx; i <= stop; i++) reassigned.set(pointOrder[i], day.id)
+  }
+
+  const hydratedPoints = reassigned.size > 0
+    ? points.map((p) => p.id && reassigned.has(p.id) ? { ...p, dayId: reassigned.get(p.id) } : p)
+    : points
+
   return {
-    points,
-    pointOrder: ordered.map((p) => p.id!),
+    points: hydratedPoints,
+    pointOrder,
     pendingPointId: null,
     savingCount: 0,
     days,

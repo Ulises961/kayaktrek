@@ -19,6 +19,7 @@ class PointSchema(BaseSchema):
     notes = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 5000)
     type = fields.Enum(PointType, by_value=True, required=True)
     day_id = fields.UUID(allow_none=True)
+    next_id = fields.UUID(allow_none=True, dump_only=True)
     next = fields.Nested(lambda: PointSchema(), allow_none=True,
                          exclude=("next", "nearby"))
     nearby = fields.List(fields.Nested(lambda: PointSchema(

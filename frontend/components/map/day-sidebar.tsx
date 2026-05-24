@@ -1,5 +1,43 @@
 "use client"
 import { useState } from "react"
+
+type DayDateInputProps = {
+  isoValue: string | null | undefined
+  dayId: string
+  onDateChange: (dayId: string, iso: string) => void
+}
+
+function isoToDisplay(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const [yyyy, mm, dd] = iso.split("-")
+  return `${dd}/${mm}/${yyyy}`
+}
+
+function DayDateInput({ isoValue, dayId, onDateChange }: DayDateInputProps) {
+  const [draft, setDraft] = useState(() => isoToDisplay(isoValue))
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+    setDraft(raw)
+    const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+    if (match) {
+      const [, dd, mm, yyyy] = match
+      onDateChange(dayId, `${yyyy}-${mm}-${dd}`)
+    }
+  }
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={handleChange}
+      placeholder="DD/MM/YYYY"
+      maxLength={10}
+      className="w-full text-xs bg-transparent border border-border/60 rounded px-2 py-1 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono mb-2"
+    />
+  )
+}
+
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
 import type { SlideState } from "@/lib/itinerary/map-reducer"
@@ -91,15 +129,7 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
         )}
       </div>
 
-      <div className="mb-2">
-        <label className="sr-only">Date</label>
-        <input
-          type="date"
-          value={day.date ?? ""}
-          onChange={(e) => onDateChange(day.id!, e.target.value)}
-          className="w-full text-xs bg-transparent border border-border/60 rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-      </div>
+      <DayDateInput isoValue={day.date} dayId={day.id!} onDateChange={onDateChange} />
 
       <div className="space-y-1 mb-2">
         <div className="flex gap-2 items-baseline">

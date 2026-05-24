@@ -15,6 +15,7 @@ export type Point = {
   name?: string | null;
   type: PointType;
   dayId?: string | null;
+  nextId?: string | null;
   next?: Point | null;
   images?: z.infer<typeof ImageSchema>[] | null;
 };
@@ -28,6 +29,7 @@ export const PointSchema: z.ZodType<Point> = z.lazy(() =>
     name: z.string().max(200, "Name must be at most 200 characters.").refine(noHtmlTags.check, noHtmlTags.message).nullish(),
     type: PointTypeSchema,
     dayId: z.uuidv7().nullish(),
+    nextId: z.string().uuid().nullish(),
     next: PointSchema.nullish(),
     images: z.array(ImageSchema).nullish(),
   })

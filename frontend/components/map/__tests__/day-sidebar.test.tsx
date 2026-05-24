@@ -99,12 +99,20 @@ describe("DaySidebar", () => {
     expect(onEditDay).toHaveBeenCalledWith(D1_ID)
   })
 
-  it("calls onDateChange when date input changes", () => {
+  it("calls onDateChange with ISO date when a valid DD/MM/YYYY is entered", () => {
     const onDateChange = vi.fn()
     const { container } = render(<DaySidebar {...defaultProps} onDateChange={onDateChange} />)
-    const input = container.querySelector("input[type='date']") as HTMLInputElement
-    fireEvent.change(input, { target: { value: "2026-06-01" } })
+    const input = container.querySelector("input[placeholder='DD/MM/YYYY']") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "01/06/2026" } })
     expect(onDateChange).toHaveBeenCalledWith(D1_ID, "2026-06-01")
+  })
+
+  it("does not call onDateChange while the date is incomplete", () => {
+    const onDateChange = vi.fn()
+    const { container } = render(<DaySidebar {...defaultProps} onDateChange={onDateChange} />)
+    const input = container.querySelector("input[placeholder='DD/MM/YYYY']") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "01/06" } })
+    expect(onDateChange).not.toHaveBeenCalled()
   })
 
   it("hides day cards after collapse toggle and shows them again on expand", () => {

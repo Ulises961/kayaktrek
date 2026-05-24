@@ -115,9 +115,24 @@ class PointService:
                     _require_editable(trip)
         PointService._sync_geo(point)
         db.session.add(point)
-        db.session.commit()
+        db.session.flush()  # assign point.id before querying for the tail
 
-        # Refresh to get relationships
+        # Append to the end of this day's ordered list.
+        # Finds the current tail (the one point with next_id=NULL that isn't the new point)
+        # and links it forward. In a well-formed list there is exactly one tail per day.
+        tail = (
+            db.session.query(Point)
+            .filter(
+                Point.day_id == point.day_id,
+                Point.next_id.is_(None),
+                Point.id != point.id,
+            )
+            .first()
+        )
+        if tail:
+            tail.next_id = point.id
+
+        db.session.commit()
         db.session.refresh(point)
         logger.info(f"Point {point.id} created successfully")
         return point

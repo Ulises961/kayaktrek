@@ -6,9 +6,9 @@ const P1 = "01952f1a-0000-7000-8000-000000000001"
 const P2 = "01952f1a-0000-7000-8000-000000000002"
 const P3 = "01952f1a-0000-7000-8000-000000000003"
 
-// Flat array with id-only next references (mirrors API response depth)
-const p1: Point = { id: P1, type: "position", next: { id: P2, type: "position" } }
-const p2: Point = { id: P2, type: "position", next: { id: P3, type: "position" } }
+// Flat array using nextId (the FK field in the API response — `next` relationship is lazy)
+const p1: Point = { id: P1, type: "position", nextId: P2 }
+const p2: Point = { id: P2, type: "position", nextId: P3 }
 const p3: Point = { id: P3, type: "position" }
 
 const POINTS: Point[] = [p3, p1, p2] // deliberately unordered
@@ -70,8 +70,8 @@ describe("walkList", () => {
 
   it("does not infinite-loop on a cyclic next chain", () => {
     const cyclic: Point[] = [
-      { id: P1, type: "position", next: { id: P2, type: "position" } },
-      { id: P2, type: "position", next: { id: P1, type: "position" } },
+      { id: P1, type: "position", nextId: P2 },
+      { id: P2, type: "position", nextId: P1 },
     ]
     const result = walkList(cyclic)
     expect(result.length).toBeLessThanOrEqual(2)

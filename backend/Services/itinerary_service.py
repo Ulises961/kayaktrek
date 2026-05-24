@@ -36,7 +36,9 @@ class ItineraryService:
         Raises:
             NoResultFound: If itinerary doesn't exist
         """
-        itinerary = db.session.query(Itinerary).options(selectinload(Itinerary.days)).filter_by(id=UUID(itinerary_id)).first()
+        itinerary = db.session.query(Itinerary).options(
+            selectinload(Itinerary.days).selectinload(Day.points)
+        ).filter_by(id=UUID(itinerary_id)).first()
         if not itinerary:
             logger.warning(f"Itinerary with id {itinerary_id} not found")
             raise NoResultFound(f"Itinerary {itinerary_id} not found in database")

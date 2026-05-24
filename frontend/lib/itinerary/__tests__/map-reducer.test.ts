@@ -180,6 +180,36 @@ describe("initialMapState", () => {
     expect(state.pointOrder).toEqual(["p1", "p2"])
   })
 
+  it("builds pointOrder from nextId (flat FK from API) when next is null", () => {
+    const p1: Point = { id: "p1", type: "position", nextId: "p2" }
+    const p2: Point = { id: "p2", type: "position", nextId: "p3" }
+    const p3: Point = { id: "p3", type: "position" }
+    const state = initialMapState([p3, p1, p2])
+    expect(state.pointOrder).toEqual(["p1", "p2", "p3"])
+  })
+
+  it("falls back to UUID v7 sort when all points have nextId null (broken/absent linked list)", () => {
+    // UUID v7 encodes creation timestamp in high bits — lexicographic sort = insertion order
+    const p1: Point = { id: "01900000-0000-7000-8000-000000000001", type: "position" }
+    const p2: Point = { id: "01900000-0000-7000-8000-000000000002", type: "position" }
+    const p3: Point = { id: "01900000-0000-7000-8000-000000000003", type: "position" }
+    const state = initialMapState([p3, p1, p2]) // unordered, no nextId
+    expect(state.pointOrder).toEqual([p1.id, p2.id, p3.id])
+  })
+
+  it("hydrates dayId on points that fall within a numbered day's start/end range", () => {
+    const D0 = "d0-id"
+    const D1 = "d1-id"
+    const p1: Point = { id: "p1", type: "position", dayId: D0, nextId: "p2" }
+    const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
+    const p3: Point = { id: "p3", type: "position", dayId: D0 }
+    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
+    const state = initialMapState([p1, p2, p3], [d1])
+    expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
+    expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)
+    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D0)
+  })
+
   it("initialises days from the provided array", () => {
     const d = day(DAY1_ID, 1)
     const state = initialMapState([], [d])

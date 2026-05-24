@@ -56,7 +56,12 @@ function buildSegments(
     const b = resolvePosition(ordered[i + 1], drag)
     const pointId = ordered[i].id
     const isPreview = pointId != null && slidePreviewIds.has(pointId) && slideColor != null
-    const dayNum = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
+    const dayNumA = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
+    const dayNumB = dayNumberById.get(ordered[i + 1].dayId ?? undefined) ?? 0
+    // Use the higher day number across the segment so crossing into a new day
+    // immediately takes that day's colour (boundary point belongs to Day N but
+    // the leg leading into Day N+1 should render in Day N+1's colour).
+    const dayNum = Math.max(dayNumA, dayNumB)
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
@@ -170,12 +175,18 @@ export default function MapCore({
   // Build boundary map: point id → { left, right } colors for split-ring markers.
   // A boundary point is startPointId of any numbered day (dayNumber > 0).
   const boundaryMap = useMemo(() => {
+    // Split-ring icons appear only on true shared boundaries: points that are
+    // simultaneously the end of Day N and the start of Day N+1 (dayNumber > 1).
+    //
+    // Plain rings (no split) for:
+    //   • Day 1's start — no previous numbered day, left half would be grey
+    //   • The trip's final endpoint — it is endPointId of the last day only,
+    //     never anyone's startPointId, so it never enters this map
     const map = new Map<string, { left: string; right: string }>()
     for (const day of days) {
-      if (day.dayNumber > 0 && day.startPointId) {
-        const prevDayNum = day.dayNumber - 1
+      if (day.dayNumber > 1 && day.startPointId) {
         map.set(day.startPointId, {
-          left: getDayColor(prevDayNum),
+          left: getDayColor(day.dayNumber - 1),
           right: getDayColor(day.dayNumber),
         })
       }
