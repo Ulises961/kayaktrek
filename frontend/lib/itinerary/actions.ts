@@ -85,7 +85,7 @@ export async function createDay(itineraryId: string, dayNumber: number): Promise
 
 export async function updateDay(
   id: string,
-  fields: Partial<Pick<Day, "date" | "startPointId" | "endPointId">>
+  fields: Partial<Pick<Day, "date" | "dayNumber" | "startPointId" | "endPointId">>
 ): Promise<DayActionResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/day/${id}`, fields)
@@ -94,6 +94,16 @@ export async function updateDay(
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update day." }
+  }
+}
+
+export async function deleteDay(id: string): Promise<DeleteActionResult> {
+  try {
+    await apiDelete<unknown>(`/api/day/${id}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to delete day." }
   }
 }
 

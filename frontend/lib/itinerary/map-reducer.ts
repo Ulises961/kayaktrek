@@ -35,6 +35,7 @@ export type MapAction =
   | { type: "SAVING_END" }
   | { type: "DAY_ADD"; day: Day }
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
+  | { type: "DAY_REMOVE"; id: string; day0Id: string }
   | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[] }
   | { type: "SLIDE_START"; dayId: string; boundaryPointId: string | null; firstAssignableId: string | null }
   | { type: "SLIDE_HOVER"; hoveredPointId: string }
@@ -103,6 +104,22 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         ...state,
         days: state.days.map((d) => (d.id === action.id ? { ...d, ...action.fields } : d)),
       }
+
+    case "DAY_REMOVE": {
+      const removed = state.days.find((d) => d.id === action.id)
+      if (!removed) return state
+      const removedNum = removed.dayNumber
+      return {
+        ...state,
+        days: state.days
+          .filter((d) => d.id !== action.id)
+          .map((d) => d.dayNumber > removedNum ? { ...d, dayNumber: d.dayNumber - 1 } : d),
+        points: state.points.map((p) =>
+          p.dayId === action.id ? { ...p, dayId: action.day0Id } : p
+        ),
+        slideState: state.slideState?.dayId === action.id ? null : state.slideState,
+      }
+    }
 
     case "POINTS_ASSIGN":
       return {

@@ -18,6 +18,7 @@ import {
   deletePoint,
   createDay,
   updateDay,
+  deleteDay,
   assignPointsToDay,
 } from "@/lib/itinerary/actions"
 
@@ -285,6 +286,25 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     })
   }, [state.days, state.pointOrder])
 
+  const handleDeleteDay = useCallback(async (dayId: string) => {
+    if (!day0Id) return
+    const removed = state.days.find((d) => d.id === dayId)
+    if (!removed) return
+    dispatch({ type: "DAY_REMOVE", id: dayId, day0Id })
+    dispatch({ type: "SAVING_START" })
+    await deleteDay(dayId)
+    // Renumber remaining days on the backend to keep DB in sync
+    const remaining = state.days
+      .filter((d) => d.id !== dayId)
+      .sort((a, b) => a.dayNumber - b.dayNumber)
+    await Promise.all(
+      remaining
+        .filter((d) => d.dayNumber > removed.dayNumber)
+        .map((d) => updateDay(d.id!, { dayNumber: d.dayNumber - 1 } as Parameters<typeof updateDay>[1]))
+    )
+    dispatch({ type: "SAVING_END" })
+  }, [day0Id, state.days])
+
   const handleDateChange = useCallback(async (dayId: string, date: string) => {
     dispatch({ type: "DAY_UPDATE", id: dayId, fields: { date } })
     dispatch({ type: "SAVING_START" })
@@ -330,6 +350,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
             slideState={state.slideState}
             distanceUnit={distanceUnit}
             onEditDay={handleEditDay}
+            onDeleteDay={handleDeleteDay}
             onDateChange={handleDateChange}
           />
         )}

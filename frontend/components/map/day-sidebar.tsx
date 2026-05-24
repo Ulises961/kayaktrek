@@ -51,6 +51,7 @@ type DaySidebarProps = {
   slideState: SlideState | null
   distanceUnit: "nm" | "km"
   onEditDay: (dayId: string) => void
+  onDeleteDay: (dayId: string) => void
   onDateChange: (dayId: string, date: string) => void
 }
 
@@ -83,10 +84,11 @@ type DayCardProps = {
   slideState: SlideState | null
   distanceUnit: "nm" | "km"
   onEditDay: (dayId: string) => void
+  onDeleteDay: (dayId: string) => void
   onDateChange: (dayId: string, date: string) => void
 }
 
-function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay, onDateChange }: DayCardProps) {
+function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay, onDeleteDay, onDateChange }: DayCardProps) {
   const color = getDayColor(day.dayNumber)
   const isActiveSlide = slideState?.dayId === day.id
   const dayPointCount = points.filter((p) => p.dayId === day.id).length
@@ -119,13 +121,22 @@ function DayCard({ day, points, pointOrder, slideState, distanceUnit, onEditDay,
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-foreground">Day {day.dayNumber}</span>
         {!isActiveSlide && (
-          <button
-            aria-label="Edit day"
-            onClick={() => onEditDay(day.id!)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
-          >
-            Edit
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              aria-label="Edit day"
+              onClick={() => onEditDay(day.id!)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+            >
+              Edit
+            </button>
+            <button
+              aria-label="Delete day"
+              onClick={() => onDeleteDay(day.id!)}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+            >
+              ×
+            </button>
+          </div>
         )}
       </div>
 
@@ -172,6 +183,7 @@ export function DaySidebar({
   slideState,
   distanceUnit,
   onEditDay,
+  onDeleteDay,
   onDateChange,
 }: DaySidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -225,6 +237,7 @@ export function DaySidebar({
                   slideState={slideState}
                   distanceUnit={distanceUnit}
                   onEditDay={onEditDay}
+                  onDeleteDay={onDeleteDay}
                   onDateChange={onDateChange}
                 />
               ))

@@ -259,6 +259,56 @@ describe("DAY_UPDATE", () => {
   })
 })
 
+describe("DAY_REMOVE", () => {
+  const DAY2_ID = "01952f1a-0000-7000-8000-000000000021"
+  const DAY3_ID = "01952f1a-0000-7000-8000-000000000022"
+  const stateWith3Days: MapState = {
+    ...BASE,
+    days: [day(DAY1_ID, 1), day(DAY2_ID, 2), day(DAY3_ID, 3)],
+    points: [pt("aaa", DAY1_ID), pt("bbb", DAY2_ID), pt("ccc", DAY3_ID)],
+  }
+
+  it("removes the deleted day", () => {
+    const next = mapReducer(stateWith3Days, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.days.find((d) => d.id === DAY2_ID)).toBeUndefined()
+  })
+
+  it("renumbers days after the gap down by one", () => {
+    const next = mapReducer(stateWith3Days, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.days.find((d) => d.id === DAY1_ID)?.dayNumber).toBe(1)
+    expect(next.days.find((d) => d.id === DAY3_ID)?.dayNumber).toBe(2)
+  })
+
+  it("reverts dayId on the deleted day's points back to day0Id", () => {
+    const next = mapReducer(stateWith3Days, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.points.find((p) => p.id === "bbb")?.dayId).toBe(DAY0_ID)
+  })
+
+  it("leaves points of other days unchanged", () => {
+    const next = mapReducer(stateWith3Days, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
+    expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY3_ID)
+  })
+
+  it("cancels slideState if it targets the deleted day", () => {
+    const state: MapState = {
+      ...stateWith3Days,
+      slideState: { dayId: DAY2_ID, boundaryPointId: "bbb", firstAssignableId: "bbb", hoveredPointId: null },
+    }
+    const next = mapReducer(state, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.slideState).toBeNull()
+  })
+
+  it("preserves slideState targeting a different day", () => {
+    const state: MapState = {
+      ...stateWith3Days,
+      slideState: { dayId: DAY1_ID, boundaryPointId: null, firstAssignableId: null, hoveredPointId: null },
+    }
+    const next = mapReducer(state, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
+    expect(next.slideState?.dayId).toBe(DAY1_ID)
+  })
+})
+
 describe("POINTS_ASSIGN", () => {
   it("updates dayId on all matching points", () => {
     const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa", "bbb"] })

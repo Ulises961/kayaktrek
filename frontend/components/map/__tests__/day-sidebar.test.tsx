@@ -34,6 +34,7 @@ const defaultProps = {
   slideState: null as SlideState | null,
   distanceUnit: "nm" as const,
   onEditDay: vi.fn(),
+  onDeleteDay: vi.fn(),
   onDateChange: vi.fn(),
 }
 
@@ -97,6 +98,13 @@ describe("DaySidebar", () => {
     render(<DaySidebar {...defaultProps} onEditDay={onEditDay} />)
     fireEvent.click(screen.getByRole("button", { name: /edit/i }))
     expect(onEditDay).toHaveBeenCalledWith(D1_ID)
+  })
+
+  it("calls onDeleteDay with the day id when × is clicked", () => {
+    const onDeleteDay = vi.fn()
+    render(<DaySidebar {...defaultProps} onDeleteDay={onDeleteDay} />)
+    fireEvent.click(screen.getByRole("button", { name: /delete day/i }))
+    expect(onDeleteDay).toHaveBeenCalledWith(D1_ID)
   })
 
   it("calls onDateChange with ISO date when a valid DD/MM/YYYY is entered", () => {
