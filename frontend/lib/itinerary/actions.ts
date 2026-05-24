@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { PointSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
+import { DaySchema } from "@/lib/dtos/day"
+import type { Day } from "@/lib/dtos/day"
 
 export type ItineraryActionResult =
   | { success: true; itineraryId: string }
@@ -11,6 +13,10 @@ export type ItineraryActionResult =
 
 export type PointActionResult =
   | { success: true; point: Point }
+  | { success: false; error: string }
+
+export type DayActionResult =
+  | { success: true; day: Day }
   | { success: false; error: string }
 
 export type DeleteActionResult =
@@ -63,5 +69,44 @@ export async function deletePoint(id: string): Promise<DeleteActionResult> {
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete point." }
+  }
+}
+
+export async function createDay(itineraryId: string, dayNumber: number): Promise<DayActionResult> {
+  try {
+    const raw = await apiPost<unknown>("/api/day/create", { itineraryId, dayNumber })
+    const day = DaySchema.parse(raw)
+    return { success: true, day }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to create day." }
+  }
+}
+
+export async function updateDay(
+  id: string,
+  fields: Partial<Pick<Day, "date" | "startPointId" | "endPointId">>
+): Promise<DayActionResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/day/${id}`, fields)
+    const day = DaySchema.parse(raw)
+    return { success: true, day }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to update day." }
+  }
+}
+
+export async function assignPointsToDay(
+  dayId: string,
+  startPointId: string,
+  endPointId: string
+): Promise<DeleteActionResult> {
+  try {
+    await apiPost<unknown>(`/api/day/${dayId}/assign`, { startPointId, endPointId })
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to assign points." }
   }
 }

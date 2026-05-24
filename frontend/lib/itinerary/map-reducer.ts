@@ -1,5 +1,16 @@
 import type { Point } from "@/lib/dtos/point"
+import type { Day } from "@/lib/dtos/day"
 import { walkList } from "./linked-list"
+
+export type SlideState = {
+  dayId: string
+  // FK stored as Day.startPointId. null = waiting for Day 1 first click.
+  // For Day 2+: pre-filled with the previous day's end (boundary point).
+  boundaryPointId: string | null
+  // First point included in the assign call. null = same as boundary point (Day 1 before click).
+  firstAssignableId: string | null
+  hoveredPointId: string | null
+}
 
 export type MapState = {
   points: Point[]
@@ -9,6 +20,8 @@ export type MapState = {
   pointOrder: string[]
   pendingPointId: string | null
   savingCount: number
+  days: Day[]
+  slideState: SlideState | null
 }
 
 export type MapAction =
@@ -20,6 +33,13 @@ export type MapAction =
   | { type: "SET_PENDING"; id: string | null }
   | { type: "SAVING_START" }
   | { type: "SAVING_END" }
+  | { type: "DAY_ADD"; day: Day }
+  | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
+  | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[] }
+  | { type: "SLIDE_START"; dayId: string; boundaryPointId: string | null; firstAssignableId: string | null }
+  | { type: "SLIDE_HOVER"; hoveredPointId: string }
+  | { type: "SLIDE_COMMIT" }
+  | { type: "SLIDE_CANCEL" }
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
   switch (action.type) {
@@ -74,15 +94,58 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
 
     case "SAVING_END":
       return { ...state, savingCount: Math.max(0, state.savingCount - 1) }
+
+    case "DAY_ADD":
+      return { ...state, days: [...state.days, action.day] }
+
+    case "DAY_UPDATE":
+      return {
+        ...state,
+        days: state.days.map((d) => (d.id === action.id ? { ...d, ...action.fields } : d)),
+      }
+
+    case "POINTS_ASSIGN":
+      return {
+        ...state,
+        points: state.points.map((p) =>
+          p.id && action.pointIds.includes(p.id) ? { ...p, dayId: action.dayId } : p
+        ),
+      }
+
+    case "SLIDE_START":
+      return {
+        ...state,
+        slideState: {
+          dayId: action.dayId,
+          boundaryPointId: action.boundaryPointId,
+          firstAssignableId: action.firstAssignableId,
+          hoveredPointId: null,
+        },
+      }
+
+    case "SLIDE_HOVER":
+      if (!state.slideState) return state
+      return {
+        ...state,
+        slideState: { ...state.slideState, hoveredPointId: action.hoveredPointId },
+      }
+
+    case "SLIDE_COMMIT":
+      return { ...state, slideState: null }
+
+    case "SLIDE_CANCEL":
+      return { ...state, slideState: null }
   }
 }
 
-export function initialMapState(points: Point[]): MapState {
+export function initialMapState(points: Point[], days: Day[] = []): MapState {
   const ordered = walkList(points.filter((p) => p.id))
   return {
     points,
     pointOrder: ordered.map((p) => p.id!),
     pendingPointId: null,
     savingCount: 0,
+    days,
+    slideState: null,
   }
 }

@@ -245,12 +245,12 @@ remove the local state.
   mid-transaction the Day 0 row must be rolled back with it (handled in §0).
 
 **Open questions**
-- **Distance unit**: km or nautical miles (nm)? Kayak expeditions typically use nm for
-  open-water coastal legs. Decision deferred — introduce a user preference in M7 (profile).
-  For M4, display km with an nm annotation.
-- **Point type on drop**: should the user assign `stop / position / interest` immediately
-  when dropping, or can it default to `position` and be changed later in the point panel?
-  Defaulting to `position` reduces friction in the route-first flow. Decide before §4.
+- **Distance unit**: resolved in §4 — default nm, km toggle in the top bar stats strip.
+  User preference (stored in profile) deferred to M7; toggle state is local component state
+  for now and does not persist across sessions.
+- **Point type on drop**: resolved in §4 — `PointDropPanel` popover with three type chips
+  appears after each drop; `position` is pre-selected. Escape or OK dismisses without
+  removing the point. No name field on drop — editing is deferred to the §6 sidebar accordion.
 - **Maximum points per itinerary**: no hard limit defined. Flag if performance degrades
   beyond ~200 points in testing.
 - **Mobile-web responsive interactions**: the hover-slide bracketing, floating panels, and

@@ -15,12 +15,18 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
-import { createItinerary, createPoint, updatePoint, deletePoint } from "../actions"
+import { createItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
 const DAY_ID = "01952f1a-0000-7000-8000-000000000003"
 const POINT_ID = "01952f1a-0000-7000-8000-000000000004"
+const DAY_ID_2 = "01952f1a-0000-7000-8000-000000000005"
+const ITINERARY_ID_2 = "01952f1a-0000-7000-8000-000000000006"
+const START_PT = "01952f1a-0000-7000-8000-000000000007"
+const END_PT = "01952f1a-0000-7000-8000-000000000008"
+
+const DAY_RESPONSE = { id: DAY_ID_2, dayNumber: 1, itineraryId: ITINERARY_ID_2 }
 
 const POINT_RESPONSE = {
   id: POINT_ID,
@@ -144,5 +150,86 @@ describe("deletePoint", () => {
     mockApiDelete.mockRejectedValue(null)
     const result = await deletePoint(POINT_ID)
     expect(result).toEqual({ success: false, error: "Failed to delete point." })
+  })
+})
+
+describe("createDay", () => {
+  it("posts to /api/day/create with itineraryId and dayNumber", async () => {
+    mockApiPost.mockResolvedValue(DAY_RESPONSE)
+    await createDay(ITINERARY_ID_2, 1)
+    expect(mockApiPost).toHaveBeenCalledWith("/api/day/create", { itineraryId: ITINERARY_ID_2, dayNumber: 1 })
+  })
+
+  it("returns success with the parsed day", async () => {
+    mockApiPost.mockResolvedValue(DAY_RESPONSE)
+    const result = await createDay(ITINERARY_ID_2, 1)
+    expect(result).toMatchObject({ success: true, day: expect.objectContaining({ id: DAY_ID_2 }) })
+  })
+
+  it("returns error on API failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("Server Error"))
+    const result = await createDay(ITINERARY_ID_2, 1)
+    expect(result).toEqual({ success: false, error: "Server Error" })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await createDay(ITINERARY_ID_2, 1)
+    expect(result).toEqual({ success: false, error: "Failed to create day." })
+  })
+})
+
+describe("updateDay", () => {
+  it("patches /api/day/:id with the given fields", async () => {
+    mockApiPatch.mockResolvedValue(DAY_RESPONSE)
+    await updateDay(DAY_ID_2, { date: "2026-06-01" })
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/day/${DAY_ID_2}`, { date: "2026-06-01" })
+  })
+
+  it("returns success with the parsed day", async () => {
+    mockApiPatch.mockResolvedValue(DAY_RESPONSE)
+    const result = await updateDay(DAY_ID_2, { endPointId: END_PT })
+    expect(result).toMatchObject({ success: true, day: expect.objectContaining({ id: DAY_ID_2 }) })
+  })
+
+  it("returns error on API failure", async () => {
+    mockApiPatch.mockRejectedValue(new Error("Not Found"))
+    const result = await updateDay(DAY_ID_2, { date: "2026-06-01" })
+    expect(result).toEqual({ success: false, error: "Not Found" })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPatch.mockRejectedValue(null)
+    const result = await updateDay(DAY_ID_2, { endPointId: END_PT })
+    expect(result).toEqual({ success: false, error: "Failed to update day." })
+  })
+})
+
+describe("assignPointsToDay", () => {
+  it("posts to /api/day/:id/assign with startPointId and endPointId", async () => {
+    mockApiPost.mockResolvedValue({})
+    await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/day/${DAY_ID_2}/assign`, {
+      startPointId: START_PT,
+      endPointId: END_PT,
+    })
+  })
+
+  it("returns success: true on success", async () => {
+    mockApiPost.mockResolvedValue({})
+    const result = await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns error on API failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("Bad Request"))
+    const result = await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
+    expect(result).toEqual({ success: false, error: "Bad Request" })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue(undefined)
+    const result = await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
+    expect(result).toEqual({ success: false, error: "Failed to assign points." })
   })
 })

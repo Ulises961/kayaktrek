@@ -23,3 +23,16 @@ export function ringIcon(color: string, type: PointType = "position"): L.DivIcon
     popupAnchor: [0, -(size / 2 + 6)],
   })
 }
+
+export function splitRingIcon(leftColor: string, rightColor: string): L.DivIcon {
+  const size = 20
+  const border = 3
+  const html = `<div style="position:relative;width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(to right,${leftColor} 50%,${rightColor} 50%);box-shadow:0 1px 3px rgba(0,0,0,0.35);"><div style="position:absolute;inset:${border}px;border-radius:50%;background:white;"></div></div>`
+  return L.divIcon({
+    className: "",
+    html,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2 + 6)],
+  })
+}

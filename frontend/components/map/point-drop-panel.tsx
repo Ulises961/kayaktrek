@@ -1,12 +1,14 @@
 "use client"
 import { useEffect } from "react"
+import type { LucideIcon } from "lucide-react"
 import type { PointType } from "@/lib/dtos/point"
+import { POINT_TYPE_META } from "@/lib/itinerary/point-icons"
 import { cn } from "@/lib/utils"
 
-const POINT_TYPES: { value: PointType; label: string }[] = [
-  { value: "stop", label: "Stop" },
-  { value: "position", label: "Position" },
-  { value: "interest", label: "Interest" },
+const POINT_TYPES: { value: PointType; label: string; Icon: LucideIcon }[] = [
+  { value: "stop", ...POINT_TYPE_META.stop },
+  { value: "position", ...POINT_TYPE_META.position },
+  { value: "interest", ...POINT_TYPE_META.interest },
 ]
 
 type PointDropPanelProps = {
@@ -17,24 +19,24 @@ type PointDropPanelProps = {
 }
 
 type TypeChipProps = {
-  option: { value: PointType; label: string }
+  option: { value: PointType; label: string; Icon: LucideIcon }
   selected: PointType
   onSelect: (type: PointType) => void
 }
 
 function TypeChip({ option, selected, onSelect }: TypeChipProps) {
-  const handleClick = () => onSelect(option.value)
-
+  const isSelected = selected === option.value
   return (
     <button
-      onClick={handleClick}
+      onClick={() => onSelect(option.value)}
       className={cn(
-        "px-3 py-1 text-xs rounded-full border transition-colors",
-        selected === option.value
+        "flex items-center gap-1.5 px-3 py-1 text-xs rounded-full border transition-colors",
+        isSelected
           ? "bg-primary text-primary-foreground border-primary"
           : "border-border hover:bg-muted"
       )}
     >
+      <option.Icon size={11} />
       {option.label}
     </button>
   )
