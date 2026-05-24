@@ -1,5 +1,5 @@
 "use client"
-import { memo, useCallback, useState } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { MapContainer, TileLayer, Polyline, Tooltip, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
@@ -8,6 +8,7 @@ import type { MapMode } from "./map-top-bar"
 import { PointMarker } from "./point-marker"
 import { haversineNm, formatDistance } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 
 export type MapCoreProps = {
@@ -16,9 +17,13 @@ export type MapCoreProps = {
   days: Day[]
   mode: MapMode
   distanceUnit: "nm" | "km"
+  slidePreviewIds?: Set<string>
+  slideColor?: string
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
+  onMarkerClick?: (pointId: string) => void
+  onMarkerHover?: (pointId: string) => void
 }
 
 type ValidPoint = Point & { latitude: number; longitude: number }
@@ -40,6 +45,8 @@ function resolvePosition(point: ValidPoint, drag: DragState | null): { latitude:
 function buildSegments(
   ordered: ValidPoint[],
   dayNumberById: Map<string | undefined, number>,
+  slidePreviewIds: Set<string>,
+  slideColor: string | undefined,
   distanceUnit: "nm" | "km",
   drag: DragState | null
 ): Segment[] {
@@ -47,11 +54,13 @@ function buildSegments(
   for (let i = 0; i < ordered.length - 1; i++) {
     const a = resolvePosition(ordered[i], drag)
     const b = resolvePosition(ordered[i + 1], drag)
+    const pointId = ordered[i].id
+    const isPreview = pointId != null && slidePreviewIds.has(pointId) && slideColor != null
     const dayNum = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
-      color: getDayColor(dayNum),
+      color: isPreview ? slideColor! : getDayColor(dayNum),
       distLabel: formatDistance(haversineNm(a, b), distanceUnit),
     })
   }
@@ -74,17 +83,35 @@ function MapEvents({ mode, onMapClick }: { mode: MapMode; onMapClick: (lat: numb
 type ConnectedMarkerProps = {
   point: ValidPoint
   dayNum: number
+  boundaryColors: { left: string; right: string } | null
+  isSlidePreview: boolean
+  slideColor: string | undefined
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
+  onMarkerClick?: (pointId: string) => void
+  onMarkerHover?: (pointId: string) => void
 }
 
 const ConnectedMarker = memo(function ConnectedMarker({
   point,
   dayNum,
+  boundaryColors,
+  isSlidePreview,
+  slideColor,
   onMarkerDragMove,
   onMarkerDragEnd,
+  onMarkerClick,
+  onMarkerHover,
 }: ConnectedMarkerProps) {
-  const color = getDayColor(dayNum)
+  const color = isSlidePreview && slideColor ? slideColor : getDayColor(dayNum)
+
+  // Memoize split icon when this is a boundary point. Regular icon is computed
+  // inside PointMarker. Splitting here keeps PointMarker unaware of day topology.
+  const customIcon = useMemo(
+    () => (boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boundaryColors?.left, boundaryColors?.right],
+  )
 
   const handleDragMove = useCallback((lat: number, lng: number) => {
     if (point.id) onMarkerDragMove(point.id, lat, lng)
@@ -94,13 +121,26 @@ const ConnectedMarker = memo(function ConnectedMarker({
     if (point.id) onMarkerDragEnd(point.id, lat, lng)
   }, [point.id, onMarkerDragEnd])
 
+  const handleClick = useMemo(
+    () => (onMarkerClick && point.id ? () => onMarkerClick(point.id!) : undefined),
+    [onMarkerClick, point.id],
+  )
+
+  const handleMouseOver = useMemo(
+    () => (onMarkerHover && point.id ? () => onMarkerHover(point.id!) : undefined),
+    [onMarkerHover, point.id],
+  )
+
   return (
     <PointMarker
       point={point}
       color={color}
       type={point.type}
+      customIcon={customIcon}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      onClick={handleClick}
+      onMouseOver={handleMouseOver}
     />
   )
 })
@@ -112,19 +152,42 @@ export default function MapCore({
   days,
   mode,
   distanceUnit,
+  slidePreviewIds = new Set(),
+  slideColor,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
+  onMarkerClick,
+  onMarkerHover,
 }: MapCoreProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
 
-  const dayNumberById = new Map(days.map((d) => [d.id, d.dayNumber ?? 0]))
+  const dayNumberById = useMemo(
+    () => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])),
+    [days],
+  )
+
+  // Build boundary map: point id → { left, right } colors for split-ring markers.
+  // A boundary point is startPointId of any numbered day (dayNumber > 0).
+  const boundaryMap = useMemo(() => {
+    const map = new Map<string, { left: string; right: string }>()
+    for (const day of days) {
+      if (day.dayNumber > 0 && day.startPointId) {
+        const prevDayNum = day.dayNumber - 1
+        map.set(day.startPointId, {
+          left: getDayColor(prevDayNum),
+          right: getDayColor(day.dayNumber),
+        })
+      }
+    }
+    return map
+  }, [days])
 
   const validPoints = points.filter(
     (p): p is ValidPoint => p.latitude != null && p.longitude != null
   )
 
-  const segments = buildSegments(validPoints, dayNumberById, distanceUnit, dragState)
+  const segments = buildSegments(validPoints, dayNumberById, slidePreviewIds, slideColor, distanceUnit, dragState)
 
   const handleMarkerDragMove = useCallback((id: string, lat: number, lng: number) => {
     setDragState({ id, lat, lng })
@@ -159,8 +222,13 @@ export default function MapCore({
             key={point.id ?? `${point.latitude},${point.longitude}`}
             point={point}
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
+            boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
+            isSlidePreview={point.id != null && slidePreviewIds.has(point.id)}
+            slideColor={slideColor}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
+            onMarkerClick={onMarkerClick}
+            onMarkerHover={onMarkerHover}
           />
         ))}
       </MapContainer>
