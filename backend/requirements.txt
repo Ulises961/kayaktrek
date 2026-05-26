@@ -31,3 +31,4 @@ gunicorn
 boto3
 python-magic
 cryptography
+gpxpy
