@@ -298,26 +298,37 @@ def _check_trip_ownership(user_id: str, trip_id: str) -> Optional[bool]:
 
 
 def _check_itinerary_ownership(user_id: str, itinerary_id: str, *, read_only: bool = False) -> Optional[bool]:
-    """Check if user owns the itinerary through trip ownership."""
+    """Check if user owns or has access to the itinerary.
 
-    # First check if itinerary exists
+    Owner access (user_id FK) always grants full rights.
+    Trip-member access grants read-only rights.
+    Public itineraries are readable by any authenticated user.
+    """
     itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
     if not itinerary:
-        return None  # Itinerary doesn't exist
+        return None
 
-    # Public itineraries are readable by anyone; mutations still require membership
+    # Owner has unconditional access
+    if itinerary.user_id and itinerary.user_id == UUID(user_id):
+        return True
+
+    # Public itineraries are readable by any authenticated user
     if itinerary.is_public and read_only:
         return True
-    
-    result = (
-        db.session.query(Itinerary)
-        .join(Trip, Itinerary.trip_id == Trip.id)
-        .join(TripMember, Trip.id == TripMember.trip_id)
-        .filter(Itinerary.id == itinerary.id, TripMember.user_id == UUID(user_id))
-        .first()
-    )
 
-    return result is not None
+    # Trip members have read access via the trip
+    if itinerary.trip_id:
+        result = (
+            db.session.query(Itinerary)
+            .join(Trip, Itinerary.trip_id == Trip.id)
+            .join(TripMember, Trip.id == TripMember.trip_id)
+            .filter(Itinerary.id == itinerary.id, TripMember.user_id == UUID(user_id))
+            .first()
+        )
+        if result is not None:
+            return True
+
+    return False
 
 
 def _check_day_ownership(user_id: str, day_id: str) -> Optional[bool]:

@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields, post_load, pre_load, validates, ValidationError
 from Models.day import Day
 from Schemas.base_schema import BaseSchema, camelcase
-from Schemas.point_schema import PointSchema
+from Schemas.point_schema import PointSchema, PointPublicSchema
 from Schemas.sea_schema import SeaSchema
 from Schemas.weather_schema import WeatherSchema
 from datetime import datetime, timedelta
@@ -70,3 +70,12 @@ class DayUpdateSchema(DaySchema):
     @post_load
     def make_day(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}
+
+
+class DayPublicSchema(BaseSchema):
+    """Day fields safe for unauthenticated exposure."""
+    day_number = fields.Integer(dump_only=True)
+    date = fields.Date('%Y-%m-%d', dump_only=True, allow_none=True)
+    start_point_id = fields.UUID(dump_only=True, allow_none=True)
+    end_point_id = fields.UUID(dump_only=True, allow_none=True)
+    points = fields.List(fields.Nested(PointPublicSchema), dump_only=True)

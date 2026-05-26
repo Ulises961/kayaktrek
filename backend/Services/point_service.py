@@ -209,10 +209,15 @@ class PointService:
             NoResultFound: If point doesn't exist
         """
         point = PointService.get_point_by_id(point_id)
-        logger.info(f"Deleting point {point_id}")
+        logger.info("point_delete", extra={"point_id": point_id})
+
+        predecessor = db.session.query(Point).filter_by(next_id=UUID(point_id)).first()
+        if predecessor:
+            predecessor.next_id = point.next_id
+
         db.session.delete(point)
         db.session.commit()
-        logger.info(f"Point {point_id} deleted successfully")
+        logger.info("point_deleted", extra={"point_id": point_id})
     
     @staticmethod
     def get_points_by_day(day_id: str) -> List[Point]:

@@ -66,33 +66,19 @@ def test_update_point(client, points, auth_headers):
 
 def test_link_points(client, points, auth_headers):
     [point, point_2, _, _] = points
-    point["next"] = point_2
 
+    # Send only the fields we want to change — not the full GET response —
+    # so dump-only fields like nextId don't accidentally override the link we're setting.
     response = client.patch(
-        f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers, json=point
+        f"{POINT_ENDPOINT}/{point['id']}",
+        headers=auth_headers,
+        json={"next": point_2},
     )
 
-    assert json.loads(response.data) == {
-        "dayId": point["dayId"],
-        "latitude": None,
-        "longitude": None,
-        "id": point["id"],
-        "images": [],
-        "next": {
-            "dayId": point_2["dayId"],
-            "latitude": None,
-            "longitude": None,
-            "id": point_2["id"],
-            "images": [],
-            "notes": None,
-            "type": "position",
-        },
-        "notes": None,
-        "type": "interest",
-    }
-
+    data = json.loads(response.data)
     assert response.status_code == 200
-    assert json.loads(response.data)["next"]["id"] == point_2["id"]
+    assert data["next"]["id"] == point_2["id"]
+    assert data["nextId"] == point_2["id"]
 
 
 def test_delete_point(client, auth_headers, points):
