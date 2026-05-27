@@ -1,18 +1,7 @@
-import type { Point } from "@/lib/dtos/point"
+import type { Point, PointType } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
-import { SlidePhase } from "@/lib/types/ui"
+import type { DraftBoundary } from "./boundaries"
 import { walkList } from "./linked-list"
-
-export type SlideState = {
-  dayId: string
-  phase: SlidePhase
-  // FK stored as Day.startPointId. null = waiting for Day 1 first click.
-  // For Day 2+: pre-filled with the previous day's end (boundary point).
-  boundaryPointId: string | null
-  // First point included in the assign call. null = same as boundary point (Day 1 before click).
-  firstAssignableId: string | null
-  hoveredPointId: string | null
-}
 
 export type MapState = {
   points: Point[]
@@ -21,9 +10,10 @@ export type MapState = {
   // backend state that may lag during optimistic updates.
   pointOrder: string[]
   pendingPointId: string | null
+  // Name typed for the pending (newly dropped) point before it is persisted.
+  pendingPointName: string | null
   savingCount: number
   days: Day[]
-  slideState: SlideState | null
 }
 
 export type MapAction =
@@ -33,16 +23,15 @@ export type MapAction =
   | { type: "POINT_UPDATE"; id: string; fields: Partial<Point> }
   | { type: "POINT_REMOVE"; id: string }
   | { type: "SET_PENDING"; id: string | null }
+  | { type: "SET_PENDING_NAME"; name: string | null }
   | { type: "SAVING_START" }
   | { type: "SAVING_END" }
   | { type: "DAY_ADD"; day: Day }
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
   | { type: "DAY_REMOVE"; id: string; day0Id: string }
   | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[]; day0Id: string; startPointId: string | null }
-  | { type: "SLIDE_START"; dayId: string; phase: SlidePhase; boundaryPointId: string | null; firstAssignableId: string | null }
-  | { type: "SLIDE_HOVER"; hoveredPointId: string }
-  | { type: "SLIDE_COMMIT" }
-  | { type: "SLIDE_CANCEL"; restore?: { dayId: string; startPointId: string; endPointId: string | null; day0Id: string } }
+  | { type: "BOUNDARIES_APPLY"; boundaries: DraftBoundary[]; pointUpdates: { id: string; type: PointType; name?: string }[]; day0Id: string }
+  | { type: "STATE_REPLACE"; state: MapState }
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
   switch (action.type) {
@@ -63,6 +52,7 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
           id === action.tempId ? (action.point.id ?? id) : id
         ),
         pendingPointId: action.point.id ?? null,
+        pendingPointName: null,
       }
 
     case "POINT_ROLLBACK":
@@ -92,6 +82,9 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
     case "SET_PENDING":
       return { ...state, pendingPointId: action.id }
 
+    case "SET_PENDING_NAME":
+      return { ...state, pendingPointName: action.name }
+
     case "SAVING_START":
       return { ...state, savingCount: state.savingCount + 1 }
 
@@ -119,7 +112,6 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         points: state.points.map((p) =>
           p.dayId === action.id ? { ...p, dayId: action.day0Id } : p
         ),
-        slideState: state.slideState?.dayId === action.id ? null : state.slideState,
       }
     }
 
@@ -137,49 +129,87 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
       }
     }
 
-    case "SLIDE_START":
-      return {
-        ...state,
-        slideState: {
-          dayId: action.dayId,
-          phase: action.phase,
-          boundaryPointId: action.boundaryPointId,
-          firstAssignableId: action.firstAssignableId,
-          hoveredPointId: null,
-        },
-      }
+    case "BOUNDARIES_APPLY": {
+      const { boundaries, pointUpdates, day0Id } = action
+      const updateMap = new Map(pointUpdates.map((u) => [u.id, u]))
 
-    case "SLIDE_HOVER":
-      if (!state.slideState) return state
-      return {
-        ...state,
-        slideState: { ...state.slideState, hoveredPointId: action.hoveredPointId },
-      }
+      // Ownership semantics: the boundary stop (at endPointIdx) is shared —
+      // it is simultaneously the endPointId of day[i] and the startPointId of
+      // day[i+1], and its dayId is assigned to day[i+1].
+      //
+      // Day at index i owns:
+      //   i == 0: indices [0, endPointIdx[0] - 1]  (boundary stop excluded)
+      //   i  > 0: indices [endPointIdx[i-1], endPointIdx[i]]  (inclusive on both)
 
-    case "SLIDE_COMMIT":
-      return { ...state, slideState: null }
+      // Build the set of all boundary start and end point IDs for stop promotion.
+      const boundaryStopIds = new Set<string>()
+      boundaries.forEach((b, i) => {
+        const startIdx = i === 0 ? 0 : boundaries[i - 1].endPointIdx
+        const startId = state.pointOrder[startIdx]
+        const endId = state.pointOrder[b.endPointIdx]
+        if (startId) boundaryStopIds.add(startId)
+        if (endId) boundaryStopIds.add(endId)
+      })
 
-    case "SLIDE_CANCEL": {
-      if (!action.restore) return { ...state, slideState: null }
-      const { dayId, startPointId, endPointId, day0Id } = action.restore
-      const startIdx = state.pointOrder.indexOf(startPointId)
-      const endIdx = endPointId ? state.pointOrder.indexOf(endPointId) : -1
-      const keepIds = new Set(
-        endIdx >= startIdx && endIdx >= 0
-          ? state.pointOrder.slice(startIdx, endIdx + 1)
-          : [startPointId]
-      )
-      return {
-        ...state,
-        points: state.points.map((p) => {
-          if (!p.id) return p
-          if (keepIds.has(p.id)) return { ...p, dayId }
-          if (p.dayId === dayId) return { ...p, dayId: day0Id }
-          return p
-        }),
-        slideState: null,
-      }
+      // Assign dayId to each point by walking boundaries in order.
+      const pointDayMap = new Map<string, string>()
+      boundaries.forEach((b, i) => {
+        if (i === 0) {
+          for (let idx = 0; idx < b.endPointIdx; idx++) {
+            const id = state.pointOrder[idx]
+            if (id) pointDayMap.set(id, b.dayId)
+          }
+        } else {
+          const startIdx = boundaries[i - 1].endPointIdx
+          for (let idx = startIdx; idx <= b.endPointIdx; idx++) {
+            const id = state.pointOrder[idx]
+            if (id) pointDayMap.set(id, b.dayId)
+          }
+        }
+      })
+
+      const newPoints = state.points.map((p) => {
+        if (!p.id) return p
+        const update = updateMap.get(p.id)
+        const newDayId = pointDayMap.get(p.id) ?? day0Id
+        let newType: PointType = p.type ?? "position"
+
+        if (update) {
+          newType = update.type
+        } else if (boundaryStopIds.has(p.id)) {
+          newType = "stop"
+        }
+
+        return {
+          ...p,
+          dayId: newDayId,
+          type: newType,
+          ...(update?.name !== undefined ? { name: update.name } : {}),
+        }
+      })
+
+      // Update day boundaries from the new draft.
+      const newDays = state.days.map((d) => {
+        const bEntry = boundaries.find((b) => b.dayId === d.id)
+        if (!bEntry) return d
+        const bIdx = boundaries.indexOf(bEntry)
+        // startPointId: index 0 for first day, previous endPointIdx for later days
+        const startIdx = bIdx === 0 ? 0 : boundaries[bIdx - 1].endPointIdx
+        const startPointId = state.pointOrder[startIdx] ?? d.startPointId
+        const endPointId = state.pointOrder[bEntry.endPointIdx] ?? d.endPointId
+        return {
+          ...d,
+          startPointId,
+          endPointId,
+          ...(bEntry.date !== null ? { date: bEntry.date ?? undefined } : {}),
+        }
+      })
+
+      return { ...state, points: newPoints, days: newDays }
     }
+
+    case "STATE_REPLACE":
+      return action.state
   }
 }
 
@@ -215,8 +245,8 @@ export function initialMapState(points: Point[], days: Day[] = []): MapState {
     points: hydratedPoints,
     pointOrder,
     pendingPointId: null,
+    pendingPointName: null,
     savingCount: 0,
     days,
-    slideState: null,
   }
 }

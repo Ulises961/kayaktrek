@@ -18,6 +18,9 @@ export type MapBuilderContextValue = {
   setDistanceUnit: (u: "nm" | "km") => void
   avgSpeedKnots: number
   setAvgSpeedKnots: (v: number) => void
+  activePointId: string | null
+  setActivePointId: (id: string | null) => void
+  day0Id: string | null
 }
 
 export const MapBuilderContext = createContext<MapBuilderContextValue | null>(null)

@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest"
 import { mapReducer, initialMapState } from "../map-reducer"
 import type { MapState } from "../map-reducer"
+import type { DraftBoundary } from "../boundaries"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
-import { SlidePhase } from "@/lib/types/ui"
 
 const DAY0_ID = "01952f1a-0000-7000-8000-000000000010"
 const DAY1_ID = "01952f1a-0000-7000-8000-000000000020"
 const ITIN_ID = "01952f1a-0000-7000-8000-000000000030"
+const DAY2_ID = "01952f1a-0000-7000-8000-000000000040"
 
 const pt = (id: string, dayId = DAY0_ID): Point => ({
   id,
@@ -27,9 +28,9 @@ const BASE: MapState = {
   points: [pt("aaa"), pt("bbb"), pt("ccc")],
   pointOrder: ["aaa", "bbb", "ccc"],
   pendingPointId: null,
+  pendingPointName: null,
   savingCount: 0,
   days: [],
-  slideState: null,
 }
 
 describe("POINT_ADD", () => {
@@ -63,6 +64,12 @@ describe("POINT_CONFIRM", () => {
     const state: MapState = { ...BASE, points: [pt("tmp-1")], pointOrder: ["tmp-1"], pendingPointId: "tmp-1" }
     const next = mapReducer(state, { type: "POINT_CONFIRM", tempId: "tmp-1", point: pt("real-1") })
     expect(next.pendingPointId).toBe("real-1")
+  })
+
+  it("clears pendingPointName on confirm", () => {
+    const state: MapState = { ...BASE, pendingPointId: "tmp-1", pendingPointName: "Cedeira" }
+    const next = mapReducer(state, { type: "POINT_CONFIRM", tempId: "tmp-1", point: pt("real-1") })
+    expect(next.pendingPointName).toBeNull()
   })
 })
 
@@ -139,6 +146,26 @@ describe("SET_PENDING", () => {
   })
 })
 
+describe("SET_PENDING_NAME", () => {
+  it("sets pendingPointName", () => {
+    const next = mapReducer(BASE, { type: "SET_PENDING_NAME", name: "Cedeira harbour" })
+    expect(next.pendingPointName).toBe("Cedeira harbour")
+  })
+
+  it("clears pendingPointName when name is null", () => {
+    const state: MapState = { ...BASE, pendingPointName: "Cedeira harbour" }
+    const next = mapReducer(state, { type: "SET_PENDING_NAME", name: null })
+    expect(next.pendingPointName).toBeNull()
+  })
+
+  it("does not affect other state", () => {
+    const next = mapReducer(BASE, { type: "SET_PENDING_NAME", name: "Cedeira" })
+    expect(next.points).toEqual(BASE.points)
+    expect(next.pointOrder).toEqual(BASE.pointOrder)
+    expect(next.pendingPointId).toBeNull()
+  })
+})
+
 describe("SAVING_START / SAVING_END", () => {
   it("increments savingCount on SAVING_START", () => {
     const next = mapReducer(BASE, { type: "SAVING_START" })
@@ -171,6 +198,7 @@ describe("initialMapState", () => {
     const state = initialMapState(points)
     expect(state.points).toEqual(points)
     expect(state.pendingPointId).toBeNull()
+    expect(state.pendingPointName).toBeNull()
     expect(state.savingCount).toBe(0)
   })
 
@@ -221,7 +249,7 @@ describe("initialMapState", () => {
   it("defaults days to empty array when not provided", () => {
     const state = initialMapState([])
     expect(state.days).toEqual([])
-    expect(state.slideState).toBeNull()
+    expect(state.pendingPointName).toBeNull()
   })
 })
 
@@ -290,24 +318,6 @@ describe("DAY_REMOVE", () => {
     expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY3_ID)
   })
-
-  it("cancels slideState if it targets the deleted day", () => {
-    const state: MapState = {
-      ...stateWith3Days,
-      slideState: { dayId: DAY2_ID, phase: SlidePhase.PickEnd, boundaryPointId: "bbb", firstAssignableId: "bbb", hoveredPointId: null },
-    }
-    const next = mapReducer(state, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
-    expect(next.slideState).toBeNull()
-  })
-
-  it("preserves slideState targeting a different day", () => {
-    const state: MapState = {
-      ...stateWith3Days,
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: null, firstAssignableId: null, hoveredPointId: null },
-    }
-    const next = mapReducer(state, { type: "DAY_REMOVE", id: DAY2_ID, day0Id: DAY0_ID })
-    expect(next.slideState?.dayId).toBe(DAY1_ID)
-  })
 })
 
 describe("POINTS_ASSIGN", () => {
@@ -362,127 +372,159 @@ describe("POINTS_ASSIGN", () => {
   })
 })
 
-describe("SLIDE_START", () => {
-  it("sets slideState with the given values", () => {
-    const next = mapReducer(BASE, {
-      type: "SLIDE_START",
-      dayId: DAY1_ID,
-      phase: SlidePhase.PickEnd,
-      boundaryPointId: "aaa",
-      firstAssignableId: "aaa",
-    })
-    expect(next.slideState).toEqual({
-      dayId: DAY1_ID,
-      phase: SlidePhase.PickEnd,
-      boundaryPointId: "aaa",
-      firstAssignableId: "aaa",
-      hoveredPointId: null,
-    })
-  })
+// ---------------------------------------------------------------------------
+// §4 — BOUNDARIES_APPLY + STATE_REPLACE
+// ---------------------------------------------------------------------------
 
-  it("sets phase to pick_start when specified", () => {
-    const next = mapReducer(BASE, {
-      type: "SLIDE_START",
-      dayId: DAY1_ID,
-      phase: SlidePhase.PickStart,
-      boundaryPointId: null,
-      firstAssignableId: null,
-    })
-    expect(next.slideState?.phase).toBe(SlidePhase.PickStart)
-  })
-
-  it("accepts null boundary/assignable for pick_start phase", () => {
-    const next = mapReducer(BASE, {
-      type: "SLIDE_START",
-      dayId: DAY1_ID,
-      phase: SlidePhase.PickStart,
-      boundaryPointId: null,
-      firstAssignableId: null,
-    })
-    expect(next.slideState?.boundaryPointId).toBeNull()
-    expect(next.slideState?.firstAssignableId).toBeNull()
-    expect(next.slideState?.hoveredPointId).toBeNull()
-  })
-
-  it("always resets hoveredPointId to null on slide start", () => {
-    const stateWithHover: MapState = {
-      ...BASE,
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: "aaa", firstAssignableId: "aaa", hoveredPointId: "bbb" },
-    }
-    const next = mapReducer(stateWithHover, {
-      type: "SLIDE_START",
-      dayId: DAY1_ID,
-      phase: SlidePhase.PickEnd,
-      boundaryPointId: "aaa",
-      firstAssignableId: "aaa",
-    })
-    expect(next.slideState?.hoveredPointId).toBeNull()
-  })
+const makePoint = (id: string, type: "stop" | "position" | "interest" = "position"): Point => ({
+  id,
+  type,
+  latitude: 44,
+  longitude: 14,
+  dayId: DAY0_ID,
 })
 
-describe("SLIDE_HOVER", () => {
-  const stateWithSlide: MapState = {
-    ...BASE,
-    slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: "aaa", firstAssignableId: "aaa", hoveredPointId: null },
-  }
+const APPLY_STATE: MapState = {
+  points: [
+    makePoint("p0"),
+    makePoint("p1"),
+    makePoint("p2", "stop"),  // was an old boundary endpoint
+    makePoint("p3"),
+    makePoint("p4"),
+  ],
+  pointOrder: ["p0", "p1", "p2", "p3", "p4"],
+  pendingPointId: null,
+  pendingPointName: null,
+  savingCount: 0,
+  days: [
+    { id: DAY0_ID, dayNumber: 0, itineraryId: ITIN_ID },
+    { id: DAY1_ID, dayNumber: 1, itineraryId: ITIN_ID, startPointId: "p0", endPointId: "p2" },
+    { id: DAY2_ID, dayNumber: 2, itineraryId: ITIN_ID, startPointId: "p2", endPointId: "p4" },
+  ],
+}
 
-  it("updates hoveredPointId", () => {
-    const next = mapReducer(stateWithSlide, { type: "SLIDE_HOVER", hoveredPointId: "bbb" })
-    expect(next.slideState?.hoveredPointId).toBe("bbb")
+const BOUNDARIES: DraftBoundary[] = [
+  { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2024-06-01" },
+  { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 4, date: "2024-06-02" },
+]
+
+const POINT_UPDATES = [{ id: "p2", type: "position" as const }]
+
+describe("BOUNDARIES_APPLY", () => {
+  it("assigns points to days by walking boundary index ranges in order", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.points.find((p) => p.id === "p0")?.dayId).toBe(DAY1_ID)
+    expect(next.points.find((p) => p.id === "p1")?.dayId).toBe(DAY2_ID)
+    expect(next.points.find((p) => p.id === "p2")?.dayId).toBe(DAY2_ID)
+    expect(next.points.find((p) => p.id === "p3")?.dayId).toBe(DAY2_ID)
+    expect(next.points.find((p) => p.id === "p4")?.dayId).toBe(DAY2_ID)
   })
 
-  it("is a no-op when slideState is null", () => {
-    const next = mapReducer(BASE, { type: "SLIDE_HOVER", hoveredPointId: "bbb" })
-    expect(next.slideState).toBeNull()
+  it("promotes new boundary points to type stop when no dirty override exists", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.points.find((p) => p.id === "p0")?.type).toBe("stop")
+    expect(next.points.find((p) => p.id === "p1")?.type).toBe("stop")
+    expect(next.points.find((p) => p.id === "p4")?.type).toBe("stop")
   })
-})
 
-describe("SLIDE_COMMIT", () => {
-  it("clears slideState", () => {
+  it("applies dirty type override from pointUpdates (demoted boundary stop → position)", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.points.find((p) => p.id === "p2")?.type).toBe("position")
+  })
+
+  it("leaves non-boundary non-dirty points with their existing type", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.points.find((p) => p.id === "p3")?.type).toBe("position")
+  })
+
+  it("applies name from pointUpdates when provided", () => {
+    const updates = [{ id: "p1", type: "stop" as const, name: "Cedeira harbour" }]
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: updates,
+      day0Id: DAY0_ID,
+    })
+    expect(next.points.find((p) => p.id === "p1")?.name).toBe("Cedeira harbour")
+  })
+
+  it("updates day startPointId, endPointId and date from the new boundaries", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    const d1 = next.days.find((d) => d.id === DAY1_ID)!
+    const d2 = next.days.find((d) => d.id === DAY2_ID)!
+    expect(d1.startPointId).toBe("p0")
+    expect(d1.endPointId).toBe("p1")
+    expect(d1.date).toBe("2024-06-01")
+    expect(d2.startPointId).toBe("p1")
+    expect(d2.endPointId).toBe("p4")
+    expect(d2.date).toBe("2024-06-02")
+  })
+
+  it("leaves day 0 unchanged", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.days.find((d) => d.id === DAY0_ID)).toEqual(APPLY_STATE.days[0])
+  })
+
+  it("sends points outside all boundary ranges to day0", () => {
     const state: MapState = {
-      ...BASE,
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: "aaa", firstAssignableId: "aaa", hoveredPointId: "ccc" },
-    }
-    const next = mapReducer(state, { type: "SLIDE_COMMIT" })
-    expect(next.slideState).toBeNull()
-  })
-})
-
-describe("SLIDE_CANCEL", () => {
-  it("clears slideState", () => {
-    const state: MapState = {
-      ...BASE,
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: "aaa", firstAssignableId: "aaa", hoveredPointId: null },
-    }
-    const next = mapReducer(state, { type: "SLIDE_CANCEL" })
-    expect(next.slideState).toBeNull()
-  })
-
-  it("reverts points outside original range to day0 when restore payload is provided", () => {
-    const state: MapState = {
-      ...BASE,
-      points: [pt("aaa", DAY1_ID), pt("bbb", DAY1_ID), pt("ccc", DAY1_ID)],
-      days: [day(DAY1_ID, 1)],
-      pointOrder: ["aaa", "bbb", "ccc"],
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickEnd, boundaryPointId: "bbb", firstAssignableId: "bbb", hoveredPointId: null },
+      ...APPLY_STATE,
+      points: [...APPLY_STATE.points, makePoint("p5")],
+      pointOrder: [...APPLY_STATE.pointOrder, "p5"],
     }
     const next = mapReducer(state, {
-      type: "SLIDE_CANCEL",
-      restore: { dayId: DAY1_ID, startPointId: "aaa", endPointId: "bbb", day0Id: DAY0_ID },
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,        // last boundary endPointIdx=4, p5 is at idx 5
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
     })
-    expect(next.slideState).toBeNull()
-    expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
-    expect(next.points.find((p) => p.id === "bbb")?.dayId).toBe(DAY1_ID)
-    expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY0_ID)
+    expect(next.points.find((p) => p.id === "p5")?.dayId).toBe(DAY0_ID)
   })
 
-  it("just clears slideState when restore payload has no startPointId", () => {
-    const state: MapState = {
-      ...BASE,
-      slideState: { dayId: DAY1_ID, phase: SlidePhase.PickStart, boundaryPointId: null, firstAssignableId: null, hoveredPointId: null },
-    }
-    const next = mapReducer(state, { type: "SLIDE_CANCEL" })
-    expect(next.slideState).toBeNull()
-    expect(next.points).toEqual(BASE.points)
+  it("does not change pointOrder", () => {
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      boundaries: BOUNDARIES,
+      pointUpdates: POINT_UPDATES,
+      day0Id: DAY0_ID,
+    })
+    expect(next.pointOrder).toEqual(APPLY_STATE.pointOrder)
+  })
+})
+
+describe("STATE_REPLACE", () => {
+  it("replaces the entire state with the provided state", () => {
+    const replacement: MapState = { ...BASE, savingCount: 42, pendingPointId: "aaa" }
+    const next = mapReducer(APPLY_STATE, { type: "STATE_REPLACE", state: replacement })
+    expect(next).toEqual(replacement)
   })
 })

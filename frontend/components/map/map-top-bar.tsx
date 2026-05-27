@@ -1,34 +1,26 @@
 "use client"
 import Link from "next/link"
-import { ArrowLeftIcon, Undo2Icon } from "lucide-react"
+import { ArrowLeftIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-export type MapMode = "drop" | "assign"
 
 type MapTopBarProps = {
   tripId: string | null
   tripName: string
-  mode: MapMode
-  onModeChange: (mode: MapMode) => void
   distanceUnit: "nm" | "km"
   onDistanceUnitChange: (unit: "nm" | "km") => void
   totalDistance: number
   dayCount: number
   isSaving?: boolean
-  onRemoveLastWaypoint?: () => void
 }
 
 export function MapTopBar({
   tripId,
   tripName,
-  mode,
-  onModeChange,
   distanceUnit,
   onDistanceUnitChange,
   totalDistance,
   dayCount,
   isSaving = false,
-  onRemoveLastWaypoint,
 }: MapTopBarProps) {
   const displayDistance =
     distanceUnit === "nm"
@@ -47,43 +39,8 @@ export function MapTopBar({
 
       <div className="flex-1" />
 
-      {/* Mode toggle */}
-      <div className="flex rounded-md border border-border overflow-hidden text-sm shrink-0">
-        <button
-          onClick={() => onModeChange("drop")}
-          className={cn(
-            "px-3 py-1 transition-colors",
-            mode === "drop" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-          )}
-        >
-          Drop points
-        </button>
-        <button
-          onClick={() => onModeChange("assign")}
-          className={cn(
-            "px-3 py-1 transition-colors border-l border-border",
-            mode === "assign" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-          )}
-        >
-          Assign days
-        </button>
-      </div>
-
-      <div className="flex-1" />
-
       {/* Stats strip */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground shrink-0">
-        {mode === "drop" && onRemoveLastWaypoint && (
-          <button
-            onClick={onRemoveLastWaypoint}
-            aria-label="Remove last waypoint"
-            className="flex items-center gap-1 text-xs hover:text-foreground transition-colors"
-          >
-            <Undo2Icon className="size-3.5" />
-            <span>Remove last waypoint</span>
-          </button>
-        )}
-
         <span className="flex items-center gap-1.5">
           <span>{displayDistance}</span>
           <span className="flex rounded border border-border overflow-hidden text-xs">

@@ -8,6 +8,7 @@ import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
 import { ItinerarySchema, ItinerariesSchema } from "@/lib/dtos/itinerary"
 import type { Itinerary } from "@/lib/dtos/itinerary"
+import type { BoundaryApplyPayload } from "./boundaries"
 
 export type ItineraryActionResult =
   | { success: true; itineraryId: string }
@@ -27,6 +28,10 @@ export type DayActionResult =
 
 export type DeleteActionResult =
   | { success: true }
+  | { success: false; error: string }
+
+export type ApplyBoundariesResult =
+  | { success: true; itinerary: Itinerary }
   | { success: false; error: string }
 
 export async function createItinerary(
@@ -149,6 +154,20 @@ export async function fetchPois(lat: number, lng: number, range = 5): Promise<Po
     return PointsSchema.parse(raw)
   } catch {
     return []
+  }
+}
+
+export async function applyBoundaries(
+  itineraryId: string,
+  payload: BoundaryApplyPayload
+): Promise<ApplyBoundariesResult> {
+  try {
+    const raw = await apiPost<unknown>(`/api/itinerary/${itineraryId}/apply-boundaries`, payload)
+    const itinerary = ItinerarySchema.parse(raw)
+    return { success: true, itinerary }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to apply boundaries." }
   }
 }
 

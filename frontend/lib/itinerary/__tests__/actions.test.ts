@@ -15,7 +15,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
-import { createItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay } from "../actions"
+import { createItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay, applyBoundaries } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -217,6 +217,41 @@ describe("updateDay", () => {
     mockApiPatch.mockRejectedValue(null)
     const result = await updateDay(DAY_ID_2, { endPointId: END_PT })
     expect(result).toEqual({ success: false, error: "Failed to update day." })
+  })
+})
+
+describe("applyBoundaries", () => {
+  const PAYLOAD = {
+    boundaries: [{ dayId: DAY_ID, startPointId: START_PT, endPointId: END_PT, date: "2024-06-01" }],
+    points: [{ id: START_PT, type: "stop" as const }],
+  }
+  const ITINERARY_RESPONSE = { id: ITINERARY_ID, name: "Test Route", days: [] }
+
+  it("posts to /api/itinerary/:id/apply-boundaries with the payload", async () => {
+    mockApiPost.mockResolvedValue(ITINERARY_RESPONSE)
+    await applyBoundaries(ITINERARY_ID, PAYLOAD)
+    expect(mockApiPost).toHaveBeenCalledWith(
+      `/api/itinerary/${ITINERARY_ID}/apply-boundaries`,
+      PAYLOAD
+    )
+  })
+
+  it("returns success with the parsed itinerary on success", async () => {
+    mockApiPost.mockResolvedValue(ITINERARY_RESPONSE)
+    const result = await applyBoundaries(ITINERARY_ID, PAYLOAD)
+    expect(result).toMatchObject({ success: true, itinerary: expect.objectContaining({ id: ITINERARY_ID }) })
+  })
+
+  it("returns error result when the API throws", async () => {
+    mockApiPost.mockRejectedValue(new Error("Conflict"))
+    const result = await applyBoundaries(ITINERARY_ID, PAYLOAD)
+    expect(result).toEqual({ success: false, error: "Conflict" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await applyBoundaries(ITINERARY_ID, PAYLOAD)
+    expect(result).toEqual({ success: false, error: "Failed to apply boundaries." })
   })
 })
 

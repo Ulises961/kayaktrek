@@ -6,8 +6,6 @@ import { MapTopBar } from "../map-top-bar"
 const BASE_PROPS = {
   tripId: "01952f1a-0000-7000-8000-000000000001",
   tripName: "Cinque Terre",
-  mode: "drop" as const,
-  onModeChange: vi.fn(),
   distanceUnit: "nm" as const,
   onDistanceUnitChange: vi.fn(),
   totalDistance: 12.5,
@@ -28,25 +26,16 @@ describe("MapTopBar — navigation", () => {
     render(<MapTopBar {...BASE_PROPS} />)
     expect(screen.getByText("Cinque Terre")).toBeInTheDocument()
   })
-})
 
-describe("MapTopBar — mode toggle", () => {
-  it("renders both mode buttons", () => {
-    render(<MapTopBar {...BASE_PROPS} />)
-    expect(screen.getByRole("button", { name: "Drop points" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Assign days" })).toBeInTheDocument()
+  it("links back to /itinerary when tripId is null", () => {
+    render(<MapTopBar {...BASE_PROPS} tripId={null} />)
+    const link = screen.getByRole("link")
+    expect(link.getAttribute("href")).toBe("/itinerary")
   })
 
-  it("calls onModeChange with 'assign' when Assign days is clicked", async () => {
-    render(<MapTopBar {...BASE_PROPS} />)
-    await userEvent.click(screen.getByRole("button", { name: "Assign days" }))
-    expect(BASE_PROPS.onModeChange).toHaveBeenCalledWith("assign")
-  })
-
-  it("calls onModeChange with 'drop' when Drop points is clicked", async () => {
-    render(<MapTopBar {...BASE_PROPS} mode="assign" />)
-    await userEvent.click(screen.getByRole("button", { name: "Drop points" }))
-    expect(BASE_PROPS.onModeChange).toHaveBeenCalledWith("drop")
+  it("shows 'Itineraries' label when tripId is null", () => {
+    render(<MapTopBar {...BASE_PROPS} tripId={null} />)
+    expect(screen.getByText("Itineraries")).toBeInTheDocument()
   })
 })
 
@@ -100,29 +89,5 @@ describe("MapTopBar — unit toggle", () => {
     render(<MapTopBar {...BASE_PROPS} totalDistance={10} distanceUnit="km" />)
     // 10 nm × 1.852 = 18.520 → "18.5"
     expect(screen.getByText("18.5")).toBeInTheDocument()
-  })
-})
-
-describe("MapTopBar — remove last waypoint", () => {
-  it("shows the button in drop mode when the handler is provided", () => {
-    render(<MapTopBar {...BASE_PROPS} mode="drop" onRemoveLastWaypoint={vi.fn()} />)
-    expect(screen.getByRole("button", { name: "Remove last waypoint" })).toBeInTheDocument()
-  })
-
-  it("does not show the button in assign mode", () => {
-    render(<MapTopBar {...BASE_PROPS} mode="assign" onRemoveLastWaypoint={vi.fn()} />)
-    expect(screen.queryByRole("button", { name: "Remove last waypoint" })).not.toBeInTheDocument()
-  })
-
-  it("does not show the button when handler is not provided", () => {
-    render(<MapTopBar {...BASE_PROPS} mode="drop" />)
-    expect(screen.queryByRole("button", { name: "Remove last waypoint" })).not.toBeInTheDocument()
-  })
-
-  it("calls onRemoveLastWaypoint when clicked", async () => {
-    const onRemove = vi.fn()
-    render(<MapTopBar {...BASE_PROPS} mode="drop" onRemoveLastWaypoint={onRemove} />)
-    await userEvent.click(screen.getByRole("button", { name: "Remove last waypoint" }))
-    expect(onRemove).toHaveBeenCalledTimes(1)
   })
 })
