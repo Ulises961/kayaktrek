@@ -1,8 +1,10 @@
+import os
 from datetime import date
 import json
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.pool import NullPool as _NullPool
 
 from Models.user import User
 from Models.item_category import ItemCategory
@@ -19,29 +21,51 @@ from Api.app import createApp
 from Api.database import db as _db
 from Api.seed import seed_item_categories
 
+
+def _get_worker_id(request) -> str:
+    """Return the pytest-xdist worker ID, or 'master' for single-process runs."""
+    if hasattr(request.config, 'workerinput'):
+        return request.config.workerinput['workerid']
+    return 'master'
+
+
 @pytest.fixture(scope='session')
 def app(request):
-    """Session-wide test `Flask` application."""
-    
-    app = createApp('testing')
+    """Session-wide test Flask application, isolated to its own PostgreSQL schema."""
+    worker_id = _get_worker_id(request)
+    schema = f"test_{worker_id}"
 
-    # Establish an application context before running the tests.
+    # Bootstrap using a plain connection (no custom search_path) so that:
+    #   - the PostGIS extension lands in public (accessible to all schemas via search_path)
+    #   - the worker schema is created before the app engine (with search_path) is set up
+    db_url = os.getenv("TESTING_DATABASE_URL", os.getenv("DATABASE_URL"))
+    bootstrap = create_engine(db_url, poolclass=_NullPool)
+    with bootstrap.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis SCHEMA public"))
+        conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+        conn.commit()
+    bootstrap.dispose()
+
+    app = createApp('testing', schema=schema)
     ctx = app.app_context()
     ctx.push()
-    with _db.engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-        conn.commit()
     _db.create_all()
     seed_item_categories()
 
     def teardown():
-        _db.session.remove()   # close/rollback open session and release any held locks
+        _db.session.remove()
         _db.drop_all()
+        cleanup = create_engine(db_url, poolclass=_NullPool)
+        with cleanup.connect() as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+            conn.commit()
+        cleanup.dispose()
         _db.engine.dispose()
         ctx.pop()
 
     request.addfinalizer(teardown)
     return app
+
 
 def _activate_user(mail: str) -> User:
     """Directly activate a test user in the DB (bypasses email flow)."""
@@ -91,13 +115,13 @@ def client(app):
 
 @pytest.fixture(scope='session')
 def id(user_1):
-    """Create first test user and return their public_id."""   
+    """Create first test user and return their public_id."""
     return str(user_1.id)
 
 @pytest.fixture(scope='session')
 def id_2(user_2):
-    """Create second test user and return their id."""    
-  
+    """Create second test user and return their id."""
+
     return str(user_2.id)
 
 
@@ -417,4 +441,3 @@ def trip_with_crew(app, client, auth_headers):
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     except:
         pass
-

@@ -3,6 +3,7 @@ flake8
 pytest
 pytest-cov
 pytest-dotenv
+pytest-xdist
 flask
 celery
 kombu
