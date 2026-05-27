@@ -2,10 +2,11 @@
 import { useState, useCallback } from "react"
 import { PlusIcon, SlashIcon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { initDraftBoundaries, applyDraftToPreviewDays } from "@/lib/itinerary/boundaries"
+import { initDraftBoundaries, computeBoundaryApplyPayload } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
-import { createDay, deleteDay, updateDay, updatePoint, deletePoint } from "@/lib/itinerary/actions"
+import { createDay, deleteDay, updateDay, updatePoint, deletePoint, applyBoundaries } from "@/lib/itinerary/actions"
+import { initialMapState } from "@/lib/itinerary/map-reducer"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
 import type { DraftBoundary } from "@/lib/itinerary/boundaries"
@@ -123,25 +124,42 @@ export function PointListPane() {
 
   const handleApply = useCallback(async () => {
     if (!draftBoundaries || !day0Id) return
-    // Compute updated days from draft for state sync.
-    applyDraftToPreviewDays(draftBoundaries, state.days, state.pointOrder)
+    const snapshot = state
 
-    // Build pointUpdates from dirty local state.
+    const base = computeBoundaryApplyPayload(draftBoundaries, state)
+    const pointMap = new Map(base.points.map((p) => [p.id, p]))
+    for (const [id, fields] of dirtyPoints.entries()) {
+      const resolvedType = (fields.type ?? state.points.find((p) => p.id === id)?.type ?? "position") as PointType
+      const existing = pointMap.get(id)
+      pointMap.set(id, existing
+        ? { ...existing, type: resolvedType, ...(fields.name !== undefined ? { name: fields.name } : {}) }
+        : { id, type: resolvedType, ...(fields.name !== undefined ? { name: fields.name } : {}) }
+      )
+    }
+    const payload = { boundaries: base.boundaries, points: Array.from(pointMap.values()) }
+
     const pointUpdates = Array.from(dirtyPoints.entries()).map(([id, fields]) => ({
       id,
       type: (fields.type ?? state.points.find((p) => p.id === id)?.type ?? "position") as PointType,
       ...(fields.name !== undefined ? { name: fields.name } : {}),
     }))
 
-    dispatch({
-      type: "BOUNDARIES_APPLY",
-      boundaries: draftBoundaries,
-      pointUpdates,
-      day0Id,
-    })
+    dispatch({ type: "BOUNDARIES_APPLY", boundaries: draftBoundaries, pointUpdates, day0Id })
     setDirtyPoints(new Map())
     setDraftBoundaries(null)
-  }, [draftBoundaries, day0Id, state.days, state.pointOrder, state.points, dirtyPoints, dispatch, setDraftBoundaries])
+
+    dispatch({ type: "SAVING_START" })
+    const result = await applyBoundaries(itineraryId, payload)
+    dispatch({ type: "SAVING_END" })
+
+    if (result.success) {
+      const allPoints = result.itinerary.days?.flatMap((d) => d.points ?? []) ?? []
+      const numberedDays = result.itinerary.days?.filter((d) => d.dayNumber > 0) ?? []
+      dispatch({ type: "STATE_REPLACE", state: initialMapState(allPoints, numberedDays) })
+    } else {
+      dispatch({ type: "STATE_REPLACE", state: snapshot })
+    }
+  }, [draftBoundaries, day0Id, state, dirtyPoints, dispatch, setDraftBoundaries, itineraryId])
 
   const handleCancel = useCallback(() => {
     setDirtyPoints(new Map())

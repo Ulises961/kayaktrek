@@ -15,6 +15,7 @@ vi.mock("@/lib/itinerary/actions", () => ({
   updateDay: vi.fn().mockResolvedValue({ success: true }),
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
   deletePoint: vi.fn().mockResolvedValue({ success: true }),
+  applyBoundaries: vi.fn().mockResolvedValue({ success: true, itinerary: { id: "itin-1", days: [] } }),
 }))
 
 vi.mock("@/lib/itinerary/boundaries", async (importOriginal) => {
@@ -28,6 +29,7 @@ vi.mock("@/lib/itinerary/boundaries", async (importOriginal) => {
 
 import { PointListPane } from "../point-list-pane"
 import * as boundaries from "@/lib/itinerary/boundaries"
+import * as actions from "@/lib/itinerary/actions"
 
 const DAY0_ID = "day-0"
 const DAY1_ID = "day-1"
@@ -150,14 +152,39 @@ describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () =
     expect(setDraftBoundaries).toHaveBeenCalledWith(null)
   })
 
-  it("clicking Apply calls applyDraftToPreviewDays and then setDraftBoundaries(null)", async () => {
+  it("clicking Apply dispatches BOUNDARIES_APPLY optimistically then calls applyBoundaries", async () => {
     const setDraftBoundaries = vi.fn()
     const dispatch = vi.fn()
     const ctx = makeCtx({ draftBoundaries: draft, setDraftBoundaries, dispatch })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /apply/i }))
-    expect(boundaries.applyDraftToPreviewDays).toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "BOUNDARIES_APPLY" }))
+    expect(actions.applyBoundaries).toHaveBeenCalledWith(ITIN_ID, expect.any(Object))
     expect(setDraftBoundaries).toHaveBeenCalledWith(null)
+  })
+
+  it("on success dispatches STATE_REPLACE with server state", async () => {
+    const dispatch = vi.fn()
+    const ctx = makeCtx({ draftBoundaries: draft, dispatch })
+    renderWithCtx(ctx)
+    await userEvent.click(screen.getByRole("button", { name: /apply/i }))
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "STATE_REPLACE" }))
+  })
+
+  it("on failure dispatches STATE_REPLACE with snapshot to rollback", async () => {
+    vi.mocked(actions.applyBoundaries).mockResolvedValueOnce({ success: false, error: "Server error" })
+    const dispatch = vi.fn()
+    const ctx = makeCtx({ draftBoundaries: draft, dispatch })
+    renderWithCtx(ctx)
+    await userEvent.click(screen.getByRole("button", { name: /apply/i }))
+    const stateReplaceCalls = dispatch.mock.calls
+      .map((c) => c[0])
+      .filter((a) => a.type === "STATE_REPLACE")
+    expect(stateReplaceCalls).toHaveLength(1)
+    expect(stateReplaceCalls[0].state).toMatchObject({
+      points: ctx.state.points,
+      pointOrder: ctx.state.pointOrder,
+    })
   })
 })
 

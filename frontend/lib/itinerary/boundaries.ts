@@ -1,8 +1,13 @@
 import type { Day } from "@/lib/dtos/day"
 import type { PointType } from "@/lib/dtos/point"
-import type { MapState, DraftBoundary } from "./map-reducer"
+import type { MapState } from "./map-reducer"
 
-export type { DraftBoundary }
+export type DraftBoundary = {
+  dayId: string
+  dayNumber: number
+  endPointIdx: number
+  date: string | null
+}
 
 type BoundaryPayloadItem = {
   dayId: string

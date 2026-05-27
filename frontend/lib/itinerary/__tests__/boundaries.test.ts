@@ -111,9 +111,9 @@ describe("computeBoundaryApplyPayload", () => {
       points: [pt(PA), pt(PB), pt(PC), pt(PD), pt(PE)],
       pointOrder,
       pendingPointId: null,
+      pendingPointName: null,
       savingCount: 0,
       days: [day1],
-      slideState: null,
     }
     const { boundaries } = computeBoundaryApplyPayload(draft, state)
     expect(boundaries).toHaveLength(1)
@@ -134,9 +134,9 @@ describe("computeBoundaryApplyPayload", () => {
       points: [pt(PA), pt(PB), pt(PC), pt(PD), pt(PE)],
       pointOrder,
       pendingPointId: null,
+      pendingPointName: null,
       savingCount: 0,
       days: [day1, day2],
-      slideState: null,
     }
     const { boundaries } = computeBoundaryApplyPayload(draft, state)
     expect(boundaries[1]).toMatchObject({ startPointId: PB, endPointId: PD })
@@ -156,9 +156,9 @@ describe("computeBoundaryApplyPayload", () => {
       ],
       pointOrder,
       pendingPointId: null,
+      pendingPointName: null,
       savingCount: 0,
       days: [{ ...day1, startPointId: PA, endPointId: PC }],
-      slideState: null,
     }
     const { points } = computeBoundaryApplyPayload(draft, state)
     const pcUpdate = points.find(p => p.id === PC)
@@ -179,9 +179,9 @@ describe("computeBoundaryApplyPayload", () => {
       ],
       pointOrder,
       pendingPointId: null,
+      pendingPointName: null,
       savingCount: 0,
       days: [{ id: D1, dayNumber: 1, itineraryId: ITIN }],
-      slideState: null,
     }
     const { points } = computeBoundaryApplyPayload(draft, state)
     expect(points.find(p => p.id === PB)).toMatchObject({ type: "stop" })
@@ -195,9 +195,9 @@ describe("computeBoundaryApplyPayload", () => {
       points: [pt(PA), pt(PB), pt(PC), pt(PD), pt(PE)],
       pointOrder,
       pendingPointId: null,
+      pendingPointName: null,
       savingCount: 0,
       days: [{ id: D1, dayNumber: 1, itineraryId: ITIN }],
-      slideState: null,
     }
     const { points } = computeBoundaryApplyPayload(draft, state)
     const ids = points.map(p => p.id)
