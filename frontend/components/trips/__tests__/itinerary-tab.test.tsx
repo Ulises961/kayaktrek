@@ -61,7 +61,7 @@ describe("ItineraryTab — no itinerary", () => {
     mockCreateItinerary.mockResolvedValue({ success: true, itineraryId: ITINERARY_ID })
     render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader />)
     await userEvent.click(screen.getByRole("button", { name: /create itinerary/i }))
-    expect(mockCreateItinerary).toHaveBeenCalledWith(TRIP_ID)
+    expect(mockCreateItinerary).toHaveBeenCalledWith({ tripId: TRIP_ID })
     expect(mockRefresh).toHaveBeenCalled()
   })
 })

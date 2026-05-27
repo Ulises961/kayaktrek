@@ -33,7 +33,7 @@ export default async function ItineraryBuilderPage({
   return (
     <MapBuilder
       itinerary={itinerary}
-      tripId={itinerary.tripId ?? ""}
+      tripId={itinerary.tripId ?? null}
       tripName={tripName}
     />
   )

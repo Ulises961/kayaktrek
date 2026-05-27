@@ -20,7 +20,7 @@ export function ItineraryTab({ tripId, itinerary, isLeader }: ItineraryTabProps)
 
   function handleCreate() {
     startTransition(async () => {
-      await createItinerary(tripId)
+      await createItinerary({ tripId })
       router.refresh()
     })
   }

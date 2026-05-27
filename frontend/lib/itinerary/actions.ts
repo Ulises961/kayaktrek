@@ -6,9 +6,15 @@ import { PointSchema, PointsSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
+import { ItinerarySchema, ItinerariesSchema } from "@/lib/dtos/itinerary"
+import type { Itinerary } from "@/lib/dtos/itinerary"
 
 export type ItineraryActionResult =
   | { success: true; itineraryId: string }
+  | { success: false; error: string }
+
+export type ItineraryUpdateResult =
+  | { success: true; itinerary: Itinerary }
   | { success: false; error: string }
 
 export type PointActionResult =
@@ -23,14 +29,44 @@ export type DeleteActionResult =
   | { success: true }
   | { success: false; error: string }
 
-export async function createItinerary(tripId: string): Promise<ItineraryActionResult> {
+export async function createItinerary(
+  params: { tripId?: string | null; name?: string }
+): Promise<ItineraryActionResult> {
   try {
-    const itinerary = await apiPost<{ id: string }>("/api/itinerary/create", { tripId })
-    revalidatePath(`/trips/${tripId}`)
+    const body: Record<string, unknown> = {}
+    if (params.tripId) body.tripId = params.tripId
+    if (params.name !== undefined) body.name = params.name
+    const itinerary = await apiPost<{ id: string }>("/api/itinerary/create", body)
+    if (params.tripId) revalidatePath(`/trips/${params.tripId}`)
+    revalidatePath("/itinerary")
     return { success: true, itineraryId: itinerary.id }
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to create itinerary." }
+  }
+}
+
+export async function updateItinerary(
+  id: string,
+  fields: Partial<Pick<Itinerary, "name" | "isPublic" | "avgSpeedKnots" | "tripId">>
+): Promise<ItineraryUpdateResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/itinerary/${id}`, fields)
+    const itinerary = ItinerarySchema.parse(raw)
+    revalidatePath("/itinerary")
+    return { success: true, itinerary }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to update itinerary." }
+  }
+}
+
+export async function fetchItineraries(): Promise<Itinerary[]> {
+  try {
+    const raw = await apiGet<unknown[]>("/api/itinerary/all")
+    return ItinerariesSchema.parse(raw)
+  } catch {
+    return []
   }
 }
 

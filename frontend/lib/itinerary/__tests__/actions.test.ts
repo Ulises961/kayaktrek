@@ -41,31 +41,46 @@ beforeEach(() => vi.clearAllMocks())
 describe("createItinerary", () => {
   it("returns success with itineraryId on successful creation", async () => {
     mockApiPost.mockResolvedValue({ id: ITINERARY_ID })
-    const result = await createItinerary(TRIP_ID)
+    const result = await createItinerary({ tripId: TRIP_ID })
     expect(result).toEqual({ success: true, itineraryId: ITINERARY_ID })
   })
 
-  it("posts to /api/itinerary/create with tripId", async () => {
+  it("posts to /api/itinerary/create with tripId and name", async () => {
     mockApiPost.mockResolvedValue({ id: ITINERARY_ID })
-    await createItinerary(TRIP_ID)
-    expect(mockApiPost).toHaveBeenCalledWith("/api/itinerary/create", { tripId: TRIP_ID })
+    await createItinerary({ tripId: TRIP_ID, name: "My Route" })
+    expect(mockApiPost).toHaveBeenCalledWith("/api/itinerary/create", {
+      tripId: TRIP_ID,
+      name: "My Route",
+    })
   })
 
-  it("revalidates the trip page on success", async () => {
+  it("omits tripId from body when not provided", async () => {
     mockApiPost.mockResolvedValue({ id: ITINERARY_ID })
-    await createItinerary(TRIP_ID)
+    await createItinerary({ name: "Standalone Route" })
+    expect(mockApiPost).toHaveBeenCalledWith("/api/itinerary/create", { name: "Standalone Route" })
+  })
+
+  it("revalidates the trip page on success when tripId given", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID })
+    await createItinerary({ tripId: TRIP_ID })
     expect(mockRevalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+  })
+
+  it("revalidates /itinerary listing on success", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID })
+    await createItinerary({ name: "Solo Route" })
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
   })
 
   it("returns error result when the API throws", async () => {
     mockApiPost.mockRejectedValue(new Error("Conflict"))
-    const result = await createItinerary(TRIP_ID)
+    const result = await createItinerary({ tripId: TRIP_ID })
     expect(result).toEqual({ success: false, error: "Conflict" })
   })
 
   it("returns a generic error message for non-Error throws", async () => {
     mockApiPost.mockRejectedValue("unknown")
-    const result = await createItinerary(TRIP_ID)
+    const result = await createItinerary({ tripId: TRIP_ID })
     expect(result).toEqual({ success: false, error: "Failed to create itinerary." })
   })
 })

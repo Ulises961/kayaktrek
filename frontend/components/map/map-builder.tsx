@@ -14,6 +14,8 @@ import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { SlidePhase } from "@/lib/types/ui"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
+import type { DraftBoundary } from "@/lib/itinerary/boundaries"
 import {
   createPoint,
   updatePoint,
@@ -29,7 +31,7 @@ const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.Com
 
 type MapBuilderProps = {
   itinerary: Itinerary
-  tripId: string
+  tripId: string | null
   tripName: string
 }
 
@@ -38,6 +40,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
   const [mode, setMode] = useState<MapMode>("drop")
   const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
+  const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
+  const [draftBoundaries, setDraftBoundaries] = useState<DraftBoundary[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)
   const [poiResults, setPoiResults] = useState<Point[]>([])
 
@@ -443,7 +447,21 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
   const hasDay0Points = state.points.some((p) => p.dayId === day0Id)
 
+  const ctxValue = useMemo(() => ({
+    state,
+    dispatch,
+    draftBoundaries,
+    setDraftBoundaries,
+    tripId: tripId ?? null,
+    itineraryId: itinerary.id ?? "",
+    distanceUnit,
+    setDistanceUnit,
+    avgSpeedKnots,
+    setAvgSpeedKnots,
+  }), [state, dispatch, draftBoundaries, tripId, itinerary.id, distanceUnit, avgSpeedKnots])
+
   return (
+    <MapBuilderContext.Provider value={ctxValue}>
     <div className="fixed inset-0 z-50 bg-background">
       <MapTopBar
         tripId={tripId}
@@ -513,5 +531,6 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
         )}
       </div>
     </div>
+    </MapBuilderContext.Provider>
   )
 }

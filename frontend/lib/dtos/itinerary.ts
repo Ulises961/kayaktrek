@@ -3,9 +3,12 @@ import { DaysSchema } from "./day";
 
 export const ItinerarySchema = z.object({
   id: z.uuidv7().optional(),
+  name: z.string().nullish(),
   isPublic: z.boolean().nullish(),
+  avgSpeedKnots: z.number().nullish(),
   totalMiles: z.number().nullish(),
   expectedTotalMiles: z.number().nullish(),
+  createdFromId: z.uuidv7().nullish(),
   days: DaysSchema.nullish(),
   tripId: z.uuidv7().nullish(),
   userId: z.uuidv7().nullish(),

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 export type MapMode = "drop" | "assign"
 
 type MapTopBarProps = {
-  tripId: string
+  tripId: string | null
   tripName: string
   mode: MapMode
   onModeChange: (mode: MapMode) => void
@@ -38,11 +38,11 @@ export function MapTopBar({
   return (
     <div className="absolute top-0 left-0 right-0 z-[1001] flex items-center gap-4 px-4 h-12 bg-background/90 backdrop-blur-sm border-b border-border">
       <Link
-        href={`/trips/${tripId}`}
+        href={tripId ? `/trips/${tripId}` : "/itinerary"}
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
       >
         <ArrowLeftIcon className="size-4" />
-        <span>{tripName}</span>
+        <span>{tripId ? tripName : "Itineraries"}</span>
       </Link>
 
       <div className="flex-1" />

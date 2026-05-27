@@ -68,9 +68,12 @@ const DAY_FIXTURE = {
 
 const ITINERARY_FIXTURE = {
   id: ITINERARY_ID,
+  name: "Galicia Coast",
   isPublic: false,
+  avgSpeedKnots: 2.5,
   totalMiles: 42.5,
   expectedTotalMiles: 45.0,
+  createdFromId: null,
   tripId: TRIP_ID,
   userId: USER_ID,
   days: [DAY_FIXTURE],
@@ -177,6 +180,36 @@ describe("ItinerarySchema", () => {
       expect(result.data.days).toHaveLength(1)
       expect(result.data.days?.[0].startPointId).toBe(POINT_ID_1)
     }
+  })
+
+  it("parses name and avgSpeedKnots", () => {
+    const result = ItinerarySchema.safeParse(ITINERARY_FIXTURE)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.name).toBe("Galicia Coast")
+      expect(result.data.avgSpeedKnots).toBe(2.5)
+    }
+  })
+
+  it("accepts null createdFromId", () => {
+    const result = ItinerarySchema.safeParse({ ...ITINERARY_FIXTURE, createdFromId: null })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts a valid createdFromId UUID", () => {
+    const result = ItinerarySchema.safeParse({
+      ...ITINERARY_FIXTURE,
+      createdFromId: "01952f1a-0000-7000-8000-000000000099",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.createdFromId).toBe("01952f1a-0000-7000-8000-000000000099")
+  })
+
+  it("accepts an itinerary without a tripId", () => {
+    const { tripId: _, ...noTrip } = ITINERARY_FIXTURE
+    const result = ItinerarySchema.safeParse(noTrip)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.tripId).toBeUndefined()
   })
 
   it("accepts an itinerary without days", () => {
