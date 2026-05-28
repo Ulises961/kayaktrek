@@ -1,13 +1,13 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, isRedirectError } from "@/lib/api/client"
 import { PointSchema, PointsSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
-import { ItinerarySchema, ItinerariesSchema } from "@/lib/dtos/itinerary"
-import type { Itinerary } from "@/lib/dtos/itinerary"
+import { ItinerarySchema, ItinerariesSchema, PublicItinerariesSchema } from "@/lib/dtos/itinerary"
+import type { Itinerary, PublicItinerary } from "@/lib/dtos/itinerary"
 import type { BoundaryApplyPayload } from "./boundaries"
 
 export type ItineraryActionResult =
@@ -182,5 +182,36 @@ export async function assignPointsToDay(
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to assign points." }
+  }
+}
+
+export async function forkItinerary(id: string): Promise<ItineraryActionResult> {
+  try {
+    const result = await apiPost<{ itineraryId: string }>(`/api/itinerary/${id}/fork`, {})
+    revalidatePath("/itinerary")
+    return { success: true, itineraryId: result.itineraryId }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to fork itinerary." }
+  }
+}
+
+export async function importGpx(formData: FormData): Promise<ItineraryActionResult> {
+  try {
+    const result = await apiUpload<{ itineraryId: string }>("/api/itinerary/import", formData)
+    revalidatePath("/itinerary")
+    return { success: true, itineraryId: result.itineraryId }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to import GPX." }
+  }
+}
+
+export async function fetchPublicItineraries(): Promise<PublicItinerary[]> {
+  try {
+    const raw = await apiGet<unknown[]>("/api/itinerary/explore")
+    return PublicItinerariesSchema.parse(raw)
+  } catch {
+    return []
   }
 }

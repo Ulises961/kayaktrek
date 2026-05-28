@@ -16,3 +16,12 @@ export const ItinerarySchema = z.object({
 
 export type Itinerary = z.infer<typeof ItinerarySchema>;
 export const ItinerariesSchema = z.array(ItinerarySchema);
+
+export const PublicItinerarySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().nullish(),
+  isPublic: z.boolean().nullish(),
+  totalMiles: z.number().nullish(),
+});
+export type PublicItinerary = z.infer<typeof PublicItinerarySchema>;
+export const PublicItinerariesSchema = z.array(PublicItinerarySchema);
