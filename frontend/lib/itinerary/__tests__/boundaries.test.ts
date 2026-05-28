@@ -47,10 +47,35 @@ describe("initDraftBoundaries", () => {
     expect(draft[0].dayId).toBe(D1)
   })
 
-  it("uses pointOrder.length - 1 when endPointId is absent", () => {
+  it("uses pointOrder.length - 1 when a single day has no endPointId", () => {
     const dayNoEnd: Day = { id: D1, dayNumber: 1, itineraryId: ITIN, startPointId: PA }
     const draft = initDraftBoundaries([dayNoEnd], pointOrder)
     expect(draft[0].endPointIdx).toBe(4)
+  })
+
+  it("always uses the last point index for the last day, ignoring endPointId", () => {
+    // Simulates a day whose endPointId was set to a non-last point by a previous apply.
+    // The last day must always extend to the end so trailing points are not left grey.
+    const dayShort: Day = { id: D2, dayNumber: 2, itineraryId: ITIN, startPointId: PB, endPointId: PB }
+    // PB is pointOrder[1] — not the last point (PE at index 4)
+    const draft = initDraftBoundaries([day1, dayShort], pointOrder)
+    expect(draft.find((d) => d.dayId === D2)?.endPointIdx).toBe(4) // M - 1
+  })
+
+  it("spreads multiple fresh days (no endPointId) evenly to avoid index collisions", () => {
+    const D3 = "01952f1a-0000-7000-8000-000000000003"
+    const freshDay1: Day = { id: D1, dayNumber: 1, itineraryId: ITIN }
+    const freshDay2: Day = { id: D2, dayNumber: 2, itineraryId: ITIN }
+    const freshDay3: Day = { id: D3, dayNumber: 3, itineraryId: ITIN }
+    const draft = initDraftBoundaries([freshDay1, freshDay2, freshDay3], pointOrder)
+    const indices = draft.map(d => d.endPointIdx)
+    // All indices must be distinct (no two boundaries at the same position)
+    expect(new Set(indices).size).toBe(indices.length)
+    // Must be monotonically increasing
+    expect(indices[0]).toBeLessThan(indices[1])
+    expect(indices[1]).toBeLessThan(indices[2])
+    // Last day always ends at the last point
+    expect(indices[2]).toBe(pointOrder.length - 1)
   })
 
   it("preserves the date from the day", () => {

@@ -40,6 +40,7 @@ function resolvePosition(point: ValidPoint, drag: DragState | null): { latitude:
 function buildSegments(
   ordered: ValidPoint[],
   dayNumberById: Map<string | undefined, number>,
+  boundaryPointIds: Set<string>,
   distanceUnit: "nm" | "km",
   avgSpeedKnots: number,
   drag: DragState | null
@@ -50,10 +51,22 @@ function buildSegments(
     const b = resolvePosition(ordered[i + 1], drag)
     const dayNumA = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
     const dayNumB = dayNumberById.get(ordered[i + 1].dayId ?? undefined) ?? 0
-    // If either endpoint is unassigned (Day 0), the leg is unassigned.
-    // Otherwise use the higher day number so that boundary points (belonging
-    // to Day N) render the outgoing leg in Day N+1's colour.
-    const dayNum = (dayNumA === 0 || dayNumB === 0) ? 0 : Math.max(dayNumA, dayNumB)
+    // A leg takes the colour of the day both endpoints agree on:
+    //   • both unassigned → grey
+    //   • same day → that day's colour
+    //   • A is a split-ring boundary stop and B is the immediately following day
+    //     → B's colour (the matching right-half of the split ring)
+    //   • otherwise (cross-day discontinuity, no shared colour) → grey
+    let dayNum: number
+    if (dayNumA === 0 || dayNumB === 0) {
+      dayNum = 0
+    } else if (dayNumA === dayNumB) {
+      dayNum = dayNumA
+    } else if (ordered[i].id != null && boundaryPointIds.has(ordered[i].id!) && dayNumB === dayNumA + 1) {
+      dayNum = dayNumB
+    } else {
+      dayNum = 0
+    }
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
@@ -171,11 +184,16 @@ export default function MapCore({
     return map
   }, [days])
 
+  const boundaryPointIds = useMemo(
+    () => new Set(boundaryMap.keys()),
+    [boundaryMap],
+  )
+
   const validPoints = points.filter(
     (p): p is ValidPoint => p.latitude != null && p.longitude != null
   )
 
-  const segments = buildSegments(validPoints, dayNumberById, distanceUnit, avgSpeedKnots, dragState)
+  const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, distanceUnit, avgSpeedKnots, dragState)
 
   const handleMarkerDragMove = useCallback((id: string, lat: number, lng: number) => {
     setDragState({ id, lat, lng })

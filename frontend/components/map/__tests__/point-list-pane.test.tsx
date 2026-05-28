@@ -33,6 +33,7 @@ import * as actions from "@/lib/itinerary/actions"
 
 const DAY0_ID = "day-0"
 const DAY1_ID = "day-1"
+const DAY2_ID = "day-2"
 const ITIN_ID = "itin-1"
 
 const pt = (id: string, dayId = DAY0_ID): Point => ({
@@ -138,8 +139,13 @@ describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () =
     expect(screen.queryByRole("button", { name: /add day/i })).not.toBeInTheDocument()
   })
 
-  it("renders a BoundaryDivider for each draft entry", () => {
-    const ctx = makeCtx({ draftBoundaries: draft })
+  it("renders N-1 BoundaryDividers for N draft entries (last boundary has no following day)", () => {
+    // 2 draft entries (Day1 + Day2) → 1 divider shown (between Day1 and Day2)
+    const draft2: DraftBoundary[] = [
+      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: null },
+      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+    ]
+    const ctx = makeCtx({ draftBoundaries: draft2 })
     renderWithCtx(ctx)
     expect(screen.getAllByTestId("boundary-drag-handle")).toHaveLength(1)
   })
@@ -185,6 +191,107 @@ describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () =
       points: ctx.state.points,
       pointOrder: ctx.state.pointOrder,
     })
+  })
+})
+
+describe("PointListPane — type change in boundary-edit mode", () => {
+  const draft: DraftBoundary[] = [
+    { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 2, date: null },
+  ]
+
+  it("type buttons reflect dirty selection immediately without dispatching POINT_UPDATE", async () => {
+    const dispatch = vi.fn()
+    const ctx = makeCtx({ draftBoundaries: draft, activePointId: "p1", dispatch })
+    renderWithCtx(ctx)
+
+    await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "POINT_UPDATE" })
+    )
+    expect(screen.getByRole("button", { name: /^stop$/i })).toHaveClass("bg-primary")
+  })
+
+  it("dirty type is included in apply payload on Apply click", async () => {
+    const ctx = makeCtx({ draftBoundaries: draft, activePointId: "p1" })
+    renderWithCtx(ctx)
+
+    await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
+    await userEvent.click(screen.getByRole("button", { name: /apply/i }))
+
+    expect(actions.applyBoundaries).toHaveBeenCalledWith(
+      ITIN_ID,
+      expect.objectContaining({
+        points: expect.arrayContaining([
+          expect.objectContaining({ id: "p1", type: "stop" }),
+        ]),
+      })
+    )
+  })
+})
+
+describe("PointListPane — delete day", () => {
+  const stateWithDay = {
+    points: [pt("p1", DAY1_ID), pt("p2", DAY1_ID), pt("p3", DAY1_ID)],
+    pointOrder: ["p1", "p2", "p3"],
+    pendingPointId: null,
+    pendingPointName: null,
+    savingCount: 0,
+    days: [day(DAY1_ID, 1, { startPointId: "p1", endPointId: "p3" })],
+  }
+
+  it("shows a delete button for the last day in normal mode", () => {
+    renderWithCtx(makeCtx({ state: stateWithDay }))
+    expect(screen.getByRole("button", { name: /delete day 1/i })).toBeInTheDocument()
+  })
+
+  it("does not show delete button when there are no days", () => {
+    renderWithCtx(makeCtx())
+    expect(screen.queryByRole("button", { name: /delete day/i })).not.toBeInTheDocument()
+  })
+
+  it("does not show delete button in boundary-edit mode", () => {
+    const draft: DraftBoundary[] = [{ dayId: DAY1_ID, dayNumber: 1, endPointIdx: 2, date: null }]
+    renderWithCtx(makeCtx({ draftBoundaries: draft, state: stateWithDay }))
+    expect(screen.queryByRole("button", { name: /delete day/i })).not.toBeInTheDocument()
+  })
+
+  it("clicking delete dispatches DAY_REMOVE and calls deleteDay", async () => {
+    const dispatch = vi.fn()
+    renderWithCtx(makeCtx({ dispatch, state: stateWithDay }))
+    await userEvent.click(screen.getByRole("button", { name: /delete day 1/i }))
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "DAY_REMOVE", id: DAY1_ID }))
+    expect(actions.deleteDay).toHaveBeenCalledWith(DAY1_ID)
+  })
+
+  it("delete button targets the highest-numbered day when multiple days exist", () => {
+    const state = {
+      ...stateWithDay,
+      days: [day(DAY1_ID, 1, { endPointId: "p1" }), day(DAY2_ID, 2, { endPointId: "p3" })],
+    }
+    renderWithCtx(makeCtx({ state }))
+    expect(screen.getByRole("button", { name: /delete day 2/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /delete day 1/i })).not.toBeInTheDocument()
+  })
+})
+
+describe("PointListPane — Day 1 header in boundary-edit mode", () => {
+  it("shows a Day 1 section header when in boundary-edit mode", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2026-07-01" },
+      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+    ]
+    renderWithCtx(makeCtx({ draftBoundaries: draft }))
+    expect(screen.getByTestId("day-1-header")).toBeInTheDocument()
+  })
+
+  it("shows Day 1 header with a date input pre-filled from the draft", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2026-07-01" },
+      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+    ]
+    renderWithCtx(makeCtx({ draftBoundaries: draft }))
+    expect(screen.getByDisplayValue("2026-07-01")).toBeInTheDocument()
   })
 })
 

@@ -28,17 +28,26 @@ export type BoundaryApplyPayload = {
 }
 
 export function initDraftBoundaries(days: Day[], pointOrder: string[]): DraftBoundary[] {
-  return days
+  const sorted = days
     .filter((d) => d.dayNumber > 0 && d.id)
     .sort((a, b) => a.dayNumber - b.dayNumber)
-    .map((day) => ({
-      dayId: day.id!,
-      dayNumber: day.dayNumber,
-      endPointIdx: day.endPointId
+
+  const N = sorted.length
+  const M = pointOrder.length
+
+  return sorted.map((day, i) => ({
+    dayId: day.id!,
+    dayNumber: day.dayNumber,
+    // The last day always extends to the final point so trailing points are
+    // never left uncoloured.  Earlier days without an endPointId are spread
+    // evenly to prevent Map key collisions from hiding their handles.
+    endPointIdx: i === N - 1
+      ? M - 1
+      : day.endPointId
         ? pointOrder.indexOf(day.endPointId)
-        : pointOrder.length - 1,
-      date: day.date ?? null,
-    }))
+        : Math.min(M - 1, Math.max(i, Math.round(((i + 1) * M) / N) - 1)),
+    date: day.date ?? null,
+  }))
 }
 
 export function applyDraftToPreviewDays(

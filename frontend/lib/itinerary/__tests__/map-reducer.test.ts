@@ -236,7 +236,41 @@ describe("initialMapState", () => {
     const state = initialMapState([p1, p2, p3], [d1])
     expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
     expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)
-    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D0)
+    // d1 is the last (only) day — it extends to the end so p3 is also coloured.
+    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D1)
+  })
+
+  it("last day covers trailing points beyond its stored endPointId", () => {
+    const D0 = "d0-id"
+    const D1 = "d1-id"
+    const D2 = "d2-id"
+    const p1: Point = { id: "p1", type: "position", dayId: D0, nextId: "p2" }
+    const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
+    const p3: Point = { id: "p3", type: "position", dayId: D0, nextId: "p4" }
+    const p4: Point = { id: "p4", type: "position", dayId: D0 }
+    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
+    // d2's endPointId was saved as p2 (a non-last point) — last day must still cover p3 and p4.
+    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p2" }
+    const state = initialMapState([p1, p2, p3, p4], [d1, d2])
+    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D2)
+    expect(state.points.find((p) => p.id === "p4")?.dayId).toBe(D2)
+  })
+
+  it("assigns boundary stop to the day that ends there (not the following day)", () => {
+    // Day1: p1..p2 (p2 is boundary stop)  Day2: p2..p3 (startPointId shared with Day1's end)
+    // p2 must get Day1's dayId so its outgoing leg renders in Day1's colour.
+    const D0 = "d0-id"
+    const D1 = "d1-id"
+    const D2 = "d2-id"
+    const p1: Point = { id: "p1", type: "position", dayId: D0, nextId: "p2" }
+    const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
+    const p3: Point = { id: "p3", type: "position", dayId: D0 }
+    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
+    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p3" }
+    const state = initialMapState([p1, p2, p3], [d1, d2])
+    expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
+    expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)  // boundary stop → Day1
+    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D2)
   })
 
   it("initialises days from the provided array", () => {
@@ -418,8 +452,10 @@ describe("BOUNDARIES_APPLY", () => {
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
+    // BOUNDARIES: Day1 endPointIdx=1, Day2 endPointIdx=4
+    // Boundary stop (p1) belongs to Day1 (the day that ends there), not Day2.
     expect(next.points.find((p) => p.id === "p0")?.dayId).toBe(DAY1_ID)
-    expect(next.points.find((p) => p.id === "p1")?.dayId).toBe(DAY2_ID)
+    expect(next.points.find((p) => p.id === "p1")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "p2")?.dayId).toBe(DAY2_ID)
     expect(next.points.find((p) => p.id === "p3")?.dayId).toBe(DAY2_ID)
     expect(next.points.find((p) => p.id === "p4")?.dayId).toBe(DAY2_ID)
@@ -495,7 +531,7 @@ describe("BOUNDARIES_APPLY", () => {
     expect(next.days.find((d) => d.id === DAY0_ID)).toEqual(APPLY_STATE.days[0])
   })
 
-  it("sends points outside all boundary ranges to day0", () => {
+  it("last boundary extends to cover points beyond its endPointIdx", () => {
     const state: MapState = {
       ...APPLY_STATE,
       points: [...APPLY_STATE.points, makePoint("p5")],
@@ -507,7 +543,8 @@ describe("BOUNDARIES_APPLY", () => {
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
-    expect(next.points.find((p) => p.id === "p5")?.dayId).toBe(DAY0_ID)
+    // The last boundary auto-extends to pointOrder.length-1 so p5 belongs to the last day.
+    expect(next.points.find((p) => p.id === "p5")?.dayId).toBe(DAY2_ID)
   })
 
   it("does not change pointOrder", () => {

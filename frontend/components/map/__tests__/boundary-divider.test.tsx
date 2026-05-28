@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent } from "@testing-library/react"
 import { BoundaryDivider } from "../boundary-divider"
 import type { DraftBoundary } from "@/lib/itinerary/boundaries"
 
@@ -11,30 +11,34 @@ const BOUNDARY: DraftBoundary = {
 }
 
 describe("BoundaryDivider — display", () => {
-  it("renders the day number", () => {
+  it("renders the labelDayNumber", () => {
     render(
       <BoundaryDivider
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
-    expect(screen.getByText(/day 1/i)).toBeInTheDocument()
+    expect(screen.getByText(/day 2/i)).toBeInTheDocument()
   })
 
-  it("renders the date when provided", () => {
+  it("renders the labelDate as an input with the correct value", () => {
     render(
       <BoundaryDivider
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
-    expect(screen.getByText("2026-06-01")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("2026-06-02")).toBeInTheDocument()
   })
 
   it("renders a distance label", () => {
@@ -44,6 +48,8 @@ describe("BoundaryDivider — display", () => {
         totalDistanceNm={8.4}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
@@ -57,6 +63,8 @@ describe("BoundaryDivider — display", () => {
         totalDistanceNm={8.4}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
@@ -70,6 +78,8 @@ describe("BoundaryDivider — display", () => {
         totalDistanceNm={10}
         distanceUnit="km"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
@@ -77,17 +87,61 @@ describe("BoundaryDivider — display", () => {
     expect(screen.getByText(/18\.5/)).toBeInTheDocument()
   })
 
-  it("shows 'No date' when date is null", () => {
+  it("renders an empty date input when labelDate is null", () => {
     render(
       <BoundaryDivider
-        boundary={{ ...BOUNDARY, date: null }}
+        boundary={BOUNDARY}
         totalDistanceNm={0}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate={null}
         onBoundaryMove={vi.fn()}
       />
     )
-    expect(screen.getByText(/no date/i)).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>("input[type=date]")
+    expect(input).toBeInTheDocument()
+    expect(input?.value).toBe("")
+  })
+})
+
+describe("BoundaryDivider — date editing", () => {
+  it("calls onDateChange with the new value when the date input changes", () => {
+    const onDateChange = vi.fn()
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate={null}
+        onDateChange={onDateChange}
+        onBoundaryMove={vi.fn()}
+      />
+    )
+    const input = document.querySelector<HTMLInputElement>("input[type=date]")!
+    fireEvent.change(input, { target: { value: "2026-07-01" } })
+    expect(onDateChange).toHaveBeenCalledWith("2026-07-01")
+  })
+
+  it("calls onDateChange with null when the date is cleared", () => {
+    const onDateChange = vi.fn()
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDateChange={onDateChange}
+        onBoundaryMove={vi.fn()}
+      />
+    )
+    const input = document.querySelector<HTMLInputElement>("input[type=date]")!
+    fireEvent.change(input, { target: { value: "" } })
+    expect(onDateChange).toHaveBeenCalledWith(null)
   })
 })
 
@@ -99,6 +153,8 @@ describe("BoundaryDivider — drag handle", () => {
         totalDistanceNm={8.4}
         distanceUnit="nm"
         avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
       />
     )
