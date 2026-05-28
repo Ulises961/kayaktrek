@@ -1,8 +1,8 @@
 import { apiGet } from "@/lib/api/client"
 import { ItinerariesSchema } from "@/lib/dtos/itinerary"
 import { MapPinIcon } from "lucide-react"
-import Link from "next/link"
 import { NewItineraryButton } from "@/components/itinerary/new-itinerary-button"
+import { ItineraryCard } from "@/components/itinerary/itinerary-card"
 
 export default async function ItineraryListPage() {
   let itineraries: Awaited<ReturnType<typeof ItinerariesSchema.parse>> = []
@@ -26,35 +26,9 @@ export default async function ItineraryListPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {itineraries.map((itinerary) => {
-            const numberedDays = (itinerary.days ?? []).filter((d) => d.dayNumber > 0)
-            return (
-              <Link key={itinerary.id} href={`/itinerary/${itinerary.id}`}>
-                <div className="rounded-lg border bg-card p-4 hover:bg-accent transition-colors cursor-pointer">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-medium truncate">
-                      {itinerary.name || "Unnamed itinerary"}
-                    </h2>
-                    {itinerary.isPublic && (
-                      <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900 dark:text-sky-300">
-                        Public
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
-                    {numberedDays.length > 0 && (
-                      <span>
-                        {numberedDays.length} day{numberedDays.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {itinerary.totalMiles != null && itinerary.totalMiles > 0 && (
-                      <span>{itinerary.totalMiles.toFixed(1)} nm</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
+          {itineraries.map((itinerary) => (
+            <ItineraryCard key={itinerary.id} itinerary={itinerary} />
+          ))}
         </div>
       )}
     </div>
