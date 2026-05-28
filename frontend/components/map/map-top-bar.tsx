@@ -11,6 +11,8 @@ type MapTopBarProps = {
   totalDistance: number
   dayCount: number
   isSaving?: boolean
+  avgSpeedKnots: number
+  onAvgSpeedKnotsChange: (v: number) => void
 }
 
 export function MapTopBar({
@@ -21,6 +23,8 @@ export function MapTopBar({
   totalDistance,
   dayCount,
   isSaving = false,
+  avgSpeedKnots,
+  onAvgSpeedKnotsChange,
 }: MapTopBarProps) {
   const displayDistance =
     distanceUnit === "nm"
@@ -64,6 +68,19 @@ export function MapTopBar({
             </button>
           </span>
         </span>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
+          <span>Avg speed</span>
+          <input
+            type="number"
+            min={1.0}
+            max={6.0}
+            step={0.1}
+            value={avgSpeedKnots}
+            onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
+            className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none"
+          />
+          <span>kn</span>
+        </label>
         <span>{dayCount} {dayCount === 1 ? "day" : "days"}</span>
         <span className="text-xs">{isSaving ? "Saving…" : "All changes saved"}</span>
       </div>

@@ -17,6 +17,7 @@ describe("BoundaryDivider — display", () => {
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -29,6 +30,7 @@ describe("BoundaryDivider — display", () => {
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -41,6 +43,7 @@ describe("BoundaryDivider — display", () => {
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -53,6 +56,7 @@ describe("BoundaryDivider — display", () => {
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -65,6 +69,7 @@ describe("BoundaryDivider — display", () => {
         boundary={BOUNDARY}
         totalDistanceNm={10}
         distanceUnit="km"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -78,6 +83,7 @@ describe("BoundaryDivider — display", () => {
         boundary={{ ...BOUNDARY, date: null }}
         totalDistanceNm={0}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )
@@ -92,6 +98,7 @@ describe("BoundaryDivider — drag handle", () => {
         boundary={BOUNDARY}
         totalDistanceNm={8.4}
         distanceUnit="nm"
+        avgSpeedKnots={2.5}
         onBoundaryMove={vi.fn()}
       />
     )

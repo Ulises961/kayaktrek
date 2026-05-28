@@ -43,3 +43,34 @@ export function formatDistance(nm: number, unit: "nm" | "km"): string {
   const value = unit === "nm" ? nm : toKm(nm)
   return value.toFixed(1)
 }
+
+export function estimatedTime(
+  distanceNm: number,
+  speedKnots: number
+): { hours: number; minutes: number } {
+  const totalHours = distanceNm / speedKnots
+  const hours = Math.floor(totalHours)
+  const minutes = Math.round((totalHours - hours) * 60)
+  return { hours, minutes }
+}
+
+export function formatTime({
+  hours,
+  minutes,
+}: {
+  hours: number
+  minutes: number
+}): string {
+  if (hours === 0) return `${minutes}min`
+  return `${hours}h ${minutes}min`
+}
+
+export function legLabel(
+  distanceNm: number,
+  speedKnots: number,
+  unit: "nm" | "km"
+): string {
+  const dist = formatDistance(distanceNm, unit)
+  const time = formatTime(estimatedTime(distanceNm, speedKnots))
+  return `${dist} ${unit} · ${time}`
+}

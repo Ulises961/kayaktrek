@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { haversineNm, totalDistanceNm, segmentMidpoint, toKm, formatDistance } from "../distance"
+import { haversineNm, totalDistanceNm, segmentMidpoint, toKm, formatDistance, estimatedTime, formatTime, legLabel } from "../distance"
 
 describe("haversineNm", () => {
   it("returns 0 for identical points", () => {
@@ -66,5 +66,35 @@ describe("formatDistance", () => {
   it("converts to km and formats with 1 decimal", () => {
     // 10 nm × 1.852 = 18.520 → "18.5"
     expect(formatDistance(10, "km")).toBe("18.5")
+  })
+})
+
+describe("estimatedTime", () => {
+  it("calculates hours and minutes for 4.2 nm at 2.5 knots", () => {
+    expect(estimatedTime(4.2, 2.5)).toEqual({ hours: 1, minutes: 41 })
+  })
+
+  it("calculates hours and minutes for 0.5 nm at 2.5 knots", () => {
+    expect(estimatedTime(0.5, 2.5)).toEqual({ hours: 0, minutes: 12 })
+  })
+})
+
+describe("formatTime", () => {
+  it("formats 7h 22min", () => {
+    expect(formatTime({ hours: 7, minutes: 22 })).toBe("7h 22min")
+  })
+
+  it("formats minutes only when hours is 0", () => {
+    expect(formatTime({ hours: 0, minutes: 41 })).toBe("41min")
+  })
+})
+
+describe("legLabel", () => {
+  it("formats leg label in nautical miles", () => {
+    expect(legLabel(4.2, 2.5, "nm")).toBe("4.2 nm · 1h 41min")
+  })
+
+  it("formats leg label in kilometers", () => {
+    expect(legLabel(4.2, 2.5, "km")).toBe("7.8 km · 1h 41min")
   })
 })

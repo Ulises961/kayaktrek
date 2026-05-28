@@ -1,5 +1,5 @@
 "use client"
-import { useCallback, useMemo, useReducer, useState } from "react"
+import { useCallback, useMemo, useReducer, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
 import { MapTopBar } from "./map-top-bar"
@@ -17,6 +17,7 @@ import {
   createDay,
   updateDay,
   deleteDay,
+  updateItinerary,
 } from "@/lib/itinerary/actions"
 
 const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.ComponentType<MapCoreProps>
@@ -34,6 +35,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftBoundaries, setDraftBoundaries] = useState<DraftBoundary[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)
+
+  const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const day0 = itinerary.days?.find((d) => d.dayNumber === 0)
   const day0Id = day0?.id ?? null
@@ -103,6 +106,14 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     setActivePointId((prev) => (prev === pointId ? null : pointId))
   }, [])
 
+  const handleAvgSpeedChange = useCallback((v: number) => {
+    setAvgSpeedKnots(v)
+    if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current)
+    speedDebounceRef.current = setTimeout(() => {
+      updateItinerary(itinerary.id ?? "", { avgSpeedKnots: v })
+    }, 800)
+  }, [itinerary.id])
+
   const ctxValue = useMemo(() => ({
     state,
     dispatch,
@@ -130,6 +141,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
           totalDistance={totalDistance}
           dayCount={state.days.length}
           isSaving={isSaving}
+          avgSpeedKnots={avgSpeedKnots}
+          onAvgSpeedKnotsChange={handleAvgSpeedChange}
         />
         <div className="absolute inset-0 top-12">
           <MapCore
@@ -140,6 +153,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerClick={handleMarkerClick}
+            avgSpeedKnots={avgSpeedKnots}
           />
           <PointListPane />
         </div>

@@ -11,6 +11,8 @@ const BASE_PROPS = {
   totalDistance: 12.5,
   dayCount: 2,
   isSaving: false,
+  avgSpeedKnots: 2.5,
+  onAvgSpeedKnotsChange: vi.fn(),
 }
 
 beforeEach(() => vi.clearAllMocks())

@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { haversineNm, formatDistance } from "@/lib/itinerary/distance"
+import { haversineNm, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
 
@@ -14,6 +14,7 @@ export type MapCoreProps = {
   points: Point[]
   days: Day[]
   distanceUnit: "nm" | "km"
+  avgSpeedKnots?: number
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -40,6 +41,7 @@ function buildSegments(
   ordered: ValidPoint[],
   dayNumberById: Map<string | undefined, number>,
   distanceUnit: "nm" | "km",
+  avgSpeedKnots: number,
   drag: DragState | null
 ): Segment[] {
   const segments: Segment[] = []
@@ -56,7 +58,7 @@ function buildSegments(
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
       color: getDayColor(dayNum),
-      distLabel: formatDistance(haversineNm(a, b), distanceUnit),
+      distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
     })
   }
   return segments
@@ -134,6 +136,7 @@ export default function MapCore({
   points,
   days,
   distanceUnit,
+  avgSpeedKnots = 2.5,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
@@ -172,7 +175,7 @@ export default function MapCore({
     (p): p is ValidPoint => p.latitude != null && p.longitude != null
   )
 
-  const segments = buildSegments(validPoints, dayNumberById, distanceUnit, dragState)
+  const segments = buildSegments(validPoints, dayNumberById, distanceUnit, avgSpeedKnots, dragState)
 
   const handleMarkerDragMove = useCallback((id: string, lat: number, lng: number) => {
     setDragState({ id, lat, lng })
@@ -203,7 +206,7 @@ export default function MapCore({
                 direction="top"
                 className="distance-label"
               >
-                {seg.distLabel} {distanceUnit}
+                {seg.distLabel}
               </Tooltip>
             )}
           </Polyline>
