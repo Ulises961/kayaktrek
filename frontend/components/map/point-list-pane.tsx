@@ -42,8 +42,15 @@ export function PointListPane() {
   // ── draft boundary positions (for divider insertion) ──────────────────────
 
   // Map from endPointIdx → draft boundary entry.
+  // When two boundaries share the same endPointIdx (empty trailing day), the
+  // earlier day's boundary must win so its divider is rendered (the last
+  // boundary's divider is always suppressed by showDivider anyway).
   const draftByEndIdx = draftBoundaries
-    ? new Map(draftBoundaries.map((b) => [b.endPointIdx, b]))
+    ? new Map(
+        [...draftBoundaries]
+          .sort((a, b) => b.dayNumber - a.dayNumber)
+          .map((b) => [b.endPointIdx, b])
+      )
     : null
 
   // Compute per-day total distance for BoundaryDivider.
@@ -107,7 +114,7 @@ export function PointListPane() {
 
     const minIdx = i > 0 ? sorted[i - 1].endPointIdx + 1 : 0
     const maxIdx = i < sorted.length - 1
-      ? sorted[i + 1].endPointIdx - 1
+      ? sorted[i + 1].endPointIdx
       : state.pointOrder.length - 1
 
     if (minIdx > maxIdx) return
