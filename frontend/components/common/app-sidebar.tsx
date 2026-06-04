@@ -1,4 +1,3 @@
-import Link from "next/link"
 import {
     Sidebar,
     SidebarContent,
@@ -9,14 +8,15 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarRail,
+    SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { SettingsIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
-import { UserAvatar } from "@/components/common/user-avatar"
 import { NavigationItems } from "./navigation-items"
 import { SidebarLogoutButton } from "./sidebar-logout-button"
+import { SidebarToggleButton } from "./sidebar-toggle-button"
+import { SidebarProfileLink } from "./sidebar-profile-link"
 
 const APP_VERSION = "0.1.0-dev"
 
@@ -36,17 +36,18 @@ export async function AppSidebar() {
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
+                <SidebarMenu>
+                    <SidebarToggleButton />
+                </SidebarMenu>
+                <SidebarSeparator />
                 {user && (
-                    <Link
-                        href="/profile"
-                        className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center"
-                    >
-                        <UserAvatar name={user.name} surname={user.surname ?? undefined} imageUrl={user.avatarUrl ?? null} size="sm" />
-                        <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
-                            <span className="text-sm font-medium truncate">{displayName}</span>
-                            <span className="text-xs text-muted-foreground truncate">{user.mail}</span>
-                        </div>
-                    </Link>
+                    <SidebarProfileLink
+                        name={user.name}
+                        surname={user.surname ?? undefined}
+                        mail={user.mail}
+                        displayName={displayName}
+                        avatarUrl={user.avatarUrl ?? null}
+                    />
                 )}
             </SidebarHeader>
 
@@ -61,7 +62,6 @@ export async function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <SidebarRail />
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton

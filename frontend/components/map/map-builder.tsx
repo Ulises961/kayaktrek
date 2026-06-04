@@ -144,7 +144,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
           avgSpeedKnots={avgSpeedKnots}
           onAvgSpeedKnotsChange={handleAvgSpeedChange}
         />
-        <div className="absolute inset-0 top-12">
+        <div className="absolute inset-0 top-[88px] md:top-12">
           <MapCore
             points={orderedPoints}
             days={allDaysForMap}

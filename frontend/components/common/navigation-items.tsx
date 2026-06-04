@@ -4,11 +4,12 @@ import { LifeBuoyIcon, MapPinIcon, NewspaperIcon, MailIcon } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { GlobeAmericasIcon } from "../icons/heroicons-globe-americas";
 import { UserGroupIcon } from "../icons/heroicons-user-group";
-import { SidebarMenuItem, SidebarMenuButton } from "../ui/sidebar";
+import { SidebarMenuItem, SidebarMenuButton, useSidebar } from "../ui/sidebar";
 
 export function NavigationItems() {
     const pathname = usePathname() || "";
     const router = useRouter();
+    const { isMobile, setOpenMobile } = useSidebar();
 
     const menuItems = [
         { title: "Trips", url: "/trips", icon: GlobeAmericasIcon },
@@ -24,7 +25,7 @@ export function NavigationItems() {
             {menuItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                        onClick={() => router.push(item.url)}
+                        onClick={() => { router.push(item.url); if (isMobile) setOpenMobile(false); }}
                         isActive={pathname === item.url}
                         className={clsx(
                             "xl:h-10 xl:[&>svg]:size-5 2xl:h-11 2xl:[&>svg]:size-6 3xl:h-12 3xl:[&>svg]:size-7",

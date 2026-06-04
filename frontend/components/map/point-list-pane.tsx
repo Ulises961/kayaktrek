@@ -1,6 +1,6 @@
 "use client"
 import { useState, useCallback, Fragment } from "react"
-import { PlusIcon, Trash2Icon } from "lucide-react"
+import { PlusIcon, Trash2Icon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
@@ -66,6 +66,9 @@ export function PointListPane() {
   } = useMapBuilder()
 
   const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(new Map())
+  const [collapsed, setCollapsed] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768
+  )
 
   const dayNumberById = new Map(state.days.map((d) => [d.id, d.dayNumber]))
   dayNumberById.set(day0Id ?? "", 0)
@@ -227,10 +230,43 @@ export function PointListPane() {
 
   // ── render ────────────────────────────────────────────────────────────────
 
+  if (collapsed) {
+    return (
+      <div className="absolute right-0 top-0 bottom-0 w-10 z-[1001] bg-background/95 border-l border-border flex flex-col items-center overflow-hidden">
+        <div className="flex items-center justify-center px-0 py-2 border-b border-border shrink-0 w-full">
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            aria-label="Expand points panel"
+            className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <PanelRightOpenIcon className="size-4" />
+          </button>
+        </div>
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <span
+            className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest select-none"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+          >
+            Points
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="absolute right-0 top-0 bottom-0 w-64 z-[1001] bg-background/95 border-l border-border flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          aria-label="Collapse panel"
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          <PanelRightCloseIcon className="size-4" />
+        </button>
         {draftSlices ? (
           <>
             <button
