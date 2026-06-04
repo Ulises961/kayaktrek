@@ -54,22 +54,6 @@ export function MapTopBar({
     </span>
   )
 
-  const speedInput = (size: "sm" | "base") => (
-    <input
-      type="number"
-      min={1.0}
-      max={6.0}
-      step={0.1}
-      value={avgSpeedKnots}
-      aria-label="Average speed in knots"
-      onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
-      className={cn(
-        "rounded border border-border bg-background px-1.5 py-0.5 text-foreground focus:outline-none",
-        size === "sm" ? "w-11 text-xs" : "w-14 text-xs"
-      )}
-    />
-  )
-
   return (
     <div className="absolute top-0 left-0 right-0 z-[1001] flex flex-col bg-background/90 backdrop-blur-sm border-b border-border">
       {/* ── Row 1: always visible ── */}
@@ -86,35 +70,55 @@ export function MapTopBar({
 
         <div className="flex-1" />
 
-        {/* Desktop stats strip */}
-        <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground shrink-0">
+        {/* Desktop stats strip — hidden on mobile */}
+        <div
+          data-testid="stats-strip"
+          className="hidden md:flex items-center gap-4 text-sm text-muted-foreground shrink-0"
+        >
           <span className="flex items-center gap-1.5">
             <span>{displayDistance}</span>
             {unitToggle}
           </span>
           <label className="flex items-center gap-1.5 shrink-0">
             <span>Avg speed</span>
-            {speedInput("base")}
+            <input
+              type="number"
+              min={1.0}
+              max={6.0}
+              step={0.1}
+              value={avgSpeedKnots}
+              aria-label="Average speed in knots"
+              onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
+              className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none"
+            />
             <span>kn</span>
           </label>
           <span>{dayCount} {dayCount === 1 ? "day" : "days"}</span>
-          <span className="text-xs">{isSaving ? "Saving…" : "All changes saved"}</span>
         </div>
 
-        {/* Mobile saving indicator */}
-        <span className="md:hidden text-xs text-muted-foreground shrink-0">
-          {isSaving ? "Saving…" : "Saved"}
-        </span>
+        {/* Saving indicator — rendered once, visible on both viewports */}
+        {isSaving && (
+          <span className="text-xs text-muted-foreground shrink-0">Saving…</span>
+        )}
       </div>
 
-      {/* ── Row 2: mobile only stats ── */}
+      {/* ── Row 2: mobile-only compact stats ── */}
       <div className="flex md:hidden items-center gap-3 px-3 h-10 text-xs text-muted-foreground border-t border-border/50">
         <span className="flex items-center gap-1.5 shrink-0">
           <span>{displayDistance}</span>
           {unitToggle}
         </span>
         <label className="flex items-center gap-1 shrink-0">
-          {speedInput("sm")}
+          <input
+            type="number"
+            min={1.0}
+            max={6.0}
+            step={0.1}
+            value={avgSpeedKnots}
+            aria-label="Average speed in knots"
+            onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
+            className="w-11 rounded border border-border bg-background px-1 py-0.5 text-xs text-foreground focus:outline-none"
+          />
           <span>kn</span>
         </label>
         <span className="shrink-0">{dayCount} {dayCount === 1 ? "day" : "days"}</span>
