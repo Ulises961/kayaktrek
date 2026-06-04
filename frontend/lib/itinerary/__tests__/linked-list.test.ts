@@ -85,4 +85,34 @@ describe("walkList", () => {
     ]
     expect(walkList(pts).length).toBe(2)
   })
+
+  it("includes orphaned chains — all disconnected heads are walked in UUID order", () => {
+    const PA = "01900000-0000-7000-8000-000000000001"
+    const PB = "01900000-0000-7000-8000-000000000002"
+    const PC = "01900000-0000-7000-8000-000000000003"
+    // Main chain: PA → PB.  Orphan: PC (no next, nobody points to it).
+    const pts: Point[] = [
+      { id: PC, type: "position" },
+      { id: PA, type: "stop", nextId: PB },
+      { id: PB, type: "stop" },
+    ]
+    const result = walkList(pts)
+    expect(result.map((p) => p.id)).toEqual([PA, PB, PC])
+  })
+
+  it("walks two separate chains in UUID order", () => {
+    const PA = "01900000-0000-7000-8000-000000000001"
+    const PB = "01900000-0000-7000-8000-000000000002"
+    const PC = "01900000-0000-7000-8000-000000000003"
+    const PD = "01900000-0000-7000-8000-000000000004"
+    // Chain 1: PA → PB.  Chain 2: PC → PD.  No link between them.
+    const pts: Point[] = [
+      { id: PC, type: "position", nextId: PD },
+      { id: PA, type: "stop", nextId: PB },
+      { id: PD, type: "stop" },
+      { id: PB, type: "stop" },
+    ]
+    const result = walkList(pts)
+    expect(result.map((p) => p.id)).toEqual([PA, PB, PC, PD])
+  })
 })

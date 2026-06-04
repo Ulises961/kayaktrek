@@ -1,5 +1,8 @@
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Resources.point_resource import POINT_ENDPOINT
+from Services.itinerary_service import ItineraryService
 import json
+import types
 from datetime import date
 
 
@@ -55,3 +58,144 @@ def test_remove_days_from_itinerary(client, auth_headers, itinerary):
 def test_delete_itinerary(client, auth_headers, itinerary):
     response = client.delete(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers)
     assert response.status_code == 200
+
+
+def test_apply_boundaries_clears_empty_day(client, auth_headers, itinerary):
+    """Days omitted from the payload have their boundary FKs cleared to null."""
+    full = client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers).json
+    days_by_number = {d['dayNumber']: d for d in full['days']}
+    day0_id = days_by_number[0]['id']
+    day1_id = days_by_number[1]['id']
+    day2_id = days_by_number[2]['id']
+
+    p1 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                     json={"dayId": day0_id, "type": "stop"}).json
+    p2 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                     json={"dayId": day0_id, "type": "stop"}).json
+
+    # First apply: give day 2 stale boundaries so we can verify they are cleared.
+    pre = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary['id']}/apply-boundaries",
+        headers=auth_headers,
+        json={
+            "boundaries": [
+                {"dayId": day1_id, "startPointId": p1['id'], "endPointId": p1['id'], "date": None},
+                {"dayId": day2_id, "startPointId": p2['id'], "endPointId": p2['id'], "date": None},
+            ],
+            "points": [],
+        }
+    )
+    assert pre.status_code == 200
+
+    # Second apply: day 2 omitted — it is now empty.
+    resp = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary['id']}/apply-boundaries",
+        headers=auth_headers,
+        json={
+            "boundaries": [
+                {"dayId": day1_id, "startPointId": p1['id'], "endPointId": p2['id'], "date": None},
+            ],
+            "points": [],
+        }
+    )
+    assert resp.status_code == 200
+    result_days = {d['dayNumber']: d for d in resp.json['days']}
+    assert result_days[1]['startPointId'] == p1['id']
+    assert result_days[1]['endPointId'] == p2['id']
+    assert result_days[2]['startPointId'] is None
+    assert result_days[2]['endPointId'] is None
+
+
+def test_new_point_links_to_global_tail_after_apply(client, auth_headers, itinerary):
+    """Points created after apply_boundaries must link to the global chain tail.
+
+    apply_boundaries moves points from day 0 into numbered days.  The original
+    tail search is day-scoped, so the first point dropped after an apply finds no
+    tail in day 0 and becomes orphaned.  _walk_linked_list then can't reach it,
+    causing a 400 on the next apply.
+    """
+    full = client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers).json
+    days_by_number = {d['dayNumber']: d for d in full['days']}
+    day0_id = days_by_number[0]['id']
+    day1_id = days_by_number[1]['id']
+    day2_id = days_by_number[2]['id']
+
+    # Step 1: create a point and assign it to day 1.
+    p1 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                     json={"dayId": day0_id, "type": "stop"}).json
+    first_apply = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary['id']}/apply-boundaries",
+        headers=auth_headers,
+        json={
+            "boundaries": [
+                {"dayId": day1_id, "startPointId": p1['id'], "endPointId": p1['id'], "date": None},
+            ],
+            "points": [],
+        }
+    )
+    assert first_apply.status_code == 200
+
+    # Step 2: add a second point.  It goes to day 0 (staging).
+    # With the bug it is orphaned; with the fix it links after p1.
+    p2 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                     json={"dayId": day0_id, "type": "stop"}).json
+
+    # Step 3: apply again with p2 as day 2's endpoint — must not 400.
+    second_apply = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary['id']}/apply-boundaries",
+        headers=auth_headers,
+        json={
+            "boundaries": [
+                {"dayId": day1_id, "startPointId": p1['id'], "endPointId": p1['id'], "date": None},
+                {"dayId": day2_id, "startPointId": p1['id'], "endPointId": p2['id'], "date": None},
+            ],
+            "points": [],
+        }
+    )
+    assert second_apply.status_code == 200
+
+
+# --- Unit tests for _walk_linked_list ---
+
+def _make_point(id_: str, next_id: str | None = None) -> object:
+    p = types.SimpleNamespace()
+    p.id = id_
+    p.next_id = next_id
+    return p
+
+
+def test_walk_linked_list_single_chain():
+    P1 = "01900000-0000-7000-8000-000000000001"
+    P2 = "01900000-0000-7000-8000-000000000002"
+    P3 = "01900000-0000-7000-8000-000000000003"
+    points = [_make_point(P3), _make_point(P1, P2), _make_point(P2, P3)]
+    assert ItineraryService._walk_linked_list(points) == [P1, P2, P3]
+
+
+def test_walk_linked_list_includes_orphaned_chains():
+    """Orphaned points (disconnected heads) must appear in the output."""
+    P1 = "01900000-0000-7000-8000-000000000001"
+    P2 = "01900000-0000-7000-8000-000000000002"
+    P3 = "01900000-0000-7000-8000-000000000003"
+    # Main chain: P1 → P2.  Orphan: P3 (no next, nobody references it).
+    points = [_make_point(P3), _make_point(P1, P2), _make_point(P2)]
+    result = ItineraryService._walk_linked_list(points)
+    assert set(result) == {P1, P2, P3}
+    # Main chain order preserved
+    assert result.index(P1) < result.index(P2)
+    # Orphan appended after (higher UUID = later creation)
+    assert result[-1] == P3
+
+
+def test_walk_linked_list_empty():
+    assert ItineraryService._walk_linked_list([]) == []
+
+
+def test_walk_linked_list_no_cycle():
+    """Cyclic chains must not cause an infinite loop."""
+    P1 = "01900000-0000-7000-8000-000000000001"
+    P2 = "01900000-0000-7000-8000-000000000002"
+    # P1 → P2 → P1 (cycle, no real head; falls back to empty list)
+    points = [_make_point(P1, P2), _make_point(P2, P1)]
+    result = ItineraryService._walk_linked_list(points)
+    assert len(result) == 0  # no heads → empty

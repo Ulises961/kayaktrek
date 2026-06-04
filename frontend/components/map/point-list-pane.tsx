@@ -1,23 +1,62 @@
 "use client"
 import { useState, useCallback, Fragment } from "react"
-import { PlusIcon, SlashIcon, Trash2Icon } from "lucide-react"
+import { PlusIcon, Trash2Icon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { initDraftBoundaries, computeBoundaryApplyPayload } from "@/lib/itinerary/boundaries"
+import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
-import { createDay, deleteDay, updateDay, updatePoint, deletePoint, applyBoundaries } from "@/lib/itinerary/actions"
+import { createDay, deleteDay, updatePoint, deletePoint, applyBoundaries } from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { PointType } from "@/lib/dtos/point"
+
+// ─── render list ─────────────────────────────────────────────────────────────
+
+type RenderItem =
+  | { kind: "point"; id: string; rowIdx: number }
+  | { kind: "divider"; slice: DaySlice; sliceIdx: number }
+
+function buildRenderList(pointOrder: string[], slices: DaySlice[] | null): RenderItem[] {
+  const items: RenderItem[] = []
+
+  // Index of the next non-last slice whose divider we need to emit.
+  let pendingSliceIdx = 0
+
+  for (let rowIdx = 0; rowIdx < pointOrder.length; rowIdx++) {
+    items.push({ kind: "point", id: pointOrder[rowIdx], rowIdx })
+
+    // After this row, emit all non-last dividers whose day ends here.
+    while (
+      slices &&
+      pendingSliceIdx < slices.length - 1 &&
+      slices[pendingSliceIdx].endIdx === rowIdx
+    ) {
+      items.push({ kind: "divider", slice: slices[pendingSliceIdx], sliceIdx: pendingSliceIdx })
+      pendingSliceIdx++
+    }
+  }
+
+  // Emit any remaining non-last dividers (days whose endIdx is past all points — empty trailing days).
+  if (slices) {
+    while (pendingSliceIdx < slices.length - 1) {
+      items.push({ kind: "divider", slice: slices[pendingSliceIdx], sliceIdx: pendingSliceIdx })
+      pendingSliceIdx++
+    }
+  }
+
+  return items
+}
+
+// ─── component ───────────────────────────────────────────────────────────────
 
 export function PointListPane() {
   const {
     state,
     dispatch,
-    draftBoundaries,
-    setDraftBoundaries,
+    draftSlices,
+    setDraftSlices,
     distanceUnit,
     avgSpeedKnots,
     itineraryId,
@@ -28,41 +67,26 @@ export function PointListPane() {
 
   const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(new Map())
 
-  // Build a map from dayId → dayNumber for color lookups.
   const dayNumberById = new Map(state.days.map((d) => [d.id, d.dayNumber]))
   dayNumberById.set(day0Id ?? "", 0)
 
-  // Build boundary point IDs set (for locking type selector).
   const boundaryIds = new Set<string>()
   for (const day of state.days) {
     if (day.startPointId) boundaryIds.add(day.startPointId)
     if (day.endPointId) boundaryIds.add(day.endPointId)
   }
 
-  // ── draft boundary positions (for divider insertion) ──────────────────────
+  const renderList = buildRenderList(state.pointOrder, draftSlices)
 
-  // Map from endPointIdx → draft boundary entry.
-  // When two boundaries share the same endPointIdx (empty trailing day), the
-  // earlier day's boundary must win so its divider is rendered (the last
-  // boundary's divider is always suppressed by showDivider anyway).
-  const draftByEndIdx = draftBoundaries
-    ? new Map(
-        [...draftBoundaries]
-          .sort((a, b) => b.dayNumber - a.dayNumber)
-          .map((b) => [b.endPointIdx, b])
-      )
-    : null
-
-  // Compute per-day total distance for BoundaryDivider.
-  function getDayDistance(boundary: DraftBoundary, idx: number): number {
-    if (!draftBoundaries) return 0
-    const startIdx = idx === 0 ? 0 : draftBoundaries[idx - 1].endPointIdx + 1
-    const endIdx = boundary.endPointIdx
-    const dayPointIds = state.pointOrder.slice(startIdx, endIdx + 1)
-    const dayPoints = dayPointIds
+  function getSliceDistance(slice: DaySlice): number {
+    const ownedStart = slice.startIdx  // includes the shared boundary stop
+    const ownedEnd = slice.endIdx
+    if (ownedStart > ownedEnd) return 0
+    const ids = state.pointOrder.slice(ownedStart, ownedEnd + 1)
+    const pts = ids
       .map((id) => state.points.find((p) => p.id === id))
       .filter((p): p is NonNullable<typeof p> => p !== undefined && p.latitude != null && p.longitude != null) as Array<{ latitude: number; longitude: number }>
-    return totalDistanceNm(dayPoints)
+    return totalDistanceNm(pts)
   }
 
   // ── handlers ─────────────────────────────────────────────────────────────
@@ -72,7 +96,7 @@ export function PointListPane() {
   }, [activePointId, setActivePointId])
 
   const handleTypeChange = useCallback(async (pointId: string, type: PointType) => {
-    if (draftBoundaries) {
+    if (draftSlices) {
       setDirtyPoints((prev) => {
         const next = new Map(prev)
         next.set(pointId, { ...next.get(pointId), type })
@@ -84,10 +108,10 @@ export function PointListPane() {
     dispatch({ type: "SAVING_START" })
     await updatePoint(pointId, { type })
     dispatch({ type: "SAVING_END" })
-  }, [draftBoundaries, dispatch])
+  }, [draftSlices, dispatch])
 
   const handleNameChange = useCallback((pointId: string, name: string) => {
-    if (draftBoundaries) {
+    if (draftSlices) {
       setDirtyPoints((prev) => {
         const next = new Map(prev)
         next.set(pointId, { ...next.get(pointId), name })
@@ -96,7 +120,7 @@ export function PointListPane() {
       return
     }
     dispatch({ type: "SET_PENDING_NAME", name })
-  }, [draftBoundaries, dispatch])
+  }, [draftSlices, dispatch])
 
   const handleDelete = useCallback(async (pointId: string) => {
     setActivePointId(null)
@@ -106,26 +130,30 @@ export function PointListPane() {
     dispatch({ type: "SAVING_END" })
   }, [dispatch, setActivePointId])
 
-  const handleBoundaryMove = useCallback((dayId: string, newEndPointIdx: number) => {
-    if (!draftBoundaries) return
-    const sorted = [...draftBoundaries].sort((a, b) => a.dayNumber - b.dayNumber)
-    const i = sorted.findIndex((b) => b.dayId === dayId)
+  const handleBoundaryMove = useCallback((dayId: string, newEndIdx: number) => {
+    if (!draftSlices) return
+    const i = draftSlices.findIndex((s) => s.dayId === dayId)
     if (i === -1) return
 
-    const minIdx = i > 0 ? sorted[i - 1].endPointIdx + 1 : 0
-    const maxIdx = i < sorted.length - 1
-      ? sorted[i + 1].endPointIdx
-      : state.pointOrder.length - 1
+    const M = state.pointOrder.length
+    const minEndIdx = i > 0 ? draftSlices[i - 1].endIdx : 0
+    const maxEndIdx = i < draftSlices.length - 1 ? draftSlices[i + 1].endIdx : M - 1
+    if (minEndIdx > maxEndIdx) return
 
-    if (minIdx > maxIdx) return
-    const clamped = Math.max(minIdx, Math.min(maxIdx, newEndPointIdx))
-    setDraftBoundaries(draftBoundaries.map((b) => b.dayId === dayId ? { ...b, endPointIdx: clamped } : b))
-  }, [draftBoundaries, setDraftBoundaries, state.pointOrder.length])
+    const clamped = Math.max(minEndIdx, Math.min(maxEndIdx, newEndIdx))
+
+    setDraftSlices(draftSlices.map((s, idx) => {
+      if (idx === i) return { ...s, endIdx: clamped }
+      // The next slice's startIdx is always the shared boundary stop from this slice.
+      if (idx === i + 1) return { ...s, startIdx: clamped }
+      return s
+    }))
+  }, [draftSlices, setDraftSlices, state.pointOrder.length])
 
   const handleEditBoundaries = useCallback(() => {
-    const draft = initDraftBoundaries(state.days, state.pointOrder)
-    setDraftBoundaries(draft)
-  }, [state.days, state.pointOrder, setDraftBoundaries])
+    const slices = initDaySlices(state.days, state.pointOrder)
+    setDraftSlices(slices)
+  }, [state.days, state.pointOrder, setDraftSlices])
 
   const handleAddDay = useCallback(async () => {
     if (!itineraryId) return
@@ -135,15 +163,14 @@ export function PointListPane() {
     dispatch({ type: "SAVING_END" })
     if (!result.success) return
     dispatch({ type: "DAY_ADD", day: result.day })
-    const draft = initDraftBoundaries([...state.days, result.day], state.pointOrder)
-    setDraftBoundaries(draft)
-  }, [itineraryId, state.days, state.pointOrder, dispatch, setDraftBoundaries])
+    setDraftSlices(initDaySlices([...state.days, result.day], state.pointOrder))
+  }, [itineraryId, state.days, state.pointOrder, dispatch, setDraftSlices])
 
   const handleApply = useCallback(async () => {
-    if (!draftBoundaries || !day0Id) return
+    if (!draftSlices || !day0Id) return
     const snapshot = state
 
-    const base = computeBoundaryApplyPayload(draftBoundaries, state)
+    const base = computeSlicesApplyPayload(draftSlices, state)
     const pointMap = new Map(base.points.map((p) => [p.id, p]))
     for (const [id, fields] of dirtyPoints.entries()) {
       const resolvedType = (fields.type ?? state.points.find((p) => p.id === id)?.type ?? "position") as PointType
@@ -161,9 +188,9 @@ export function PointListPane() {
       ...(fields.name !== undefined ? { name: fields.name } : {}),
     }))
 
-    dispatch({ type: "BOUNDARIES_APPLY", boundaries: draftBoundaries, pointUpdates, day0Id })
+    dispatch({ type: "BOUNDARIES_APPLY", slices: draftSlices, pointUpdates, day0Id })
     setDirtyPoints(new Map())
-    setDraftBoundaries(null)
+    setDraftSlices(null)
 
     dispatch({ type: "SAVING_START" })
     const result = await applyBoundaries(itineraryId, payload)
@@ -176,17 +203,17 @@ export function PointListPane() {
     } else {
       dispatch({ type: "STATE_REPLACE", state: snapshot })
     }
-  }, [draftBoundaries, day0Id, state, dirtyPoints, dispatch, setDraftBoundaries, itineraryId])
+  }, [draftSlices, day0Id, state, dirtyPoints, dispatch, setDraftSlices, itineraryId])
 
   const handleCancel = useCallback(() => {
     setDirtyPoints(new Map())
-    setDraftBoundaries(null)
-  }, [setDraftBoundaries])
+    setDraftSlices(null)
+  }, [setDraftSlices])
 
   const handleDateChange = useCallback((dayId: string, date: string | null) => {
-    if (!draftBoundaries) return
-    setDraftBoundaries(draftBoundaries.map((b) => b.dayId === dayId ? { ...b, date } : b))
-  }, [draftBoundaries, setDraftBoundaries])
+    if (!draftSlices) return
+    setDraftSlices(draftSlices.map((s) => s.dayId === dayId ? { ...s, date } : s))
+  }, [draftSlices, setDraftSlices])
 
   const handleDeleteDay = useCallback(async () => {
     if (!state.days.length || !day0Id) return
@@ -204,7 +231,7 @@ export function PointListPane() {
     <div className="absolute right-0 top-0 bottom-0 w-64 z-[1001] bg-background/95 border-l border-border flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-        {draftBoundaries ? (
+        {draftSlices ? (
           <>
             <button
               type="button"
@@ -261,9 +288,9 @@ export function PointListPane() {
 
       {/* Point list */}
       <div className="flex-1 overflow-y-auto" data-point-list="true">
-        {/* Static Day 1 header — non-draggable, shows date and day 1 distance */}
-        {draftBoundaries && draftBoundaries.length > 0 && (() => {
-          const b1 = draftBoundaries[0]
+        {/* Static Day 1 header */}
+        {draftSlices && draftSlices.length > 0 && (() => {
+          const s0 = draftSlices[0]
           return (
             <div
               data-testid="day-1-header"
@@ -273,41 +300,33 @@ export function PointListPane() {
               <span className="text-muted-foreground">·</span>
               <input
                 type="date"
-                value={b1.date ?? ""}
+                value={s0.date ?? ""}
                 placeholder="No date"
-                onChange={(e) => handleDateChange(b1.dayId, e.target.value || null)}
+                onChange={(e) => handleDateChange(s0.dayId, e.target.value || null)}
                 className="text-xs text-muted-foreground bg-transparent border-none outline-none cursor-pointer w-[6.5rem]"
               />
               <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground">{legLabel(getDayDistance(b1, 0), avgSpeedKnots, distanceUnit)}</span>
+              <span className="text-muted-foreground">{legLabel(getSliceDistance(s0), avgSpeedKnots, distanceUnit)}</span>
             </div>
           )
         })()}
-        {state.pointOrder.map((id, rowIdx) => {
-          const point = state.points.find((p) => p.id === id)
-          if (!point) return null
 
-          const dayNum = dayNumberById.get(point.dayId ?? "") ?? 0
-          const dayColor = getDayColor(dayNum)
-          const isBoundary = !!point.id && boundaryIds.has(point.id)
-          const isExpanded = activePointId === id || state.pendingPointId === id
+        {renderList.map((item) => {
+          if (item.kind === "point") {
+            const { id, rowIdx } = item
+            const point = state.points.find((p) => p.id === id)
+            if (!point) return null
 
-          // In boundary-edit mode, apply dirty type/name overrides for visual feedback
-          // without touching state.points (dirty changes are staged until Apply).
-          const dirtyFields = draftBoundaries ? dirtyPoints.get(id) : undefined
-          const displayPoint = dirtyFields ? { ...point, ...dirtyFields } : point
+            const dayNum = dayNumberById.get(point.dayId ?? "") ?? 0
+            const dayColor = getDayColor(dayNum)
+            const isBoundary = !!point.id && boundaryIds.has(point.id)
+            const isExpanded = activePointId === id || state.pendingPointId === id
 
-          const divider = draftByEndIdx?.get(rowIdx)
-          const dividerIdx = divider ? draftBoundaries!.indexOf(divider) : -1
-          // Skip the last boundary — the final day has no following day to label.
-          const showDivider = divider && dividerIdx < draftBoundaries!.length - 1
-          const labelDate = showDivider
-            ? (draftBoundaries![dividerIdx + 1]?.date ?? null)
-            : null
+            const dirtyFields = draftSlices ? dirtyPoints.get(id) : undefined
+            const displayPoint = dirtyFields ? { ...point, ...dirtyFields } : point
 
-          return (
-            <Fragment key={id}>
-              <div data-point-idx={rowIdx}>
+            return (
+              <div key={id} data-point-idx={rowIdx}>
                 <PointRow
                   point={displayPoint}
                   index={rowIdx + 1}
@@ -320,21 +339,24 @@ export function PointListPane() {
                   onDelete={point.id ? () => handleDelete(point.id!) : undefined}
                 />
               </div>
-              {showDivider && (
-                <BoundaryDivider
-                  boundary={divider!}
-                  totalDistanceNm={getDayDistance(divider!, dividerIdx)}
-                  distanceUnit={distanceUnit}
-                  avgSpeedKnots={avgSpeedKnots}
-                  labelDayNumber={divider!.dayNumber + 1}
-                  labelDate={labelDate}
-                  onDateChange={(date) => {
-                    const nextBoundary = draftBoundaries![dividerIdx + 1]
-                    if (nextBoundary) handleDateChange(nextBoundary.dayId, date)
-                  }}
-                  onBoundaryMove={(newIdx) => handleBoundaryMove(divider!.dayId, newIdx)}
-                />
-              )}
+            )
+          }
+
+          // kind === "divider"
+          const { slice, sliceIdx } = item
+          const nextSlice = draftSlices![sliceIdx + 1]
+          return (
+            <Fragment key={`divider-${slice.dayId}`}>
+              <BoundaryDivider
+                boundary={slice}
+                totalDistanceNm={getSliceDistance(slice)}
+                distanceUnit={distanceUnit}
+                avgSpeedKnots={avgSpeedKnots}
+                labelDayNumber={slice.dayNumber + 1}
+                labelDate={nextSlice?.date ?? null}
+                onDateChange={(date) => nextSlice && handleDateChange(nextSlice.dayId, date)}
+                onBoundaryMove={(newEndIdx) => handleBoundaryMove(slice.dayId, newEndIdx)}
+              />
             </Fragment>
           )
         })}

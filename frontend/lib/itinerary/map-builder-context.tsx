@@ -3,15 +3,15 @@
 import { createContext, useContext } from "react"
 import type { Dispatch } from "react"
 import type { MapState, MapAction } from "./map-reducer"
-import type { DraftBoundary } from "./boundaries"
+import type { DaySlice } from "./boundaries"
 
-export type { DraftBoundary }
+export type { DaySlice }
 
 export type MapBuilderContextValue = {
   state: MapState
   dispatch: Dispatch<MapAction>
-  draftBoundaries: DraftBoundary[] | null
-  setDraftBoundaries: (b: DraftBoundary[] | null) => void
+  draftSlices: DaySlice[] | null
+  setDraftSlices: (s: DaySlice[] | null) => void
   tripId: string | null
   itineraryId: string
   distanceUnit: "nm" | "km"

@@ -234,6 +234,24 @@ class ItineraryService:
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
 
         all_points: List[Point] = [p for day in itinerary.days for p in day.points]
+        # Also collect points whose day was deleted (day_id = NULL) by chasing
+        # next_id chains forward from the known set.
+        known_ids: Set[str] = {str(p.id) for p in all_points}
+        to_chase: Set[str] = {
+            str(p.next_id) for p in all_points
+            if p.next_id and str(p.next_id) not in known_ids
+        }
+        while to_chase:
+            extra: List[Point] = db.session.query(Point).filter(
+                Point.id.in_([UUID(pid) for pid in to_chase])
+            ).all()
+            all_points.extend(extra)
+            for p in extra:
+                known_ids.add(str(p.id))
+            to_chase = {
+                str(p.next_id) for p in extra
+                if p.next_id and str(p.next_id) not in known_ids
+            }
         point_map: Dict[str, Point] = {str(p.id): p for p in all_points}
 
         point_order = ItineraryService._walk_linked_list(all_points)
@@ -283,6 +301,15 @@ class ItineraryService:
 
             new_boundary_ids.add(start_pid)
             new_boundary_ids.add(end_pid)
+
+        # Days absent from the payload are now empty — clear their boundary FKs.
+        received_day_ids = {str(b["dayId"]) for b in boundaries}
+        for day_id_str, day in day_map.items():
+            if day.day_number == 0:
+                continue
+            if day_id_str not in received_day_ids:
+                day.start_point_id = None
+                day.end_point_id = None
 
         update_map: Dict[str, dict] = {str(u["id"]): u for u in point_updates}
 
@@ -439,20 +466,23 @@ class ItineraryService:
 
     @staticmethod
     def _walk_linked_list(points: List[Point]) -> List[str]:
-        """Return point IDs in linked-list order, head first.
+        """Return point IDs in linked-list order, walking all disconnected chains.
 
-        The head is the point not referenced as next_id by any other point.
+        UUID v7 IDs sort lexicographically by creation time, so sorting heads by
+        str(id) gives a stable, deterministic order for orphaned chains.
         """
         referenced: Set[str] = {str(p.next_id) for p in points if p.next_id}
         heads = [p for p in points if str(p.id) not in referenced]
         if not heads:
             return []
+        heads.sort(key=lambda p: str(p.id))
         point_map: Dict[str, Point] = {str(p.id): p for p in points}
         order: List[str] = []
         visited: Set[str] = set()
-        current: Optional[Point] = heads[0]
-        while current and str(current.id) not in visited:
-            visited.add(str(current.id))
-            order.append(str(current.id))
-            current = point_map.get(str(current.next_id)) if current.next_id else None
+        for head in heads:
+            current: Optional[Point] = head
+            while current and str(current.id) not in visited:
+                visited.add(str(current.id))
+                order.append(str(current.id))
+                current = point_map.get(str(current.next_id)) if current.next_id else None
         return order

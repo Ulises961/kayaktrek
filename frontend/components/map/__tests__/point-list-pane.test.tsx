@@ -5,7 +5,7 @@ import { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context"
 import type { MapState } from "@/lib/itinerary/map-reducer"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 
@@ -22,8 +22,7 @@ vi.mock("@/lib/itinerary/boundaries", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/itinerary/boundaries")>()
   return {
     ...actual,
-    initDraftBoundaries: vi.fn(actual.initDraftBoundaries),
-    applyDraftToPreviewDays: vi.fn(actual.applyDraftToPreviewDays),
+    initDaySlices: vi.fn(actual.initDaySlices),
   }
 })
 
@@ -57,8 +56,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
   return {
     state,
     dispatch: vi.fn(),
-    draftBoundaries: null,
-    setDraftBoundaries: vi.fn(),
+    draftSlices: null,
+    setDraftSlices: vi.fn(),
     tripId: null,
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
@@ -80,7 +79,9 @@ function renderWithCtx(ctx: MapBuilderContextValue) {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe("PointListPane — drop mode (no draftBoundaries)", () => {
+// ─── drop mode ───────────────────────────────────────────────────────────────
+
+describe("PointListPane — drop mode (no draftSlices)", () => {
   it("renders a row for each point in pointOrder", () => {
     renderWithCtx(makeCtx())
     expect(screen.getAllByTestId("point-row")).toHaveLength(3)
@@ -115,63 +116,64 @@ describe("PointListPane — drop mode (no draftBoundaries)", () => {
   it("auto-expands the pending point row", () => {
     const ctx = makeCtx({ state: { points: [pt("p1"), pt("p2"), pt("p3")], pointOrder: ["p1", "p2", "p3"], pendingPointId: "p2", pendingPointName: null, savingCount: 0, days: [] } })
     renderWithCtx(ctx)
-    // The expanded row shows the type selector — presence of "Stop" chip confirms expansion
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument()
   })
 })
 
-describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () => {
-  const draft: DraftBoundary[] = [
-    { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: null },
+// ─── boundary-edit mode ───────────────────────────────────────────────────────
+
+describe("PointListPane — boundary-edit mode (draftSlices non-null)", () => {
+  const draft: DaySlice[] = [
+    { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
   ]
 
-  it("shows 'Apply' and 'Cancel' buttons when draftBoundaries is non-null", () => {
-    const ctx = makeCtx({ draftBoundaries: draft })
+  it("shows 'Apply' and 'Cancel' buttons when draftSlices is non-null", () => {
+    const ctx = makeCtx({ draftSlices: draft })
     renderWithCtx(ctx)
     expect(screen.getByRole("button", { name: /apply/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument()
   })
 
   it("does not show 'Edit boundaries' or 'Add day' in boundary-edit mode", () => {
-    const ctx = makeCtx({ draftBoundaries: draft })
+    const ctx = makeCtx({ draftSlices: draft })
     renderWithCtx(ctx)
     expect(screen.queryByRole("button", { name: /edit boundaries/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /add day/i })).not.toBeInTheDocument()
   })
 
-  it("renders N-1 BoundaryDividers for N draft entries (last boundary has no following day)", () => {
-    // 2 draft entries (Day1 + Day2) → 1 divider shown (between Day1 and Day2)
-    const draft2: DraftBoundary[] = [
-      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: null },
-      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+  it("renders N-1 BoundaryDividers for N slices (last slice has no following day)", () => {
+    // 2 slices (Day1 + Day2) → 1 divider shown (between Day1 and Day2)
+    const draft2: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
     ]
-    const ctx = makeCtx({ draftBoundaries: draft2 })
+    const ctx = makeCtx({ draftSlices: draft2 })
     renderWithCtx(ctx)
     expect(screen.getAllByTestId("boundary-drag-handle")).toHaveLength(1)
   })
 
-  it("clicking Cancel calls setDraftBoundaries(null)", async () => {
-    const setDraftBoundaries = vi.fn()
-    const ctx = makeCtx({ draftBoundaries: draft, setDraftBoundaries })
+  it("clicking Cancel calls setDraftSlices(null)", async () => {
+    const setDraftSlices = vi.fn()
+    const ctx = makeCtx({ draftSlices: draft, setDraftSlices })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
-    expect(setDraftBoundaries).toHaveBeenCalledWith(null)
+    expect(setDraftSlices).toHaveBeenCalledWith(null)
   })
 
   it("clicking Apply dispatches BOUNDARIES_APPLY optimistically then calls applyBoundaries", async () => {
-    const setDraftBoundaries = vi.fn()
+    const setDraftSlices = vi.fn()
     const dispatch = vi.fn()
-    const ctx = makeCtx({ draftBoundaries: draft, setDraftBoundaries, dispatch })
+    const ctx = makeCtx({ draftSlices: draft, setDraftSlices, dispatch })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /apply/i }))
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "BOUNDARIES_APPLY" }))
     expect(actions.applyBoundaries).toHaveBeenCalledWith(ITIN_ID, expect.any(Object))
-    expect(setDraftBoundaries).toHaveBeenCalledWith(null)
+    expect(setDraftSlices).toHaveBeenCalledWith(null)
   })
 
   it("on success dispatches STATE_REPLACE with server state", async () => {
     const dispatch = vi.fn()
-    const ctx = makeCtx({ draftBoundaries: draft, dispatch })
+    const ctx = makeCtx({ draftSlices: draft, dispatch })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /apply/i }))
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "STATE_REPLACE" }))
@@ -180,7 +182,7 @@ describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () =
   it("on failure dispatches STATE_REPLACE with snapshot to rollback", async () => {
     vi.mocked(actions.applyBoundaries).mockResolvedValueOnce({ success: false, error: "Server error" })
     const dispatch = vi.fn()
-    const ctx = makeCtx({ draftBoundaries: draft, dispatch })
+    const ctx = makeCtx({ draftSlices: draft, dispatch })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /apply/i }))
     const stateReplaceCalls = dispatch.mock.calls
@@ -194,14 +196,16 @@ describe("PointListPane — boundary-edit mode (draftBoundaries non-null)", () =
   })
 })
 
+// ─── type change in boundary-edit mode ───────────────────────────────────────
+
 describe("PointListPane — type change in boundary-edit mode", () => {
-  const draft: DraftBoundary[] = [
-    { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 2, date: null },
+  const draft: DaySlice[] = [
+    { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
   ]
 
   it("type buttons reflect dirty selection immediately without dispatching POINT_UPDATE", async () => {
     const dispatch = vi.fn()
-    const ctx = makeCtx({ draftBoundaries: draft, activePointId: "p1", dispatch })
+    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1", dispatch })
     renderWithCtx(ctx)
 
     await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
@@ -213,7 +217,7 @@ describe("PointListPane — type change in boundary-edit mode", () => {
   })
 
   it("dirty type is included in apply payload on Apply click", async () => {
-    const ctx = makeCtx({ draftBoundaries: draft, activePointId: "p1" })
+    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1" })
     renderWithCtx(ctx)
 
     await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
@@ -229,6 +233,8 @@ describe("PointListPane — type change in boundary-edit mode", () => {
     )
   })
 })
+
+// ─── delete day ───────────────────────────────────────────────────────────────
 
 describe("PointListPane — delete day", () => {
   const stateWithDay = {
@@ -251,8 +257,8 @@ describe("PointListPane — delete day", () => {
   })
 
   it("does not show delete button in boundary-edit mode", () => {
-    const draft: DraftBoundary[] = [{ dayId: DAY1_ID, dayNumber: 1, endPointIdx: 2, date: null }]
-    renderWithCtx(makeCtx({ draftBoundaries: draft, state: stateWithDay }))
+    const draft: DaySlice[] = [{ dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
+    renderWithCtx(makeCtx({ draftSlices: draft, state: stateWithDay }))
     expect(screen.queryByRole("button", { name: /delete day/i })).not.toBeInTheDocument()
   })
 
@@ -275,31 +281,35 @@ describe("PointListPane — delete day", () => {
   })
 })
 
+// ─── Day 1 header ─────────────────────────────────────────────────────────────
+
 describe("PointListPane — Day 1 header in boundary-edit mode", () => {
   it("shows a Day 1 section header when in boundary-edit mode", () => {
-    const draft: DraftBoundary[] = [
-      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2026-07-01" },
-      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
     ]
-    renderWithCtx(makeCtx({ draftBoundaries: draft }))
+    renderWithCtx(makeCtx({ draftSlices: draft }))
     expect(screen.getByTestId("day-1-header")).toBeInTheDocument()
   })
 
-  it("shows Day 1 header with a date input pre-filled from the draft", () => {
-    const draft: DraftBoundary[] = [
-      { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2026-07-01" },
-      { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 2, date: null },
+  it("shows Day 1 header with a date input pre-filled from the slice", () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
     ]
-    renderWithCtx(makeCtx({ draftBoundaries: draft }))
+    renderWithCtx(makeCtx({ draftSlices: draft }))
     expect(screen.getByDisplayValue("2026-07-01")).toBeInTheDocument()
   })
 })
 
+// ─── Edit boundaries ──────────────────────────────────────────────────────────
+
 describe("PointListPane — Edit boundaries", () => {
-  it("clicking 'Edit boundaries' calls setDraftBoundaries with initDraftBoundaries result", async () => {
-    const setDraftBoundaries = vi.fn()
+  it("clicking 'Edit boundaries' calls setDraftSlices with initDaySlices result", async () => {
+    const setDraftSlices = vi.fn()
     const ctx = makeCtx({
-      setDraftBoundaries,
+      setDraftSlices,
       state: {
         points: [pt("p1", DAY1_ID)],
         pointOrder: ["p1"],
@@ -311,7 +321,7 @@ describe("PointListPane — Edit boundaries", () => {
     })
     renderWithCtx(ctx)
     await userEvent.click(screen.getByRole("button", { name: /edit boundaries/i }))
-    expect(boundaries.initDraftBoundaries).toHaveBeenCalled()
-    expect(setDraftBoundaries).toHaveBeenCalledWith(expect.any(Array))
+    expect(boundaries.initDaySlices).toHaveBeenCalled()
+    expect(setDraftSlices).toHaveBeenCalledWith(expect.any(Array))
   })
 })

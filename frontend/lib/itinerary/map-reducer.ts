@@ -1,6 +1,6 @@
 import type { Point, PointType } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
-import type { DraftBoundary } from "./boundaries"
+import type { DaySlice } from "./boundaries"
 import { walkList } from "./linked-list"
 
 export type MapState = {
@@ -30,7 +30,7 @@ export type MapAction =
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
   | { type: "DAY_REMOVE"; id: string; day0Id: string }
   | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[]; day0Id: string; startPointId: string | null }
-  | { type: "BOUNDARIES_APPLY"; boundaries: DraftBoundary[]; pointUpdates: { id: string; type: PointType; name?: string }[]; day0Id: string }
+  | { type: "BOUNDARIES_APPLY"; slices: DaySlice[]; pointUpdates: { id: string; type: PointType; name?: string }[]; day0Id: string }
   | { type: "STATE_REPLACE"; state: MapState }
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
@@ -130,47 +130,28 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
     }
 
     case "BOUNDARIES_APPLY": {
-      const { boundaries, pointUpdates, day0Id } = action
+      const { slices, pointUpdates, day0Id } = action
       const updateMap = new Map(pointUpdates.map((u) => [u.id, u]))
 
-      // Ownership semantics: the boundary stop (at endPointIdx) belongs to the
-      // day that ENDS there (day[i]), not the following day.  This keeps the
-      // last leg of each day in the same day's colour on the map.
-      //
-      // Day at index i owns:
-      //   i == 0: indices [0, endPointIdx[0]]          (boundary stop included)
-      //   i  > 0: indices [endPointIdx[i-1]+1, endPointIdx[i]]  (skip shared stop)
-
-      // Build the set of all boundary start and end point IDs for stop promotion.
-      // The last boundary always extends to the final point so trailing points
-      // are never left grey.
+      // Ownership: the boundary stop at slice.endIdx belongs to the day that ends
+      // there.  Day i+1 shares startIdx with Day i's endIdx, so we skip startIdx
+      // when assigning (except for the first day which starts at 0).
       const boundaryStopIds = new Set<string>()
-      boundaries.forEach((b, i) => {
-        const isLast = i === boundaries.length - 1
-        const effectiveEndIdx = isLast ? state.pointOrder.length - 1 : b.endPointIdx
-        const startIdx = i === 0 ? 0 : boundaries[i - 1].endPointIdx
-        const startId = state.pointOrder[startIdx]
-        const endId = state.pointOrder[effectiveEndIdx]
-        if (startId) boundaryStopIds.add(startId)
-        if (endId) boundaryStopIds.add(endId)
-      })
+      for (const slice of slices) {
+        if (slice.startIdx <= slice.endIdx) {
+          const startId = state.pointOrder[slice.startIdx]
+          const endId = state.pointOrder[slice.endIdx]
+          if (startId) boundaryStopIds.add(startId)
+          if (endId) boundaryStopIds.add(endId)
+        }
+      }
 
-      // Assign dayId to each point by walking boundaries in order.
       const pointDayMap = new Map<string, string>()
-      boundaries.forEach((b, i) => {
-        const isLast = i === boundaries.length - 1
-        const effectiveEndIdx = isLast ? state.pointOrder.length - 1 : b.endPointIdx
-        if (i === 0) {
-          for (let idx = 0; idx <= effectiveEndIdx; idx++) {
-            const id = state.pointOrder[idx]
-            if (id) pointDayMap.set(id, b.dayId)
-          }
-        } else {
-          const startIdx = boundaries[i - 1].endPointIdx + 1
-          for (let idx = startIdx; idx <= effectiveEndIdx; idx++) {
-            const id = state.pointOrder[idx]
-            if (id) pointDayMap.set(id, b.dayId)
-          }
+      slices.forEach((slice, i) => {
+        const ownedStart = i === 0 ? slice.startIdx : slice.startIdx + 1
+        for (let idx = ownedStart; idx <= slice.endIdx; idx++) {
+          const id = state.pointOrder[idx]
+          if (id) pointDayMap.set(id, slice.dayId)
         }
       })
 
@@ -194,22 +175,15 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         }
       })
 
-      // Update day boundaries from the new draft.
       const newDays = state.days.map((d) => {
-        const bEntry = boundaries.find((b) => b.dayId === d.id)
-        if (!bEntry) return d
-        const bIdx = boundaries.indexOf(bEntry)
-        const isLast = bIdx === boundaries.length - 1
-        const effectiveEndIdx = isLast ? state.pointOrder.length - 1 : bEntry.endPointIdx
-        // startPointId: index 0 for first day, previous endPointIdx for later days
-        const startIdx = bIdx === 0 ? 0 : boundaries[bIdx - 1].endPointIdx
-        const startPointId = state.pointOrder[startIdx] ?? d.startPointId
-        const endPointId = state.pointOrder[effectiveEndIdx] ?? d.endPointId
+        const slice = slices.find((s) => s.dayId === d.id)
+        if (!slice) return d
+        const isEmpty = slice.startIdx > slice.endIdx
         return {
           ...d,
-          startPointId,
-          endPointId,
-          ...(bEntry.date !== null ? { date: bEntry.date ?? undefined } : {}),
+          startPointId: isEmpty ? null : (state.pointOrder[slice.startIdx] ?? d.startPointId),
+          endPointId: isEmpty ? null : (state.pointOrder[slice.endIdx] ?? d.endPointId),
+          ...(slice.date !== null ? { date: slice.date ?? undefined } : {}),
         }
       })
 
@@ -233,21 +207,19 @@ export function initialMapState(points: Point[], days: Day[] = []): MapState {
   const pointOrder = ordered.map((p) => p.id!)
 
   // Reassign dayId for points that fall within a numbered day's [startPointId, endPointId] range.
-  // The DB stores all points under Day 0 (staging); numbered days record only boundary FKs.
   // The boundary stop (endPointId of day N = startPointId of day N+1) belongs to day N, so
-  // days after the first skip the first point in their range (already assigned to the prev day).
+  // days after the first skip startIdx (already assigned to the previous day).
+  // Points beyond any day's endPointId remain in Day 0 (unassigned) until the next apply.
   const reassigned = new Map<string, string>()
   const sortedDays = [...days].filter((d) => d.dayNumber > 0).sort((a, b) => a.dayNumber - b.dayNumber)
   for (let j = 0; j < sortedDays.length; j++) {
     const day = sortedDays[j]
-    if (!day.id || !day.startPointId) continue
+    if (!day.id || !day.startPointId || !day.endPointId) continue
     const startIdx = pointOrder.indexOf(day.startPointId)
-    const endIdx = day.endPointId ? pointOrder.indexOf(day.endPointId) : -1
-    if (startIdx === -1) continue
-    const isLastDay = j === sortedDays.length - 1
-    const stop = isLastDay ? pointOrder.length - 1 : (endIdx >= startIdx ? endIdx : pointOrder.length - 1)
+    const endIdx = pointOrder.indexOf(day.endPointId)
+    if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) continue
     const assignStart = j === 0 ? startIdx : startIdx + 1
-    for (let i = assignStart; i <= stop; i++) reassigned.set(pointOrder[i], day.id)
+    for (let i = assignStart; i <= endIdx; i++) reassigned.set(pointOrder[i], day.id)
   }
 
   const hydratedPoints = reassigned.size > 0

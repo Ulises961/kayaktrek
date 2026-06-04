@@ -19,8 +19,8 @@ const BASE_STATE: MapState = {
 const MOCK_CTX: MapBuilderContextValue = {
   state: BASE_STATE,
   dispatch: () => {},
-  draftBoundaries: null,
-  setDraftBoundaries: () => {},
+  draftSlices: null,
+  setDraftSlices: () => {},
   tripId: null,
   itineraryId: ITIN_ID,
   distanceUnit: "nm",
@@ -50,12 +50,12 @@ describe("useMapBuilder", () => {
     expect(result.current.tripId).toBeNull()
   })
 
-  it("provides draftBoundaries as null initially", () => {
+  it("provides draftSlices as null initially", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(MapBuilderContext.Provider, { value: MOCK_CTX }, children)
 
     const { result } = renderHook(() => useMapBuilder(), { wrapper })
-    expect(result.current.draftBoundaries).toBeNull()
+    expect(result.current.draftSlices).toBeNull()
   })
 
   it("exposes activePointId and day0Id from context", () => {

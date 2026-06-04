@@ -9,7 +9,7 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import type { DaySlice } from "@/lib/itinerary/boundaries"
 import {
   createPoint,
   updatePoint,
@@ -33,7 +33,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
 
   const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
-  const [draftBoundaries, setDraftBoundaries] = useState<DraftBoundary[] | null>(null)
+  const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -117,8 +117,8 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
   const ctxValue = useMemo(() => ({
     state,
     dispatch,
-    draftBoundaries,
-    setDraftBoundaries,
+    draftSlices,
+    setDraftSlices,
     tripId: tripId ?? null,
     itineraryId: itinerary.id ?? "",
     distanceUnit,
@@ -128,7 +128,7 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     activePointId,
     setActivePointId,
     day0Id,
-  }), [state, dispatch, draftBoundaries, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id])
+  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id])
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>

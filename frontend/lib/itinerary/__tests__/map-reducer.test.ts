@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { mapReducer, initialMapState } from "../map-reducer"
 import type { MapState } from "../map-reducer"
-import type { DraftBoundary } from "../boundaries"
+import type { DaySlice } from "../boundaries"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 
@@ -236,11 +236,11 @@ describe("initialMapState", () => {
     const state = initialMapState([p1, p2, p3], [d1])
     expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
     expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)
-    // d1 is the last (only) day — it extends to the end so p3 is also coloured.
-    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D1)
+    // p3 is beyond d1's endPointId — it stays in Day 0 (unassigned)
+    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D0)
   })
 
-  it("last day covers trailing points beyond its stored endPointId", () => {
+  it("trailing points beyond the last day's endPointId stay in day 0 (unassigned)", () => {
     const D0 = "d0-id"
     const D1 = "d1-id"
     const D2 = "d2-id"
@@ -249,11 +249,10 @@ describe("initialMapState", () => {
     const p3: Point = { id: "p3", type: "position", dayId: D0, nextId: "p4" }
     const p4: Point = { id: "p4", type: "position", dayId: D0 }
     const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
-    // d2's endPointId was saved as p2 (a non-last point) — last day must still cover p3 and p4.
-    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p2" }
+    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p3" }
     const state = initialMapState([p1, p2, p3, p4], [d1, d2])
-    expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D2)
-    expect(state.points.find((p) => p.id === "p4")?.dayId).toBe(D2)
+    // p4 is beyond d2's endPointId — it is unassigned (day 0)
+    expect(state.points.find((p) => p.id === "p4")?.dayId).toBe(D0)
   })
 
   it("assigns boundary stop to the day that ends there (not the following day)", () => {
@@ -437,23 +436,25 @@ const APPLY_STATE: MapState = {
   ],
 }
 
-const BOUNDARIES: DraftBoundary[] = [
-  { dayId: DAY1_ID, dayNumber: 1, endPointIdx: 1, date: "2024-06-01" },
-  { dayId: DAY2_ID, dayNumber: 2, endPointIdx: 4, date: "2024-06-02" },
+// Day 1: owns [0,1]  (p0,p1)  — boundary stop p1 belongs to Day 1
+// Day 2: owns [1,4]  startIdx shared at 1; owned points are [2,4] (p2,p3,p4)
+const SLICES: DaySlice[] = [
+  { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2024-06-01" },
+  { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 4, date: "2024-06-02" },
 ]
 
 const POINT_UPDATES = [{ id: "p2", type: "position" as const }]
 
 describe("BOUNDARIES_APPLY", () => {
-  it("assigns points to days by walking boundary index ranges in order", () => {
+  it("assigns points to days using explicit slice ranges", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
-    // BOUNDARIES: Day1 endPointIdx=1, Day2 endPointIdx=4
-    // Boundary stop (p1) belongs to Day1 (the day that ends there), not Day2.
+    // Day1 owns [0,1]: p0, p1.  Boundary stop p1 belongs to Day1.
+    // Day2 owns [1,4] but skips startIdx (shared stop): p2, p3, p4.
     expect(next.points.find((p) => p.id === "p0")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "p1")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "p2")?.dayId).toBe(DAY2_ID)
@@ -464,7 +465,7 @@ describe("BOUNDARIES_APPLY", () => {
   it("promotes new boundary points to type stop when no dirty override exists", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
@@ -476,7 +477,7 @@ describe("BOUNDARIES_APPLY", () => {
   it("applies dirty type override from pointUpdates (demoted boundary stop → position)", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
@@ -486,7 +487,7 @@ describe("BOUNDARIES_APPLY", () => {
   it("leaves non-boundary non-dirty points with their existing type", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
@@ -497,17 +498,17 @@ describe("BOUNDARIES_APPLY", () => {
     const updates = [{ id: "p1", type: "stop" as const, name: "Cedeira harbour" }]
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: updates,
       day0Id: DAY0_ID,
     })
     expect(next.points.find((p) => p.id === "p1")?.name).toBe("Cedeira harbour")
   })
 
-  it("updates day startPointId, endPointId and date from the new boundaries", () => {
+  it("updates day startPointId, endPointId and date from slices", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
@@ -524,14 +525,14 @@ describe("BOUNDARIES_APPLY", () => {
   it("leaves day 0 unchanged", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
     expect(next.days.find((d) => d.id === DAY0_ID)).toEqual(APPLY_STATE.days[0])
   })
 
-  it("last boundary extends to cover points beyond its endPointIdx", () => {
+  it("points beyond the last slice's endIdx stay in day 0 (not auto-absorbed)", () => {
     const state: MapState = {
       ...APPLY_STATE,
       points: [...APPLY_STATE.points, makePoint("p5")],
@@ -539,18 +540,32 @@ describe("BOUNDARIES_APPLY", () => {
     }
     const next = mapReducer(state, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,        // last boundary endPointIdx=4, p5 is at idx 5
+      slices: SLICES,   // last slice endIdx=4; p5 is at idx 5 — not covered
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })
-    // The last boundary auto-extends to pointOrder.length-1 so p5 belongs to the last day.
-    expect(next.points.find((p) => p.id === "p5")?.dayId).toBe(DAY2_ID)
+    expect(next.points.find((p) => p.id === "p5")?.dayId).toBe(DAY0_ID)
+  })
+
+  it("empty last day (startIdx > endIdx) leaves all points unassigned beyond prev slice", () => {
+    const emptyLastSlices: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 4, date: null },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 5, endIdx: 4, date: null }, // empty
+    ]
+    const next = mapReducer(APPLY_STATE, {
+      type: "BOUNDARIES_APPLY",
+      slices: emptyLastSlices,
+      pointUpdates: [],
+      day0Id: DAY0_ID,
+    })
+    // All 5 points belong to Day1; Day2 is empty
+    expect(next.points.every((p) => p.dayId !== DAY2_ID)).toBe(true)
   })
 
   it("does not change pointOrder", () => {
     const next = mapReducer(APPLY_STATE, {
       type: "BOUNDARIES_APPLY",
-      boundaries: BOUNDARIES,
+      slices: SLICES,
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })

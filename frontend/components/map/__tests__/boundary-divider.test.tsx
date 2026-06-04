@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { BoundaryDivider } from "../boundary-divider"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import type { DaySlice } from "@/lib/itinerary/boundaries"
 
-const BOUNDARY: DraftBoundary = {
+const BOUNDARY: DaySlice = {
   dayId: "day-1",
   dayNumber: 1,
-  endPointIdx: 2,
+  startIdx: 0,
+  endIdx: 2,
   date: "2026-06-01",
 }
 

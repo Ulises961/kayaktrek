@@ -1,11 +1,11 @@
 "use client"
 import { useRef } from "react"
 import { GripVerticalIcon } from "lucide-react"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import type { DaySlice } from "@/lib/itinerary/boundaries"
 import { legLabel } from "@/lib/itinerary/distance"
 
 export type BoundaryDividerProps = {
-  boundary: DraftBoundary
+  boundary: DaySlice
   totalDistanceNm: number
   distanceUnit: "nm" | "km"
   avgSpeedKnots: number
@@ -40,13 +40,13 @@ export function BoundaryDivider({
   // Tracks the target index during drag without triggering React re-renders.
   // onBoundaryMove is called only on pointerup so this component never
   // unmounts/remounts during a drag, keeping pointer capture intact.
-  const dragTargetRef = useRef<number>(boundary.endPointIdx)
+  const dragTargetRef = useRef<number>(boundary.endIdx)
 
   const displayDist = legLabel(totalDistanceNm, avgSpeedKnots, distanceUnit)
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId)
-    dragTargetRef.current = boundary.endPointIdx
+    dragTargetRef.current = boundary.endIdx
 
     const scrollEl = e.currentTarget.closest("[data-point-list]") as HTMLElement | null
     if (!scrollEl || !containerRef.current) return
@@ -128,7 +128,7 @@ export function BoundaryDivider({
       containerRef.current.style.transform = ""
       containerRef.current.style.zIndex = ""
     }
-    dragTargetRef.current = boundary.endPointIdx
+    dragTargetRef.current = boundary.endIdx
     snapshotRef.current = null
     scrollElRef.current = null
   }

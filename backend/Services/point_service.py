@@ -107,6 +107,7 @@ class PointService:
         logger.info(f"Creating new point")
         point: Point = cast(Point, PointSchema().load(point_data))
         day = db.session.query(Day).filter_by(id=point.day_id).first()
+        itinerary = None
         if day:
             itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
             if itinerary and itinerary.trip_id:
@@ -117,18 +118,31 @@ class PointService:
         db.session.add(point)
         db.session.flush()  # assign point.id before querying for the tail
 
-        # Append to the end of this day's ordered list.
-        # Finds the current tail (the one point with next_id=NULL that isn't the new point)
-        # and links it forward. In a well-formed list there is exactly one tail per day.
-        tail = (
-            db.session.query(Point)
-            .filter(
-                Point.day_id == point.day_id,
-                Point.next_id.is_(None),
-                Point.id != point.id,
+        # Append to the tail of the ITINERARY-WIDE chain (not day-scoped).
+        # apply_boundaries moves points from day 0 into numbered days; a day-scoped
+        # search would find no tail in day 0 and leave the new point orphaned, causing
+        # _walk_linked_list to miss it and reject the next apply-boundaries call.
+        if itinerary:
+            tail = (
+                db.session.query(Point)
+                .join(Day, Point.day_id == Day.id)
+                .filter(
+                    Day.itinerary_id == itinerary.id,
+                    Point.next_id.is_(None),
+                    Point.id != point.id,
+                )
+                .first()
             )
-            .first()
-        )
+        else:
+            tail = (
+                db.session.query(Point)
+                .filter(
+                    Point.day_id == point.day_id,
+                    Point.next_id.is_(None),
+                    Point.id != point.id,
+                )
+                .first()
+            )
         if tail:
             tail.next_id = point.id
 

@@ -2,10 +2,14 @@ import type { Day } from "@/lib/dtos/day"
 import type { PointType } from "@/lib/dtos/point"
 import type { MapState } from "./map-reducer"
 
-export type DraftBoundary = {
+export type DaySlice = {
   dayId: string
   dayNumber: number
-  endPointIdx: number
+  // Inclusive range of pointOrder indices owned by this day.
+  // startIdx === 0 for day 1; startIdx === prev.endIdx for later days (shared boundary stop).
+  // startIdx > endIdx means the day is empty (no points assigned).
+  startIdx: number
+  endIdx: number
   date: string | null
 }
 
@@ -27,7 +31,7 @@ export type BoundaryApplyPayload = {
   points: PointPayloadItem[]
 }
 
-export function initDraftBoundaries(days: Day[], pointOrder: string[]): DraftBoundary[] {
+export function initDaySlices(days: Day[], pointOrder: string[]): DaySlice[] {
   const sorted = days
     .filter((d) => d.dayNumber > 0 && d.id)
     .sort((a, b) => a.dayNumber - b.dayNumber)
@@ -35,69 +39,71 @@ export function initDraftBoundaries(days: Day[], pointOrder: string[]): DraftBou
   const N = sorted.length
   const M = pointOrder.length
 
+  // Compute endIdx for each day. For days without a saved endPointId we spread
+  // evenly to avoid index collisions between handles.
+  // The last slice always extends to M-1 so tail-orphan points (dropped after
+  // the last boundary, or left behind by a deleted middle day) are never stranded.
+  const endIndices: number[] = sorted.map((day, i) => {
+    const isLast = i === N - 1
+    if (isLast) return Math.max(0, M - 1)
+    if (day.endPointId) {
+      const idx = pointOrder.indexOf(day.endPointId)
+      if (idx !== -1) return idx
+    }
+    // No saved endpoint — spread evenly.
+    return Math.min(M - 1, Math.max(i, Math.round(((i + 1) * M) / N) - 1))
+  })
+
   return sorted.map((day, i) => ({
     dayId: day.id!,
     dayNumber: day.dayNumber,
-    // The last day always extends to the final point so trailing points are
-    // never left uncoloured.  Earlier days without an endPointId are spread
-    // evenly to prevent Map key collisions from hiding their handles.
-    endPointIdx: i === N - 1
-      ? M - 1
-      : day.endPointId
-        ? pointOrder.indexOf(day.endPointId)
-        : Math.min(M - 1, Math.max(i, Math.round(((i + 1) * M) / N) - 1)),
+    // startIdx: day 1 starts at 0; later days start at the previous day's endIdx
+    // (shared overnight-stop semantics — the boundary point belongs to the ending day).
+    startIdx: i === 0 ? 0 : endIndices[i - 1],
+    endIdx: endIndices[i],
     date: day.date ?? null,
   }))
 }
 
-export function applyDraftToPreviewDays(
-  draft: DraftBoundary[],
+export function applySlicesToPreviewDays(
+  slices: DaySlice[],
   days: Day[],
   pointOrder: string[]
 ): Day[] {
-  const sorted = [...draft].sort((a, b) => a.dayNumber - b.dayNumber)
-  const draftByDayId = new Map(sorted.map((b) => [b.dayId, b]))
+  const sliceById = new Map(slices.map((s) => [s.dayId, s]))
 
   return days.map((day) => {
-    const boundary = draftByDayId.get(day.id ?? "")
-    if (!boundary || day.dayNumber === 0) return day
+    const slice = sliceById.get(day.id ?? "")
+    if (!slice || day.dayNumber === 0) return day
 
-    const myIdx = sorted.findIndex((b) => b.dayId === day.id)
-    const prevBoundary = myIdx > 0 ? sorted[myIdx - 1] : null
-    const startPointId = prevBoundary
-      ? (pointOrder[prevBoundary.endPointIdx] ?? null)
-      : (pointOrder[0] ?? null)
-    const endPointId = pointOrder[boundary.endPointIdx] ?? null
-
+    const isEmpty = slice.startIdx > slice.endIdx
     return {
       ...day,
-      startPointId,
-      endPointId,
-      date: boundary.date ?? day.date,
+      startPointId: isEmpty ? null : (pointOrder[slice.startIdx] ?? null),
+      endPointId: isEmpty ? null : (pointOrder[slice.endIdx] ?? null),
+      date: slice.date ?? day.date,
     }
   })
 }
 
-export function computeBoundaryApplyPayload(
-  draft: DraftBoundary[],
+export function computeSlicesApplyPayload(
+  slices: DaySlice[],
   state: MapState
 ): BoundaryApplyPayload {
-  const sorted = [...draft].sort((a, b) => a.dayNumber - b.dayNumber)
   const { pointOrder, days, points } = state
 
   const newBoundaryIds = new Set<string>()
-  const boundaries: BoundaryPayloadItem[] = sorted.map((boundary, i) => {
-    const prevBoundary = i > 0 ? sorted[i - 1] : null
-    const startPointId = prevBoundary
-      ? (pointOrder[prevBoundary.endPointIdx] ?? "")
-      : (pointOrder[0] ?? "")
-    const endPointId = pointOrder[boundary.endPointIdx] ?? ""
-
-    if (startPointId) newBoundaryIds.add(startPointId)
-    if (endPointId) newBoundaryIds.add(endPointId)
-
-    return { dayId: boundary.dayId, startPointId, endPointId, date: boundary.date }
-  })
+  const boundaries: BoundaryPayloadItem[] = []
+  for (const slice of slices) {
+    const isEmpty = slice.startIdx > slice.endIdx
+    if (isEmpty) continue
+    const startPointId = pointOrder[slice.startIdx] ?? ""
+    const endPointId = pointOrder[slice.endIdx] ?? ""
+    if (!startPointId || !endPointId) continue
+    newBoundaryIds.add(startPointId)
+    newBoundaryIds.add(endPointId)
+    boundaries.push({ dayId: slice.dayId, startPointId, endPointId, date: slice.date })
+  }
 
   const oldBoundaryIds = new Set<string>()
   for (const day of days) {

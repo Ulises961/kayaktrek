@@ -3,6 +3,7 @@ from uuid import UUID
 
 from camel_converter import dict_to_snake
 from Models.day import Day
+from Models.point import Point
 from Models.itinerary import Itinerary
 from Models.sea import Sea
 from Models.trip import Trip, TripStateType
@@ -303,6 +304,16 @@ class DayService:
 
         if not day_to_delete:
             raise NoResultFound(f"Day with id {day_id} not found")
+
+        # Move the day's points to day 0 so they remain in the itinerary's
+        # linked list rather than being left with day_id = NULL.
+        day0 = db.session.query(Day).filter_by(
+            itinerary_id=day_to_delete.itinerary_id, day_number=0
+        ).first()
+        if day0:
+            db.session.query(Point).filter_by(day_id=day_to_delete.id).update(
+                {"day_id": day0.id}
+            )
 
         db.session.delete(day_to_delete)
         db.session.commit()

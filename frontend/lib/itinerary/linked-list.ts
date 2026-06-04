@@ -17,21 +17,25 @@ export function findTail(points: Point[]): Point | null {
 
 export function walkList(points: Point[]): Point[] {
   if (points.length === 0) return []
-  const head = findHead(points)
-  if (!head) return [...points]
+  const nextIds = new Set(points.flatMap((p) => { const n = resolveNextId(p); return n ? [n] : [] }))
+  const allHeads = points.filter((p) => p.id != null && !nextIds.has(p.id!))
+  if (allHeads.length === 0) return [...points]
+  allHeads.sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""))
   const byId = new Map(points.filter((p) => p.id).map((p) => [p.id!, p]))
   const ordered: Point[] = []
   const visited = new Set<string>()
-  let current: Point | null | undefined = head
-  while (current) {
-    const id = current.id
-    if (id) {
-      if (visited.has(id)) break
-      visited.add(id)
+  for (const head of allHeads) {
+    let current: Point | null | undefined = head
+    while (current) {
+      const id = current.id
+      if (id) {
+        if (visited.has(id)) break
+        visited.add(id)
+      }
+      ordered.push(current)
+      const nextId = resolveNextId(current)
+      current = nextId ? (byId.get(nextId) ?? null) : null
     }
-    ordered.push(current)
-    const nextId = resolveNextId(current)
-    current = nextId ? (byId.get(nextId) ?? null) : null
   }
   return ordered
 }
