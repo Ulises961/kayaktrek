@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 
 const { mockUseCollapseSidebar } = vi.hoisted(() => ({
   mockUseCollapseSidebar: vi.fn(),
@@ -77,11 +77,11 @@ describe("MapBuilder", () => {
       ],
     }
     render(<MapBuilder itinerary={withDays} tripId={TRIP_ID} tripName="Cinque Terre" />)
-    expect(screen.getByText("2 days")).toBeInTheDocument()
+    expect(within(screen.getByTestId("stats-strip")).getByText("2 days")).toBeInTheDocument()
   })
 
   it("shows 0 days for an empty itinerary", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
-    expect(screen.getByText("0 days")).toBeInTheDocument()
+    expect(within(screen.getByTestId("stats-strip")).getByText("0 days")).toBeInTheDocument()
   })
 })
