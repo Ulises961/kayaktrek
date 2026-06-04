@@ -31,7 +31,7 @@ describe("PointMarker — icon memoization", () => {
   it("calls ringIcon once on initial render", () => {
     render(<PointMarker {...BASE_PROPS} />)
     expect(ringIconModule.ringIcon).toHaveBeenCalledTimes(1)
-    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "position")
+    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "position", undefined)
   })
 
   it("does not call ringIcon again when re-rendered with same color and type but new callback refs", () => {
@@ -51,7 +51,7 @@ describe("PointMarker — icon memoization", () => {
     rerender(<PointMarker {...BASE_PROPS} color="#e05a2b" />)
 
     expect(ringIconModule.ringIcon).toHaveBeenCalledTimes(1)
-    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#e05a2b", "position")
+    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#e05a2b", "position", undefined)
   })
 
   it("calls ringIcon again when type changes", () => {
@@ -61,6 +61,16 @@ describe("PointMarker — icon memoization", () => {
     rerender(<PointMarker {...BASE_PROPS} type="stop" />)
 
     expect(ringIconModule.ringIcon).toHaveBeenCalledTimes(1)
-    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "stop")
+    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "stop", undefined)
+  })
+
+  it("calls ringIcon again when index changes", () => {
+    const { rerender } = render(<PointMarker {...BASE_PROPS} index={1} />)
+    vi.clearAllMocks()
+
+    rerender(<PointMarker {...BASE_PROPS} index={2} />)
+
+    expect(ringIconModule.ringIcon).toHaveBeenCalledTimes(1)
+    expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "position", 2)
   })
 })

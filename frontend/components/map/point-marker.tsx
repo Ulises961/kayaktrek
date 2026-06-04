@@ -9,6 +9,7 @@ type PointMarkerProps = {
   point: Point & { latitude: number; longitude: number }
   color: string
   type: PointType
+  index?: number
   customIcon?: L.Icon | L.DivIcon
   onDragMove: (lat: number, lng: number) => void
   onDragEnd: (lat: number, lng: number) => void
@@ -16,7 +17,7 @@ type PointMarkerProps = {
   onMouseOver?: () => void
 }
 
-export function PointMarker({ point, color, type, customIcon, onDragMove, onDragEnd, onClick, onMouseOver }: PointMarkerProps) {
+export function PointMarker({ point, color, type, index, customIcon, onDragMove, onDragEnd, onClick, onMouseOver }: PointMarkerProps) {
   const position = useMemo<[number, number]>(
     () => [point.latitude, point.longitude],
     [point.latitude, point.longitude],
@@ -27,8 +28,9 @@ export function PointMarker({ point, color, type, customIcon, onDragMove, onDrag
   // detaching Leaflet's drag handlers and producing the jagged "dropped early" effect.
   // customIcon (e.g. splitRingIcon for boundary markers) must also be memoised by the caller.
   const icon = useMemo(
-    () => customIcon ?? ringIcon(color, type),
-    [customIcon, color, type],
+    () => customIcon ?? ringIcon(color, type, index),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [customIcon, color, type, index],
   )
 
   const handleDrag = useCallback((e: L.LeafletEvent) => {

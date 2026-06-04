@@ -34,7 +34,9 @@ export function PointRow({
   onDelete,
 }: PointRowProps) {
   const [localName, setLocalName] = useState(point.name ?? "")
-  const label = point.name ? point.name : String(index)
+  const label = point.name || null
+  const typeConfig = TYPE_OPTIONS.find((o) => o.type === (point.type ?? "position")) ?? TYPE_OPTIONS[1]
+  const TypeIcon = typeConfig.Icon
 
   if (!isExpanded) {
     return (
@@ -45,7 +47,10 @@ export function PointRow({
         onClick={() => point.id && onExpand(point.id)}
       >
         <span className="w-1 h-4 rounded-sm shrink-0" style={{ backgroundColor: dayColor }} />
-        <span className="flex-1 truncate">{label}</span>
+        <span className="text-[10px] tabular-nums text-muted-foreground w-4 shrink-0 text-right">{index}</span>
+        <TypeIcon className="size-3.5 text-muted-foreground shrink-0" />
+        <span className="text-xs text-muted-foreground shrink-0">{typeConfig.label}</span>
+        {label && <span className="flex-1 truncate text-foreground ml-0.5">{label}</span>}
       </button>
     )
   }
@@ -54,7 +59,11 @@ export function PointRow({
     <div data-testid="point-row" className="flex flex-col px-3 py-2 gap-2 bg-muted/30 border-b border-border">
       <div className="flex items-center gap-2 text-sm font-medium">
         <span className="w-1 h-4 rounded-sm shrink-0" style={{ backgroundColor: dayColor }} />
-        <span className="flex-1 truncate">{label}</span>
+        <TypeIcon className="size-3.5 text-muted-foreground shrink-0" />
+        {label
+          ? <span className="flex-1 truncate">{label}</span>
+          : <span className="flex-1 truncate text-muted-foreground">{typeConfig.label} {index}</span>
+        }
       </div>
 
       {!isBoundary && onTypeChange && (

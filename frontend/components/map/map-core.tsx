@@ -92,6 +92,7 @@ function MapEvents({ onMapClick }: { onMapClick: (lat: number, lng: number) => P
 
 type ConnectedMarkerProps = {
   point: ValidPoint
+  index: number
   dayNum: number
   boundaryColors: { left: string; right: string } | null
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -101,6 +102,7 @@ type ConnectedMarkerProps = {
 
 const ConnectedMarker = memo(function ConnectedMarker({
   point,
+  index,
   dayNum,
   boundaryColors,
   onMarkerDragMove,
@@ -112,9 +114,9 @@ const ConnectedMarker = memo(function ConnectedMarker({
   // Memoize split icon when this is a boundary point. Regular icon is computed
   // inside PointMarker. Splitting here keeps PointMarker unaware of day topology.
   const customIcon = useMemo(
-    () => (boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right) : undefined),
+    () => (boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right, index) : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [boundaryColors?.left, boundaryColors?.right],
+    [boundaryColors?.left, boundaryColors?.right, index],
   )
 
   const handleDragMove = useCallback((lat: number, lng: number) => {
@@ -135,6 +137,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
       point={point}
       color={color}
       type={point.type}
+      index={index}
       customIcon={customIcon}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
@@ -189,6 +192,12 @@ export default function MapCore({
     [boundaryMap],
   )
 
+  const pointIndexById = useMemo(() => {
+    const m = new Map<string, number>()
+    points.forEach((p, i) => { if (p.id) m.set(p.id, i + 1) })
+    return m
+  }, [points])
+
   const validPoints = points.filter(
     (p): p is ValidPoint => p.latitude != null && p.longitude != null
   )
@@ -234,6 +243,7 @@ export default function MapCore({
           <ConnectedMarker
             key={point.id ?? `${point.latitude},${point.longitude}`}
             point={point}
+            index={point.id ? (pointIndexById.get(point.id) ?? 0) : 0}
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
             onMarkerDragMove={handleMarkerDragMove}

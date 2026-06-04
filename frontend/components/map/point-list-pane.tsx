@@ -349,7 +349,7 @@ export function PointListPane() {
             <Fragment key={`divider-${slice.dayId}`}>
               <BoundaryDivider
                 boundary={slice}
-                totalDistanceNm={getSliceDistance(slice)}
+                totalDistanceNm={getSliceDistance(nextSlice ?? slice)}
                 distanceUnit={distanceUnit}
                 avgSpeedKnots={avgSpeedKnots}
                 labelDayNumber={slice.dayNumber + 1}

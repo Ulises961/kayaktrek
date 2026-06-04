@@ -134,31 +134,38 @@ export function BoundaryDivider({
   }
 
   return (
-    <div ref={containerRef} className="flex items-center gap-2 px-3 py-1 border-y border-border bg-muted/50">
-      <div className="flex-1 h-px bg-border" />
+    <div ref={containerRef} className="flex items-center gap-1.5 px-2 py-1 border-y border-border bg-muted/50">
+      <div className="flex-1 h-px bg-border shrink-0 min-w-[0.5rem]" />
       <div
         data-testid="boundary-drag-handle"
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-background border border-border text-xs font-medium cursor-ns-resize select-none"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border cursor-ns-resize select-none shrink-0"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
-        <GripVerticalIcon className="size-3 text-muted-foreground" />
-        <span>Day {labelDayNumber}</span>
-        <span className="text-muted-foreground">·</span>
-        <input
-          type="date"
-          value={labelDate ?? ""}
-          placeholder="No date"
-          onChange={(e) => onDateChange?.(e.target.value || null)}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="text-xs text-muted-foreground bg-transparent border-none outline-none cursor-pointer w-[6.5rem]"
-        />
-        <span className="text-muted-foreground">·</span>
-        <span>{displayDist}</span>
+        <GripVerticalIcon className="size-3 text-muted-foreground shrink-0" />
+        {/* 1/3 — day number */}
+        <span className="text-xs font-semibold w-10 text-center shrink-0">
+          Day {labelDayNumber}
+        </span>
+        <div className="w-px h-7 bg-border shrink-0" />
+        {/* 2/3 — date + distance stacked */}
+        <div className="flex flex-col gap-0.5">
+          <input
+            type="date"
+            value={labelDate ?? ""}
+            placeholder="No date"
+            onChange={(e) => onDateChange?.(e.target.value || null)}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="text-xs text-foreground bg-transparent border-none outline-none cursor-pointer w-28 sm:w-32"
+          />
+          <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap">
+            {displayDist}
+          </span>
+        </div>
       </div>
-      <div className="flex-1 h-px bg-border" />
+      <div className="flex-1 h-px bg-border shrink-0 min-w-[0.5rem]" />
     </div>
   )
 }
