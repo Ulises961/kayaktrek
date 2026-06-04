@@ -341,7 +341,31 @@ noise on the browse map. This is handled at the display layer:
 - Clustering is a frontend rendering concern using Leaflet marker clustering; no schema or
   API changes needed beyond what `created_from_id` already provides.
 
-### 13. GPX import and export
+### 13. Itinerary ownership persists through all trip state transitions
+
+`itinerary.user_id` is set when the itinerary is created and is **never cleared** thereafter,
+regardless of which state the linked trip transitions through (including `happening` and `past`).
+
+**Rationale**: an earlier implementation cleared `user_id` to `None` when a trip transitioned
+to `happening`, under a pre-ADR-026 model where the itinerary was a planning artifact that
+"belonged to the expedition" once underway. That model is incompatible with first-class
+itineraries (§5): the route has its own identity — attribution, lineage, visibility — that is
+authored by a person, not by a trip event. Clearing `user_id` on `happening` caused the
+itinerary to silently vanish from the owner's listing (`GET /api/itinerary/all` filters by
+`user_id`), making it unmanageable without navigating through the trip.
+
+**Listing filter** (`GET /api/itinerary/all`): returns itineraries where `user_id = current_user`.
+This is sufficient because ownership is now stable. If a future model introduces shared
+trip leadership (multiple leaders co-managing one trip's itinerary), the query will need a
+second branch: `OR trip_id IN (trips where current_user is leader)`. That extension is
+deferred until the shared-leadership model is defined.
+
+**Edit permissions during `happening`**: not enforced by removing ownership. If locking
+route edits while the expedition is live is required, enforce it as an explicit business rule
+in the service layer based on `trip.state`. Ownership and edit permission are separate
+concerns and must not be conflated via FK nulling.
+
+### 14. GPX import and export
 
 GPX is the universal GPS interchange format — compatible with Garmin, Navionics, OpenCPN,
 and chart plotters used on the water. A bespoke lat/lon dump is a closed island; GPX plugs

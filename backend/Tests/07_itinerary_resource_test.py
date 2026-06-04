@@ -1,5 +1,6 @@
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
+from Resources.trip_resource import TRIP_ENDPOINT
 from Services.itinerary_service import ItineraryService
 import json
 import types
@@ -199,3 +200,27 @@ def test_walk_linked_list_no_cycle():
     points = [_make_point(P1, P2), _make_point(P2, P1)]
     result = ItineraryService._walk_linked_list(points)
     assert len(result) == 0  # no heads → empty
+
+
+def test_get_all_itineraries_returns_owned(client, auth_headers, itinerary):
+    """GET /itinerary/all returns itineraries owned by the current user."""
+    response = client.get(f"{ITINERARY_ENDPOINT}/all", headers=auth_headers)
+    assert response.status_code == 200
+    ids = [i["id"] for i in response.json]
+    assert itinerary["id"] in ids
+
+
+def test_happening_transition_preserves_itinerary_ownership(client, auth_headers, itinerary):
+    """Transitioning a trip to 'happening' must not clear the itinerary's user_id.
+
+    Before ADR-026 the service nulled out user_id on the itinerary when the trip went
+    live, causing the itinerary to vanish from GET /itinerary/all.  That behaviour was
+    removed: ownership is now preserved through all trip state transitions.
+    """
+    trip_id = itinerary["tripId"]
+    client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": "happening"}, headers=auth_headers)
+
+    response = client.get(f"{ITINERARY_ENDPOINT}/all", headers=auth_headers)
+    assert response.status_code == 200
+    ids = [i["id"] for i in response.json]
+    assert itinerary["id"] in ids, "itinerary disappeared from listing after trip went to happening"
