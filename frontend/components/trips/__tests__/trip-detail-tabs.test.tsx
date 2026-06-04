@@ -104,14 +104,14 @@ describe("TripDetailTabs", () => {
     expect(screen.queryByRole("tab", { name: /float plan/i })).toBeNull()
   })
 
-  it("shows crew content by default", () => {
+  it("shows itinerary tab content by default", () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
-    expect(screen.getAllByText(/crew/i).length).toBeGreaterThan(0)
+    // leader + no itinerary → create form is shown on the default tab
+    expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 
-  it("shows create itinerary button for leader when itinerary tab is clicked and no itinerary exists", async () => {
+  it("shows create itinerary button for leader in itinerary tab", async () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
-    await userEvent.click(screen.getByRole("tab", { name: /itinerary/i }))
     expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 

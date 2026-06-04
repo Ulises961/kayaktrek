@@ -50,7 +50,7 @@ export function TripDetailTabs({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(
-    (searchParams.get("tab") ?? "crew") as TabId
+    (searchParams.get("tab") ?? "itinerary") as TabId
   )
 
   function handleTabChange(value: string) {
