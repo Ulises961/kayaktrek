@@ -10,6 +10,7 @@ import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
+import type { TripState } from "@/lib/dtos/trip"
 import {
   createPoint,
   updatePoint,
@@ -19,6 +20,7 @@ import {
   deleteDay,
   updateItinerary,
 } from "@/lib/itinerary/actions"
+import { DayStrip } from "./day-strip"
 
 const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.ComponentType<MapCoreProps>
 
@@ -26,15 +28,19 @@ type MapBuilderProps = {
   itinerary: Itinerary
   tripId: string | null
   tripName: string
+  tripState?: TripState | null
+  isLeader?: boolean
 }
 
-export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
+export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLeader = true }: MapBuilderProps) {
   useCollapseSidebar()
 
   const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState(true)
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -114,6 +120,11 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     }, 800)
   }, [itinerary.id])
 
+  const handleToggleViewMode = useCallback(() => {
+    setViewMode((v) => !v)
+    setSelectedDayId(null)
+  }, [])
+
   const ctxValue = useMemo(() => ({
     state,
     dispatch,
@@ -128,7 +139,13 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
     activePointId,
     setActivePointId,
     day0Id,
-  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id])
+    viewMode,
+    setViewMode,
+    selectedDayId,
+    setSelectedDayId,
+    tripState,
+    isLeader,
+  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id, viewMode, selectedDayId, tripState, isLeader])
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>
@@ -143,19 +160,25 @@ export function MapBuilder({ itinerary, tripId, tripName }: MapBuilderProps) {
           isSaving={isSaving}
           avgSpeedKnots={avgSpeedKnots}
           onAvgSpeedKnotsChange={handleAvgSpeedChange}
+          viewMode={viewMode}
+          onToggleViewMode={handleToggleViewMode}
+          isLeader={isLeader}
+          tripState={tripState}
         />
         <div className="absolute top-[100px] md:top-12 right-0 bottom-0 left-0">
           <MapCore
             points={orderedPoints}
             days={allDaysForMap}
             distanceUnit={distanceUnit}
+            viewMode={viewMode}
+            selectedDayId={selectedDayId}
             onMapClick={handleMapClick}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerClick={handleMarkerClick}
             avgSpeedKnots={avgSpeedKnots}
           />
-          <PointListPane />
+          {viewMode ? <DayStrip /> : <PointListPane />}
         </div>
       </div>
     </MapBuilderContext.Provider>

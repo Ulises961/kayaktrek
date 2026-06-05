@@ -15,6 +15,8 @@ export type MapCoreProps = {
   days: Day[]
   distanceUnit: "nm" | "km"
   avgSpeedKnots?: number
+  viewMode?: boolean
+  selectedDayId?: string | null
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -30,6 +32,7 @@ type Segment = {
   positions: [[number, number], [number, number]]
   color: string
   distLabel: string
+  dayNum: number
 }
 
 function resolvePosition(point: ValidPoint, drag: DragState | null): { latitude: number; longitude: number } {
@@ -72,6 +75,7 @@ function buildSegments(
       positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
       color: getDayColor(dayNum),
       distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
+      dayNum,
     })
   }
   return segments
@@ -95,6 +99,7 @@ type ConnectedMarkerProps = {
   index: number
   dayNum: number
   boundaryColors: { left: string; right: string } | null
+  draggable?: boolean
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
@@ -105,6 +110,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
   index,
   dayNum,
   boundaryColors,
+  draggable = true,
   onMarkerDragMove,
   onMarkerDragEnd,
   onMarkerClick,
@@ -139,6 +145,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
       type={point.type}
       index={index}
       customIcon={customIcon}
+      draggable={draggable}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
@@ -153,12 +160,19 @@ export default function MapCore({
   days,
   distanceUnit,
   avgSpeedKnots = 2.5,
+  viewMode = false,
+  selectedDayId = null,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
   onMarkerClick,
 }: MapCoreProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
+
+  const selectedDayNum = useMemo(
+    () => (selectedDayId ? (days.find((d) => d.id === selectedDayId)?.dayNumber ?? null) : null),
+    [selectedDayId, days],
+  )
 
   const dayNumberById = useMemo(
     () => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])),
@@ -215,29 +229,38 @@ export default function MapCore({
   }, [onMarkerDragEnd])
 
   return (
-    <div className="w-full h-full [&_.leaflet-container]:cursor-crosshair">
+    <div className={viewMode ? "w-full h-full" : "w-full h-full [&_.leaflet-container]:cursor-crosshair"}>
       <MapContainer center={[43, 13]} zoom={6} className="w-full h-full" zoomControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <MapEvents onMapClick={onMapClick} />
+        {!viewMode && <MapEvents onMapClick={onMapClick} />}
 
-        {segments.map((seg) => (
-          <Polyline key={`${seg.key}-${seg.color}`} positions={seg.positions} color={seg.color} weight={2.5} opacity={0.85}>
-            {!dragState && (
-              <Tooltip
-                key={`${seg.positions[0][0]},${seg.positions[0][1]}-${seg.positions[1][0]},${seg.positions[1][1]}`}
-                permanent
-                direction="top"
-                className="distance-label"
-              >
-                {seg.distLabel}
-              </Tooltip>
-            )}
-          </Polyline>
-        ))}
+        {segments.map((seg) => {
+          const dimmed = selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
+          return (
+            <Polyline
+              key={`${seg.key}-${seg.color}`}
+              positions={seg.positions}
+              color={seg.color}
+              weight={dimmed ? 2 : (selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5)}
+              opacity={dimmed ? 0.2 : 0.85}
+            >
+              {!dragState && !viewMode && (
+                <Tooltip
+                  key={`${seg.positions[0][0]},${seg.positions[0][1]}-${seg.positions[1][0]},${seg.positions[1][1]}`}
+                  permanent
+                  direction="top"
+                  className="distance-label"
+                >
+                  {seg.distLabel}
+                </Tooltip>
+              )}
+            </Polyline>
+          )
+        })}
 
         {validPoints.map((point) => (
           <ConnectedMarker
@@ -246,6 +269,7 @@ export default function MapCore({
             index={point.id ? (pointIndexById.get(point.id) ?? 0) : 0}
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
+            draggable={!viewMode}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerClick={onMarkerClick}

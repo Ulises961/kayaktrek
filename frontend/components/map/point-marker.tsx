@@ -11,13 +11,14 @@ type PointMarkerProps = {
   type: PointType
   index?: number
   customIcon?: L.Icon | L.DivIcon
+  draggable?: boolean
   onDragMove: (lat: number, lng: number) => void
   onDragEnd: (lat: number, lng: number) => void
   onClick?: () => void
   onMouseOver?: () => void
 }
 
-export function PointMarker({ point, color, type, index, customIcon, onDragMove, onDragEnd, onClick, onMouseOver }: PointMarkerProps) {
+export function PointMarker({ point, color, type, index, customIcon, draggable = true, onDragMove, onDragEnd, onClick, onMouseOver }: PointMarkerProps) {
   const position = useMemo<[number, number]>(
     () => [point.latitude, point.longitude],
     [point.latitude, point.longitude],
@@ -54,7 +55,7 @@ export function PointMarker({ point, color, type, index, customIcon, onDragMove,
     <Marker
       position={position}
       icon={icon}
-      draggable
+      draggable={draggable}
       eventHandlers={eventHandlers}
     />
   )

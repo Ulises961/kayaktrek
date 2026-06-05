@@ -67,6 +67,12 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     activePointId: null,
     setActivePointId: vi.fn(),
     day0Id: DAY0_ID,
+    viewMode: false,
+    setViewMode: vi.fn(),
+    selectedDayId: null,
+    setSelectedDayId: vi.fn(),
+    tripState: null,
+    isLeader: true,
     ...overrides,
   }
 }

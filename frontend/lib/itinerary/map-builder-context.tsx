@@ -4,6 +4,7 @@ import { createContext, useContext } from "react"
 import type { Dispatch } from "react"
 import type { MapState, MapAction } from "./map-reducer"
 import type { DaySlice } from "./boundaries"
+import type { TripState } from "@/lib/dtos/trip"
 
 export type { DaySlice }
 
@@ -21,6 +22,12 @@ export type MapBuilderContextValue = {
   activePointId: string | null
   setActivePointId: (id: string | null) => void
   day0Id: string | null
+  viewMode: boolean
+  setViewMode: (v: boolean) => void
+  selectedDayId: string | null
+  setSelectedDayId: (id: string | null) => void
+  tripState: TripState | null
+  isLeader: boolean
 }
 
 export const MapBuilderContext = createContext<MapBuilderContextValue | null>(null)

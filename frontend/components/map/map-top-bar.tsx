@@ -2,6 +2,7 @@
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { TripState } from "@/lib/dtos/trip"
 
 type MapTopBarProps = {
   tripId: string | null
@@ -13,6 +14,10 @@ type MapTopBarProps = {
   isSaving?: boolean
   avgSpeedKnots: number
   onAvgSpeedKnotsChange: (v: number) => void
+  viewMode?: boolean
+  onToggleViewMode?: () => void
+  isLeader?: boolean
+  tripState?: TripState | null
 }
 
 export function MapTopBar({
@@ -25,7 +30,13 @@ export function MapTopBar({
   isSaving = false,
   avgSpeedKnots,
   onAvgSpeedKnotsChange,
+  viewMode = false,
+  onToggleViewMode = () => {},
+  isLeader = true,
+  tripState = null,
 }: MapTopBarProps) {
+  const showEditRoute = viewMode && isLeader && tripState !== "past"
+  const showDone = !viewMode
   const displayDistance =
     distanceUnit === "nm"
       ? totalDistance.toFixed(1)
@@ -95,6 +106,36 @@ export function MapTopBar({
           </label>
           <span>{dayCount} {dayCount === 1 ? "day" : "days"}</span>
         </div>
+
+        {/* Mode pill */}
+        <span className={cn(
+          "text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0",
+          viewMode
+            ? "border-border text-muted-foreground"
+            : "border-primary text-primary bg-primary/10",
+        )}>
+          {viewMode ? "Viewing" : "Editing"}
+        </span>
+
+        {showEditRoute && (
+          <button
+            type="button"
+            onClick={onToggleViewMode}
+            className="text-xs font-medium text-primary hover:underline shrink-0"
+          >
+            Edit route
+          </button>
+        )}
+
+        {showDone && (
+          <button
+            type="button"
+            onClick={onToggleViewMode}
+            className="text-xs font-medium text-primary hover:underline shrink-0"
+          >
+            Done
+          </button>
+        )}
 
         {/* Saving indicator — rendered once, visible on both viewports */}
         {isSaving && (
