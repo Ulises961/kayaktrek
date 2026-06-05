@@ -50,8 +50,8 @@ export function NewItineraryButton() {
   return (
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
-        <PlusIcon className="size-4 mr-2" />
-        New itinerary
+        <PlusIcon className="size-4" />
+        <span className="hidden sm:inline">New itinerary</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

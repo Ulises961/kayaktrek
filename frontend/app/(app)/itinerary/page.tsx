@@ -2,6 +2,7 @@ import { apiGet } from "@/lib/api/client"
 import { ItinerariesSchema } from "@/lib/dtos/itinerary"
 import { MapPinIcon } from "lucide-react"
 import { NewItineraryButton } from "@/components/itinerary/new-itinerary-button"
+import { ImportGpxButton } from "@/components/itinerary/import-gpx-button"
 import { ItineraryCard } from "@/components/itinerary/itinerary-card"
 
 export default async function ItineraryListPage() {
@@ -14,10 +15,13 @@ export default async function ItineraryListPage() {
   }
 
   return (
-    <div className="p-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Itineraries</h1>
-        <NewItineraryButton />
+    <>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h1 className="text-xl sm:text-2xl font-semibold">Itineraries</h1>
+        <div className="flex items-center gap-2">
+          <ImportGpxButton />
+          <NewItineraryButton />
+        </div>
       </div>
       {itineraries.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
@@ -25,12 +29,12 @@ export default async function ItineraryListPage() {
           <p className="text-sm">No itineraries yet.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-3 mt-4">
           {itineraries.map((itinerary) => (
             <ItineraryCard key={itinerary.id} itinerary={itinerary} />
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

@@ -20,7 +20,7 @@ interface FloatPlanTabProps {
 
 function SectionLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <p className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+    <p className="text-xs font-semibold uppercase tracking-[0.06em] flex items-center gap-1.5 text-muted-foreground">
       {icon}
       {children}
     </p>
@@ -30,9 +30,11 @@ function SectionLabel({ icon, children }: { icon: React.ReactNode; children: Rea
 function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-sm">
-      <span className="text-muted-foreground w-32 shrink-0">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div className="flex flex-col gap-0.5 min-w-0 md:flex-row md:gap-2 md:items-start">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70 leading-none md:text-sm md:normal-case md:tracking-normal md:font-normal md:text-muted-foreground md:w-32 md:shrink-0 md:pt-px">
+        {label}
+      </span>
+      <span className="text-sm text-foreground leading-snug break-words md:font-medium">{value}</span>
     </div>
   )
 }
@@ -121,7 +123,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
           <div className="flex flex-col gap-4">
             <SectionLabel icon={<AnchorIcon className="size-4" />}>Vessel</SectionLabel>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpVesselMake">Make</Label>
                 <Input id="fpVesselMake" placeholder="e.g. Wilderness Systems" disabled={isPending} {...register("vesselMake")} />
@@ -131,7 +133,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
                 <Input id="fpVesselModel" placeholder="e.g. Tempest 170" disabled={isPending} {...register("vesselModel")} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpVesselLength">Length (cm)</Label>
                 <Input id="fpVesselLength" type="number" min={1} disabled={isPending} {...register("vesselLengthCm")} />
@@ -152,7 +154,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
           <div className="flex flex-col gap-4">
             <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Emergency contact</SectionLabel>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpEmergencyName">Name</Label>
                 <Input id="fpEmergencyName" disabled={isPending} {...register("emergencyContactName")} />
@@ -180,23 +182,21 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
         </form>
       ) : (
-        <div className="flex flex-col gap-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-6 flex-1">
-              <div className="flex flex-col gap-3">
-                <SectionLabel icon={<AnchorIcon className="size-4" />}>Vessel</SectionLabel>
-                <VesselReadOnly member={currentMember} />
-              </div>
-              <Separator />
-              <div className="flex flex-col gap-3">
-                <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Emergency contact</SectionLabel>
-                <EmergencyReadOnly member={currentMember} />
-              </div>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <SectionLabel icon={<AnchorIcon className="size-4" />}>Vessel</SectionLabel>
+              <Button variant="ghost" size="sm" onClick={handleEdit} className="shrink-0 h-6 px-2 text-xs">
+                <PencilIcon className="size-3" />
+                Edit
+              </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={handleEdit} className="shrink-0">
-              <PencilIcon className="size-3.5" />
-              Edit
-            </Button>
+            <VesselReadOnly member={currentMember} />
+          </div>
+          <Separator />
+          <div className="flex flex-col gap-3">
+            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Emergency contact</SectionLabel>
+            <EmergencyReadOnly member={currentMember} />
           </div>
         </div>
       )}

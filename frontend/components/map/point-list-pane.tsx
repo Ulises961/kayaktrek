@@ -256,7 +256,10 @@ export function PointListPane() {
   }
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-64 z-[1001] bg-background/95 border-l border-border flex flex-col overflow-hidden">
+    <div
+      data-testid="point-list-pane"
+      className="absolute right-0 top-0 bottom-0 w-56 sm:w-64 z-[1001] bg-background/95 border-l border-border flex flex-col overflow-hidden"
+    >
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
         <button

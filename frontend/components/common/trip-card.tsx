@@ -7,6 +7,7 @@ import type { Trip, TripState } from "@/lib/dtos/trip"
 
 interface TripCardProps {
   trip: Trip
+  hero?: boolean
 }
 
 const STATE_ACCENT: Record<TripState, string> = {
@@ -29,7 +30,7 @@ function formatDateRange(from: string, to: string): string {
   return sameYear ? `${short(f)} – ${full(t)}` : `${full(f)} – ${full(t)}`
 }
 
-export function TripCard({ trip }: TripCardProps) {
+export function TripCard({ trip, hero = false }: TripCardProps) {
   const { id, destination, state, dateFrom, dateTo, travellers } = trip
   const crewCount = travellers?.length ?? 0
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
@@ -37,12 +38,18 @@ export function TripCard({ trip }: TripCardProps) {
   return (
     <Link href={`/trips/${id}`}>
       <Card
-        className={cn("hover:bg-accent/50 transition-colors cursor-pointer border-l-[3px]")}
-        style={{ borderLeftColor: state ? STATE_ACCENT[state] : undefined }}
+        className={cn(
+          "transition-colors cursor-pointer",
+          hero ? "border-l-[4px]" : "border-l-[3px] hover:bg-accent/50",
+        )}
+        style={{
+          borderLeftColor: state ? STATE_ACCENT[state] : undefined,
+          ...(hero ? { backgroundColor: "var(--state-happening-bg)" } : {}),
+        }}
       >
         <CardHeader className="pb-1.5 pt-3 px-3">
           <div className="flex items-start justify-between gap-2 min-w-0">
-            <CardTitle className="text-sm font-semibold leading-snug truncate min-w-0">
+            <CardTitle className={cn("font-semibold leading-snug truncate min-w-0", hero ? "text-base" : "text-sm")}>
               {destination ?? "Untitled trip"}
             </CardTitle>
             {state && <StateBadge state={state} className="shrink-0 self-start" />}
