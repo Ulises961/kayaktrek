@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
@@ -19,10 +19,6 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
     trip = TripSchema.parse(raw)
   } catch {
     notFound()
-  }
-
-  if (trip.state === "happening" && trip.itinerary?.id) {
-    redirect(`/itinerary/${trip.itinerary.id}`)
   }
 
   const session = await getSession()
