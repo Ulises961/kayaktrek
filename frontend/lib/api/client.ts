@@ -66,6 +66,16 @@ export async function apiDelete(path: string, extraHeaders?: Record<string, stri
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 
+// Unauthenticated GET — for public endpoints that must not redirect to /login on failure.
+export async function apiGetPublic<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    next: { revalidate: 300 },
+  })
+  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  return res.json() as Promise<T>
+}
+
 // Multipart upload — omits Content-Type so the browser sets the boundary.
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const token = await getAccessToken()

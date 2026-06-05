@@ -1,18 +1,46 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import MapLoader from "@/components/map/map-loader"
 import { getSession } from "@/lib/auth/session"
+import { apiGetPublic } from "@/lib/api/client"
+import { PublicItinerariesSchema, PublicItineraryDetailSchema } from "@/lib/dtos/itinerary"
+import { extractRouteData } from "@/lib/itinerary/public-routes"
+import type { RouteData } from "@/lib/itinerary/public-routes"
+
+async function fetchLandingRoutes(): Promise<RouteData[]> {
+  try {
+    const list = PublicItinerariesSchema.parse(
+      await apiGetPublic<unknown[]>("/api/itinerary/explore")
+    )
+    const ids = list.map((i) => i.id).filter(Boolean) as string[]
+    const details = await Promise.all(
+      ids.slice(0, 20).map(async (id) => {
+        try {
+          const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
+          return PublicItineraryDetailSchema.parse(raw)
+        } catch {
+          return null
+        }
+      })
+    )
+    return details.filter(Boolean).map((d) => extractRouteData(d!))
+  } catch {
+    return []
+  }
+}
 
 export default async function LandingPage() {
   const session = await getSession()
   if (session) redirect("/dashboard")
+
+  const routes = await fetchLandingRoutes()
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* Full-screen map */}
       <div className="absolute inset-0">
-        <MapLoader />
+        <MapLoader routes={routes} />
       </div>
 
       {/* Top bar */}
@@ -30,15 +58,14 @@ export default async function LandingPage() {
         </div>
       </div>
 
-      {/* Search bar overlay */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1001] w-full max-w-md px-4">
-        <div className="flex items-center gap-2 bg-white rounded-lg shadow-md border border-slate-200 px-3 py-2">
-          <Input
-            placeholder="Search public expeditions…"
-            className="border-0 shadow-none focus-visible:ring-0 bg-transparent"
-          />
+      {/* Route count overlay */}
+      {routes.length > 0 && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1001]">
+          <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-slate-700 shadow border border-slate-200">
+            {routes.length} public {routes.length === 1 ? "route" : "routes"} shared by the community
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

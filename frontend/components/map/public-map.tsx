@@ -2,56 +2,22 @@
 
 import { MapContainer, TileLayer, Polyline, Popup } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
+import type { RouteData } from "@/lib/itinerary/public-routes"
 
-type PublicRoute = {
-  name: string
-  color: string
-  positions: [number, number][]
-}
-
-// Mock public itineraries — replaced with real API data in M7
-const MOCK_ROUTES: PublicRoute[] = [
-  {
-    name: "Cinque Terre — 4 days",
-    color: "#0ea5e9",
-    positions: [
-      [44.1053, 9.7289],
-      [44.1272, 9.7172],
-      [44.1461, 9.6814],
-      [44.1558, 9.6503],
-      [44.1675, 9.6396],
-    ],
-  },
-  {
-    name: "Gulf of Orosei — 5 days",
-    color: "#10b981",
-    positions: [
-      [40.1667, 9.75],
-      [40.1333, 9.7333],
-      [40.1, 9.7167],
-      [40.0667, 9.7],
-      [40.05, 9.6833],
-    ],
-  },
-  {
-    name: "Kornati Islands — 6 days",
-    color: "#f59e0b",
-    positions: [
-      [43.8333, 15.3167],
-      [43.8, 15.35],
-      [43.7667, 15.3833],
-      [43.7333, 15.4167],
-      [43.7, 15.45],
-      [43.6667, 15.4833],
-    ],
-  },
+const ROUTE_COLORS = [
+  "#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
+  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#6366f1",
 ]
 
-export default function PublicMap() {
+type Props = {
+  routes?: RouteData[]
+}
+
+export default function PublicMap({ routes = [] }: Props) {
   return (
     <MapContainer
       center={[43, 13]}
-      zoom={6}
+      zoom={5}
       className="w-full h-full"
       zoomControl={false}
     >
@@ -59,15 +25,26 @@ export default function PublicMap() {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {MOCK_ROUTES.map((route) => (
-        <Polyline
-          key={route.name}
-          positions={route.positions}
-          pathOptions={{ color: route.color, weight: 3, opacity: 0.8 }}
-        >
-          <Popup>{route.name}</Popup>
-        </Polyline>
-      ))}
+      {routes.map((route, i) => {
+        if (route.positions.length === 0) return null
+        return (
+          <Polyline
+            key={route.id}
+            positions={route.positions}
+            pathOptions={{
+              color: ROUTE_COLORS[i % ROUTE_COLORS.length],
+              weight: 3,
+              opacity: 0.8,
+            }}
+          >
+            <Popup>
+              <strong>{route.name}</strong>
+              {route.dayCount > 0 && <div>{route.dayCount} days</div>}
+              {route.totalMiles != null && <div>{route.totalMiles.toFixed(1)} nm</div>}
+            </Popup>
+          </Polyline>
+        )
+      })}
     </MapContainer>
   )
 }
