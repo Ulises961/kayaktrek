@@ -21,8 +21,9 @@ import { DayDetailPanel } from "../day-detail-panel"
 const DAY1_ID = "day-1"
 const ITIN_ID = "itin-1"
 
-const pt = (id: string, name?: string): Point => ({
-  id, type: "position", latitude: 44, longitude: 14, dayId: DAY1_ID, name: name ?? undefined,
+const pt = (id: string, name?: string, notes?: string): Point => ({
+  id, type: "position", latitude: 44, longitude: 14, dayId: DAY1_ID,
+  name: name ?? undefined, notes: notes ?? undefined,
 })
 
 const day1: Day = { id: DAY1_ID, dayNumber: 1, itineraryId: ITIN_ID }
@@ -103,12 +104,35 @@ describe("DayDetailPanel — point list", () => {
     // p3 has no name, is at index 3 in pointOrder
     expect(screen.getByText("3")).toBeInTheDocument()
   })
+
+  it("shows notes preview for crew when point has notes", () => {
+    const state = {
+      points: [pt("p1", "Harbour", "Exposed beach landing")],
+      pointOrder: ["p1"],
+      pendingPointId: null, pendingPointName: null, savingCount: 0, days: [day1],
+    }
+    renderWithCtx(makeCtx({ state: state as never, isLeader: false }))
+    expect(screen.getByText("Exposed beach landing")).toBeInTheDocument()
+  })
+
+  it("does not show notes text for crew when point has no notes", () => {
+    renderWithCtx(makeCtx({ isLeader: false }))
+    expect(screen.queryByPlaceholderText("Notes…")).not.toBeInTheDocument()
+  })
 })
 
 describe("DayDetailPanel — leader vs crew", () => {
   it("renders an editable name input for leaders", () => {
     renderWithCtx(makeCtx({ isLeader: true }))
-    expect(screen.getAllByRole("textbox")).not.toHaveLength(0)
+    const nameInputs = screen.getAllByRole("textbox").filter(
+      (el) => (el as HTMLInputElement).placeholder !== "Notes…"
+    )
+    expect(nameInputs).not.toHaveLength(0)
+  })
+
+  it("renders a notes input for leaders", () => {
+    renderWithCtx(makeCtx({ isLeader: true }))
+    expect(screen.getAllByPlaceholderText("Notes…")).not.toHaveLength(0)
   })
 
   it("renders no editable inputs for crew", () => {
@@ -116,12 +140,47 @@ describe("DayDetailPanel — leader vs crew", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
+  it("calls updatePoint with notes on notes blur", async () => {
+    renderWithCtx(makeCtx({ isLeader: true }))
+    const notesInput = screen.getAllByPlaceholderText("Notes…")[0]
+    await userEvent.click(notesInput)
+    await userEvent.type(notesInput, "Tricky current")
+    await userEvent.tab()
+    expect(mockUpdatePoint).toHaveBeenCalledWith("p1", expect.objectContaining({ notes: "Tricky current" }))
+  })
+
   it("calls updatePoint on blur when leader edits a name", async () => {
     renderWithCtx(makeCtx({ isLeader: true }))
-    const inputs = screen.getAllByRole("textbox")
-    await userEvent.clear(inputs[0])
-    await userEvent.type(inputs[0], "New Harbour")
+    const nameInput = screen.getAllByRole("textbox").find(
+      (el) => (el as HTMLInputElement).placeholder !== "Notes…"
+    )!
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New Harbour")
     await userEvent.tab()
     expect(mockUpdatePoint).toHaveBeenCalledWith("p1", expect.objectContaining({ name: "New Harbour" }))
+  })
+})
+
+describe("DayDetailPanel — past trip state", () => {
+  it("renders no editable inputs for leader on a past trip", () => {
+    renderWithCtx(makeCtx({ isLeader: true, tripState: "past" }))
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+  })
+
+  it("shows read-only name spans for leader on a past trip", () => {
+    renderWithCtx(makeCtx({ isLeader: true, tripState: "past" }))
+    expect(screen.getByText("Harbour")).toBeInTheDocument()
+    expect(screen.getByText("Cala Bianca")).toBeInTheDocument()
+  })
+
+  it("shows notes preview (not input) for leader on a past trip", () => {
+    const state = {
+      points: [pt("p1", "Harbour", "Rocky approach")],
+      pointOrder: ["p1"],
+      pendingPointId: null, pendingPointName: null, savingCount: 0, days: [day1],
+    }
+    renderWithCtx(makeCtx({ state: state as never, isLeader: true, tripState: "past" }))
+    expect(screen.getByText("Rocky approach")).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText("Notes…")).not.toBeInTheDocument()
   })
 })

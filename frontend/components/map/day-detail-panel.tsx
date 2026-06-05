@@ -13,56 +13,81 @@ const TYPE_ICON: Record<string, string> = {
 type PointRowProps = {
   point: Point
   index: number
-  isLeader: boolean
-  onNameSave: (id: string, name: string) => void
+  canEdit: boolean
+  onSave: (id: string, fields: Partial<Pick<Point, "name" | "notes">>) => void
 }
 
-function DetailPointRow({ point, index, isLeader, onNameSave }: PointRowProps) {
-  const [draft, setDraft] = useState(point.name ?? "")
+function DetailPointRow({ point, index, canEdit, onSave }: PointRowProps) {
+  const [draftName, setDraftName] = useState(point.name ?? "")
+  const [draftNotes, setDraftNotes] = useState(point.notes ?? "")
 
-  const handleBlur = useCallback(() => {
-    const trimmed = draft.trim()
+  const handleNameBlur = useCallback(() => {
+    const trimmed = draftName.trim()
     if (trimmed !== (point.name ?? "")) {
-      onNameSave(point.id!, trimmed)
+      onSave(point.id!, { name: trimmed })
     }
-  }, [draft, point.name, point.id, onNameSave])
+  }, [draftName, point.name, point.id, onSave])
+
+  const handleNotesBlur = useCallback(() => {
+    const trimmed = draftNotes.trim()
+    if (trimmed !== (point.notes ?? "")) {
+      onSave(point.id!, { notes: trimmed })
+    }
+  }, [draftNotes, point.notes, point.id, onSave])
 
   const label = point.name || String(index)
 
   return (
-    <li className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/30 rounded">
-      <span className="text-xs text-muted-foreground w-4 shrink-0">{index}</span>
-      <span className="text-muted-foreground w-5 shrink-0 text-center">
-        {TYPE_ICON[point.type ?? "position"] ?? "·"}
-      </span>
-      {isLeader ? (
-        <input
-          className="flex-1 min-w-0 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none border-b border-transparent focus:border-border"
-          value={draft}
-          placeholder={String(index)}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={handleBlur}
-        />
-      ) : (
-        <span className="flex-1 min-w-0 text-foreground truncate">{label}</span>
-      )}
+    <li className="flex flex-col px-3 py-1.5 text-sm hover:bg-muted/30 rounded">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground w-4 shrink-0">{index}</span>
+        <span className="text-muted-foreground w-5 shrink-0 text-center">
+          {TYPE_ICON[point.type ?? "position"] ?? "·"}
+        </span>
+        {canEdit ? (
+          <input
+            className="flex-1 min-w-0 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none border-b border-transparent focus:border-border"
+            value={draftName}
+            placeholder={String(index)}
+            onChange={(e) => setDraftName(e.target.value)}
+            onBlur={handleNameBlur}
+          />
+        ) : (
+          <span className="flex-1 min-w-0 text-foreground truncate">{label}</span>
+        )}
+      </div>
+      {canEdit ? (
+        <div className="pl-9">
+          <input
+            className="w-full bg-transparent text-xs text-muted-foreground placeholder-muted-foreground/60 focus:outline-none border-b border-transparent focus:border-border/50"
+            value={draftNotes}
+            placeholder="Notes…"
+            onChange={(e) => setDraftNotes(e.target.value)}
+            onBlur={handleNotesBlur}
+          />
+        </div>
+      ) : point.notes ? (
+        <p className="pl-9 text-xs text-muted-foreground truncate">{point.notes}</p>
+      ) : null}
     </li>
   )
 }
 
 export function DayDetailPanel() {
-  const { state, dispatch, selectedDayId, isLeader } = useMapBuilder()
+  const { state, dispatch, selectedDayId, isLeader, tripState } = useMapBuilder()
 
   if (!selectedDayId) return null
+
+  const canEdit = isLeader && tripState !== "past"
 
   const dayPoints = state.pointOrder
     .map((id) => state.points.find((p) => p.id === id))
     .filter((p): p is Point => p !== undefined && p.dayId === selectedDayId)
 
-  const handleNameSave = useCallback(
-    async (id: string, name: string) => {
-      dispatch({ type: "POINT_UPDATE", id, fields: { name } })
-      await updatePoint(id, { name })
+  const handleSave = useCallback(
+    async (id: string, fields: Partial<Pick<Point, "name" | "notes">>) => {
+      dispatch({ type: "POINT_UPDATE", id, fields })
+      await updatePoint(id, fields)
     },
     [dispatch],
   )
@@ -77,8 +102,8 @@ export function DayDetailPanel() {
               key={point.id}
               point={point}
               index={globalIdx || i + 1}
-              isLeader={isLeader}
-              onNameSave={handleNameSave}
+              canEdit={canEdit}
+              onSave={handleSave}
             />
           )
         })}
