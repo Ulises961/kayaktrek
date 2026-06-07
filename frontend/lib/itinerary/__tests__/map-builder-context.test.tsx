@@ -30,6 +30,14 @@ const MOCK_CTX: MapBuilderContextValue = {
   activePointId: null,
   setActivePointId: () => {},
   day0Id: null,
+  viewMode: true,
+  setViewMode: () => {},
+  selectedDayId: null,
+  setSelectedDayId: () => {},
+  selectedPointId: null,
+  setSelectedPointId: () => {},
+  tripState: null,
+  isLeader: true,
 }
 
 describe("useMapBuilder", () => {
