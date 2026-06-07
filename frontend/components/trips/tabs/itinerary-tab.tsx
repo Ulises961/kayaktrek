@@ -16,6 +16,7 @@ export interface ItineraryTabProps {
   tripId: string
   itinerary: Itinerary | null | undefined
   isLeader: boolean
+  tripName?: string
 }
 
 const COLLAPSE_LIMIT = 5
@@ -125,10 +126,10 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ItineraryTab({ tripId, itinerary, isLeader }: ItineraryTabProps) {
+export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: ItineraryTabProps) {
   const [isPending, startTransition] = useTransition()
   const [showAll, setShowAll] = useState(false)
-  const [name, setName] = useState("")
+  const [name, setName] = useState(tripName ?? "")
   const router = useRouter()
 
   function handleCreate() {

@@ -34,6 +34,10 @@ export type ApplyBoundariesResult =
   | { success: true; itinerary: Itinerary }
   | { success: false; error: string }
 
+export type CreateTripFromItineraryResult =
+  | { success: true; tripId: string }
+  | { success: false; error: string }
+
 export async function createItinerary(
   params: { tripId?: string | null; name?: string }
 ): Promise<ItineraryActionResult> {
@@ -193,6 +197,22 @@ export async function forkItinerary(id: string): Promise<ItineraryActionResult> 
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to fork itinerary." }
+  }
+}
+
+export async function createTripFromItinerary(
+  itineraryId: string,
+  tripName: string
+): Promise<CreateTripFromItineraryResult> {
+  try {
+    const trip = await apiPost<{ id: string }>("/api/trip/create", { destination: tripName.trim() })
+    await apiPatch(`/api/itinerary/${itineraryId}`, { tripId: trip.id })
+    revalidatePath("/itinerary")
+    revalidatePath(`/trips/${trip.id}`)
+    return { success: true, tripId: trip.id }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to create trip." }
   }
 }
 
