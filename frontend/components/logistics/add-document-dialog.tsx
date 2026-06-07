@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { FileIcon, PaperclipIcon, PlusIcon, XIcon } from "lucide-react"
 import { createTravelDocument, uploadTravelDocumentAttachment } from "@/lib/travel-documents/actions"
@@ -42,10 +42,12 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { register, handleSubmit, setValue, watch, setError, reset, formState: { errors } } = useForm<TravelDocumentFields>({
+  const { register, handleSubmit, setValue, control, setError, reset, formState: { errors } } = useForm<TravelDocumentFields>({
     resolver: zodResolver(TravelDocumentFieldsSchema),
     defaultValues: { type: "accommodation" },
   })
+  const watchDate = useWatch({ control, name: "date" })
+  const watchExpiryDate = useWatch({ control, name: "expiryDate" })
 
   function handleOpen(v: boolean) {
     setOpen(v)
@@ -132,7 +134,7 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
               <div className="flex flex-col gap-1.5">
                 <FieldLabel>Date</FieldLabel>
                 <DatePicker
-                  value={watch("date") ?? ""}
+                  value={watchDate ?? ""}
                   onChange={(v) => setValue("date", v, { shouldValidate: true })}
                   placeholder="Service date"
                   disabled={isPending}
@@ -141,7 +143,7 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
               <div className="flex flex-col gap-1.5">
                 <FieldLabel>Expiry date</FieldLabel>
                 <DatePicker
-                  value={watch("expiryDate") ?? ""}
+                  value={watchExpiryDate ?? ""}
                   onChange={(v) => setValue("expiryDate", v, { shouldValidate: true })}
                   placeholder="Expiry date"
                   disabled={isPending}

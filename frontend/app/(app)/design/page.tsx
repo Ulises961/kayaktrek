@@ -6,8 +6,8 @@ import { TripCard } from "@/components/common/trip-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { WindIcon, WavesIcon, MapPinIcon, UsersIcon, RadioIcon } from "lucide-react"
-import { TRIP_STATES, TRIP_STATE_LABELS, type Trip } from "@/lib/dtos/trip"
+import { WavesIcon, UsersIcon, RadioIcon } from "lucide-react"
+import { TRIP_STATES, type Trip } from "@/lib/dtos/trip"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

@@ -17,11 +17,6 @@ function formatDate(iso: string | null | undefined) {
   try { return format(new Date(iso), "d MMM yyyy") } catch { return iso }
 }
 
-function formatLength(cm: number | null | undefined) {
-  if (!cm) return null
-  return `${(cm / 100).toFixed(2)} m`
-}
-
 function SectionHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground border-b pb-1.5 mb-3">
@@ -31,15 +26,6 @@ function SectionHeading({ icon, children }: { icon: React.ReactNode; children: R
   )
 }
 
-function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
-  if (!value) return null
-  return (
-    <div className="flex gap-2 text-sm">
-      <span className="text-muted-foreground w-36 shrink-0">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  )
-}
 
 
 export default async function FloatPlanPage({ params }: { params: Promise<{ id: string }> }) {

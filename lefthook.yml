@@ -20,14 +20,15 @@ pre-commit:
     frontend-eslint:
       glob: "frontend/**/*.{ts,tsx}"
       run: cd frontend && pnpm lint {staged_files}
-    frontend-typecheck:
-      glob: "frontend/**/*.{ts,tsx}"
-      run: cd frontend && pnpm tsc --noEmit
 
 pre-push:
   parallel: true
   commands:
     backend-tests:
       run: cd backend && .venv/bin/pytest -n auto
+    frontend-lint:
+      run: cd frontend && pnpm lint
+    frontend-typecheck:
+      run: cd frontend && pnpm tsc --noEmit
     frontend-tests:
       run: cd frontend && pnpm test:run

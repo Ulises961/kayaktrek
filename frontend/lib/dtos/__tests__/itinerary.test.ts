@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { DaySchema, DaysSchema } from "../day"
+import { DaySchema } from "../day"
 import { ItinerarySchema } from "../itinerary"
 import { PointSchema } from "../point"
 
