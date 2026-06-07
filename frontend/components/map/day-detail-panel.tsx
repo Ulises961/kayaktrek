@@ -1,23 +1,36 @@
 "use client"
 import { useState, useCallback } from "react"
+import { Anchor, Star, CircleDot, GripVertical } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { updatePoint } from "@/lib/itinerary/actions"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel"
 import type { Point } from "@/lib/dtos/point"
 
-const TYPE_ICON: Record<string, string> = {
-  stop: "⚓",
-  position: "·",
-  interest: "★",
+function TypeIcon({ type }: { type: string }) {
+  if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
+  if (type === "interest") return <Star className="size-3.5 shrink-0" />
+  return <CircleDot className="size-3.5 shrink-0" />
 }
 
-type PointRowProps = {
+function coordLabel(point: Point): string {
+  if (point.latitude != null && point.longitude != null) {
+    return `${point.latitude.toFixed(4)}°, ${point.longitude.toFixed(4)}°`
+  }
+  return "—"
+}
+
+type PointCardProps = {
   point: Point
   index: number
   canEdit: boolean
   onSave: (id: string, fields: Partial<Pick<Point, "name" | "notes">>) => void
 }
 
-function DetailPointRow({ point, index, canEdit, onSave }: PointRowProps) {
+function PointCard({ point, index, canEdit, onSave }: PointCardProps) {
   const [draftName, setDraftName] = useState(point.name ?? "")
   const [draftNotes, setDraftNotes] = useState(point.notes ?? "")
 
@@ -35,41 +48,56 @@ function DetailPointRow({ point, index, canEdit, onSave }: PointRowProps) {
     }
   }, [draftNotes, point.notes, point.id, onSave])
 
-  const label = point.name || String(index)
+  const firstImage = point.images?.[0]
+  const displayLabel = point.name || coordLabel(point)
 
   return (
-    <li className="flex flex-col px-3 py-1.5 text-sm hover:bg-muted/30 rounded">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground w-4 shrink-0">{index}</span>
-        <span className="text-muted-foreground w-5 shrink-0 text-center">
-          {TYPE_ICON[point.type ?? "position"] ?? "·"}
-        </span>
-        {canEdit ? (
-          <input
-            className="flex-1 min-w-0 bg-transparent text-foreground placeholder-muted-foreground focus:outline-none border-b border-transparent focus:border-border"
-            value={draftName}
-            placeholder={String(index)}
-            onChange={(e) => setDraftName(e.target.value)}
-            onBlur={handleNameBlur}
-          />
-        ) : (
-          <span className="flex-1 min-w-0 text-foreground truncate">{label}</span>
-        )}
-      </div>
-      {canEdit ? (
-        <div className="pl-9">
-          <input
-            className="w-full bg-transparent text-xs text-muted-foreground placeholder-muted-foreground/60 focus:outline-none border-b border-transparent focus:border-border/50"
-            value={draftNotes}
-            placeholder="Notes…"
-            onChange={(e) => setDraftNotes(e.target.value)}
-            onBlur={handleNotesBlur}
+    <div className="flex flex-col rounded-lg border border-border bg-card overflow-hidden w-36">
+      {firstImage?.location && (
+        <div className="h-16 shrink-0 bg-muted overflow-hidden">
+          <img
+            src={firstImage.location}
+            alt={point.name ?? "Point photo"}
+            className="w-full h-full object-cover"
           />
         </div>
-      ) : point.notes ? (
-        <p className="pl-9 text-xs text-muted-foreground truncate">{point.notes}</p>
-      ) : null}
-    </li>
+      )}
+      <div className="flex flex-1 min-w-0">
+        <div className="w-5 shrink-0 flex items-center justify-center border-r border-border/40 text-muted-foreground/30 cursor-grab active:cursor-grabbing">
+          <GripVertical className="size-3" />
+        </div>
+        <div className="flex flex-col gap-1 p-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="text-xs font-mono w-4 shrink-0 text-muted-foreground/70">{index}</span>
+            <TypeIcon type={point.type ?? "position"} />
+            {canEdit ? (
+              <input
+                className="flex-1 min-w-0 bg-transparent text-xs font-medium text-foreground placeholder-muted-foreground/60 focus:outline-none border-b border-transparent focus:border-border"
+                value={draftName}
+                placeholder={coordLabel(point)}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={handleNameBlur}
+              />
+            ) : (
+              <span className="flex-1 min-w-0 text-xs font-medium text-foreground truncate">
+                {displayLabel}
+              </span>
+            )}
+          </div>
+          {canEdit ? (
+            <input
+              className="w-full bg-transparent text-xs text-muted-foreground placeholder-muted-foreground/60 focus:outline-none border-b border-transparent focus:border-border/50"
+              value={draftNotes}
+              placeholder="Notes…"
+              onChange={(e) => setDraftNotes(e.target.value)}
+              onBlur={handleNotesBlur}
+            />
+          ) : point.notes ? (
+            <p className="text-xs text-muted-foreground line-clamp-2">{point.notes}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -93,21 +121,19 @@ export function DayDetailPanel() {
   )
 
   return (
-    <div className="bg-background/95 border-t border-border max-h-[40vh] overflow-y-auto">
-      <ul role="list" className="py-1">
-        {dayPoints.map((point, i) => {
-          const globalIdx = state.pointOrder.indexOf(point.id!) + 1
-          return (
-            <DetailPointRow
-              key={point.id}
-              point={point}
-              index={globalIdx || i + 1}
-              canEdit={canEdit}
-              onSave={handleSave}
-            />
-          )
-        })}
-      </ul>
+    <div className="bg-background/95 border-t border-border py-2">
+      <Carousel opts={{ align: "start", dragFree: true }}>
+        <CarouselContent className="-ml-2 px-3">
+          {dayPoints.map((point) => {
+            const globalIdx = state.pointOrder.indexOf(point.id!) + 1
+            return (
+              <CarouselItem key={point.id} className="pl-2 basis-auto">
+                <PointCard point={point} index={globalIdx} canEdit={canEdit} onSave={handleSave} />
+              </CarouselItem>
+            )
+          })}
+        </CarouselContent>
+      </Carousel>
     </div>
   )
 }

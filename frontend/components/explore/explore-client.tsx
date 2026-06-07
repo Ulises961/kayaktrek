@@ -32,14 +32,14 @@ export function ExploreClient({ routes, isAuthenticated }: Props) {
   }
 
   return (
-    <div className="flex flex-col md:flex-row md:h-full">
-      {/* Map panel — fixed height on mobile, fills remaining space on desktop */}
-      <div className="h-[45vw] min-h-48 max-h-80 md:max-h-none md:h-full md:flex-1 md:min-w-0 shrink-0">
+    <div className="flex flex-col xl:flex-row xl:h-full">
+      {/* Map panel — fixed height on mobile/md/lg, fills remaining space on xl+ */}
+      <div className="h-[45vw] min-h-48 max-h-80 xl:max-h-none xl:h-full xl:flex-1 xl:min-w-0 shrink-0">
         <ExploreMap routes={routes} selectedId={selectedId} />
       </div>
 
-      {/* Card list — flows below map on mobile, scrollable sidebar on desktop */}
-      <div className="md:w-80 md:shrink-0 md:overflow-y-auto flex flex-col gap-2 p-3 border-t md:border-t-0 md:border-l border-border bg-background">
+      {/* Card list — flows below map up to xl, scrollable sidebar on xl+ */}
+      <div className="xl:w-80 xl:shrink-0 xl:overflow-y-auto flex flex-col gap-2 p-3 border-t xl:border-t-0 xl:border-l border-border bg-background">
         {routes.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
             <RouteIcon className="size-8 opacity-30" />

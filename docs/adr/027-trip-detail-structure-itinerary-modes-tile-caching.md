@@ -193,6 +193,74 @@ thumbnail (M4b/deferred), the itinerary map (current), M8 (expedition mode), and
 (offline mobile). They should be scoped as a dedicated infrastructure milestone before
 M8, not bolted onto any single feature.
 
+**Tile sources and layer strategy (resolved)**
+
+Three map layers, each with a distinct access model:
+
+| Layer | Source | Access model | Resolution | Who |
+|-------|--------|--------------|------------|-----|
+| Base map | OpenStreetMap | Cached in MinIO; served from own origin | — | All users |
+| Satellite | Sentinel-2 L2A (Copernicus/ESA) via AWS Open Data | Rendered by titiler; cached in MinIO | 10 m | All users |
+| Satellite HD | Mapbox Satellite | Direct client↔Mapbox fetch; no server cache | < 1 m | Premium users |
+
+**Base map (OSM)**: a caching reverse proxy (nginx or thin Flask endpoint) fetches from
+OSM tile servers on miss and stores in MinIO. Long TTL — OSM tiles are stable. Feeds
+the device cache download for offline use.
+
+**Satellite free tier (Sentinel-2)**: Sentinel-2 L2A COGs from AWS Open Data (Element84)
+are rendered to XYZ tiles on demand by **titiler** (`developmentseed/titiler`, MIT
+licensed), deployed as a sidecar service in the compose stack. Tiles are cached in MinIO
+under a `sentinel/` prefix with a medium TTL (Sentinel-2 revisits every 5 days; tiles
+change slowly). Coverage: global, 56°S–84°N. Fully public domain — no ToS constraints.
+Resolution at 10 m is sufficient for route-level coastal planning (distinguishing beach
+from rocks, reading headland exposure) but not for sub-metre point inspection.
+
+**Satellite HD (Mapbox, premium)**: tiles are fetched directly from Mapbox's CDN by the
+user's browser — no server-side caching or storage. The backend checks subscription
+status and issues a short-lived, referrer-domain-restricted Mapbox access token for
+the session. The frontend uses this token in Leaflet for that session only. This model
+is fully ToS-compliant: Mapbox's restriction is on caching and re-serving tiles, not
+on brokered client-direct access.
+
+Mapbox HD satellite is the primary premium value proposition: sub-metre coastal imagery
+enables inspection of specific landing beaches, rock platforms, and hazard detail that
+10 m Sentinel-2 cannot resolve. This maps directly to the map-first planning use case
+(ADR-006).
+
+Cost model: at ~$0.50–$1 per 1,000 tile requests, a premium user doing a full planning
+session loads ~200–400 tiles (~$0.10–$0.40). A modest subscription price covers costs
+at any realistic user count.
+
+Sources evaluated and rejected:
+- **NASA GIBS (MODIS)**: 250 m resolution — too coarse for coastal point placement.
+- **Esri World Imagery**: higher resolution than Sentinel-2 in some areas, but ToS
+  ambiguity for caching. Mapbox HD covers the high-resolution need more cleanly via
+  the premium model.
+
+### 7. Point detail: zoom-and-sheet interaction
+
+Tapping a point card in the day detail carousel triggers a two-step interaction:
+
+1. **Map zooms to the point** (`flyTo(lat, lng, zoom ~14)`) with a bottom padding
+   offset equal to the sheet height, so the point centres in the visible map area
+   above the sheet rather than behind it.
+2. **A bottom sheet slides up** (~55 vh) showing: full notes (no truncation), photo
+   gallery, exact coordinates, point type.
+
+The sheet covers the lower portion of the map. This is intentional: at the moment of
+point inspection the user's focus shifts from spatial overview to point detail, and the
+zoomed map above the sheet provides the relevant coastal context (the specific beach,
+headland, or hazard) rather than the full-route view. This mirrors the established
+pattern in Google Maps and similar apps.
+
+When the sheet is dismissed, the map remains at the zoomed level. The user controls
+pan and zoom from that point. The day carousel and day detail carousel remain accessible
+below the sheet so the user can navigate to the next point without closing.
+
+Rationale for sheet over a separate route (`/itinerary/[id]/point/[id]`): navigation
+to a new page discards carousel position, selected day, and map state. A sheet
+preserves all context and is dismissible in one gesture.
+
 ---
 
 ## Consequences
@@ -225,5 +293,10 @@ M8, not bolted onto any single feature.
   co-leader transition state? edit the route?) not yet defined.
 - **"Download for offline" UX**: what bounding box strategy? Route corridor + N km
   margin? User-drawn box? What zoom levels? Design before M8.
-- **Tile proxy choice**: TileServer GL vs a simple caching reverse proxy (nginx +
-  MinIO) vs a custom Flask tile endpoint. Evaluate at the infrastructure milestone.
+- **Tile proxy choice**: resolved in decision 6. OSM uses a caching reverse proxy
+  (nginx or thin Flask endpoint) storing in MinIO. Sentinel-2 uses titiler as a
+  sidecar rendering COGs from AWS Open Data. TileServer GL is not used.
+- **Premium subscription model**: the Mapbox HD layer is the first premium feature.
+  Subscription tiers, pricing, and billing infrastructure are out of scope until the
+  feature set is closer to complete. The backend must support a `is_premium` flag on
+  User before the Mapbox token issuance endpoint can be built.

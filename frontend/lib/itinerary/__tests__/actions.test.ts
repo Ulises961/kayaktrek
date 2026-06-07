@@ -15,7 +15,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
-import { createItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay, applyBoundaries } from "../actions"
+import { createItinerary, createTripFromItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay, applyBoundaries } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -281,5 +281,50 @@ describe("assignPointsToDay", () => {
     mockApiPost.mockRejectedValue(undefined)
     const result = await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
     expect(result).toEqual({ success: false, error: "Failed to assign points." })
+  })
+})
+
+const TRIP_ID_NEW = "01952f1a-0000-7000-8000-000000000099"
+
+describe("createTripFromItinerary", () => {
+  it("posts to /api/trip/create with destination trimmed", async () => {
+    mockApiPost.mockResolvedValue({ id: TRIP_ID_NEW })
+    mockApiPatch.mockResolvedValue({})
+    await createTripFromItinerary(ITINERARY_ID, "  Galicia Coast  ")
+    expect(mockApiPost).toHaveBeenCalledWith("/api/trip/create", { destination: "Galicia Coast" })
+  })
+
+  it("patches the itinerary with the new tripId", async () => {
+    mockApiPost.mockResolvedValue({ id: TRIP_ID_NEW })
+    mockApiPatch.mockResolvedValue({})
+    await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`, { tripId: TRIP_ID_NEW })
+  })
+
+  it("returns success with the new tripId", async () => {
+    mockApiPost.mockResolvedValue({ id: TRIP_ID_NEW })
+    mockApiPatch.mockResolvedValue({})
+    const result = await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
+    expect(result).toEqual({ success: true, tripId: TRIP_ID_NEW })
+  })
+
+  it("revalidates /itinerary and the trip page", async () => {
+    mockApiPost.mockResolvedValue({ id: TRIP_ID_NEW })
+    mockApiPatch.mockResolvedValue({})
+    await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+    expect(mockRevalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID_NEW}`)
+  })
+
+  it("returns error when trip creation fails", async () => {
+    mockApiPost.mockRejectedValue(new Error("Server error"))
+    const result = await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
+    expect(result).toEqual({ success: false, error: "Server error" })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
+    expect(result).toEqual({ success: false, error: "Failed to create trip." })
   })
 })

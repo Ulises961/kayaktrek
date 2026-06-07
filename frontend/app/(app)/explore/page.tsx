@@ -32,7 +32,7 @@ export default async function ExplorePage() {
   const [routes, session] = await Promise.all([fetchRoutes(), getSession()])
 
   return (
-    <div className="flex flex-col md:h-full">
+    <div className="flex flex-col xl:h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <h1 className="text-lg font-semibold">Explore routes</h1>
         <p className="text-sm text-muted-foreground">
@@ -41,7 +41,7 @@ export default async function ExplorePage() {
             : `${routes.length} public ${routes.length === 1 ? "route" : "routes"}`}
         </p>
       </div>
-      <div className="flex-1 md:min-h-0">
+      <div className="flex-1 xl:min-h-0">
         <ExploreClient routes={routes} isAuthenticated={!!session} />
       </div>
     </div>

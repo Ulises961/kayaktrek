@@ -124,6 +124,18 @@ describe("ItineraryTab — no itinerary", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader={false} />)
     expect(screen.queryByRole("button", { name: /create itinerary/i })).toBeNull()
   })
+
+  it("pre-fills the name input with tripName when provided", () => {
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader tripName="Costa Brava" />)
+    const input = screen.getByRole("textbox") as HTMLInputElement
+    expect(input.value).toBe("Costa Brava")
+  })
+
+  it("leaves the name input empty when tripName is not provided", () => {
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader />)
+    const input = screen.getByRole("textbox") as HTMLInputElement
+    expect(input.value).toBe("")
+  })
 })
 
 // ---------------------------------------------------------------------------

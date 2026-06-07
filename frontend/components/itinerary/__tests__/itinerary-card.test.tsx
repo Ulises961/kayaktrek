@@ -2,17 +2,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockUpdateItinerary, mockRefresh } = vi.hoisted(() => ({
+const { mockUpdateItinerary, mockRefresh, mockPush, mockCreateTripFromItinerary } = vi.hoisted(() => ({
   mockUpdateItinerary: vi.fn(),
   mockRefresh: vi.fn(),
+  mockPush: vi.fn(),
+  mockCreateTripFromItinerary: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
+  useRouter: () => ({ refresh: mockRefresh, push: mockPush }),
 }))
 
 vi.mock("@/lib/itinerary/actions", () => ({
   updateItinerary: mockUpdateItinerary,
+  createTripFromItinerary: mockCreateTripFromItinerary,
 }))
 
 import { ItineraryCard } from "../itinerary-card"
@@ -115,5 +118,52 @@ describe("ItineraryCard — GPX download", () => {
     render(<ItineraryCard itinerary={BASE} />)
     const link = screen.getByRole("link", { name: /gpx/i })
     expect(link.getAttribute("href")).toBe(`/itinerary/${BASE.id}/export`)
+  })
+})
+
+describe("ItineraryCard — create trip", () => {
+  const TRIP_ID = "01952f1a-0000-7000-8000-000000000099"
+
+  it("shows 'Create trip' button when itinerary has no trip linked", () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    expect(screen.getByRole("button", { name: /create trip/i })).toBeInTheDocument()
+  })
+
+  it("hides 'Create trip' button when itinerary already has a trip", () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: TRIP_ID }} />)
+    expect(screen.queryByRole("button", { name: /create trip/i })).not.toBeInTheDocument()
+  })
+
+  it("opens a dialog with the itinerary name pre-filled when 'Create trip' is clicked", async () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
+    const input = screen.getByRole("textbox")
+    expect((input as HTMLInputElement).value).toBe("Galicia Coast")
+  })
+
+  it("calls createTripFromItinerary with the itinerary id and edited name on submit", async () => {
+    mockCreateTripFromItinerary.mockResolvedValue({ success: true, tripId: TRIP_ID })
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
+    const input = screen.getByRole("textbox")
+    await userEvent.clear(input)
+    await userEvent.type(input, "Rías Baixas")
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
+    expect(mockCreateTripFromItinerary).toHaveBeenCalledWith(BASE.id, "Rías Baixas")
+  })
+
+  it("navigates to the new trip page on success", async () => {
+    mockCreateTripFromItinerary.mockResolvedValue({ success: true, tripId: TRIP_ID })
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
+    expect(mockPush).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+  })
+
+  it("submit button is disabled when name is empty", async () => {
+    render(<ItineraryCard itinerary={{ ...BASE, name: null, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
+    const submitBtn = screen.getByRole("button", { name: /^create$/i }) as HTMLButtonElement
+    expect(submitBtn.disabled).toBe(true)
   })
 })

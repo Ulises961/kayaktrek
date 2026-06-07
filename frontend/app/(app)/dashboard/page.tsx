@@ -2,7 +2,7 @@ import Link from "next/link"
 import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
-import { TripsSchema } from "@/lib/dtos/trip"
+import { TRIP_STATE_LABELS, TripsSchema } from "@/lib/dtos/trip"
 import { StateBadge } from "@/components/common/state-badge"
 import { Button } from "@/components/ui/button"
 import type { Trip } from "@/lib/dtos/trip"
@@ -27,11 +27,11 @@ function HeroTrip({ trip }: { trip: Trip }) {
           <h2 className="font-semibold text-base leading-tight">
             {trip.destination ?? "Untitled trip"}
           </h2>
-          {trip.startDate && (
+          {trip.dateFrom && (
             <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
               <CalendarIcon className="size-3" />
-              {trip.startDate}
-              {trip.endDate ? ` → ${trip.endDate}` : ""}
+              {trip.dateFrom}
+              {trip.dateTo ? ` → ${trip.dateTo}` : ""}
             </p>
           )}
         </div>
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
   const trips = session ? await fetchTrips(session.userId) : []
 
   const happening = trips.filter((t) => t.state === "happening")
-  const upcoming = trips.filter((t) => t.state === "building" || t.state === "planning")
+  const upcoming = trips.filter((t) => t.state === "building" || t.state === TRIP_STATE_LABELS.building)
   const heroTrips = [...happening, ...upcoming].slice(0, 3)
   const pastCount = trips.filter((t) => t.state === "past").length
 
@@ -97,14 +97,14 @@ export default async function DashboardPage() {
               Plan a new expedition or explore public routes for inspiration.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild size="sm">
+          <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">
+            <Button asChild size="sm" className="w-full sm:w-auto">
               <Link href="/trips">
                 <PlusIcon className="size-4 mr-1.5" />
                 New trip
               </Link>
             </Button>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
               <Link href="/explore">
                 <CompassIcon className="size-4 mr-1.5" />
                 Explore routes

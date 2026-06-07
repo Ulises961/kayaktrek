@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { createElement } from "react"
+import React, { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context"
 import type { MapState } from "@/lib/itinerary/map-reducer"
@@ -14,6 +14,12 @@ const { mockUpdatePoint } = vi.hoisted(() => ({
 
 vi.mock("@/lib/itinerary/actions", () => ({
   updatePoint: mockUpdatePoint,
+}))
+
+vi.mock("@/components/ui/carousel", () => ({
+  Carousel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 import { DayDetailPanel } from "../day-detail-panel"
@@ -70,21 +76,23 @@ beforeEach(() => vi.clearAllMocks())
 
 describe("DayDetailPanel — visibility", () => {
   it("renders nothing when selectedDayId is null", () => {
-    renderWithCtx(makeCtx({ selectedDayId: null }))
-    expect(screen.queryByRole("list")).not.toBeInTheDocument()
+    const { container } = renderWithCtx(makeCtx({ selectedDayId: null }))
+    expect(container.firstChild).toBeNull()
   })
 
-  it("renders the panel when selectedDayId is set", () => {
+  it("renders point cards when selectedDayId is set", () => {
     renderWithCtx(makeCtx())
-    expect(screen.getByRole("list")).toBeInTheDocument()
+    // default ctx has isLeader: true → names are in inputs
+    expect(screen.getByDisplayValue("Harbour")).toBeInTheDocument()
   })
 })
 
-describe("DayDetailPanel — point list", () => {
-  it("renders points for the selected day in route order", () => {
-    renderWithCtx(makeCtx())
-    const items = screen.getAllByRole("listitem")
-    expect(items).toHaveLength(3)
+describe("DayDetailPanel — point cards", () => {
+  it("renders all points for the selected day", () => {
+    renderWithCtx(makeCtx({ isLeader: false }))
+    expect(screen.getByText("Harbour")).toBeInTheDocument()
+    expect(screen.getByText("Cala Bianca")).toBeInTheDocument()
+    expect(screen.getByText("44.0000°, 14.0000°")).toBeInTheDocument()
   })
 
   it("shows named points by their name (crew — read-only spans)", () => {
@@ -99,10 +107,17 @@ describe("DayDetailPanel — point list", () => {
     expect(screen.getByDisplayValue("Cala Bianca")).toBeInTheDocument()
   })
 
-  it("shows the 1-based index for unnamed points", () => {
-    renderWithCtx(makeCtx())
-    // p3 has no name, is at index 3 in pointOrder
+  it("shows the global index once per card as a standalone element", () => {
+    renderWithCtx(makeCtx({ isLeader: true }))
+    // p3 is at index 3 in pointOrder — index shows once, not recycled as name
     expect(screen.getByText("3")).toBeInTheDocument()
+    // all test points share the same coords, so multiple placeholders exist — that's fine
+    expect(screen.getAllByPlaceholderText("44.0000°, 14.0000°").length).toBeGreaterThan(0)
+  })
+
+  it("shows coord label as text for unnamed points (crew)", () => {
+    renderWithCtx(makeCtx({ isLeader: false }))
+    expect(screen.getByText("44.0000°, 14.0000°")).toBeInTheDocument()
   })
 
   it("shows notes preview for crew when point has notes", () => {
@@ -122,7 +137,7 @@ describe("DayDetailPanel — point list", () => {
 })
 
 describe("DayDetailPanel — leader vs crew", () => {
-  it("renders an editable name input for leaders", () => {
+  it("renders editable name inputs for leaders", () => {
     renderWithCtx(makeCtx({ isLeader: true }))
     const nameInputs = screen.getAllByRole("textbox").filter(
       (el) => (el as HTMLInputElement).placeholder !== "Notes…"
@@ -130,7 +145,7 @@ describe("DayDetailPanel — leader vs crew", () => {
     expect(nameInputs).not.toHaveLength(0)
   })
 
-  it("renders a notes input for leaders", () => {
+  it("renders notes inputs for leaders", () => {
     renderWithCtx(makeCtx({ isLeader: true }))
     expect(screen.getAllByPlaceholderText("Notes…")).not.toHaveLength(0)
   })

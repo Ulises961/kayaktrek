@@ -1,4 +1,5 @@
 "use client"
+import { GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatDistance, formatTime, estimatedTime } from "@/lib/itinerary/distance"
 
@@ -42,21 +43,26 @@ export function DayStripCard({
       data-today={isToday ? "true" : undefined}
       data-past={isPastDay ? "true" : undefined}
       className={cn(
-        "flex flex-col items-start gap-1 rounded-lg border px-3 py-2 text-left text-xs shrink-0 w-32 transition-all",
+        "flex items-stretch rounded-lg border text-left text-xs shrink-0 w-32 transition-all overflow-hidden",
         "border-border bg-background/80 hover:bg-muted/60",
         isSelected && "border-primary bg-muted ring-1 ring-primary",
         isToday && "border-primary bg-primary/10 font-medium",
         isPastDay && "opacity-50",
       )}
     >
-      <span className="font-semibold text-foreground">Day {dayNumber}</span>
-      <span className="text-muted-foreground">{date ? formatDate(date) : "No date"}</span>
-      <span className="text-muted-foreground">
-        {dist} {distanceUnit} · {time}
-      </span>
-      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-        No data
-      </span>
+      <div className="w-5 shrink-0 flex items-center justify-center border-r border-border/40 text-muted-foreground/30 cursor-grab active:cursor-grabbing">
+        <GripVertical className="size-3" />
+      </div>
+      <div className="flex flex-col items-start gap-1 px-2 py-2 flex-1 min-w-0">
+        <span className="font-semibold text-foreground">Day {dayNumber}</span>
+        <span className="text-muted-foreground">{date ? formatDate(date) : "No date"}</span>
+        <span className="text-muted-foreground">
+          {dist} {distanceUnit} · {time}
+        </span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          No data
+        </span>
+      </div>
     </button>
   )
 }
