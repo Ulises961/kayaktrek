@@ -19,6 +19,7 @@ test.describe("Crew invitation flow", () => {
   test("leader invites crew → crew accepts → crew appears on trip", async ({ page, browser }) => {
     // Leader: navigate to trip and invite crew by email
     await page.goto(`/trips/${tripId}`)
+    await page.getByRole("tab", { name: /crew/i }).click()
     await page.getByRole("button", { name: /invite/i }).click()
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
     await page.getByRole("button", { name: /invite/i }).click()
@@ -35,6 +36,7 @@ test.describe("Crew invitation flow", () => {
 
     // Leader: refresh and verify crew is now a traveller (not pending)
     await page.reload()
+    await page.getByRole("tab", { name: /crew/i }).click()
     await expect(page.getByText(CREW.name)).toBeVisible()
   })
 
@@ -42,6 +44,7 @@ test.describe("Crew invitation flow", () => {
     // Invite via API, then cancel via UI
     const leaderPage = page
     await leaderPage.goto(`/trips/${tripId}`)
+    await leaderPage.getByRole("tab", { name: /crew/i }).click()
     await leaderPage.getByRole("button", { name: /invite/i }).click()
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
     await leaderPage.getByRole("button", { name: /invite/i }).click()
