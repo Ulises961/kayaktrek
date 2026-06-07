@@ -16,3 +16,5 @@ class SeaState (db.Model):
     wave_direction: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     swell_direction: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     swell_period: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    current_speed: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    current_direction: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)

@@ -15,6 +15,7 @@ class SeaSchema(Schema):
     moon_phase = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 50)
     high_tide = fields.Time('%H:%M', allow_none=True)
     low_tide = fields.Time('%H:%M', allow_none=True)
+    tidal_range_m = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 20)
     sea_states = fields.List(fields.Nested(SeaStateSchema), allow_none=True, validate=lambda x: x is None or len(x) <= 24)
 
     @validates('moon_phase')

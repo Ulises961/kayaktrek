@@ -14,6 +14,8 @@ class SeaStateSchema(Schema):
     wave_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
     swell_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
     swell_period = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 30)
+    current_speed = fields.Float(allow_none=True)
+    current_direction = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 360)
 
     @validates('wave_height')
     def validate_wave_height(self, value):
