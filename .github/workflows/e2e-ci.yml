@@ -50,6 +50,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
+          prune-cache: false
 
       - name: Install backend dependencies
         working-directory: backend
