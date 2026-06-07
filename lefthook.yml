@@ -1,0 +1,33 @@
+commit-msg:
+  commands:
+    enforce-format:
+      run: |
+        MSG=$(cat {1})
+        echo "$MSG" | grep -qE '^(feat|fix|docs|style|refactor|test|chore|perf)(\(.+\))?: .{1,100}$' || {
+          echo "❌ Commit message does not match conventional commits format."
+          echo "   Expected: type(scope): description"
+          echo "   Types: feat fix docs style refactor test chore perf"
+          echo "   Got: $MSG"
+          exit 1
+        }
+
+pre-commit:
+  parallel: true
+  commands:
+    backend-flake8:
+      glob: "backend/**/*.py"
+      run: cd backend && .venv/bin/flake8 {staged_files}
+    frontend-eslint:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: cd frontend && pnpm lint {staged_files}
+    frontend-typecheck:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: cd frontend && pnpm tsc --noEmit
+
+pre-push:
+  parallel: true
+  commands:
+    backend-tests:
+      run: cd backend && .venv/bin/pytest -n auto
+    frontend-tests:
+      run: cd frontend && pnpm test:run
