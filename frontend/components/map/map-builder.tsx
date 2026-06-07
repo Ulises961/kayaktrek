@@ -14,10 +14,6 @@ import type { TripState } from "@/lib/dtos/trip"
 import {
   createPoint,
   updatePoint,
-  deletePoint,
-  createDay,
-  updateDay,
-  deleteDay,
   updateItinerary,
 } from "@/lib/itinerary/actions"
 import { DayStrip } from "./day-strip"

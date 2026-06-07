@@ -137,6 +137,7 @@ export function PointDetailSheet() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Photos</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {point.images.map((img) => (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={img.id}
                     src={img.location}

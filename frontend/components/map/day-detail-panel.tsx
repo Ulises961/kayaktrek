@@ -41,6 +41,7 @@ function PointCard({ point, index, onOpen }: PointCardProps) {
     >
       {firstImage?.location && (
         <div className="h-16 shrink-0 bg-muted overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={firstImage.location}
             alt={point.name ?? "Point photo"}

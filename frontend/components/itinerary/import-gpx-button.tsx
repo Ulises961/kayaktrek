@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { UploadIcon } from "lucide-react"
@@ -39,7 +39,7 @@ export function ImportGpxButton() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
@@ -47,7 +47,7 @@ export function ImportGpxButton() {
     defaultValues: { epsilon: 0.0001 },
   })
 
-  const epsilon = watch("epsilon")
+  const epsilon = useWatch({ control, name: "epsilon" })
 
   function onOpen() {
     setOpen(true)

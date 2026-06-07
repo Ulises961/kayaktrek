@@ -30,7 +30,6 @@ export function PointMarker({ point, color, type, index, customIcon, draggable =
   // customIcon (e.g. splitRingIcon for boundary markers) must also be memoised by the caller.
   const icon = useMemo(
     () => customIcon ?? ringIcon(color, type, index),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [customIcon, color, type, index],
   )
 

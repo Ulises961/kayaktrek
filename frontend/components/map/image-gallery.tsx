@@ -13,6 +13,7 @@ export function ImageGallery({ images, onRemove }: ImageGalleryProps) {
       {images.map((img) => (
         <div key={img.id} className="relative group w-12 h-12 rounded overflow-hidden bg-muted border border-border/40 shrink-0">
           {img.location ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={img.location} alt={img.name ?? ""} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
