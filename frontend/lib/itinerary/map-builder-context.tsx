@@ -26,6 +26,8 @@ export type MapBuilderContextValue = {
   setViewMode: (v: boolean) => void
   selectedDayId: string | null
   setSelectedDayId: (id: string | null) => void
+  selectedPointId: string | null
+  setSelectedPointId: (id: string | null) => void
   tripState: TripState | null
   isLeader: boolean
 }

@@ -1,20 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import React, { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context"
 import type { MapState } from "@/lib/itinerary/map-reducer"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
-
-const { mockUpdatePoint } = vi.hoisted(() => ({
-  mockUpdatePoint: vi.fn().mockResolvedValue({ success: true }),
-}))
-
-vi.mock("@/lib/itinerary/actions", () => ({
-  updatePoint: mockUpdatePoint,
-}))
 
 vi.mock("@/components/ui/carousel", () => ({
   Carousel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -62,6 +53,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setViewMode: vi.fn(),
     selectedDayId: DAY1_ID,
     setSelectedDayId: vi.fn(),
+    selectedPointId: null,
+    setSelectedPointId: vi.fn(),
     tripState: null,
     isLeader: true,
     ...overrides,
@@ -82,120 +75,61 @@ describe("DayDetailPanel — visibility", () => {
 
   it("renders point cards when selectedDayId is set", () => {
     renderWithCtx(makeCtx())
-    // default ctx has isLeader: true → names are in inputs
-    expect(screen.getByDisplayValue("Harbour")).toBeInTheDocument()
+    expect(screen.getByText("Harbour")).toBeInTheDocument()
   })
 })
 
 describe("DayDetailPanel — point cards", () => {
   it("renders all points for the selected day", () => {
-    renderWithCtx(makeCtx({ isLeader: false }))
+    renderWithCtx(makeCtx())
     expect(screen.getByText("Harbour")).toBeInTheDocument()
     expect(screen.getByText("Cala Bianca")).toBeInTheDocument()
     expect(screen.getByText("44.0000°, 14.0000°")).toBeInTheDocument()
   })
 
-  it("shows named points by their name (crew — read-only spans)", () => {
-    renderWithCtx(makeCtx({ isLeader: false }))
-    expect(screen.getByText("Harbour")).toBeInTheDocument()
-    expect(screen.getByText("Cala Bianca")).toBeInTheDocument()
-  })
-
-  it("shows named points by their name (leader — editable inputs)", () => {
-    renderWithCtx(makeCtx({ isLeader: true }))
-    expect(screen.getByDisplayValue("Harbour")).toBeInTheDocument()
-    expect(screen.getByDisplayValue("Cala Bianca")).toBeInTheDocument()
-  })
-
-  it("shows the global index once per card as a standalone element", () => {
-    renderWithCtx(makeCtx({ isLeader: true }))
-    // p3 is at index 3 in pointOrder — index shows once, not recycled as name
+  it("shows the global index for each card", () => {
+    renderWithCtx(makeCtx())
+    expect(screen.getByText("1")).toBeInTheDocument()
+    expect(screen.getByText("2")).toBeInTheDocument()
     expect(screen.getByText("3")).toBeInTheDocument()
-    // all test points share the same coords, so multiple placeholders exist — that's fine
-    expect(screen.getAllByPlaceholderText("44.0000°, 14.0000°").length).toBeGreaterThan(0)
   })
 
-  it("shows coord label as text for unnamed points (crew)", () => {
-    renderWithCtx(makeCtx({ isLeader: false }))
+  it("falls back to coord label for unnamed points", () => {
+    renderWithCtx(makeCtx())
     expect(screen.getByText("44.0000°, 14.0000°")).toBeInTheDocument()
   })
 
-  it("shows notes preview for crew when point has notes", () => {
+  it("shows notes preview when point has notes", () => {
     const state = {
       points: [pt("p1", "Harbour", "Exposed beach landing")],
       pointOrder: ["p1"],
       pendingPointId: null, pendingPointName: null, savingCount: 0, days: [day1],
     }
-    renderWithCtx(makeCtx({ state: state as never, isLeader: false }))
+    renderWithCtx(makeCtx({ state: state as never }))
     expect(screen.getByText("Exposed beach landing")).toBeInTheDocument()
   })
 
-  it("does not show notes text for crew when point has no notes", () => {
-    renderWithCtx(makeCtx({ isLeader: false }))
-    expect(screen.queryByPlaceholderText("Notes…")).not.toBeInTheDocument()
+  it("does not show notes text when point has no notes", () => {
+    renderWithCtx(makeCtx())
+    // p1 and p2 have no notes — no notes paragraph should appear
+    expect(screen.queryByText(/entrance|current|landing/)).not.toBeInTheDocument()
   })
-})
 
-describe("DayDetailPanel — leader vs crew", () => {
-  it("renders editable name inputs for leaders", () => {
+  it("cards are always read-only — no editable inputs", () => {
     renderWithCtx(makeCtx({ isLeader: true }))
-    const nameInputs = screen.getAllByRole("textbox").filter(
-      (el) => (el as HTMLInputElement).placeholder !== "Notes…"
-    )
-    expect(nameInputs).not.toHaveLength(0)
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
-  it("renders notes inputs for leaders", () => {
-    renderWithCtx(makeCtx({ isLeader: true }))
-    expect(screen.getAllByPlaceholderText("Notes…")).not.toHaveLength(0)
-  })
-
-  it("renders no editable inputs for crew", () => {
+  it("cards have no inputs even for crew", () => {
     renderWithCtx(makeCtx({ isLeader: false }))
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
-  it("calls updatePoint with notes on notes blur", async () => {
-    renderWithCtx(makeCtx({ isLeader: true }))
-    const notesInput = screen.getAllByPlaceholderText("Notes…")[0]
-    await userEvent.click(notesInput)
-    await userEvent.type(notesInput, "Tricky current")
-    await userEvent.tab()
-    expect(mockUpdatePoint).toHaveBeenCalledWith("p1", expect.objectContaining({ notes: "Tricky current" }))
-  })
-
-  it("calls updatePoint on blur when leader edits a name", async () => {
-    renderWithCtx(makeCtx({ isLeader: true }))
-    const nameInput = screen.getAllByRole("textbox").find(
-      (el) => (el as HTMLInputElement).placeholder !== "Notes…"
-    )!
-    await userEvent.clear(nameInput)
-    await userEvent.type(nameInput, "New Harbour")
-    await userEvent.tab()
-    expect(mockUpdatePoint).toHaveBeenCalledWith("p1", expect.objectContaining({ name: "New Harbour" }))
-  })
-})
-
-describe("DayDetailPanel — past trip state", () => {
-  it("renders no editable inputs for leader on a past trip", () => {
-    renderWithCtx(makeCtx({ isLeader: true, tripState: "past" }))
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
-  })
-
-  it("shows read-only name spans for leader on a past trip", () => {
-    renderWithCtx(makeCtx({ isLeader: true, tripState: "past" }))
-    expect(screen.getByText("Harbour")).toBeInTheDocument()
-    expect(screen.getByText("Cala Bianca")).toBeInTheDocument()
-  })
-
-  it("shows notes preview (not input) for leader on a past trip", () => {
-    const state = {
-      points: [pt("p1", "Harbour", "Rocky approach")],
-      pointOrder: ["p1"],
-      pendingPointId: null, pendingPointName: null, savingCount: 0, days: [day1],
-    }
-    renderWithCtx(makeCtx({ state: state as never, isLeader: true, tripState: "past" }))
-    expect(screen.getByText("Rocky approach")).toBeInTheDocument()
-    expect(screen.queryByPlaceholderText("Notes…")).not.toBeInTheDocument()
+  it("each card is a button that calls setSelectedPointId on click", async () => {
+    const setSelectedPointId = vi.fn()
+    const { getAllByRole } = renderWithCtx(makeCtx({ setSelectedPointId }))
+    const cards = getAllByRole("button")
+    cards[0].click()
+    expect(setSelectedPointId).toHaveBeenCalledWith("p1")
   })
 })

@@ -21,6 +21,7 @@ import {
   updateItinerary,
 } from "@/lib/itinerary/actions"
 import { DayStrip } from "./day-strip"
+import { PointDetailSheet } from "./point-detail-sheet"
 
 const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.ComponentType<MapCoreProps>
 
@@ -41,6 +42,7 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
   const [activePointId, setActivePointId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -120,9 +122,17 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
     }, 800)
   }, [itinerary.id])
 
+  const flyToPoint = useMemo(() => {
+    if (!selectedPointId) return null
+    const p = state.points.find((pt) => pt.id === selectedPointId)
+    if (!p || p.latitude == null || p.longitude == null) return null
+    return { id: selectedPointId, lat: p.latitude, lng: p.longitude }
+  }, [selectedPointId, state.points])
+
   const handleToggleViewMode = useCallback(() => {
     setViewMode((v) => !v)
     setSelectedDayId(null)
+    setSelectedPointId(null)
   }, [])
 
   const ctxValue = useMemo(() => ({
@@ -143,9 +153,11 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
     setViewMode,
     selectedDayId,
     setSelectedDayId,
+    selectedPointId,
+    setSelectedPointId,
     tripState,
     isLeader,
-  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id, viewMode, selectedDayId, tripState, isLeader])
+  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id, viewMode, selectedDayId, selectedPointId, tripState, isLeader])
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>
@@ -172,13 +184,21 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
             distanceUnit={distanceUnit}
             viewMode={viewMode}
             selectedDayId={selectedDayId}
+            flyToPoint={flyToPoint}
             onMapClick={handleMapClick}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerClick={handleMarkerClick}
             avgSpeedKnots={avgSpeedKnots}
           />
-          {viewMode ? <DayStrip /> : <PointListPane />}
+          {viewMode ? (
+            <>
+              <DayStrip />
+              <PointDetailSheet />
+            </>
+          ) : (
+            <PointListPane />
+          )}
         </div>
       </div>
     </MapBuilderContext.Provider>

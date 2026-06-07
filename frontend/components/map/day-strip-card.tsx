@@ -43,7 +43,7 @@ export function DayStripCard({
       data-today={isToday ? "true" : undefined}
       data-past={isPastDay ? "true" : undefined}
       className={cn(
-        "flex items-stretch rounded-lg border text-left text-xs shrink-0 w-32 transition-all overflow-hidden",
+        "flex items-stretch rounded-lg border text-left text-xs shrink-0 w-36 h-full transition-all overflow-hidden",
         "border-border bg-background/80 hover:bg-muted/60",
         isSelected && "border-primary bg-muted ring-1 ring-primary",
         isToday && "border-primary bg-primary/10 font-medium",

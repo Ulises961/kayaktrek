@@ -1,6 +1,6 @@
 "use client"
-import { memo, useCallback, useMemo, useState } from "react"
-import { MapContainer, TileLayer, Polyline, Tooltip, useMapEvents } from "react-leaflet"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { MapContainer, TileLayer, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
@@ -8,6 +8,8 @@ import { PointMarker } from "./point-marker"
 import { haversineNm, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
+
+export type FlyToTarget = { id: string; lat: number; lng: number }
 
 export type MapCoreProps = {
   // Points already sorted in route order by MapBuilder — no walkList needed here.
@@ -17,6 +19,7 @@ export type MapCoreProps = {
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null
+  flyToPoint?: FlyToTarget | null
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -79,6 +82,29 @@ function buildSegments(
     })
   }
   return segments
+}
+
+// ── FlyToController ───────────────────────────────────────────────────────────
+
+function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | undefined }) {
+  const map = useMap()
+  const prevIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!flyToPoint) { prevIdRef.current = null; return }
+    if (flyToPoint.id === prevIdRef.current) return
+    prevIdRef.current = flyToPoint.id
+
+    const zoom = 12
+    // Offset the target so the point centres in the visible area above the 55vh
+    // point-detail sheet rather than at the geometric centre of the viewport.
+    const px = map.project([flyToPoint.lat, flyToPoint.lng], zoom)
+    const sheetOffset = window.innerHeight * 0.275
+    const offsetLatLng = map.unproject([px.x, px.y + sheetOffset] as [number, number], zoom)
+    map.flyTo(offsetLatLng, zoom, { animate: true, duration: 0.6 })
+  }, [flyToPoint, map])
+
+  return null
 }
 
 // ── MapEvents ─────────────────────────────────────────────────────────────────
@@ -162,6 +188,7 @@ export default function MapCore({
   avgSpeedKnots = 2.5,
   viewMode = false,
   selectedDayId = null,
+  flyToPoint = null,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
@@ -237,6 +264,7 @@ export default function MapCore({
         />
 
         {!viewMode && <MapEvents onMapClick={onMapClick} />}
+        <FlyToController flyToPoint={flyToPoint} />
 
         {segments.map((seg) => {
           const dimmed = selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
