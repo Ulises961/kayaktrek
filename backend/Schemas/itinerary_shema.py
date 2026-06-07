@@ -1,64 +1,113 @@
 from flask import g
-from marshmallow import Schema, fields, post_dump, post_load, pre_load, validates, ValidationError
+from marshmallow import fields, post_dump, post_load, pre_load, validates, ValidationError
+import bleach
 from Models.itinerary import Itinerary
-from Models.trip import Trip
 from Schemas.base_schema import BaseSchema
-from Schemas.day_schema import DaySchema
-from Api.database import db
-from sqlalchemy.exc import NoResultFound
+from Schemas.day_schema import DaySchema, DayPublicSchema
 
 
 class ItinerarySchema(BaseSchema):
-    """
-    Itinerary Schema
-    used for loading/dumping Itinerary entities
-    """
+    # name is load_default=None; the service resolves it from trip.destination when absent
+    name = fields.String(load_default=None, allow_none=True)
     is_public = fields.Boolean(load_default=False)
+    avg_speed_knots = fields.Float(load_default=2.5)
     total_miles = fields.Float(validate=lambda x: 0 <= x <= 50000, load_default=0)
     expected_total_miles = fields.Float(
         allow_none=True, validate=lambda x: x is None or (0 <= x <= 50000)
     )
+    created_from_id = fields.UUID(allow_none=True, dump_only=True)
     days = fields.List(
         fields.Nested(DaySchema),
         allow_none=True,
         metadata={"exclude": ["itinerary_id"]},
         validate=lambda x: x is None or len(x) <= 365,
     )
-    trip_id = fields.UUID(allow_none=True)
+    trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
 
-    @validates("total_miles")
-    def validate_total_miles(self, value, **kwargs):
-        """Validate total miles is within reasonable range."""
-        if value < 0:
-            raise ValidationError("Total miles cannot be negative")
-        if value > 50000:
-            raise ValidationError("Total miles cannot exceed 50,000")
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        if 'name' in data and data['name'] is not None:
+            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+        return data
 
-    @validates("expected_total_miles")
-    def validate_expected_total_miles(self, value, **kwargs):
-        """Validate expected total miles is within reasonable range."""
-        if value is not None:
-            if value < 0:
-                raise ValidationError("Expected total miles cannot be negative")
-            if value > 50000:
-                raise ValidationError("Expected total miles cannot exceed 50,000")
+    @validates('name')
+    def validate_name(self, value, **kwargs):
+        if value is not None and len(value) > 255:
+            raise ValidationError("Name cannot exceed 255 characters")
 
-    @validates("days")
-    def validate_days(self, value, **kwargs):
-        """Validate days list doesn't exceed reasonable limits."""
-        if value is not None and len(value) > 365:
-            raise ValidationError("Itinerary cannot have more than 365 days")
+    @validates('avg_speed_knots')
+    def validate_avg_speed_knots(self, value, **kwargs):
+        if value is not None and not (0.5 <= value <= 20.0):
+            raise ValidationError("Average speed must be between 0.5 and 20.0 knots")
 
-  
+    @post_dump
+    def exclude_day_zero(self, data, **kwargs):
+        # Set schema.include_staging = True before dumping to keep Day 0 in the response.
+        if not getattr(self, "include_staging", False) and data.get("days"):
+            data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
+        return data
 
     @post_load
     def make_itinerary(self, data, **kwargs):
-        # Stamp user ownership only for personal (non-trip) itineraries.
-        # trip_id absent from self.fields means we're nested inside TripSchema;
-        # trip_id present in data means standalone creation with an explicit trip link.
-        # Either way, the itinerary belongs to the trip, not the user.
-        if "trip_id" in self.fields and data.get("trip_id") is None:
-            data["user_id"] = g.current_user_id
+        data["user_id"] = g.current_user_id
         return Itinerary(**data)
-    
+
+
+class ItineraryUpdateSchema(BaseSchema):
+    """
+    Schema for PATCH /api/itinerary/<id>.
+    All fields optional. Returns a validated plain dict for the service layer.
+    """
+    name = fields.String(allow_none=True)
+    is_public = fields.Boolean()
+    avg_speed_knots = fields.Float()
+    trip_id = fields.UUID(allow_none=True)
+
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        if 'name' in data and data['name'] is not None:
+            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+        return data
+
+    @validates('name')
+    def validate_name(self, value, **kwargs):
+        if value is not None and len(value) > 255:
+            raise ValidationError("Name cannot exceed 255 characters")
+
+    @validates('avg_speed_knots')
+    def validate_avg_speed_knots(self, value, **kwargs):
+        if value is not None and not (0.5 <= value <= 20.0):
+            raise ValidationError("Average speed must be between 0.5 and 20.0 knots")
+
+    @post_load
+    def to_dict(self, data, **kwargs):
+        return data
+
+
+class ItineraryPublicSchema(BaseSchema):
+    """Stripped schema for unauthenticated public itinerary access.
+
+    Excludes user_id, trip_id, notes, and private images.
+    """
+    name = fields.String(dump_only=True)
+    is_public = fields.Boolean(dump_only=True)
+    avg_speed_knots = fields.Float(dump_only=True)
+    total_miles = fields.Float(dump_only=True)
+    days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
+
+    @post_dump
+    def exclude_day_zero(self, data, **kwargs):
+        if data.get("days"):
+            data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
+        return data
+
+
+class ItineraryExploreSchema(BaseSchema):
+    """Lightweight schema for the /explore listing (unauthenticated).
+
+    Returns id, name, total distance, and day count.
+    """
+    name = fields.String(dump_only=True)
+    is_public = fields.Boolean(dump_only=True)
+    total_miles = fields.Float(dump_only=True)

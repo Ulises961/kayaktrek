@@ -1,7 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { FileIcon } from "lucide-react"
 import { updateTravelDocument } from "@/lib/travel-documents/actions"
@@ -43,7 +43,7 @@ interface EditDocumentDialogProps {
 export function EditDocumentDialog({ tripId, document, open, onOpenChange }: EditDocumentDialogProps) {
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setValue, watch, setError, formState: { errors } } = useForm<TravelDocumentFields>({
+  const { register, handleSubmit, setValue, control, setError, formState: { errors } } = useForm<TravelDocumentFields>({
     resolver: zodResolver(TravelDocumentFieldsSchema),
     values: {
       type: document.type,
@@ -55,6 +55,8 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
       notes: document.notes ?? "",
     },
   })
+  const watchDate = useWatch({ control, name: "date" })
+  const watchExpiryDate = useWatch({ control, name: "expiryDate" })
 
   const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
@@ -110,7 +112,7 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
               <div className="flex flex-col gap-1.5">
                 <FieldLabel>Date</FieldLabel>
                 <DatePicker
-                  value={watch("date") ?? ""}
+                  value={watchDate ?? ""}
                   onChange={(v) => setValue("date", v, { shouldValidate: true })}
                   placeholder="Service date"
                   disabled={isPending}
@@ -119,7 +121,7 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
               <div className="flex flex-col gap-1.5">
                 <FieldLabel>Expiry date</FieldLabel>
                 <DatePicker
-                  value={watch("expiryDate") ?? ""}
+                  value={watchExpiryDate ?? ""}
                   onChange={(v) => setValue("expiryDate", v, { shouldValidate: true })}
                   placeholder="Expiry date"
                   disabled={isPending}

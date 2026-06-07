@@ -16,9 +16,11 @@ class PointSchema(BaseSchema):
     """
     latitude = fields.Float(allow_none=True, validate=lambda x: x is None or (-90 <= x <= 90))
     longitude = fields.Float(allow_none=True, validate=lambda x: x is None or (-180 <= x <= 180))
+    name = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 255)
     notes = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 5000)
     type = fields.Enum(PointType, by_value=True, required=True)
     day_id = fields.UUID(allow_none=True)
+    next_id = fields.UUID(allow_none=True, dump_only=True)
     next = fields.Nested(lambda: PointSchema(), allow_none=True,
                          exclude=("next", "nearby"))
     nearby = fields.List(fields.Nested(lambda: PointSchema(
@@ -27,6 +29,8 @@ class PointSchema(BaseSchema):
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
+        if 'name' in data and data['name'] is not None:
+            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
         if 'notes' in data and data['notes'] is not None:
             data['notes'] = bleach.clean(str(data['notes']).strip(), tags=[], strip=True)
         return data
@@ -76,7 +80,7 @@ class PointUpdateSchema(PointSchema):
     Validates scalar mutable fields only (type, lat, lon, notes — all optional).
     Nested objects (images, next, nearby) are excluded from load;
     the resource handler merges validated scalars with the raw request.
-    day_id excluded — point reassignment requires a dedicated endpoint.
+    day_id excluded — point reassignment is handled by the day assign endpoint.
     Returns a camelCase dict for the service layer.
     """
     type = fields.Enum(PointType, by_value=True)
@@ -88,3 +92,13 @@ class PointUpdateSchema(PointSchema):
     @post_load
     def make_point(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}
+
+
+class PointPublicSchema(BaseSchema):
+    """Point fields safe for unauthenticated exposure — geometry + classification, no notes."""
+    latitude = fields.Float(dump_only=True, allow_none=True)
+    longitude = fields.Float(dump_only=True, allow_none=True)
+    name = fields.String(dump_only=True, allow_none=True)
+    type = fields.Enum(PointType, by_value=True, dump_only=True, allow_none=True)
+    day_id = fields.UUID(dump_only=True, allow_none=True)
+    next_id = fields.UUID(dump_only=True, allow_none=True)

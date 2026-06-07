@@ -30,3 +30,12 @@ New decisions go in a new numbered file. Existing ADRs are not edited to reflect
 | [017](017-external-gps-device-integration.md) | External GPS device integration — Bluetooth and satellite communicator feeds | proposed |
 | [018](018-float-plan-model.md) | Float plan — aggregate HTML view, consent-gated medical visibility | accepted |
 | [019](019-trip-collaboration-model.md) | Trip collaboration model — leader authority vs crew contribution | accepted |
+| [020](020-trip-detail-tab-layout.md) | Trip detail page — tabbed layout and logistics field cleanup | accepted |
+| [021](021-expedition-log-auto-generation.md) | Expedition log auto-generation — Celery dual-trigger model | accepted |
+| [022](022-float-plan-sharing-and-notifications.md) | Float plan sharing — frozen snapshot, opaque token, email notifications | accepted |
+| [023](023-medical-notes-asymmetric-e2e-encryption.md) | Medical notes — asymmetric end-to-end encryption for leader-visible copy | accepted |
+| [024](024-itinerary-builder-interaction-model.md) | Map-first itinerary builder — route-first model, hover-slide day bracketing | accepted |
+| [025](025-rest-days-and-paused-expedition-state.md) | Rest days and paused expedition state | accepted |
+| [026](026-itinerary-builder-unified-sidebar-boundaries-editor.md) | Itinerary builder UX redesign — unified sidebar, drag boundaries editor, first-class itinerary | accepted |
+| [027](027-trip-detail-structure-itinerary-modes-tile-caching.md) | Trip detail page structure, itinerary page view/edit modes, and tile caching model | accepted |
+| [028](028-weather-sea-tidal-data.md) | Weather, Sea & Tidal Data — OpenMeteo, tidal stream model, rule of 12s | accepted |

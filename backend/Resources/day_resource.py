@@ -112,6 +112,33 @@ def update_day(id: str):
         logger.error(f"Error updating day: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
+@day_api.route("/<string:id>/assign", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('day')
+def assign_points(id: str):
+    """POST /api/day/<id>/assign — Assign a range of points to this day.
+
+    Body: { startPointId: uuid, endPointId: uuid }
+    Walks the linked list from startPointId to endPointId and sets each
+    point's day_id to this day's id.
+    """
+    try:
+        body = request.get_json()
+        if not body or not body.get("startPointId") or not body.get("endPointId"):
+            abort(HTTPStatus.BAD_REQUEST, description="startPointId and endPointId are required")
+        DayService.assign_points(id, body["startPointId"], body["endPointId"])
+        return jsonify({"message": "Points assigned"}), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(f"Error assigning points to day {id}: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @day_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('day')

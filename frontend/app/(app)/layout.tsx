@@ -27,8 +27,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="w-full h-screen flex flex-col">
           {/* Nav bar */}
           <header className="h-12 border-b border-border flex flex-row items-center gap-2 px-4 mb-6 shrink-0">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
+            <SidebarTrigger className="md:hidden" />
+            <Separator orientation="vertical" className="h-4 md:hidden" />
             {/* Breadcrumb — each page renders its own via slot pattern */}
             <div id="breadcrumb-slot" className="flex-1 flex items-center" />
             <ThemeToggle />

@@ -15,8 +15,7 @@ import type { TravelDocument } from "@/lib/dtos/travel-document"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
-const TABS = ["crew", "float-plan", "logistics", "itinerary", "items"] as const
-type TabId = (typeof TABS)[number]
+type TabId = "crew" | "float-plan" | "logistics" | "itinerary" | "items"
 
 interface TripDetailTabsProps {
   tripId: string
@@ -50,7 +49,7 @@ export function TripDetailTabs({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(
-    (searchParams.get("tab") ?? "crew") as TabId
+    (searchParams.get("tab") ?? "itinerary") as TabId
   )
 
   function handleTabChange(value: string) {
@@ -121,7 +120,7 @@ export function TripDetailTabs({
       </TabsContent>
 
       <TabsContent value="itinerary" className="p-6 pt-5">
-        <ItineraryTab />
+        <ItineraryTab tripId={tripId} itinerary={trip.itinerary} isLeader={isLeader} tripName={trip.destination ?? ""} />
       </TabsContent>
 
       <TabsContent value="items" className="p-6 pt-5">

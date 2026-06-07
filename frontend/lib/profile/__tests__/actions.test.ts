@@ -14,7 +14,7 @@ vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiGet, apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
+import { apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import {
   updateProfile,

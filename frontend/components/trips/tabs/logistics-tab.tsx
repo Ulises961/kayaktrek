@@ -30,7 +30,7 @@ export function LogisticsTab({
   shuttleVehicles,
   members,
   today,
-  isLeader,
+  isLeader: _isLeader,
   isMember,
   currentMemberId,
   currentUserId,

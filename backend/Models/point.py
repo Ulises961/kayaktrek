@@ -2,7 +2,7 @@ import uuid_extension
 
 from Api.database import db
 from geoalchemy2 import Geography
-from sqlalchemy import UUID, Numeric, Text, Enum, ForeignKey, ForeignKeyConstraint
+from sqlalchemy import UUID, Numeric, Text, String, Enum, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from Models.base_model import BaseModel
@@ -29,6 +29,7 @@ class Point(BaseModel):
         Geography(geometry_type='POINT', srid=4326),
         nullable=True,
     )
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     type: Mapped[Optional[PointType]] = mapped_column(
         Enum(PointType, values_callable=lambda obj: [e.value for e in obj]),

@@ -45,7 +45,7 @@ async function openToEdit({
   await userEvent.click(screen.getByRole("button", { name: btnName }))
   await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
-  await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
+  await waitFor(() => expect(screen.getByRole("button", { name: /^save$/i })).toBeDefined())
 }
 
 describe("FloatPlanMedicalTabSection — idle state", () => {

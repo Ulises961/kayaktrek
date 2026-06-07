@@ -2,10 +2,22 @@ import { getSession } from "@/lib/auth/session"
 import { apiGet } from "@/lib/api/client"
 import { TripPageSchema } from "@/lib/dtos/trip"
 import { TripCard } from "@/components/common/trip-card"
+import { PastTripsSection } from "@/components/trips/past-trips-section"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
 import { StateVisual } from "@/components/illustrations/state-visual"
 import CurrentPageTitle from "@/components/common/current-page-title"
 import { redirect } from "next/navigation"
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="text-xs text-muted-foreground/50">{count}</span>
+    </div>
+  )
+}
 
 export default async function Page() {
   const session = await getSession()
@@ -13,6 +25,17 @@ export default async function Page() {
 
   const raw = await apiGet(`/api/trip/${session.userId}/all`)
   const { items: trips, total } = TripPageSchema.parse(raw)
+
+  const happeningTrips = trips.filter((t) => t.state === "happening")
+  const planningTrips = trips.filter((t) => t.state === "building")
+  const pastTrips = trips
+    .filter((t) => t.state === "past")
+    .sort((a, b) => {
+      if (!a.dateTo && !b.dateTo) return 0
+      if (!a.dateTo) return 1
+      if (!b.dateTo) return -1
+      return b.dateTo.localeCompare(a.dateTo)
+    })
 
   return (
     <>
@@ -28,10 +51,33 @@ export default async function Page() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 mt-4">
-          {trips.map((trip) => (
-            <TripCard key={trip.id} trip={trip} />
-          ))}
+        <div className="flex flex-col gap-6 mt-4">
+          {happeningTrips.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <SectionHeader label="Happening" count={happeningTrips.length} />
+              <div className="flex flex-col gap-3">
+                {happeningTrips.map((trip) => (
+                  <TripCard key={trip.id} trip={trip} hero />
+                ))}
+              </div>
+            </section>
+          )}
+          {planningTrips.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <SectionHeader label="Planning" count={planningTrips.length} />
+              <div className="flex flex-col gap-3">
+                {planningTrips.map((trip) => (
+                  <TripCard key={trip.id} trip={trip} />
+                ))}
+              </div>
+            </section>
+          )}
+          {pastTrips.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <SectionHeader label="Past" count={pastTrips.length} />
+              <PastTripsSection trips={pastTrips} />
+            </section>
+          )}
         </div>
       )}
     </>

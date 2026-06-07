@@ -140,7 +140,7 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_worker
-    command: celery -A Api.celery_app worker --loglevel=info
+    command: celery -A celery_worker worker --loglevel=info
     environment:
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}

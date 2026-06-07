@@ -435,16 +435,6 @@ class TripService:
 
         trip = TripService.get_trip_by_id(trip_id)
         trip.transition_state(new_state)
-
-        # Release user ownership on itinerary and inventory when the expedition starts.
-        # Those user_id columns are only meaningful while building; once happening
-        # both objects belong to the trip, not the individual.
-        if new_state == TripStateType.HAPPENING:
-            if trip.itinerary:
-                trip.itinerary.user_id = None
-            if trip.inventory:
-                trip.inventory.user_id = None
-
         db.session.commit()
         db.session.refresh(trip)
         logger.info(f"Trip {trip_id} transitioned to '{new_state_value}'")

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
-import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
+import { apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import type { ProfileFormValues } from "@/lib/dtos/user"
 

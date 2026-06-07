@@ -3,6 +3,7 @@ from uuid import UUID
 
 from camel_converter import dict_to_snake
 from Models.day import Day
+from Models.point import Point
 from Models.itinerary import Itinerary
 from Models.sea import Sea
 from Models.trip import Trip, TripStateType
@@ -24,7 +25,7 @@ def _require_editable(trip: Trip) -> None:
 
 
 class DayService:
-    _MUTABLE_FIELDS = frozenset({"day_number", "date"})
+    _MUTABLE_FIELDS = frozenset({"day_number", "date", "start_point_id", "end_point_id"})
     _MUTABLE_WEATHER_FIELDS = frozenset({"model"})
     _MUTABLE_SEA_FIELDS = frozenset({"moon_phase", "high_tide", "low_tide"})
     @staticmethod
@@ -68,7 +69,7 @@ class DayService:
         days = (
             db.session.query(Day)
             .join(Itinerary, Day.itinerary_id == Itinerary.id)
-            .filter(Itinerary.id == UUID(itinerary_id))
+            .filter(Itinerary.id == UUID(itinerary_id), Day.day_number != 0)
             .all()
         )
         return days
@@ -197,6 +198,45 @@ class DayService:
         return existing_day
 
     @staticmethod
+    def assign_points(day_id: str, start_point_id: str, end_point_id: str) -> None:
+        """
+        Assign all points in the linked-list range [start_point_id, end_point_id]
+        to the given day by updating their day_id.
+
+        Walks next_id pointers from start to end; raises ValueError if end is not
+        reachable from start within the itinerary's point list.
+        """
+        from Models.point import Point as PointModel
+        from uuid import UUID
+
+        day = db.session.get(Day, UUID(day_id))
+        if not day:
+            raise NoResultFound(f"Day with id {day_id} not found")
+
+        start_uuid = UUID(start_point_id)
+        end_uuid = UUID(end_point_id)
+
+        current = db.session.get(PointModel, start_uuid)
+        if not current:
+            raise NoResultFound(f"Point {start_point_id} not found")
+
+        visited: set = set()
+        while current is not None:
+            if current.id in visited:
+                raise ValueError("Cycle detected in point linked list")
+            visited.add(current.id)
+            current.day_id = UUID(day_id)
+            if current.id == end_uuid:
+                break
+            if current.next_id is None:
+                raise ValueError(f"End point {end_point_id} not reachable from {start_point_id}")
+            current = db.session.get(PointModel, current.next_id)
+        else:
+            raise ValueError(f"End point {end_point_id} not reachable from {start_point_id}")
+
+        db.session.commit()
+
+    @staticmethod
     def _update_weather(day: Day, weather_data: Optional[Dict[str, Any]]) -> None:
         """
         Update or create weather data for a day.
@@ -264,6 +304,16 @@ class DayService:
 
         if not day_to_delete:
             raise NoResultFound(f"Day with id {day_id} not found")
+
+        # Move the day's points to day 0 so they remain in the itinerary's
+        # linked list rather than being left with day_id = NULL.
+        day0 = db.session.query(Day).filter_by(
+            itinerary_id=day_to_delete.itinerary_id, day_number=0
+        ).first()
+        if day0:
+            db.session.query(Point).filter_by(day_id=day_to_delete.id).update(
+                {"day_id": day0.id}
+            )
 
         db.session.delete(day_to_delete)
         db.session.commit()

@@ -37,13 +37,15 @@ from Models.shuttle_vehicle import ShuttleVehicle  # noqa: F401
 from Models.shuttle_passenger import ShuttlePassenger  # noqa: F401
 
 
-def createApp(config_mode: str):
+def createApp(config_mode: str, *, schema: str | None = None):
     """
     Creates and configurates the Flask app, the logger to be used throughout  the application
     and the database to use. Returns the configured app that is to be used in the main function.
 
     Params:
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
+    schema      -- optional PostgreSQL schema name; sets search_path so all tables land in that schema.
+                   Used by the test suite to isolate parallel workers.
     """
 
     app = Flask(
@@ -52,6 +54,13 @@ def createApp(config_mode: str):
     )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
+
+    if schema:
+        engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
+        connect_args = dict(engine_opts.get('connect_args', {}))
+        connect_args['options'] = f"-csearch_path={schema},public"
+        engine_opts['connect_args'] = connect_args
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_opts
     app.register_blueprint(authApi)
     app.register_blueprint(day_api)
     app.register_blueprint(inventory_api)

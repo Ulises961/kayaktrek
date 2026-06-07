@@ -27,6 +27,7 @@ vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
   getMedicalNotes: vi.fn(),
 }))
+vi.mock("@/lib/itinerary/actions", () => ({ createItinerary: vi.fn() }))
 
 import { TripDetailTabs } from "../trip-detail-tabs"
 import type { Trip } from "@/lib/dtos/trip"
@@ -103,15 +104,15 @@ describe("TripDetailTabs", () => {
     expect(screen.queryByRole("tab", { name: /float plan/i })).toBeNull()
   })
 
-  it("shows crew content by default", () => {
+  it("shows itinerary tab content by default", () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
-    expect(screen.getAllByText(/crew/i).length).toBeGreaterThan(0)
+    // leader + no itinerary → create form is shown on the default tab
+    expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 
-  it("shows itinerary placeholder when itinerary tab is clicked", async () => {
+  it("shows create itinerary button for leader in itinerary tab", async () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
-    await userEvent.click(screen.getByRole("tab", { name: /itinerary/i }))
-    expect(screen.getByText(/M4/i)).toBeDefined()
+    expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 
   it("shows items placeholder when items tab is active", async () => {

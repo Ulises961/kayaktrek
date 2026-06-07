@@ -1,124 +1,242 @@
 from http import HTTPStatus
 import logging
-from flask import Blueprint, g, jsonify, request, abort
+from flask import Blueprint, g, jsonify, request, abort, Response
 from werkzeug.exceptions import HTTPException
+from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from Schemas.itinerary_shema import ItinerarySchema
+
+from Schemas.itinerary_shema import ItinerarySchema, ItineraryPublicSchema, ItineraryExploreSchema
 from Models.itinerary import Itinerary
 from Api.database import db
 from Services.Middleware.auth_middleware import JWTService
-from Services.Middleware.privileges_middleware import require_owner
+from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
 from Services.itinerary_service import ItineraryService
 
-# It will print the name of this module when the main app is running
 logger = logging.getLogger(__name__)
 
 ITINERARY_ENDPOINT = "/api/itinerary"
 itinerary_api = Blueprint("itinerary", __name__, url_prefix=ITINERARY_ENDPOINT)
 
+
 @itinerary_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
 def get_all_itineraries():
-    """GET /api/itinerary - Retrieve all itineraries"""
-    try:
-        logger.info("Retrieve all itineraries from db")
-        itineraries = ItineraryService.get_itineraries_by_user(g.current_user_id)
+    """GET /api/itinerary/all — Return all itineraries owned by the current user."""
+    itineraries = ItineraryService.get_itineraries_by_user(g.current_user_id)
+    return jsonify([ItinerarySchema().dump(i) for i in itineraries]), HTTPStatus.OK
 
-        return jsonify([ItinerarySchema().dump(itinerary) for itinerary in itineraries]), HTTPStatus.OK
-        
-    except Exception as e:
-        logger.error(f"Error retrieving itineraries: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+@itinerary_api.route("/explore", methods=["GET"])
+def get_explore():
+    """GET /api/itinerary/explore — Unauthenticated. Return all public itineraries (lightweight)."""
+    itineraries = ItineraryService.get_public_itineraries()
+    schema = ItineraryExploreSchema()
+    return jsonify([schema.dump(i) for i in itineraries]), HTTPStatus.OK
+
+
+@itinerary_api.route("/<string:id>/public", methods=["GET"])
+def get_public_itinerary(id: str):
+    """GET /api/itinerary/<id>/public — Unauthenticated. Returns 404 if not public."""
+    try:
+        itinerary = ItineraryService.get_public_itinerary(id)
+        return jsonify(ItineraryPublicSchema().dump(itinerary)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Itinerary not found or not public")
 
 
 @itinerary_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('itinerary', read_only=True)
 def get_itinerary(id: str):
-    """GET /api/itinerary/<id> - Retrieve itinerary by ID"""
-    logger.info(f"Retrieve itinerary with id {id}")
-    
+    """GET /api/itinerary/<id> — Return itinerary by ID (owner or trip member)."""
     itinerary = ItineraryService.get_itinerary_by_id(id)
-    
-    if not itinerary:
-        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary with id {id} not found")
-    
-    return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.OK
+    schema = ItinerarySchema()
+    schema.include_staging = True
+    return jsonify(schema.dump(itinerary)), HTTPStatus.OK
+
 
 @itinerary_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-@require_owner('itinerary', parent_resource=('trip', 'tripId'), from_body=True)
 def create_itinerary():
-    """POST /api/itinerary/create - Create new itinerary"""
-    try:
-        itinerary = ItineraryService.create_itinerary(request.get_json())
-        return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.CREATED
-        
-    except HTTPException as e:
-        logger.exception(f"Integrity error creating itinerary: {e}")
+    """POST /api/itinerary/create — Create a new itinerary.
 
-        raise
-    except IntegrityError as e:
-        logger.error(f"Integrity error creating itinerary: {e}")
+    tripId is optional. If provided, user must be a member of that trip.
+    name is optional when tripId is provided (derived from trip.destination).
+    name is required for standalone itineraries.
+    """
+    data = request.get_json() or {}
+    trip_id = data.get("tripId")
+
+    if trip_id:
+        has_access = check_resource_ownership(resource_type="trip", resource_id=trip_id)
+        if has_access is None:
+            abort(HTTPStatus.NOT_FOUND, description=f"Trip {trip_id} not found")
+        if not has_access:
+            abort(HTTPStatus.FORBIDDEN, description="Access denied to trip")
+
+    try:
+        itinerary = ItineraryService.create_itinerary(data, g.current_user_id)
+        schema = ItinerarySchema()
+        schema.include_staging = True
+        return jsonify(schema.dump(itinerary)), HTTPStatus.CREATED
+
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except IntegrityError:
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error creating itinerary: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @itinerary_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
 def update_itinerary(id: str):
-    """
-    PATCH /api/itinerary/<id> — Partially update an existing itinerary.
-
-    Accepts a JSON body with any subset of mutable itinerary fields (isPublic, totalMiles).
-    Only the fields present in the body are applied; omitted fields are left unchanged.
-
-    Returns:
-        200 with the updated itinerary object, or 404 if not found.
-    """
+    """PATCH /api/itinerary/<id> — Partially update an itinerary (owner only)."""
     try:
-        itinerary_data = request.get_json()
-        updated_itinerary = ItineraryService.update_itinerary(id, itinerary_data)
-        return jsonify(ItinerarySchema().dump(updated_itinerary)), HTTPStatus.OK
+        updated = ItineraryService.update_itinerary(id, request.get_json() or {})
+        return jsonify(ItinerarySchema().dump(updated)), HTTPStatus.OK
 
     except HTTPException:
         raise
     except PermissionError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except IntegrityError as e:
-        logger.error(f"Integrity error updating itinerary: {e}")
+    except IntegrityError:
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error updating itinerary: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
 
 @itinerary_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
 def delete_itinerary(id: str):
-    """DELETE /api/itinerary/<id> - Delete itinerary by ID"""
+    """DELETE /api/itinerary/<id> — Delete an itinerary (owner only)."""
     try:
-        logger.info(f"Deleting itinerary {id}")
         ItineraryService.delete_itinerary(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-        
+
     except HTTPException:
         raise
     except NoResultFound:
-        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary with id {id} not found")
-    except IntegrityError as e:
-        logger.error(f"Integrity error deleting itinerary: {e}")
+        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
+    except IntegrityError:
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete itinerary due to existing references")
-    except Exception as e:
-        logger.error(f"Error deleting itinerary: {e}")
+
+
+@itinerary_api.route("/<string:id>/fork", methods=["POST"])
+@JWTService.authenticate_restful
+def fork_itinerary(id: str):
+    """POST /api/itinerary/<id>/fork — Fork a public itinerary into a private copy."""
+    try:
+        fork = ItineraryService.fork_itinerary(id, g.current_user_id)
+        return jsonify({"itineraryId": str(fork.id)}), HTTPStatus.CREATED
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Itinerary not found or not public")
+    except PermissionError as e:
+        abort(HTTPStatus.FORBIDDEN, description=str(e))
+
+
+@itinerary_api.route("/<string:id>/apply-boundaries", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('itinerary')
+def apply_boundaries(id: str):
+    """POST /api/itinerary/<id>/apply-boundaries — Batch-apply day boundaries (owner only)."""
+    body = request.get_json() or {}
+    boundaries = body.get("boundaries", [])
+    point_updates = body.get("points", [])
+
+    if not isinstance(boundaries, list):
+        abort(HTTPStatus.BAD_REQUEST, description="boundaries must be a list")
+
+    try:
+        itinerary = ItineraryService.apply_boundaries(id, boundaries, point_updates)
+        schema = ItinerarySchema()
+        schema.include_staging = True
+        return jsonify(schema.dump(itinerary)), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception:
         db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+        logger.exception("apply_boundaries_error", extra={"itinerary_id": id})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+@itinerary_api.route("/<string:id>/export", methods=["GET"])
+def export_gpx(id: str):
+    """GET /api/itinerary/<id>/export?format=gpx
+
+    Authenticated owner/member: full export including notes.
+    Unauthenticated: allowed only if itinerary is public; notes stripped.
+    """
+    fmt = request.args.get("format", "gpx")
+    if fmt != "gpx":
+        abort(HTTPStatus.BAD_REQUEST, description="Only format=gpx is supported")
+
+    current_user_id = g.get("current_user_id")
+    include_private = False
+
+    try:
+        itinerary = ItineraryService.get_itinerary_by_id(id)
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Itinerary not found")
+
+    if current_user_id:
+        has_access = check_resource_ownership(resource_type="itinerary", resource_id=id, read_only=True)
+        if has_access:
+            include_private = True
+    else:
+        if not itinerary.is_public:
+            abort(HTTPStatus.NOT_FOUND, description="Itinerary not found")
+
+    gpx_bytes = ItineraryService.export_gpx(id, include_private=include_private)
+    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in itinerary.name)
+    return Response(
+        gpx_bytes,
+        mimetype="application/gpx+xml",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.gpx"'},
+    )
+
+
+@itinerary_api.route("/import", methods=["POST"])
+@JWTService.authenticate_restful
+def import_gpx():
+    """POST /api/itinerary/import — Import a GPX file (multipart, field name 'file')."""
+    if "file" not in request.files:
+        abort(HTTPStatus.BAD_REQUEST, description="No file field in request")
+
+    file = request.files["file"]
+    if not file.filename or not file.filename.lower().endswith(".gpx"):
+        abort(HTTPStatus.BAD_REQUEST, description="Only .gpx files are accepted")
+
+    file_bytes = file.read()
+    epsilon = float(request.form.get("epsilon", 0.0001))
+
+    try:
+        itinerary = ItineraryService.import_gpx(
+            file_bytes=file_bytes,
+            filename=file.filename,
+            user_id=g.current_user_id,
+            epsilon=epsilon,
+        )
+        return jsonify({"itineraryId": str(itinerary.id)}), HTTPStatus.CREATED
+
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception:
+        db.session.rollback()
+        logger.exception("gpx_import_error")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR)

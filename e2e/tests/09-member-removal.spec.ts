@@ -24,6 +24,7 @@ test.describe("Member removal", () => {
 
   test("leader removes crew member → crew loses access to the trip", async ({ page, browser }) => {
     await page.goto(`/trips/${tripId}`)
+    await page.getByRole("tab", { name: /crew/i }).click()
 
     // Leader removes crew via UI
     await page.getByText(CREW.name).hover()

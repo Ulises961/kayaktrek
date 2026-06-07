@@ -1,0 +1,53 @@
+[project]
+name = "kayak-expedition-planner"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "flask",
+    "celery",
+    "kombu",
+    "marshmallow",
+    "marshmallow-sqlalchemy",
+    "flask-sqlalchemy>=3.1.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary",
+    "flask-bcrypt",
+    "python-dotenv",
+    "pyjwt",
+    "flask-migrate",
+    "alembic",
+    "geoalchemy2",
+    "openmeteo-requests",
+    "requests-cache",
+    "retry-requests",
+    "setuptools",
+    "bleach",
+    "uuid_extension",
+    "camel-converter",
+    "flask-limiter",
+    "redis>=3.0",
+    "flask-mail",
+    "gunicorn",
+    "boto3",
+    "python-magic",
+    "cryptography",
+    "gpxpy",
+    "shapely",
+]
+
+[dependency-groups]
+dev = [
+    "flake8",
+    "pytest",
+    "pytest-cov",
+    "pytest-dotenv",
+    "pytest-xdist",
+    "path",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["Api*", "Models*", "Resources*", "Schemas*", "Services*", "Tasks*", "Tests*"]

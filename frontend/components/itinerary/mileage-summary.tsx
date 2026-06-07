@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 const KM_PER_NM = 1.852
 type Unit = "km" | "nm"
@@ -10,18 +10,19 @@ function convert(km: number, unit: Unit): string {
   return `${value.toFixed(1)} ${unit}`
 }
 
+function readStoredUnit(): Unit {
+  if (typeof window === "undefined") return "km"
+  const stored = localStorage.getItem("distanceUnit")
+  return stored === "km" || stored === "nm" ? stored : "km"
+}
+
 interface MileageSummaryProps {
   planned: number | null | undefined
   actual: number | null | undefined
 }
 
 export function MileageSummary({ planned, actual }: MileageSummaryProps) {
-  const [unit, setUnit] = useState<Unit>("km")
-
-  useEffect(() => {
-    const stored = localStorage.getItem("distanceUnit")
-    if (stored === "km" || stored === "nm") setUnit(stored)
-  }, [])
+  const [unit, setUnit] = useState<Unit>(readStoredUnit)
 
   function toggleUnit(next: Unit) {
     setUnit(next)
