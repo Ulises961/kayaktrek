@@ -15,6 +15,9 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER") or os.getenv("MAIL_USERNAME")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+    CACHE_TYPE = "RedisCache"
+    CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
+    CACHE_REDIS_URL = os.getenv("REDIS_CACHE_URL", "redis://localhost:6379/1")
 
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
@@ -35,6 +38,8 @@ class TestingConfig(Config):
     MAIL_SUPPRESS_SEND = True
     RATELIMIT_ENABLED = False
     RATELIMIT_STORAGE_URI = "memory://"
+    CACHE_TYPE = "SimpleCache"
+    CACHE_DEFAULT_TIMEOUT = 0
 
 class StagingConfig(Config):
     DEVELOPMENT = True

@@ -4,6 +4,7 @@ import uuid
 from flask import Flask, g, request
 from flask_migrate import Migrate
 
+from Api.cache import cache
 from Api.config import config
 from Api.database import db
 from Api.limiter import limiter
@@ -84,6 +85,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     db.init_app(app)
     mail.init_app(app)
     limiter.init_app(app)
+    cache.init_app(app)
     with app.app_context():
         if not app.config.get("TESTING"):
             seed_item_categories()

@@ -33,6 +33,7 @@ dependencies = [
     "cryptography",
     "gpxpy",
     "shapely",
+    "flask-caching",
 ]
 
 [dependency-groups]
