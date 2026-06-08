@@ -38,6 +38,7 @@ celery_app = Celery(
         "Tasks.ping",
         "Tasks.data_export",
         "Tasks.erasure",
+        "Tasks.weather_fetch_task",
     ],
 )
 

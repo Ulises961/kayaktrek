@@ -29,6 +29,8 @@ from Resources.logistics_resource import logistics_api
 from Resources.travel_document_resource import travel_document_api
 from Resources.shuttle_resource import shuttle_api
 from Resources.float_plan_resource import float_plan_api
+from Resources.sea_resource import sea_api
+from Resources.tidal_station_resource import tidal_station_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
@@ -76,6 +78,8 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(travel_document_api)
     app.register_blueprint(shuttle_api)
     app.register_blueprint(float_plan_api)
+    app.register_blueprint(sea_api)
+    app.register_blueprint(tidal_station_api)
 
     db.init_app(app)
     mail.init_app(app)

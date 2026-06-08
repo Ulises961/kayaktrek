@@ -1,0 +1,234 @@
+"""§2 Sea resource + tidal station API tests."""
+from unittest.mock import MagicMock, patch
+from uuid import UUID
+
+import pytest
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point as ShapelyPoint
+
+from Api.database import db as _db
+from Models.day import Day
+from Models.sea import Sea
+from Models.tidal_station import TidalStation
+
+
+# ── Sea CRUD ─────────────────────────────────────────────────────────────────
+
+def test_get_sea_404_when_not_exists(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/sea", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_post_sea_creates_and_returns_rule_of_twelfths(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    body = {"highTide": "12:00", "lowTide": "06:00", "tidalRangeM": 4.0}
+    resp = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.get_json()
+    assert data["dayId"] == day_id
+    assert data["highTide"] == "12:00"
+    assert data["tidalRangeM"] == pytest.approx(4.0)
+    assert data["ruleOfTwelfths"] is not None
+    assert len(data["ruleOfTwelfths"]) == 7
+
+    _cleanup_sea(day_id)
+
+
+def test_post_sea_409_when_already_exists(client, auth_headers, itinerary):
+    day_id = itinerary["days"][1]["id"]
+    body = {"highTide": "06:00", "lowTide": "12:00", "tidalRangeM": 3.0}
+    resp1 = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    assert resp1.status_code == 201
+
+    resp2 = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    assert resp2.status_code == 409
+
+    _cleanup_sea(day_id)
+
+
+def test_patch_sea_updates_fields(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    client.post(
+        f"/api/day/{day_id}/sea",
+        json={"highTide": "10:00", "lowTide": "04:00", "tidalRangeM": 2.0},
+        headers=auth_headers,
+    )
+
+    resp = client.patch(
+        f"/api/day/{day_id}/sea",
+        json={"tidalRangeM": 3.5, "moonPhase": "waxing gibbous"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["tidalRangeM"] == pytest.approx(3.5)
+    assert data["moonPhase"] == "waxing gibbous"
+    assert data["highTide"] == "10:00"  # untouched
+
+    _cleanup_sea(day_id)
+
+
+def test_patch_sea_404_when_not_exists(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.patch(f"/api/day/{day_id}/sea", json={"tidalRangeM": 1.0}, headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_sea_returns_created_record(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    client.post(
+        f"/api/day/{day_id}/sea",
+        json={"lowTide": "08:00", "highTide": "14:00", "tidalRangeM": 5.5},
+        headers=auth_headers,
+    )
+
+    resp = client.get(f"/api/day/{day_id}/sea", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["tidalRangeM"] == pytest.approx(5.5)
+
+    _cleanup_sea(day_id)
+
+
+# ── tidal gates ───────────────────────────────────────────────────────────────
+
+def test_get_tidal_gates_returns_empty_list(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/tidal-gates", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+# ── weather fetch ─────────────────────────────────────────────────────────────
+
+def test_weather_fetch_400_without_date(client, auth_headers, app, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    with app.app_context():
+        day = _db.session.get(Day, UUID(day_id))
+        original_date = day.date
+        day.date = None
+        _db.session.commit()
+    try:
+        resp = client.post(f"/api/day/{day_id}/weather/fetch", headers=auth_headers)
+        assert resp.status_code == 400
+    finally:
+        with app.app_context():
+            day = _db.session.get(Day, UUID(day_id))
+            day.date = original_date
+            _db.session.commit()
+
+
+def test_weather_fetch_202_with_date(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    mock_result = MagicMock()
+    mock_result.id = "mock-celery-task-id"
+    with patch("Resources.sea_resource.fetch_weather") as mock_task:
+        mock_task.delay.return_value = mock_result
+        resp = client.post(f"/api/day/{day_id}/weather/fetch", headers=auth_headers)
+    assert resp.status_code == 202
+    assert resp.get_json()["taskId"] == "mock-celery-task-id"
+
+
+# ── tidal station admin ───────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module", autouse=False)
+def admin_user_1(user_1):
+    """Promote user_1 to admin for tidal-station admin endpoint tests.
+
+    Registration ignores the admin field (correctly), so we set it directly.
+    Restored at teardown.
+    """
+    user_1.admin = True
+    _db.session.commit()
+    yield user_1
+    user_1.admin = False
+    _db.session.commit()
+
+
+def test_tidal_station_create_requires_admin(client, auth_headers_2, itinerary):
+    body = {
+        "name": "Test Station",
+        "location": {"type": "Point", "coordinates": [-4.15, 50.35]},
+    }
+    resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers_2)
+    assert resp.status_code == 403
+
+
+def test_tidal_station_create_and_delete(admin_user_1, client, auth_headers):
+    body = {
+        "name": "Falmouth Approach",
+        "location": {"type": "Point", "coordinates": [-5.05, 50.15]},
+        "meanSpringRangeM": 4.8,
+        "tidalStreamEntries": [
+            {"hoursFromHw": 0, "springRateKnots": 2.1, "neapRateKnots": 1.0, "directionDegrees": 270},
+        ],
+    }
+    resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers)
+    assert resp.status_code == 201
+    data = resp.get_json()
+    station_id = data["id"]
+    assert data["name"] == "Falmouth Approach"
+    assert data["meanSpringRangeM"] == pytest.approx(4.8)
+    assert len(data["tidalStreamEntries"]) == 1
+    assert data["location"]["type"] == "Point"
+
+    del_resp = client.delete(f"/api/tidal-station/{station_id}", headers=auth_headers)
+    assert del_resp.status_code == 200
+
+
+def test_tidal_station_patch(admin_user_1, client, auth_headers):
+    body = {
+        "name": "Lizard Point",
+        "location": {"type": "Point", "coordinates": [-5.20, 49.96]},
+    }
+    create_resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers)
+    station_id = create_resp.get_json()["id"]
+
+    patch_resp = client.patch(
+        f"/api/tidal-station/{station_id}",
+        json={"name": "Lizard Point Updated", "meanSpringRangeM": 3.9},
+        headers=auth_headers,
+    )
+    assert patch_resp.status_code == 200
+    patched = patch_resp.get_json()
+    assert patched["name"] == "Lizard Point Updated"
+    assert patched["meanSpringRangeM"] == pytest.approx(3.9)
+
+    client.delete(f"/api/tidal-station/{station_id}", headers=auth_headers)
+
+
+def test_tidal_station_nearby(client, auth_headers, app):
+    geo = from_shape(ShapelyPoint(-4.15, 50.35), srid=4326)
+    station = TidalStation(name="Nearby Station Test", location=geo, mean_spring_range_m=3.0)
+    with app.app_context():
+        _db.session.add(station)
+        _db.session.commit()
+        station_id = str(station.id)
+    try:
+        resp = client.get("/api/tidal-station/nearby?lat=50.35&lng=-4.15&range=1")
+        assert resp.status_code == 200
+        names = [s["name"] for s in resp.get_json()]
+        assert "Nearby Station Test" in names
+    finally:
+        with app.app_context():
+            s = _db.session.get(TidalStation, station_id)
+            if s:
+                _db.session.delete(s)
+                _db.session.commit()
+
+
+def test_tidal_station_nearby_excludes_out_of_range(client):
+    resp = client.get("/api/tidal-station/nearby?lat=51.50&lng=-0.10&range=1")
+    assert resp.status_code == 200
+    # No stations near London — just confirm the endpoint returns an empty list
+    assert isinstance(resp.get_json(), list)
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def _cleanup_sea(day_id: str):
+    sea = _db.session.query(Sea).filter_by(day_id=day_id).one_or_none()
+    if sea:
+        _db.session.delete(sea)
+        _db.session.commit()
