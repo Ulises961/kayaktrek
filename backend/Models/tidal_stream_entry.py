@@ -19,9 +19,9 @@ class TidalStreamEntry(db.Model):
         primary_key=True,
     )
     hours_from_hw: Mapped[int] = mapped_column(Integer, primary_key=True)
-    direction_degrees: Mapped[Optional[object]] = mapped_column(Numeric, nullable=True)
-    spring_rate_knots: Mapped[Optional[object]] = mapped_column(Numeric, nullable=True)
-    neap_rate_knots: Mapped[Optional[object]] = mapped_column(Numeric, nullable=True)
+    direction_degrees: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
+    spring_rate_knots: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
+    neap_rate_knots: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
 
     station: Mapped["TidalStation"] = relationship(back_populates="tidal_stream_entries")
 

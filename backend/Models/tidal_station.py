@@ -17,7 +17,7 @@ class TidalStation(BaseModel):
     location: Mapped[object] = mapped_column(Geometry("POINT", srid=4326, spatial_index=False), nullable=False)
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    mean_spring_range_m: Mapped[Optional[object]] = mapped_column(Numeric, nullable=True)
+    mean_spring_range_m: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
 
     tidal_stream_entries: Mapped[List["TidalStreamEntry"]] = relationship(
         back_populates="station",
