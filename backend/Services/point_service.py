@@ -29,7 +29,7 @@ def _require_editable(trip: Trip) -> None:
 
 class PointService:
     """Service class for Point-related business logic."""
-    _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "notes"})
+    _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "name", "notes"})
     
     @staticmethod
     def get_point_by_id(point_id: str) -> Optional[Point]:

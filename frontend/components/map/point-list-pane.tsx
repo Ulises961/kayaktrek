@@ -120,10 +120,19 @@ export function PointListPane() {
         next.set(pointId, { ...next.get(pointId), name })
         return next
       })
-      return
     }
-    dispatch({ type: "SET_PENDING_NAME", name })
-  }, [draftSlices, dispatch])
+  }, [draftSlices])
+
+  const handleNameBlur = useCallback(async (pointId: string, name: string) => {
+    if (draftSlices) return
+    const trimmed = name.trim()
+    const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
+    if (trimmed === currentName) return
+    dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
+    dispatch({ type: "SAVING_START" })
+    await updatePoint(pointId, { name: trimmed || null })
+    dispatch({ type: "SAVING_END" })
+  }, [draftSlices, dispatch, state.points])
 
   const handleDelete = useCallback(async (pointId: string) => {
     setActivePointId(null)
@@ -375,6 +384,7 @@ export function PointListPane() {
                   dayColor={dayColor}
                   onTypeChange={(type) => point.id && handleTypeChange(point.id, type)}
                   onNameChange={(name) => point.id && handleNameChange(point.id, name)}
+                  onNameBlur={(name) => point.id && handleNameBlur(point.id, name)}
                   onDelete={point.id ? () => handleDelete(point.id!) : undefined}
                 />
               </div>

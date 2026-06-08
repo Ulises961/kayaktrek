@@ -13,6 +13,7 @@ export type PointRowProps = {
   dayColor: string
   onTypeChange?: (type: PointType) => void
   onNameChange?: (name: string) => void
+  onNameBlur?: (name: string) => void
   onDelete?: () => void
 }
 
@@ -31,6 +32,7 @@ export function PointRow({
   dayColor,
   onTypeChange,
   onNameChange,
+  onNameBlur,
   onDelete,
 }: PointRowProps) {
   const [localName, setLocalName] = useState(point.name ?? "")
@@ -97,6 +99,7 @@ export function PointRow({
             setLocalName(e.target.value)
             onNameChange(e.target.value)
           }}
+          onBlur={() => onNameBlur?.(localName)}
         />
       )}
 
