@@ -1,5 +1,4 @@
 "use client"
-import { GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatDistance, formatTime, estimatedTime } from "@/lib/itinerary/distance"
 
@@ -50,9 +49,6 @@ export function DayStripCard({
         isPastDay && "opacity-50",
       )}
     >
-      <div className="w-5 shrink-0 flex items-center justify-center border-r border-border/40 text-muted-foreground/30 cursor-grab active:cursor-grabbing">
-        <GripVertical className="size-3" />
-      </div>
       <div className="flex flex-col items-start gap-1 px-2 py-2 flex-1 min-w-0">
         <span className="font-semibold text-foreground">Day {dayNumber}</span>
         <span className="text-muted-foreground">{date ? formatDate(date) : "No date"}</span>

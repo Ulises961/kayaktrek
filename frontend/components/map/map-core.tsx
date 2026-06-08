@@ -95,7 +95,7 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
     if (flyToPoint.id === prevIdRef.current) return
     prevIdRef.current = flyToPoint.id
 
-    const zoom = 12
+    const zoom = 13
     // Offset the target so the point centres in the visible area above the 55vh
     // point-detail sheet rather than at the geometric centre of the viewport.
     const px = map.project([flyToPoint.lat, flyToPoint.lng], zoom)
