@@ -59,11 +59,59 @@ fields require migration.
 
 ### 2. Tidal times and range — manual entry in M5; automated prediction deferred
 
-Automated global tidal height prediction requires either:
-- A paid API (WorldTides, Stormglass — recurring cost at zero revenue), or
-- Harmonic constituent data + a local prediction library (`pytides`, `utide`). Constituent
-  data is available from national authorities for well-surveyed ports but coverage is
-  uneven for remote coastlines.
+**Why OpenMeteo cannot drive the rule of 12s**: OpenMeteo's marine API provides wave data
+and `ocean_current_velocity` / `ocean_current_direction` from a global circulation model
+(CMEMS/GFS). These are current speed in knots — not tidal heights in metres. The rule of
+12s needs HW/LW times and a height range; neither exists anywhere in OpenMeteo's output.
+Even if peak-current timing were extracted from the hourly velocity series, the signal
+mixes tidal, wind-driven, and geostrophic components at 5–25 km grid resolution — far too
+coarse and mixed to recover reliable HW times at the scale of a tidal passage. OpenMeteo's
+current vectors are used only for the indicative `leaflet-velocity` overlay; they must not
+be confused with tidal prediction data.
+
+**Free automated prediction is achievable without a paid API** through two tiers:
+
+*Tier 1 — Global harmonic grid models (full global coverage, ±5–20 cm accuracy offshore):*
+- **FES2022 / FES2014b** (AVISO+, LEGOS/CNES) — free after non-commercial registration;
+  ~1/16° global grid; Python access via `pyTMD` or `pyfes`; ~30 GB server-hosted model
+  files.
+- **EOT20** (DGFI-TUM) — fully open license, published on Zenodo; slightly coarser than
+  FES2022; same `pyTMD` access path. No registration required.
+- **TPXO9-atlas** (Oregon State University) — free for non-commercial/academic use; widely
+  used in research; also accessible via `pyTMD`.
+- **`pyTMD`** is the Python package that unifies all three: given (lat, lon, datetime) it
+  returns predicted tide height, from which HW/LW times and range are derived.
+
+*Tier 2 — National authority free APIs (gauge-calibrated, higher accuracy, limited
+coverage):*
+
+| Authority | Waters | Notes |
+|-----------|--------|-------|
+| NOAA CO-OPS | US, Caribbean, Pacific territories | Public REST API, no key |
+| SHOM | France, DOM/TOM | Open data portal; forecast API needs a free key |
+| SMHI | Sweden | Open data API, free |
+| MET Norway | Norwegian coast | Free API |
+| DMI | Denmark, Greenland | Partially free via DMI open data |
+| Waterinfo.be | Belgium | Free REST API |
+
+The UK gap: UKHO charges for tidal prediction API access. NTSLF publishes observed gauge
+data free but not predictions. Harmonic constants for UK ports are in Admiralty products
+not freely redistributable. The global grid models (FES2022, EOT20) are the practical
+fallback for UK coastal waters; accuracy degrades in shallow shelf seas and sea lochs.
+
+**Architecture for the automated prediction pipeline (deferred to post-M5):**
+1. Add `Sea.tidal_source` nullable enum: `"manual"`, `"predicted_noaa"`,
+   `"predicted_shom"`, `"predicted_grid"` — so the UI labels where data came from and
+   lets the leader override.
+2. The existing Celery task triggered by `apply-boundaries` (OpenMeteo fetch) is the right
+   place to also run tidal prediction for the day's coordinates.
+3. Task priority: try NOAA CO-OPS first (US bounding box), then SHOM (France), then fall
+   back to `pyTMD` + FES2022/EOT20 for all other regions; leave null if model coverage is
+   absent.
+4. The model files (FES2022/EOT20) are server-hosted one-time downloads. `pyTMD` supports
+   subset downloads limited to a bounding box to reduce storage.
+5. Manual entry remains the first-class path: leaders with access to a local almanac or
+   chart table should always be able to override automated predictions.
 
 **Decision for M5**: `Sea.high_tide`, `Sea.low_tide` remain manually entered by the trip
 leader. A new `Sea.tidal_range_m` column (nullable float) is added for the height
@@ -71,9 +119,9 @@ difference between HW and LW — also manually entered. The UI presents these th
 as an optional data-entry section on the day detail panel, labelled "Tidal data (from
 almanac/chart)".
 
-**Automated tidal prediction is deferred** to a later milestone once a viable free-or-low-
-cost data pipeline is identified. The model is ready for it — `high_tide`, `low_tide`, and
-`tidal_range_m` can be populated programmatically when that pipeline exists.
+**Automated tidal prediction is deferred** to a post-M5 milestone using the pipeline
+described above. The model is ready for it — `high_tide`, `low_tide`, and `tidal_range_m`
+can be populated programmatically when that pipeline is implemented.
 
 ### 3. Tidal stream data — TidalStation + TidalStreamEntry, community/imported
 
@@ -163,8 +211,9 @@ on the fly (no pre-computed tile storage required at M5 scale).
 
 **Negative / trade-offs**
 - Tidal times (`high_tide`, `low_tide`, `tidal_range_m`) are manually entered in M5 —
-  this places a burden on the trip leader to consult an almanac. Automated prediction
-  requires a future data pipeline.
+  this places a burden on the trip leader to consult an almanac. Automated prediction is
+  achievable without a paid API (see §2 above: pyTMD + FES2022/EOT20, or national-
+  authority APIs for US/France/Nordics); it is deferred, not blocked.
 - OpenMeteo ocean current vectors are global model output (CMEMS/GFS), not measured data.
   In complex tidal environments (estuaries, archipelagos), they diverge from actual stream
   atlases. The `leaflet-velocity` overlay is indicative; `TidalStreamEntry` data is the
