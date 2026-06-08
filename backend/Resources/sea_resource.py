@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from werkzeug.exceptions import HTTPException
 
 from Api.database import db
-from Schemas.sea_schema import SeaSchema
+from Schemas.sea_schema import SeaSchema, _gate_schema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.day_service import DayService
@@ -88,7 +88,7 @@ def get_tidal_gates(id: str):
         sea = day.sea
         points = sorted(day.points or [], key=lambda p: (p.next_id is None, str(p.id)))
         gates = TidalService.tidal_gates_for_day(day, points, sea)
-        return jsonify(gates), HTTPStatus.OK
+        return jsonify(_gate_schema.dump(gates)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
     except HTTPException:
