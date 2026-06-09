@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { fetchDaySea, updateDaySea, fetchDayWeather, triggerWeatherFetch, fetchTidalGates } from "../actions"
+import { fetchDaySea, updateDaySea, fetchDayWeather, triggerWeatherFetch, fetchTidalGates, fetchWindVectors, fetchWaveVectors, fetchTidalStreamVectors } from "../actions"
 
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
@@ -151,5 +151,65 @@ describe("fetchTidalGates", () => {
     GET.mockRejectedValue(new Error("Server error"))
     const result = await fetchTidalGates(DAY_ID)
     expect(result).toEqual({ success: false, error: "Server error" })
+  })
+})
+
+const velocityGridFixture = {
+  source: "station" as const,
+  grid: [
+    {
+      header: {
+        parameterUnit: "m.s-1",
+        parameterNumberName: "eastward_component",
+        la1: 51.5, la2: 52.0, lo1: -5.5, lo2: -5.0,
+        nx: 5, ny: 5, dx: 0.1, dy: 0.1,
+      },
+      data: [0.1, 0.2, 0.3, 0.4, 0.5],
+    },
+  ],
+}
+
+describe("fetchWindVectors", () => {
+  it("gets /api/day/:id/wind-vectors?hour=12", async () => {
+    GET.mockResolvedValue(velocityGridFixture)
+    const result = await fetchWindVectors(DAY_ID, 12)
+    expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/wind-vectors?hour=12`)
+    expect(result).toEqual({ success: true, data: velocityGridFixture })
+  })
+
+  it("returns error on failure", async () => {
+    GET.mockRejectedValue(new Error("No data"))
+    const result = await fetchWindVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "No data" })
+  })
+})
+
+describe("fetchWaveVectors", () => {
+  it("gets /api/day/:id/wave-vectors?hour=12", async () => {
+    GET.mockResolvedValue(velocityGridFixture)
+    const result = await fetchWaveVectors(DAY_ID, 12)
+    expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/wave-vectors?hour=12`)
+    expect(result).toEqual({ success: true, data: velocityGridFixture })
+  })
+
+  it("returns error on failure", async () => {
+    GET.mockRejectedValue(new Error("No data"))
+    const result = await fetchWaveVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "No data" })
+  })
+})
+
+describe("fetchTidalStreamVectors", () => {
+  it("gets /api/day/:id/tidal-stream-vectors?hour=12", async () => {
+    GET.mockResolvedValue({ source: "manual", grid: [] })
+    const result = await fetchTidalStreamVectors(DAY_ID, 12)
+    expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/tidal-stream-vectors?hour=12`)
+    expect(result).toEqual({ success: true, data: { source: "manual", grid: [] } })
+  })
+
+  it("returns error on failure", async () => {
+    GET.mockRejectedValue(new Error("No data"))
+    const result = await fetchTidalStreamVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "No data" })
   })
 })

@@ -24,6 +24,16 @@ const SEA_FIXTURE = {
   highTide: "09:00",
   lowTide: "15:00",
   tidalRangeM: 3.5,
+  referencePortName: "Milford Haven",
+  hwTimeOffsetMinutes: 35,
+  lwTimeOffsetMinutes: 30,
+  hwHeightRatio: 0.95,
+  lwHeightRatio: 1.05,
+  tidalSource: "manual_corrected",
+  floodDirectionDegrees: 47,
+  ebbDirectionDegrees: 227,
+  maxSpringRateKnots: 3.1,
+  maxNeapRateKnots: 1.6,
   seaStates: [SEA_STATE_FIXTURE],
   recordedAt: "2026-06-08T10:00:00",
   ruleOfTwelfths: [ROT_ENTRY_FIXTURE],
@@ -61,25 +71,50 @@ describe("RuleOfTwelfthsEntrySchema", () => {
 })
 
 describe("SeaSchema", () => {
-  it("parses a full sea fixture", () => {
+  it("parses a full sea fixture including tidal operability fields", () => {
     expect(SeaSchema.safeParse(SEA_FIXTURE).success).toBe(true)
   })
 
-  it("accepts absent optional fields", () => {
-    const result = SeaSchema.safeParse({ dayId: SEA_FIXTURE.dayId })
-    expect(result.success).toBe(true)
+  it("accepts absent optional fields (minimum valid)", () => {
+    expect(SeaSchema.safeParse({ dayId: SEA_FIXTURE.dayId }).success).toBe(true)
   })
 
-  it("accepts null tidal fields", () => {
+  it("accepts null on all nullable tidal fields", () => {
     const result = SeaSchema.safeParse({
       ...SEA_FIXTURE,
       moonPhase: null,
       highTide: null,
       lowTide: null,
       tidalRangeM: null,
+      referencePortName: null,
+      hwTimeOffsetMinutes: null,
+      lwTimeOffsetMinutes: null,
+      hwHeightRatio: null,
+      lwHeightRatio: null,
+      floodDirectionDegrees: null,
+      ebbDirectionDegrees: null,
+      maxSpringRateKnots: null,
+      maxNeapRateKnots: null,
       ruleOfTwelfths: null,
     })
     expect(result.success).toBe(true)
+  })
+
+  it("parses tidalSource as a string", () => {
+    const result = SeaSchema.safeParse({ ...SEA_FIXTURE, tidalSource: "manual" })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.tidalSource).toBe("manual")
+  })
+
+  it("parses stream direction and rate fields", () => {
+    const result = SeaSchema.safeParse(SEA_FIXTURE)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.floodDirectionDegrees).toBe(47)
+      expect(result.data.ebbDirectionDegrees).toBe(227)
+      expect(result.data.maxSpringRateKnots).toBe(3.1)
+      expect(result.data.maxNeapRateKnots).toBe(1.6)
+    }
   })
 
   it("rejects missing dayId", () => {

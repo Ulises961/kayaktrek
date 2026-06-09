@@ -23,6 +23,18 @@ export const SeaSchema = z.object({
   highTide: z.string().nullable().optional(),
   lowTide: z.string().nullable().optional(),
   tidalRangeM: z.number().nullable().optional(),
+  // tidal reference and correction fields (manual operability)
+  referencePortName: z.string().nullable().optional(),
+  hwTimeOffsetMinutes: z.number().int().nullable().optional(),
+  lwTimeOffsetMinutes: z.number().int().nullable().optional(),
+  hwHeightRatio: z.number().nullable().optional(),
+  lwHeightRatio: z.number().nullable().optional(),
+  tidalSource: z.string().optional(),
+  // manual stream fields (drives tidal stream animated layer)
+  floodDirectionDegrees: z.number().nullable().optional(),
+  ebbDirectionDegrees: z.number().nullable().optional(),
+  maxSpringRateKnots: z.number().nullable().optional(),
+  maxNeapRateKnots: z.number().nullable().optional(),
   seaStates: z.array(SeaStateSchema).optional(),
   recordedAt: z.string().nullable().optional(),
   ruleOfTwelfths: z.array(RuleOfTwelfthsEntrySchema).nullable().optional(),
