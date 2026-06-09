@@ -147,6 +147,14 @@ def test_export_unauthenticated_private_returns_404(app, itinerary):
     assert r.status_code == 404
 
 
+def test_export_authenticated_owner_private_returns_gpx(client, auth_headers, itinerary):
+    """Owner can export their own private itinerary — optional auth reads the request token."""
+    r = client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/export?format=gpx",
+                   headers=auth_headers)
+    assert r.status_code == 200
+    assert "gpx" in r.content_type
+
+
 # ── POST /import ──────────────────────────────────────────────────────────────
 
 def test_import_no_file_field_returns_400(client, auth_headers):

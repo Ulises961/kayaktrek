@@ -147,7 +147,42 @@ class JWTService:
                 raise
             except Exception:
                 abort(HTTPStatus.UNAUTHORIZED, description="Invalid token")
-        
+
+            return f(*args, **kwargs)
+        return decorator
+
+    @staticmethod
+    def authenticate_optional(f):
+        """Populate g.current_user_id from a valid token when present, otherwise proceed
+        unauthenticated. Never aborts on missing or invalid credentials — the view decides
+        what an anonymous caller may see.
+
+        g.current_user_id is reset to None up front so the result depends only on this
+        request's headers, never on an ambient value left over from a prior request sharing
+        the same application context."""
+        @wraps(f)
+        def decorator(*args, **kwargs):
+            g.current_user_id = None
+            g.current_user_mail = None
+            auth_header = request.headers.get("Authorization", None)
+            if auth_header:
+                try:
+                    token = auth_header.split(" ")[1] if auth_header.startswith("Bearer ") else auth_header
+                    data = JWTService.verify_token(token)
+                    if data:
+                        user = UserService.get_user_by_id(data["user_id"])
+                        if user and user.active:
+                            iat = data.get("iat")
+                            invalidated = (
+                                iat is not None
+                                and user.password_changed_at is not None
+                                and datetime.fromtimestamp(iat, tz=timezone.utc) < user.password_changed_at
+                            )
+                            if not invalidated:
+                                g.current_user_mail = user.mail
+                                g.current_user_id = str(user.id)
+                except Exception:
+                    pass  # malformed/invalid token → remain unauthenticated
             return f(*args, **kwargs)
         return decorator
 

@@ -176,6 +176,7 @@ def apply_boundaries(id: str):
 
 
 @itinerary_api.route("/<string:id>/export", methods=["GET"])
+@JWTService.authenticate_optional
 def export_gpx(id: str):
     """GET /api/itinerary/<id>/export?format=gpx
 
