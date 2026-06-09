@@ -1,0 +1,92 @@
+  What to look for
+                                                                                                                                                                                        
+  Functional icons (UI-level, you need all of these)
+                                                                                                                                                                                        
+  Lucide is already installed and covers most of it — check these exist before sourcing elsewhere:                                                                                      
+                                                                                                                                                                                        
+  ┌──────────────────────┬───────────────────────────────────────────────┐                                                                                                              
+  │         Need         │                  Lucide name                  │                                                                                             
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Compass / bearing    │ Compass, Navigation                           │                                                                                 
+  ├──────────────────────┼───────────────────────────────────────────────┤          
+  │ Anchor / fixed point │ Anchor                                        │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Kayak / boat         │ Sailboat (closest), Ship                      │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Waves / sea state    │ Waves                                         │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Wind                 │ Wind                                          │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Sunset / sunrise     │ Sunset, Sunrise, Sun                          │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Waypoint / stop      │ MapPin, Flag                                  │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Route / path         │ Route, Navigation2                            │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Ruler / distance     │ Ruler                                         │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Weather general      │ CloudRain, CloudLightning, Thermometer        │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Tent / camp stop     │ Tent                                          │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Backpack / gear      │ Backpack                                      │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Life ring            │ LifeBuoy                                      │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Container / cargo    │ — missing from Lucide                         │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Paddle               │ — missing from Lucide                         │
+  ├──────────────────────┼───────────────────────────────────────────────┤                                                                                                              
+  │ Beaufort / sea force │ — missing (you'd abstract from Waves or Wind) │
+  └──────────────────────┴───────────────────────────────────────────────┘                                                                                                              
+        
+  The two genuine gaps are paddle and cargo container. Everything else Lucide covers.                                                                                                   
+                                                        
+  Brand / mark level                                                                                                                                                                    
+                                                        
+  One coherent mark that works as favicon, app icon, and sidebar logo. You want something that abstracts a paddle blade or kayak cross-section into geometry — not clip-art. Think: two 
+  opposing teardrop shapes (double-blade paddle top view), or a single blade as a letterform.
+                                                                                                                                                                                        
+  Avoid: full kayak + person silhouettes (too detailed, won't scale to 16×16).                                                                                                          
+                                                                                    
+  Illustration layer (empty states, onboarding, hero)                                                                                                                                   
+                                                        
+  The visual grammar we built is the system. For one-off storytelling moments (onboarding flow, landing page hero, marketing) you'd want a cohesive pack rather than individual SVGs.   
+  Look for: adventure / outdoor / expedition style packs, not generic SaaS illustrations.
+                                                                                                                                                                                        
+  ---                                                   
+  Where to look                                                                     
+
+  Icons:
+  - Lucide (pnpm shadcn add or direct import) — your primary source, already wired
+  - Phosphor Icons — huge, has weights (thin → bold → duotone), searchable. Has a Boat, Compass with rose, AnchorSimple, maritime coverage is strong                                    
+  - Tabler Icons — 4500+ MIT licensed SVGs, very consistent stroke width, good nautical set. Has a Kayak icon specifically                          
+  - The Noun Project — best for very specific objects (kayak paddle, life jacket, Beaufort scale visual). Needs attribution on free tier                                                
+  - SVGRepo — searchable open SVG repo, good for finding a specific shape you can trace/simplify                                                                                        
+                                                                                                                                                                                        
+  Illustrations:                                                                                                                                                                        
+  - Blush.design — curated packs, some have outdoor/adventure themes, Figma-native so you can swap colors before exporting                                                              
+  - DrawKit — has an "adventure" pack, clean vector style, works with CSS color variables if you clean the SVG                                                                          
+  - Storyset — customizable palette on export, more personality than unDraw                                                                                                             
+  - Lottie Files (lottiefiles.com) — animated SVG/JSON, search "sea", "compass", "kayak" — useful specifically for loading states where motion IS the design                            
+                                                                                                                                                                                        
+  Brand mark / logo:                                                                                                                                                                    
+  - Figma Community — search "outdoor logo", "paddle logo", "maritime mark" for inspiration and remixable starting points                                                               
+  - Logoipsum — placeholder logos if you want a holding mark while the real one is designed                                                                                             
+  - For the real mark: this is one thing worth commissioning from a human designer for ~€150–300, or using a design tool like Figma/Affinity with the Phosphor/Tabler primitives as a
+  starting point                                                                                                                                                                        
+                                                                                                                                                                                        
+  Background textures / patterns:                                                                                                                                                       
+  - Hero Patterns (heropatterns.com) — SVG repeating patterns, has a topographic/grid one that reads as nautical chart                                                                  
+  - SVG Backgrounds (svgbackgrounds.com) — similar                                                                    
+  - These are good for the nautical chart grid primitive in the state visuals
+                                                                                                                                                                                        
+  ---                                                                                                                                                                                   
+  Practical next step                                                                                                                                                                   
+                                                                                                                                                                                        
+  Run pnpm dlx lucide-react to browse all icons, or check lucide.dev — confirm which ones already satisfy the list above. Then the only real sourcing work is:
+                                                                                                                                                                                        
+  1. A paddle icon — Tabler has one, Phosphor might, otherwise trace from The Noun Project                                                                                              
+  2. A cargo container — SVGRepo, The Noun Project                                                                                                                                      
+  3. An illustration pack for the landing page / onboarding — Blush or DrawKit adventure pack                                                                                           
+  4. A brand mark — either commission or compose from geometric primitives                     
