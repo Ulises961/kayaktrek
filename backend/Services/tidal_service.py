@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, time, timedelta
 from typing import Optional
 
@@ -20,8 +21,53 @@ logger = logging.getLogger(__name__)
 # Cumulative fractions at each hour from LW: 0, 1/12, 3/12, 6/12, 9/12, 11/12, 12/12
 _RULE_12_FRACTIONS = [0.0, 1 / 12, 3 / 12, 6 / 12, 9 / 12, 11 / 12, 1.0]
 
+# Per-hour rate fractions normalized to peak (h=2 or h=3): [1/3, 2/3, 1, 1, 2/3, 1/3]
+# max_spring_rate_knots is treated as the peak current speed.
+_STREAM_FRACTIONS = [1 / 3, 2 / 3, 1.0, 1.0, 2 / 3, 1 / 3]
+
 # Assumed paddling start (minutes from midnight) when no explicit start time exists
 _DEFAULT_START_MIN = 9 * 60  # 09:00
+
+
+def _build_uniform_velocity_grid(
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    rate_ms: float,
+    direction_deg: float,
+    source: str,
+) -> dict:
+    """Build a 3x3 uniform leaflet-velocity grid from speed (m/s) + direction."""
+    rad = math.radians(direction_deg)
+    u = round(rate_ms * math.sin(rad), 5)
+    v = round(rate_ms * math.cos(rad), 5)
+
+    nx, ny = 3, 3
+    n = nx * ny
+    dx = round((lon_max - lon_min) / (nx - 1), 4) if nx > 1 else 0.0
+    dy = round((lat_max - lat_min) / (ny - 1), 4) if ny > 1 else 0.0
+
+    header_base = {
+        "parameterUnit": "m.s-1",
+        "la1": lat_max, "la2": lat_min,
+        "lo1": lon_min, "lo2": lon_max,
+        "nx": nx, "ny": ny,
+        "dx": dx, "dy": dy,
+    }
+    return {
+        "source": source,
+        "grid": [
+            {
+                "header": {**header_base, "parameterNumberName": "eastward_component"},
+                "data": [u] * n,
+            },
+            {
+                "header": {**header_base, "parameterNumberName": "northward_component"},
+                "data": [v] * n,
+            },
+        ],
+    }
 
 
 def _rule_12_height(scaled_hours: float, range_m: float) -> float:
@@ -193,6 +239,136 @@ class TidalService:
         neap_rate = entry.neap_rate_knots if entry.neap_rate_knots is not None else 0.0
         ratio = min(sea.tidal_range_m / spring_range, 1.0)
         return neap_rate + ratio * (spring_rate - neap_rate)
+
+    @staticmethod
+    def build_wind_velocity_grid(bounding_box: tuple, weather_states: list, hour: int) -> dict:
+        """
+        Build a leaflet-velocity grid from WeatherState data at the given UTC hour.
+
+        wind_force is stored in km/h (OpenMeteo default). Converts to m/s for the grid.
+        Falls back to the closest available state when no exact hour match exists.
+        Returns {"source": "weather", "grid": [...]} or {"source": "weather", "grid": []}.
+        """
+        if not weather_states:
+            return {"source": "weather", "grid": []}
+
+        def _hour_of(state) -> int:
+            return state.time.hour if hasattr(state.time, "hour") else 0
+
+        best = min(weather_states, key=lambda s: abs(_hour_of(s) - hour))
+        if best.wind_force is None or best.wind_direction is None:
+            return {"source": "weather", "grid": []}
+
+        speed_ms = float(best.wind_force) / 3.6  # km/h → m/s
+        lat_min, lat_max, lon_min, lon_max = bounding_box
+        return _build_uniform_velocity_grid(
+            lat_min, lat_max, lon_min, lon_max,
+            speed_ms,
+            float(best.wind_direction),
+            "weather",
+        )
+
+    @staticmethod
+    def build_wave_velocity_grid(bounding_box: tuple, sea_states: list, hour: int) -> dict:
+        """
+        Build a leaflet-velocity grid from SeaState wave data at the given UTC hour.
+
+        wave_height (m) is used as a proxy for speed magnitude (1 m ≈ 1 m/s visually).
+        Falls back to closest available state when no exact hour match exists.
+        Returns {"source": "marine", "grid": [...]} or {"source": "marine", "grid": []}.
+        """
+        if not sea_states:
+            return {"source": "marine", "grid": []}
+
+        def _hour_of(state) -> int:
+            return state.time.hour if hasattr(state.time, "hour") else 0
+
+        best = min(sea_states, key=lambda s: abs(_hour_of(s) - hour))
+        if best.wave_height is None or best.wave_direction is None:
+            return {"source": "marine", "grid": []}
+
+        lat_min, lat_max, lon_min, lon_max = bounding_box
+        speed_ms = float(best.wave_height)  # metres → treat directly as m/s for visualisation
+        return _build_uniform_velocity_grid(
+            lat_min, lat_max, lon_min, lon_max,
+            speed_ms,
+            float(best.wave_direction),
+            "marine",
+        )
+
+    @staticmethod
+    def stream_rate_from_sea(sea: Sea, hour_from_lw: int) -> Optional[tuple]:
+        """
+        Returns (rate_knots, direction_degrees) using rule-of-12s fractions and
+        the manual stream fields on the Sea record.
+
+        max_spring_rate_knots is the peak rate (at hours 2-3 from LW).
+        Hours 0-5 → flood direction; hours 6-11 → ebb direction.
+        Returns None if any required field is absent.
+        """
+        if (sea.flood_direction_degrees is None
+                or sea.ebb_direction_degrees is None
+                or sea.max_spring_rate_knots is None):
+            return None
+
+        h = int(hour_from_lw) % 12
+        fraction_idx = h if h < 6 else 11 - h
+        fraction = _STREAM_FRACTIONS[max(0, min(fraction_idx, 5))]
+
+        rate = fraction * float(sea.max_spring_rate_knots)
+        direction = (float(sea.flood_direction_degrees) if h < 6
+                     else float(sea.ebb_direction_degrees))
+        return rate, direction
+
+    @staticmethod
+    def build_stream_velocity_grid(
+        bounding_box: tuple,
+        hour_from_lw: int,
+        sea: Optional[Sea],
+        stations: list,
+    ) -> dict:
+        """
+        Build a leaflet-velocity compatible velocity grid dict.
+
+        Priority: TidalStation entry data > Sea manual stream fields.
+        Returns { "source": "station"|"manual"|None, "grid": [...] }.
+        """
+        lat_min, lat_max, lon_min, lon_max = bounding_box
+
+        if stations:
+            station = stations[0]
+            clamped = max(-6, min(6, hour_from_lw - 6))
+            entry = next(
+                (e for e in station.tidal_stream_entries if e.hours_from_hw == clamped),
+                None,
+            )
+            if entry is None or entry.direction_degrees is None:
+                return {"source": "station", "grid": []}
+
+            rate = (
+                TidalService.interpolate_stream_rate(entry, sea)
+                if sea is not None
+                else (float(entry.spring_rate_knots) if entry.spring_rate_knots else None)
+            )
+            if rate is None:
+                return {"source": "station", "grid": []}
+
+            return _build_uniform_velocity_grid(
+                lat_min, lat_max, lon_min, lon_max,
+                rate * 0.514444, float(entry.direction_degrees), "station",
+            )
+
+        if sea is not None:
+            result = TidalService.stream_rate_from_sea(sea, hour_from_lw)
+            if result is None:
+                return {"source": "manual", "grid": []}
+            rate, direction = result
+            return _build_uniform_velocity_grid(
+                lat_min, lat_max, lon_min, lon_max,
+                rate * 0.514444, direction, "manual",
+            )
+
+        return {"source": None, "grid": []}
 
     @staticmethod
     def tidal_gates_for_day(day: Day, points: list, sea: Optional[Sea]) -> list:

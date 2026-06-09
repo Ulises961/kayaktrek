@@ -6,7 +6,18 @@ from Models.sea import Sea
 
 logger = logging.getLogger(__name__)
 
-_MUTABLE = frozenset({"moon_phase", "high_tide", "low_tide", "tidal_range_m"})
+_MUTABLE = frozenset({
+    "moon_phase", "high_tide", "low_tide", "tidal_range_m",
+    "reference_port_name", "hw_time_offset_minutes", "lw_time_offset_minutes",
+    "hw_height_ratio", "lw_height_ratio", "tidal_source",
+    "flood_direction_degrees", "ebb_direction_degrees",
+    "max_spring_rate_knots", "max_neap_rate_knots",
+})
+
+_CORRECTION_FIELDS = frozenset({
+    "hw_time_offset_minutes", "lw_time_offset_minutes",
+    "hw_height_ratio", "lw_height_ratio",
+})
 
 
 class SeaService:
@@ -31,6 +42,9 @@ class SeaService:
         for key in _MUTABLE:
             if key in data:
                 setattr(sea, key, data[key])
+        if "tidal_source" not in data:
+            if any(k in data and data[k] is not None for k in _CORRECTION_FIELDS):
+                sea.tidal_source = "manual_corrected"
         db.session.commit()
         logger.info("sea_updated", extra={"day_id": day_id})
         return sea

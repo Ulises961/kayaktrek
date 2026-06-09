@@ -225,6 +225,113 @@ def test_tidal_station_nearby_excludes_out_of_range(client):
     assert isinstance(resp.get_json(), list)
 
 
+def test_patch_sea_tidal_stream_fields(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    client.post(
+        f"/api/day/{day_id}/sea",
+        json={"highTide": "10:00", "lowTide": "04:00", "tidalRangeM": 4.0},
+        headers=auth_headers,
+    )
+
+    resp = client.patch(
+        f"/api/day/{day_id}/sea",
+        json={
+            "referencePortName": "Milford Haven",
+            "hwTimeOffsetMinutes": 35,
+            "lwTimeOffsetMinutes": 30,
+            "hwHeightRatio": 0.95,
+            "lwHeightRatio": 1.05,
+            "floodDirectionDegrees": 47.0,
+            "ebbDirectionDegrees": 227.0,
+            "maxSpringRateKnots": 3.1,
+            "maxNeapRateKnots": 1.6,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["referencePortName"] == "Milford Haven"
+    assert data["hwTimeOffsetMinutes"] == 35
+    assert data["floodDirectionDegrees"] == pytest.approx(47.0)
+    assert data["ebbDirectionDegrees"] == pytest.approx(227.0)
+    assert data["maxSpringRateKnots"] == pytest.approx(3.1)
+    assert data["maxNeapRateKnots"] == pytest.approx(1.6)
+    assert data["tidalSource"] == "manual_corrected"  # auto-set by correction fields
+
+    _cleanup_sea(day_id)
+
+
+def test_patch_sea_explicit_tidal_source_not_overridden(client, auth_headers, itinerary):
+    day_id = itinerary["days"][1]["id"]
+    client.post(
+        f"/api/day/{day_id}/sea",
+        json={"highTide": "09:00", "lowTide": "15:00"},
+        headers=auth_headers,
+    )
+
+    resp = client.patch(
+        f"/api/day/{day_id}/sea",
+        json={"hwTimeOffsetMinutes": 20, "tidalSource": "manual"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["tidalSource"] == "manual"
+
+    _cleanup_sea(day_id)
+
+
+# ── velocity grid endpoints ────────────────────────────────────────────────────
+
+def test_wind_vectors_returns_empty_grid_when_no_weather(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/wind-vectors?hour=12", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["grid"] == []
+
+
+def test_wave_vectors_returns_empty_grid_when_no_sea_states(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/wave-vectors?hour=12", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["grid"] == []
+
+
+def test_tidal_stream_vectors_empty_when_no_data(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/tidal-stream-vectors?hour=3", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["grid"] == []
+
+
+def test_tidal_stream_vectors_returns_manual_grid_when_sea_has_stream_fields(
+    client, auth_headers, itinerary
+):
+    day_id = itinerary["days"][0]["id"]
+    client.post(
+        f"/api/day/{day_id}/sea",
+        json={
+            "highTide": "12:00",
+            "lowTide": "06:00",
+            "tidalRangeM": 4.0,
+            "floodDirectionDegrees": 45.0,
+            "ebbDirectionDegrees": 225.0,
+            "maxSpringRateKnots": 3.0,
+        },
+        headers=auth_headers,
+    )
+
+    resp = client.get(f"/api/day/{day_id}/tidal-stream-vectors?hour=3", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["source"] == "manual"
+    assert len(data["grid"]) == 2
+
+    _cleanup_sea(day_id)
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _cleanup_sea(day_id: str):

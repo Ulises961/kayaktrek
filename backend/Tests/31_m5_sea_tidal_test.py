@@ -187,3 +187,79 @@ def test_tidal_stream_entry_optional_rate_fields(app):
 
     _db.session.delete(station)
     _db.session.commit()
+
+
+# ── Sea tidal operability fields ──────────────────────────────────────────────
+
+def test_sea_tidal_operability_fields_round_trip(app, itinerary):
+    """All 10 tidal operability fields persist and are read back correctly."""
+    day_id = itinerary["days"][0]["id"]
+    sea = Sea(
+        day_id=day_id,
+        reference_port_name="Milford Haven",
+        hw_time_offset_minutes=35,
+        lw_time_offset_minutes=30,
+        hw_height_ratio=0.95,
+        lw_height_ratio=1.05,
+        tidal_source="manual_corrected",
+        flood_direction_degrees=47.0,
+        ebb_direction_degrees=227.0,
+        max_spring_rate_knots=3.1,
+        max_neap_rate_knots=1.6,
+    )
+    _db.session.add(sea)
+    _db.session.commit()
+
+    _db.session.expire(sea)
+    loaded = _db.session.query(Sea).filter_by(day_id=day_id).first()
+    assert loaded.reference_port_name == "Milford Haven"
+    assert loaded.hw_time_offset_minutes == 35
+    assert loaded.lw_time_offset_minutes == 30
+    assert float(loaded.hw_height_ratio) == pytest.approx(0.95)
+    assert float(loaded.lw_height_ratio) == pytest.approx(1.05)
+    assert loaded.tidal_source == "manual_corrected"
+    assert float(loaded.flood_direction_degrees) == pytest.approx(47.0)
+    assert float(loaded.ebb_direction_degrees) == pytest.approx(227.0)
+    assert float(loaded.max_spring_rate_knots) == pytest.approx(3.1)
+    assert float(loaded.max_neap_rate_knots) == pytest.approx(1.6)
+
+    _db.session.delete(loaded)
+    _db.session.commit()
+
+
+def test_sea_tidal_source_defaults_to_manual(app, itinerary):
+    """Sea.tidal_source defaults to 'manual' when not set."""
+    day_id = itinerary["days"][1]["id"]
+    sea = Sea(day_id=day_id)
+    _db.session.add(sea)
+    _db.session.commit()
+
+    _db.session.expire(sea)
+    loaded = _db.session.query(Sea).filter_by(day_id=day_id).first()
+    assert loaded.tidal_source == "manual"
+
+    _db.session.delete(loaded)
+    _db.session.commit()
+
+
+def test_sea_tidal_operability_fields_all_nullable(app, itinerary):
+    """All optional tidal operability fields are nullable by default."""
+    day_id = itinerary["days"][0]["id"]
+    sea = Sea(day_id=day_id)
+    _db.session.add(sea)
+    _db.session.commit()
+
+    _db.session.expire(sea)
+    loaded = _db.session.query(Sea).filter_by(day_id=day_id).first()
+    assert loaded.reference_port_name is None
+    assert loaded.hw_time_offset_minutes is None
+    assert loaded.lw_time_offset_minutes is None
+    assert loaded.hw_height_ratio is None
+    assert loaded.lw_height_ratio is None
+    assert loaded.flood_direction_degrees is None
+    assert loaded.ebb_direction_degrees is None
+    assert loaded.max_spring_rate_knots is None
+    assert loaded.max_neap_rate_knots is None
+
+    _db.session.delete(loaded)
+    _db.session.commit()
