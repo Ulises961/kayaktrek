@@ -149,6 +149,10 @@ class JWTService:
                 abort(HTTPStatus.UNAUTHORIZED, description="Invalid token")
 
             return f(*args, **kwargs)
+        # Marks this decorator as one that populates g.current_user_id. The
+        # auth-invariant canary test relies on this tag to distinguish routes
+        # that legitimately read the current user from a silent auth gap.
+        decorator._populates_current_user = True
         return decorator
 
     @staticmethod
@@ -184,6 +188,7 @@ class JWTService:
                 except Exception:
                     pass  # malformed/invalid token → remain unauthenticated
             return f(*args, **kwargs)
+        decorator._populates_current_user = True
         return decorator
 
    
