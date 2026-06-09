@@ -1,4 +1,4 @@
-"""Tests for RDP simplification, geo utils, JSON encoder, weather state schema, and data export helpers."""
+"""Tests for RDP simplification, geo utils, JSON encoder, weather state schema, sea state schema, weather schema, and data export helpers."""
 import json
 import math
 import types
@@ -12,6 +12,8 @@ from Services.Utils.geo_utils import haversine_nm
 from Services.Utils.json_encoder import CustomJSONEncoder
 from Services.Utils.rdp import _perp_distance, rdp_simplify
 from Schemas.weather_state_schema import WeatherStateSchema
+from Schemas.sea_state_schema import SeaStateSchema
+from Schemas.weather_schema import WeatherSchema
 from Tasks.data_export import _build_export, _json_default
 
 
@@ -261,3 +263,89 @@ def test_build_export_is_json_serialisable():
     result = _build_export(_mock_user())
     serialised = json.dumps(result, default=_json_default)
     assert "test@example.com" in serialised
+
+
+# ── SeaStateSchema @validates ─────────────────────────────────────────────────
+
+_VALID_SEA_STATE = {
+    "waveHeight": 1.5,
+    "waveDirection": 180.0,
+    "swellDirection": 90.0,
+    "swellPeriod": 8.0,
+}
+
+
+def test_sea_state_schema_valid_load(app):
+    from Models.sea_state import SeaState
+    result = SeaStateSchema().load(_VALID_SEA_STATE)
+    assert isinstance(result, SeaState)
+
+
+def test_sea_state_wave_height_negative(app):
+    with pytest.raises(ValidationError, match="negative"):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "waveHeight": -1.0})
+
+
+def test_sea_state_wave_height_too_high(app):
+    with pytest.raises(ValidationError, match="exceed"):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "waveHeight": 31.0})
+
+
+def test_sea_state_wave_direction_out_of_range(app):
+    with pytest.raises(ValidationError):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "waveDirection": 361.0})
+
+
+def test_sea_state_swell_direction_out_of_range(app):
+    with pytest.raises(ValidationError):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "swellDirection": -1.0})
+
+
+def test_sea_state_swell_period_negative(app):
+    with pytest.raises(ValidationError, match="negative"):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "swellPeriod": -0.1})
+
+
+def test_sea_state_swell_period_too_high(app):
+    with pytest.raises(ValidationError, match="exceed"):
+        SeaStateSchema().load({**_VALID_SEA_STATE, "swellPeriod": 31.0})
+
+
+# ── WeatherSchema @validates ──────────────────────────────────────────────────
+
+_DAY_ID = str(uuid4())
+_VALID_WEATHER_STATE = {"dayId": _DAY_ID, "time": "12:00:00"}
+
+
+def test_weather_schema_valid_load(app):
+    from Models.weather import Weather
+    result = WeatherSchema().load({"dayId": _DAY_ID, "model": "best_match", "weatherStates": []})
+    assert isinstance(result, Weather)
+
+
+def test_weather_schema_model_empty_raises(app):
+    with pytest.raises(ValidationError):
+        WeatherSchema().load({"dayId": _DAY_ID, "model": ""})
+
+
+def test_weather_schema_model_too_long_raises(app):
+    with pytest.raises(ValidationError):
+        WeatherSchema().load({"dayId": _DAY_ID, "model": "x" * 101})
+
+
+def test_weather_schema_model_invalid_chars_raises(app):
+    with pytest.raises(ValidationError, match="invalid characters"):
+        WeatherSchema().load({"dayId": _DAY_ID, "model": "model;name"})
+
+
+def test_weather_schema_weather_states_too_many_raises(app):
+    states = [_VALID_WEATHER_STATE] * 25
+    with pytest.raises(ValidationError):
+        WeatherSchema().load({"dayId": _DAY_ID, "model": "best_match", "weatherStates": states})
+
+
+def test_weather_schema_weather_states_exactly_24_is_valid(app):
+    from Models.weather import Weather
+    states = [_VALID_WEATHER_STATE] * 24
+    result = WeatherSchema().load({"dayId": _DAY_ID, "model": "best_match", "weatherStates": states})
+    assert isinstance(result, Weather)
