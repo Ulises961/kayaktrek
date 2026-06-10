@@ -1,8 +1,16 @@
 "use client"
+import { useEffect, useState } from "react"
+import { Navigation2, Waves, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatDistance, formatTime, estimatedTime } from "@/lib/itinerary/distance"
+import { fetchDayWeather, fetchDaySea } from "@/lib/weather/actions"
+import { waveHeightSeverity } from "@/lib/weather/beaufort"
+import { BeaufortPill } from "@/components/weather/beaufort-pill"
+import type { Weather, WeatherState } from "@/lib/dtos/weather"
+import type { Sea, SeaState } from "@/lib/dtos/sea"
 
 export type DayStripCardProps = {
+  dayId: string
   dayNumber: number
   date: string | null
   distanceNm: number
@@ -14,12 +22,26 @@ export type DayStripCardProps = {
   onClick: () => void
 }
 
+const waveSeverityStyles: Record<ReturnType<typeof waveHeightSeverity>, string> = {
+  calm:     "text-green-700  dark:text-green-400",
+  moderate: "text-amber-700  dark:text-amber-400",
+  rough:    "text-orange-700 dark:text-orange-400",
+  high:     "text-red-700    dark:text-red-400",
+}
+
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`)
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
 }
 
+// The card shows a single representative value per condition — prefer midday, else the middle hour.
+function representative<T extends { time?: string }>(states: T[] | null | undefined): T | undefined {
+  if (!states || states.length === 0) return undefined
+  return states.find((s) => s.time === "12:00") ?? states[Math.floor(states.length / 2)]
+}
+
 export function DayStripCard({
+  dayId,
   dayNumber,
   date,
   distanceNm,
@@ -32,6 +54,33 @@ export function DayStripCard({
 }: DayStripCardProps) {
   const dist = formatDistance(distanceNm, distanceUnit)
   const time = formatTime(estimatedTime(distanceNm, avgSpeedKnots))
+
+  const [weather, setWeather] = useState<Weather | null>(null)
+  const [sea, setSea] = useState<Sea | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchDayWeather(dayId).then((r) => {
+      if (active && r.success) setWeather(r.data)
+    })
+    fetchDaySea(dayId).then((r) => {
+      if (active && r.success) setSea(r.data)
+    })
+    return () => {
+      active = false
+    }
+  }, [dayId])
+
+  const windState: WeatherState | undefined = representative(weather?.weatherStates)
+  const waveState: SeaState | undefined = representative(sea?.seaStates)
+
+  const hasWind = windState != null && windState.windForce != null
+  const hasWave = waveState != null && waveState.waveHeight != null
+  const tideTime = sea?.highTide ?? sea?.lowTide ?? null
+  const tideIsHigh = sea?.highTide != null
+  const hasTide = tideTime != null
+
+  const showChips = hasWind || hasWave || hasTide
 
   return (
     <button
@@ -55,9 +104,49 @@ export function DayStripCard({
         <span className="text-muted-foreground">
           {dist} {distanceUnit} · {time}
         </span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          No data
-        </span>
+
+        {showChips && (
+          <div data-testid="weather-chips" className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5">
+            <span className="inline-flex items-center gap-0.5">
+              <Navigation2
+                className="size-3 shrink-0 text-muted-foreground"
+                aria-hidden
+                style={hasWind ? { transform: `rotate(${windState!.windDirection ?? 0}deg)` } : undefined}
+              />
+              {hasWind ? (
+                <BeaufortPill knots={windState!.windForce!} direction={windState!.windDirection} />
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </span>
+
+            <span className="inline-flex items-center gap-0.5">
+              <Waves className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+              {hasWave ? (
+                <span className={cn("text-[10px] font-medium", waveSeverityStyles[waveHeightSeverity(waveState!.waveHeight)])}>
+                  {waveState!.waveHeight.toFixed(1)} m
+                </span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </span>
+
+            <span className="inline-flex items-center gap-0.5">
+              {tideIsHigh ? (
+                <ArrowUp className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+              ) : (
+                <ArrowDown className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+              )}
+              {hasTide ? (
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {tideIsHigh ? "HW" : "LW"} {tideTime}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
     </button>
   )

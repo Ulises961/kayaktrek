@@ -58,6 +58,7 @@ export function DayStrip() {
               return (
                 <CarouselItem key={day.id} className="pl-2 basis-auto">
                   <DayStripCard
+                    dayId={day.id!}
                     dayNumber={day.dayNumber}
                     date={day.date ?? null}
                     distanceNm={dist}
