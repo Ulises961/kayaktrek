@@ -359,3 +359,126 @@ def test_build_stream_velocity_grid_station_empty_when_entry_missing(app):
 
     _db.session.delete(station)
     _db.session.commit()
+
+
+def test_build_stream_velocity_grid_returns_none_source_without_sea_or_station():
+    bbox = (50.0, 51.0, -5.0, -4.0)
+    result = TidalService.build_stream_velocity_grid(bbox, 3, None, [])
+    assert result == {"source": None, "grid": []}
+
+
+# ── height_at — secondary phase branches ─────────────────────────────────────
+
+def test_height_at_ebb_after_hw_in_explicit_flood():
+    # LW=06:00, HW=12:00 (explicit flood); t=15:00 is 3 h into the ebb after HW.
+    sea = _sea(time(12, 0), time(6, 0), 4.0)
+    assert TidalService.height_at(sea, time(15, 0)) == pytest.approx(2.0)
+
+
+def test_height_at_before_lw_in_explicit_flood():
+    # LW=06:00, HW=12:00; t=03:00 is before LW → ebb from the inferred preceding HW.
+    sea = _sea(time(12, 0), time(6, 0), 4.0)
+    result = TidalService.height_at(sea, time(3, 0))
+    assert result is not None and 0.0 <= result <= 4.0
+
+
+def test_height_at_before_hw_in_explicit_ebb():
+    # HW=12:00, LW=18:00 (explicit ebb); t=09:00 is before HW → flood leading up to HW.
+    sea = _sea(time(12, 0), time(18, 0), 4.0)
+    result = TidalService.height_at(sea, time(9, 0))
+    assert result is not None and 0.0 <= result <= 4.0
+
+
+def test_height_at_after_lw_in_explicit_ebb():
+    # HW=06:00, LW=12:00 (explicit ebb); t=15:00 is after LW → flood has resumed.
+    sea = _sea(time(6, 0), time(12, 0), 4.0)
+    result = TidalService.height_at(sea, time(15, 0))
+    assert result is not None and 0.0 <= result <= 4.0
+
+
+# ── build_wind_velocity_grid ─────────────────────────────────────────────────
+
+def _wind_state(hour, wind_force, wind_direction):
+    return types.SimpleNamespace(
+        time=time(hour, 0), wind_force=wind_force, wind_direction=wind_direction
+    )
+
+
+def test_build_wind_velocity_grid_empty_when_no_states():
+    result = TidalService.build_wind_velocity_grid((50.0, 51.0, -5.0, -4.0), [], 12)
+    assert result == {"source": "weather", "grid": []}
+
+
+def test_build_wind_velocity_grid_empty_when_force_or_direction_missing():
+    states = [_wind_state(12, None, 90.0)]
+    result = TidalService.build_wind_velocity_grid((50.0, 51.0, -5.0, -4.0), states, 12)
+    assert result == {"source": "weather", "grid": []}
+
+
+def test_build_wind_velocity_grid_happy_path_picks_closest_hour():
+    states = [_wind_state(6, 18.0, 90.0), _wind_state(12, 36.0, 270.0)]
+    result = TidalService.build_wind_velocity_grid((50.0, 51.0, -5.0, -4.0), states, 11)
+    assert result["source"] == "weather"
+    assert len(result["grid"]) == 2
+    # 36 km/h ≈ 10 m/s blowing toward 270° → u dominates, eastward component non-zero
+    east = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "eastward_component")
+    assert east["data"][0] != 0.0
+
+
+# ── build_wave_velocity_grid ─────────────────────────────────────────────────
+
+def _wave_state(hour, wave_height, wave_direction):
+    return types.SimpleNamespace(
+        time=time(hour, 0), wave_height=wave_height, wave_direction=wave_direction
+    )
+
+
+def test_build_wave_velocity_grid_empty_when_no_states():
+    result = TidalService.build_wave_velocity_grid((50.0, 51.0, -5.0, -4.0), [], 12)
+    assert result == {"source": "marine", "grid": []}
+
+
+def test_build_wave_velocity_grid_empty_when_height_or_direction_missing():
+    states = [_wave_state(12, 1.5, None)]
+    result = TidalService.build_wave_velocity_grid((50.0, 51.0, -5.0, -4.0), states, 12)
+    assert result == {"source": "marine", "grid": []}
+
+
+def test_build_wave_velocity_grid_happy_path():
+    states = [_wave_state(12, 2.0, 180.0)]
+    result = TidalService.build_wave_velocity_grid((50.0, 51.0, -5.0, -4.0), states, 12)
+    assert result["source"] == "marine"
+    assert len(result["grid"]) == 2
+    # 2 m toward 180° (south) → northward component negative
+    north = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "northward_component")
+    assert north["data"][0] < 0.0
+
+
+# ── tidal_gates_for_day — skip branches ──────────────────────────────────────
+
+def test_tidal_gates_empty_when_no_date(app, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    day = _db.session.get(Day, UUID(day_id))
+    day.date = None
+    _db.session.flush()
+    assert TidalService.tidal_gates_for_day(day, [], None) == []
+
+
+def test_tidal_gates_skips_interest_and_coordless_points(app, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    day = _db.session.get(Day, UUID(day_id))
+
+    interest = Point(latitude=50.3, longitude=-4.1, type=PointType.INTEREST, day_id=day.id)
+    no_coords = Point(latitude=None, longitude=None, type=PointType.STOP, day_id=day.id)
+    no_geo = Point(latitude=50.3, longitude=-4.1, geo=None, type=PointType.STOP, day_id=day.id)
+    _db.session.add_all([interest, no_coords, no_geo])
+    _db.session.commit()
+
+    try:
+        gates = TidalService.tidal_gates_for_day(day, [interest, no_coords, no_geo], None)
+        assert gates == []
+    finally:
+        _db.session.delete(interest)
+        _db.session.delete(no_coords)
+        _db.session.delete(no_geo)
+        _db.session.commit()
