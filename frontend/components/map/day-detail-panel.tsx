@@ -6,6 +6,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel"
+import { ConditionsSection } from "@/components/weather/conditions-section"
 import type { Point } from "@/lib/dtos/point"
 
 function TypeIcon({ type }: { type: string }) {
@@ -66,7 +67,7 @@ function PointCard({ point, index, onOpen }: PointCardProps) {
 }
 
 export function DayDetailPanel() {
-  const { state, selectedDayId, setSelectedPointId } = useMapBuilder()
+  const { state, selectedDayId, setSelectedPointId, isLeader } = useMapBuilder()
 
   if (!selectedDayId) return null
 
@@ -75,23 +76,29 @@ export function DayDetailPanel() {
     .filter((p): p is Point => p !== undefined && p.dayId === selectedDayId)
 
   return (
-    <div className="bg-background/95 border-t border-border py-2">
-      <Carousel opts={{ align: "start", dragFree: true }}>
-        <CarouselContent className="-ml-2 px-3">
-          {dayPoints.map((point) => {
-            const globalIdx = state.pointOrder.indexOf(point.id!) + 1
-            return (
-              <CarouselItem key={point.id} className="pl-2 basis-auto h-18">
-                <PointCard
-                  point={point}
-                  index={globalIdx}
-                  onOpen={setSelectedPointId}
-                />
-              </CarouselItem>
-            )
-          })}
-        </CarouselContent>
-      </Carousel>
+    <div className="bg-background/95 border-t border-border">
+      <div className="py-2">
+        <Carousel opts={{ align: "start", dragFree: true }}>
+          <CarouselContent className="-ml-2 px-3">
+            {dayPoints.map((point) => {
+              const globalIdx = state.pointOrder.indexOf(point.id!) + 1
+              return (
+                <CarouselItem key={point.id} className="pl-2 basis-auto h-18">
+                  <PointCard
+                    point={point}
+                    index={globalIdx}
+                    onOpen={setSelectedPointId}
+                  />
+                </CarouselItem>
+              )
+            })}
+          </CarouselContent>
+        </Carousel>
+      </div>
+
+      <div className="max-h-72 overflow-y-auto">
+        <ConditionsSection dayId={selectedDayId} isLeader={isLeader} />
+      </div>
     </div>
   )
 }

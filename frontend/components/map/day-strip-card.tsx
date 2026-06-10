@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { formatDistance, formatTime, estimatedTime } from "@/lib/itinerary/distance"
 import { fetchDayWeather, fetchDaySea } from "@/lib/weather/actions"
 import { waveHeightSeverity } from "@/lib/weather/beaufort"
+import { representativeHour } from "@/lib/weather/hourly"
 import { BeaufortPill } from "@/components/weather/beaufort-pill"
 import type { Weather, WeatherState } from "@/lib/dtos/weather"
 import type { Sea, SeaState } from "@/lib/dtos/sea"
@@ -32,12 +33,6 @@ const waveSeverityStyles: Record<ReturnType<typeof waveHeightSeverity>, string> 
 function formatDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`)
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
-}
-
-// The card shows a single representative value per condition — prefer midday, else the middle hour.
-function representative<T extends { time?: string }>(states: T[] | null | undefined): T | undefined {
-  if (!states || states.length === 0) return undefined
-  return states.find((s) => s.time === "12:00") ?? states[Math.floor(states.length / 2)]
 }
 
 export function DayStripCard({
@@ -71,8 +66,8 @@ export function DayStripCard({
     }
   }, [dayId])
 
-  const windState: WeatherState | undefined = representative(weather?.weatherStates)
-  const waveState: SeaState | undefined = representative(sea?.seaStates)
+  const windState: WeatherState | undefined = representativeHour(weather?.weatherStates)
+  const waveState: SeaState | undefined = representativeHour(sea?.seaStates)
 
   const hasWind = windState != null && windState.windForce != null
   const hasWave = waveState != null && waveState.waveHeight != null
