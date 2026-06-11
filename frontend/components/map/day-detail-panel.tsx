@@ -1,12 +1,16 @@
 "use client"
-import { Anchor, Star, CircleDot } from "lucide-react"
+import { useState, useTransition } from "react"
+import { Calendar, ChevronDown, Anchor, Star, CircleDot } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
+import { updateDay } from "@/lib/itinerary/actions"
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel"
 import { ConditionsSection } from "@/components/weather/conditions-section"
+import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
 
 function TypeIcon({ type }: { type: string }) {
@@ -21,6 +25,70 @@ function coordLabel(point: Point): string {
   }
   return "—"
 }
+
+function formatDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`)
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+}
+
+type DayDateHeaderProps = {
+  day: Day
+  isLeader: boolean
+  onDateSaved: (date: string) => void
+}
+
+function DayDateHeader({ day, isLeader, onDateSaved }: DayDateHeaderProps) {
+  const [editing, setEditing] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    if (!value) { setEditing(false); return }
+    startTransition(async () => {
+      const result = await updateDay(day.id!, { date: value })
+      if (result.success) onDateSaved(value)
+      setEditing(false)
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50">
+      <span className="text-[11px] font-semibold text-foreground">Day {day.dayNumber}</span>
+      {editing ? (
+        <input
+          type="date"
+          autoFocus
+          defaultValue={day.date ?? ""}
+          disabled={isPending}
+          onBlur={() => setEditing(false)}
+          onChange={handleChange}
+          className="text-[11px] h-5 border-0 border-b border-primary bg-transparent text-foreground focus:outline-none"
+          data-testid="date-input"
+        />
+      ) : (
+        <>
+          {day.date ? (
+            <span className="text-[11px] text-muted-foreground">{formatDate(day.date)}</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/60 italic">No date set</span>
+          )}
+          {isLeader && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label="Edit date"
+              className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            >
+              <Calendar className="size-3" />
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+type PointEntry = { point: Point; globalIdx: number }
 
 type PointCardProps = {
   point: Point
@@ -66,38 +134,75 @@ function PointCard({ point, index, onOpen }: PointCardProps) {
   )
 }
 
+type PointsSectionProps = {
+  entries: PointEntry[]
+  onOpen: (id: string) => void
+}
+
+function PointsSection({ entries, onOpen }: PointsSectionProps) {
+  const [open, setOpen] = useState(false)
+  const count = entries.length
+
+  return (
+    <div className="border-t border-border" data-testid="points-section">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+        aria-expanded={open}
+      >
+        <span>Waypoints{count > 0 ? ` (${count})` : ""}</span>
+        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+
+      {open && count > 0 && (
+        <div className="py-2">
+          <Carousel opts={{ align: "start", dragFree: true }}>
+            <CarouselContent className="-ml-2 px-3">
+              {entries.map(({ point, globalIdx }) => (
+                <CarouselItem key={point.id} className="pl-2 basis-auto h-18">
+                  <PointCard point={point} index={globalIdx} onOpen={onOpen} />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+        </div>
+      )}
+
+      {open && count === 0 && (
+        <p className="px-3 pb-2 text-xs text-muted-foreground">No waypoints for this day.</p>
+      )}
+    </div>
+  )
+}
+
 export function DayDetailPanel() {
-  const { state, selectedDayId, setSelectedPointId, isLeader } = useMapBuilder()
+  const { state, selectedDayId, setSelectedPointId, isLeader, dispatch } = useMapBuilder()
 
   if (!selectedDayId) return null
 
-  const dayPoints = state.pointOrder
-    .map((id) => state.points.find((p) => p.id === id))
-    .filter((p): p is Point => p !== undefined && p.dayId === selectedDayId)
+  const day = state.days.find((d) => d.id === selectedDayId)
+
+  const dayEntries = state.pointOrder.reduce<PointEntry[]>((acc, id, i) => {
+    const point = state.points.find((p) => p.id === id)
+    if (point && point.dayId === selectedDayId) {
+      acc.push({ point, globalIdx: i + 1 })
+    }
+    return acc
+  }, [])
 
   return (
     <div className="bg-background/95 border-t border-border">
-      <div className="py-2">
-        <Carousel opts={{ align: "start", dragFree: true }}>
-          <CarouselContent className="-ml-2 px-3">
-            {dayPoints.map((point) => {
-              const globalIdx = state.pointOrder.indexOf(point.id!) + 1
-              return (
-                <CarouselItem key={point.id} className="pl-2 basis-auto h-18">
-                  <PointCard
-                    point={point}
-                    index={globalIdx}
-                    onOpen={setSelectedPointId}
-                  />
-                </CarouselItem>
-              )
-            })}
-          </CarouselContent>
-        </Carousel>
-      </div>
-
-      <div className="max-h-72 overflow-y-auto">
+      {day && (
+        <DayDateHeader
+          day={day}
+          isLeader={isLeader}
+          onDateSaved={(date) => dispatch({ type: "DAY_UPDATE", id: day.id!, fields: { date } })}
+        />
+      )}
+      <div className="max-h-80 overflow-y-auto">
         <ConditionsSection dayId={selectedDayId} isLeader={isLeader} />
+        <PointsSection entries={dayEntries} onOpen={setSelectedPointId} />
       </div>
     </div>
   )

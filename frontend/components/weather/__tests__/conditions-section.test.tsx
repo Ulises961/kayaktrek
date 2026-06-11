@@ -39,7 +39,31 @@ describe("ConditionsSection", () => {
     expect(await screen.findByTestId("conditions-section")).toBeInTheDocument()
   })
 
-  it("shows the weather grid once expanded when weather data is present", async () => {
+  it("shows the Bft badge and summary when weather data is present", async () => {
+    WEATHER.mockResolvedValue({
+      success: true,
+      data: {
+        dayId: DAY_ID,
+        model: "gfs",
+        weatherStates: [
+          { dayId: DAY_ID, time: "12:00:00", temperature: 18, precipitation: 0, windDirection: 247, windForce: 12, cloud: null },
+        ],
+      },
+    })
+    SEA.mockResolvedValue({
+      success: true,
+      data: { dayId: DAY_ID, seaStates: [
+        { dayId: DAY_ID, time: "12:00:00", waveHeight: 1.2, waveDirection: 270, swellDirection: 280, swellPeriod: 8 },
+      ]},
+    })
+    render(<ConditionsSection dayId={DAY_ID} isLeader />)
+    await screen.findByTestId("conditions-section")
+    // Badge — combinedSeaState(12 kn wind → Bft 4, 1.2 m wave → Bft 4) = Bft 4
+    expect(await screen.findByText("4")).toBeInTheDocument()
+    expect(screen.getByText(/Moderate breeze/i)).toBeInTheDocument()
+  })
+
+  it("shows the weather grid once the hourly accordion is expanded", async () => {
     WEATHER.mockResolvedValue({
       success: true,
       data: {
@@ -52,22 +76,19 @@ describe("ConditionsSection", () => {
     })
     render(<ConditionsSection dayId={DAY_ID} isLeader />)
     await screen.findByTestId("conditions-section")
-    await userEvent.click(screen.getByRole("button", { name: /conditions/i }))
+    await userEvent.click(await screen.findByRole("button", { name: /hourly/i }))
     expect(await screen.findByTestId("weather-grid")).toBeInTheDocument()
-    expect(screen.getByText("12:00")).toBeInTheDocument()
+    expect(await screen.findByText("12:00")).toBeInTheDocument()
   })
 
-  it("triggers a weather fetch and reloads on Refresh", async () => {
+  it("triggers a weather fetch via the Refresh button in the summary strip", async () => {
     render(<ConditionsSection dayId={DAY_ID} isLeader />)
     await screen.findByTestId("conditions-section")
-    await userEvent.click(screen.getByRole("button", { name: /conditions/i }))
     await userEvent.click(screen.getByRole("button", { name: /refresh/i }))
     await waitFor(() => expect(TRIGGER).toHaveBeenCalledWith(DAY_ID))
-    // initial load + reload after trigger
-    await waitFor(() => expect(WEATHER).toHaveBeenCalledTimes(2))
   })
 
-  it("shows the rule of 12s table and source label when tidal data is present", async () => {
+  it("shows the rule of 12s table and source label after opening the tide accordion", async () => {
     SEA.mockResolvedValue({
       success: true,
       data: {
@@ -84,7 +105,7 @@ describe("ConditionsSection", () => {
     })
     render(<ConditionsSection dayId={DAY_ID} isLeader />)
     await screen.findByTestId("conditions-section")
-    await userEvent.click(screen.getByRole("button", { name: /conditions/i }))
+    await userEvent.click(await screen.findByRole("button", { name: /^tide$/i }))
     expect(await screen.findByTestId("rule-of-twelfths")).toBeInTheDocument()
     expect(screen.getByText("Tidal data: manual")).toBeInTheDocument()
   })

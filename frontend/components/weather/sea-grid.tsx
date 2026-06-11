@@ -29,9 +29,12 @@ export function SeaGrid({ states }: SeaGridProps) {
           >
             <span className="text-[10px] text-muted-foreground tabular-nums">{formatHour(s.time)}</span>
 
-            {/* wind-wave: height (coloured) + direction */}
+            {/* wind wave: label + height + direction arrow */}
             <span className="flex flex-col items-center gap-0.5">
-              <Waves className="size-3 text-muted-foreground" aria-hidden />
+              <span className="flex items-center gap-0.5">
+                <Waves className="size-2.5 text-muted-foreground" aria-hidden />
+                <span className="text-[8px] font-semibold uppercase tracking-wide text-muted-foreground/60">wv</span>
+              </span>
               <span className={cn("text-[11px] font-medium tabular-nums", waveSeverityStyles[waveHeightSeverity(s.waveHeight)])}>
                 {s.waveHeight.toFixed(1)} m
               </span>
@@ -42,8 +45,14 @@ export function SeaGrid({ states }: SeaGridProps) {
               />
             </span>
 
-            {/* swell: direction + period (distinct phenomenon, shown separately) */}
+            {/* swell: label + height + direction arrow + period */}
             <span className="flex flex-col items-center gap-0.5 border-t border-border/50 pt-1 w-full">
+              <span className="text-[8px] font-semibold uppercase tracking-wide text-sky-600/60 dark:text-sky-400/60">sw</span>
+              {s.swellWaveHeight != null && (
+                <span className="text-[10px] text-sky-600/80 dark:text-sky-400/80 tabular-nums font-medium">
+                  {s.swellWaveHeight.toFixed(1)} m
+                </span>
+              )}
               <Navigation2
                 className="size-2.5 text-sky-600/80 dark:text-sky-400/80"
                 aria-hidden

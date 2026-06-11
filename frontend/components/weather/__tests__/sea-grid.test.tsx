@@ -30,4 +30,10 @@ describe("SeaGrid", () => {
     expect(screen.getByText("1.2 m").className).toContain("text-amber-700") // moderate
     expect(screen.getByText("2.8 m").className).toContain("text-red-700") // high
   })
+
+  it("labels wind wave and swell sections", () => {
+    render(<SeaGrid states={states} />)
+    expect(screen.getAllByText("wv").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("sw").length).toBeGreaterThanOrEqual(1)
+  })
 })

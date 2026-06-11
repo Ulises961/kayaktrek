@@ -14,6 +14,7 @@ class SeaState(db.Model):
     time: Mapped[Time] = mapped_column(Time, primary_key=True)
     wave_height: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     wave_direction: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
+    swell_wave_height: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     swell_direction: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     swell_period: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     current_speed: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)

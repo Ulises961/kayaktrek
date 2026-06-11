@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
+from datetime import time
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point as ShapelyPoint
 
@@ -10,6 +11,8 @@ from Api.database import db as _db
 from Models.day import Day
 from Models.sea import Sea
 from Models.tidal_station import TidalStation
+from Models.weather import Weather
+from Models.weather_state import WeatherState
 
 
 # ── Sea CRUD ─────────────────────────────────────────────────────────────────
@@ -98,6 +101,49 @@ def test_get_tidal_gates_returns_empty_list(client, auth_headers, itinerary):
     resp = client.get(f"/api/day/{day_id}/tidal-gates", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json() == []
+
+
+# ── weather GET ───────────────────────────────────────────────────────────────
+
+def test_get_weather_404_when_no_record(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    resp = client.get(f"/api/day/{day_id}/weather", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_weather_returns_states(client, auth_headers, app, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    from uuid import UUID as _UUID
+    with app.app_context():
+        weather = Weather(day_id=_UUID(day_id), model="gfs")
+        _db.session.add(weather)
+        _db.session.flush()
+        ws = WeatherState(
+            day_id=_UUID(day_id),
+            time=time(12, 0),
+            temperature=22.5,
+            precipitation=0.0,
+            wind_direction=270.0,
+            wind_force=10.0,
+            cloud=None,
+        )
+        _db.session.add(ws)
+        _db.session.commit()
+
+    resp = client.get(f"/api/day/{day_id}/weather", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["dayId"] == day_id
+    assert data["model"] == "gfs"
+    assert len(data["weatherStates"]) == 1
+    state = data["weatherStates"][0]
+    assert state["windForce"] == pytest.approx(10.0)
+    assert state["windDirection"] == pytest.approx(270.0)
+
+    with app.app_context():
+        _db.session.query(WeatherState).filter_by(day_id=_UUID(day_id)).delete()
+        _db.session.query(Weather).filter_by(day_id=_UUID(day_id)).delete()
+        _db.session.commit()
 
 
 # ── weather fetch ─────────────────────────────────────────────────────────────

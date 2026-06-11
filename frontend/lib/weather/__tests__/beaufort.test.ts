@@ -5,6 +5,8 @@ import {
   beaufortSeverity,
   waveHeightSeverity,
   degreesToCompass,
+  waveHeightToBft,
+  combinedSeaState,
 } from "../beaufort"
 
 describe("knotsToBeaufort", () => {
@@ -79,6 +81,51 @@ describe("waveHeightSeverity", () => {
     expect(waveHeightSeverity(2.5)).toBe("rough")
   })
   it("high above 2.5 m", () => expect(waveHeightSeverity(2.51)).toBe("high"))
+})
+
+describe("waveHeightToBft", () => {
+  it("maps 0 m to Bft 0", () => expect(waveHeightToBft(0)).toBe(0))
+  it("maps 0.4 m (wavelet) to Bft 2", () => expect(waveHeightToBft(0.4)).toBe(2))
+  it("maps 0.8 m (large wavelets) to Bft 3", () => expect(waveHeightToBft(0.8)).toBe(3))
+  it("maps 1.5 m (small waves) to Bft 4", () => expect(waveHeightToBft(1.5)).toBe(4))
+  it("maps 2.5 m (moderate) to Bft 5", () => expect(waveHeightToBft(2.5)).toBe(5))
+  it("maps 3.5 m (large) to Bft 6", () => expect(waveHeightToBft(3.5)).toBe(6))
+  it("maps 5.0 m (very rough) to Bft 7", () => expect(waveHeightToBft(5.0)).toBe(7))
+  it("maps 6.0 m (high) to Bft 8", () => expect(waveHeightToBft(6.0)).toBe(8))
+  it("maps boundary 1.0 m to Bft 4", () => expect(waveHeightToBft(1.0)).toBe(4))
+  it("maps boundary 0.6 m to Bft 3", () => expect(waveHeightToBft(0.6)).toBe(3))
+})
+
+describe("combinedSeaState", () => {
+  it("returns wind Bft when no wave data", () => {
+    expect(combinedSeaState(14, null, null)).toBe(4) // 14 kn = Bft 4
+  })
+
+  it("returns wave Bft when no wind data", () => {
+    expect(combinedSeaState(null, 2.5, null)).toBe(5) // 2.5 m = Bft 5
+  })
+
+  it("returns max when wave is worse than wind", () => {
+    // 8 kn = Bft 3, but 2.5 m swell on 0.5 m wind-chop → effective wave > 2.5 m → Bft 5+
+    expect(combinedSeaState(8, 2.5, 2.5)).toBeGreaterThanOrEqual(5)
+  })
+
+  it("returns max when wind is worse than wave", () => {
+    expect(combinedSeaState(35, 0.4, 0)).toBe(8) // 35 kn = Bft 8, 0.4 m = Bft 2
+  })
+
+  it("constructive interference raises effective height above combined Hs", () => {
+    // wave_height = 2.0 m, swell = 1.8 m
+    // wind_sea = sqrt(2.0² − 1.8²) ≈ 0.87 m
+    // effective = 0.87 + 1.8 = 2.67 m → Bft 5
+    // plain wave_height = 2.0 m → Bft 5 as well, but effective > 2.0 m
+    const bft = combinedSeaState(10, 2.0, 1.8)
+    expect(bft).toBeGreaterThanOrEqual(5)
+  })
+
+  it("returns 0 with no data at all", () => {
+    expect(combinedSeaState(null, null, null)).toBe(0)
+  })
 })
 
 describe("degreesToCompass", () => {

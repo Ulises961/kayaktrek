@@ -107,6 +107,7 @@ def _upsert_sea(day_uuid: UUID, records: list[dict]) -> None:
             time=t,
             wave_height=rec.get("wave_height"),
             wave_direction=rec.get("wave_direction"),
+            swell_wave_height=rec.get("swell_wave_height"),
             swell_direction=rec.get("swell_wave_direction"),
             swell_period=rec.get("swell_wave_period"),
             current_speed=rec.get("ocean_current_velocity"),

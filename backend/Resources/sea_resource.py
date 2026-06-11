@@ -14,6 +14,7 @@ from Models.sea_state import SeaState
 from Models.tidal_station import TidalStation
 from Models.weather_state import WeatherState
 from Schemas.sea_schema import SeaSchema, _gate_schema
+from Schemas.weather_schema import WeatherSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.day_service import DayService
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 sea_api = Blueprint('sea', __name__, url_prefix='/api/day')
 
 _schema = SeaSchema()
+_weather_schema = WeatherSchema()
 
 
 @sea_api.route('/<string:id>/sea', methods=['GET'])
@@ -101,6 +103,24 @@ def get_tidal_gates(id: str):
         raise
     except Exception as e:
         logger.error("get_tidal_gates_error", extra={"day_id": id, "error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@sea_api.route('/<string:id>/weather', methods=['GET'])
+@JWTService.authenticate_restful
+@require_owner('day')
+def get_weather(id: str):
+    try:
+        day = DayService.get_day_by_id(id)
+        if day.weather is None:
+            abort(HTTPStatus.NOT_FOUND, description="No weather record for this day")
+        return jsonify(_weather_schema.dump(day.weather)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Day not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("get_weather_error", extra={"day_id": id, "error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 

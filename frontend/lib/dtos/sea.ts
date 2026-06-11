@@ -5,6 +5,7 @@ export const SeaStateSchema = z.object({
   time: z.string().optional(),
   waveHeight: z.number(),
   waveDirection: z.number(),
+  swellWaveHeight: z.number().nullable().optional(),
   swellDirection: z.number(),
   swellPeriod: z.number(),
   currentSpeed: z.number().nullable().optional(),

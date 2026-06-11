@@ -13,6 +13,7 @@ class SeaStateSchema(Schema):
     time = fields.Time('%H:%M:%S', allow_none=True)
     wave_height = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 30)
     wave_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
+    swell_wave_height = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 30)
     swell_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
     swell_period = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 30)
     current_speed = fields.Float(allow_none=True)
