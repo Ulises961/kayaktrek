@@ -15,7 +15,12 @@ vi.mock("@/lib/trip-member/actions", () => ({
 }))
 
 import { reAuth, getMedicalNotes } from "@/lib/profile/actions"
-import { getTripMedicalNotes, setTripMedicalNotes, revokeTripMedicalNotes, shareMedicalNotes } from "@/lib/trip-member/actions"
+import {
+  getTripMedicalNotes,
+  setTripMedicalNotes,
+  revokeTripMedicalNotes,
+  shareMedicalNotes,
+} from "@/lib/trip-member/actions"
 import { FloatPlanMedicalTabSection } from "../float-plan-medical-tab-section"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -67,7 +72,13 @@ describe("FloatPlanMedicalTabSection — idle state", () => {
   })
 
   it("shows shared indicator when sharedAt is set", () => {
-    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt="2026-05-14T10:00:00" />)
+    render(
+      <FloatPlanMedicalTabSection
+        tripId={TRIP_ID}
+        hasStoredNotes={true}
+        sharedAt="2026-05-14T10:00:00"
+      />,
+    )
     expect(screen.getByText(/shared with.*leader/i)).toBeDefined()
   })
 })
@@ -102,7 +113,9 @@ describe("FloatPlanMedicalTabSection — editing state, note loading", () => {
   it("pre-fills existing trip notes into the textarea", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
     await openToEdit({ hasStoredTripNotes: true })
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Allergic to penicillin")
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "Allergic to penicillin",
+    )
   })
 
   it("seeds from profile notes when no trip notes exist", async () => {
@@ -132,7 +145,12 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() =>
-      expect(setTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, "Blood type A+", ELEVATED_TOKEN, PASSWORD)
+      expect(setTripMedicalNotes).toHaveBeenCalledWith(
+        TRIP_ID,
+        "Blood type A+",
+        ELEVATED_TOKEN,
+        PASSWORD,
+      ),
     )
   })
 
@@ -161,7 +179,9 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
     await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /delete/i }))
-    await waitFor(() => expect(revokeTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN))
+    await waitFor(() =>
+      expect(revokeTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN),
+    )
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
   })
 
@@ -177,7 +197,7 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
     await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /share with.*leader/i }))
     await waitFor(() =>
-      expect(shareMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+      expect(shareMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN, PASSWORD),
     )
   })
 
@@ -190,10 +210,15 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
   })
 
   it("shows error when share fails", async () => {
-    vi.mocked(shareMedicalNotes).mockResolvedValue({ success: false, error: "Session expired. Please try again." })
+    vi.mocked(shareMedicalNotes).mockResolvedValue({
+      success: false,
+      error: "Session expired. Please try again.",
+    })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
     await openToEdit({ hasStoredTripNotes: true })
     await userEvent.click(screen.getByRole("button", { name: /share with.*leader/i }))
-    await waitFor(() => expect(screen.getByText("Session expired. Please try again.")).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByText("Session expired. Please try again.")).toBeDefined(),
+    )
   })
 })

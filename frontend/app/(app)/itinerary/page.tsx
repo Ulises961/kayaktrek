@@ -16,20 +16,20 @@ export default async function ItineraryListPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl sm:text-2xl font-semibold">Itineraries</h1>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold sm:text-2xl">Itineraries</h1>
         <div className="flex items-center gap-2">
           <ImportGpxButton />
           <NewItineraryButton />
         </div>
       </div>
       {itineraries.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+        <div className="text-muted-foreground flex flex-col items-center gap-3 py-16">
           <MapPinIcon className="size-10 opacity-30" />
           <p className="text-sm">No itineraries yet.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 mt-4">
+        <div className="mt-4 flex flex-col gap-3">
           {itineraries.map((itinerary) => (
             <ItineraryCard key={itinerary.id} itinerary={itinerary} />
           ))}

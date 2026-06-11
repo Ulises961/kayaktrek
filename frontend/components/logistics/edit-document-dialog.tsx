@@ -5,13 +5,24 @@ import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { FileIcon } from "lucide-react"
 import { updateTravelDocument } from "@/lib/travel-documents/actions"
-import { TravelDocumentFieldsSchema, TRAVEL_DOCUMENT_TYPES, type TravelDocumentFields, type TravelDocument } from "@/lib/dtos/travel-document"
+import {
+  TravelDocumentFieldsSchema,
+  TRAVEL_DOCUMENT_TYPES,
+  type TravelDocumentFields,
+  type TravelDocument,
+} from "@/lib/dtos/travel-document"
 import { AttachmentActions } from "@/components/logistics/attachment-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { DatePicker } from "@/components/common/date-picker"
 
 const TYPE_LABELS: Record<string, string> = {
@@ -27,7 +38,10 @@ const SELECT_CLASS =
 
 function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <Label
+      htmlFor={htmlFor}
+      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
+    >
       {children}
     </Label>
   )
@@ -40,10 +54,22 @@ interface EditDocumentDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function EditDocumentDialog({ tripId, document, open, onOpenChange }: EditDocumentDialogProps) {
+export function EditDocumentDialog({
+  tripId,
+  document,
+  open,
+  onOpenChange,
+}: EditDocumentDialogProps) {
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setValue, control, setError, formState: { errors } } = useForm<TravelDocumentFields>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    setError,
+    formState: { errors },
+  } = useForm<TravelDocumentFields>({
     resolver: zodResolver(TravelDocumentFieldsSchema),
     values: {
       type: document.type,
@@ -92,7 +118,9 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                   {...register("type")}
                 >
                   {TRAVEL_DOCUMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                    <option key={t} value={t}>
+                      {TYPE_LABELS[t]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -104,7 +132,7 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                   disabled={isPending}
                   {...register("name")}
                 />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
               </div>
             </div>
 
@@ -126,7 +154,9 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
                   placeholder="Expiry date"
                   disabled={isPending}
                 />
-                {errors.expiryDate && <p className="text-xs text-destructive">{errors.expiryDate.message}</p>}
+                {errors.expiryDate && (
+                  <p className="text-destructive text-xs">{errors.expiryDate.message}</p>
+                )}
               </div>
             </div>
 
@@ -174,10 +204,12 @@ export function EditDocumentDialog({ tripId, document, open, onOpenChange }: Edi
               </div>
             )}
 
-            {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
             <DialogFooter>
-              <Button type="submit" disabled={isPending}>Save</Button>
+              <Button type="submit" disabled={isPending}>
+                Save
+              </Button>
             </DialogFooter>
           </form>
         </div>

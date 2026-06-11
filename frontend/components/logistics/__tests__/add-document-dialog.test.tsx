@@ -8,13 +8,17 @@ vi.mock("@/lib/travel-documents/actions", () => ({
   uploadTravelDocumentAttachment: vi.fn(),
 }))
 
-import { createTravelDocument, updateTravelDocument, uploadTravelDocumentAttachment } from "@/lib/travel-documents/actions"
+import {
+  createTravelDocument,
+  updateTravelDocument,
+  uploadTravelDocumentAttachment,
+} from "@/lib/travel-documents/actions"
 import { AddDocumentDialog } from "../add-document-dialog"
 import { EditDocumentDialog } from "../edit-document-dialog"
 import type { TravelDocument } from "@/lib/dtos/travel-document"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
-const DOC_ID  = "01952f1a-0000-7000-8000-000000000002"
+const DOC_ID = "01952f1a-0000-7000-8000-000000000002"
 
 const DOCUMENT: TravelDocument = {
   id: DOC_ID,
@@ -65,8 +69,8 @@ describe("AddDocumentDialog", () => {
     await waitFor(() =>
       expect(createTravelDocument).toHaveBeenCalledWith(
         TRIP_ID,
-        expect.objectContaining({ name: "Ferry La Escala" })
-      )
+        expect.objectContaining({ name: "Ferry La Escala" }),
+      ),
     )
   })
 
@@ -85,7 +89,11 @@ describe("AddDocumentDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
     await waitFor(() => {
       expect(createTravelDocument).toHaveBeenCalled()
-      expect(uploadTravelDocumentAttachment).toHaveBeenCalledWith(TRIP_ID, DOC_ID, expect.any(FormData))
+      expect(uploadTravelDocumentAttachment).toHaveBeenCalledWith(
+        TRIP_ID,
+        DOC_ID,
+        expect.any(FormData),
+      )
     })
   })
 
@@ -130,10 +138,12 @@ describe("EditDocumentDialog", () => {
   it("calls updateTravelDocument on submit", async () => {
     vi.mocked(updateTravelDocument).mockResolvedValue({ success: true })
     const onOpenChange = vi.fn()
-    render(<EditDocumentDialog tripId={TRIP_ID} document={DOCUMENT} open onOpenChange={onOpenChange} />)
+    render(
+      <EditDocumentDialog tripId={TRIP_ID} document={DOCUMENT} open onOpenChange={onOpenChange} />,
+    )
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
-      expect(updateTravelDocument).toHaveBeenCalledWith(TRIP_ID, DOC_ID, expect.any(Object))
+      expect(updateTravelDocument).toHaveBeenCalledWith(TRIP_ID, DOC_ID, expect.any(Object)),
     )
   })
 

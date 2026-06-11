@@ -12,7 +12,16 @@ vi.mock("@/lib/api/client", () => ({
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
-import { inviteUser, cancelInvitation, handleInvitation, createTrip, updateTrip, advanceState, removeMember, deleteTrip } from "../actions"
+import {
+  inviteUser,
+  cancelInvitation,
+  handleInvitation,
+  createTrip,
+  updateTrip,
+  advanceState,
+  removeMember,
+  deleteTrip,
+} from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const USER_ID = "01952f1a-0000-7000-8000-000000000020"
@@ -93,7 +102,12 @@ describe("handleInvitation", () => {
 })
 
 describe("createTrip", () => {
-  const FIELDS = { destination: "Costa Brava", description: "5 days", dateFrom: "2026-07-01", dateTo: "2026-07-05" }
+  const FIELDS = {
+    destination: "Costa Brava",
+    description: "5 days",
+    dateFrom: "2026-07-01",
+    dateTo: "2026-07-05",
+  }
 
   it("posts to /api/trip/create with the provided fields", async () => {
     vi.mocked(apiPost).mockResolvedValue({ id: TRIP_ID })

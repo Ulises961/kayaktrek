@@ -15,7 +15,13 @@ interface InviteFormProps {
 export function InviteForm({ tripId }: InviteFormProps) {
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<InviteUserFields>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<InviteUserFields>({
     resolver: zodResolver(InviteUserSchema),
   })
 
@@ -33,12 +39,17 @@ export function InviteForm({ tripId }: InviteFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
       <div className="flex gap-2">
-        <Input type="email" placeholder="Email address" disabled={isPending} {...register("email")} />
+        <Input
+          type="email"
+          placeholder="Email address"
+          disabled={isPending}
+          {...register("email")}
+        />
         <Button type="submit" disabled={isPending}>
           {isPending ? "Inviting…" : "Invite"}
         </Button>
       </div>
-      {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+      {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
     </form>
   )
 }

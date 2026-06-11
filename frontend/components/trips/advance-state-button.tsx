@@ -17,10 +17,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-const TRANSITIONS: Record<TripState, { state: TripState; label: string; description: string } | null> = {
-  building:  { state: "happening", label: "Begin expedition", description: "The expedition is now underway. This cannot be undone." },
-  happening: { state: "past",      label: "Mark as past",     description: "The trip will be marked as completed. This cannot be undone." },
-  past:      null,
+const TRANSITIONS: Record<
+  TripState,
+  { state: TripState; label: string; description: string } | null
+> = {
+  building: {
+    state: "happening",
+    label: "Begin expedition",
+    description: "The expedition is now underway. This cannot be undone.",
+  },
+  happening: {
+    state: "past",
+    label: "Mark as past",
+    description: "The trip will be marked as completed. This cannot be undone.",
+  },
+  past: null,
 }
 
 interface AdvanceStateButtonProps {
@@ -45,7 +56,12 @@ export function AdvanceStateButton({ tripId, currentState }: AdvanceStateButtonP
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isPending} className="w-full sm:w-auto sm:self-start">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isPending}
+          className="w-full sm:w-auto sm:self-start"
+        >
           {next.label}
         </Button>
       </AlertDialogTrigger>

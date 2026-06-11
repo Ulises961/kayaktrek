@@ -24,7 +24,7 @@ export function PastTripsSection({ trips }: PastTripsSectionProps) {
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left py-1"
+          className="text-muted-foreground hover:text-foreground py-1 text-left text-xs transition-colors"
         >
           Show {hidden} more past {hidden === 1 ? "trip" : "trips"}
         </button>
@@ -33,7 +33,7 @@ export function PastTripsSection({ trips }: PastTripsSectionProps) {
         <button
           type="button"
           onClick={() => setShowAll(false)}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left py-1"
+          className="text-muted-foreground hover:text-foreground py-1 text-left text-xs transition-colors"
         >
           Show less
         </button>

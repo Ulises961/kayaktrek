@@ -47,7 +47,7 @@ export function RemovePassengerButton({ tripId, vehicleId, memberId }: RemovePas
     <button
       onClick={handleRemove}
       disabled={isPending}
-      className="inline-flex items-center justify-center size-4 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+      className="bg-muted hover:bg-destructive/10 hover:text-destructive inline-flex size-4 items-center justify-center rounded-full transition-colors disabled:opacity-50"
       aria-label="Remove passenger"
     >
       <XIcon className="size-2.5" />

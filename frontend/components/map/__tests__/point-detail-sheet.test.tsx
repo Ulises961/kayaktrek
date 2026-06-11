@@ -62,7 +62,9 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
 }
 
 function renderWithCtx(ctx: MapBuilderContextValue) {
-  return render(createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointDetailSheet)))
+  return render(
+    createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointDetailSheet)),
+  )
 }
 
 beforeEach(() => vi.clearAllMocks())

@@ -20,7 +20,7 @@ interface FloatPlanTabProps {
 
 function SectionLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-[0.06em] flex items-center gap-1.5 text-muted-foreground">
+    <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-[0.06em] uppercase">
       {icon}
       {children}
     </p>
@@ -30,24 +30,34 @@ function SectionLabel({ icon, children }: { icon: React.ReactNode; children: Rea
 function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
   return (
-    <div className="flex flex-col gap-0.5 min-w-0 md:flex-row md:gap-2 md:items-start">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70 leading-none md:text-sm md:normal-case md:tracking-normal md:font-normal md:text-muted-foreground md:w-32 md:shrink-0 md:pt-px">
+    <div className="flex min-w-0 flex-col gap-0.5 md:flex-row md:items-start md:gap-2">
+      <span className="text-muted-foreground/70 md:text-muted-foreground text-[10px] leading-none font-semibold tracking-[0.06em] uppercase md:w-32 md:shrink-0 md:pt-px md:text-sm md:font-normal md:tracking-normal md:normal-case">
         {label}
       </span>
-      <span className="text-sm text-foreground leading-snug break-words md:font-medium">{value}</span>
+      <span className="text-foreground text-sm leading-snug break-words md:font-medium">
+        {value}
+      </span>
     </div>
   )
 }
 
 function VesselReadOnly({ member }: { member: TripMember }) {
-  const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } = member
+  const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } =
+    member
   const hasAny = vesselMake || vesselModel || vesselLengthCm || vesselColorPrimary
-  if (!hasAny) return <p className="text-sm text-muted-foreground italic">No vessel info recorded.</p>
+  if (!hasAny)
+    return <p className="text-muted-foreground text-sm italic">No vessel info recorded.</p>
   const colors = [vesselColorPrimary, vesselColorSecondary].filter(Boolean).join(" / ")
   return (
     <div className="flex flex-col gap-1.5">
-      <FieldRow label="Make / Model" value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null} />
-      <FieldRow label="Length (cm)" value={vesselLengthCm != null ? String(vesselLengthCm) : null} />
+      <FieldRow
+        label="Make / Model"
+        value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null}
+      />
+      <FieldRow
+        label="Length (cm)"
+        value={vesselLengthCm != null ? String(vesselLengthCm) : null}
+      />
       <FieldRow label="Colour" value={colors || null} />
     </div>
   )
@@ -56,7 +66,8 @@ function VesselReadOnly({ member }: { member: TripMember }) {
 function EmergencyReadOnly({ member }: { member: TripMember }) {
   const { emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = member
   const hasAny = emergencyContactName || emergencyContactPhone
-  if (!hasAny) return <p className="text-sm text-muted-foreground italic">No emergency contact recorded.</p>
+  if (!hasAny)
+    return <p className="text-muted-foreground text-sm italic">No emergency contact recorded.</p>
   return (
     <div className="flex flex-col gap-1.5">
       <FieldRow label="Name" value={emergencyContactName} />
@@ -72,12 +83,18 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
   const [error, setError] = useState<string | null>(null)
   const [isConfirmed, setIsConfirmed] = useState(!!currentMember.floatPlanConfirmedAt)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FloatPlanFormValues>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<FloatPlanFormValues>({
     resolver: zodResolver(FloatPlanFormSchema),
     defaultValues: {
       vesselMake: currentMember.vesselMake ?? "",
       vesselModel: currentMember.vesselModel ?? "",
-      vesselLengthCm: currentMember.vesselLengthCm != null ? String(currentMember.vesselLengthCm) : "",
+      vesselLengthCm:
+        currentMember.vesselLengthCm != null ? String(currentMember.vesselLengthCm) : "",
       vesselColorPrimary: currentMember.vesselColorPrimary ?? "",
       vesselColorSecondary: currentMember.vesselColorSecondary ?? "",
       emergencyContactName: currentMember.emergencyContactName ?? "",
@@ -101,7 +118,10 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
     setError(null)
     startTransition(async () => {
       const result = await updateMyFloatPlan(tripId, values)
-      if (!result.success) { setError(result.error); return }
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
       setIsConfirmed(true)
       setIsEditing(false)
     })
@@ -109,9 +129,8 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
   return (
     <div className="flex flex-col gap-6">
-
       {!isConfirmed && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950">
           <p className="text-sm text-amber-800 dark:text-amber-200">
             Review your float plan for this trip and save it to confirm.
           </p>
@@ -120,32 +139,59 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
       {isEditing ? (
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-
           <div className="flex flex-col gap-4">
             <SectionLabel icon={<AnchorIcon className="size-4" />}>Vessel</SectionLabel>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpVesselMake">Make</Label>
-                <Input id="fpVesselMake" placeholder="e.g. Wilderness Systems" disabled={isPending} {...register("vesselMake")} />
+                <Input
+                  id="fpVesselMake"
+                  placeholder="e.g. Wilderness Systems"
+                  disabled={isPending}
+                  {...register("vesselMake")}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpVesselModel">Model</Label>
-                <Input id="fpVesselModel" placeholder="e.g. Tempest 170" disabled={isPending} {...register("vesselModel")} />
+                <Input
+                  id="fpVesselModel"
+                  placeholder="e.g. Tempest 170"
+                  disabled={isPending}
+                  {...register("vesselModel")}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpVesselLength">Length (cm)</Label>
-                <Input id="fpVesselLength" type="number" min={1} disabled={isPending} {...register("vesselLengthCm")} />
-                {errors.vesselLengthCm && <p className="text-xs text-destructive">{errors.vesselLengthCm.message}</p>}
+                <Input
+                  id="fpVesselLength"
+                  type="number"
+                  min={1}
+                  disabled={isPending}
+                  {...register("vesselLengthCm")}
+                />
+                {errors.vesselLengthCm && (
+                  <p className="text-destructive text-xs">{errors.vesselLengthCm.message}</p>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpColorPrimary">Primary colour</Label>
-                <Input id="fpColorPrimary" placeholder="e.g. Red" disabled={isPending} {...register("vesselColorPrimary")} />
+                <Input
+                  id="fpColorPrimary"
+                  placeholder="e.g. Red"
+                  disabled={isPending}
+                  {...register("vesselColorPrimary")}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpColorSecondary">Secondary colour</Label>
-                <Input id="fpColorSecondary" placeholder="e.g. White" disabled={isPending} {...register("vesselColorSecondary")} />
+                <Input
+                  id="fpColorSecondary"
+                  placeholder="e.g. White"
+                  disabled={isPending}
+                  {...register("vesselColorSecondary")}
+                />
               </div>
             </div>
           </div>
@@ -153,20 +199,36 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
           <Separator />
 
           <div className="flex flex-col gap-4">
-            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Emergency contact</SectionLabel>
+            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>
+              Emergency contact
+            </SectionLabel>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpEmergencyName">Name</Label>
-                <Input id="fpEmergencyName" disabled={isPending} {...register("emergencyContactName")} />
+                <Input
+                  id="fpEmergencyName"
+                  disabled={isPending}
+                  {...register("emergencyContactName")}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fpEmergencyRelationship">Relationship</Label>
-                <Input id="fpEmergencyRelationship" placeholder="e.g. Partner" disabled={isPending} {...register("emergencyContactRelationship")} />
+                <Input
+                  id="fpEmergencyRelationship"
+                  placeholder="e.g. Partner"
+                  disabled={isPending}
+                  {...register("emergencyContactRelationship")}
+                />
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="fpEmergencyPhone">Phone</Label>
-              <Input id="fpEmergencyPhone" type="tel" disabled={isPending} {...register("emergencyContactPhone")} />
+              <Input
+                id="fpEmergencyPhone"
+                type="tel"
+                disabled={isPending}
+                {...register("emergencyContactPhone")}
+              />
             </div>
           </div>
 
@@ -177,16 +239,20 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
             <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
               Cancel
             </Button>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-xs">{error}</p>}
           </div>
-
         </form>
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <SectionLabel icon={<AnchorIcon className="size-4" />}>Vessel</SectionLabel>
-              <Button variant="ghost" size="sm" onClick={handleEdit} className="shrink-0 h-6 px-2 text-xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEdit}
+                className="h-6 shrink-0 px-2 text-xs"
+              >
                 <PencilIcon className="size-3" />
                 Edit
               </Button>
@@ -195,7 +261,9 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
           </div>
           <Separator />
           <div className="flex flex-col gap-3">
-            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Emergency contact</SectionLabel>
+            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>
+              Emergency contact
+            </SectionLabel>
             <EmergencyReadOnly member={currentMember} />
           </div>
         </div>
@@ -205,7 +273,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
 
       <div className="flex flex-col gap-4">
         <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Medical notes</SectionLabel>
-        <p className="text-xs text-muted-foreground -mt-2">
+        <p className="text-muted-foreground -mt-2 text-xs">
           Private — visible only to the trip leader on the float plan.
         </p>
         <FloatPlanMedicalTabSection
@@ -214,7 +282,6 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
           sharedAt={currentMember.medicalNotesConsentAt ?? null}
         />
       </div>
-
     </div>
   )
 }

@@ -35,15 +35,19 @@ export function DeleteAccountButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="sm">Request account deletion</Button>
+        <Button variant="destructive" size="sm">
+          Request account deletion
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Request account deletion</DialogTitle>
           <DialogDescription asChild>
             <div className="flex flex-col gap-3 text-sm">
-              <p>Your account will be deactivated immediately and permanently deleted after 30 days.</p>
-              <ul className="list-disc pl-4 flex flex-col gap-1 text-muted-foreground">
+              <p>
+                Your account will be deactivated immediately and permanently deleted after 30 days.
+              </p>
+              <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-4">
                 <li>You will be logged out and unable to sign in during the grace period.</li>
                 <li>You will receive an email with a link to cancel within 30 days.</li>
                 <li>Trips you lead will be preserved with your name anonymised.</li>
@@ -52,7 +56,7 @@ export function DeleteAccountButton() {
             </div>
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
         <DialogFooter>
           <Button variant="outline" disabled={isPending} onClick={() => setOpen(false)}>
             Cancel

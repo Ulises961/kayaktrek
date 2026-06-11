@@ -37,9 +37,7 @@ describe("ChangePasswordForm", () => {
     vi.mocked(changePassword).mockResolvedValue({ success: true })
     await fillAndSubmit("OldPass1!", "NewPass1!", "NewPass1!")
 
-    await waitFor(() =>
-      expect(changePassword).toHaveBeenCalledWith("OldPass1!", "NewPass1!")
-    )
+    await waitFor(() => expect(changePassword).toHaveBeenCalledWith("OldPass1!", "NewPass1!"))
   })
 
   it("redirects to /profile on success", async () => {

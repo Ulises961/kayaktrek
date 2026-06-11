@@ -14,7 +14,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [serverState, formAction] = useActionState(resetPassword, null)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ResetPasswordInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResetPasswordInput>({
     resolver: zodResolver(ResetPasswordSchema),
     defaultValues: { token },
     mode: "onBlur",
@@ -36,15 +40,33 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <input type="hidden" {...register("token")} />
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="auth-label">New password</label>
-          <Input id="password" type="password" autoComplete="new-password" className="auth-input" {...register("password")} />
+          <label htmlFor="password" className="auth-label">
+            New password
+          </label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            className="auth-input"
+            {...register("password")}
+          />
           {errors.password && <p className="text-[11px] text-red-600">{errors.password.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="confirmPassword" className="auth-label">Confirm password</label>
-          <Input id="confirmPassword" type="password" autoComplete="new-password" className="auth-input" {...register("confirmPassword")} />
-          {errors.confirmPassword && <p className="text-[11px] text-red-600">{errors.confirmPassword.message}</p>}
+          <label htmlFor="confirmPassword" className="auth-label">
+            Confirm password
+          </label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            className="auth-input"
+            {...register("confirmPassword")}
+          />
+          {errors.confirmPassword && (
+            <p className="text-[11px] text-red-600">{errors.confirmPassword.message}</p>
+          )}
         </div>
 
         {serverState && !serverState.success && (
@@ -57,7 +79,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
       </form>
 
       <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
-        <Link href="/login" className="auth-link">Back to sign in</Link>
+        <Link href="/login" className="auth-link">
+          Back to sign in
+        </Link>
       </p>
     </AuthCard>
   )

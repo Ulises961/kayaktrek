@@ -7,12 +7,26 @@ const MEMBERS: TripMember[] = [
   {
     id: "01952f1a-0000-7000-8000-000000000001",
     role: "leader",
-    user: { id: "01952f1a-0000-7000-8000-000000000002", mail: "ada@example.com", username: "ada", name: "Ada", surname: "Lovelace", phone: "+34600000001" },
+    user: {
+      id: "01952f1a-0000-7000-8000-000000000002",
+      mail: "ada@example.com",
+      username: "ada",
+      name: "Ada",
+      surname: "Lovelace",
+      phone: "+34600000001",
+    },
   },
   {
     id: "01952f1a-0000-7000-8000-000000000003",
     role: "crew",
-    user: { id: "01952f1a-0000-7000-8000-000000000004", mail: "bob@example.com", username: "bob", name: "Bob", surname: "Sparrow", phone: "+34600000002" },
+    user: {
+      id: "01952f1a-0000-7000-8000-000000000004",
+      mail: "bob@example.com",
+      username: "bob",
+      name: "Bob",
+      surname: "Sparrow",
+      phone: "+34600000002",
+    },
   },
 ]
 

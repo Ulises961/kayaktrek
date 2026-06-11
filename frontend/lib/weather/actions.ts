@@ -10,9 +10,7 @@ import type { TidalGateWarning } from "@/lib/dtos/tidal-station"
 import type { VelocityGridData } from "@/lib/types/ui"
 import { z } from "zod"
 
-export type SeaActionResult =
-  | { success: true; data: Sea }
-  | { success: false; error: string }
+export type SeaActionResult = { success: true; data: Sea } | { success: false; error: string }
 
 export type WeatherActionResult =
   | { success: true; data: Weather }
@@ -30,13 +28,25 @@ export type VelocityGridResult =
   | { success: true; data: VelocityGridData }
   | { success: false; error: string }
 
-type SeaUpdateFields = Partial<Pick<Sea,
-  | "moonPhase" | "highTide" | "lowTide" | "tidalRangeM"
-  | "referencePortName" | "hwTimeOffsetMinutes" | "lwTimeOffsetMinutes"
-  | "hwHeightRatio" | "lwHeightRatio" | "tidalSource"
-  | "floodDirectionDegrees" | "ebbDirectionDegrees"
-  | "maxSpringRateKnots" | "maxNeapRateKnots"
->>
+type SeaUpdateFields = Partial<
+  Pick<
+    Sea,
+    | "moonPhase"
+    | "highTide"
+    | "lowTide"
+    | "tidalRangeM"
+    | "referencePortName"
+    | "hwTimeOffsetMinutes"
+    | "lwTimeOffsetMinutes"
+    | "hwHeightRatio"
+    | "lwHeightRatio"
+    | "tidalSource"
+    | "floodDirectionDegrees"
+    | "ebbDirectionDegrees"
+    | "maxSpringRateKnots"
+    | "maxNeapRateKnots"
+  >
+>
 
 export async function fetchDaySea(dayId: string): Promise<SeaActionResult> {
   try {
@@ -51,7 +61,7 @@ export async function fetchDaySea(dayId: string): Promise<SeaActionResult> {
 
 export async function updateDaySea(
   dayId: string,
-  fields: SeaUpdateFields
+  fields: SeaUpdateFields,
 ): Promise<SeaActionResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/day/${dayId}/sea`, fields)
@@ -70,7 +80,10 @@ export async function fetchDayWeather(dayId: string): Promise<WeatherActionResul
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to fetch weather data." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch weather data.",
+    }
   }
 }
 
@@ -80,7 +93,10 @@ export async function triggerWeatherFetch(dayId: string): Promise<TriggerWeather
     return { success: true, taskId: result.taskId }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to trigger weather fetch." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to trigger weather fetch.",
+    }
   }
 }
 
@@ -91,7 +107,10 @@ export async function fetchTidalGates(dayId: string): Promise<TidalGatesResult> 
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to fetch tidal gates." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch tidal gates.",
+    }
   }
 }
 
@@ -101,7 +120,10 @@ export async function fetchWindVectors(dayId: string, hour: number): Promise<Vel
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to fetch wind vectors." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch wind vectors.",
+    }
   }
 }
 
@@ -111,16 +133,27 @@ export async function fetchWaveVectors(dayId: string, hour: number): Promise<Vel
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to fetch wave vectors." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch wave vectors.",
+    }
   }
 }
 
-export async function fetchTidalStreamVectors(dayId: string, hour: number): Promise<VelocityGridResult> {
+export async function fetchTidalStreamVectors(
+  dayId: string,
+  hour: number,
+): Promise<VelocityGridResult> {
   try {
-    const data = await apiGet<VelocityGridData>(`/api/day/${dayId}/tidal-stream-vectors?hour=${hour}`)
+    const data = await apiGet<VelocityGridData>(
+      `/api/day/${dayId}/tidal-stream-vectors?hour=${hour}`,
+    )
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to fetch tidal stream vectors." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch tidal stream vectors.",
+    }
   }
 }

@@ -21,7 +21,13 @@ export function LogForm({ log }: LogFormProps) {
   const [isPending, startTransition] = useTransition()
   const isEdit = !!log?.id
 
-  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<LogFields>({
+  const {
+    register,
+    handleSubmit,
+    setError,
+    control,
+    formState: { errors },
+  } = useForm<LogFields>({
     resolver: zodResolver(LogFieldsSchema),
     defaultValues: {
       date: log?.date ?? "",
@@ -42,9 +48,7 @@ export function LogForm({ log }: LogFormProps) {
         notes: data.notes?.trim() || undefined,
       }
 
-      const result = isEdit
-        ? await updateLog(log.id!, fields)
-        : await createLog(fields)
+      const result = isEdit ? await updateLog(log.id!, fields) : await createLog(fields)
 
       if (result.success) {
         router.push("/logs")
@@ -55,7 +59,7 @@ export function LogForm({ log }: LogFormProps) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5 max-w-lg">
+    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="date">Date</Label>
         <Controller
@@ -70,7 +74,7 @@ export function LogForm({ log }: LogFormProps) {
             />
           )}
         />
-        {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
+        {errors.date && <p className="text-destructive text-sm">{errors.date.message}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -86,7 +90,7 @@ export function LogForm({ log }: LogFormProps) {
             disabled={isPending}
             {...register("hours", { valueAsNumber: true })}
           />
-          {errors.hours && <p className="text-sm text-destructive">{errors.hours.message}</p>}
+          {errors.hours && <p className="text-destructive text-sm">{errors.hours.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -100,7 +104,7 @@ export function LogForm({ log }: LogFormProps) {
             disabled={isPending}
             {...register("distance", { valueAsNumber: true })}
           />
-          {errors.distance && <p className="text-sm text-destructive">{errors.distance.message}</p>}
+          {errors.distance && <p className="text-destructive text-sm">{errors.distance.message}</p>}
         </div>
       </div>
 
@@ -116,7 +120,7 @@ export function LogForm({ log }: LogFormProps) {
           disabled={isPending}
           {...register("avgSea", { valueAsNumber: true })}
         />
-        {errors.avgSea && <p className="text-sm text-destructive">{errors.avgSea.message}</p>}
+        {errors.avgSea && <p className="text-destructive text-sm">{errors.avgSea.message}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -128,16 +132,21 @@ export function LogForm({ log }: LogFormProps) {
           disabled={isPending}
           {...register("notes")}
         />
-        {errors.notes && <p className="text-sm text-destructive">{errors.notes.message}</p>}
+        {errors.notes && <p className="text-destructive text-sm">{errors.notes.message}</p>}
       </div>
 
-      {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+      {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
       <div className="flex gap-3">
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : isEdit ? "Save changes" : "Add log"}
         </Button>
-        <Button type="button" variant="outline" disabled={isPending} onClick={() => router.push("/logs")}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isPending}
+          onClick={() => router.push("/logs")}
+        >
           Cancel
         </Button>
       </div>

@@ -7,18 +7,30 @@ import type { Logistics } from "@/lib/dtos/logistics"
 
 const MEMBER_A_ID = "01952f1a-0000-7000-8000-000000000010"
 const MEMBER_B_ID = "01952f1a-0000-7000-8000-000000000020"
-const VEHICLE_ID  = "01952f1a-0000-7000-8000-000000000030"
+const VEHICLE_ID = "01952f1a-0000-7000-8000-000000000030"
 
 const MEMBERS: TripMember[] = [
   {
     id: MEMBER_A_ID,
     role: "leader",
-    user: { id: "01952f1a-0000-7000-8000-000000000011", mail: "ana@example.com", username: "ana", name: "Ana", surname: "Font" },
+    user: {
+      id: "01952f1a-0000-7000-8000-000000000011",
+      mail: "ana@example.com",
+      username: "ana",
+      name: "Ana",
+      surname: "Font",
+    },
   },
   {
     id: MEMBER_B_ID,
     role: "crew",
-    user: { id: "01952f1a-0000-7000-8000-000000000021", mail: "joan@example.com", username: "joan", name: "Joan", surname: "Miró" },
+    user: {
+      id: "01952f1a-0000-7000-8000-000000000021",
+      mail: "joan@example.com",
+      username: "joan",
+      name: "Joan",
+      surname: "Miró",
+    },
   },
 ]
 
@@ -34,7 +46,11 @@ const VEHICLE: ShuttleVehicle = {
   vehicleDescription: "White Toyota Land Cruiser",
   pickupPoint: "Harbour road",
   passengers: [
-    { id: "01952f1a-0000-7000-8000-000000000040", vehicleId: VEHICLE_ID, tripMemberId: MEMBER_A_ID },
+    {
+      id: "01952f1a-0000-7000-8000-000000000040",
+      vehicleId: VEHICLE_ID,
+      tripMemberId: MEMBER_A_ID,
+    },
   ],
 }
 
@@ -110,7 +126,7 @@ describe("ShuttleSection", () => {
         members={MEMBERS}
         tripId="01952f1a-0000-7000-8000-000000000001"
         currentMemberId={MEMBER_A_ID}
-      />
+      />,
     )
     expect(screen.queryByRole("button", { name: /join/i })).toBeNull()
   })
@@ -130,7 +146,7 @@ describe("ShuttleSection", () => {
         members={MEMBERS}
         tripId="01952f1a-0000-7000-8000-000000000001"
         currentMemberId={MEMBER_A_ID}
-      />
+      />,
     )
     expect(screen.queryByRole("button", { name: /join/i })).toBeNull()
   })
@@ -145,7 +161,7 @@ describe("ShuttleSection", () => {
         members={MEMBERS}
         tripId="01952f1a-0000-7000-8000-000000000001"
         currentMemberId={MEMBER_B_ID}
-      />
+      />,
     )
     expect(screen.getByRole("button", { name: /join/i })).toBeDefined()
   })

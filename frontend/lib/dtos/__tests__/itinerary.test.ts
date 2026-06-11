@@ -202,7 +202,8 @@ describe("ItinerarySchema", () => {
       createdFromId: "01952f1a-0000-7000-8000-000000000099",
     })
     expect(result.success).toBe(true)
-    if (result.success) expect(result.data.createdFromId).toBe("01952f1a-0000-7000-8000-000000000099")
+    if (result.success)
+      expect(result.data.createdFromId).toBe("01952f1a-0000-7000-8000-000000000099")
   })
 
   it("accepts an itinerary without a tripId", () => {

@@ -27,7 +27,11 @@ import type { TripMember } from "@/lib/dtos/trip-member"
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—"
-  try { return format(new Date(iso), "d MMM yyyy") } catch { return iso }
+  try {
+    return format(new Date(iso), "d MMM yyyy")
+  } catch {
+    return iso
+  }
 }
 
 function formatLength(cm: number | null | undefined) {
@@ -46,13 +50,17 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function VesselBlock({ member }: { member: TripMember }) {
-  const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } = member
+  const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } =
+    member
   if (!vesselMake && !vesselModel && !vesselLengthCm && !vesselColorPrimary)
-    return <p className="text-sm text-muted-foreground italic">No vessel info recorded.</p>
+    return <p className="text-muted-foreground text-sm italic">No vessel info recorded.</p>
   const colors = [vesselColorPrimary, vesselColorSecondary].filter(Boolean).join(" / ")
   return (
     <div className="flex flex-col gap-1">
-      <FieldRow label="Make / Model" value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null} />
+      <FieldRow
+        label="Make / Model"
+        value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null}
+      />
       <FieldRow label="Length" value={formatLength(vesselLengthCm)} />
       <FieldRow label="Colour" value={colors || null} />
     </div>
@@ -62,7 +70,7 @@ function VesselBlock({ member }: { member: TripMember }) {
 function EmergencyBlock({ member }: { member: TripMember }) {
   const { emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = member
   if (!emergencyContactName && !emergencyContactPhone)
-    return <p className="text-sm text-muted-foreground italic">No emergency contact recorded.</p>
+    return <p className="text-muted-foreground text-sm italic">No emergency contact recorded.</p>
   return (
     <div className="flex flex-col gap-1">
       <FieldRow label="Name" value={emergencyContactName} />
@@ -96,31 +104,39 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
   const memberId = member.user.id ?? ""
 
   return (
-    <div className="rounded-lg border border-border p-4 flex flex-col gap-4">
+    <div className="border-border flex flex-col gap-4 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <UserIcon className="size-4 text-muted-foreground shrink-0" />
+          <UserIcon className="text-muted-foreground size-4 shrink-0" />
           <span className="font-semibold">{fullName}</span>
-          {member.user.mail && <span className="text-xs text-muted-foreground">{member.user.mail}</span>}
+          {member.user.mail && (
+            <span className="text-muted-foreground text-xs">{member.user.mail}</span>
+          )}
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded">
+        <span className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-[10px] font-semibold tracking-widest uppercase">
           {member.role}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Vessel</p>
+          <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+            Vessel
+          </p>
           <VesselBlock member={member} />
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Emergency Contact</p>
+          <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+            Emergency Contact
+          </p>
           <EmergencyBlock member={member} />
         </div>
       </div>
 
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Medical Notes</p>
+        <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+          Medical Notes
+        </p>
         <MedicalNotesViewer
           hasLeaderMedicalNotes={member.hasLeaderMedicalNotes ?? false}
           notes={notes}
@@ -131,11 +147,11 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
       </div>
 
       {member.floatPlanConfirmedAt ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-muted-foreground text-[10px]">
           Float plan confirmed {formatDate(member.floatPlanConfirmedAt)}
         </p>
       ) : (
-        <span className="self-start text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
+        <span className="self-start rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-amber-700 uppercase dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
           Not confirmed
         </span>
       )}
@@ -160,14 +176,27 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
   const [dialogOpen, setDialogOpen] = useState(false)
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null)
 
-  const { register, handleSubmit, setError, reset, formState: { errors, isSubmitting } } =
-    useForm<PasswordFormValues>({ resolver: zodResolver(PasswordSchema) })
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PasswordFormValues>({ resolver: zodResolver(PasswordSchema) })
 
   async function fetchNotes(memberId: string, password: string) {
     setLoadingMembers((prev) => new Set(prev).add(memberId))
-    setMemberErrors((prev) => { const next = { ...prev }; delete next[memberId]; return next })
+    setMemberErrors((prev) => {
+      const next = { ...prev }
+      delete next[memberId]
+      return next
+    })
     const result = await readMemberMedicalNotes(tripId, memberId, password)
-    setLoadingMembers((prev) => { const next = new Set(prev); next.delete(memberId); return next })
+    setLoadingMembers((prev) => {
+      const next = new Set(prev)
+      next.delete(memberId)
+      return next
+    })
     if (result.success) {
       setNotesCache((prev) => ({ ...prev, [memberId]: result.medicalNotes }))
     } else {
@@ -216,13 +245,21 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
         })}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) { setDialogOpen(false); reset() } }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogOpen(false)
+            reset()
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Enter your password</DialogTitle>
             <DialogDescription>
-              Your password is needed to decrypt the crew member&apos;s medical notes.
-              It will be cached for this session so you only enter it once.
+              Your password is needed to decrypt the crew member&apos;s medical notes. It will be
+              cached for this session so you only enter it once.
             </DialogDescription>
           </DialogHeader>
           <form noValidate onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
@@ -235,11 +272,18 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
                 {...register("password")}
               />
               {errors.password && (
-                <p className="text-sm text-destructive">{errors.password.message}</p>
+                <p className="text-destructive text-sm">{errors.password.message}</p>
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => { setDialogOpen(false); reset() }}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDialogOpen(false)
+                  reset()
+                }}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>

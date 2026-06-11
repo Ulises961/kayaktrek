@@ -47,7 +47,13 @@ const TRIP: Trip = {
     {
       id: "01952f1a-0000-7000-8000-000000000010",
       role: "leader",
-      user: { id: "01952f1a-0000-7000-8000-000000000011", mail: "ana@example.com", username: "ana", name: "Ana", surname: "Font" },
+      user: {
+        id: "01952f1a-0000-7000-8000-000000000011",
+        mail: "ana@example.com",
+        username: "ana",
+        name: "Ana",
+        surname: "Font",
+      },
     },
   ],
   pendingTravellers: [],
@@ -72,7 +78,13 @@ beforeEach(() => vi.clearAllMocks())
 const CURRENT_MEMBER: TripMember = {
   id: "01952f1a-0000-7000-8000-000000000010",
   role: "leader",
-  user: { id: "01952f1a-0000-7000-8000-000000000011", mail: "ana@example.com", username: "ana", name: "Ana", surname: "Font" },
+  user: {
+    id: "01952f1a-0000-7000-8000-000000000011",
+    mail: "ana@example.com",
+    username: "ana",
+    name: "Ana",
+    surname: "Font",
+  },
   vesselMake: null,
   vesselModel: null,
   vesselLengthCm: null,
@@ -132,7 +144,7 @@ describe("TripDetailTabs", () => {
     await userEvent.click(screen.getByRole("tab", { name: /logistics/i }))
     expect(mockReplace).toHaveBeenCalledWith(
       expect.stringContaining("tab=logistics"),
-      expect.any(Object)
+      expect.any(Object),
     )
   })
 })

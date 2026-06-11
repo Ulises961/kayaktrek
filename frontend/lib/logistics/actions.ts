@@ -12,7 +12,10 @@ export async function getLogistics(tripId: string): Promise<Logistics | null> {
   return LogisticsSchema.parse(raw)
 }
 
-export async function upsertLogistics(tripId: string, fields: Partial<LogisticsFields>): Promise<LogisticsActionResult> {
+export async function upsertLogistics(
+  tripId: string,
+  fields: Partial<LogisticsFields>,
+): Promise<LogisticsActionResult> {
   try {
     await apiPut(`/api/logistics/${tripId}`, fields)
     revalidatePath(`/trips/${tripId}`)
@@ -24,7 +27,9 @@ export async function upsertLogistics(tripId: string, fields: Partial<LogisticsF
   }
 }
 
-export async function generateFloatPlanShare(tripId: string): Promise<{ success: true; logistics: Logistics } | { success: false; error: string }> {
+export async function generateFloatPlanShare(
+  tripId: string,
+): Promise<{ success: true; logistics: Logistics } | { success: false; error: string }> {
   try {
     const raw = await apiPost<unknown>(`/api/logistics/${tripId}/share`, {})
     const logistics = LogisticsSchema.parse(raw)
@@ -32,7 +37,10 @@ export async function generateFloatPlanShare(tripId: string): Promise<{ success:
     return { success: true, logistics }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to generate share link." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to generate share link.",
+    }
   }
 }
 

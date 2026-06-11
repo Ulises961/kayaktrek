@@ -21,13 +21,13 @@ hooks/          Custom React hooks
 
 ## Key pages
 
-| Route | Description |
-|-------|-------------|
-| `/` | Landing page — public map with shared itineraries |
-| `/login` `/register` | Auth (not yet implemented) |
-| `/dashboard` | Authenticated shell with sidebar |
-| `/trips` | Trip list, grouped by state |
-| `/trips/[id]` | Trip detail → days → itinerary on map |
+| Route                | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `/`                  | Landing page — public map with shared itineraries |
+| `/login` `/register` | Auth (not yet implemented)                        |
+| `/dashboard`         | Authenticated shell with sidebar                  |
+| `/trips`             | Trip list, grouped by state                       |
+| `/trips/[id]`        | Trip detail → days → itinerary on map             |
 
 ## Stack
 

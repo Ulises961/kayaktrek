@@ -18,7 +18,11 @@ async function fetchSnapshot(token: string) {
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—"
-  try { return format(new Date(iso), "d MMM yyyy") } catch { return iso }
+  try {
+    return format(new Date(iso), "d MMM yyyy")
+  } catch {
+    return iso
+  }
 }
 
 function formatLength(cm: number | null | undefined) {
@@ -31,14 +35,14 @@ function DocRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground">{value}</span>
+      <span className="text-foreground font-medium">{value}</span>
     </div>
   )
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground border-b border-border pb-2 mb-4 flex items-center gap-2">
+    <h2 className="text-muted-foreground border-border mb-4 flex items-center gap-2 border-b pb-2 font-mono text-[11px] font-medium tracking-[0.1em] uppercase">
       {children}
     </h2>
   )
@@ -52,26 +56,26 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
   const hasEc = ec.name || ec.phone
 
   return (
-    <div className="fp-crew-card rounded-md border border-border bg-card overflow-hidden">
+    <div className="fp-crew-card border-border bg-card overflow-hidden rounded-md border">
       {/* Card header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-surface-2 border-b border-border">
-        <span className="font-mono text-xs text-muted-foreground w-5 shrink-0">
+      <div className="bg-surface-2 border-border flex items-center gap-3 border-b px-4 py-3">
+        <span className="text-muted-foreground w-5 shrink-0 font-mono text-xs">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <UserIcon className="size-3.5 text-muted-foreground shrink-0" />
-        <div className="flex items-baseline gap-2 flex-wrap">
+        <UserIcon className="text-muted-foreground size-3.5 shrink-0" />
+        <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-sm font-semibold">{member.name}</span>
-          <span className="text-[11px] font-medium uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+          <span className="text-primary bg-primary/10 rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase">
             {member.role}
           </span>
         </div>
       </div>
 
       {/* Card body */}
-      <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+      <div className="divide-border grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         {/* Vessel */}
         <div className="p-4">
-          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-3">
+          <p className="text-muted-foreground mb-3 font-mono text-[10px] font-medium tracking-[0.1em] uppercase">
             Vessel
           </p>
           {hasVessel ? (
@@ -82,13 +86,13 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
               {v.colorSecondary && <DocRow label="Secondary colour" value={v.colorSecondary} />}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No vessel information provided.</p>
+            <p className="text-muted-foreground text-xs italic">No vessel information provided.</p>
           )}
         </div>
 
         {/* Emergency contact */}
-        <div className="p-4 bg-surface-1">
-          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-3">
+        <div className="bg-surface-1 p-4">
+          <p className="text-muted-foreground mb-3 font-mono text-[10px] font-medium tracking-[0.1em] uppercase">
             Emergency Contact
           </p>
           {hasEc ? (
@@ -98,7 +102,7 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
               {ec.relationship && <DocRow label="Relationship" value={ec.relationship} />}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">No emergency contact provided.</p>
+            <p className="text-muted-foreground text-xs italic">No emergency contact provided.</p>
           )}
         </div>
       </div>
@@ -106,18 +110,23 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
   )
 }
 
-export default async function PublicFloatPlanPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function PublicFloatPlanPage({
+  params,
+}: {
+  params: Promise<{ token: string }>
+}) {
   const { token } = await params
   const snap = await fetchSnapshot(token)
 
   if (!snap) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="max-w-sm text-center flex flex-col items-center gap-4">
-          <AlertTriangleIcon className="size-10 text-muted-foreground" />
+      <div className="bg-background flex min-h-screen items-center justify-center p-6">
+        <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <AlertTriangleIcon className="text-muted-foreground size-10" />
           <h1 className="text-xl font-semibold">Float plan not found</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            This link has expired or is no longer valid. Contact the expedition leader for an updated link.
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            This link has expired or is no longer valid. Contact the expedition leader for an
+            updated link.
           </p>
         </div>
       </div>
@@ -129,59 +138,70 @@ export default async function PublicFloatPlanPage({ params }: { params: Promise<
     dateRange.length === 2
       ? `${formatDate(dateRange[0])} – ${formatDate(dateRange[1])}`
       : dateRange.length === 1
-      ? formatDate(dateRange[0])
-      : "Dates not set"
+        ? formatDate(dateRange[0])
+        : "Dates not set"
 
   const sc = snap.shoreContact
   const hasShoreContact = sc && (sc.name || sc.phone || sc.email)
-  const sortedCrew = [...snap.crew].sort((a, b) => (a.role === "leader" ? -1 : b.role === "leader" ? 1 : 0))
+  const sortedCrew = [...snap.crew].sort((a, b) =>
+    a.role === "leader" ? -1 : b.role === "leader" ? 1 : 0,
+  )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background min-h-screen">
       {/* Header — hidden on print */}
-      <header className="border-b border-border bg-card px-6 py-3.5 flex items-center gap-2 print:hidden">
-        <ShipWheelIcon className="size-4 text-primary shrink-0" />
-        <span className="text-sm font-semibold tracking-tight text-primary">Kayak Planner</span>
-        <span className="ml-auto font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+      <header className="border-border bg-card flex items-center gap-2 border-b px-6 py-3.5 print:hidden">
+        <ShipWheelIcon className="text-primary size-4 shrink-0" />
+        <span className="text-primary text-sm font-semibold tracking-tight">Kayak Planner</span>
+        <span className="text-muted-foreground ml-auto font-mono text-[11px] tracking-widest uppercase">
           Float Plan
         </span>
       </header>
 
       {/* Print-only document label */}
-      <p className="hidden print:block font-mono text-[10px] uppercase tracking-widest text-muted-foreground px-6 pt-4">
+      <p className="text-muted-foreground hidden px-6 pt-4 font-mono text-[10px] tracking-widest uppercase print:block">
         Float Plan — Safety Document
       </p>
 
-      <main className="max-w-2xl mx-auto px-6 py-8 flex flex-col gap-8">
+      <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-8">
         {/* Title block */}
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-light tracking-tight text-primary" style={{ fontFamily: "var(--font-display)" }}>
+            <h1
+              className="text-primary text-3xl font-light tracking-tight"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               {snap.trip.destination ?? "Kayak Expedition"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">{dateLabel}</p>
+            <p className="text-muted-foreground mt-1 text-sm">{dateLabel}</p>
           </div>
 
-          <div className="flex flex-wrap gap-x-6 gap-y-1 border-y border-border py-3">
+          <div className="border-border flex flex-wrap gap-x-6 gap-y-1 border-y py-3">
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Crew</span>
-              <span className="text-sm font-semibold">{sortedCrew.length} {sortedCrew.length === 1 ? "person" : "people"}</span>
+              <span className="text-muted-foreground font-mono text-[10px] tracking-[0.08em] uppercase">
+                Crew
+              </span>
+              <span className="text-sm font-semibold">
+                {sortedCrew.length} {sortedCrew.length === 1 ? "person" : "people"}
+              </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Issued</span>
+              <span className="text-muted-foreground font-mono text-[10px] tracking-[0.08em] uppercase">
+                Issued
+              </span>
               <span className="text-sm font-semibold">{formatDate(snap.generatedAt)}</span>
             </div>
           </div>
         </div>
 
         {/* Safety notice */}
-        <div className="flex gap-3 rounded-md border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
-          <AnchorIcon className="size-4 text-accent shrink-0 mt-0.5" />
+        <div className="flex gap-3 rounded-md border border-amber-200/70 bg-amber-50/60 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+          <AnchorIcon className="text-accent mt-0.5 size-4 shrink-0" />
           <div className="flex flex-col gap-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+            <p className="text-accent text-xs font-semibold tracking-wide uppercase">
               Instructions for shore contact
             </p>
-            <p className="text-sm text-amber-900/90 dark:text-amber-200/90 leading-relaxed">
+            <p className="text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">
               If the expedition party has not returned or made contact by the expected return date
               and you are unable to reach them, contact the relevant local emergency services and
               provide the vessel descriptions and emergency contacts listed in this document.
@@ -206,7 +226,7 @@ export default async function PublicFloatPlanPage({ params }: { params: Promise<
         <section>
           <SectionHeading>
             Crew Manifest
-            <span className="inline-flex items-center justify-center size-5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
+            <span className="bg-primary/10 text-primary inline-flex size-5 items-center justify-center rounded-full text-[11px] font-semibold">
               {sortedCrew.length}
             </span>
           </SectionHeading>
@@ -217,8 +237,9 @@ export default async function PublicFloatPlanPage({ params }: { params: Promise<
           </div>
         </section>
 
-        <footer className="border-t border-border pt-5 text-xs text-muted-foreground text-center leading-relaxed">
-          Generated by Kayak Planner · This document contains logistical information only. Medical information is not included.
+        <footer className="border-border text-muted-foreground border-t pt-5 text-center text-xs leading-relaxed">
+          Generated by Kayak Planner · This document contains logistical information only. Medical
+          information is not included.
         </footer>
       </main>
     </div>

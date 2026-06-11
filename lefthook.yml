@@ -20,14 +20,21 @@ pre-commit:
     frontend-eslint:
       glob: "frontend/**/*.{ts,tsx}"
       run: cd frontend && pnpm lint {staged_files}
+    frontend-format:
+      glob: "frontend/**/*.{ts,tsx,js,mjs,json,css,md}"
+      run: cd frontend && pnpm prettier --check {staged_files}
 
 pre-push:
   parallel: true
   commands:
     backend-tests:
       run: cd backend && .venv/bin/pytest -n auto
+    backend-flake8-full:
+      run: cd backend && .venv/bin/flake8 backend/
     frontend-lint:
       run: cd frontend && pnpm lint
+    frontend-format:
+      run: cd frontend && pnpm format:check
     frontend-typecheck:
       run: cd frontend && pnpm tsc --noEmit
     frontend-tests:

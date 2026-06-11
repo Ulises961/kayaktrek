@@ -15,7 +15,13 @@ export function ChangePasswordForm() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<ChangePasswordValues>({
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors },
+  } = useForm<ChangePasswordValues>({
     resolver: zodResolver(ChangePasswordSchema),
   })
 
@@ -36,35 +42,65 @@ export function ChangePasswordForm() {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5 max-w-sm">
+    <form onSubmit={onSubmit} className="flex max-w-sm flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="currentPwd">Current password</Label>
-        <Input id="currentPwd" type="password" autoComplete="current-password" disabled={isPending} {...register("currentPwd")} />
-        {errors.currentPwd && <p className="text-xs text-destructive">{errors.currentPwd.message}</p>}
-        <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 self-start">
+        <Input
+          id="currentPwd"
+          type="password"
+          autoComplete="current-password"
+          disabled={isPending}
+          {...register("currentPwd")}
+        />
+        {errors.currentPwd && (
+          <p className="text-destructive text-xs">{errors.currentPwd.message}</p>
+        )}
+        <Link
+          href="/forgot-password"
+          className="text-muted-foreground hover:text-foreground self-start text-xs underline underline-offset-2"
+        >
           Forgot your current password?
         </Link>
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="newPwd">New password</Label>
-        <Input id="newPwd" type="password" autoComplete="new-password" disabled={isPending} {...register("newPwd")} />
-        {errors.newPwd && <p className="text-xs text-destructive">{errors.newPwd.message}</p>}
+        <Input
+          id="newPwd"
+          type="password"
+          autoComplete="new-password"
+          disabled={isPending}
+          {...register("newPwd")}
+        />
+        {errors.newPwd && <p className="text-destructive text-xs">{errors.newPwd.message}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="confirmPwd">Confirm new password</Label>
-        <Input id="confirmPwd" type="password" autoComplete="new-password" disabled={isPending} {...register("confirmPwd")} />
-        {errors.confirmPwd && <p className="text-xs text-destructive">{errors.confirmPwd.message}</p>}
+        <Input
+          id="confirmPwd"
+          type="password"
+          autoComplete="new-password"
+          disabled={isPending}
+          {...register("confirmPwd")}
+        />
+        {errors.confirmPwd && (
+          <p className="text-destructive text-xs">{errors.confirmPwd.message}</p>
+        )}
       </div>
 
-      {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+      {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
       <div className="flex gap-3">
         <Button type="submit" disabled={isPending}>
           {isPending ? "Updating…" : "Update password"}
         </Button>
-        <Button type="button" variant="outline" disabled={isPending} onClick={() => router.push("/profile")}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isPending}
+          onClick={() => router.push("/profile")}
+        >
           Cancel
         </Button>
       </div>

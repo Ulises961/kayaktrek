@@ -79,10 +79,7 @@ describe("walkList", () => {
 
   it("includes all points even when head detection yields a fallback", () => {
     // Points with no clear head (no id)
-    const pts: Point[] = [
-      { type: "position" },
-      { type: "stop" },
-    ]
+    const pts: Point[] = [{ type: "position" }, { type: "stop" }]
     expect(walkList(pts).length).toBe(2)
   })
 

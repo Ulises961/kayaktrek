@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { fetchDaySea, updateDaySea, fetchDayWeather, triggerWeatherFetch, fetchTidalGates, fetchWindVectors, fetchWaveVectors, fetchTidalStreamVectors } from "../actions"
+import {
+  fetchDaySea,
+  updateDaySea,
+  fetchDayWeather,
+  triggerWeatherFetch,
+  fetchTidalGates,
+  fetchWindVectors,
+  fetchWaveVectors,
+  fetchTidalStreamVectors,
+} from "../actions"
 
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
@@ -75,7 +84,10 @@ describe("fetchDaySea", () => {
     GET.mockResolvedValue(seaFixture)
     const result = await fetchDaySea(DAY_ID)
     expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/sea`)
-    expect(result).toEqual({ success: true, data: expect.objectContaining({ dayId: DAY_ID, highTide: "09:42" }) })
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({ dayId: DAY_ID, highTide: "09:42" }),
+    })
   })
 
   it("returns error on failure", async () => {
@@ -89,7 +101,10 @@ describe("updateDaySea", () => {
   it("patches /api/day/:id/sea with fields and parses response", async () => {
     PATCH.mockResolvedValue(seaFixture)
     const result = await updateDaySea(DAY_ID, { highTide: "09:42", tidalRangeM: 4.2 })
-    expect(PATCH).toHaveBeenCalledWith(`/api/day/${DAY_ID}/sea`, { highTide: "09:42", tidalRangeM: 4.2 })
+    expect(PATCH).toHaveBeenCalledWith(`/api/day/${DAY_ID}/sea`, {
+      highTide: "09:42",
+      tidalRangeM: 4.2,
+    })
     expect(result).toEqual({ success: true, data: expect.objectContaining({ dayId: DAY_ID }) })
   })
 
@@ -105,7 +120,10 @@ describe("fetchDayWeather", () => {
     GET.mockResolvedValue(weatherFixture)
     const result = await fetchDayWeather(DAY_ID)
     expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/weather`)
-    expect(result).toEqual({ success: true, data: expect.objectContaining({ dayId: DAY_ID, model: "gfs" }) })
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({ dayId: DAY_ID, model: "gfs" }),
+    })
   })
 
   it("returns error on failure", async () => {
@@ -161,8 +179,14 @@ const velocityGridFixture = {
       header: {
         parameterUnit: "m.s-1",
         parameterNumberName: "eastward_component",
-        la1: 51.5, la2: 52.0, lo1: -5.5, lo2: -5.0,
-        nx: 5, ny: 5, dx: 0.1, dy: 0.1,
+        la1: 51.5,
+        la2: 52.0,
+        lo1: -5.5,
+        lo2: -5.0,
+        nx: 5,
+        ny: 5,
+        dx: 0.1,
+        dy: 0.1,
       },
       data: [0.1, 0.2, 0.3, 0.4, 0.5],
     },

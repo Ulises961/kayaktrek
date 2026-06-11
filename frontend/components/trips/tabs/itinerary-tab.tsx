@@ -20,7 +20,7 @@ export interface ItineraryTabProps {
 }
 
 const COLLAPSE_LIMIT = 5
-const DEFAULT_SPEED  = 2.5
+const DEFAULT_SPEED = 2.5
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ function getDayStats(day: Day, speedKnots: number): DayStats {
   const { hours, minutes } = estimatedTime(distanceNm, speedKnots)
   const map = new Map(pts.map((p) => [p.id!, p]))
   const startName = map.get(day.startPointId!)?.name ?? null
-  const endName   = day.endPointId ? (map.get(day.endPointId)?.name ?? null) : null
+  const endName = day.endPointId ? (map.get(day.endPointId)?.name ?? null) : null
   return { isRestDay: false, distanceNm, startName, endName, hours, minutes }
 }
 
@@ -67,7 +67,7 @@ function getDayStats(day: Day, speedKnots: number): DayStats {
 
 function StatLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground leading-none">
+    <span className="text-muted-foreground text-[10px] leading-none font-semibold tracking-[0.08em] uppercase">
       {children}
     </span>
   )
@@ -75,8 +75,8 @@ function StatLabel({ children }: { children: React.ReactNode }) {
 
 function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-lg font-semibold font-mono tabular-nums leading-none text-foreground truncate">
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-foreground truncate font-mono text-lg leading-none font-semibold tabular-nums">
         {value}
       </span>{" "}
       <StatLabel>{label}</StatLabel>
@@ -89,23 +89,24 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
   const routeLabel =
     stats.startName && stats.endName && stats.endName !== stats.startName
       ? `${stats.startName} → ${stats.endName}`
-      : stats.startName ?? ""
+      : (stats.startName ?? "")
 
   return (
-    <div className="py-2.5 border-l-2 border-border/50 pl-3 hover:border-primary/50 transition-colors">
+    <div className="border-border/50 hover:border-primary/50 border-l-2 py-2.5 pl-3 transition-colors">
       {/* Header row: day + date · metrics */}
-      <div className="flex items-baseline justify-between gap-2 flex-wrap">
-        <div className="flex items-baseline gap-1.5 min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground shrink-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <span className="text-muted-foreground shrink-0 text-[10px] font-semibold tracking-[0.06em] uppercase">
             Day {day.dayNumber}
           </span>
           {day.date && (
-            <span className="text-[10px] text-muted-foreground/60 truncate">· {day.date}</span>
+            <span className="text-muted-foreground/60 truncate text-[10px]">· {day.date}</span>
           )}
         </div>
         {!stats.isRestDay && stats.distanceNm > 0 && (
-          <span className="text-[11px] font-mono tabular-nums text-muted-foreground shrink-0">
-            {stats.distanceNm.toFixed(1)} nm · {formatTime({ hours: stats.hours, minutes: stats.minutes })}
+          <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+            {stats.distanceNm.toFixed(1)} nm ·{" "}
+            {formatTime({ hours: stats.hours, minutes: stats.minutes })}
           </span>
         )}
       </div>
@@ -113,11 +114,11 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
       {/* Route or rest label */}
       <div className="mt-0.5">
         {stats.isRestDay ? (
-          <span className="text-xs italic text-muted-foreground/70">Rest day</span>
+          <span className="text-muted-foreground/70 text-xs italic">Rest day</span>
         ) : routeLabel ? (
-          <span className="text-sm text-foreground leading-snug">{routeLabel}</span>
+          <span className="text-foreground text-sm leading-snug">{routeLabel}</span>
         ) : day.date ? (
-          <span className="text-sm text-muted-foreground leading-snug">{day.date}</span>
+          <span className="text-muted-foreground text-sm leading-snug">{day.date}</span>
         ) : null}
       </div>
     </div>
@@ -144,11 +145,11 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
   // ── No itinerary ──────────────────────────────────────────────────────────
   if (!itinerary) {
     if (!isLeader) {
-      return <p className="text-sm text-muted-foreground italic">No itinerary yet.</p>
+      return <p className="text-muted-foreground text-sm italic">No itinerary yet.</p>
     }
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-xs text-muted-foreground">Give the route a name to get started.</p>
+        <p className="text-muted-foreground text-xs">Give the route a name to get started.</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Input
             placeholder="e.g. Galician Coast southbound"
@@ -176,8 +177,9 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
   if (days.length === 0) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Draft</span> — points dropped, no days assigned yet.
+        <p className="text-muted-foreground text-sm">
+          <span className="text-foreground font-medium">Draft</span> — points dropped, no days
+          assigned yet.
         </p>
         <Button asChild size="sm" className="self-start">
           <Link href={`/itinerary/${itinerary.id}`}>
@@ -192,41 +194,32 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
   // ── Full summary ──────────────────────────────────────────────────────────
   const speedKnots = itinerary.avgSpeedKnots ?? DEFAULT_SPEED
   const totalMiles = itinerary.totalMiles ?? 0
-  const stopCount  = days.flatMap((d) => d.points ?? []).filter((p) => p.type === "stop").length
-  const avgTime    = days.length > 0 && totalMiles > 0
-    ? estimatedTime(totalMiles / days.length, speedKnots)
-    : null
+  const stopCount = days.flatMap((d) => d.points ?? []).filter((p) => p.type === "stop").length
+  const avgTime =
+    days.length > 0 && totalMiles > 0 ? estimatedTime(totalMiles / days.length, speedKnots) : null
 
   const datesWithDate = days.filter((d) => d.date)
   const firstDate = datesWithDate[0]?.date
-  const lastDate  = datesWithDate[datesWithDate.length - 1]?.date
+  const lastDate = datesWithDate[datesWithDate.length - 1]?.date
 
   const visible = showAll ? days : days.slice(0, COLLAPSE_LIMIT)
   const hasMore = days.length > COLLAPSE_LIMIT
 
   return (
     <div className="flex flex-col gap-5">
-
       {/* Stats tiles */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-        <StatTile
-          value={days.length}
-          label={days.length === 1 ? "day" : "days"}
-        />
+        <StatTile value={days.length} label={days.length === 1 ? "day" : "days"} />
         {totalMiles > 0 && (
           <StatTile value={`${totalMiles.toFixed(1)} nm`} label="total distance" />
         )}
-        {avgTime && (
-          <StatTile value={`~${formatTime(avgTime)}`} label="avg / day" />
-        )}
-        {stopCount > 0 && (
-          <StatTile value={stopCount} label={stopCount === 1 ? "stop" : "stops"} />
-        )}
+        {avgTime && <StatTile value={`~${formatTime(avgTime)}`} label="avg / day" />}
+        {stopCount > 0 && <StatTile value={stopCount} label={stopCount === 1 ? "stop" : "stops"} />}
       </div>
 
       {/* Date span */}
       {firstDate && lastDate && (
-        <p className="text-xs text-muted-foreground -mt-2">
+        <p className="text-muted-foreground -mt-2 text-xs">
           {firstDate} → {lastDate}
         </p>
       )}
@@ -243,12 +236,18 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors self-start -mt-1"
+          className="text-muted-foreground hover:text-foreground -mt-1 flex items-center gap-1 self-start text-xs transition-colors"
         >
           {showAll ? (
-            <><ChevronUpIcon className="size-3" />Show less</>
+            <>
+              <ChevronUpIcon className="size-3" />
+              Show less
+            </>
           ) : (
-            <><ChevronDownIcon className="size-3" />Show all ({days.length - COLLAPSE_LIMIT} more)</>
+            <>
+              <ChevronDownIcon className="size-3" />
+              Show all ({days.length - COLLAPSE_LIMIT} more)
+            </>
           )}
         </button>
       )}
@@ -260,7 +259,6 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
           Open itinerary →
         </Link>
       </Button>
-
     </div>
   )
 }

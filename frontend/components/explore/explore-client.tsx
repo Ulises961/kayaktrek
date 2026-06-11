@@ -32,40 +32,40 @@ export function ExploreClient({ routes, isAuthenticated }: Props) {
   }
 
   return (
-    <div className="flex flex-col xl:flex-row xl:h-full">
+    <div className="flex flex-col xl:h-full xl:flex-row">
       {/* Map panel — fixed height on mobile/md/lg, fills remaining space on xl+ */}
-      <div className="h-[45vw] min-h-48 max-h-80 xl:max-h-none xl:h-full xl:flex-1 xl:min-w-0 shrink-0">
+      <div className="h-[45vw] max-h-80 min-h-48 shrink-0 xl:h-full xl:max-h-none xl:min-w-0 xl:flex-1">
         <ExploreMap routes={routes} selectedId={selectedId} />
       </div>
 
       {/* Card list — flows below map up to xl, scrollable sidebar on xl+ */}
-      <div className="xl:w-80 xl:shrink-0 xl:overflow-y-auto flex flex-col gap-2 p-3 border-t xl:border-t-0 xl:border-l border-border bg-background">
+      <div className="border-border bg-background flex flex-col gap-2 border-t p-3 xl:w-80 xl:shrink-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
         {routes.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+          <div className="text-muted-foreground flex flex-col items-center gap-3 py-16">
             <RouteIcon className="size-8 opacity-30" />
-            <p className="text-sm text-center">No public itineraries yet.</p>
+            <p className="text-center text-sm">No public itineraries yet.</p>
           </div>
         ) : (
           routes.map((route) => (
             <div
               key={route.id}
-              className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2 transition-colors hover:bg-accent"
+              className="border-border bg-card hover:bg-accent flex flex-col gap-2 rounded-lg border p-3 transition-colors"
               onMouseEnter={() => setSelectedId(route.id)}
               onMouseLeave={() => setSelectedId(null)}
             >
-              <p className="font-medium text-sm leading-tight">{route.name}</p>
-              <div className="flex gap-3 text-xs text-muted-foreground">
-                {route.totalMiles != null && (
-                  <span>{route.totalMiles.toFixed(1)} nm</span>
-                )}
+              <p className="text-sm leading-tight font-medium">{route.name}</p>
+              <div className="text-muted-foreground flex gap-3 text-xs">
+                {route.totalMiles != null && <span>{route.totalMiles.toFixed(1)} nm</span>}
                 {route.dayCount > 0 && (
-                  <span>{route.dayCount} {route.dayCount === 1 ? "day" : "days"}</span>
+                  <span>
+                    {route.dayCount} {route.dayCount === 1 ? "day" : "days"}
+                  </span>
                 )}
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                className="w-full text-xs h-7"
+                className="h-7 w-full text-xs"
                 disabled={isPending}
                 onClick={() => handleFork(route.id)}
               >

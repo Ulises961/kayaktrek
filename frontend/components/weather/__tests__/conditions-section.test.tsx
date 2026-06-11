@@ -11,7 +11,12 @@ vi.mock("@/lib/weather/actions", () => ({
   updateDaySea: vi.fn(),
 }))
 
-import { fetchDayWeather, fetchDaySea, fetchTidalGates, triggerWeatherFetch } from "@/lib/weather/actions"
+import {
+  fetchDayWeather,
+  fetchDaySea,
+  fetchTidalGates,
+  triggerWeatherFetch,
+} from "@/lib/weather/actions"
 const WEATHER = fetchDayWeather as ReturnType<typeof vi.fn>
 const SEA = fetchDaySea as ReturnType<typeof vi.fn>
 const GATES = fetchTidalGates as ReturnType<typeof vi.fn>
@@ -46,15 +51,33 @@ describe("ConditionsSection", () => {
         dayId: DAY_ID,
         model: "gfs",
         weatherStates: [
-          { dayId: DAY_ID, time: "12:00:00", temperature: 18, precipitation: 0, windDirection: 247, windForce: 12, cloud: null },
+          {
+            dayId: DAY_ID,
+            time: "12:00:00",
+            temperature: 18,
+            precipitation: 0,
+            windDirection: 247,
+            windForce: 12,
+            cloud: null,
+          },
         ],
       },
     })
     SEA.mockResolvedValue({
       success: true,
-      data: { dayId: DAY_ID, seaStates: [
-        { dayId: DAY_ID, time: "12:00:00", waveHeight: 1.2, waveDirection: 270, swellDirection: 280, swellPeriod: 8 },
-      ]},
+      data: {
+        dayId: DAY_ID,
+        seaStates: [
+          {
+            dayId: DAY_ID,
+            time: "12:00:00",
+            waveHeight: 1.2,
+            waveDirection: 270,
+            swellDirection: 280,
+            swellPeriod: 8,
+          },
+        ],
+      },
     })
     render(<ConditionsSection dayId={DAY_ID} isLeader />)
     await screen.findByTestId("conditions-section")
@@ -70,7 +93,15 @@ describe("ConditionsSection", () => {
         dayId: DAY_ID,
         model: "gfs",
         weatherStates: [
-          { dayId: DAY_ID, time: "12:00:00", temperature: 18, precipitation: 0, windDirection: 247, windForce: 12, cloud: null },
+          {
+            dayId: DAY_ID,
+            time: "12:00:00",
+            temperature: 18,
+            precipitation: 0,
+            windDirection: 247,
+            windForce: 12,
+            cloud: null,
+          },
         ],
       },
     })

@@ -16,7 +16,7 @@ import {
 } from "@/lib/travel-documents/actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
-const DOC_ID  = "01952f1a-0000-7000-8000-000000000002"
+const DOC_ID = "01952f1a-0000-7000-8000-000000000002"
 
 describe("AttachmentActions — no attachment, can edit", () => {
   beforeEach(() => vi.clearAllMocks())
@@ -28,7 +28,7 @@ describe("AttachmentActions — no attachment, can edit", () => {
         documentId={DOC_ID}
         attachmentPath={null}
         canEdit={true}
-      />
+      />,
     )
     expect(screen.getByRole("button", { name: /upload/i })).toBeDefined()
   })
@@ -40,7 +40,7 @@ describe("AttachmentActions — no attachment, can edit", () => {
         documentId={DOC_ID}
         attachmentPath={null}
         canEdit={false}
-      />
+      />,
     )
     expect(screen.queryByRole("button", { name: /upload/i })).toBeNull()
   })
@@ -54,7 +54,7 @@ describe("AttachmentActions — no attachment, can edit", () => {
         documentId={DOC_ID}
         attachmentPath={null}
         canEdit={true}
-      />
+      />,
     )
 
     const file = new File(["content"], "voucher.pdf", { type: "application/pdf" })
@@ -65,7 +65,7 @@ describe("AttachmentActions — no attachment, can edit", () => {
       expect(uploadTravelDocumentAttachment).toHaveBeenCalledWith(
         TRIP_ID,
         DOC_ID,
-        expect.any(FormData)
+        expect.any(FormData),
       )
     })
   })
@@ -81,13 +81,16 @@ describe("AttachmentActions — attachment exists", () => {
         documentId={DOC_ID}
         attachmentPath="trips/abc/doc/voucher.pdf"
         canEdit={false}
-      />
+      />,
     )
     expect(screen.getByRole("button", { name: /download/i })).toBeDefined()
   })
 
   it("calls getTravelDocumentAttachmentUrl when download is clicked", async () => {
-    vi.mocked(getTravelDocumentAttachmentUrl).mockResolvedValue({ success: true, url: "https://example.com/voucher.pdf" })
+    vi.mocked(getTravelDocumentAttachmentUrl).mockResolvedValue({
+      success: true,
+      url: "https://example.com/voucher.pdf",
+    })
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null)
 
     render(
@@ -96,7 +99,7 @@ describe("AttachmentActions — attachment exists", () => {
         documentId={DOC_ID}
         attachmentPath="trips/abc/doc/voucher.pdf"
         canEdit={false}
-      />
+      />,
     )
 
     await userEvent.click(screen.getByRole("button", { name: /download/i }))
@@ -115,7 +118,7 @@ describe("AttachmentActions — attachment exists", () => {
         documentId={DOC_ID}
         attachmentPath="trips/abc/doc/voucher.pdf"
         canEdit={true}
-      />
+      />,
     )
     expect(screen.getByRole("button", { name: /remove/i })).toBeDefined()
   })
@@ -127,7 +130,7 @@ describe("AttachmentActions — attachment exists", () => {
         documentId={DOC_ID}
         attachmentPath="trips/abc/doc/voucher.pdf"
         canEdit={false}
-      />
+      />,
     )
     expect(screen.queryByRole("button", { name: /remove/i })).toBeNull()
   })
@@ -141,7 +144,7 @@ describe("AttachmentActions — attachment exists", () => {
         documentId={DOC_ID}
         attachmentPath="trips/abc/doc/voucher.pdf"
         canEdit={true}
-      />
+      />,
     )
 
     await userEvent.click(screen.getByRole("button", { name: /remove/i }))
@@ -165,7 +168,7 @@ describe("AttachmentActions — drag and drop", () => {
         documentId={DOC_ID}
         attachmentPath={null}
         canEdit={true}
-      />
+      />,
     )
     expect(screen.getByTestId("drop-zone")).toBeDefined()
   })
@@ -179,7 +182,7 @@ describe("AttachmentActions — drag and drop", () => {
         documentId={DOC_ID}
         attachmentPath={null}
         canEdit={true}
-      />
+      />,
     )
 
     const zone = screen.getByTestId("drop-zone")

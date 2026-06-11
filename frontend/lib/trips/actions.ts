@@ -43,7 +43,10 @@ export async function advanceState(tripId: string, targetState: string): Promise
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to advance trip state." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to advance trip state.",
+    }
   }
 }
 
@@ -79,24 +82,36 @@ export async function inviteUser(tripId: string, email: string): Promise<TripAct
   }
 }
 
-export async function cancelInvitation(tripId: string, inviteeId: string): Promise<TripActionResult> {
+export async function cancelInvitation(
+  tripId: string,
+  inviteeId: string,
+): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}/invite/${inviteeId}`)
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to cancel invitation." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to cancel invitation.",
+    }
   }
 }
 
-export async function handleInvitation(tripId: string, accepted: boolean): Promise<TripActionResult> {
+export async function handleInvitation(
+  tripId: string,
+  accepted: boolean,
+): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invitation`, { accepted })
     revalidatePath(`/trips/${tripId}`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to respond to invitation." }
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to respond to invitation.",
+    }
   }
 }

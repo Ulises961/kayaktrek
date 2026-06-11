@@ -13,12 +13,24 @@ const BASE_TRIP: Trip = {
     {
       id: "01952f1a-0000-7000-8000-000000000001",
       role: "leader",
-      user: { id: "01952f1a-0000-7000-8000-000000000002", mail: "a@example.com", username: "ada", name: "Ada", phone: "+34600000001" },
+      user: {
+        id: "01952f1a-0000-7000-8000-000000000002",
+        mail: "a@example.com",
+        username: "ada",
+        name: "Ada",
+        phone: "+34600000001",
+      },
     },
     {
       id: "01952f1a-0000-7000-8000-000000000003",
       role: "crew",
-      user: { id: "01952f1a-0000-7000-8000-000000000004", mail: "b@example.com", username: "bob", name: "Bob", phone: "+34600000002" },
+      user: {
+        id: "01952f1a-0000-7000-8000-000000000004",
+        mail: "b@example.com",
+        username: "bob",
+        name: "Bob",
+        phone: "+34600000002",
+      },
     },
   ],
 }

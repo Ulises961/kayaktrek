@@ -68,7 +68,7 @@ export function initDaySlices(days: Day[], pointOrder: string[]): DaySlice[] {
 export function applySlicesToPreviewDays(
   slices: DaySlice[],
   days: Day[],
-  pointOrder: string[]
+  pointOrder: string[],
 ): Day[] {
   const sliceById = new Map(slices.map((s) => [s.dayId, s]))
 
@@ -88,7 +88,7 @@ export function applySlicesToPreviewDays(
 
 export function computeSlicesApplyPayload(
   slices: DaySlice[],
-  state: MapState
+  state: MapState,
 ): BoundaryApplyPayload {
   const { pointOrder, days, points } = state
 

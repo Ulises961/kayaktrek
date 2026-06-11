@@ -24,10 +24,10 @@ export type DayStripCardProps = {
 }
 
 const waveSeverityStyles: Record<ReturnType<typeof waveHeightSeverity>, string> = {
-  calm:     "text-green-700  dark:text-green-400",
+  calm: "text-green-700  dark:text-green-400",
   moderate: "text-amber-700  dark:text-amber-400",
-  rough:    "text-orange-700 dark:text-orange-400",
-  high:     "text-red-700    dark:text-red-400",
+  rough: "text-orange-700 dark:text-orange-400",
+  high: "text-red-700    dark:text-red-400",
 }
 
 function formatDate(iso: string): string {
@@ -86,27 +86,32 @@ export function DayStripCard({
       data-today={isToday ? "true" : undefined}
       data-past={isPastDay ? "true" : undefined}
       className={cn(
-        "flex items-stretch rounded-lg border text-left text-xs shrink-0 w-36 h-full transition-all overflow-hidden",
+        "flex h-full w-36 shrink-0 items-stretch overflow-hidden rounded-lg border text-left text-xs transition-all",
         "border-border bg-background/80 hover:bg-muted/60",
-        isSelected && "border-primary bg-muted ring-1 ring-primary",
+        isSelected && "border-primary bg-muted ring-primary ring-1",
         isToday && "border-primary bg-primary/10 font-medium",
         isPastDay && "opacity-50",
       )}
     >
-      <div className="flex flex-col items-start gap-1 px-2 py-2 flex-1 min-w-0">
-        <span className="font-semibold text-foreground">Day {dayNumber}</span>
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1 px-2 py-2">
+        <span className="text-foreground font-semibold">Day {dayNumber}</span>
         <span className="text-muted-foreground">{date ? formatDate(date) : "No date"}</span>
         <span className="text-muted-foreground">
           {dist} {distanceUnit} · {time}
         </span>
 
         {showChips && (
-          <div data-testid="weather-chips" className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5">
+          <div
+            data-testid="weather-chips"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5"
+          >
             <span className="inline-flex items-center gap-0.5">
               <Navigation2
-                className="size-3 shrink-0 text-muted-foreground"
+                className="text-muted-foreground size-3 shrink-0"
                 aria-hidden
-                style={hasWind ? { transform: `rotate(${windState!.windDirection ?? 0}deg)` } : undefined}
+                style={
+                  hasWind ? { transform: `rotate(${windState!.windDirection ?? 0}deg)` } : undefined
+                }
               />
               {hasWind ? (
                 <BeaufortPill knots={windState!.windForce!} direction={windState!.windDirection} />
@@ -116,9 +121,14 @@ export function DayStripCard({
             </span>
 
             <span className="inline-flex items-center gap-0.5">
-              <Waves className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+              <Waves className="text-muted-foreground size-3 shrink-0" aria-hidden />
               {hasWave ? (
-                <span className={cn("text-[10px] font-medium", waveSeverityStyles[waveHeightSeverity(waveState!.waveHeight)])}>
+                <span
+                  className={cn(
+                    "text-[10px] font-medium",
+                    waveSeverityStyles[waveHeightSeverity(waveState!.waveHeight)],
+                  )}
+                >
                   {waveState!.waveHeight.toFixed(1)} m
                 </span>
               ) : (
@@ -128,12 +138,12 @@ export function DayStripCard({
 
             <span className="inline-flex items-center gap-0.5">
               {tideIsHigh ? (
-                <ArrowUp className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                <ArrowUp className="text-muted-foreground size-3 shrink-0" aria-hidden />
               ) : (
-                <ArrowDown className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                <ArrowDown className="text-muted-foreground size-3 shrink-0" aria-hidden />
               )}
               {hasTide ? (
-                <span className="text-[10px] font-medium text-muted-foreground">
+                <span className="text-muted-foreground text-[10px] font-medium">
                   {tideIsHigh ? "HW" : "LW"} {tideTime}
                 </span>
               ) : (

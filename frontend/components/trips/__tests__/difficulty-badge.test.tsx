@@ -9,7 +9,7 @@ describe("DifficultyBadge", () => {
     (difficulty) => {
       render(<DifficultyBadge difficulty={difficulty} />)
       expect(screen.getByText(difficulty, { exact: false })).toBeTruthy()
-    }
+    },
   )
 
   it("renders nothing when difficulty is null", () => {

@@ -38,7 +38,10 @@ type Segment = {
   dayNum: number
 }
 
-function resolvePosition(point: ValidPoint, drag: DragState | null): { latitude: number; longitude: number } {
+function resolvePosition(
+  point: ValidPoint,
+  drag: DragState | null,
+): { latitude: number; longitude: number } {
   if (drag && point.id === drag.id) return { latitude: drag.lat, longitude: drag.lng }
   return point
 }
@@ -49,7 +52,7 @@ function buildSegments(
   boundaryPointIds: Set<string>,
   distanceUnit: "nm" | "km",
   avgSpeedKnots: number,
-  drag: DragState | null
+  drag: DragState | null,
 ): Segment[] {
   const segments: Segment[] = []
   for (let i = 0; i < ordered.length - 1; i++) {
@@ -68,14 +71,21 @@ function buildSegments(
       dayNum = 0
     } else if (dayNumA === dayNumB) {
       dayNum = dayNumA
-    } else if (ordered[i].id != null && boundaryPointIds.has(ordered[i].id!) && dayNumB === dayNumA + 1) {
+    } else if (
+      ordered[i].id != null &&
+      boundaryPointIds.has(ordered[i].id!) &&
+      dayNumB === dayNumA + 1
+    ) {
       dayNum = dayNumB
     } else {
       dayNum = 0
     }
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
-      positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
+      positions: [
+        [a.latitude, a.longitude],
+        [b.latitude, b.longitude],
+      ],
       color: getDayColor(dayNum),
       distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
       dayNum,
@@ -91,7 +101,10 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
   const prevIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!flyToPoint) { prevIdRef.current = null; return }
+    if (!flyToPoint) {
+      prevIdRef.current = null
+      return
+    }
     if (flyToPoint.id === prevIdRef.current) return
     prevIdRef.current = flyToPoint.id
 
@@ -146,18 +159,25 @@ const ConnectedMarker = memo(function ConnectedMarker({
   // Memoize split icon when this is a boundary point. Regular icon is computed
   // inside PointMarker. Splitting here keeps PointMarker unaware of day topology.
   const customIcon = useMemo(
-    () => (boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right, index) : undefined),
+    () =>
+      boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right, index) : undefined,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boundaryColors?.left, boundaryColors?.right, index],
   )
 
-  const handleDragMove = useCallback((lat: number, lng: number) => {
-    if (point.id) onMarkerDragMove(point.id, lat, lng)
-  }, [point.id, onMarkerDragMove])
+  const handleDragMove = useCallback(
+    (lat: number, lng: number) => {
+      if (point.id) onMarkerDragMove(point.id, lat, lng)
+    },
+    [point.id, onMarkerDragMove],
+  )
 
-  const handleDragEnd = useCallback((lat: number, lng: number) => {
-    if (point.id) onMarkerDragEnd(point.id, lat, lng)
-  }, [point.id, onMarkerDragEnd])
+  const handleDragEnd = useCallback(
+    (lat: number, lng: number) => {
+      if (point.id) onMarkerDragEnd(point.id, lat, lng)
+    },
+    [point.id, onMarkerDragEnd],
+  )
 
   const handleClick = useMemo(
     () => (onMarkerClick && point.id ? () => onMarkerClick(point.id!) : undefined),
@@ -201,10 +221,7 @@ export default function MapCore({
     [selectedDayId, days],
   )
 
-  const dayNumberById = useMemo(
-    () => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])),
-    [days],
-  )
+  const dayNumberById = useMemo(() => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])), [days])
 
   // Build boundary map: point id → { left, right } colors for split-ring markers.
   // A boundary point is startPointId of any numbered day (dayNumber > 0).
@@ -228,36 +245,52 @@ export default function MapCore({
     return map
   }, [days])
 
-  const boundaryPointIds = useMemo(
-    () => new Set(boundaryMap.keys()),
-    [boundaryMap],
-  )
+  const boundaryPointIds = useMemo(() => new Set(boundaryMap.keys()), [boundaryMap])
 
   const pointIndexById = useMemo(() => {
     const m = new Map<string, number>()
-    points.forEach((p, i) => { if (p.id) m.set(p.id, i + 1) })
+    points.forEach((p, i) => {
+      if (p.id) m.set(p.id, i + 1)
+    })
     return m
   }, [points])
 
   const validPoints = points.filter(
-    (p): p is ValidPoint => p.latitude != null && p.longitude != null
+    (p): p is ValidPoint => p.latitude != null && p.longitude != null,
   )
 
-  const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, distanceUnit, avgSpeedKnots, dragState)
+  const segments = buildSegments(
+    validPoints,
+    dayNumberById,
+    boundaryPointIds,
+    distanceUnit,
+    avgSpeedKnots,
+    dragState,
+  )
 
-  const handleMarkerDragMove = useCallback((id: string, lat: number, lng: number) => {
-    setDragState({ id, lat, lng })
-    onMarkerDragMove(id, lat, lng)
-  }, [onMarkerDragMove])
+  const handleMarkerDragMove = useCallback(
+    (id: string, lat: number, lng: number) => {
+      setDragState({ id, lat, lng })
+      onMarkerDragMove(id, lat, lng)
+    },
+    [onMarkerDragMove],
+  )
 
-  const handleMarkerDragEnd = useCallback((id: string, lat: number, lng: number) => {
-    setDragState(null)
-    onMarkerDragEnd(id, lat, lng)
-  }, [onMarkerDragEnd])
+  const handleMarkerDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      setDragState(null)
+      onMarkerDragEnd(id, lat, lng)
+    },
+    [onMarkerDragEnd],
+  )
 
   return (
-    <div className={viewMode ? "w-full h-full" : "w-full h-full [&_.leaflet-container]:cursor-crosshair"}>
-      <MapContainer center={[43, 13]} zoom={6} className="w-full h-full" zoomControl>
+    <div
+      className={
+        viewMode ? "h-full w-full" : "h-full w-full [&_.leaflet-container]:cursor-crosshair"
+      }
+    >
+      <MapContainer center={[43, 13]} zoom={6} className="h-full w-full" zoomControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -267,13 +300,16 @@ export default function MapCore({
         <FlyToController flyToPoint={flyToPoint} />
 
         {segments.map((seg) => {
-          const dimmed = selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
+          const dimmed =
+            selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
           return (
             <Polyline
               key={`${seg.key}-${seg.color}`}
               positions={seg.positions}
               color={seg.color}
-              weight={dimmed ? 2 : (selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5)}
+              weight={
+                dimmed ? 2 : selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5
+              }
               opacity={dimmed ? 0.2 : 0.85}
             >
               {!dragState && !viewMode && (

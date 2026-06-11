@@ -29,16 +29,24 @@ function timeOrUndefined(v: string | undefined): string | undefined {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-md border border-border/60">
+    <div className="border-border/60 rounded-md border">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-2.5 py-1.5 text-xs font-medium text-foreground"
+        className="text-foreground flex w-full items-center justify-between px-2.5 py-1.5 text-xs font-medium"
       >
         {title}
-        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
+        <ChevronDown
+          className={cn(
+            "text-muted-foreground size-3.5 transition-transform",
+            open && "rotate-180",
+          )}
+          aria-hidden
+        />
       </button>
-      {open && <div className="flex flex-col gap-2 border-t border-border/60 px-2.5 py-2">{children}</div>}
+      {open && (
+        <div className="border-border/60 flex flex-col gap-2 border-t px-2.5 py-2">{children}</div>
+      )}
     </div>
   )
 }
@@ -49,9 +57,18 @@ function ReadOnlyTidal({ sea }: { sea: Sea | null }) {
   const range = sea?.tidalRangeM != null ? `${sea.tidalRangeM} m` : "—"
   return (
     <dl className="grid grid-cols-3 gap-2 text-xs" data-testid="tidal-readonly">
-      <div><dt className="text-muted-foreground">High water</dt><dd className="font-medium">{hw}</dd></div>
-      <div><dt className="text-muted-foreground">Low water</dt><dd className="font-medium">{lw}</dd></div>
-      <div><dt className="text-muted-foreground">Range</dt><dd className="font-medium">{range}</dd></div>
+      <div>
+        <dt className="text-muted-foreground">High water</dt>
+        <dd className="font-medium">{hw}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">Low water</dt>
+        <dd className="font-medium">{lw}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">Range</dt>
+        <dd className="font-medium">{range}</dd>
+      </div>
     </dl>
   )
 }
@@ -60,7 +77,13 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
   const [isPending, startTransition] = useTransition()
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<TidalEntryFields>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { errors },
+  } = useForm<TidalEntryFields>({
     resolver: zodResolver(TidalEntryFieldsSchema),
     defaultValues: {
       highTide: sea?.highTide ?? "",
@@ -133,65 +156,183 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
       {/* Quick entry */}
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="highTide" className="text-xs">High water</Label>
-          <Input id="highTide" type="time" className="h-8" disabled={isPending} {...register("highTide")} />
+          <Label htmlFor="highTide" className="text-xs">
+            High water
+          </Label>
+          <Input
+            id="highTide"
+            type="time"
+            className="h-8"
+            disabled={isPending}
+            {...register("highTide")}
+          />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="lowTide" className="text-xs">Low water</Label>
-          <Input id="lowTide" type="time" className="h-8" disabled={isPending} {...register("lowTide")} />
+          <Label htmlFor="lowTide" className="text-xs">
+            Low water
+          </Label>
+          <Input
+            id="lowTide"
+            type="time"
+            className="h-8"
+            disabled={isPending}
+            {...register("lowTide")}
+          />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="tidalRangeM" className="text-xs">Range (m)</Label>
-          <Input id="tidalRangeM" type="number" step="0.1" min={0} className="h-8" disabled={isPending} {...register("tidalRangeM", numberOpts)} />
+          <Label htmlFor="tidalRangeM" className="text-xs">
+            Range (m)
+          </Label>
+          <Input
+            id="tidalRangeM"
+            type="number"
+            step="0.1"
+            min={0}
+            className="h-8"
+            disabled={isPending}
+            {...register("tidalRangeM", numberOpts)}
+          />
         </div>
       </div>
 
       {/* Port-referenced correction */}
       <Section title="Port-referenced correction">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="referencePortName" className="text-xs">Reference port</Label>
-          <Input id="referencePortName" className="h-8" placeholder="e.g. Milford Haven" disabled={isPending} {...register("referencePortName")} />
+          <Label htmlFor="referencePortName" className="text-xs">
+            Reference port
+          </Label>
+          <Input
+            id="referencePortName"
+            className="h-8"
+            placeholder="e.g. Milford Haven"
+            disabled={isPending}
+            {...register("referencePortName")}
+          />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="baseHighTide" className="text-xs">Std HW time</Label>
-            <Input id="baseHighTide" type="time" className="h-8" disabled={isPending} {...register("baseHighTide")} />
+            <Label htmlFor="baseHighTide" className="text-xs">
+              Std HW time
+            </Label>
+            <Input
+              id="baseHighTide"
+              type="time"
+              className="h-8"
+              disabled={isPending}
+              {...register("baseHighTide")}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="hwTimeOffsetMinutes" className="text-xs">HW offset (min)</Label>
-            <Input id="hwTimeOffsetMinutes" type="number" step="1" className="h-8" disabled={isPending} {...register("hwTimeOffsetMinutes", numberOpts)} />
+            <Label htmlFor="hwTimeOffsetMinutes" className="text-xs">
+              HW offset (min)
+            </Label>
+            <Input
+              id="hwTimeOffsetMinutes"
+              type="number"
+              step="1"
+              className="h-8"
+              disabled={isPending}
+              {...register("hwTimeOffsetMinutes", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="baseLowTide" className="text-xs">Std LW time</Label>
-            <Input id="baseLowTide" type="time" className="h-8" disabled={isPending} {...register("baseLowTide")} />
+            <Label htmlFor="baseLowTide" className="text-xs">
+              Std LW time
+            </Label>
+            <Input
+              id="baseLowTide"
+              type="time"
+              className="h-8"
+              disabled={isPending}
+              {...register("baseLowTide")}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="lwTimeOffsetMinutes" className="text-xs">LW offset (min)</Label>
-            <Input id="lwTimeOffsetMinutes" type="number" step="1" className="h-8" disabled={isPending} {...register("lwTimeOffsetMinutes", numberOpts)} />
+            <Label htmlFor="lwTimeOffsetMinutes" className="text-xs">
+              LW offset (min)
+            </Label>
+            <Input
+              id="lwTimeOffsetMinutes"
+              type="number"
+              step="1"
+              className="h-8"
+              disabled={isPending}
+              {...register("lwTimeOffsetMinutes", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="baseHwHeightM" className="text-xs">Std HW height (m)</Label>
-            <Input id="baseHwHeightM" type="number" step="0.1" min={0} className="h-8" disabled={isPending} {...register("baseHwHeightM", numberOpts)} />
+            <Label htmlFor="baseHwHeightM" className="text-xs">
+              Std HW height (m)
+            </Label>
+            <Input
+              id="baseHwHeightM"
+              type="number"
+              step="0.1"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("baseHwHeightM", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="hwHeightRatio" className="text-xs">HW height ratio</Label>
-            <Input id="hwHeightRatio" type="number" step="0.01" min={0} className="h-8" disabled={isPending} {...register("hwHeightRatio", numberOpts)} />
+            <Label htmlFor="hwHeightRatio" className="text-xs">
+              HW height ratio
+            </Label>
+            <Input
+              id="hwHeightRatio"
+              type="number"
+              step="0.01"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("hwHeightRatio", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="baseLwHeightM" className="text-xs">Std LW height (m)</Label>
-            <Input id="baseLwHeightM" type="number" step="0.1" min={0} className="h-8" disabled={isPending} {...register("baseLwHeightM", numberOpts)} />
+            <Label htmlFor="baseLwHeightM" className="text-xs">
+              Std LW height (m)
+            </Label>
+            <Input
+              id="baseLwHeightM"
+              type="number"
+              step="0.1"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("baseLwHeightM", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="lwHeightRatio" className="text-xs">LW height ratio</Label>
-            <Input id="lwHeightRatio" type="number" step="0.01" min={0} className="h-8" disabled={isPending} {...register("lwHeightRatio", numberOpts)} />
+            <Label htmlFor="lwHeightRatio" className="text-xs">
+              LW height ratio
+            </Label>
+            <Input
+              id="lwHeightRatio"
+              type="number"
+              step="0.01"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("lwHeightRatio", numberOpts)}
+            />
           </div>
         </div>
-        <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5 text-xs" data-testid="derived-tide">
+        <div
+          className="bg-muted/50 flex items-center justify-between rounded-md px-2 py-1.5 text-xs"
+          data-testid="derived-tide"
+        >
           <span className="text-muted-foreground">
             Derived: HW {derived.highTide ?? "—"} · LW {derived.lowTide ?? "—"} · range{" "}
             {derived.tidalRangeM != null ? `${derived.tidalRangeM} m` : "—"}
           </span>
-          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={applyDerived} disabled={isPending}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs"
+            onClick={applyDerived}
+            disabled={isPending}
+          >
             Apply
           </Button>
         </div>
@@ -201,26 +342,70 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
       <Section title="Stream data (from atlas / local knowledge)">
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="floodDirectionDegrees" className="text-xs">Flood dir (°)</Label>
-            <Input id="floodDirectionDegrees" type="number" step="1" min={0} max={360} className="h-8" disabled={isPending} {...register("floodDirectionDegrees", numberOpts)} />
+            <Label htmlFor="floodDirectionDegrees" className="text-xs">
+              Flood dir (°)
+            </Label>
+            <Input
+              id="floodDirectionDegrees"
+              type="number"
+              step="1"
+              min={0}
+              max={360}
+              className="h-8"
+              disabled={isPending}
+              {...register("floodDirectionDegrees", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="ebbDirectionDegrees" className="text-xs">Ebb dir (°)</Label>
-            <Input id="ebbDirectionDegrees" type="number" step="1" min={0} max={360} className="h-8" disabled={isPending} {...register("ebbDirectionDegrees", numberOpts)} />
+            <Label htmlFor="ebbDirectionDegrees" className="text-xs">
+              Ebb dir (°)
+            </Label>
+            <Input
+              id="ebbDirectionDegrees"
+              type="number"
+              step="1"
+              min={0}
+              max={360}
+              className="h-8"
+              disabled={isPending}
+              {...register("ebbDirectionDegrees", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="maxSpringRateKnots" className="text-xs">Max spring (kn)</Label>
-            <Input id="maxSpringRateKnots" type="number" step="0.1" min={0} className="h-8" disabled={isPending} {...register("maxSpringRateKnots", numberOpts)} />
+            <Label htmlFor="maxSpringRateKnots" className="text-xs">
+              Max spring (kn)
+            </Label>
+            <Input
+              id="maxSpringRateKnots"
+              type="number"
+              step="0.1"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("maxSpringRateKnots", numberOpts)}
+            />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="maxNeapRateKnots" className="text-xs">Max neap (kn)</Label>
-            <Input id="maxNeapRateKnots" type="number" step="0.1" min={0} className="h-8" disabled={isPending} {...register("maxNeapRateKnots", numberOpts)} />
+            <Label htmlFor="maxNeapRateKnots" className="text-xs">
+              Max neap (kn)
+            </Label>
+            <Input
+              id="maxNeapRateKnots"
+              type="number"
+              step="0.1"
+              min={0}
+              className="h-8"
+              disabled={isPending}
+              {...register("maxNeapRateKnots", numberOpts)}
+            />
           </div>
         </div>
       </Section>
 
-      {errors.tidalRangeM && <p className="text-xs text-destructive">{errors.tidalRangeM.message}</p>}
-      {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+      {errors.tidalRangeM && (
+        <p className="text-destructive text-xs">{errors.tidalRangeM.message}</p>
+      )}
+      {saveError && <p className="text-destructive text-xs">{saveError}</p>}
 
       <Button type="submit" size="sm" className="self-start" disabled={isPending}>
         {isPending ? "Saving…" : "Save tidal data"}

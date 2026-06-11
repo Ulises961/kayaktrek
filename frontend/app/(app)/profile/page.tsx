@@ -32,11 +32,12 @@ export default async function ProfilePage() {
     notFound()
   }
 
-  const hasVessel = user.vesselMake || user.vesselModel || user.vesselLengthCm || user.vesselColorPrimary
+  const hasVessel =
+    user.vesselMake || user.vesselModel || user.vesselLengthCm || user.vesselColorPrimary
   const hasEmergency = user.emergencyContactName || user.emergencyContactPhone
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageBreadcrumb crumbs={[{ label: "Profile" }]} />
 
       {/* Header */}
@@ -48,13 +49,13 @@ export default async function ProfilePage() {
           size="lg"
           className="!size-16"
         />
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-semibold truncate">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-semibold">
             {[user.name, user.surname].filter(Boolean).join(" ")}
           </h1>
-          <p className="text-sm text-muted-foreground">@{user.username}</p>
+          <p className="text-muted-foreground text-sm">@{user.username}</p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex shrink-0 gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/profile/edit">
               <PencilIcon className="size-4" />
@@ -73,19 +74,19 @@ export default async function ProfilePage() {
       {/* Contact */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <UserIcon className="size-4" />
             Contact
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm">
-            <MailIcon className="size-4 text-muted-foreground shrink-0" />
+            <MailIcon className="text-muted-foreground size-4 shrink-0" />
             <span>{user.mail}</span>
           </div>
           {user.phone && (
             <div className="flex items-center gap-2 text-sm">
-              <PhoneIcon className="size-4 text-muted-foreground shrink-0" />
+              <PhoneIcon className="text-muted-foreground size-4 shrink-0" />
               <span>{user.phone}</span>
             </div>
           )}
@@ -95,7 +96,7 @@ export default async function ProfilePage() {
       {/* Vessel */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <AnchorIcon className="size-4" />
             Vessel defaults
           </CardTitle>
@@ -137,9 +138,12 @@ export default async function ProfilePage() {
               )}
             </dl>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               No vessel details yet.{" "}
-              <Link href="/profile/edit" className="underline underline-offset-2 hover:text-foreground">
+              <Link
+                href="/profile/edit"
+                className="hover:text-foreground underline underline-offset-2"
+              >
                 Add them
               </Link>{" "}
               to pre-fill float plans when you join trips.
@@ -151,7 +155,7 @@ export default async function ProfilePage() {
       {/* Emergency contact */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <ShieldAlertIcon className="size-4" />
             Emergency contact
           </CardTitle>
@@ -179,9 +183,12 @@ export default async function ProfilePage() {
               )}
             </dl>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               No emergency contact yet.{" "}
-              <Link href="/profile/edit" className="underline underline-offset-2 hover:text-foreground">
+              <Link
+                href="/profile/edit"
+                className="hover:text-foreground underline underline-offset-2"
+              >
                 Add one
               </Link>{" "}
               — it will be included in your float plans.
@@ -193,7 +200,7 @@ export default async function ProfilePage() {
       {/* Medical notes */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <HeartPulseIcon className="size-4" />
             Medical notes
           </CardTitle>
@@ -206,13 +213,13 @@ export default async function ProfilePage() {
       {/* Privacy */}
       <div className="flex flex-col gap-3">
         <Separator />
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Privacy</p>
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Privacy</p>
         <div className="flex flex-col gap-2">
           <DataExportButton />
         </div>
-        <div className="flex flex-col gap-3 border border-destructive/30 rounded-lg p-4 mt-2">
-          <p className="text-sm font-medium text-destructive">Danger zone</p>
-          <p className="text-sm text-muted-foreground">
+        <div className="border-destructive/30 mt-2 flex flex-col gap-3 rounded-lg border p-4">
+          <p className="text-destructive text-sm font-medium">Danger zone</p>
+          <p className="text-muted-foreground text-sm">
             Request deletion of your account. You will have 30 days to cancel before all your
             personal data is permanently removed.
           </p>

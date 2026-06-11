@@ -20,15 +20,15 @@ export default async function InvitationsPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold mb-6">Invitations</h1>
+      <h1 className="mb-6 text-2xl font-semibold">Invitations</h1>
 
       {trips.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 mt-16 text-center">
+        <div className="mt-16 flex flex-col items-center gap-4 text-center">
           <NoTripsIllustration className="w-56 opacity-80" />
           <p className="text-muted-foreground text-sm">No pending invitations.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 max-w-2xl">
+        <div className="flex max-w-2xl flex-col gap-3">
           {trips.map((trip) => {
             const leader = trip.travellers?.find((m) => m.role === "leader")
             const leaderName = leader
@@ -47,12 +47,8 @@ export default async function InvitationsPage() {
                 </CardHeader>
                 <CardContent className="flex items-center justify-between gap-4">
                   {leader && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <UserAvatar
-                        name={leader.user.name}
-                        surname={leader.user.surname}
-                        size="sm"
-                      />
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                      <UserAvatar name={leader.user.name} surname={leader.user.surname} size="sm" />
                       <span>Invited by {leaderName}</span>
                     </div>
                   )}

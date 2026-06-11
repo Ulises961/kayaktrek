@@ -9,7 +9,14 @@ import { LogisticsFieldsSchema, type LogisticsFields, type Logistics } from "@/l
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 interface EditLogisticsDialogProps {
   tripId: string
@@ -18,7 +25,10 @@ interface EditLogisticsDialogProps {
 
 function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <Label
+      htmlFor={htmlFor}
+      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
+    >
       {children}
     </Label>
   )
@@ -28,7 +38,13 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, reset, formState: { errors } } = useForm<LogisticsFields>({
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors },
+  } = useForm<LogisticsFields>({
     resolver: zodResolver(LogisticsFieldsSchema),
     defaultValues: {
       shoreContactName: logistics?.shoreContactName ?? "",
@@ -40,12 +56,13 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
 
   function handleOpen(v: boolean) {
     setOpen(v)
-    if (!v) reset({
-      shoreContactName: logistics?.shoreContactName ?? "",
-      shoreContactEmail: logistics?.shoreContactEmail ?? "",
-      shoreContactPhone: logistics?.shoreContactPhone ?? "",
-      shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
-    })
+    if (!v)
+      reset({
+        shoreContactName: logistics?.shoreContactName ?? "",
+        shoreContactEmail: logistics?.shoreContactEmail ?? "",
+        shoreContactPhone: logistics?.shoreContactPhone ?? "",
+        shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
+      })
   }
 
   const onSubmit = handleSubmit((data) => {
@@ -80,7 +97,7 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
 
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
             {/* Shore contact */}
-            <div className="flex flex-col gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20 p-3">
+            <div className="flex flex-col gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 p-3 dark:border-amber-800/30 dark:bg-amber-950/20">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <FieldLabel htmlFor="shoreContactName">Shore contact name</FieldLabel>
@@ -118,17 +135,19 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
                     disabled={isPending}
                     {...register("shoreContactEmail")}
                   />
-                  {errors.shoreContactEmail && <p className="text-xs text-destructive">{errors.shoreContactEmail.message}</p>}
+                  {errors.shoreContactEmail && (
+                    <p className="text-destructive text-xs">{errors.shoreContactEmail.message}</p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {errors.root && (
-              <p className="text-sm text-destructive">{errors.root.message}</p>
-            )}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
             <DialogFooter>
-              <Button type="submit" disabled={isPending}>Save</Button>
+              <Button type="submit" disabled={isPending}>
+                Save
+              </Button>
             </DialogFooter>
           </form>
         </div>

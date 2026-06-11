@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { TravelDocumentSchema, TravelDocumentFieldsSchema, TRAVEL_DOCUMENT_TYPES } from "../travel-document"
+import {
+  TravelDocumentSchema,
+  TravelDocumentFieldsSchema,
+  TRAVEL_DOCUMENT_TYPES,
+} from "../travel-document"
 
 const VALID_DOCUMENT = {
   id: "01952f1a-0000-7000-8000-000000000001",

@@ -5,7 +5,13 @@ import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
-import { createDay, deleteDay, updatePoint, deletePoint, applyBoundaries } from "@/lib/itinerary/actions"
+import {
+  createDay,
+  deleteDay,
+  updatePoint,
+  deletePoint,
+  applyBoundaries,
+} from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
@@ -65,9 +71,11 @@ export function PointListPane() {
     setActivePointId,
   } = useMapBuilder()
 
-  const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(new Map())
-  const [collapsed, setCollapsed] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth < 768
+  const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(
+    new Map(),
+  )
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
   )
 
   const dayNumberById = new Map(state.days.map((d) => [d.id, d.dayNumber]))
@@ -82,85 +90,108 @@ export function PointListPane() {
   const renderList = buildRenderList(state.pointOrder, draftSlices)
 
   function getSliceDistance(slice: DaySlice): number {
-    const ownedStart = slice.startIdx  // includes the shared boundary stop
+    const ownedStart = slice.startIdx // includes the shared boundary stop
     const ownedEnd = slice.endIdx
     if (ownedStart > ownedEnd) return 0
     const ids = state.pointOrder.slice(ownedStart, ownedEnd + 1)
     const pts = ids
       .map((id) => state.points.find((p) => p.id === id))
-      .filter((p): p is NonNullable<typeof p> => p !== undefined && p.latitude != null && p.longitude != null) as Array<{ latitude: number; longitude: number }>
+      .filter(
+        (p): p is NonNullable<typeof p> =>
+          p !== undefined && p.latitude != null && p.longitude != null,
+      ) as Array<{ latitude: number; longitude: number }>
     return totalDistanceNm(pts)
   }
 
   // ── handlers ─────────────────────────────────────────────────────────────
 
-  const handleExpand = useCallback((id: string) => {
-    setActivePointId(activePointId === id ? null : id)
-  }, [activePointId, setActivePointId])
+  const handleExpand = useCallback(
+    (id: string) => {
+      setActivePointId(activePointId === id ? null : id)
+    },
+    [activePointId, setActivePointId],
+  )
 
-  const handleTypeChange = useCallback(async (pointId: string, type: PointType) => {
-    if (draftSlices) {
-      setDirtyPoints((prev) => {
-        const next = new Map(prev)
-        next.set(pointId, { ...next.get(pointId), type })
-        return next
-      })
-      return
-    }
-    dispatch({ type: "POINT_UPDATE", id: pointId, fields: { type } })
-    dispatch({ type: "SAVING_START" })
-    await updatePoint(pointId, { type })
-    dispatch({ type: "SAVING_END" })
-  }, [draftSlices, dispatch])
+  const handleTypeChange = useCallback(
+    async (pointId: string, type: PointType) => {
+      if (draftSlices) {
+        setDirtyPoints((prev) => {
+          const next = new Map(prev)
+          next.set(pointId, { ...next.get(pointId), type })
+          return next
+        })
+        return
+      }
+      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { type } })
+      dispatch({ type: "SAVING_START" })
+      await updatePoint(pointId, { type })
+      dispatch({ type: "SAVING_END" })
+    },
+    [draftSlices, dispatch],
+  )
 
-  const handleNameChange = useCallback((pointId: string, name: string) => {
-    if (draftSlices) {
-      setDirtyPoints((prev) => {
-        const next = new Map(prev)
-        next.set(pointId, { ...next.get(pointId), name })
-        return next
-      })
-    }
-  }, [draftSlices])
+  const handleNameChange = useCallback(
+    (pointId: string, name: string) => {
+      if (draftSlices) {
+        setDirtyPoints((prev) => {
+          const next = new Map(prev)
+          next.set(pointId, { ...next.get(pointId), name })
+          return next
+        })
+      }
+    },
+    [draftSlices],
+  )
 
-  const handleNameBlur = useCallback(async (pointId: string, name: string) => {
-    if (draftSlices) return
-    const trimmed = name.trim()
-    const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
-    if (trimmed === currentName) return
-    dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
-    dispatch({ type: "SAVING_START" })
-    await updatePoint(pointId, { name: trimmed || null })
-    dispatch({ type: "SAVING_END" })
-  }, [draftSlices, dispatch, state.points])
+  const handleNameBlur = useCallback(
+    async (pointId: string, name: string) => {
+      if (draftSlices) return
+      const trimmed = name.trim()
+      const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
+      if (trimmed === currentName) return
+      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
+      dispatch({ type: "SAVING_START" })
+      await updatePoint(pointId, { name: trimmed || null })
+      dispatch({ type: "SAVING_END" })
+    },
+    [draftSlices, dispatch, state.points],
+  )
 
-  const handleDelete = useCallback(async (pointId: string) => {
-    setActivePointId(null)
-    dispatch({ type: "POINT_REMOVE", id: pointId })
-    dispatch({ type: "SAVING_START" })
-    await deletePoint(pointId)
-    dispatch({ type: "SAVING_END" })
-  }, [dispatch, setActivePointId])
+  const handleDelete = useCallback(
+    async (pointId: string) => {
+      setActivePointId(null)
+      dispatch({ type: "POINT_REMOVE", id: pointId })
+      dispatch({ type: "SAVING_START" })
+      await deletePoint(pointId)
+      dispatch({ type: "SAVING_END" })
+    },
+    [dispatch, setActivePointId],
+  )
 
-  const handleBoundaryMove = useCallback((dayId: string, newEndIdx: number) => {
-    if (!draftSlices) return
-    const i = draftSlices.findIndex((s) => s.dayId === dayId)
-    if (i === -1) return
+  const handleBoundaryMove = useCallback(
+    (dayId: string, newEndIdx: number) => {
+      if (!draftSlices) return
+      const i = draftSlices.findIndex((s) => s.dayId === dayId)
+      if (i === -1) return
 
-    const M = state.pointOrder.length
-    const minEndIdx = i > 0 ? draftSlices[i - 1].endIdx : 0
-    const maxEndIdx = i < draftSlices.length - 1 ? draftSlices[i + 1].endIdx : M - 1
-    if (minEndIdx > maxEndIdx) return
+      const M = state.pointOrder.length
+      const minEndIdx = i > 0 ? draftSlices[i - 1].endIdx : 0
+      const maxEndIdx = i < draftSlices.length - 1 ? draftSlices[i + 1].endIdx : M - 1
+      if (minEndIdx > maxEndIdx) return
 
-    const clamped = Math.max(minEndIdx, Math.min(maxEndIdx, newEndIdx))
+      const clamped = Math.max(minEndIdx, Math.min(maxEndIdx, newEndIdx))
 
-    setDraftSlices(draftSlices.map((s, idx) => {
-      if (idx === i) return { ...s, endIdx: clamped }
-      // The next slice's startIdx is always the shared boundary stop from this slice.
-      if (idx === i + 1) return { ...s, startIdx: clamped }
-      return s
-    }))
-  }, [draftSlices, setDraftSlices, state.pointOrder.length])
+      setDraftSlices(
+        draftSlices.map((s, idx) => {
+          if (idx === i) return { ...s, endIdx: clamped }
+          // The next slice's startIdx is always the shared boundary stop from this slice.
+          if (idx === i + 1) return { ...s, startIdx: clamped }
+          return s
+        }),
+      )
+    },
+    [draftSlices, setDraftSlices, state.pointOrder.length],
+  )
 
   const handleEditBoundaries = useCallback(() => {
     const slices = initDaySlices(state.days, state.pointOrder)
@@ -185,11 +216,19 @@ export function PointListPane() {
     const base = computeSlicesApplyPayload(draftSlices, state)
     const pointMap = new Map(base.points.map((p) => [p.id, p]))
     for (const [id, fields] of dirtyPoints.entries()) {
-      const resolvedType = (fields.type ?? state.points.find((p) => p.id === id)?.type ?? "position") as PointType
+      const resolvedType = (fields.type ??
+        state.points.find((p) => p.id === id)?.type ??
+        "position") as PointType
       const existing = pointMap.get(id)
-      pointMap.set(id, existing
-        ? { ...existing, type: resolvedType, ...(fields.name !== undefined ? { name: fields.name } : {}) }
-        : { id, type: resolvedType, ...(fields.name !== undefined ? { name: fields.name } : {}) }
+      pointMap.set(
+        id,
+        existing
+          ? {
+              ...existing,
+              type: resolvedType,
+              ...(fields.name !== undefined ? { name: fields.name } : {}),
+            }
+          : { id, type: resolvedType, ...(fields.name !== undefined ? { name: fields.name } : {}) },
       )
     }
     const payload = { boundaries: base.boundaries, points: Array.from(pointMap.values()) }
@@ -222,14 +261,20 @@ export function PointListPane() {
     setDraftSlices(null)
   }, [setDraftSlices])
 
-  const handleDateChange = useCallback((dayId: string, date: string | null) => {
-    if (!draftSlices) return
-    setDraftSlices(draftSlices.map((s) => s.dayId === dayId ? { ...s, date } : s))
-  }, [draftSlices, setDraftSlices])
+  const handleDateChange = useCallback(
+    (dayId: string, date: string | null) => {
+      if (!draftSlices) return
+      setDraftSlices(draftSlices.map((s) => (s.dayId === dayId ? { ...s, date } : s)))
+    },
+    [draftSlices, setDraftSlices],
+  )
 
   const handleDeleteDay = useCallback(async () => {
     if (!state.days.length || !day0Id) return
-    const lastDay = state.days.reduce((max, d) => d.dayNumber > max.dayNumber ? d : max, state.days[0])
+    const lastDay = state.days.reduce(
+      (max, d) => (d.dayNumber > max.dayNumber ? d : max),
+      state.days[0],
+    )
     if (!lastDay.id) return
     dispatch({ type: "DAY_REMOVE", id: lastDay.id, day0Id })
     dispatch({ type: "SAVING_START" })
@@ -241,20 +286,20 @@ export function PointListPane() {
 
   if (collapsed) {
     return (
-      <div className="absolute right-0 top-0 bottom-0 w-10 z-[1001] bg-background/95 border-l border-border flex flex-col items-center overflow-hidden">
-        <div className="flex items-center justify-center px-0 py-2 border-b border-border shrink-0 w-full">
+      <div className="bg-background/95 border-border absolute top-0 right-0 bottom-0 z-[1001] flex w-10 flex-col items-center overflow-hidden border-l">
+        <div className="border-border flex w-full shrink-0 items-center justify-center border-b px-0 py-2">
           <button
             type="button"
             onClick={() => setCollapsed(false)}
             aria-label="Expand points panel"
-            className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
           >
             <PanelRightOpenIcon className="size-4" />
           </button>
         </div>
-        <div className="flex-1 flex items-center justify-center overflow-hidden">
+        <div className="flex flex-1 items-center justify-center overflow-hidden">
           <span
-            className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest select-none"
+            className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase select-none"
             style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
             Points
@@ -267,15 +312,15 @@ export function PointListPane() {
   return (
     <div
       data-testid="point-list-pane"
-      className="absolute right-0 top-0 bottom-0 w-56 sm:w-64 z-[1001] bg-background/95 border-l border-border flex flex-col overflow-hidden"
+      className="bg-background/95 border-border absolute top-0 right-0 bottom-0 z-[1001] flex w-56 flex-col overflow-hidden border-l sm:w-64"
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+      <div className="border-border flex shrink-0 items-center gap-2 border-b px-3 py-2">
         <button
           type="button"
           onClick={() => setCollapsed(true)}
           aria-label="Collapse panel"
-          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
         >
           <PanelRightCloseIcon className="size-4" />
         </button>
@@ -283,14 +328,14 @@ export function PointListPane() {
           <>
             <button
               type="button"
-              className="flex-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              className="text-primary hover:text-primary/80 flex-1 text-sm font-medium transition-colors"
               onClick={handleApply}
             >
               Apply
             </button>
             <button
               type="button"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-muted-foreground hover:text-foreground text-sm transition-colors"
               onClick={handleCancel}
             >
               Cancel
@@ -301,7 +346,7 @@ export function PointListPane() {
             {state.days.length > 0 && (
               <button
                 type="button"
-                className="flex-1 text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
+                className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
                 onClick={handleEditBoundaries}
               >
                 Edit boundaries
@@ -310,26 +355,30 @@ export function PointListPane() {
             <button
               type="button"
               aria-label="Add day"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
               onClick={handleAddDay}
             >
               <PlusIcon className="size-3.5" />
               <span>Add day</span>
             </button>
-            {state.days.length > 0 && (() => {
-              const lastDay = state.days.reduce((max, d) => d.dayNumber > max.dayNumber ? d : max, state.days[0])
-              return (
-                <button
-                  type="button"
-                  aria-label={`Delete day ${lastDay.dayNumber}`}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-                  onClick={handleDeleteDay}
-                >
-                  <Trash2Icon className="size-3.5" />
-                  <span>Day {lastDay.dayNumber}</span>
-                </button>
-              )
-            })()}
+            {state.days.length > 0 &&
+              (() => {
+                const lastDay = state.days.reduce(
+                  (max, d) => (d.dayNumber > max.dayNumber ? d : max),
+                  state.days[0],
+                )
+                return (
+                  <button
+                    type="button"
+                    aria-label={`Delete day ${lastDay.dayNumber}`}
+                    className="text-muted-foreground hover:text-destructive flex items-center gap-1 text-xs transition-colors"
+                    onClick={handleDeleteDay}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                    <span>Day {lastDay.dayNumber}</span>
+                  </button>
+                )
+              })()}
           </>
         )}
       </div>
@@ -337,27 +386,31 @@ export function PointListPane() {
       {/* Point list */}
       <div className="flex-1 overflow-y-auto" data-point-list="true">
         {/* Static Day 1 header */}
-        {draftSlices && draftSlices.length > 0 && (() => {
-          const s0 = draftSlices[0]
-          return (
-            <div
-              data-testid="day-1-header"
-              className="flex items-center gap-1.5 px-3 py-1 border-b border-border bg-muted/30 text-xs font-medium select-none"
-            >
-              <span>Day 1</span>
-              <span className="text-muted-foreground">·</span>
-              <input
-                type="date"
-                value={s0.date ?? ""}
-                placeholder="No date"
-                onChange={(e) => handleDateChange(s0.dayId, e.target.value || null)}
-                className="text-xs text-muted-foreground bg-transparent border-none outline-none cursor-pointer w-[6.5rem]"
-              />
-              <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground">{legLabel(getSliceDistance(s0), avgSpeedKnots, distanceUnit)}</span>
-            </div>
-          )
-        })()}
+        {draftSlices &&
+          draftSlices.length > 0 &&
+          (() => {
+            const s0 = draftSlices[0]
+            return (
+              <div
+                data-testid="day-1-header"
+                className="border-border bg-muted/30 flex items-center gap-1.5 border-b px-3 py-1 text-xs font-medium select-none"
+              >
+                <span>Day 1</span>
+                <span className="text-muted-foreground">·</span>
+                <input
+                  type="date"
+                  value={s0.date ?? ""}
+                  placeholder="No date"
+                  onChange={(e) => handleDateChange(s0.dayId, e.target.value || null)}
+                  className="text-muted-foreground w-[6.5rem] cursor-pointer border-none bg-transparent text-xs outline-none"
+                />
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">
+                  {legLabel(getSliceDistance(s0), avgSpeedKnots, distanceUnit)}
+                </span>
+              </div>
+            )
+          })()}
 
         {renderList.map((item) => {
           if (item.kind === "point") {

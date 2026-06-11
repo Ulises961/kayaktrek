@@ -18,7 +18,18 @@ type PointMarkerProps = {
   onMouseOver?: () => void
 }
 
-export function PointMarker({ point, color, type, index, customIcon, draggable = true, onDragMove, onDragEnd, onClick, onMouseOver }: PointMarkerProps) {
+export function PointMarker({
+  point,
+  color,
+  type,
+  index,
+  customIcon,
+  draggable = true,
+  onDragMove,
+  onDragEnd,
+  onClick,
+  onMouseOver,
+}: PointMarkerProps) {
   const position = useMemo<[number, number]>(
     () => [point.latitude, point.longitude],
     [point.latitude, point.longitude],
@@ -33,29 +44,33 @@ export function PointMarker({ point, color, type, index, customIcon, draggable =
     [customIcon, color, type, index],
   )
 
-  const handleDrag = useCallback((e: L.LeafletEvent) => {
-    const { lat, lng } = (e.target as L.Marker).getLatLng()
-    onDragMove(lat, lng)
-  }, [onDragMove])
+  const handleDrag = useCallback(
+    (e: L.LeafletEvent) => {
+      const { lat, lng } = (e.target as L.Marker).getLatLng()
+      onDragMove(lat, lng)
+    },
+    [onDragMove],
+  )
 
-  const handleDragEnd = useCallback((e: L.LeafletEvent) => {
-    const { lat, lng } = (e.target as L.Marker).getLatLng()
-    onDragEnd(lat, lng)
-  }, [onDragEnd])
+  const handleDragEnd = useCallback(
+    (e: L.LeafletEvent) => {
+      const { lat, lng } = (e.target as L.Marker).getLatLng()
+      onDragEnd(lat, lng)
+    },
+    [onDragEnd],
+  )
 
-  const eventHandlers = useMemo(() => ({
-    drag: handleDrag,
-    dragend: handleDragEnd,
-    ...(onClick ? { click: onClick } : {}),
-    ...(onMouseOver ? { mouseover: onMouseOver } : {}),
-  }), [handleDrag, handleDragEnd, onClick, onMouseOver])
+  const eventHandlers = useMemo(
+    () => ({
+      drag: handleDrag,
+      dragend: handleDragEnd,
+      ...(onClick ? { click: onClick } : {}),
+      ...(onMouseOver ? { mouseover: onMouseOver } : {}),
+    }),
+    [handleDrag, handleDragEnd, onClick, onMouseOver],
+  )
 
   return (
-    <Marker
-      position={position}
-      icon={icon}
-      draggable={draggable}
-      eventHandlers={eventHandlers}
-    />
+    <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers} />
   )
 }

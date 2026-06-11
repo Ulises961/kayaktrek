@@ -16,7 +16,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-sm">
+    <div className="flex max-w-sm flex-col gap-6">
       <Card>
         <CardContent className="flex flex-col items-center gap-3 pt-8 pb-6">
           <UserAvatar name={user.name} surname={user.surname} imageUrl={user.avatarUrl} size="lg" />
@@ -24,11 +24,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <p className="text-lg font-semibold">
               {[user.name, user.surname].filter(Boolean).join(" ")}
             </p>
-            <p className="text-sm text-muted-foreground">@{user.username}</p>
+            <p className="text-muted-foreground text-sm">@{user.username}</p>
           </div>
         </CardContent>
       </Card>
-      <p className="text-sm text-muted-foreground text-center">
+      <p className="text-muted-foreground text-center text-sm">
         Logs, endorsements, and buddy requests coming in M7.
       </p>
     </div>

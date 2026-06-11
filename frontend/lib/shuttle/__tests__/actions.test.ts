@@ -60,7 +60,10 @@ describe("createShuttleVehicle", () => {
   it("posts to the correct path", async () => {
     vi.mocked(apiPost).mockResolvedValue(VEHICLE_FIXTURE)
     await createShuttleVehicle(TRIP_ID, { seatsAvailable: 4, kayakSpots: 2 })
-    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/${TRIP_ID}/create`, { seatsAvailable: 4, kayakSpots: 2 })
+    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/${TRIP_ID}/create`, {
+      seatsAvailable: 4,
+      kayakSpots: 2,
+    })
   })
 
   it("revalidates the trip path on success", async () => {
@@ -86,7 +89,9 @@ describe("updateShuttleVehicle", () => {
   it("patches the correct vehicle", async () => {
     vi.mocked(apiPatch).mockResolvedValue(VEHICLE_FIXTURE)
     await updateShuttleVehicle(TRIP_ID, VEHICLE_ID, { vehicleDescription: "Blue VW" })
-    expect(apiPatch).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}`, { vehicleDescription: "Blue VW" })
+    expect(apiPatch).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}`, {
+      vehicleDescription: "Blue VW",
+    })
   })
 
   it("revalidates the trip path on success", async () => {
@@ -126,7 +131,9 @@ describe("addShuttlePassenger", () => {
   it("posts to the correct path with tripMemberId", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
     await addShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
-    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}/passenger`, { tripMemberId: MEMBER_ID })
+    expect(apiPost).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}/passenger`, {
+      tripMemberId: MEMBER_ID,
+    })
   })
 
   it("revalidates the trip path on success", async () => {
@@ -146,7 +153,9 @@ describe("removeShuttlePassenger", () => {
   it("sends DELETE to the correct path", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await removeShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
-    expect(apiDelete).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}/passenger/${MEMBER_ID}`)
+    expect(apiDelete).toHaveBeenCalledWith(
+      `/api/shuttle/vehicle/${VEHICLE_ID}/passenger/${MEMBER_ID}`,
+    )
   })
 
   it("revalidates the trip path on success", async () => {

@@ -9,7 +9,14 @@ import { ShuttleVehicleFieldsSchema, type ShuttleVehicleFields } from "@/lib/dto
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 const SELECT_CLASS =
@@ -17,7 +24,10 @@ const SELECT_CLASS =
 
 function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <Label
+      htmlFor={htmlFor}
+      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
+    >
       {children}
     </Label>
   )
@@ -33,7 +43,14 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
   const [externalDriver, setExternalDriver] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setValue, setError, reset, formState: { errors } } = useForm<ShuttleVehicleFields>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    setError,
+    reset,
+    formState: { errors },
+  } = useForm<ShuttleVehicleFields>({
     resolver: zodResolver(ShuttleVehicleFieldsSchema),
   })
 
@@ -82,7 +99,7 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
 
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5 col-span-2">
+              <div className="col-span-2 flex flex-col gap-1.5">
                 <FieldLabel htmlFor="vehicleDescription">Vehicle description</FieldLabel>
                 <Input
                   id="vehicleDescription"
@@ -90,9 +107,11 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
                   disabled={isPending}
                   {...register("vehicleDescription")}
                 />
-                {errors.vehicleDescription && <p className="text-xs text-destructive">{errors.vehicleDescription.message}</p>}
+                {errors.vehicleDescription && (
+                  <p className="text-destructive text-xs">{errors.vehicleDescription.message}</p>
+                )}
               </div>
-              <div className="flex flex-col gap-1.5 col-span-2">
+              <div className="col-span-2 flex flex-col gap-1.5">
                 <FieldLabel htmlFor="pickupPoint">Pickup point</FieldLabel>
                 <Input
                   id="pickupPoint"
@@ -109,9 +128,14 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
                   min={0}
                   placeholder="0"
                   disabled={isPending}
-                  {...register("seatsAvailable", { setValueAs: (v: string) => v === "" || v == null ? undefined : parseInt(v, 10) })}
+                  {...register("seatsAvailable", {
+                    setValueAs: (v: string) =>
+                      v === "" || v == null ? undefined : parseInt(v, 10),
+                  })}
                 />
-                {errors.seatsAvailable && <p className="text-xs text-destructive">{errors.seatsAvailable.message}</p>}
+                {errors.seatsAvailable && (
+                  <p className="text-destructive text-xs">{errors.seatsAvailable.message}</p>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <FieldLabel htmlFor="kayakSpots">Kayak spots</FieldLabel>
@@ -121,26 +145,38 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
                   min={0}
                   placeholder="0"
                   disabled={isPending}
-                  {...register("kayakSpots", { setValueAs: (v: string) => v === "" || v == null ? undefined : parseInt(v, 10) })}
+                  {...register("kayakSpots", {
+                    setValueAs: (v: string) =>
+                      v === "" || v == null ? undefined : parseInt(v, 10),
+                  })}
                 />
-                {errors.kayakSpots && <p className="text-xs text-destructive">{errors.kayakSpots.message}</p>}
+                {errors.kayakSpots && (
+                  <p className="text-destructive text-xs">{errors.kayakSpots.message}</p>
+                )}
               </div>
             </div>
 
             {/* Driver toggle */}
             <div className="flex flex-col gap-2">
               <FieldLabel>Driver</FieldLabel>
-              <div className="flex rounded-md border border-input overflow-hidden text-sm">
+              <div className="border-input flex overflow-hidden rounded-md border text-sm">
                 <button
                   type="button"
-                  onClick={() => { setExternalDriver(false); setValue("driverName", undefined); setValue("driverContact", undefined) }}
+                  onClick={() => {
+                    setExternalDriver(false)
+                    setValue("driverName", undefined)
+                    setValue("driverContact", undefined)
+                  }}
                   className={`flex-1 px-3 py-1.5 transition-colors ${!externalDriver ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
                 >
                   Trip member
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setExternalDriver(true); setValue("driverId", null) }}
+                  onClick={() => {
+                    setExternalDriver(true)
+                    setValue("driverId", null)
+                  }}
                   className={`flex-1 px-3 py-1.5 transition-colors ${externalDriver ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
                 >
                   External
@@ -163,16 +199,26 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
                 </select>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  <Input placeholder="Driver name" disabled={isPending} {...register("driverName")} />
-                  <Input placeholder="Driver contact" disabled={isPending} {...register("driverContact")} />
+                  <Input
+                    placeholder="Driver name"
+                    disabled={isPending}
+                    {...register("driverName")}
+                  />
+                  <Input
+                    placeholder="Driver contact"
+                    disabled={isPending}
+                    {...register("driverContact")}
+                  />
                 </div>
               )}
             </div>
 
-            {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
             <DialogFooter>
-              <Button type="submit" disabled={isPending}>Add</Button>
+              <Button type="submit" disabled={isPending}>
+                Add
+              </Button>
             </DialogFooter>
           </form>
         </div>

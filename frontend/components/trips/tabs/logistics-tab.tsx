@@ -1,7 +1,12 @@
 "use client"
 
 import { CarIcon, FileIcon } from "lucide-react"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { TravelDocumentsSection } from "@/components/logistics/travel-documents-section"
 import { ShuttleSection } from "@/components/logistics/shuttle-section"
 import type { Logistics } from "@/lib/dtos/logistics"
@@ -39,15 +44,14 @@ export function LogisticsTab({
   return (
     <div>
       <Accordion type="multiple">
-
         {/* Travel documents */}
         <AccordionItem value="travel-documents">
           <AccordionTrigger className="text-sm font-medium hover:no-underline">
             <span className="flex items-center gap-2">
-              <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
               Travel documents
               {travelDocuments.length > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-muted-foreground text-xs font-normal">
                   {travelDocuments.length}
                 </span>
               )}
@@ -69,10 +73,10 @@ export function LogisticsTab({
         <AccordionItem value="shuttle">
           <AccordionTrigger className="text-sm font-medium hover:no-underline">
             <span className="flex items-center gap-2">
-              <CarIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <CarIcon className="text-muted-foreground size-3.5 shrink-0" />
               Shuttle
               {shuttleVehicles.length > 0 && (
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-muted-foreground text-xs font-normal">
                   {shuttleVehicles.length}
                 </span>
               )}
@@ -91,7 +95,6 @@ export function LogisticsTab({
             />
           </AccordionContent>
         </AccordionItem>
-
       </Accordion>
     </div>
   )

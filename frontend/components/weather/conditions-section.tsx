@@ -57,15 +57,18 @@ function Accordion({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-t border-border/50">
+    <div className="border-border/50 border-t">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+        className="text-muted-foreground flex w-full items-center justify-between px-3 py-2 text-xs font-semibold tracking-[0.06em] uppercase"
         aria-expanded={open}
       >
         {label}
-        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+        <ChevronDown
+          className={cn("size-3.5 transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
       </button>
       {open && <div className="px-3 pb-3">{children}</div>}
     </div>
@@ -86,7 +89,9 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
     fetchTidalGates(dayId).then((r) => r.success && setGates(r.data))
   }, [dayId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   function handleRefresh() {
     startRefresh(async () => {
@@ -125,19 +130,17 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
   const waveHeight = waveState?.waveHeight ?? null
 
   const swellHeight = waveState?.swellWaveHeight ?? null
-  const bft = hasWeather
-    ? combinedSeaState(windForce, waveHeight, swellHeight)
-    : null
+  const bft = hasWeather ? combinedSeaState(windForce, waveHeight, swellHeight) : null
 
   return (
     <div data-testid="conditions-section">
       {/* Summary strip */}
       <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           {bft != null ? (
             <>
               <ConditionsBadge bft={bft} />
-              <span className="text-[11px] text-muted-foreground truncate">
+              <span className="text-muted-foreground truncate text-[11px]">
                 {beaufortLabel(bft)}
                 {windForce != null && (
                   <span className="text-foreground">
@@ -145,7 +148,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
                     {windDir != null && (
                       <>
                         <Navigation2
-                          className="inline size-2.5 -mt-0.5 mr-0.5 text-muted-foreground"
+                          className="text-muted-foreground -mt-0.5 mr-0.5 inline size-2.5"
                           aria-hidden
                           style={{ transform: `rotate(${windDir}deg)` }}
                         />
@@ -161,7 +164,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
               </span>
             </>
           ) : (
-            <span className="text-xs text-muted-foreground">No forecast yet.</span>
+            <span className="text-muted-foreground text-xs">No forecast yet.</span>
           )}
         </div>
         {isLeader && (
@@ -169,7 +172,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 gap-1 text-xs shrink-0"
+            className="h-6 shrink-0 gap-1 text-xs"
             onClick={handleRefresh}
             disabled={isRefreshing}
           >
@@ -187,7 +190,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
             <SeaGrid states={seaStates} />
             {gates.length > 0 && (
               <div className="flex flex-col gap-2">
-                <h4 className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <h4 className="text-muted-foreground text-xs font-semibold tracking-[0.06em] uppercase">
                   Tidal gates
                 </h4>
                 <TidalGateWarnings gates={gates} />
@@ -203,7 +206,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
           <div className="flex flex-col gap-2">
             <TidalEntryForm dayId={dayId} sea={sea} isLeader={isLeader} onSaved={setSea} />
             {ruleOfTwelfths.length > 0 && <RuleOfTwelfthsTable entries={ruleOfTwelfths} />}
-            {tideSrcLabel && <p className="text-[11px] text-muted-foreground">{tideSrcLabel}</p>}
+            {tideSrcLabel && <p className="text-muted-foreground text-[11px]">{tideSrcLabel}</p>}
           </div>
         </Accordion>
       )}

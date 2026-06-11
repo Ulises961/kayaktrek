@@ -1,7 +1,13 @@
 import { z } from "zod"
 import { noHtmlTags, isoDateField } from "../validators"
 
-export const TRAVEL_DOCUMENT_TYPES = ["accommodation", "transport", "insurance", "permit", "other"] as const
+export const TRAVEL_DOCUMENT_TYPES = [
+  "accommodation",
+  "transport",
+  "insurance",
+  "permit",
+  "other",
+] as const
 export type TravelDocumentType = (typeof TRAVEL_DOCUMENT_TYPES)[number]
 
 export const TravelDocumentSchema = z.object({
@@ -37,7 +43,7 @@ export const TravelDocumentFieldsSchema = z
       if (d.date && d.expiryDate) return d.date <= d.expiryDate
       return true
     },
-    { message: "Expiry date must be on or after the document date.", path: ["expiryDate"] }
+    { message: "Expiry date must be on or after the document date.", path: ["expiryDate"] },
   )
 
 export type TravelDocument = z.infer<typeof TravelDocumentSchema>

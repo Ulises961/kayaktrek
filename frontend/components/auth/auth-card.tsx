@@ -10,20 +10,12 @@ export function AuthCard({ children, className }: AuthCardProps) {
   return (
     <div className={cn("auth-card", className)}>
       <div className="auth-card-accent" aria-hidden />
-      <div className="flex flex-col gap-5 p-8">
-        {children}
-      </div>
+      <div className="flex flex-col gap-5 p-8">{children}</div>
     </div>
   )
 }
 
-export function AuthCardHeading({
-  title,
-  subtitle,
-}: {
-  title: string
-  subtitle?: string
-}) {
+export function AuthCardHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="flex flex-col gap-1">
       <h1 className="auth-heading">{title}</h1>

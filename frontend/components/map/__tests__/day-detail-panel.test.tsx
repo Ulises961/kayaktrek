@@ -24,8 +24,13 @@ const DAY1_ID = "day-1"
 const ITIN_ID = "itin-1"
 
 const pt = (id: string, name?: string, notes?: string): Point => ({
-  id, type: "position", latitude: 44, longitude: 14, dayId: DAY1_ID,
-  name: name ?? undefined, notes: notes ?? undefined,
+  id,
+  type: "position",
+  latitude: 44,
+  longitude: 14,
+  dayId: DAY1_ID,
+  name: name ?? undefined,
+  notes: notes ?? undefined,
 })
 
 const day1: Day = { id: DAY1_ID, dayNumber: 1, itineraryId: ITIN_ID }
@@ -67,7 +72,9 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
 }
 
 function renderWithCtx(ctx: MapBuilderContextValue) {
-  return render(createElement(MapBuilderContext.Provider, { value: ctx }, createElement(DayDetailPanel)))
+  return render(
+    createElement(MapBuilderContext.Provider, { value: ctx }, createElement(DayDetailPanel)),
+  )
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -153,7 +160,10 @@ describe("DayDetailPanel — points section", () => {
     const state = {
       points: [pt("p1", "Harbour", "Exposed beach landing")],
       pointOrder: ["p1"],
-      pendingPointId: null, pendingPointName: null, savingCount: 0, days: [day1],
+      pendingPointId: null,
+      pendingPointName: null,
+      savingCount: 0,
+      days: [day1],
     }
     renderWithCtx(makeCtx({ state: state as never }))
     await userEvent.click(screen.getByRole("button", { name: /waypoints/i }))

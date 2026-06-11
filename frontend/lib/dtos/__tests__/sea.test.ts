@@ -45,7 +45,10 @@ describe("SeaStateSchema", () => {
   })
 
   it("accepts null current fields", () => {
-    expect(SeaStateSchema.safeParse({ ...SEA_STATE_FIXTURE, currentSpeed: null, currentDirection: null }).success).toBe(true)
+    expect(
+      SeaStateSchema.safeParse({ ...SEA_STATE_FIXTURE, currentSpeed: null, currentDirection: null })
+        .success,
+    ).toBe(true)
   })
 
   it("accepts absent current fields", () => {

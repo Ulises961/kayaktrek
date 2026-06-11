@@ -3,13 +3,11 @@ import { PackageIcon } from "lucide-react"
 export function ItemsTab() {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium flex items-center gap-2">
-        <PackageIcon className="size-4 text-muted-foreground" />
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <PackageIcon className="text-muted-foreground size-4" />
         Items
       </p>
-      <p className="text-sm text-muted-foreground italic">
-        Gear and inventory coming in M6.
-      </p>
+      <p className="text-muted-foreground text-sm italic">Gear and inventory coming in M6.</p>
     </div>
   )
 }

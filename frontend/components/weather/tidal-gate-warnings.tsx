@@ -11,7 +11,7 @@ interface TidalGateWarningsProps {
 function slackLabel(utc: string | null | undefined): string | null {
   if (!utc) return null
   // accept either an ISO timestamp or a plain HH:MM[:SS]
-  const timePart = utc.includes("T") ? utc.split("T")[1] ?? "" : utc
+  const timePart = utc.includes("T") ? (utc.split("T")[1] ?? "") : utc
   const hhmm = formatHour(timePart)
   return hhmm === "—" ? null : `next slack ${hhmm} UTC`
 }
@@ -35,12 +35,15 @@ export function TidalGateWarnings({ gates }: TidalGateWarningsProps) {
             )}
           >
             {gate.isBlocking ? (
-              <AlertTriangle className="size-3.5 shrink-0 mt-0.5 text-orange-600 dark:text-orange-400" aria-hidden />
+              <AlertTriangle
+                className="mt-0.5 size-3.5 shrink-0 text-orange-600 dark:text-orange-400"
+                aria-hidden
+              />
             ) : (
-              <Info className="size-3.5 shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
+              <Info className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden />
             )}
             <span className="min-w-0">
-              <span className="font-medium text-foreground">{gate.stationName}</span>{" "}
+              <span className="text-foreground font-medium">{gate.stationName}</span>{" "}
               <span className="text-muted-foreground">
                 {gate.rateKnots.toFixed(1)} kn
                 {gate.directionDegrees != null && ` ${degreesToCompass(gate.directionDegrees)}`}

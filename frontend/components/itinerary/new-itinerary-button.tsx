@@ -61,14 +61,8 @@ export function NewItineraryButton() {
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="itin-name">Name</Label>
-              <Input
-                id="itin-name"
-                placeholder="e.g. Galicia Coast"
-                {...register("name")}
-              />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
+              <Input id="itin-name" placeholder="e.g. Galicia Coast" {...register("name")} />
+              {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
             </div>
             <DialogFooter>
               <Button

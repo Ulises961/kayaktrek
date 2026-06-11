@@ -16,7 +16,13 @@ export function EditTripForm({ trip }: { trip: Trip }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, control, formState: { errors } } = useForm<TripFields>({
+  const {
+    register,
+    handleSubmit,
+    setError,
+    control,
+    formState: { errors },
+  } = useForm<TripFields>({
     resolver: zodResolver(TripFieldsSchema),
     defaultValues: {
       destination: trip.destination ?? "",
@@ -43,7 +49,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5 max-w-lg">
+    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="destination">Destination</Label>
         <Input
@@ -88,13 +94,18 @@ export function EditTripForm({ trip }: { trip: Trip }) {
         </div>
       </div>
 
-      {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+      {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
       <div className="flex gap-3">
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : "Save changes"}
         </Button>
-        <Button type="button" variant="outline" disabled={isPending} onClick={() => router.push(`/trips/${trip.id}`)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isPending}
+          onClick={() => router.push(`/trips/${trip.id}`)}
+        >
           Cancel
         </Button>
       </div>

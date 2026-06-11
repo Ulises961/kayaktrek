@@ -6,8 +6,22 @@ import type { SeaState } from "@/lib/dtos/sea"
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 
 const states: SeaState[] = [
-  { dayId: DAY_ID, time: "09:00:00", waveHeight: 1.2, waveDirection: 270, swellDirection: 280, swellPeriod: 8 },
-  { dayId: DAY_ID, time: "12:00:00", waveHeight: 2.8, waveDirection: 260, swellDirection: 285, swellPeriod: 11 },
+  {
+    dayId: DAY_ID,
+    time: "09:00:00",
+    waveHeight: 1.2,
+    waveDirection: 270,
+    swellDirection: 280,
+    swellPeriod: 8,
+  },
+  {
+    dayId: DAY_ID,
+    time: "12:00:00",
+    waveHeight: 2.8,
+    waveDirection: 260,
+    swellDirection: 285,
+    swellPeriod: 11,
+  },
 ]
 
 describe("SeaGrid", () => {

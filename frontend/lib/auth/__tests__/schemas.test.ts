@@ -6,7 +6,9 @@ const STRONG_PASSWORD = "Expedition#24"
 
 describe("LoginSchema", () => {
   it("accepts any non-empty password (complexity is not enforced at login)", () => {
-    expect(LoginSchema.safeParse({ mail: "user@example.com", password: "anything" }).success).toBe(true)
+    expect(LoginSchema.safeParse({ mail: "user@example.com", password: "anything" }).success).toBe(
+      true,
+    )
   })
 
   it("rejects an invalid email", () => {

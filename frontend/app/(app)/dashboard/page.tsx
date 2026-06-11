@@ -20,15 +20,15 @@ function HeroTrip({ trip }: { trip: Trip }) {
   return (
     <Link
       href={`/trips/${trip.id}`}
-      className="block rounded-xl border border-border bg-card p-5 hover:bg-accent transition-colors"
+      className="border-border bg-card hover:bg-accent block rounded-xl border p-5 transition-colors"
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-base leading-tight">
+          <h2 className="text-base leading-tight font-semibold">
             {trip.destination ?? "Untitled trip"}
           </h2>
           {trip.dateFrom && (
-            <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
+            <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-sm">
               <CalendarIcon className="size-3" />
               {trip.dateFrom}
               {trip.dateTo ? ` → ${trip.dateTo}` : ""}
@@ -38,7 +38,7 @@ function HeroTrip({ trip }: { trip: Trip }) {
         {trip.state && <StateBadge state={trip.state} />}
       </div>
       {trip.itinerary?.id && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
+        <p className="text-muted-foreground mt-2 flex items-center gap-1 text-xs">
           <MapIcon className="size-3" />
           Itinerary ready — open to view the route
         </p>
@@ -52,18 +52,20 @@ export default async function DashboardPage() {
   const trips = session ? await fetchTrips(session.userId) : []
 
   const happening = trips.filter((t) => t.state === "happening")
-  const upcoming = trips.filter((t) => t.state === "building" || t.state === TRIP_STATE_LABELS.building)
+  const upcoming = trips.filter(
+    (t) => t.state === "building" || t.state === TRIP_STATE_LABELS.building,
+  )
   const heroTrips = [...happening, ...upcoming].slice(0, 3)
   const pastCount = trips.filter((t) => t.state === "past").length
 
   return (
-    <div className="p-6 flex flex-col gap-8 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-8 p-6">
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-semibold">
           Welcome back{session?.email ? `, ${session.email.split("@")[0]}` : ""}
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           {trips.length === 0
             ? "You have no trips yet. Start planning your first expedition."
             : `${trips.length} ${trips.length === 1 ? "trip" : "trips"} total${pastCount > 0 ? `, ${pastCount} completed` : ""}.`}
@@ -73,40 +75,37 @@ export default async function DashboardPage() {
       {/* Active / upcoming trips */}
       {heroTrips.length > 0 ? (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
             {happening.length > 0 ? "Active expedition" : "Upcoming"}
           </h2>
           {heroTrips.map((trip) => (
             <HeroTrip key={trip.id} trip={trip} />
           ))}
           {trips.length > heroTrips.length && (
-            <Link
-              href="/trips"
-              className="text-sm text-primary hover:underline text-center py-1"
-            >
+            <Link href="/trips" className="text-primary py-1 text-center text-sm hover:underline">
               View all {trips.length} trips →
             </Link>
           )}
         </section>
       ) : (
-        <section className="rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-4 text-center">
-          <MapIcon className="size-10 text-muted-foreground/40" />
+        <section className="border-border flex flex-col items-center gap-4 rounded-xl border border-dashed p-8 text-center">
+          <MapIcon className="text-muted-foreground/40 size-10" />
           <div>
             <p className="font-medium">No active or upcoming trips</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm">
               Plan a new expedition or explore public routes for inspiration.
             </p>
           </div>
-          <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button asChild size="sm" className="w-full sm:w-auto">
               <Link href="/trips">
-                <PlusIcon className="size-4 mr-1.5" />
+                <PlusIcon className="mr-1.5 size-4" />
                 New trip
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
               <Link href="/explore">
-                <CompassIcon className="size-4 mr-1.5" />
+                <CompassIcon className="mr-1.5 size-4" />
                 Explore routes
               </Link>
             </Button>
@@ -116,22 +115,22 @@ export default async function DashboardPage() {
 
       {/* Quick links */}
       {heroTrips.length > 0 && (
-        <section className="flex gap-2 flex-wrap">
+        <section className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href="/trips">
-              <PlusIcon className="size-4 mr-1.5" />
+              <PlusIcon className="mr-1.5 size-4" />
               All trips
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/itinerary">
-              <MapIcon className="size-4 mr-1.5" />
+              <MapIcon className="mr-1.5 size-4" />
               My itineraries
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/explore">
-              <CompassIcon className="size-4 mr-1.5" />
+              <CompassIcon className="mr-1.5 size-4" />
               Explore routes
             </Link>
           </Button>

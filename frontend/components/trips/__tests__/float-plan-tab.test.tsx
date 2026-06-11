@@ -22,7 +22,12 @@ const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const BASE_MEMBER: TripMember = {
   id: "01952f1a-0000-7000-8000-000000000010",
   role: "crew",
-  user: { id: "01952f1a-0000-7000-8000-000000000001", mail: "ada@example.com", username: "ada", name: "Ada" },
+  user: {
+    id: "01952f1a-0000-7000-8000-000000000001",
+    mail: "ada@example.com",
+    username: "ada",
+    name: "Ada",
+  },
   vesselMake: "Wilderness Systems",
   vesselModel: "Tempest 170",
   vesselLengthCm: 520,
@@ -94,14 +99,17 @@ describe("FloatPlanTab — editing state", () => {
     await waitFor(() =>
       expect(updateMyFloatPlan).toHaveBeenCalledWith(
         TRIP_ID,
-        expect.objectContaining({ vesselMake: "Wilderness Systems" })
-      )
+        expect.objectContaining({ vesselMake: "Wilderness Systems" }),
+      ),
     )
     await waitFor(() => expect(screen.queryByLabelText(/make/i)).toBeNull())
   })
 
   it("shows error and stays in editing on save failure", async () => {
-    vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: false, error: "Failed to update float plan." })
+    vi.mocked(updateMyFloatPlan).mockResolvedValue({
+      success: false,
+      error: "Failed to update float plan.",
+    })
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))

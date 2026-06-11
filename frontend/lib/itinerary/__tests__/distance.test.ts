@@ -1,9 +1,20 @@
 import { describe, it, expect } from "vitest"
-import { haversineNm, totalDistanceNm, segmentMidpoint, toKm, formatDistance, estimatedTime, formatTime, legLabel } from "../distance"
+import {
+  haversineNm,
+  totalDistanceNm,
+  segmentMidpoint,
+  toKm,
+  formatDistance,
+  estimatedTime,
+  formatTime,
+  legLabel,
+} from "../distance"
 
 describe("haversineNm", () => {
   it("returns 0 for identical points", () => {
-    expect(haversineNm({ latitude: 44, longitude: 14 }, { latitude: 44, longitude: 14 })).toBeCloseTo(0)
+    expect(
+      haversineNm({ latitude: 44, longitude: 14 }, { latitude: 44, longitude: 14 }),
+    ).toBeCloseTo(0)
   })
 
   it("calculates ~60 nm per degree of latitude at the equator", () => {

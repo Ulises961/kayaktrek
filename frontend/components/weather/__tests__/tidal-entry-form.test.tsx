@@ -47,7 +47,12 @@ describe("TidalEntryForm — leader", () => {
 
     await waitFor(() => expect(UPDATE).toHaveBeenCalledTimes(1))
     const [, fields] = UPDATE.mock.calls[0]
-    expect(fields).toMatchObject({ highTide: "09:42", lowTide: "03:10", tidalRangeM: 5.5, tidalSource: "manual" })
+    expect(fields).toMatchObject({
+      highTide: "09:42",
+      lowTide: "03:10",
+      tidalRangeM: 5.5,
+      tidalSource: "manual",
+    })
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce())
   })
 
@@ -91,6 +96,10 @@ describe("TidalEntryForm — leader", () => {
 
     await waitFor(() => expect(UPDATE).toHaveBeenCalled())
     const [, fields] = UPDATE.mock.calls[0]
-    expect(fields).toMatchObject({ floodDirectionDegrees: 200, ebbDirectionDegrees: 20, maxSpringRateKnots: 5.5 })
+    expect(fields).toMatchObject({
+      floodDirectionDegrees: 200,
+      ebbDirectionDegrees: 20,
+      maxSpringRateKnots: 5.5,
+    })
   })
 })

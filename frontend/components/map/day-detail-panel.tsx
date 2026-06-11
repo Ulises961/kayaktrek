@@ -4,11 +4,7 @@ import { Calendar, ChevronDown, Anchor, Star, CircleDot } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { updateDay } from "@/lib/itinerary/actions"
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel"
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel"
 import { ConditionsSection } from "@/components/weather/conditions-section"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
@@ -43,7 +39,10 @@ function DayDateHeader({ day, isLeader, onDateSaved }: DayDateHeaderProps) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
-    if (!value) { setEditing(false); return }
+    if (!value) {
+      setEditing(false)
+      return
+    }
     startTransition(async () => {
       const result = await updateDay(day.id!, { date: value })
       if (result.success) onDateSaved(value)
@@ -52,8 +51,8 @@ function DayDateHeader({ day, isLeader, onDateSaved }: DayDateHeaderProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50">
-      <span className="text-[11px] font-semibold text-foreground">Day {day.dayNumber}</span>
+    <div className="border-border/50 flex items-center gap-2 border-b px-3 py-1.5">
+      <span className="text-foreground text-[11px] font-semibold">Day {day.dayNumber}</span>
       {editing ? (
         <input
           type="date"
@@ -62,15 +61,15 @@ function DayDateHeader({ day, isLeader, onDateSaved }: DayDateHeaderProps) {
           disabled={isPending}
           onBlur={() => setEditing(false)}
           onChange={handleChange}
-          className="text-[11px] h-5 border-0 border-b border-primary bg-transparent text-foreground focus:outline-none"
+          className="border-primary text-foreground h-5 border-0 border-b bg-transparent text-[11px] focus:outline-none"
           data-testid="date-input"
         />
       ) : (
         <>
           {day.date ? (
-            <span className="text-[11px] text-muted-foreground">{formatDate(day.date)}</span>
+            <span className="text-muted-foreground text-[11px]">{formatDate(day.date)}</span>
           ) : (
-            <span className="text-[11px] text-muted-foreground/60 italic">No date set</span>
+            <span className="text-muted-foreground/60 text-[11px] italic">No date set</span>
           )}
           {isLeader && (
             <button
@@ -102,33 +101,31 @@ function PointCard({ point, index, onOpen }: PointCardProps) {
 
   return (
     <div
-      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden w-36 h-full min-h-18 cursor-pointer hover:border-primary/50 transition-colors"
+      className="border-border bg-card hover:border-primary/50 flex h-full min-h-18 w-36 cursor-pointer flex-col overflow-hidden rounded-lg border transition-colors"
       onClick={() => onOpen(point.id!)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onOpen(point.id!)}
     >
       {firstImage?.location && (
-        <div className="h-16 shrink-0 bg-muted overflow-hidden">
+        <div className="bg-muted h-16 shrink-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={firstImage.location}
             alt={point.name ?? "Point photo"}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
         </div>
       )}
-      <div className="flex flex-col gap-1 p-2 flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="text-xs font-mono w-4 shrink-0 text-muted-foreground/70">{index}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2">
+        <div className="text-muted-foreground flex items-center gap-1.5">
+          <span className="text-muted-foreground/70 w-4 shrink-0 font-mono text-xs">{index}</span>
           <TypeIcon type={point.type ?? "position"} />
-          <span className="flex-1 min-w-0 text-xs font-medium text-foreground truncate">
+          <span className="text-foreground min-w-0 flex-1 truncate text-xs font-medium">
             {displayLabel}
           </span>
         </div>
-        {point.notes && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{point.notes}</p>
-        )}
+        {point.notes && <p className="text-muted-foreground line-clamp-2 text-xs">{point.notes}</p>}
       </div>
     </div>
   )
@@ -144,15 +141,18 @@ function PointsSection({ entries, onOpen }: PointsSectionProps) {
   const count = entries.length
 
   return (
-    <div className="border-t border-border" data-testid="points-section">
+    <div className="border-border border-t" data-testid="points-section">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+        className="text-muted-foreground flex w-full items-center justify-between px-3 py-2 text-xs font-semibold tracking-[0.06em] uppercase"
         aria-expanded={open}
       >
         <span>Waypoints{count > 0 ? ` (${count})` : ""}</span>
-        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+        <ChevronDown
+          className={cn("size-3.5 transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
       </button>
 
       {open && count > 0 && (
@@ -160,7 +160,7 @@ function PointsSection({ entries, onOpen }: PointsSectionProps) {
           <Carousel opts={{ align: "start", dragFree: true }}>
             <CarouselContent className="-ml-2 px-3">
               {entries.map(({ point, globalIdx }) => (
-                <CarouselItem key={point.id} className="pl-2 basis-auto h-18">
+                <CarouselItem key={point.id} className="h-18 basis-auto pl-2">
                   <PointCard point={point} index={globalIdx} onOpen={onOpen} />
                 </CarouselItem>
               ))}
@@ -170,7 +170,7 @@ function PointsSection({ entries, onOpen }: PointsSectionProps) {
       )}
 
       {open && count === 0 && (
-        <p className="px-3 pb-2 text-xs text-muted-foreground">No waypoints for this day.</p>
+        <p className="text-muted-foreground px-3 pb-2 text-xs">No waypoints for this day.</p>
       )}
     </div>
   )
@@ -192,7 +192,7 @@ export function DayDetailPanel() {
   }, [])
 
   return (
-    <div className="bg-background/95 border-t border-border">
+    <div className="bg-background/95 border-border border-t">
       {day && (
         <DayDateHeader
           day={day}

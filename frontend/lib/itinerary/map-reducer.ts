@@ -29,8 +29,19 @@ export type MapAction =
   | { type: "DAY_ADD"; day: Day }
   | { type: "DAY_UPDATE"; id: string; fields: Partial<Day> }
   | { type: "DAY_REMOVE"; id: string; day0Id: string }
-  | { type: "POINTS_ASSIGN"; dayId: string; pointIds: string[]; day0Id: string; startPointId: string | null }
-  | { type: "BOUNDARIES_APPLY"; slices: DaySlice[]; pointUpdates: { id: string; type: PointType; name?: string }[]; day0Id: string }
+  | {
+      type: "POINTS_ASSIGN"
+      dayId: string
+      pointIds: string[]
+      day0Id: string
+      startPointId: string | null
+    }
+  | {
+      type: "BOUNDARIES_APPLY"
+      slices: DaySlice[]
+      pointUpdates: { id: string; type: PointType; name?: string }[]
+      day0Id: string
+    }
   | { type: "STATE_REPLACE"; state: MapState }
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
@@ -39,9 +50,7 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
       return {
         ...state,
         points: [...state.points, action.point],
-        pointOrder: action.point.id
-          ? [...state.pointOrder, action.point.id]
-          : state.pointOrder,
+        pointOrder: action.point.id ? [...state.pointOrder, action.point.id] : state.pointOrder,
       }
 
     case "POINT_CONFIRM":
@@ -49,7 +58,7 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         ...state,
         points: state.points.map((p) => (p.id === action.tempId ? action.point : p)),
         pointOrder: state.pointOrder.map((id) =>
-          id === action.tempId ? (action.point.id ?? id) : id
+          id === action.tempId ? (action.point.id ?? id) : id,
         ),
         pendingPointId: action.point.id ?? null,
         pendingPointName: null,
@@ -66,9 +75,7 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
     case "POINT_UPDATE":
       return {
         ...state,
-        points: state.points.map((p) =>
-          p.id === action.id ? { ...p, ...action.fields } : p
-        ),
+        points: state.points.map((p) => (p.id === action.id ? { ...p, ...action.fields } : p)),
       }
 
     case "POINT_REMOVE":
@@ -108,9 +115,9 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         ...state,
         days: state.days
           .filter((d) => d.id !== action.id)
-          .map((d) => d.dayNumber > removedNum ? { ...d, dayNumber: d.dayNumber - 1 } : d),
+          .map((d) => (d.dayNumber > removedNum ? { ...d, dayNumber: d.dayNumber - 1 } : d)),
         points: state.points.map((p) =>
-          p.dayId === action.id ? { ...p, dayId: action.day0Id } : p
+          p.dayId === action.id ? { ...p, dayId: action.day0Id } : p,
         ),
       }
     }
@@ -123,7 +130,8 @@ export function mapReducer(state: MapState, action: MapAction): MapState {
         ...state,
         points: state.points.map((p) => {
           if (p.id && assignSet.has(p.id)) return { ...p, dayId: action.dayId }
-          if (p.dayId === action.dayId && p.id && !keepSet.has(p.id)) return { ...p, dayId: action.day0Id }
+          if (p.dayId === action.dayId && p.id && !keepSet.has(p.id))
+            return { ...p, dayId: action.day0Id }
           return p
         }),
       }
@@ -201,9 +209,10 @@ export function initialMapState(points: Point[], days: Day[] = []): MapState {
   // If walkList recovered fewer than half the points the linked list is absent/broken
   // (all next_id null). Fall back to UUID v7 lexicographic sort which preserves
   // insertion order because UUID v7 encodes a millisecond timestamp in the high bits.
-  const ordered = walked.length >= Math.ceil(withId.length / 2)
-    ? walked
-    : [...withId].sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""))
+  const ordered =
+    walked.length >= Math.ceil(withId.length / 2)
+      ? walked
+      : [...withId].sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""))
   const pointOrder = ordered.map((p) => p.id!)
 
   // Reassign dayId for points that fall within a numbered day's [startPointId, endPointId] range.
@@ -211,7 +220,9 @@ export function initialMapState(points: Point[], days: Day[] = []): MapState {
   // days after the first skip startIdx (already assigned to the previous day).
   // Points beyond any day's endPointId remain in Day 0 (unassigned) until the next apply.
   const reassigned = new Map<string, string>()
-  const sortedDays = [...days].filter((d) => d.dayNumber > 0).sort((a, b) => a.dayNumber - b.dayNumber)
+  const sortedDays = [...days]
+    .filter((d) => d.dayNumber > 0)
+    .sort((a, b) => a.dayNumber - b.dayNumber)
   for (let j = 0; j < sortedDays.length; j++) {
     const day = sortedDays[j]
     if (!day.id || !day.startPointId || !day.endPointId) continue
@@ -222,9 +233,12 @@ export function initialMapState(points: Point[], days: Day[] = []): MapState {
     for (let i = assignStart; i <= endIdx; i++) reassigned.set(pointOrder[i], day.id)
   }
 
-  const hydratedPoints = reassigned.size > 0
-    ? points.map((p) => p.id && reassigned.has(p.id) ? { ...p, dayId: reassigned.get(p.id) } : p)
-    : points
+  const hydratedPoints =
+    reassigned.size > 0
+      ? points.map((p) =>
+          p.id && reassigned.has(p.id) ? { ...p, dayId: reassigned.get(p.id) } : p,
+        )
+      : points
 
   return {
     points: hydratedPoints,

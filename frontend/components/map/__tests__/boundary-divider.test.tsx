@@ -22,7 +22,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByText(/day 2/i)).toBeInTheDocument()
   })
@@ -37,7 +37,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByDisplayValue("2026-06-02")).toBeInTheDocument()
   })
@@ -52,7 +52,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByText(/8\.4/)).toBeInTheDocument()
   })
@@ -67,7 +67,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByText(/nm/i)).toBeInTheDocument()
   })
@@ -82,7 +82,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     // 10 nm × 1.852 = 18.5 km
     expect(screen.getByText(/18\.5/)).toBeInTheDocument()
@@ -98,7 +98,7 @@ describe("BoundaryDivider — display", () => {
         labelDayNumber={2}
         labelDate={null}
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     const input = document.querySelector<HTMLInputElement>("input[type=date]")
     expect(input).toBeInTheDocument()
@@ -119,7 +119,7 @@ describe("BoundaryDivider — date editing", () => {
         labelDate={null}
         onDateChange={onDateChange}
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     const input = document.querySelector<HTMLInputElement>("input[type=date]")!
     fireEvent.change(input, { target: { value: "2026-07-01" } })
@@ -138,7 +138,7 @@ describe("BoundaryDivider — date editing", () => {
         labelDate="2026-06-02"
         onDateChange={onDateChange}
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     const input = document.querySelector<HTMLInputElement>("input[type=date]")!
     fireEvent.change(input, { target: { value: "" } })
@@ -157,7 +157,7 @@ describe("BoundaryDivider — drag handle", () => {
         labelDayNumber={2}
         labelDate="2026-06-02"
         onBoundaryMove={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByTestId("boundary-drag-handle")).toBeInTheDocument()
   })

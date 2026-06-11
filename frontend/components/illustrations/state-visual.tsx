@@ -19,14 +19,28 @@ function Horizon({ tilted }: { tilted?: boolean }) {
     // Static tilt encoded in coordinates — disruption via CSS on a wrapping <g>
     return (
       <g style={{ animation: "sv-disrupt 0.9s ease-in-out infinite" }}>
-        <line x1="-10" y1={H - 6} x2="490" y2={H + 6}
-          stroke="var(--border)" strokeWidth="1" strokeDasharray="8 10" />
+        <line
+          x1="-10"
+          y1={H - 6}
+          x2="490"
+          y2={H + 6}
+          stroke="var(--border)"
+          strokeWidth="1"
+          strokeDasharray="8 10"
+        />
       </g>
     )
   }
   return (
-    <line x1="0" y1={H} x2="480" y2={H}
-      stroke="var(--border)" strokeWidth="1" strokeDasharray="8 10" />
+    <line
+      x1="0"
+      y1={H}
+      x2="480"
+      y2={H}
+      stroke="var(--border)"
+      strokeWidth="1"
+      strokeDasharray="8 10"
+    />
   )
 }
 
@@ -36,11 +50,17 @@ function Sea() {
       <rect x="0" y={H} width="480" height={400 - H} fill="var(--secondary)" opacity="0.35" />
       <path
         d={`M0 ${H + 14} Q60 ${H + 6} 120 ${H + 14} Q180 ${H + 22} 240 ${H + 14} Q300 ${H + 6} 360 ${H + 14} Q420 ${H + 22} 480 ${H + 14}`}
-        stroke="var(--foam)" strokeWidth="1" fill="none" opacity="0.30"
+        stroke="var(--foam)"
+        strokeWidth="1"
+        fill="none"
+        opacity="0.30"
       />
       <path
         d={`M0 ${H + 32} Q80 ${H + 24} 160 ${H + 32} Q240 ${H + 40} 320 ${H + 32} Q400 ${H + 24} 480 ${H + 32}`}
-        stroke="var(--foam)" strokeWidth="0.8" fill="none" opacity="0.18"
+        stroke="var(--foam)"
+        strokeWidth="0.8"
+        fill="none"
+        opacity="0.18"
       />
     </>
   )
@@ -48,17 +68,35 @@ function Sea() {
 
 // Compass with cardinal ticks and a north needle.
 // `disrupted` makes the needle oscillate erratically via CSS animation.
-function Compass({ cx, cy, r = 26, disrupted }: { cx: number; cy: number; r?: number; disrupted?: boolean }) {
+function Compass({
+  cx,
+  cy,
+  r = 26,
+  disrupted,
+}: {
+  cx: number
+  cy: number
+  r?: number
+  disrupted?: boolean
+}) {
   const ticks = [0, 90, 180, 270] // degrees from east in SVG coord space
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r}
-        stroke="var(--muted-foreground)" strokeWidth="1" fill="none" opacity="0.22" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        stroke="var(--muted-foreground)"
+        strokeWidth="1"
+        fill="none"
+        opacity="0.22"
+      />
       {ticks.map((deg) => {
         const rad = (deg * Math.PI) / 180
         const isNorth = deg === 270
         return (
-          <line key={deg}
+          <line
+            key={deg}
             x1={cx + Math.cos(rad) * (r - (isNorth ? 7 : 5))}
             y1={cy + Math.sin(rad) * (r - (isNorth ? 7 : 5))}
             x2={cx + Math.cos(rad) * r}
@@ -75,10 +113,14 @@ function Compass({ cx, cy, r = 26, disrupted }: { cx: number; cy: number; r?: nu
         d={`M${cx} ${cy - r + 5} L${cx - 3.5} ${cy + 3} L${cx + 3.5} ${cy + 3} Z`}
         fill="var(--accent)"
         opacity="0.65"
-        style={disrupted ? {
-          animation: "sv-needle 1.6s ease-in-out infinite",
-          transformOrigin: `${cx}px ${cy}px`,
-        } : undefined}
+        style={
+          disrupted
+            ? {
+                animation: "sv-needle 1.6s ease-in-out infinite",
+                transformOrigin: `${cx}px ${cy}px`,
+              }
+            : undefined
+        }
       />
     </g>
   )
@@ -87,7 +129,17 @@ function Compass({ cx, cy, r = 26, disrupted }: { cx: number; cy: number; r?: nu
 // Waypoint marker: filled dot with an outer ring.
 // `faded` = destination that should exist but doesn't (404 ghost node).
 // `pulse` = emits a slow expanding ring (active / just placed).
-function Waypoint({ cx, cy, faded, pulse }: { cx: number; cy: number; faded?: boolean; pulse?: boolean }) {
+function Waypoint({
+  cx,
+  cy,
+  faded,
+  pulse,
+}: {
+  cx: number
+  cy: number
+  faded?: boolean
+  pulse?: boolean
+}) {
   const op = faded ? 0.18 : 0.85
   return (
     <g>
@@ -98,9 +150,16 @@ function Waypoint({ cx, cy, faded, pulse }: { cx: number; cy: number; faded?: bo
         </circle>
       )}
       {faded && (
-        <circle cx={cx} cy={cy} r={6}
-          stroke="var(--muted-foreground)" strokeWidth="1"
-          fill="none" opacity="0.2" strokeDasharray="2 2" />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={6}
+          stroke="var(--muted-foreground)"
+          strokeWidth="1"
+          fill="none"
+          opacity="0.2"
+          strokeDasharray="2 2"
+        />
       )}
       <circle cx={cx} cy={cy} r={4} fill="var(--accent)" opacity={op} />
     </g>
@@ -108,24 +167,43 @@ function Waypoint({ cx, cy, faded, pulse }: { cx: number; cy: number; faded?: bo
 }
 
 // Route path — dashed by default, broken = gap with misaligned second half.
-function Route({ broken, solid, opacity = 0.45 }: { broken?: boolean; solid?: boolean; opacity?: number }) {
+function Route({
+  broken,
+  solid,
+  opacity = 0.45,
+}: {
+  broken?: boolean
+  solid?: boolean
+  opacity?: number
+}) {
   const dash = solid ? undefined : "6 4"
   if (broken) {
     return (
       <>
-        <path d="M 72 192 Q 132 174 168 182"
-          stroke="var(--muted-foreground)" strokeWidth="1.5"
-          strokeDasharray="6 4" fill="none" opacity={opacity} />
+        <path
+          d="M 72 192 Q 132 174 168 182"
+          stroke="var(--muted-foreground)"
+          strokeWidth="1.5"
+          strokeDasharray="6 4"
+          fill="none"
+          opacity={opacity}
+        />
         <g style={{ animation: "sv-disrupt 1.1s ease-in-out infinite" }}>
-          <path d="M 212 194 Q 310 206 408 186"
-            stroke="var(--muted-foreground)" strokeWidth="1.5"
-            strokeDasharray="6 4" fill="none" opacity={opacity} />
+          <path
+            d="M 212 194 Q 310 206 408 186"
+            stroke="var(--muted-foreground)"
+            strokeWidth="1.5"
+            strokeDasharray="6 4"
+            fill="none"
+            opacity={opacity}
+          />
         </g>
       </>
     )
   }
   return (
-    <path d={ROUTE}
+    <path
+      d={ROUTE}
       stroke={solid ? "var(--accent)" : "var(--muted-foreground)"}
       strokeWidth="1.5"
       strokeDasharray={dash}
@@ -139,8 +217,14 @@ function Route({ broken, solid, opacity = 0.45 }: { broken?: boolean; solid?: bo
 function TrackingNode() {
   return (
     <circle r={4.5} fill="var(--accent)" opacity={0.9}>
-      <animateMotion dur="2.8s" repeatCount="indefinite" path={ROUTE}
-        calcMode="spline" keyTimes="0;1" keySplines="0.42 0 0.58 1" />
+      <animateMotion
+        dur="2.8s"
+        repeatCount="indefinite"
+        path={ROUTE}
+        calcMode="spline"
+        keyTimes="0;1"
+        keySplines="0.42 0 0.58 1"
+      />
     </circle>
   )
 }
@@ -151,24 +235,57 @@ function Paddle({ cy = 178, opacity = 0.45 }: { cy?: number; opacity?: number })
   return (
     <g opacity={opacity}>
       {/* Shaft */}
-      <line x1="110" y1={cy} x2="370" y2={cy}
-        stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
+      <line
+        x1="110"
+        y1={cy}
+        x2="370"
+        y2={cy}
+        stroke="var(--accent)"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
       {/* Left blade */}
-      <ellipse cx="92" cy={cy} rx="24" ry="10"
+      <ellipse
+        cx="92"
+        cy={cy}
+        rx="24"
+        ry="10"
         fill="var(--accent)"
-        transform={`rotate(-10, 92, ${cy})`} />
+        transform={`rotate(-10, 92, ${cy})`}
+      />
       {/* Left blade highlight */}
-      <ellipse cx="92" cy={cy} rx="16" ry="6"
-        fill="none" stroke="var(--background)" strokeWidth="1" opacity="0.3"
-        transform={`rotate(-10, 92, ${cy})`} />
+      <ellipse
+        cx="92"
+        cy={cy}
+        rx="16"
+        ry="6"
+        fill="none"
+        stroke="var(--background)"
+        strokeWidth="1"
+        opacity="0.3"
+        transform={`rotate(-10, 92, ${cy})`}
+      />
       {/* Right blade */}
-      <ellipse cx="388" cy={cy} rx="24" ry="10"
+      <ellipse
+        cx="388"
+        cy={cy}
+        rx="24"
+        ry="10"
         fill="var(--accent)"
-        transform={`rotate(10, 388, ${cy})`} />
+        transform={`rotate(10, 388, ${cy})`}
+      />
       {/* Right blade highlight */}
-      <ellipse cx="388" cy={cy} rx="16" ry="6"
-        fill="none" stroke="var(--background)" strokeWidth="1" opacity="0.3"
-        transform={`rotate(10, 388, ${cy})`} />
+      <ellipse
+        cx="388"
+        cy={cy}
+        rx="16"
+        ry="6"
+        fill="none"
+        stroke="var(--background)"
+        strokeWidth="1"
+        opacity="0.3"
+        transform={`rotate(10, 388, ${cy})`}
+      />
     </g>
   )
 }
@@ -190,9 +307,14 @@ function EmptyScene() {
         <Waypoint cx={240} cy={192} pulse />
       </g>
       {/* Open-ended dashed path — potential, not yet defined */}
-      <path d="M 240 192 Q 318 172 410 180"
-        stroke="var(--muted-foreground)" strokeWidth="1.2"
-        strokeDasharray="3 7" fill="none" opacity="0.18" />
+      <path
+        d="M 240 192 Q 318 172 410 180"
+        stroke="var(--muted-foreground)"
+        strokeWidth="1.2"
+        strokeDasharray="3 7"
+        fill="none"
+        opacity="0.18"
+      />
     </>
   )
 }
@@ -206,7 +328,7 @@ function LoadingScene() {
       <Waypoint cx={72} cy={192} />
       <Waypoint cx={240} cy={186} />
       <Waypoint cx={408} cy={186} />
-      <Route opacity={0.30} />
+      <Route opacity={0.3} />
       <TrackingNode />
     </>
   )
@@ -226,9 +348,14 @@ function NotFoundScene() {
       <Waypoint cx={412} cy={183} faded />
       <Route opacity={0.42} />
       {/* Path dissolves past last confirmed waypoint */}
-      <path d="M 348 192 Q 382 180 422 182"
-        stroke="var(--muted-foreground)" strokeWidth="1.2"
-        strokeDasharray="2 6" fill="none" opacity="0.16" />
+      <path
+        d="M 348 192 Q 382 180 422 182"
+        stroke="var(--muted-foreground)"
+        strokeWidth="1.2"
+        strokeDasharray="2 6"
+        fill="none"
+        opacity="0.16"
+      />
     </>
   )
 }
@@ -245,10 +372,24 @@ function ErrorScene() {
       <Route broken opacity={0.48} />
       {/* Break mark at gap */}
       <g style={{ animation: "sv-disrupt 0.8s ease-in-out infinite" }}>
-        <line x1="182" y1="179" x2="196" y2="193"
-          stroke="var(--destructive)" strokeWidth="2" opacity="0.72" />
-        <line x1="196" y1="179" x2="182" y2="193"
-          stroke="var(--destructive)" strokeWidth="2" opacity="0.72" />
+        <line
+          x1="182"
+          y1="179"
+          x2="196"
+          y2="193"
+          stroke="var(--destructive)"
+          strokeWidth="2"
+          opacity="0.72"
+        />
+        <line
+          x1="196"
+          y1="179"
+          x2="182"
+          y2="193"
+          stroke="var(--destructive)"
+          strokeWidth="2"
+          opacity="0.72"
+        />
       </g>
     </>
   )
@@ -270,10 +411,16 @@ function SuccessScene() {
       <Waypoint cx={300} cy={194} />
       <Waypoint cx={408} cy={180} />
       {/* Flag at destination */}
-      <line x1="408" y1="180" x2="408" y2="150"
-        stroke="var(--accent)" strokeWidth="1.5" opacity="0.65" />
-      <path d="M 408 150 L 430 158 L 408 166 Z"
-        fill="var(--accent)" opacity="0.65" />
+      <line
+        x1="408"
+        y1="180"
+        x2="408"
+        y2="150"
+        stroke="var(--accent)"
+        strokeWidth="1.5"
+        opacity="0.65"
+      />
+      <path d="M 408 150 L 430 158 L 408 166 Z" fill="var(--accent)" opacity="0.65" />
     </>
   )
 }
@@ -290,11 +437,11 @@ export function StateVisual({ state, className }: StateVisualProps) {
       aria-hidden="true"
     >
       <rect width="480" height="400" fill="var(--background)" />
-      {state === "empty"     && <EmptyScene />}
-      {state === "loading"   && <LoadingScene />}
+      {state === "empty" && <EmptyScene />}
+      {state === "loading" && <LoadingScene />}
       {state === "not-found" && <NotFoundScene />}
-      {state === "error"     && <ErrorScene />}
-      {state === "success"   && <SuccessScene />}
+      {state === "error" && <ErrorScene />}
+      {state === "success" && <SuccessScene />}
     </svg>
   )
 }

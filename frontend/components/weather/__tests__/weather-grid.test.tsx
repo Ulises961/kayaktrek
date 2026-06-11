@@ -6,8 +6,24 @@ import type { WeatherState } from "@/lib/dtos/weather"
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 
 const states: WeatherState[] = [
-  { dayId: DAY_ID, time: "09:00:00", temperature: 14.6, precipitation: 0, windDirection: 247, windForce: 12, cloud: "10" },
-  { dayId: DAY_ID, time: "12:00:00", temperature: 18.2, precipitation: 1.5, windDirection: 90, windForce: 6, cloud: "70" },
+  {
+    dayId: DAY_ID,
+    time: "09:00:00",
+    temperature: 14.6,
+    precipitation: 0,
+    windDirection: 247,
+    windForce: 12,
+    cloud: "10",
+  },
+  {
+    dayId: DAY_ID,
+    time: "12:00:00",
+    temperature: 18.2,
+    precipitation: 1.5,
+    windDirection: 90,
+    windForce: 6,
+    cloud: "70",
+  },
 ]
 
 describe("WeatherGrid", () => {

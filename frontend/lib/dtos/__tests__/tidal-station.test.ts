@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { TidalStreamEntrySchema, TidalStationSchema, TidalGateWarningSchema } from "../tidal-station"
+import {
+  TidalStreamEntrySchema,
+  TidalStationSchema,
+  TidalGateWarningSchema,
+} from "../tidal-station"
 
 const STREAM_ENTRY_FIXTURE = {
   stationId: "01952f1a-0000-7000-8000-000000000002",
@@ -72,7 +76,13 @@ describe("TidalStationSchema", () => {
   it("rejects wrong GeoJSON type", () => {
     const result = TidalStationSchema.safeParse({
       ...TIDAL_STATION_FIXTURE,
-      location: { type: "LineString", coordinates: [[-3.1, 58.7], [-3.2, 58.8]] },
+      location: {
+        type: "LineString",
+        coordinates: [
+          [-3.1, 58.7],
+          [-3.2, 58.8],
+        ],
+      },
     })
     expect(result.success).toBe(false)
   })

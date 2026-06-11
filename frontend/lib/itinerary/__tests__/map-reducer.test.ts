@@ -48,20 +48,34 @@ describe("POINT_ADD", () => {
 
 describe("POINT_CONFIRM", () => {
   it("replaces the temp point with the confirmed point", () => {
-    const state: MapState = { ...BASE, points: [...BASE.points, pt("tmp-1")], pointOrder: [...BASE.pointOrder, "tmp-1"], pendingPointId: "tmp-1" }
+    const state: MapState = {
+      ...BASE,
+      points: [...BASE.points, pt("tmp-1")],
+      pointOrder: [...BASE.pointOrder, "tmp-1"],
+      pendingPointId: "tmp-1",
+    }
     const next = mapReducer(state, { type: "POINT_CONFIRM", tempId: "tmp-1", point: pt("real-1") })
     expect(next.points.map((p) => p.id)).not.toContain("tmp-1")
     expect(next.points.map((p) => p.id)).toContain("real-1")
   })
 
   it("replaces tempId with real id in pointOrder", () => {
-    const state: MapState = { ...BASE, points: [...BASE.points, pt("tmp-1")], pointOrder: [...BASE.pointOrder, "tmp-1"] }
+    const state: MapState = {
+      ...BASE,
+      points: [...BASE.points, pt("tmp-1")],
+      pointOrder: [...BASE.pointOrder, "tmp-1"],
+    }
     const next = mapReducer(state, { type: "POINT_CONFIRM", tempId: "tmp-1", point: pt("real-1") })
     expect(next.pointOrder).toEqual(["aaa", "bbb", "ccc", "real-1"])
   })
 
   it("updates pendingPointId to the real id", () => {
-    const state: MapState = { ...BASE, points: [pt("tmp-1")], pointOrder: ["tmp-1"], pendingPointId: "tmp-1" }
+    const state: MapState = {
+      ...BASE,
+      points: [pt("tmp-1")],
+      pointOrder: ["tmp-1"],
+      pendingPointId: "tmp-1",
+    }
     const next = mapReducer(state, { type: "POINT_CONFIRM", tempId: "tmp-1", point: pt("real-1") })
     expect(next.pendingPointId).toBe("real-1")
   })
@@ -232,7 +246,13 @@ describe("initialMapState", () => {
     const p1: Point = { id: "p1", type: "position", dayId: D0, nextId: "p2" }
     const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
     const p3: Point = { id: "p3", type: "position", dayId: D0 }
-    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
+    const d1: Day = {
+      id: D1,
+      dayNumber: 1,
+      itineraryId: "itin",
+      startPointId: "p1",
+      endPointId: "p2",
+    }
     const state = initialMapState([p1, p2, p3], [d1])
     expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
     expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)
@@ -248,8 +268,20 @@ describe("initialMapState", () => {
     const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
     const p3: Point = { id: "p3", type: "position", dayId: D0, nextId: "p4" }
     const p4: Point = { id: "p4", type: "position", dayId: D0 }
-    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
-    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p3" }
+    const d1: Day = {
+      id: D1,
+      dayNumber: 1,
+      itineraryId: "itin",
+      startPointId: "p1",
+      endPointId: "p2",
+    }
+    const d2: Day = {
+      id: D2,
+      dayNumber: 2,
+      itineraryId: "itin",
+      startPointId: "p2",
+      endPointId: "p3",
+    }
     const state = initialMapState([p1, p2, p3, p4], [d1, d2])
     // p4 is beyond d2's endPointId — it is unassigned (day 0)
     expect(state.points.find((p) => p.id === "p4")?.dayId).toBe(D0)
@@ -264,11 +296,23 @@ describe("initialMapState", () => {
     const p1: Point = { id: "p1", type: "position", dayId: D0, nextId: "p2" }
     const p2: Point = { id: "p2", type: "position", dayId: D0, nextId: "p3" }
     const p3: Point = { id: "p3", type: "position", dayId: D0 }
-    const d1: Day = { id: D1, dayNumber: 1, itineraryId: "itin", startPointId: "p1", endPointId: "p2" }
-    const d2: Day = { id: D2, dayNumber: 2, itineraryId: "itin", startPointId: "p2", endPointId: "p3" }
+    const d1: Day = {
+      id: D1,
+      dayNumber: 1,
+      itineraryId: "itin",
+      startPointId: "p1",
+      endPointId: "p2",
+    }
+    const d2: Day = {
+      id: D2,
+      dayNumber: 2,
+      itineraryId: "itin",
+      startPointId: "p2",
+      endPointId: "p3",
+    }
     const state = initialMapState([p1, p2, p3], [d1, d2])
     expect(state.points.find((p) => p.id === "p1")?.dayId).toBe(D1)
-    expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1)  // boundary stop → Day1
+    expect(state.points.find((p) => p.id === "p2")?.dayId).toBe(D1) // boundary stop → Day1
     expect(state.points.find((p) => p.id === "p3")?.dayId).toBe(D2)
   })
 
@@ -315,7 +359,11 @@ describe("DAY_UPDATE", () => {
   it("leaves other days untouched", () => {
     const DAY2_ID = "01952f1a-0000-7000-8000-000000000021"
     const state: MapState = { ...BASE, days: [day(DAY1_ID, 1), day(DAY2_ID, 2)] }
-    const next = mapReducer(state, { type: "DAY_UPDATE", id: DAY1_ID, fields: { date: "2026-06-01" } })
+    const next = mapReducer(state, {
+      type: "DAY_UPDATE",
+      id: DAY1_ID,
+      fields: { date: "2026-06-01" },
+    })
     expect(next.days[1].id).toBe(DAY2_ID)
     expect(next.days[1].date).toBeUndefined()
   })
@@ -355,18 +403,36 @@ describe("DAY_REMOVE", () => {
 
 describe("POINTS_ASSIGN", () => {
   it("updates dayId on all matching points", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa", "bbb"], day0Id: DAY0_ID, startPointId: null })
+    const next = mapReducer(BASE, {
+      type: "POINTS_ASSIGN",
+      dayId: DAY1_ID,
+      pointIds: ["aaa", "bbb"],
+      day0Id: DAY0_ID,
+      startPointId: null,
+    })
     expect(next.points.find((p) => p.id === "aaa")?.dayId).toBe(DAY1_ID)
     expect(next.points.find((p) => p.id === "bbb")?.dayId).toBe(DAY1_ID)
   })
 
   it("leaves non-matching points unchanged when no prior assignment exists", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"], day0Id: DAY0_ID, startPointId: null })
+    const next = mapReducer(BASE, {
+      type: "POINTS_ASSIGN",
+      dayId: DAY1_ID,
+      pointIds: ["aaa"],
+      day0Id: DAY0_ID,
+      startPointId: null,
+    })
     expect(next.points.find((p) => p.id === "ccc")?.dayId).toBe(DAY0_ID)
   })
 
   it("does not change pointOrder", () => {
-    const next = mapReducer(BASE, { type: "POINTS_ASSIGN", dayId: DAY1_ID, pointIds: ["aaa"], day0Id: DAY0_ID, startPointId: null })
+    const next = mapReducer(BASE, {
+      type: "POINTS_ASSIGN",
+      dayId: DAY1_ID,
+      pointIds: ["aaa"],
+      day0Id: DAY0_ID,
+      startPointId: null,
+    })
     expect(next.pointOrder).toEqual(BASE.pointOrder)
   })
 
@@ -421,7 +487,7 @@ const APPLY_STATE: MapState = {
   points: [
     makePoint("p0"),
     makePoint("p1"),
-    makePoint("p2", "stop"),  // was an old boundary endpoint
+    makePoint("p2", "stop"), // was an old boundary endpoint
     makePoint("p3"),
     makePoint("p4"),
   ],
@@ -540,7 +606,7 @@ describe("BOUNDARIES_APPLY", () => {
     }
     const next = mapReducer(state, {
       type: "BOUNDARIES_APPLY",
-      slices: SLICES,   // last slice endIdx=4; p5 is at idx 5 — not covered
+      slices: SLICES, // last slice endIdx=4; p5 is at idx 5 — not covered
       pointUpdates: POINT_UPDATES,
       day0Id: DAY0_ID,
     })

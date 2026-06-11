@@ -2,9 +2,9 @@ import L from "leaflet"
 import type { PointType } from "@/lib/dtos/point"
 
 const SIZES: Record<PointType, number> = {
-  stop: 22,       // overnight stop — larger, fits 2-digit numbers
-  position: 18,   // waypoint — standard
-  interest: 18,   // POI — medium, rotated square to visually separate from route points
+  stop: 22, // overnight stop — larger, fits 2-digit numbers
+  position: 18, // waypoint — standard
+  interest: 18, // POI — medium, rotated square to visually separate from route points
 }
 
 function numHtml(index: number, color: string, size: number, counterRotate = false): string {

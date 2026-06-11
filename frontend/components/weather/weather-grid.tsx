@@ -7,7 +7,8 @@ function CloudIcon({ cloud }: { cloud: string | null | undefined }) {
   const pct = cloud != null ? parseInt(cloud, 10) : null
   if (pct == null || isNaN(pct)) return null
   if (pct < 25) return <Sun className="size-3 text-amber-400" aria-label={`${pct}% cloud`} />
-  if (pct < 62) return <CloudSun className="size-3 text-muted-foreground" aria-label={`${pct}% cloud`} />
+  if (pct < 62)
+    return <CloudSun className="text-muted-foreground size-3" aria-label={`${pct}% cloud`} />
   return <Cloud className="size-3 text-slate-400" aria-label={`${pct}% cloud`} />
 }
 
@@ -17,7 +18,7 @@ interface WeatherGridProps {
 
 export function WeatherGrid({ states }: WeatherGridProps) {
   if (states.length === 0) {
-    return <p className="text-xs text-muted-foreground">No weather data.</p>
+    return <p className="text-muted-foreground text-xs">No weather data.</p>
   }
 
   return (
@@ -25,22 +26,24 @@ export function WeatherGrid({ states }: WeatherGridProps) {
       {states.map((s) => (
         <div
           key={s.time}
-          className="flex w-14 shrink-0 flex-col items-center gap-1 rounded-md border border-border/60 bg-muted/30 px-1 py-1.5 text-center"
+          className="border-border/60 bg-muted/30 flex w-14 shrink-0 flex-col items-center gap-1 rounded-md border px-1 py-1.5 text-center"
         >
-          <span className="text-[10px] text-muted-foreground tabular-nums">{formatHour(s.time)}</span>
+          <span className="text-muted-foreground text-[10px] tabular-nums">
+            {formatHour(s.time)}
+          </span>
           {s.windForce != null ? (
             <span className="flex flex-col items-center gap-0.5">
               <Navigation2
-                className="size-3 text-muted-foreground"
+                className="text-muted-foreground size-3"
                 aria-hidden
                 style={{ transform: `rotate(${s.windDirection ?? 0}deg)` }}
               />
               <BeaufortPill knots={s.windForce} />
             </span>
           ) : (
-            <span className="text-[10px] text-muted-foreground">—</span>
+            <span className="text-muted-foreground text-[10px]">—</span>
           )}
-          <span className="h-3.5 flex items-center justify-center">
+          <span className="flex h-3.5 items-center justify-center">
             <CloudIcon cloud={s.cloud} />
           </span>
           <span className="h-3.5">

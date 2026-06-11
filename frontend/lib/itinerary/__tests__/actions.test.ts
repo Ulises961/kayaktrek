@@ -15,7 +15,17 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
-import { createItinerary, createTripFromItinerary, createPoint, updatePoint, deletePoint, createDay, updateDay, assignPointsToDay, applyBoundaries } from "../actions"
+import {
+  createItinerary,
+  createTripFromItinerary,
+  createPoint,
+  updatePoint,
+  deletePoint,
+  createDay,
+  updateDay,
+  assignPointsToDay,
+  applyBoundaries,
+} from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -100,7 +110,10 @@ describe("createPoint", () => {
   it("returns success with the parsed point on success", async () => {
     mockApiPost.mockResolvedValue(POINT_RESPONSE)
     const result = await createPoint(DAY_ID, { type: "position", latitude: 44.5, longitude: 14.2 })
-    expect(result).toMatchObject({ success: true, point: expect.objectContaining({ id: POINT_ID }) })
+    expect(result).toMatchObject({
+      success: true,
+      point: expect.objectContaining({ id: POINT_ID }),
+    })
   })
 
   it("returns error result when the API throws", async () => {
@@ -126,7 +139,10 @@ describe("updatePoint", () => {
   it("returns success with the parsed point on success", async () => {
     mockApiPatch.mockResolvedValue(POINT_RESPONSE)
     const result = await updatePoint(POINT_ID, { latitude: 44.6, longitude: 14.3 })
-    expect(result).toMatchObject({ success: true, point: expect.objectContaining({ id: POINT_ID }) })
+    expect(result).toMatchObject({
+      success: true,
+      point: expect.objectContaining({ id: POINT_ID }),
+    })
   })
 
   it("returns error result when the API throws", async () => {
@@ -172,7 +188,10 @@ describe("createDay", () => {
   it("posts to /api/day/create with itineraryId and dayNumber", async () => {
     mockApiPost.mockResolvedValue(DAY_RESPONSE)
     await createDay(ITINERARY_ID_2, 1)
-    expect(mockApiPost).toHaveBeenCalledWith("/api/day/create", { itineraryId: ITINERARY_ID_2, dayNumber: 1 })
+    expect(mockApiPost).toHaveBeenCalledWith("/api/day/create", {
+      itineraryId: ITINERARY_ID_2,
+      dayNumber: 1,
+    })
   })
 
   it("returns success with the parsed day", async () => {
@@ -232,14 +251,17 @@ describe("applyBoundaries", () => {
     await applyBoundaries(ITINERARY_ID, PAYLOAD)
     expect(mockApiPost).toHaveBeenCalledWith(
       `/api/itinerary/${ITINERARY_ID}/apply-boundaries`,
-      PAYLOAD
+      PAYLOAD,
     )
   })
 
   it("returns success with the parsed itinerary on success", async () => {
     mockApiPost.mockResolvedValue(ITINERARY_RESPONSE)
     const result = await applyBoundaries(ITINERARY_ID, PAYLOAD)
-    expect(result).toMatchObject({ success: true, itinerary: expect.objectContaining({ id: ITINERARY_ID }) })
+    expect(result).toMatchObject({
+      success: true,
+      itinerary: expect.objectContaining({ id: ITINERARY_ID }),
+    })
   })
 
   it("returns error result when the API throws", async () => {
@@ -298,7 +320,9 @@ describe("createTripFromItinerary", () => {
     mockApiPost.mockResolvedValue({ id: TRIP_ID_NEW })
     mockApiPatch.mockResolvedValue({})
     await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
-    expect(mockApiPatch).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`, { tripId: TRIP_ID_NEW })
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`, {
+      tripId: TRIP_ID_NEW,
+    })
   })
 
   it("returns success with the new tripId", async () => {
