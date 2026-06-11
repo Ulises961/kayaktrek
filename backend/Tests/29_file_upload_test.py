@@ -29,9 +29,12 @@ not require MinIO to be running.
 import io
 import json
 from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 
+from Api.database import db
+from Models.travel_document import TravelDocument
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.travel_document_resource import TRAVEL_DOCUMENT_ENDPOINT
 
@@ -240,6 +243,25 @@ def test_doc_upload_no_file_field(client, auth_headers, travel_doc):
     assert r.status_code == 400, f"missing file field → {r.status_code}"
 
 
+@pytest.fixture(scope="function")
+def travel_doc_with_attachment(client, auth_headers, trip_w_o_itinerary, app):
+    """Travel document with attachment_path pre-set directly — no MinIO needed."""
+    trip_id = trip_w_o_itinerary["id"]
+    r = client.post(
+        f"{TRAVEL_DOCUMENT_ENDPOINT}/{trip_id}/create",
+        headers=auth_headers,
+        json={"type": "permit", "name": "Ownership gate test"},
+    )
+    assert r.status_code == 201, r.data
+    data = json.loads(r.data)
+    with app.app_context():
+        doc = db.session.query(TravelDocument).filter_by(id=UUID(data["id"])).first()
+        doc.attachment_path = f"{trip_id}/{data['id']}/permit.pdf"
+        db.session.commit()
+    yield data
+    client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{data['id']}", headers=auth_headers)
+
+
 def test_doc_upload_path_traversal_filename_sanitized(client, auth_headers, travel_doc):
     """
     A filename containing path traversal sequences (../../etc/passwd) must not
@@ -264,3 +286,40 @@ def test_doc_upload_path_traversal_filename_sanitized(client, auth_headers, trav
         "Fix: sanitize filename in TravelDocumentService.upload_attachment "
         "using werkzeug.utils.secure_filename before building the object key."
     )
+
+
+# ---------------------------------------------------------------------------
+# §3 — Document attachment URL ownership gate (HIGH-2)
+# ---------------------------------------------------------------------------
+
+def test_attachment_url_member_gets_presigned_url(client, auth_headers, travel_doc_with_attachment):
+    """Trip member receives a presigned URL for the document attachment."""
+    with patch(
+        "Services.travel_document_service.StorageService.presigned_url",
+        return_value="https://minio/signed?X-Amz-Signature=abc",
+    ) as mock_presigned:
+        r = client.get(
+            f"{TRAVEL_DOCUMENT_ENDPOINT}/{travel_doc_with_attachment['id']}/attachment",
+            headers=auth_headers,
+        )
+    assert r.status_code == 200
+    assert r.get_json()["url"] == "https://minio/signed?X-Amz-Signature=abc"
+    mock_presigned.assert_called_once()
+
+
+def test_attachment_url_non_member_gets_403(client, outsider_headers, travel_doc_with_attachment):
+    """Non-trip-member is denied access to the presigned URL endpoint."""
+    r = client.get(
+        f"{TRAVEL_DOCUMENT_ENDPOINT}/{travel_doc_with_attachment['id']}/attachment",
+        headers=outsider_headers,
+    )
+    assert r.status_code == 403
+
+
+def test_attachment_url_no_attachment_returns_404(client, auth_headers, travel_doc):
+    """Document with no attachment returns 404 on the URL endpoint."""
+    r = client.get(
+        f"{TRAVEL_DOCUMENT_ENDPOINT}/{travel_doc['id']}/attachment",
+        headers=auth_headers,
+    )
+    assert r.status_code == 404
