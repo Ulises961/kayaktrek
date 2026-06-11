@@ -16,13 +16,16 @@ pre-commit:
   commands:
     backend-flake8:
       glob: "backend/**/*.py"
-      run: cd backend && .venv/bin/flake8 {staged_files}
+      root: "backend"
+      run: .venv/bin/flake8 {staged_files}
     frontend-eslint:
       glob: "frontend/**/*.{ts,tsx}"
-      run: cd frontend && pnpm lint {staged_files}
+      root: "frontend"
+      run: pnpm lint {staged_files}
     frontend-format:
       glob: "frontend/**/*.{ts,tsx,js,mjs,json,css,md}"
-      run: cd frontend && pnpm prettier --check {staged_files}
+      root: "frontend"
+      run: pnpm prettier --check {staged_files}
 
 pre-push:
   parallel: true
