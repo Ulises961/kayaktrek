@@ -17,7 +17,7 @@ class Config:
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
     CACHE_TYPE = "RedisCache"
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
-    CACHE_REDIS_URL = os.getenv("REDIS_CACHE_URL", "redis://localhost:6379/1")
+    CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
 
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
