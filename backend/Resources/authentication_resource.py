@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, request, jsonify, abort, current_app
+from flask import Blueprint, request, jsonify, abort, current_app, g
 from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from marshmallow import ValidationError
@@ -45,8 +45,8 @@ def login_user():
         user = AuthService.authenticate_user(password, mail_addr=mail, username=username)
 
         if user:
-            access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin)
-            refresh_token = JWTService.generate_refresh_token(str(user.id))
+            access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
+            refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version)
 
             if access_token and refresh_token:
                 response_object = {
@@ -199,25 +199,36 @@ def reset_password():
 
 @api.route("/api/auth/refresh", methods=["POST"])
 def refresh_token():
-    data = request.get_json()
-    refresh_token = data.get("refresh_token")
-    if not refresh_token:
+    body = request.get_json()
+    raw_refresh = body.get("refresh_token") if body else None
+    if not raw_refresh:
         abort(HTTPStatus.BAD_REQUEST, description="Missing refresh token")
 
-    data = JWTService.verify_token(refresh_token, "refresh")
-
-    if not data:
+    payload = JWTService.verify_token(raw_refresh, "refresh")
+    if not payload:
         abort(HTTPStatus.UNAUTHORIZED, description="Invalid token")
 
     try:
-        user = UserService.get_user_by_id(data["user_id"])
+        user = UserService.get_user_by_id(payload["user_id"])
     except NoResultFound:
-        abort(HTTPStatus.UNAUTHORIZED, description="Login attempt with non-existent user")
+        abort(HTTPStatus.UNAUTHORIZED, description="User not found")
 
-    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin)
+    if not user.active:
+        abort(HTTPStatus.FORBIDDEN, description="Account not active")
 
-    response_object = {
-        "status": "success",
-        "access_token": access_token
-    }
-    return jsonify(response_object), HTTPStatus.OK
+    if payload.get("tv") != user.token_version:
+        abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
+
+    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
+
+    return jsonify({"status": "success", "access_token": access_token}), HTTPStatus.OK
+
+
+@api.route("/api/auth/logout", methods=["POST"])
+@JWTService.authenticate_restful
+def logout():
+    try:
+        UserService.invalidate_sessions(str(g.current_user_id))
+    except NoResultFound:
+        abort(HTTPStatus.UNAUTHORIZED)
+    return jsonify({"status": "success", "message": "Logged out"}), HTTPStatus.OK

@@ -255,3 +255,86 @@ class TestPasswordReset:
     def test_forgot_password_missing_mail_returns_400(self, client):
         r = client.post("/api/auth/forgot-password", json={})
         assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Token revocation (HIGH-1 regression)
+# ---------------------------------------------------------------------------
+
+def _active_user_with_tokens(client):
+    """Register, activate, and log in; return (user, access_token, refresh_token)."""
+    suffix = uuid.uuid4().hex[:8]
+    numeric = str(int(suffix, 16) % 100_000_000).zfill(8)
+    d = {
+        "mail": f"revoke_{suffix}@example.com",
+        "pwd": "Revoke9$Test",
+        "phone": f"+391{numeric}",
+        "name": "Revoke",
+        "surname": "Test",
+        "username": f"revoke_{suffix}",
+    }
+    client.post("/api/auth/register", json=d)
+    user = User.query.filter_by(mail=d["mail"]).first()
+    user.active = True
+    from Api.database import db as _db
+    _db.session.commit()
+
+    r = client.post("/api/auth/login", json={"mail": d["mail"], "pwd": d["pwd"]})
+    body = r.get_json()
+    return user, body["access_token"], body["refresh_token"]
+
+
+class TestRevocableTokens:
+
+    def test_refresh_token_rejected_after_password_reset(self, app, client):
+        """HIGH-1 regression: refresh token from before a reset must be rejected."""
+        user, _, refresh_tok = _active_user_with_tokens(client)
+
+        raw_reset = _insert_token(user.id, AuthTokenType.RESET)
+        client.post("/api/auth/reset-password", json={"token": raw_reset, "pwd": "NewSecure9$"})
+
+        r = client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 401
+
+    def test_access_token_rejected_after_logout(self, app, client):
+        """Access token issued before logout is rejected on subsequent requests."""
+        user, access_tok, _ = _active_user_with_tokens(client)
+
+        r1 = client.get("/api/user/me", headers={"Authorization": f"Bearer {access_tok}"})
+        assert r1.status_code == 200
+
+        client.post("/api/auth/logout", headers={"Authorization": f"Bearer {access_tok}"})
+
+        r2 = client.get("/api/user/me", headers={"Authorization": f"Bearer {access_tok}"})
+        assert r2.status_code == 401
+
+    def test_refresh_token_rejected_after_logout(self, app, client):
+        """Refresh token issued before logout is rejected after logout."""
+        user, access_tok, refresh_tok = _active_user_with_tokens(client)
+
+        client.post("/api/auth/logout", headers={"Authorization": f"Bearer {access_tok}"})
+
+        r = client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 401
+
+    def test_valid_session_survives_request_refresh_cycle(self, app, client):
+        """Normal login → refresh cycle continues to work unchanged."""
+        user, _, refresh_tok = _active_user_with_tokens(client)
+
+        r = client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 200
+        assert "access_token" in r.get_json()
+
+    def test_logout_requires_auth(self, client):
+        r = client.post("/api/auth/logout")
+        assert r.status_code in (401, 403)
+
+    def test_deactivated_account_refresh_rejected(self, app, client):
+        """Refresh endpoint rejects tokens for inactive accounts."""
+        user, _, refresh_tok = _active_user_with_tokens(client)
+
+        user.active = False
+        db.session.commit()
+
+        r = client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 403

@@ -32,7 +32,7 @@ def pw_user(app, client):
         user = User.query.filter_by(mail="pwchange.tmp@example.com").first()
         user.active = True
         _db.session.commit()
-        token = JWTService.generate_access_token(str(user.id), user.mail, user.admin)
+        token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
         user_id = str(user.id)
     yield {"Authorization": f"Bearer {token}"}
     with app.app_context():

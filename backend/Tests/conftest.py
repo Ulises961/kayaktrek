@@ -129,7 +129,7 @@ def id_2(user_2):
 def auth_token(app, user_1):
     """Get JWT token for the test user."""
 
-    token = JWTService.generate_access_token(user_1.id, user_1.mail, user_1.admin)
+    token = JWTService.generate_access_token(user_1.id, user_1.mail, user_1.admin, user_1.token_version)
     return token
 
 @pytest.fixture(scope='session')
@@ -140,7 +140,7 @@ def auth_headers(auth_token):
 @pytest.fixture(scope='session')
 def auth_token_2(app, user_2):
     """Get JWT token for the second test user."""
-    token = JWTService.generate_access_token(user_2.id, user_2.mail, user_2.admin)
+    token = JWTService.generate_access_token(user_2.id, user_2.mail, user_2.admin, user_2.token_version)
     return token
 
 @pytest.fixture(scope='session')
@@ -164,7 +164,7 @@ def outsider_headers(app, client):
     client.post("/api/auth/register", json=outsider_data)
     with app.app_context():
         outsider = _activate_user("outsider.tmp@example.com")
-        token = JWTService.generate_access_token(str(outsider.id), outsider.mail, outsider.admin)
+        token = JWTService.generate_access_token(str(outsider.id), outsider.mail, outsider.admin, outsider.token_version)
         outsider_id = str(outsider.id)
 
     yield {"Authorization": f"Bearer {token}"}
@@ -413,7 +413,7 @@ def trip_with_crew(app, client, auth_headers):
         crew_user = _activate_user("crew.member@example.com")
         assert crew_user is not None
         crew_id = str(crew_user.id)
-        crew_token = JWTService.generate_access_token(str(crew_user.id), crew_user.mail, crew_user.admin)
+        crew_token = JWTService.generate_access_token(str(crew_user.id), crew_user.mail, crew_user.admin, crew_user.token_version)
 
         # Directly insert crew membership (invitation flow is M3a)
         membership = TripMemberSchema().load({

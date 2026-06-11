@@ -21,7 +21,7 @@ class TestJWTService:
         email = "test@example.com"
         is_admin = False
         
-        token = JWTService.generate_access_token(user_id, email, is_admin)
+        token = JWTService.generate_access_token(user_id, email, is_admin, 0)
         
         assert token is not None
         assert isinstance(token, str)
@@ -39,7 +39,7 @@ class TestJWTService:
         """Test refresh token generation"""
         user_id = "test-uuid-456"
         
-        token = JWTService.generate_refresh_token(user_id)
+        token = JWTService.generate_refresh_token(user_id, 0)
         
         assert token is not None
         assert isinstance(token, str)
@@ -56,7 +56,7 @@ class TestJWTService:
         user_id = "test-uuid-789"
         email = "decode@example.com"
         
-        token = JWTService.generate_access_token(user_id, email, False)
+        token = JWTService.generate_access_token(user_id, email, False, 0)
         payload = JWTService.decode_token(token)
         
         assert payload['user_id'] == user_id
@@ -90,7 +90,7 @@ class TestJWTService:
     def test_verify_token_correct_type(self, app):
         """Test verifying token with correct type"""
         user_id = "verify-user"
-        token = JWTService.generate_access_token(user_id, "verify@test.com", False)
+        token = JWTService.generate_access_token(user_id, "verify@test.com", False, 0)
         
         payload = JWTService.verify_token(token, 'access')
         
@@ -101,7 +101,7 @@ class TestJWTService:
     def test_verify_token_wrong_type(self, app):
         """Test verifying token with wrong type returns None"""
         user_id = "wrong-type-user"
-        access_token = JWTService.generate_access_token(user_id, "wrong@test.com", False)
+        access_token = JWTService.generate_access_token(user_id, "wrong@test.com", False, 0)
         
         # Try to verify access token as refresh token
         payload = JWTService.verify_token(access_token, 'refresh')

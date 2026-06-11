@@ -180,8 +180,10 @@ class AuthService:
         if not user:
             raise ValueError("User not found")
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
+        user.password_changed_at = datetime.now(timezone.utc)
+        user.token_version += 1
         db.session.commit()
-        logger.info(f"Password reset for user {user.username}")
+        logger.info("password_reset", extra={"user_id": str(user.id)})
         return user
 
     # ------------------------------------------------------------------

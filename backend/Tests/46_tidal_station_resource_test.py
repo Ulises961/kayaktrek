@@ -33,7 +33,7 @@ def admin_headers(client):
     user.admin = True
     db.session.commit()
     uid = str(user.id)
-    token = JWTService.generate_access_token(user.id, user.mail, True)
+    token = JWTService.generate_access_token(user.id, user.mail, True, user.token_version)
 
     yield {"Authorization": f"Bearer {token}"}
 
