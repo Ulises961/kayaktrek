@@ -7,7 +7,7 @@ from uuid import UUID
 
 from flask import current_app
 from flask_bcrypt import check_password_hash, generate_password_hash
-from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.exc import NoResultFound
 from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
@@ -23,6 +23,9 @@ _TOKEN_EXPIRY_HOURS = {
     AuthTokenType.DATA_EXPORT: 24,
     AuthTokenType.DELETION_CANCEL: 24 * 30,  # 30-day grace window
 }
+
+# Pre-computed hash used to equalise login timing when the account does not exist.
+_DUMMY_HASH: str = generate_password_hash("timing-equalizer").decode("UTF-8")
 
 
 class AuthService:
@@ -45,6 +48,7 @@ class AuthService:
             user = query.filter_by(username=username).first()
 
         if not user:
+            check_password_hash(_DUMMY_HASH, password)
             return None
         if user.deletion_requested_at is not None:
             raise PermissionError("deletion_pending")
@@ -60,8 +64,11 @@ class AuthService:
         Register a new user with active=False.
         Sends an email verification token. In testing mode the email is suppressed.
 
+        When the submitted email address already has an account, sends a "you already have an
+        account" email to that address and returns normally — no error is raised and no HTTP
+        signal is given to the caller, preventing email enumeration.
+
         Raises:
-            IntegrityError: If a user with the same username or mail already exists
             ValueError: If user was not correctly persisted after creation
         """
         username = user_json.get("username")
@@ -71,7 +78,9 @@ class AuthService:
             (User.username == username) | (User.mail == mail_addr)
         ).first()
         if existing:
-            raise IntegrityError(statement="User already present", params=None, orig=Exception())
+            if existing.mail == mail_addr:
+                AuthService._send_already_registered_email(existing)
+            return existing
 
         user = cast(User, UserSchema().load(user_json))
         user.active = False
@@ -182,6 +191,17 @@ class AuthService:
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
         user.password_changed_at = datetime.now(timezone.utc)
         user.token_version += 1
+        # The private key is derived from the old password; after a reset it is
+        # undecryptable. Clear the keypair and any medical notes ciphertext so
+        # the UI reflects reality rather than holding orphaned encrypted data.
+        user.medical_notes_ciphertext = None
+        user.medical_notes_nonce = None
+        user.medical_notes_salt = None
+        user.medical_notes_consent_at = None
+        user.public_key = None
+        user.private_key_ciphertext = None
+        user.private_key_nonce = None
+        user.private_key_salt = None
         db.session.commit()
         logger.info("password_reset", extra={"user_id": str(user.id)})
         return user
@@ -191,17 +211,17 @@ class AuthService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _create_token(user_id:UUID, token_type: AuthTokenType) -> str:
+    def _create_token(user_id: UUID, token_type: AuthTokenType) -> str:
         """Generate a raw token, persist its hash, and return the raw value."""
         raw = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw.encode()).hexdigest()
         expiry_hours = _TOKEN_EXPIRY_HOURS[token_type]
         auth_token = AuthToken()
-        auth_token.user_id= user_id
-        auth_token.token_hash=token_hash
-        auth_token.type=token_type
-        auth_token.expires_at=datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
-        
+        auth_token.user_id = user_id
+        auth_token.token_hash = token_hash
+        auth_token.type = token_type
+        auth_token.expires_at = datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
+
         db.session.add(auth_token)
         db.session.commit()
         return raw
@@ -246,5 +266,19 @@ class AuthService:
             "account_verification",
             name=user.name,
             verify_url=verify_url,
+            support_email=support_email,
+        )
+
+    @staticmethod
+    def _send_already_registered_email(user: User) -> None:
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+        send_template_email(
+            user.mail,
+            "Someone tried to register with your Kayak Planner email",
+            "account_already_registered",
+            name=user.name,
+            login_url=f"{frontend_url}/login",
+            forgot_url=f"{frontend_url}/forgot-password",
             support_email=support_email,
         )

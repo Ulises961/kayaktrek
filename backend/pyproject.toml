@@ -32,6 +32,7 @@ dependencies = [
     "python-magic",
     "cryptography",
     "gpxpy",
+    "defusedxml",
     "shapely",
     "flask-caching",
 ]

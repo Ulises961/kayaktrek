@@ -4,8 +4,9 @@ from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
+
 class Config:
-    SQLALCHEMY_TRACK_MODIFICATIONS = True
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
     MAIL_USE_TLS = True
@@ -14,10 +15,10 @@ class Config:
     # Must match MAIL_USERNAME when using Gmail SMTP — Gmail rejects mismatched senders.
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER") or os.getenv("MAIL_USERNAME")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
     CACHE_TYPE = "RedisCache"
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
+
 
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
@@ -26,6 +27,7 @@ class DevelopmentConfig(Config):
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+
 
 class TestingConfig(Config):
     TESTING = True
@@ -41,18 +43,23 @@ class TestingConfig(Config):
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = 0
 
+
 class StagingConfig(Config):
-    DEVELOPMENT = True
-    DEBUG = True
+    DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+    RATELIMIT_STORAGE_URI = os.environ["RATELIMIT_STORAGE_URI"]
+
 
 class ProductionConfig(Config):
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+    RATELIMIT_STORAGE_URI = os.environ["RATELIMIT_STORAGE_URI"]
+
+
 config = {
     "development": DevelopmentConfig,
     "testing": TestingConfig,

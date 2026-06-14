@@ -3,7 +3,6 @@ import logging
 from flask import Blueprint, request, jsonify, abort, current_app, g
 from flask_limiter.util import get_remote_address
 from http import HTTPStatus
-from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
 from Api.database import db
@@ -80,13 +79,12 @@ def register_user():
     if not user_json:
         raise ValueError("Missing request body")
 
-    user = AuthService.register_user(user_json)
+    AuthService.register_user(user_json)
 
-    response_object = {
+    return jsonify({
         "status": "success",
-        "message": "Account created. Check your email to verify your account before logging in.",
-    }
-    return jsonify(response_object), HTTPStatus.CREATED
+        "message": "Request received. If this address is new, check your email to verify your account.",
+    }), HTTPStatus.CREATED
 
 
 @api.route("/api/auth/activate-test", methods=["POST"])
