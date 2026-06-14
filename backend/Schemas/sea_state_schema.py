@@ -14,8 +14,8 @@ class SeaStateSchema(Schema):
     wave_height = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 30)
     wave_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
     swell_wave_height = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 30)
-    swell_direction = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 360)
-    swell_period = fields.Float(allow_none=False, required=True, validate=lambda x: 0 <= x <= 30)
+    swell_direction = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 360)
+    swell_period = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 30)
     current_speed = fields.Float(allow_none=True)
     current_direction = fields.Float(allow_none=True, validate=lambda x: x is None or 0 <= x <= 360)
 
@@ -40,14 +40,14 @@ class SeaStateSchema(Schema):
 
     @validates('swell_direction')
     def validate_swell_direction(self, value, **kwargs):
-        if value < 0 or value > 360:
+        if value is not None and (value < 0 or value > 360):
             raise ValidationError("Swell direction must be between 0 and 360 degrees")
 
     @validates('swell_period')
     def validate_swell_period(self, value, **kwargs):
-        if value < 0:
+        if value is not None and value < 0:
             raise ValidationError("Swell period cannot be negative")
-        if value > 30:
+        if value is not None and value > 30:
             raise ValidationError("Swell period cannot exceed 30 seconds")
 
     @post_load

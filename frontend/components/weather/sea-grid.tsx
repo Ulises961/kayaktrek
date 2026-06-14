@@ -61,19 +61,27 @@ export function SeaGrid({ states }: SeaGridProps) {
               <span className="text-[8px] font-semibold tracking-wide text-sky-600/60 uppercase dark:text-sky-400/60">
                 sw
               </span>
-              {s.swellWaveHeight != null && (
+              {s.swellWaveHeight != null ? (
                 <span className="text-[10px] font-medium text-sky-600/80 tabular-nums dark:text-sky-400/80">
                   {s.swellWaveHeight.toFixed(1)} m
                 </span>
+              ) : (
+                <span className="text-muted-foreground/50 text-[10px]">—</span>
               )}
-              <Navigation2
-                className="size-2.5 text-sky-600/80 dark:text-sky-400/80"
-                aria-hidden
-                style={{ transform: `rotate(${s.swellDirection}deg)` }}
-              />
-              <span className="text-muted-foreground text-[10px] tabular-nums">
-                {s.swellPeriod.toFixed(0)} s
-              </span>
+              {s.swellDirection != null && (
+                <Navigation2
+                  className="size-2.5 text-sky-600/80 dark:text-sky-400/80"
+                  aria-hidden
+                  style={{ transform: `rotate(${s.swellDirection}deg)` }}
+                />
+              )}
+              {s.swellPeriod != null ? (
+                <span className="text-muted-foreground text-[10px] tabular-nums">
+                  {s.swellPeriod.toFixed(0)} s
+                </span>
+              ) : (
+                <span className="text-muted-foreground/50 text-[10px]">—</span>
+              )}
             </span>
           </div>
         ))}

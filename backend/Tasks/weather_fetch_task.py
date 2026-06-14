@@ -32,18 +32,12 @@ def fetch_weather(self, day_id: str, request_id: Optional[str] = None) -> None:
         logger.warning("weather_fetch_no_date", extra={"day_id": day_id})
         return
 
-    route_points = [
-        p for p in (day.points or [])
-        if p.type != PointType.INTEREST
-        and p.latitude is not None
-        and p.longitude is not None
-    ]
-    if not route_points:
+    ref = _midpoint_of_route(day)
+    if ref is None:
         logger.warning("weather_fetch_no_coordinates", extra={"day_id": day_id})
         return
 
-    lat = sum(float(p.latitude) for p in route_points) / len(route_points)
-    lng = sum(float(p.longitude) for p in route_points) / len(route_points)
+    lat, lng = ref
     date_str = day.date.isoformat()
 
     weather_records = OpenMeteoService.fetch_weather(lat, lng, date_str)
@@ -61,6 +55,37 @@ def fetch_weather(self, day_id: str, request_id: Optional[str] = None) -> None:
             "sea_states": len(marine_records),
         },
     )
+
+
+def _midpoint_of_route(day) -> tuple[float, float] | None:
+    """Return (lat, lng) of the midpoint of the day's ordered route.
+
+    Walking the linked list guarantees we use an actual on-water coordinate
+    rather than an arithmetic mean that could fall on land.
+    """
+    candidates = {
+        p.id: p for p in (day.points or [])
+        if p.type != PointType.INTEREST
+        and p.latitude is not None
+        and p.longitude is not None
+    }
+    if not candidates:
+        return None
+
+    next_ids = {p.next_id for p in candidates.values() if p.next_id is not None}
+    heads = [p for p in candidates.values() if p.id not in next_ids]
+    head = heads[0] if heads else next(iter(candidates.values()))
+
+    ordered: list = []
+    current = head
+    seen: set = set()
+    while current is not None and current.id not in seen:
+        ordered.append(current)
+        seen.add(current.id)
+        current = candidates.get(current.next_id)
+
+    mid = ordered[len(ordered) // 2]
+    return float(mid.latitude), float(mid.longitude)
 
 
 def _upsert_weather(day_uuid: UUID, records: list[dict]) -> None:
