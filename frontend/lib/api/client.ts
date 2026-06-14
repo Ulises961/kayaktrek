@@ -54,7 +54,8 @@ export async function apiPost<T>(
       `POST ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
     )
   }
-  return res.json() as Promise<T>
+  const text = await res.text()
+  return (text ? JSON.parse(text) : null) as T
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {

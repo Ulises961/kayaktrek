@@ -44,8 +44,8 @@ def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
         with open(filepath, "w") as fh:
             fh.write(payload)
 
-        backend_url = current_app.config.get("BACKEND_URL", "http://localhost:5000")
-        download_url = f"{backend_url}/api/user/me/data-export/{raw_token}"
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        download_url = f"{frontend_url}/download-export/{raw_token}"
         support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
