@@ -43,6 +43,7 @@ export function MapBuilder({
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
+  const [selectedHour, setSelectedHour] = useState(12)
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -161,6 +162,8 @@ export function MapBuilder({
       setSelectedPointId,
       tripState,
       isLeader,
+      selectedHour,
+      setSelectedHour,
     }),
     [
       state,
@@ -177,6 +180,7 @@ export function MapBuilder({
       selectedPointId,
       tripState,
       isLeader,
+      selectedHour,
     ],
   )
 
@@ -205,6 +209,7 @@ export function MapBuilder({
             distanceUnit={distanceUnit}
             viewMode={viewMode}
             selectedDayId={selectedDayId}
+            selectedHour={selectedHour}
             flyToPoint={flyToPoint}
             onMapClick={handleMapClick}
             onMarkerDragEnd={handleMarkerDragEnd}

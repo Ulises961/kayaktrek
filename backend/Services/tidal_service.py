@@ -59,11 +59,11 @@ def _build_uniform_velocity_grid(
         "source": source,
         "grid": [
             {
-                "header": {**header_base, "parameterNumberName": "eastward_component"},
+                "header": {**header_base, "parameterCategory": 2, "parameterNumber": 2, "parameterNumberName": "eastward_component"},
                 "data": [u] * n,
             },
             {
-                "header": {**header_base, "parameterNumberName": "northward_component"},
+                "header": {**header_base, "parameterCategory": 2, "parameterNumber": 3, "parameterNumberName": "northward_component"},
                 "data": [v] * n,
             },
         ],

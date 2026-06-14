@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import React, { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
@@ -67,6 +67,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setSelectedPointId: vi.fn(),
     tripState: null,
     isLeader: true,
+    selectedHour: 12,
+    setSelectedHour: vi.fn(),
     ...overrides,
   }
 }
@@ -182,10 +184,38 @@ describe("DayDetailPanel — points section", () => {
     const setSelectedPointId = vi.fn()
     renderWithCtx(makeCtx({ setSelectedPointId }))
     await userEvent.click(screen.getByRole("button", { name: /waypoints/i }))
-    const cards = screen.getAllByRole("button")
-    // Cards are the last buttons rendered; find the one wrapping "Harbour"
+    // Find the card wrapping "Harbour"
     const harbourCard = screen.getByText("Harbour").closest("[role=button]") as HTMLElement
     await userEvent.click(harbourCard)
     expect(setSelectedPointId).toHaveBeenCalledWith("p1")
+  })
+})
+
+describe("DayDetailPanel — hour slider", () => {
+  it("renders the hour slider with the context selectedHour value", () => {
+    renderWithCtx(makeCtx({ selectedHour: 9 }))
+    const slider = screen.getByTestId("hour-slider")
+    expect(slider).toBeInTheDocument()
+    expect(slider).toHaveValue("9")
+  })
+
+  it("displays the current hour as HH:00", () => {
+    renderWithCtx(makeCtx({ selectedHour: 6 }))
+    expect(screen.getByText("06:00")).toBeInTheDocument()
+  })
+
+  it("calls setSelectedHour when the slider changes", () => {
+    const setSelectedHour = vi.fn()
+    renderWithCtx(makeCtx({ selectedHour: 12, setSelectedHour }))
+    const slider = screen.getByTestId("hour-slider")
+    fireEvent.change(slider, { target: { value: "18" } })
+    expect(setSelectedHour).toHaveBeenCalledWith(18)
+  })
+
+  it("has min=0 and max=23 range", () => {
+    renderWithCtx(makeCtx())
+    const slider = screen.getByTestId("hour-slider")
+    expect(slider).toHaveAttribute("min", "0")
+    expect(slider).toHaveAttribute("max", "23")
   })
 })

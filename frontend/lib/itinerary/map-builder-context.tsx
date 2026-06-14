@@ -30,6 +30,8 @@ export type MapBuilderContextValue = {
   setSelectedPointId: (id: string | null) => void
   tripState: TripState | null
   isLeader: boolean
+  selectedHour: number
+  setSelectedHour: (h: number) => void
 }
 
 export const MapBuilderContext = createContext<MapBuilderContextValue | null>(null)

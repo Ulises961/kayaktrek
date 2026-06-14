@@ -38,6 +38,8 @@ const MOCK_CTX: MapBuilderContextValue = {
   setSelectedPointId: () => {},
   tripState: null,
   isLeader: true,
+  selectedHour: 12,
+  setSelectedHour: () => {},
 }
 
 describe("useMapBuilder", () => {

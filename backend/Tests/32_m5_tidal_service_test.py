@@ -308,6 +308,12 @@ def test_build_stream_velocity_grid_manual_source(app, itinerary):
     headers = [g["header"]["parameterNumberName"] for g in result["grid"]]
     assert "eastward_component" in headers
     assert "northward_component" in headers
+    u = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "eastward_component")
+    v = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "northward_component")
+    assert u["header"]["parameterCategory"] == 2
+    assert u["header"]["parameterNumber"] == 2
+    assert v["header"]["parameterCategory"] == 2
+    assert v["header"]["parameterNumber"] == 3
 
 
 def test_build_stream_velocity_grid_empty_when_no_data(app):
@@ -423,6 +429,11 @@ def test_build_wind_velocity_grid_happy_path_picks_closest_hour():
     # 36 km/h ≈ 10 m/s blowing toward 270° → u dominates, eastward component non-zero
     east = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "eastward_component")
     assert east["data"][0] != 0.0
+    nrth = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "northward_component")
+    assert east["header"]["parameterCategory"] == 2
+    assert east["header"]["parameterNumber"] == 2
+    assert nrth["header"]["parameterCategory"] == 2
+    assert nrth["header"]["parameterNumber"] == 3
 
 
 # ── build_wave_velocity_grid ─────────────────────────────────────────────────
@@ -452,6 +463,11 @@ def test_build_wave_velocity_grid_happy_path():
     # 2 m toward 180° (south) → northward component negative
     north = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "northward_component")
     assert north["data"][0] < 0.0
+    east2 = next(g for g in result["grid"] if g["header"]["parameterNumberName"] == "eastward_component")
+    assert east2["header"]["parameterCategory"] == 2
+    assert east2["header"]["parameterNumber"] == 2
+    assert north["header"]["parameterCategory"] == 2
+    assert north["header"]["parameterNumber"] == 3
 
 
 # ── tidal_gates_for_day — skip branches ──────────────────────────────────────

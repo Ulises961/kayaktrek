@@ -75,6 +75,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     isLeader: true,
     selectedPointId: null,
     setSelectedPointId: vi.fn(),
+    selectedHour: 12,
+    setSelectedHour: vi.fn(),
     ...overrides,
   }
 }

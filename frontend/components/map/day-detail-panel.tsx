@@ -177,7 +177,15 @@ function PointsSection({ entries, onOpen }: PointsSectionProps) {
 }
 
 export function DayDetailPanel() {
-  const { state, selectedDayId, setSelectedPointId, isLeader, dispatch } = useMapBuilder()
+  const {
+    state,
+    selectedDayId,
+    setSelectedPointId,
+    isLeader,
+    dispatch,
+    selectedHour,
+    setSelectedHour,
+  } = useMapBuilder()
 
   if (!selectedDayId) return null
 
@@ -200,6 +208,22 @@ export function DayDetailPanel() {
           onDateSaved={(date) => dispatch({ type: "DAY_UPDATE", id: day.id!, fields: { date } })}
         />
       )}
+      <div className="border-border/50 flex items-center gap-3 border-b px-3 py-1.5">
+        <span className="text-muted-foreground shrink-0 text-[11px]">Hr</span>
+        <input
+          type="range"
+          min={0}
+          max={23}
+          value={selectedHour}
+          onChange={(e) => setSelectedHour(Number(e.target.value))}
+          className="accent-primary flex-1"
+          aria-label="Map overlay hour"
+          data-testid="hour-slider"
+        />
+        <span className="text-foreground font-mono text-[11px]">
+          {String(selectedHour).padStart(2, "0")}:00
+        </span>
+      </div>
       <div className="max-h-80 overflow-y-auto">
         <ConditionsSection dayId={selectedDayId} isLeader={isLeader} />
         <PointsSection entries={dayEntries} onOpen={setSelectedPointId} />

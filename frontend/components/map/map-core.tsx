@@ -8,6 +8,11 @@ import { PointMarker } from "./point-marker"
 import { haversineNm, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
+import { cn } from "@/lib/utils"
+import { VelocityLayer } from "@/components/weather/velocity-layer"
+import { LayersControl } from "./layers-control"
+import { fetchWindVectors, fetchWaveVectors, fetchTidalStreamVectors } from "@/lib/weather/actions"
+import type { VelocityGridData } from "@/lib/types/ui"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -19,11 +24,47 @@ export type MapCoreProps = {
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null
+  selectedHour?: number
   flyToPoint?: FlyToTarget | null
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
+}
+
+// Module-level constants so options objects are stable across renders.
+// leaflet-velocity needs hex colors — CSS custom properties are not resolved by canvas.
+// Wind: Windy.com / earth.nullschool Spectral palette — calm blue → gale deep red.
+const WIND_SCALE = [
+  "#3288bd",
+  "#66c2a5",
+  "#abdda4",
+  "#e6f598",
+  "#fffdbf",
+  "#fdae61",
+  "#f46d43",
+  "#d53e4f",
+  "#9e0142",
+]
+const WIND_OPTIONS = {
+  velocityScale: 0.005,
+  colorScale: WIND_SCALE,
+  particleAge: 64,
+  lineWidth: 2,
+}
+// Swell: white — direction matters more than speed, matches standard chart convention.
+const SWELL_OPTIONS = {
+  velocityScale: 0.012,
+  colorScale: ["#ffffff", "#e8f4fc"],
+  particleAge: 90,
+  lineWidth: 3,
+}
+// Tidal stream: blue-purple ramp indicating current strength.
+const TIDAL_OPTIONS = {
+  velocityScale: 0.05,
+  colorScale: ["#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
+  particleAge: 64,
+  lineWidth: 2,
 }
 
 type ValidPoint = Point & { latitude: number; longitude: number }
@@ -208,6 +249,7 @@ export default function MapCore({
   avgSpeedKnots = 2.5,
   viewMode = false,
   selectedDayId = null,
+  selectedHour = 12,
   flyToPoint = null,
   onMapClick,
   onMarkerDragEnd,
@@ -215,6 +257,26 @@ export default function MapCore({
   onMarkerClick,
 }: MapCoreProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
+
+  const [windData, setWindData] = useState<VelocityGridData | null>(null)
+  const [swellData, setSwellData] = useState<VelocityGridData | null>(null)
+  const [tidalData, setTidalData] = useState<VelocityGridData | null>(null)
+  const [windEnabled, setWindEnabled] = useState(true)
+  const [swellEnabled, setSwellEnabled] = useState(true)
+  const [tidalEnabled, setTidalEnabled] = useState(true)
+
+  useEffect(() => {
+    if (!selectedDayId) return
+    fetchWindVectors(selectedDayId, selectedHour).then((r) =>
+      setWindData(r.success ? r.data : null),
+    )
+    fetchWaveVectors(selectedDayId, selectedHour).then((r) =>
+      setSwellData(r.success ? r.data : null),
+    )
+    fetchTidalStreamVectors(selectedDayId, selectedHour).then((r) =>
+      setTidalData(r.success ? r.data : null),
+    )
+  }, [selectedDayId, selectedHour])
 
   const selectedDayNum = useMemo(
     () => (selectedDayId ? (days.find((d) => d.id === selectedDayId)?.dayNumber ?? null) : null),
@@ -284,11 +346,14 @@ export default function MapCore({
     [onMarkerDragEnd],
   )
 
+  const hasTidalLayer = selectedDayId !== null && tidalData !== null && tidalData.grid.length > 0
+
   return (
     <div
-      className={
-        viewMode ? "h-full w-full" : "h-full w-full [&_.leaflet-container]:cursor-crosshair"
-      }
+      className={cn(
+        "relative h-full w-full",
+        !viewMode && "[&_.leaflet-container]:cursor-crosshair",
+      )}
     >
       <MapContainer center={[43, 13]} zoom={6} className="h-full w-full" zoomControl>
         <TileLayer
@@ -339,7 +404,45 @@ export default function MapCore({
             onMarkerClick={onMarkerClick}
           />
         ))}
+
+        {selectedDayId && windData && windEnabled && (
+          <VelocityLayer data={windData.grid} options={WIND_OPTIONS} />
+        )}
+        {selectedDayId && swellData && swellEnabled && (
+          <VelocityLayer data={swellData.grid} options={SWELL_OPTIONS} />
+        )}
+        {hasTidalLayer && tidalEnabled && (
+          <VelocityLayer data={tidalData!.grid} options={TIDAL_OPTIONS} />
+        )}
       </MapContainer>
+
+      {selectedDayId && (
+        <LayersControl
+          windEnabled={windEnabled}
+          swellEnabled={swellEnabled}
+          tidalEnabled={tidalEnabled}
+          hasTidalLayer={hasTidalLayer}
+          tidalSource={tidalData?.source}
+          onWindToggle={() => setWindEnabled((e) => !e)}
+          onSwellToggle={() => setSwellEnabled((e) => !e)}
+          onTidalToggle={() => setTidalEnabled((e) => !e)}
+        />
+      )}
+      {selectedDayId && windEnabled && windData && (
+        <div
+          className="bg-card/85 ring-border/30 absolute bottom-6 left-2 z-[1001] flex flex-col gap-0.5 rounded-md px-2.5 py-1.5 shadow-md ring-1 backdrop-blur-sm"
+          data-testid="wind-legend"
+        >
+          <div
+            className="h-2 w-28 rounded-full"
+            style={{ background: `linear-gradient(to right, ${WIND_SCALE.join(", ")})` }}
+          />
+          <div className="text-muted-foreground flex justify-between text-[9px]">
+            <span>Calm</span>
+            <span>Gale</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

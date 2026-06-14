@@ -14,6 +14,8 @@ export interface HomeIconHandle {
 
 export interface VelocityGridHeader {
   parameterUnit: string
+  parameterCategory: number
+  parameterNumber: number
   parameterNumberName: string
   la1: number
   la2: number
@@ -36,4 +38,9 @@ export interface VelocityGridLayer {
 export interface VelocityGridData {
   source?: "station" | "manual"
   grid: VelocityGridLayer[]
+}
+
+export interface VelocityLayerProps {
+  data: VelocityGridLayer[]
+  options?: Record<string, unknown>
 }
