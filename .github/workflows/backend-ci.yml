@@ -40,6 +40,7 @@ jobs:
       DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5434/kayak_test
       SECRET_KEY: ci-secret-key-not-used-in-prod
       JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
+      RATELIMIT_STORAGE_URI: memory://
 
     steps:
       - uses: actions/checkout@v4

@@ -46,6 +46,7 @@ class TestingConfig(Config):
 
 class StagingConfig(Config):
     DEBUG = False
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
@@ -54,6 +55,7 @@ class StagingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SECRET_KEY = os.environ["SECRET_KEY"]
     JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
