@@ -38,17 +38,15 @@ export function MapTopBar({
   const showEditRoute = viewMode && isLeader && tripState !== "past"
   const showDone = !viewMode
   const displayDistance =
-    distanceUnit === "nm"
-      ? totalDistance.toFixed(1)
-      : (totalDistance * 1.852).toFixed(1)
+    distanceUnit === "nm" ? totalDistance.toFixed(1) : (totalDistance * 1.852).toFixed(1)
 
   const unitToggle = (
-    <span className="flex rounded border border-border overflow-hidden text-[10px]">
+    <span className="border-border flex overflow-hidden rounded border text-[10px]">
       <button
         onClick={() => onDistanceUnitChange("nm")}
         className={cn(
           "px-1.5 py-0.5 transition-colors",
-          distanceUnit === "nm" ? "bg-muted font-medium text-foreground" : "hover:bg-muted"
+          distanceUnit === "nm" ? "bg-muted text-foreground font-medium" : "hover:bg-muted",
         )}
       >
         nm
@@ -56,8 +54,8 @@ export function MapTopBar({
       <button
         onClick={() => onDistanceUnitChange("km")}
         className={cn(
-          "px-1.5 py-0.5 transition-colors border-l border-border",
-          distanceUnit === "km" ? "bg-muted font-medium text-foreground" : "hover:bg-muted"
+          "border-border border-l px-1.5 py-0.5 transition-colors",
+          distanceUnit === "km" ? "bg-muted text-foreground font-medium" : "hover:bg-muted",
         )}
       >
         km
@@ -66,15 +64,15 @@ export function MapTopBar({
   )
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-[1001] flex flex-col bg-background/90 backdrop-blur-sm border-b border-border">
+    <div className="bg-background/90 border-border absolute top-0 right-0 left-0 z-[1001] flex flex-col border-b backdrop-blur-sm">
       {/* ── Row 1: always visible ── */}
-      <div className="flex items-center gap-3 px-3 md:px-4 h-12">
+      <div className="flex h-12 items-center gap-3 px-3 md:px-4">
         <Link
           href={tripId ? `/trips/${tripId}` : "/itinerary"}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors min-w-0"
+          className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-sm transition-colors"
         >
           <ArrowLeftIcon className="size-4 shrink-0" />
-          <span className="truncate max-w-[120px] md:max-w-none">
+          <span className="max-w-[120px] truncate md:max-w-none">
             {tripId ? tripName : "Itineraries"}
           </span>
         </Link>
@@ -84,13 +82,13 @@ export function MapTopBar({
         {/* Desktop stats strip — hidden on mobile */}
         <div
           data-testid="stats-strip"
-          className="hidden md:flex items-center gap-4 text-sm text-muted-foreground shrink-0"
+          className="text-muted-foreground hidden shrink-0 items-center gap-4 text-sm md:flex"
         >
           <span className="flex items-center gap-1.5">
             <span>{displayDistance}</span>
             {unitToggle}
           </span>
-          <label className="flex items-center gap-1.5 shrink-0">
+          <label className="flex shrink-0 items-center gap-1.5">
             <span>Avg speed</span>
             <input
               type="number"
@@ -100,20 +98,24 @@ export function MapTopBar({
               value={avgSpeedKnots}
               aria-label="Average speed in knots"
               onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
-              className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none"
+              className="border-border bg-background text-foreground w-14 rounded border px-1.5 py-0.5 text-xs focus:outline-none"
             />
             <span>kn</span>
           </label>
-          <span>{dayCount} {dayCount === 1 ? "day" : "days"}</span>
+          <span>
+            {dayCount} {dayCount === 1 ? "day" : "days"}
+          </span>
         </div>
 
         {/* Mode pill */}
-        <span className={cn(
-          "text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0",
-          viewMode
-            ? "border-border text-muted-foreground"
-            : "border-primary text-primary bg-primary/10",
-        )}>
+        <span
+          className={cn(
+            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+            viewMode
+              ? "border-border text-muted-foreground"
+              : "border-primary text-primary bg-primary/10",
+          )}
+        >
           {viewMode ? "Viewing" : "Editing"}
         </span>
 
@@ -121,7 +123,7 @@ export function MapTopBar({
           <button
             type="button"
             onClick={onToggleViewMode}
-            className="text-xs font-medium text-primary hover:underline shrink-0"
+            className="text-primary shrink-0 text-xs font-medium hover:underline"
           >
             Edit route
           </button>
@@ -131,25 +133,23 @@ export function MapTopBar({
           <button
             type="button"
             onClick={onToggleViewMode}
-            className="text-xs font-medium text-primary hover:underline shrink-0"
+            className="text-primary shrink-0 text-xs font-medium hover:underline"
           >
             Done
           </button>
         )}
 
         {/* Saving indicator — rendered once, visible on both viewports */}
-        {isSaving && (
-          <span className="text-xs text-muted-foreground shrink-0">Saving…</span>
-        )}
+        {isSaving && <span className="text-muted-foreground shrink-0 text-xs">Saving…</span>}
       </div>
 
       {/* ── Row 2: mobile-only compact stats ── */}
-      <div className="flex md:hidden items-center gap-3 px-3 h-10 text-xs text-muted-foreground border-t border-border/50">
-        <span className="flex items-center gap-1.5 shrink-0">
+      <div className="text-muted-foreground border-border/50 flex h-10 items-center gap-3 border-t px-3 text-xs md:hidden">
+        <span className="flex shrink-0 items-center gap-1.5">
           <span>{displayDistance}</span>
           {unitToggle}
         </span>
-        <label className="flex items-center gap-1 shrink-0">
+        <label className="flex shrink-0 items-center gap-1">
           <input
             type="number"
             min={1.0}
@@ -158,11 +158,13 @@ export function MapTopBar({
             value={avgSpeedKnots}
             aria-label="Average speed in knots"
             onChange={(e) => onAvgSpeedKnotsChange(parseFloat(e.target.value))}
-            className="w-11 rounded border border-border bg-background px-1 py-0.5 text-xs text-foreground focus:outline-none"
+            className="border-border bg-background text-foreground w-11 rounded border px-1 py-0.5 text-xs focus:outline-none"
           />
           <span>kn</span>
         </label>
-        <span className="shrink-0">{dayCount} {dayCount === 1 ? "day" : "days"}</span>
+        <span className="shrink-0">
+          {dayCount} {dayCount === 1 ? "day" : "days"}
+        </span>
       </div>
     </div>
   )

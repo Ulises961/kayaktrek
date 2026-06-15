@@ -44,7 +44,11 @@ describe("InvitationActions", () => {
 
   it("disables both buttons while a response is pending", async () => {
     let resolve: (v: { success: true }) => void
-    vi.mocked(handleInvitation).mockReturnValue(new Promise((r) => { resolve = r }))
+    vi.mocked(handleInvitation).mockReturnValue(
+      new Promise((r) => {
+        resolve = r
+      }),
+    )
     render(<InvitationActions tripId={TRIP_ID} />)
 
     await userEvent.click(screen.getByRole("button", { name: /accept/i }))

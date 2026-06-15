@@ -9,7 +9,12 @@ vi.mock("@/lib/profile/actions", () => ({
   revokeMedicalConsent: vi.fn(),
 }))
 
-import { reAuth, getMedicalNotes, grantMedicalConsent, revokeMedicalConsent } from "@/lib/profile/actions"
+import {
+  reAuth,
+  getMedicalNotes,
+  grantMedicalConsent,
+  revokeMedicalConsent,
+} from "@/lib/profile/actions"
 import { MedicalNotesSection } from "../medical-notes-section"
 
 const ELEVATED_TOKEN = "eyJ.elevated.token"
@@ -24,7 +29,9 @@ async function openToEdit(hasStoredNotes = false) {
     success: true,
     notes: hasStoredNotes ? "Allergic to penicillin" : null,
   })
-  await userEvent.click(screen.getByRole("button", { name: hasStoredNotes ? /edit/i : /add notes/i }))
+  await userEvent.click(
+    screen.getByRole("button", { name: hasStoredNotes ? /edit/i : /add notes/i }),
+  )
   await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
   await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
@@ -89,7 +96,9 @@ describe("MedicalNotesSection — authenticating state", () => {
 describe("MedicalNotesSection — editing state", () => {
   it("shows a textarea pre-filled with fetched notes", async () => {
     await openToEdit(true)
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Allergic to penicillin")
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "Allergic to penicillin",
+    )
   })
 
   it("shows an empty textarea when no notes are stored yet", async () => {
@@ -103,7 +112,7 @@ describe("MedicalNotesSection — editing state", () => {
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() =>
-      expect(grantMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN, "Blood type A+", PASSWORD)
+      expect(grantMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN, "Blood type A+", PASSWORD),
     )
   })
 

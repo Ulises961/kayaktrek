@@ -16,7 +16,7 @@ interface CrewTabProps {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+    <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
       {children}
     </p>
   )
@@ -27,15 +27,14 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
   const pendingTravellers = trip.pendingTravellers ?? []
 
   return (
-    <div className="divide-y divide-border">
-
+    <div className="divide-border divide-y">
       <div className="pb-5">
         <SectionLabel>
-          <UsersIcon className="inline size-3 mr-1 -mt-px" />
+          <UsersIcon className="-mt-px mr-1 inline size-3" />
           Crew ({travellers.length})
         </SectionLabel>
         {travellers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No crew members yet.</p>
+          <p className="text-muted-foreground text-sm">No crew members yet.</p>
         ) : (
           <CrewList
             members={travellers}
@@ -60,7 +59,7 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
             {pendingTravellers.length > 0 && ` (${pendingTravellers.length})`}
           </SectionLabel>
           {pendingTravellers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending invitations.</p>
+            <p className="text-muted-foreground text-sm">No pending invitations.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {pendingTravellers.map((user) => (
@@ -76,7 +75,6 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
           )}
         </div>
       )}
-
     </div>
   )
 }

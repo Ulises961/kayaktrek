@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react"
 import { format } from "date-fns"
-import { CheckIcon, LinkIcon, MailIcon, RefreshCwIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import {
+  CheckIcon,
+  LinkIcon,
+  MailIcon,
+  RefreshCwIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,7 +28,10 @@ interface FloatPlanShareSectionProps {
   logistics: Logistics | null
 }
 
-export function FloatPlanShareSection({ tripId, logistics: initialLogistics }: FloatPlanShareSectionProps) {
+export function FloatPlanShareSection({
+  tripId,
+  logistics: initialLogistics,
+}: FloatPlanShareSectionProps) {
   const [logistics, setLogistics] = useState(initialLogistics)
   const [copied, setCopied] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
@@ -88,26 +98,24 @@ export function FloatPlanShareSection({ tripId, logistics: initialLogistics }: F
   return (
     <div className="flex flex-col gap-3">
       {showInvalidatedBanner && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300/70 bg-amber-50/80 dark:border-amber-700/40 dark:bg-amber-950/30 px-3 py-2.5 text-sm text-amber-800 dark:text-amber-300">
-          <TriangleAlertIcon className="size-4 shrink-0 mt-0.5" />
-          <span className="flex-1">Previous link invalidated — re-send the new link to your shore contact.</span>
-          <button onClick={() => setShowInvalidatedBanner(false)} className="shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+        <div className="flex items-start gap-2 rounded-md border border-amber-300/70 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+          <span className="flex-1">
+            Previous link invalidated — re-send the new link to your shore contact.
+          </span>
+          <button
+            onClick={() => setShowInvalidatedBanner(false)}
+            className="shrink-0 opacity-60 transition-opacity hover:opacity-100"
+          >
             <XIcon className="size-4" />
           </button>
         </div>
       )}
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-destructive text-sm">{error}</p>}
 
       {!shareToken ? (
-        <Button
-          size="sm"
-          onClick={handleGenerate}
-          disabled={isPending}
-          className="w-fit"
-        >
+        <Button size="sm" onClick={handleGenerate} disabled={isPending} className="w-fit">
           <LinkIcon className="size-3.5" />
           {isPending ? "Generating…" : "Generate float plan link"}
         </Button>
@@ -128,7 +136,11 @@ export function FloatPlanShareSection({ tripId, logistics: initialLogistics }: F
                     onClick={handleEmail}
                     disabled={isPending || !hasShoreContactEmail}
                   >
-                    {emailSent ? <CheckIcon className="size-3.5" /> : <MailIcon className="size-3.5" />}
+                    {emailSent ? (
+                      <CheckIcon className="size-3.5" />
+                    ) : (
+                      <MailIcon className="size-3.5" />
+                    )}
                     {emailSent ? "Sent!" : "Email shore contact"}
                   </Button>
                 </span>
@@ -152,7 +164,7 @@ export function FloatPlanShareSection({ tripId, logistics: initialLogistics }: F
       )}
 
       {snapshotGeneratedAt && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Last generated {format(new Date(snapshotGeneratedAt), "d MMM yyyy 'at' HH:mm")}
         </p>
       )}

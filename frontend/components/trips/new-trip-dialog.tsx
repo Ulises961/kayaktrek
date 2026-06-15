@@ -9,7 +9,14 @@ import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/common/date-picker"
 import { PlusIcon } from "lucide-react"
@@ -19,7 +26,14 @@ export function NewTripDialog() {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setError, reset, control, formState: { errors } } = useForm<TripFields>({
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<TripFields>({
     resolver: zodResolver(TripFieldsSchema),
   })
 
@@ -42,7 +56,13 @@ export function NewTripDialog() {
   })
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) reset()
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <PlusIcon className="size-4" />
@@ -56,11 +76,20 @@ export function NewTripDialog() {
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Input placeholder="Destination" disabled={isPending} {...register("destination")} />
-            {errors.destination && <p className="text-xs text-destructive">{errors.destination.message}</p>}
+            {errors.destination && (
+              <p className="text-destructive text-xs">{errors.destination.message}</p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Textarea placeholder="Description (optional)" rows={3} disabled={isPending} {...register("description")} />
-            {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+            <Textarea
+              placeholder="Description (optional)"
+              rows={3}
+              disabled={isPending}
+              {...register("description")}
+            />
+            {errors.description && (
+              <p className="text-destructive text-xs">{errors.description.message}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -69,10 +98,17 @@ export function NewTripDialog() {
                 name="dateFrom"
                 control={control}
                 render={({ field }) => (
-                  <DatePicker id="dateFrom" value={field.value} onChange={field.onChange} disabled={isPending} />
+                  <DatePicker
+                    id="dateFrom"
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={isPending}
+                  />
                 )}
               />
-              {errors.dateFrom && <p className="text-xs text-destructive">{errors.dateFrom.message}</p>}
+              {errors.dateFrom && (
+                <p className="text-destructive text-xs">{errors.dateFrom.message}</p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateTo">To</Label>
@@ -80,13 +116,18 @@ export function NewTripDialog() {
                 name="dateTo"
                 control={control}
                 render={({ field }) => (
-                  <DatePicker id="dateTo" value={field.value} onChange={field.onChange} disabled={isPending} />
+                  <DatePicker
+                    id="dateTo"
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={isPending}
+                  />
                 )}
               />
-              {errors.dateTo && <p className="text-xs text-destructive">{errors.dateTo.message}</p>}
+              {errors.dateTo && <p className="text-destructive text-xs">{errors.dateTo.message}</p>}
             </div>
           </div>
-          {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+          {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? "Creating…" : "Create"}

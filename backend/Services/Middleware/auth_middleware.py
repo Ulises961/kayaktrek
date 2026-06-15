@@ -16,27 +16,27 @@ class JWTService:
         return token
 
     @staticmethod
-    def generate_access_token(user_id: str, email: str, is_admin: bool) -> str:
-        """Generates a JWT token with an expiration time."""
+    def generate_access_token(user_id: str, email: str, is_admin: bool, token_version: int) -> str:
         payload = {
             'user_id': str(user_id),
             'email': email,
             'is_admin': is_admin,
             'token_type': 'access',
+            'tv': token_version,
             'iat': datetime.now(timezone.utc),
-            'exp':  datetime.now(timezone.utc) + timedelta(minutes=15) 
+            'exp': datetime.now(timezone.utc) + timedelta(minutes=15),
         }
-        return JWTService.generate_token(payload)    
+        return JWTService.generate_token(payload)
 
     @staticmethod
-    def generate_refresh_token(user_id: str)-> str:
+    def generate_refresh_token(user_id: str, token_version: int) -> str:
         payload = {
             'user_id': str(user_id),
             'token_type': 'refresh',
+            'tv': token_version,
             'iat': datetime.now(timezone.utc),
-            'exp':  datetime.now(timezone.utc) + timedelta(days=30)
+            'exp': datetime.now(timezone.utc) + timedelta(days=30),
         }
-
         return JWTService.generate_token(payload)
 
     @staticmethod
@@ -140,6 +140,9 @@ class JWTService:
                         if token_issued_at < user.password_changed_at:
                             abort(HTTPStatus.UNAUTHORIZED, description="Token invalidated by password change — please log in again")
 
+                    if data.get("tv") != user.token_version:
+                        abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
+
                     g.current_user_mail = user.mail
                     g.current_user_id = str(user.id)
 
@@ -147,8 +150,49 @@ class JWTService:
                 raise
             except Exception:
                 abort(HTTPStatus.UNAUTHORIZED, description="Invalid token")
-        
+
             return f(*args, **kwargs)
+        # Marks this decorator as one that populates g.current_user_id. The
+        # auth-invariant canary test relies on this tag to distinguish routes
+        # that legitimately read the current user from a silent auth gap.
+        decorator._populates_current_user = True
+        return decorator
+
+    @staticmethod
+    def authenticate_optional(f):
+        """Populate g.current_user_id from a valid token when present, otherwise proceed
+        unauthenticated. Never aborts on missing or invalid credentials — the view decides
+        what an anonymous caller may see.
+
+        g.current_user_id is reset to None up front so the result depends only on this
+        request's headers, never on an ambient value left over from a prior request sharing
+        the same application context."""
+        @wraps(f)
+        def decorator(*args, **kwargs):
+            g.current_user_id = None
+            g.current_user_mail = None
+            auth_header = request.headers.get("Authorization", None)
+            if auth_header:
+                try:
+                    token = auth_header.split(" ")[1] if auth_header.startswith("Bearer ") else auth_header
+                    data = JWTService.verify_token(token)
+                    if data:
+                        user = UserService.get_user_by_id(data["user_id"])
+                        if user and user.active:
+                            iat = data.get("iat")
+                            pwd_invalidated = (
+                                iat is not None
+                                and user.password_changed_at is not None
+                                and datetime.fromtimestamp(iat, tz=timezone.utc) < user.password_changed_at
+                            )
+                            tv_invalidated = data.get("tv") != user.token_version
+                            if not pwd_invalidated and not tv_invalidated:
+                                g.current_user_mail = user.mail
+                                g.current_user_id = str(user.id)
+                except Exception:
+                    pass  # malformed/invalid token → remain unauthenticated
+            return f(*args, **kwargs)
+        decorator._populates_current_user = True
         return decorator
 
    

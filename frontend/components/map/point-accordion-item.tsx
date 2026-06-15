@@ -59,24 +59,22 @@ export function PointAccordionItem({
   }
 
   return (
-    <div className="border-b border-border/40 last:border-b-0">
+    <div className="border-border/40 border-b last:border-b-0">
       <button
         aria-label={`Expand point ${index}`}
         onClick={onToggle}
-        className="w-full flex items-center gap-2 py-1.5 px-0 text-left hover:bg-muted/40 transition-colors rounded"
+        className="hover:bg-muted/40 flex w-full items-center gap-2 rounded px-0 py-1.5 text-left transition-colors"
       >
-        <span className="text-[10px] text-muted-foreground w-3 shrink-0 select-none">
+        <span className="text-muted-foreground w-3 shrink-0 text-[10px] select-none">
           {isOpen ? "−" : "+"}
         </span>
-        <span className="text-[10px] text-muted-foreground w-4 shrink-0 tabular-nums">{index}</span>
+        <span className="text-muted-foreground w-4 shrink-0 text-[10px] tabular-nums">{index}</span>
         <Icon size={10} className="text-muted-foreground shrink-0" />
-        <span className="text-xs text-foreground truncate min-w-0">
-          {point.name ?? "—"}
-        </span>
+        <span className="text-foreground min-w-0 truncate text-xs">{point.name ?? "—"}</span>
       </button>
 
       {isOpen && (
-        <div className="pl-7 pb-2 space-y-2">
+        <div className="space-y-2 pb-2 pl-7">
           <div className="flex gap-1">
             {(["stop", "position", "interest"] as PointType[]).map((t) => {
               const { label, Icon: TIcon } = POINT_TYPE_META[t]
@@ -86,7 +84,7 @@ export function PointAccordionItem({
                   key={t}
                   aria-label={label}
                   onClick={() => handleTypeClick(t)}
-                  className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                     active
                       ? "bg-foreground text-background"
                       : "bg-muted text-muted-foreground hover:text-foreground"
@@ -105,7 +103,7 @@ export function PointAccordionItem({
             value={nameVal}
             onChange={(e) => setNameVal(e.target.value)}
             onBlur={handleNameBlur}
-            className="w-full text-xs bg-transparent border border-border/60 rounded px-2 py-1 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="border-border/60 text-foreground placeholder:text-muted-foreground/50 focus:ring-ring w-full rounded border bg-transparent px-2 py-1 text-xs focus:ring-1 focus:outline-none"
           />
 
           <textarea
@@ -114,14 +112,11 @@ export function PointAccordionItem({
             onChange={(e) => setNotesVal(e.target.value)}
             onBlur={handleNotesBlur}
             rows={2}
-            className="w-full text-xs bg-transparent border border-border/60 rounded px-2 py-1 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+            className="border-border/60 text-foreground placeholder:text-muted-foreground/50 focus:ring-ring w-full resize-none rounded border bg-transparent px-2 py-1 text-xs focus:ring-1 focus:outline-none"
           />
 
           {(point.images?.length ?? 0) > 0 && (
-            <ImageGallery
-              images={point.images!}
-              onRemove={() => {}}
-            />
+            <ImageGallery images={point.images!} onRemove={() => {}} />
           )}
 
           {point.type === "interest" && onFetchPois && (
@@ -130,7 +125,7 @@ export function PointAccordionItem({
                 onClick={handleFetchPois}
                 disabled={isFetchingPois}
                 aria-label="Find nearby POIs"
-                className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-50"
+                className="text-primary flex items-center gap-1 text-[10px] hover:underline disabled:opacity-50"
               >
                 <MapPin size={10} />
                 {isFetchingPois ? "Searching…" : "Find nearby POIs"}
@@ -142,7 +137,7 @@ export function PointAccordionItem({
                     <li key={poi.id}>
                       <button
                         onClick={() => onPoiSelect?.(poi.name ?? "")}
-                        className="text-[10px] text-foreground hover:text-primary hover:underline text-left w-full truncate"
+                        className="text-foreground hover:text-primary w-full truncate text-left text-[10px] hover:underline"
                       >
                         {poi.name}
                       </button>
@@ -156,7 +151,7 @@ export function PointAccordionItem({
           <button
             aria-label="Delete point"
             onClick={() => onDelete(point.id!)}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+            className="text-muted-foreground hover:text-destructive flex items-center gap-1 text-[10px] transition-colors"
           >
             <Trash2 size={10} />
             Delete

@@ -49,7 +49,7 @@ export function TripDetailTabs({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(
-    (searchParams.get("tab") ?? "itinerary") as TabId
+    (searchParams.get("tab") ?? "itinerary") as TabId,
   )
 
   function handleTabChange(value: string) {
@@ -63,38 +63,33 @@ export function TripDetailTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
-      <TabsList className="w-full justify-start overflow-x-auto px-6 mb-0 border-b border-border rounded-none">
+      <TabsList className="border-border mb-0 w-full justify-start overflow-x-auto rounded-none border-b px-6">
         <TabsTrigger value="crew" className="whitespace-nowrap">
-          <UsersIcon className="size-3.5 mr-1.5" />
+          <UsersIcon className="mr-1.5 size-3.5" />
           Crew
         </TabsTrigger>
         {currentMember && (
           <TabsTrigger value="float-plan" className="whitespace-nowrap">
-            <ClipboardListIcon className="size-3.5 mr-1.5" />
+            <ClipboardListIcon className="mr-1.5 size-3.5" />
             Float plan
           </TabsTrigger>
         )}
         <TabsTrigger value="logistics" className="whitespace-nowrap">
-          <AnchorIcon className="size-3.5 mr-1.5" />
+          <AnchorIcon className="mr-1.5 size-3.5" />
           Logistics
         </TabsTrigger>
         <TabsTrigger value="itinerary" className="whitespace-nowrap">
-          <MapPinIcon className="size-3.5 mr-1.5" />
+          <MapPinIcon className="mr-1.5 size-3.5" />
           Itinerary
         </TabsTrigger>
         <TabsTrigger value="items" className="whitespace-nowrap">
-          <PackageIcon className="size-3.5 mr-1.5" />
+          <PackageIcon className="mr-1.5 size-3.5" />
           Items
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="crew" className="p-6 pt-5">
-        <CrewTab
-          tripId={tripId}
-          trip={trip}
-          isLeader={isLeader}
-          leaderId={leaderId}
-        />
+        <CrewTab tripId={tripId} trip={trip} isLeader={isLeader} leaderId={leaderId} />
       </TabsContent>
 
       {currentMember && (
@@ -120,7 +115,12 @@ export function TripDetailTabs({
       </TabsContent>
 
       <TabsContent value="itinerary" className="p-6 pt-5">
-        <ItineraryTab tripId={tripId} itinerary={trip.itinerary} isLeader={isLeader} tripName={trip.destination ?? ""} />
+        <ItineraryTab
+          tripId={tripId}
+          itinerary={trip.itinerary}
+          isLeader={isLeader}
+          tripName={trip.destination ?? ""}
+        />
       </TabsContent>
 
       <TabsContent value="items" className="p-6 pt-5">

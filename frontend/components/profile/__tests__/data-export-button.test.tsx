@@ -20,9 +20,7 @@ describe("DataExportButton", () => {
     render(<DataExportButton />)
     await userEvent.click(screen.getByRole("button", { name: /download my data/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/download link has been sent/i)).toBeDefined()
-    )
+    await waitFor(() => expect(screen.getByText(/download link has been sent/i)).toBeDefined())
   })
 
   it("hides the button after a successful request", async () => {
@@ -31,7 +29,7 @@ describe("DataExportButton", () => {
     await userEvent.click(screen.getByRole("button", { name: /download my data/i }))
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /download my data/i })).toBeNull()
+      expect(screen.queryByRole("button", { name: /download my data/i })).toBeNull(),
     )
   })
 
@@ -44,7 +42,7 @@ describe("DataExportButton", () => {
     await userEvent.click(screen.getByRole("button", { name: /download my data/i }))
 
     await waitFor(() =>
-      expect(screen.getByText("You can only request a data export once per day.")).toBeDefined()
+      expect(screen.getByText("You can only request a data export once per day.")).toBeDefined(),
     )
   })
 })

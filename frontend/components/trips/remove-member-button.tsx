@@ -36,7 +36,12 @@ export function RemoveMemberButton({ tripId, userId, displayName }: RemoveMember
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={isPending}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          disabled={isPending}
+        >
           Remove
         </Button>
       </AlertDialogTrigger>
@@ -49,7 +54,11 @@ export function RemoveMemberButton({ tripId, userId, displayName }: RemoveMember
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+          <AlertDialogAction
+            onClick={handleConfirm}
+            disabled={isPending}
+            className="bg-destructive hover:bg-destructive/90"
+          >
             Confirm
           </AlertDialogAction>
         </AlertDialogFooter>

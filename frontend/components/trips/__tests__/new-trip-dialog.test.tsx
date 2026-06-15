@@ -47,7 +47,9 @@ describe("NewTripDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
 
     await waitFor(() => {
-      expect(createTrip).toHaveBeenCalledWith(expect.objectContaining({ destination: "Costa Brava" }))
+      expect(createTrip).toHaveBeenCalledWith(
+        expect.objectContaining({ destination: "Costa Brava" }),
+      )
     })
   })
 

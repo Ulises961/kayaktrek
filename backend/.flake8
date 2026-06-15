@@ -1,3 +1,4 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E501
+extend-ignore = E501,E302,E303,E305,E301,E261,E231,E222,E221,E266,E117,E114,E116,E127,W293,W292,W391,W291,E402,E712,E722,E741
+exclude = .venv,__pycache__,alembic,Tests

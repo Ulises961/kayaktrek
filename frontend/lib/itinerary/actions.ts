@@ -18,17 +18,11 @@ export type ItineraryUpdateResult =
   | { success: true; itinerary: Itinerary }
   | { success: false; error: string }
 
-export type PointActionResult =
-  | { success: true; point: Point }
-  | { success: false; error: string }
+export type PointActionResult = { success: true; point: Point } | { success: false; error: string }
 
-export type DayActionResult =
-  | { success: true; day: Day }
-  | { success: false; error: string }
+export type DayActionResult = { success: true; day: Day } | { success: false; error: string }
 
-export type DeleteActionResult =
-  | { success: true }
-  | { success: false; error: string }
+export type DeleteActionResult = { success: true } | { success: false; error: string }
 
 export type ApplyBoundariesResult =
   | { success: true; itinerary: Itinerary }
@@ -38,9 +32,10 @@ export type CreateTripFromItineraryResult =
   | { success: true; tripId: string }
   | { success: false; error: string }
 
-export async function createItinerary(
-  params: { tripId?: string | null; name?: string }
-): Promise<ItineraryActionResult> {
+export async function createItinerary(params: {
+  tripId?: string | null
+  name?: string
+}): Promise<ItineraryActionResult> {
   try {
     const body: Record<string, unknown> = {}
     if (params.tripId) body.tripId = params.tripId
@@ -57,7 +52,7 @@ export async function createItinerary(
 
 export async function updateItinerary(
   id: string,
-  fields: Partial<Pick<Itinerary, "name" | "isPublic" | "avgSpeedKnots" | "tripId">>
+  fields: Partial<Pick<Itinerary, "name" | "isPublic" | "avgSpeedKnots" | "tripId">>,
 ): Promise<ItineraryUpdateResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/itinerary/${id}`, fields)
@@ -81,7 +76,7 @@ export async function fetchItineraries(): Promise<Itinerary[]> {
 
 export async function createPoint(
   dayId: string,
-  fields: { type: PointType; latitude: number; longitude: number }
+  fields: { type: PointType; latitude: number; longitude: number },
 ): Promise<PointActionResult> {
   try {
     const raw = await apiPost<unknown>("/api/point/create", { dayId, ...fields })
@@ -95,7 +90,13 @@ export async function createPoint(
 
 export async function updatePoint(
   id: string,
-  fields: Partial<{ type: PointType; latitude: number; longitude: number; name: string | null; notes: string | null }>
+  fields: Partial<{
+    type: PointType
+    latitude: number
+    longitude: number
+    name: string | null
+    notes: string | null
+  }>,
 ): Promise<PointActionResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/point/${id}`, fields)
@@ -130,7 +131,7 @@ export async function createDay(itineraryId: string, dayNumber: number): Promise
 
 export async function updateDay(
   id: string,
-  fields: Partial<Pick<Day, "date" | "dayNumber" | "startPointId" | "endPointId">>
+  fields: Partial<Pick<Day, "date" | "dayNumber" | "startPointId" | "endPointId">>,
 ): Promise<DayActionResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/day/${id}`, fields)
@@ -163,7 +164,7 @@ export async function fetchPois(lat: number, lng: number, range = 5): Promise<Po
 
 export async function applyBoundaries(
   itineraryId: string,
-  payload: BoundaryApplyPayload
+  payload: BoundaryApplyPayload,
 ): Promise<ApplyBoundariesResult> {
   try {
     const raw = await apiPost<unknown>(`/api/itinerary/${itineraryId}/apply-boundaries`, payload)
@@ -178,7 +179,7 @@ export async function applyBoundaries(
 export async function assignPointsToDay(
   dayId: string,
   startPointId: string,
-  endPointId: string
+  endPointId: string,
 ): Promise<DeleteActionResult> {
   try {
     await apiPost<unknown>(`/api/day/${dayId}/assign`, { startPointId, endPointId })
@@ -202,7 +203,7 @@ export async function forkItinerary(id: string): Promise<ItineraryActionResult> 
 
 export async function createTripFromItinerary(
   itineraryId: string,
-  tripName: string
+  tripName: string,
 ): Promise<CreateTripFromItineraryResult> {
   try {
     const trip = await apiPost<{ id: string }>("/api/trip/create", { destination: tripName.trim() })

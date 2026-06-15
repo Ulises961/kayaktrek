@@ -253,6 +253,7 @@ def test_token_invalidated_after_password_change(client, app, pw_revocation_user
             "email": mail,
             "is_admin": False,
             "token_type": "access",
+            "tv": 0,
             "iat": datetime.now(timezone.utc),
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         },

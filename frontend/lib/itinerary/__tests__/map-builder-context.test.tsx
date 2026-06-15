@@ -38,12 +38,14 @@ const MOCK_CTX: MapBuilderContextValue = {
   setSelectedPointId: () => {},
   tripState: null,
   isLeader: true,
+  selectedHour: 12,
+  setSelectedHour: () => {},
 }
 
 describe("useMapBuilder", () => {
   it("throws when called outside MapBuilderContext.Provider", () => {
     expect(() => renderHook(() => useMapBuilder())).toThrow(
-      "useMapBuilder must be used inside MapBuilder"
+      "useMapBuilder must be used inside MapBuilder",
     )
   })
 

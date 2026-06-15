@@ -17,17 +17,17 @@ export function LogsTabs({ myLogs, endorsedLogs }: LogsTabsProps) {
         <TabsTrigger value="endorsed">Endorsed ({endorsedLogs.length})</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="mine" className="flex flex-col gap-2 mt-4">
+      <TabsContent value="mine" className="mt-4 flex flex-col gap-2">
         {myLogs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No logs yet. Record your first session.</p>
+          <p className="text-muted-foreground text-sm">No logs yet. Record your first session.</p>
         ) : (
           myLogs.map((log) => <LogCard key={log.id} log={log} />)
         )}
       </TabsContent>
 
-      <TabsContent value="endorsed" className="flex flex-col gap-2 mt-4">
+      <TabsContent value="endorsed" className="mt-4 flex flex-col gap-2">
         {endorsedLogs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No endorsed logs yet.</p>
+          <p className="text-muted-foreground text-sm">No endorsed logs yet.</p>
         ) : (
           endorsedLogs.map((log) => <LogCard key={log.id} log={log} />)
         )}

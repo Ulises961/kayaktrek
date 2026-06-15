@@ -11,15 +11,13 @@ import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
-import {
-  createPoint,
-  updatePoint,
-  updateItinerary,
-} from "@/lib/itinerary/actions"
+import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
 import { DayStrip } from "./day-strip"
 import { PointDetailSheet } from "./point-detail-sheet"
 
-const MapCore = dynamic(() => import("./map-core"), { ssr: false }) as React.ComponentType<MapCoreProps>
+const MapCore = dynamic(() => import("./map-core"), {
+  ssr: false,
+}) as React.ComponentType<MapCoreProps>
 
 type MapBuilderProps = {
   itinerary: Itinerary
@@ -29,7 +27,13 @@ type MapBuilderProps = {
   isLeader?: boolean
 }
 
-export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLeader = true }: MapBuilderProps) {
+export function MapBuilder({
+  itinerary,
+  tripId,
+  tripName,
+  tripState = null,
+  isLeader = true,
+}: MapBuilderProps) {
   useCollapseSidebar()
 
   const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
@@ -39,6 +43,7 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
+  const [selectedHour, setSelectedHour] = useState(12)
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -65,15 +70,12 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
 
   const validForDistance = orderedPoints.filter(
     (p): p is typeof p & { latitude: number; longitude: number } =>
-      p.latitude != null && p.longitude != null
+      p.latitude != null && p.longitude != null,
   )
   const totalDistance = totalDistanceNm(validForDistance)
 
   // All days passed to MapCore: Day 0 (for dayId colour lookups) + numbered days.
-  const allDaysForMap = useMemo(
-    () => [...(day0 ? [day0] : []), ...state.days],
-    [day0, state.days],
-  )
+  const allDaysForMap = useMemo(() => [...(day0 ? [day0] : []), ...state.days], [day0, state.days])
 
   // ── handlers ─────────────────────────────────────────────────────────────
 
@@ -81,7 +83,10 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
     if (!day0Id) return
     const tempId = `tmp-${Date.now()}`
 
-    dispatch({ type: "POINT_ADD", point: { id: tempId, type: "position", latitude: lat, longitude: lng, dayId: day0Id } })
+    dispatch({
+      type: "POINT_ADD",
+      point: { id: tempId, type: "position", latitude: lat, longitude: lng, dayId: day0Id },
+    })
     dispatch({ type: "SET_PENDING", id: tempId })
     dispatch({ type: "SAVING_START" })
 
@@ -110,13 +115,16 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
     setActivePointId((prev) => (prev === pointId ? null : pointId))
   }, [])
 
-  const handleAvgSpeedChange = useCallback((v: number) => {
-    setAvgSpeedKnots(v)
-    if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current)
-    speedDebounceRef.current = setTimeout(() => {
-      updateItinerary(itinerary.id ?? "", { avgSpeedKnots: v })
-    }, 800)
-  }, [itinerary.id])
+  const handleAvgSpeedChange = useCallback(
+    (v: number) => {
+      setAvgSpeedKnots(v)
+      if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current)
+      speedDebounceRef.current = setTimeout(() => {
+        updateItinerary(itinerary.id ?? "", { avgSpeedKnots: v })
+      }, 800)
+    },
+    [itinerary.id],
+  )
 
   const flyToPoint = useMemo(() => {
     if (!selectedPointId) return null
@@ -131,33 +139,54 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
     setSelectedPointId(null)
   }, [])
 
-  const ctxValue = useMemo(() => ({
-    state,
-    dispatch,
-    draftSlices,
-    setDraftSlices,
-    tripId: tripId ?? null,
-    itineraryId: itinerary.id ?? "",
-    distanceUnit,
-    setDistanceUnit,
-    avgSpeedKnots,
-    setAvgSpeedKnots,
-    activePointId,
-    setActivePointId,
-    day0Id,
-    viewMode,
-    setViewMode,
-    selectedDayId,
-    setSelectedDayId,
-    selectedPointId,
-    setSelectedPointId,
-    tripState,
-    isLeader,
-  }), [state, dispatch, draftSlices, tripId, itinerary.id, distanceUnit, avgSpeedKnots, activePointId, day0Id, viewMode, selectedDayId, selectedPointId, tripState, isLeader])
+  const ctxValue = useMemo(
+    () => ({
+      state,
+      dispatch,
+      draftSlices,
+      setDraftSlices,
+      tripId: tripId ?? null,
+      itineraryId: itinerary.id ?? "",
+      distanceUnit,
+      setDistanceUnit,
+      avgSpeedKnots,
+      setAvgSpeedKnots,
+      activePointId,
+      setActivePointId,
+      day0Id,
+      viewMode,
+      setViewMode,
+      selectedDayId,
+      setSelectedDayId,
+      selectedPointId,
+      setSelectedPointId,
+      tripState,
+      isLeader,
+      selectedHour,
+      setSelectedHour,
+    }),
+    [
+      state,
+      dispatch,
+      draftSlices,
+      tripId,
+      itinerary.id,
+      distanceUnit,
+      avgSpeedKnots,
+      activePointId,
+      day0Id,
+      viewMode,
+      selectedDayId,
+      selectedPointId,
+      tripState,
+      isLeader,
+      selectedHour,
+    ],
+  )
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>
-      <div className="fixed inset-0 z-50 bg-background">
+      <div className="bg-background fixed inset-0 z-50">
         <MapTopBar
           tripId={tripId}
           tripName={tripName}
@@ -173,13 +202,14 @@ export function MapBuilder({ itinerary, tripId, tripName, tripState = null, isLe
           isLeader={isLeader}
           tripState={tripState}
         />
-        <div className="absolute top-[100px] md:top-12 right-0 bottom-0 left-0">
+        <div className="absolute top-[100px] right-0 bottom-0 left-0 md:top-12">
           <MapCore
             points={orderedPoints}
             days={allDaysForMap}
             distanceUnit={distanceUnit}
             viewMode={viewMode}
             selectedDayId={selectedDayId}
+            selectedHour={selectedHour}
             flyToPoint={flyToPoint}
             onMapClick={handleMapClick}
             onMarkerDragEnd={handleMarkerDragEnd}

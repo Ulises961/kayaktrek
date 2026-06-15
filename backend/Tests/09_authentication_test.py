@@ -1,11 +1,9 @@
 import pytest
 import jwt
 import uuid
-import uuid_extension
 import random
 from datetime import datetime, timedelta, timezone
 from flask import current_app
-from http import HTTPStatus
 
 from Models.user import User
 from Services.Middleware.auth_middleware import JWTService
@@ -14,18 +12,18 @@ from Api.database import db
 
 class TestJWTService:
     """Test JWT token generation and validation"""
-    
+
     def test_generate_access_token(self, app):
         """Test access token generation"""
         user_id = "test-uuid-123"
         email = "test@example.com"
         is_admin = False
-        
-        token = JWTService.generate_access_token(user_id, email, is_admin)
-        
+
+        token = JWTService.generate_access_token(user_id, email, is_admin, 0)
+
         assert token is not None
         assert isinstance(token, str)
-        
+
         # Decode and verify payload
         payload = JWTService.decode_token(token)
         assert payload['user_id'] == user_id
@@ -34,34 +32,34 @@ class TestJWTService:
         assert payload['token_type'] == 'access'
         assert 'exp' in payload
         assert 'iat' in payload
-    
+
     def test_generate_refresh_token(self, app):
         """Test refresh token generation"""
         user_id = "test-uuid-456"
-        
-        token = JWTService.generate_refresh_token(user_id)
-        
+
+        token = JWTService.generate_refresh_token(user_id, 0)
+
         assert token is not None
         assert isinstance(token, str)
-        
+
         # Decode and verify payload
         payload = JWTService.decode_token(token)
         assert payload['user_id'] == user_id
         assert payload['token_type'] == 'refresh'
         assert 'exp' in payload
         assert 'iat' in payload
-    
+
     def test_decode_valid_token(self, app):
         """Test decoding a valid token"""
         user_id = "test-uuid-789"
         email = "decode@example.com"
-        
-        token = JWTService.generate_access_token(user_id, email, False)
+
+        token = JWTService.generate_access_token(user_id, email, False, 0)
         payload = JWTService.decode_token(token)
-        
+
         assert payload['user_id'] == user_id
         assert payload['email'] == email
-    
+
     def test_decode_expired_token(self, app):
         """Test decoding an expired token raises ValueError"""
         # Create expired token
@@ -73,41 +71,41 @@ class TestJWTService:
             'iat': datetime.now(timezone.utc) - timedelta(hours=2),
             'exp': datetime.now(timezone.utc) - timedelta(hours=1)
         }
-        
+
         secret_key = current_app.config['JWT_SECRET_KEY']
         expired_token = jwt.encode(payload, secret_key, algorithm='HS256')
-        
+
         with pytest.raises(ValueError, match="Token has expired"):
             JWTService.decode_token(expired_token)
-    
+
     def test_decode_invalid_token(self, app):
         """Test decoding an invalid token raises ValueError"""
         invalid_token = "invalid.token.here"
-        
+
         with pytest.raises(ValueError, match="Invalid token"):
             JWTService.decode_token(invalid_token)
-    
+
     def test_verify_token_correct_type(self, app):
         """Test verifying token with correct type"""
         user_id = "verify-user"
-        token = JWTService.generate_access_token(user_id, "verify@test.com", False)
-        
+        token = JWTService.generate_access_token(user_id, "verify@test.com", False, 0)
+
         payload = JWTService.verify_token(token, 'access')
-        
+
         assert payload is not None
         assert payload['user_id'] == user_id
         assert payload['token_type'] == 'access'
-    
+
     def test_verify_token_wrong_type(self, app):
         """Test verifying token with wrong type returns None"""
         user_id = "wrong-type-user"
-        access_token = JWTService.generate_access_token(user_id, "wrong@test.com", False)
-        
+        access_token = JWTService.generate_access_token(user_id, "wrong@test.com", False, 0)
+
         # Try to verify access token as refresh token
         payload = JWTService.verify_token(access_token, 'refresh')
-        
+
         assert payload is None
-    
+
     def test_verify_invalid_token(self, app):
         """Test verifying invalid token returns None"""
         payload = JWTService.verify_token("invalid.token", 'access')
@@ -116,7 +114,7 @@ class TestJWTService:
 
 class TestAuthenticationEndpoints:
     """Test authentication endpoints"""
-    
+
     def test_register_new_user(self, client):
         """Test registering a new user"""
         new_user_data = {
@@ -127,9 +125,9 @@ class TestAuthenticationEndpoints:
             "name": "Test",
             "surname": "User"
         }
-        
+
         response = client.post('/api/auth/register', json=new_user_data)
-        
+
         assert response.status_code == 201
         data = response.get_json()
         assert data['status'] == 'success'
@@ -141,7 +139,7 @@ class TestAuthenticationEndpoints:
         assert user is not None
         assert user.username == new_user_data['username']
         assert user.id is not None
-    
+
     def test_register_duplicate_username(self, client):
         """Test registering with existing username fails"""
         # Create first user
@@ -155,30 +153,31 @@ class TestAuthenticationEndpoints:
             "phone": f"+987654{phone_suffix}",
             "name": "First"
         }
-        
+
         response1 = client.post('/api/auth/register', json=user_data)
         assert response1.status_code == 201
-        
-        # Try to register with same username but different email
+
+        # Try to register with same username but different email — non-disclosure:
+        # the API returns 201 either way so usernames are not enumerable.
         duplicate_data = user_data.copy()
         duplicate_data['mail'] = f"second_{unique_suffix}@example.com"
         duplicate_data['phone'] = f"+111111{phone_suffix}"
-        
+
         response2 = client.post('/api/auth/register', json=duplicate_data)
-        assert response2.status_code == 400  # IntegrityError handler
-    
+        assert response2.status_code == 201
+
     def test_register_missing_fields(self, client):
         """Test registration with missing required fields"""
         incomplete_data = {
             "username": "incomplete"
             # Missing mail, pwd, phone, name
         }
-        
+
         response = client.post('/api/auth/register', json=incomplete_data)
-        
+
         # Should fail validation
         assert response.status_code in [400, 422]
-    
+
     def test_login_valid_credentials(self, client):
         """Test login with valid credentials"""
         # First register a user
@@ -190,7 +189,7 @@ class TestAuthenticationEndpoints:
             "phone": f"+555555{random.randint(1000, 9999)}",
             "name": "Login"
         }
-        
+
         register_response = client.post('/api/auth/register', json=user_data)
         assert register_response.status_code == 201
 
@@ -205,22 +204,22 @@ class TestAuthenticationEndpoints:
             "username": user_data['username'],
             "pwd": user_data['pwd']
         }
-        
+
         response = client.post('/api/auth/login', json=login_data)
-        
+
         assert response.status_code == 200
         data = response.get_json()
         assert data['status'] == 'success'
         assert 'access_token' in data
         assert 'refresh_token' in data
-        
+
         # Verify tokens are valid
         access_payload = JWTService.decode_token(data['access_token'])
         assert access_payload['token_type'] == 'access'
-        
+
         refresh_payload = JWTService.decode_token(data['refresh_token'])
         assert refresh_payload['token_type'] == 'refresh'
-    
+
     def test_login_invalid_password(self, client):
         """Test login with wrong password"""
         # Register user
@@ -232,7 +231,7 @@ class TestAuthenticationEndpoints:
             "phone": f"+666666{random.randint(1000, 9999)}",
             "name": "Wrong"
         }
-        
+
         client.post('/api/auth/register', json=user_data)
 
         user = User.query.filter_by(mail=user_data['mail']).first()
@@ -247,13 +246,13 @@ class TestAuthenticationEndpoints:
             "username": user_data['username'],
             "pwd": "WrongPassword123!"
         }
-        
+
         response = client.post('/api/auth/login', json=login_data)
-        
+
         assert response.status_code == 401
         data = response.get_json()
         assert data['status'] == 'fail'
-    
+
     def test_login_nonexistent_user(self, client):
         """Test login with non-existent user"""
         login_data = {
@@ -261,18 +260,18 @@ class TestAuthenticationEndpoints:
             "username": "nonexistent",
             "pwd": "SomePassword123!"
         }
-        
+
         response = client.post('/api/auth/login', json=login_data)
 
         assert response.status_code == 401
-    
+
     def test_login_missing_body(self, client):
         """Test login with missing request body"""
         response = client.post('/api/auth/login', json=None)
-        
-        #Flask returns 415 when Content-Type is not application/json
+
+        # Flask returns 415 when Content-Type is not application/json
         assert response.status_code in [400, 415]
-    
+
     def test_refresh_token_valid(self, client):
         """Test refreshing access token with valid refresh token"""
         unique_suffix = uuid.uuid4().hex[:8]
@@ -300,13 +299,13 @@ class TestAuthenticationEndpoints:
         assert 'access_token' in data
         new_access_payload = JWTService.decode_token(data['access_token'])
         assert new_access_payload['token_type'] == 'access'
-    
+
     def test_refresh_token_missing(self, client):
         """Test refresh endpoint with missing token"""
         response = client.post('/api/auth/refresh', json={})
-        
+
         assert response.status_code == 400
-    
+
     def test_refresh_with_access_token(self, client):
         """Test refresh endpoint with access token instead of refresh token"""
         unique_suffix = uuid.uuid4().hex[:8]
@@ -329,12 +328,11 @@ class TestAuthenticationEndpoints:
         response = client.post('/api/auth/refresh', json={"refresh_token": access_token})
 
         assert response.status_code == 401
-    
+
     def test_refresh_with_invalid_token(self, client):
         """Test refresh with completely invalid token"""
         response = client.post('/api/auth/refresh', json={
             "refresh_token": "invalid.token.here"
         })
-        
+
         assert response.status_code == 401
-    

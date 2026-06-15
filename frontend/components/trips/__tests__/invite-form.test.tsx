@@ -55,12 +55,17 @@ describe("InviteForm", () => {
   })
 
   it("shows an error message when the action returns success: false", async () => {
-    vi.mocked(inviteUser).mockResolvedValue({ success: false, error: "No account found for that email address" })
+    vi.mocked(inviteUser).mockResolvedValue({
+      success: false,
+      error: "No account found for that email address",
+    })
     render(<InviteForm tripId={TRIP_ID} />)
 
     await userEvent.type(screen.getByRole("textbox"), VALID_EMAIL)
     await userEvent.click(screen.getByRole("button", { name: /invite/i }))
 
-    await waitFor(() => expect(screen.getByText("No account found for that email address")).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByText("No account found for that email address")).toBeDefined(),
+    )
   })
 })

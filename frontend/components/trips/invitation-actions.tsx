@@ -19,19 +19,10 @@ export function InvitationActions({ tripId }: InvitationActionsProps) {
 
   return (
     <div className="flex gap-2">
-      <Button
-        size="sm"
-        disabled={isPending}
-        onClick={() => respond(true)}
-      >
+      <Button size="sm" disabled={isPending} onClick={() => respond(true)}>
         Accept
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={isPending}
-        onClick={() => respond(false)}
-      >
+      <Button size="sm" variant="outline" disabled={isPending} onClick={() => respond(false)}>
         Decline
       </Button>
     </div>

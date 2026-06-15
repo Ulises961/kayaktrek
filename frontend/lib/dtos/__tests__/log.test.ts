@@ -48,7 +48,13 @@ describe("LogSchema", () => {
   })
 
   it("accepts null for all optional fields", () => {
-    const result = LogSchema.safeParse({ ...LOG_FIXTURE, hours: null, avgSea: null, distance: null, notes: null })
+    const result = LogSchema.safeParse({
+      ...LOG_FIXTURE,
+      hours: null,
+      avgSea: null,
+      distance: null,
+      notes: null,
+    })
     expect(result.success).toBe(true)
   })
 })

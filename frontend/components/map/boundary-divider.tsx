@@ -90,7 +90,10 @@ export function BoundaryDivider({
     if (distFromTop < SCROLL_ZONE) {
       scrollEl.scrollBy({ top: -Math.max(1, (SCROLL_ZONE - distFromTop) / 2), behavior: "instant" })
     } else if (distFromBottom < SCROLL_ZONE) {
-      scrollEl.scrollBy({ top: Math.max(1, (SCROLL_ZONE - distFromBottom) / 2), behavior: "instant" })
+      scrollEl.scrollBy({
+        top: Math.max(1, (SCROLL_ZONE - distFromBottom) / 2),
+        behavior: "instant",
+      })
     }
 
     // Determine target row from snapshotted midpoints (container-relative coords
@@ -134,22 +137,25 @@ export function BoundaryDivider({
   }
 
   return (
-    <div ref={containerRef} className="flex items-center gap-1.5 px-2 py-1 border-y border-border bg-muted/50">
-      <div className="flex-1 h-px bg-border shrink-0 min-w-[0.5rem]" />
+    <div
+      ref={containerRef}
+      className="border-border bg-muted/50 flex items-center gap-1.5 border-y px-2 py-1"
+    >
+      <div className="bg-border h-px min-w-[0.5rem] flex-1 shrink-0" />
       <div
         data-testid="boundary-drag-handle"
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border cursor-ns-resize select-none shrink-0"
+        className="bg-background border-border flex shrink-0 cursor-ns-resize items-center gap-1.5 rounded-lg border px-2 py-1 select-none"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
-        <GripVerticalIcon className="size-3 text-muted-foreground shrink-0" />
+        <GripVerticalIcon className="text-muted-foreground size-3 shrink-0" />
         {/* 1/3 — day number */}
-        <span className="text-xs font-semibold w-10 text-center shrink-0">
+        <span className="w-10 shrink-0 text-center text-xs font-semibold">
           Day {labelDayNumber}
         </span>
-        <div className="w-px h-7 bg-border shrink-0" />
+        <div className="bg-border h-7 w-px shrink-0" />
         {/* 2/3 — date + distance stacked */}
         <div className="flex flex-col gap-0.5">
           <input
@@ -158,14 +164,14 @@ export function BoundaryDivider({
             placeholder="No date"
             onChange={(e) => onDateChange?.(e.target.value || null)}
             onPointerDown={(e) => e.stopPropagation()}
-            className="text-xs text-foreground bg-transparent border-none outline-none cursor-pointer w-28 sm:w-32"
+            className="text-foreground w-28 cursor-pointer border-none bg-transparent text-xs outline-none sm:w-32"
           />
-          <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap">
+          <span className="text-muted-foreground text-[10px] leading-none whitespace-nowrap">
             {displayDist}
           </span>
         </div>
       </div>
-      <div className="flex-1 h-px bg-border shrink-0 min-w-[0.5rem]" />
+      <div className="bg-border h-px min-w-[0.5rem] flex-1 shrink-0" />
     </div>
   )
 }

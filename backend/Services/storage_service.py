@@ -33,22 +33,27 @@ ALLOWED_DOCUMENT_MIMES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
-FileKind = Literal["image", "document", "avatar"]
+FileKind = Literal["image", "image-private", "document", "avatar"]
 
 _KIND_PREFIXES: dict[FileKind, str] = {
     "image": "point-images/",
+    # Private point images — on non-public itineraries. Served via presigned_url().
+    # Routing to this kind is wired in M1 when the itinerary is_public flag ships.
+    "image-private": "point-images-private/",
     "document": "documents/",
     "avatar": "avatars/",
 }
 
 _KIND_ALLOWED_MIMES: dict[FileKind, set[str]] = {
     "image": ALLOWED_IMAGE_MIMES,
+    "image-private": ALLOWED_IMAGE_MIMES,
     "avatar": ALLOWED_IMAGE_MIMES,
     "document": ALLOWED_DOCUMENT_MIMES,
 }
 
 _KIND_MAX_SIZE: dict[FileKind, int] = {
     "image": MAX_IMAGE_SIZE,
+    "image-private": MAX_IMAGE_SIZE,
     "avatar": MAX_IMAGE_SIZE,
     "document": MAX_DOCUMENT_SIZE,
 }
@@ -65,6 +70,9 @@ def _client():
     )
 
 
+# Only avatars and public point images are directly accessible.
+# documents/ and point-images-private/ are not covered — objects there
+# require a presigned URL (StorageService.presigned_url).
 _PUBLIC_READ_POLICY = json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -72,7 +80,10 @@ _PUBLIC_READ_POLICY = json.dumps({
             "Effect": "Allow",
             "Principal": {"AWS": ["*"]},
             "Action": ["s3:GetObject"],
-            "Resource": [f"arn:aws:s3:::{_BUCKET}/*"],
+            "Resource": [
+                f"arn:aws:s3:::{_BUCKET}/avatars/*",
+                f"arn:aws:s3:::{_BUCKET}/point-images/*",
+            ],
         }
     ],
 })

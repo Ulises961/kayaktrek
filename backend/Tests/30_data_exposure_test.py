@@ -27,7 +27,6 @@ used for token revocation, and raw database error messages.
 import json
 import re
 
-import pytest
 
 from Resources.user_resource import USER_ENDPOINT
 
@@ -103,8 +102,9 @@ def test_search_users_no_sensitive_fields(client, auth_headers, user_2):
 
 def test_duplicate_registration_no_sql_leak(client):
     """
-    Registering with an already-taken email triggers an IntegrityError.
-    The response must not include raw SQL text, constraint names, or table names.
+    Registering with an already-taken email uses non-disclosure: the API returns 201
+    with a neutral message regardless of whether the address exists, so no SQL details
+    or account-existence signals are leaked.
     """
     payload = {
         "mail": "sql.leak.test@example.com",
@@ -118,17 +118,20 @@ def test_duplicate_registration_no_sql_leak(client):
     r = client.post("/api/auth/register", json=payload)
     body = r.data.decode()
 
-    assert r.status_code in (400, 409, 422), f"unexpected status {r.status_code}"
+    assert r.status_code == 201, f"non-disclosure must return 201, got {r.status_code}"
     assert "detail" not in json.loads(body), "raw SQL detail field must not be present"
 
     for pattern in _SQL_PATTERNS:
         assert not re.search(pattern, body, re.IGNORECASE), (
-            f"SQL pattern {pattern!r} found in error response: {body[:200]}"
+            f"SQL pattern {pattern!r} found in response: {body[:200]}"
         )
 
 
 def test_duplicate_username_no_sql_leak(client):
-    """Same check for duplicate username constraint."""
+    """
+    Username collision also returns 201 (non-disclosure) — usernames are not enumerable
+    via the registration endpoint. No SQL details are present in the response body.
+    """
     base = {
         "mail": "sqlleak.a@example.com",
         "pwd": "Password9$",
@@ -142,11 +145,11 @@ def test_duplicate_username_no_sql_leak(client):
     r = client.post("/api/auth/register", json=payload2)
     body = r.data.decode()
 
-    assert r.status_code in (400, 409, 422)
+    assert r.status_code == 201, f"non-disclosure must return 201, got {r.status_code}"
     assert "detail" not in json.loads(body)
     for pattern in _SQL_PATTERNS:
         assert not re.search(pattern, body, re.IGNORECASE), (
-            f"SQL pattern {pattern!r} found in error response: {body[:200]}"
+            f"SQL pattern {pattern!r} found in response: {body[:200]}"
         )
 
 

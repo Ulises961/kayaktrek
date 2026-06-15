@@ -7,8 +7,12 @@ import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
   const [pageData, endorsedData] = await Promise.all([
-    apiGet("/api/log/all?per_page=100").then((r) => LogPageSchema.parse(r)).catch(() => ({ items: [], total: 0, page: 1, pages: 1 })),
-    apiGet("/api/log/endorsed").then((r) => LogsSchema.parse(r)).catch(() => []),
+    apiGet("/api/log/all?per_page=100")
+      .then((r) => LogPageSchema.parse(r))
+      .catch(() => ({ items: [], total: 0, page: 1, pages: 1 })),
+    apiGet("/api/log/endorsed")
+      .then((r) => LogsSchema.parse(r))
+      .catch(() => []),
   ])
 
   const { items } = pageData
@@ -21,7 +25,7 @@ export default async function LogsPage() {
     : null
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Paddling logs</h1>
         <Button asChild size="sm">
@@ -32,13 +36,13 @@ export default async function LogsPage() {
       {items.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <ClockIcon className="size-3.5" /> Hours
             </span>
             <span className="text-xl font-semibold">{totalHours.toFixed(1)}</span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <RouteIcon className="size-3.5" /> Distance
             </span>
             <span className="text-xl font-semibold">
@@ -46,7 +50,7 @@ export default async function LogsPage() {
             </span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <WavesIcon className="size-3.5" /> Avg sea
             </span>
             <span className="text-xl font-semibold">

@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 import os
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from Api.celery_app import celery_app
@@ -44,8 +44,8 @@ def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
         with open(filepath, "w") as fh:
             fh.write(payload)
 
-        backend_url = current_app.config.get("BACKEND_URL", "http://localhost:5000")
-        download_url = f"{backend_url}/api/user/me/data-export/{raw_token}"
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        download_url = f"{frontend_url}/download-export/{raw_token}"
         support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
@@ -71,7 +71,7 @@ def _json_default(obj):
 
 def _build_export(user: User) -> dict:
     return {
-        "exportedAt": datetime.utcnow().isoformat(),
+        "exportedAt": datetime.now(UTC).isoformat(),
         "profile": {
             "id": str(user.id),
             "mail": user.mail,
@@ -120,7 +120,7 @@ def _build_export(user: User) -> dict:
             {
                 "id": str(log.id),
                 "date": log.date.isoformat() if log.date else None,
-                "distanceKm": log.distance_km,
+                "distanceKm": float(log.distance) if log.distance else None,
                 "notes": log.notes,
             }
             for log in user.logs

@@ -20,7 +20,12 @@ const LEADER_MEMBER = {
 const CREW_MEMBER = {
   id: "01952f1a-0000-7000-8000-000000000003",
   role: "crew",
-  user: { ...MEMBER_USER, id: "01952f1a-0000-7000-8000-000000000004", mail: "crew@example.com", username: "crew" },
+  user: {
+    ...MEMBER_USER,
+    id: "01952f1a-0000-7000-8000-000000000004",
+    mail: "crew@example.com",
+    username: "crew",
+  },
 }
 
 const TRIP_FIXTURE = {

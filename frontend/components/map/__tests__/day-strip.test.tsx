@@ -29,11 +29,18 @@ const DAY2_ID = "day-2"
 const ITIN_ID = "itin-1"
 
 const pt = (id: string, dayId: string): Point => ({
-  id, type: "position", latitude: 44 + Number(id.slice(-1)) * 0.01, longitude: 14, dayId,
+  id,
+  type: "position",
+  latitude: 44 + Number(id.slice(-1)) * 0.01,
+  longitude: 14,
+  dayId,
 })
 
 const day = (id: string, dayNumber: number, extra: Partial<Day> = {}): Day => ({
-  id, dayNumber, itineraryId: ITIN_ID, ...extra,
+  id,
+  dayNumber,
+  itineraryId: ITIN_ID,
+  ...extra,
 })
 
 function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderContextValue {
@@ -68,6 +75,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     isLeader: true,
     selectedPointId: null,
     setSelectedPointId: vi.fn(),
+    selectedHour: 12,
+    setSelectedHour: vi.fn(),
     ...overrides,
   }
 }
@@ -86,7 +95,18 @@ describe("DayStrip — card count", () => {
   })
 
   it("renders zero cards when there are no numbered days", () => {
-    renderWithCtx(makeCtx({ state: { points: [], pointOrder: [], pendingPointId: null, pendingPointName: null, savingCount: 0, days: [] } }))
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [],
+          pointOrder: [],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [],
+        },
+      }),
+    )
     expect(screen.queryByText(/Day \d/)).not.toBeInTheDocument()
   })
 })

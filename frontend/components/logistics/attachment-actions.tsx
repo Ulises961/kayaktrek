@@ -27,7 +27,12 @@ interface AttachmentActionsProps {
   canEdit: boolean
 }
 
-export function AttachmentActions({ tripId, documentId, attachmentPath, canEdit }: AttachmentActionsProps) {
+export function AttachmentActions({
+  tripId,
+  documentId,
+  attachmentPath,
+  canEdit,
+}: AttachmentActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -69,11 +74,11 @@ export function AttachmentActions({ tripId, documentId, attachmentPath, canEdit 
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
+          className="text-muted-foreground h-7 px-2 text-xs"
           onClick={handleDownload}
           disabled={isPending}
         >
-          <DownloadIcon className="size-3 mr-1" />
+          <DownloadIcon className="mr-1 size-3" />
           Download
         </Button>
         {canEdit && (
@@ -82,10 +87,10 @@ export function AttachmentActions({ tripId, documentId, attachmentPath, canEdit 
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-destructive"
+                className="text-destructive h-7 px-2 text-xs"
                 disabled={isPending}
               >
-                <Trash2Icon className="size-3 mr-1" />
+                <Trash2Icon className="mr-1 size-3" />
                 Remove
               </Button>
             </AlertDialogTrigger>
@@ -120,16 +125,19 @@ export function AttachmentActions({ tripId, documentId, attachmentPath, canEdit 
       />
       <div
         data-testid="drop-zone"
-        className={`border border-dashed rounded-md p-2.5 text-center transition-colors ${
+        className={`rounded-md border border-dashed p-2.5 text-center transition-colors ${
           isDragging ? "border-primary bg-primary/5" : "border-border"
         }`}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setIsDragging(true)
+        }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
       >
         <div className="flex items-center justify-center gap-2">
-          <PaperclipIcon className="size-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Drop a file or</span>
+          <PaperclipIcon className="text-muted-foreground size-3.5" />
+          <span className="text-muted-foreground text-xs">Drop a file or</span>
           <Button
             type="button"
             variant="ghost"
@@ -138,7 +146,7 @@ export function AttachmentActions({ tripId, documentId, attachmentPath, canEdit 
             onClick={() => fileInputRef.current?.click()}
             disabled={isPending}
           >
-            <UploadIcon className="size-3 mr-1" />
+            <UploadIcon className="mr-1 size-3" />
             Upload
           </Button>
         </div>

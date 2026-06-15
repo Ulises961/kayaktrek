@@ -11,7 +11,7 @@ import type { RouteData } from "@/lib/itinerary/public-routes"
 async function fetchLandingRoutes(): Promise<RouteData[]> {
   try {
     const list = PublicItinerariesSchema.parse(
-      await apiGetPublic<unknown[]>("/api/itinerary/explore")
+      await apiGetPublic<unknown[]>("/api/itinerary/explore"),
     )
     const ids = list.map((i) => i.id).filter(Boolean) as string[]
     const details = await Promise.all(
@@ -22,7 +22,7 @@ async function fetchLandingRoutes(): Promise<RouteData[]> {
         } catch {
           return null
         }
-      })
+      }),
     )
     return details.filter(Boolean).map((d) => extractRouteData(d!))
   } catch {
@@ -37,15 +37,15 @@ export default async function LandingPage() {
   const routes = await fetchLandingRoutes()
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
+    <div className="relative h-screen w-full overflow-hidden">
       {/* Full-screen map */}
       <div className="absolute inset-0">
         <MapLoader routes={routes} />
       </div>
 
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-[1001] flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-sm border-b border-slate-200">
-        <span className="font-semibold text-slate-900 tracking-tight">
+      <div className="absolute top-0 right-0 left-0 z-[1001] flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-sm">
+        <span className="font-semibold tracking-tight text-slate-900">
           Kayak Expedition Planner
         </span>
         <div className="flex items-center gap-2">
@@ -60,9 +60,10 @@ export default async function LandingPage() {
 
       {/* Route count overlay */}
       {routes.length > 0 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1001]">
-          <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm text-slate-700 shadow border border-slate-200">
-            {routes.length} public {routes.length === 1 ? "route" : "routes"} shared by the community
+        <div className="absolute bottom-6 left-1/2 z-[1001] -translate-x-1/2">
+          <div className="rounded-full border border-slate-200 bg-white/90 px-4 py-1.5 text-sm text-slate-700 shadow backdrop-blur-sm">
+            {routes.length} public {routes.length === 1 ? "route" : "routes"} shared by the
+            community
           </div>
         </div>
       )}

@@ -48,7 +48,7 @@ describe("updateProfile", () => {
     await updateProfile(PROFILE_FIELDS)
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/user/${USER_ID}`,
-      expect.objectContaining({ name: "Ada", username: "ada" })
+      expect.objectContaining({ name: "Ada", username: "ada" }),
     )
   })
 
@@ -57,7 +57,7 @@ describe("updateProfile", () => {
     await updateProfile({ ...PROFILE_FIELDS, vesselLengthCm: "" })
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/user/${USER_ID}`,
-      expect.objectContaining({ vesselLengthCm: null })
+      expect.objectContaining({ vesselLengthCm: null }),
     )
   })
 
@@ -66,7 +66,7 @@ describe("updateProfile", () => {
     await updateProfile({ ...PROFILE_FIELDS, vesselLengthCm: "518" })
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/user/${USER_ID}`,
-      expect.objectContaining({ vesselLengthCm: 518 })
+      expect.objectContaining({ vesselLengthCm: 518 }),
     )
   })
 
@@ -83,7 +83,10 @@ describe("updateProfile", () => {
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPatch).mockRejectedValue(new Error("400"))
-    expect(await updateProfile(PROFILE_FIELDS)).toEqual({ success: false, error: expect.any(String) })
+    expect(await updateProfile(PROFILE_FIELDS)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 
   it("redirects to /login when there is no session", async () => {
@@ -123,7 +126,10 @@ describe("uploadAvatar", () => {
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiUpload).mockRejectedValue(new Error("400"))
-    expect(await uploadAvatar(new FormData())).toEqual({ success: false, error: expect.any(String) })
+    expect(await uploadAvatar(new FormData())).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 })
 
@@ -150,7 +156,10 @@ describe("changePassword", () => {
   it("patches /api/user/me/password with currentPwd and newPwd", async () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await changePassword("old", "New1!")
-    expect(apiPatch).toHaveBeenCalledWith("/api/user/me/password", { currentPwd: "old", newPwd: "New1!" })
+    expect(apiPatch).toHaveBeenCalledWith("/api/user/me/password", {
+      currentPwd: "old",
+      newPwd: "New1!",
+    })
   })
 
   it("returns success: true on success", async () => {
@@ -166,7 +175,10 @@ describe("changePassword", () => {
 
   it("returns a generic error on other failures", async () => {
     vi.mocked(apiPatch).mockRejectedValue(new Error("500"))
-    expect(await changePassword("old", "New1!")).toEqual({ success: false, error: expect.any(String) })
+    expect(await changePassword("old", "New1!")).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 })
 
@@ -185,7 +197,10 @@ describe("requestDataExport", () => {
   it("returns a user-friendly message on 429", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/data-export failed: 429"))
     const result = await requestDataExport()
-    expect(result).toEqual({ success: false, error: "You can only request a data export once per day." })
+    expect(result).toEqual({
+      success: false,
+      error: "You can only request a data export once per day.",
+    })
   })
 
   it("returns a generic error on other failures", async () => {
@@ -245,7 +260,7 @@ describe("getMedicalNotes", () => {
     expect(apiPost).toHaveBeenCalledWith(
       "/api/user/me/medical-notes",
       { password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN }
+      { "X-Elevated-Token": ELEVATED_TOKEN },
     )
   })
 
@@ -271,17 +286,27 @@ describe("getMedicalNotes", () => {
 
 describe("grantMedicalConsent", () => {
   it("POSTs to /api/user/me/medical-consent with elevated header", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ id: USER_ID, mail: "ada@example.com", username: "ada", name: "Ada" })
+    vi.mocked(apiPost).mockResolvedValue({
+      id: USER_ID,
+      mail: "ada@example.com",
+      username: "ada",
+      name: "Ada",
+    })
     await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)
     expect(apiPost).toHaveBeenCalledWith(
       "/api/user/me/medical-consent",
       { medicalNotes: "notes", password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN }
+      { "X-Elevated-Token": ELEVATED_TOKEN },
     )
   })
 
   it("returns success: true on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ id: USER_ID, mail: "ada@example.com", username: "ada", name: "Ada" })
+    vi.mocked(apiPost).mockResolvedValue({
+      id: USER_ID,
+      mail: "ada@example.com",
+      username: "ada",
+      name: "Ada",
+    })
     expect(await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)).toEqual({ success: true })
   })
 
@@ -298,10 +323,9 @@ describe("revokeMedicalConsent", () => {
   it("sends DELETE to /api/user/me/medical-consent with elevated header", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await revokeMedicalConsent(ELEVATED_TOKEN)
-    expect(apiDelete).toHaveBeenCalledWith(
-      "/api/user/me/medical-consent",
-      { "X-Elevated-Token": ELEVATED_TOKEN }
-    )
+    expect(apiDelete).toHaveBeenCalledWith("/api/user/me/medical-consent", {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
   })
 
   it("returns success: true on success", async () => {
@@ -310,7 +334,9 @@ describe("revokeMedicalConsent", () => {
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
-    vi.mocked(apiDelete).mockRejectedValue(new Error("DELETE /api/user/me/medical-consent failed: 403"))
+    vi.mocked(apiDelete).mockRejectedValue(
+      new Error("DELETE /api/user/me/medical-consent failed: 403"),
+    )
     expect(await revokeMedicalConsent(ELEVATED_TOKEN)).toEqual({
       success: false,
       error: expect.any(String),

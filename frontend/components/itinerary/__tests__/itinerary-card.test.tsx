@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockUpdateItinerary, mockRefresh, mockPush, mockCreateTripFromItinerary } = vi.hoisted(() => ({
-  mockUpdateItinerary: vi.fn(),
-  mockRefresh: vi.fn(),
-  mockPush: vi.fn(),
-  mockCreateTripFromItinerary: vi.fn(),
-}))
+const { mockUpdateItinerary, mockRefresh, mockPush, mockCreateTripFromItinerary } = vi.hoisted(
+  () => ({
+    mockUpdateItinerary: vi.fn(),
+    mockRefresh: vi.fn(),
+    mockPush: vi.fn(),
+    mockCreateTripFromItinerary: vi.fn(),
+  }),
+)
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mockRefresh, push: mockPush }),

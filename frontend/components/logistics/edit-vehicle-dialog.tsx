@@ -5,11 +5,21 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CarIcon } from "lucide-react"
 import { updateShuttleVehicle } from "@/lib/shuttle/actions"
-import { ShuttleVehicleFieldsSchema, type ShuttleVehicleFields, type ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
+import {
+  ShuttleVehicleFieldsSchema,
+  type ShuttleVehicleFields,
+  type ShuttleVehicle,
+} from "@/lib/dtos/shuttle-vehicle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 const SELECT_CLASS =
@@ -17,7 +27,10 @@ const SELECT_CLASS =
 
 function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <Label
+      htmlFor={htmlFor}
+      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
+    >
       {children}
     </Label>
   )
@@ -31,11 +44,23 @@ interface EditVehicleDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange }: EditVehicleDialogProps) {
-  const [externalDriver, setExternalDriver] = useState(!vehicle.driverId && !!(vehicle.driverName))
+export function EditVehicleDialog({
+  tripId,
+  vehicle,
+  members,
+  open,
+  onOpenChange,
+}: EditVehicleDialogProps) {
+  const [externalDriver, setExternalDriver] = useState(!vehicle.driverId && !!vehicle.driverName)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, setValue, setError, formState: { errors } } = useForm<ShuttleVehicleFields>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    setError,
+    formState: { errors },
+  } = useForm<ShuttleVehicleFields>({
     resolver: zodResolver(ShuttleVehicleFieldsSchema),
     values: {
       driverId: vehicle.driverId,
@@ -106,7 +131,10 @@ export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange
                   type="number"
                   min={0}
                   disabled={isPending}
-                  {...register("seatsAvailable", { setValueAs: (v: string) => v === "" || v == null ? undefined : parseInt(v, 10) })}
+                  {...register("seatsAvailable", {
+                    setValueAs: (v: string) =>
+                      v === "" || v == null ? undefined : parseInt(v, 10),
+                  })}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -116,7 +144,10 @@ export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange
                   type="number"
                   min={0}
                   disabled={isPending}
-                  {...register("kayakSpots", { setValueAs: (v: string) => v === "" || v == null ? undefined : parseInt(v, 10) })}
+                  {...register("kayakSpots", {
+                    setValueAs: (v: string) =>
+                      v === "" || v == null ? undefined : parseInt(v, 10),
+                  })}
                 />
               </div>
             </div>
@@ -124,7 +155,7 @@ export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange
             {/* Driver toggle */}
             <div className="flex flex-col gap-2">
               <FieldLabel>Driver</FieldLabel>
-              <div className="flex rounded-md border border-input overflow-hidden text-sm">
+              <div className="border-input flex overflow-hidden rounded-md border text-sm">
                 <button
                   type="button"
                   onClick={() => setExternalDriver(false)}
@@ -134,7 +165,10 @@ export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setExternalDriver(true); setValue("driverId", null) }}
+                  onClick={() => {
+                    setExternalDriver(true)
+                    setValue("driverId", null)
+                  }}
                   className={`flex-1 px-3 py-1.5 transition-colors ${externalDriver ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
                 >
                   External
@@ -156,16 +190,26 @@ export function EditVehicleDialog({ tripId, vehicle, members, open, onOpenChange
                 </select>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  <Input placeholder="Driver name" disabled={isPending} {...register("driverName")} />
-                  <Input placeholder="Driver contact" disabled={isPending} {...register("driverContact")} />
+                  <Input
+                    placeholder="Driver name"
+                    disabled={isPending}
+                    {...register("driverName")}
+                  />
+                  <Input
+                    placeholder="Driver contact"
+                    disabled={isPending}
+                    {...register("driverContact")}
+                  />
                 </div>
               )}
             </div>
 
-            {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
             <DialogFooter>
-              <Button type="submit" disabled={isPending}>Save</Button>
+              <Button type="submit" disabled={isPending}>
+                Save
+              </Button>
             </DialogFooter>
           </form>
         </div>

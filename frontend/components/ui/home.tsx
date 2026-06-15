@@ -1,14 +1,14 @@
-"use client";
+"use client"
 
-import type { Variants } from "motion/react";
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
-import { cn } from "@/lib/utils";
-import type { HomeIconHandle } from "@/lib/types/ui";
+import type { Variants } from "motion/react"
+import { motion, useAnimation } from "motion/react"
+import type { HTMLAttributes } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useRef } from "react"
+import { cn } from "@/lib/utils"
+import type { HomeIconHandle } from "@/lib/types/ui"
 
 interface HomeIconProps extends HTMLAttributes<HTMLDivElement> {
-  size?: number;
+  size?: number
 }
 
 const SVG_VARIANTS: Variants = {
@@ -24,43 +24,43 @@ const SVG_VARIANTS: Variants = {
       ease: "easeOut",
     },
   },
-};
+}
 
 const HomeIcon = forwardRef<HomeIconHandle, HomeIconProps>(
   ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
+    const controls = useAnimation()
+    const isControlledRef = useRef(false)
 
     useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
+      isControlledRef.current = true
 
       return {
         startAnimation: () => controls.start("animate"),
         stopAnimation: () => controls.start("normal"),
-      };
-    });
+      }
+    })
 
     const handleMouseEnter = useCallback(
       (e: React.MouseEvent<HTMLDivElement>) => {
         if (isControlledRef.current) {
-          onMouseEnter?.(e);
+          onMouseEnter?.(e)
         } else {
-          controls.start("animate");
+          controls.start("animate")
         }
       },
-      [controls, onMouseEnter]
-    );
+      [controls, onMouseEnter],
+    )
 
     const handleMouseLeave = useCallback(
       (e: React.MouseEvent<HTMLDivElement>) => {
         if (isControlledRef.current) {
-          onMouseLeave?.(e);
+          onMouseLeave?.(e)
         } else {
-          controls.start("normal");
+          controls.start("normal")
         }
       },
-      [controls, onMouseLeave]
-    );
+      [controls, onMouseLeave],
+    )
 
     return (
       <div
@@ -86,10 +86,10 @@ const HomeIcon = forwardRef<HomeIconHandle, HomeIconProps>(
           <path d="M2.25 12L11.2045 3.04549C11.6438 2.60615 12.3562 2.60615 12.7955 3.04549L21.75 12M4.5 9.75V19.875C4.5 20.4963 5.00368 21 5.625 21H9.75V16.125C9.75 15.5037 10.2537 15 10.875 15H13.125C13.7463 15 14.25 15.5037 14.25 16.125V21H18.375C18.9963 21 19.5 20.4963 19.5 19.875V9.75M8.25 21H16.5" />
         </motion.svg>
       </div>
-    );
-  }
-);
+    )
+  },
+)
 
-HomeIcon.displayName = "HomeIcon";
+HomeIcon.displayName = "HomeIcon"
 
-export { HomeIcon };
+export { HomeIcon }

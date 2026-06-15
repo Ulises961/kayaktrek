@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from uuid import UUID
 
 import bleach
+import defusedxml.ElementTree
 import gpxpy
 import gpxpy.gpx
 from sqlalchemy.exc import NoResultFound, IntegrityError
@@ -395,6 +396,7 @@ class ItineraryService:
             raise ValueError("GPX file exceeds the 5 MB limit")
 
         try:
+            defusedxml.ElementTree.fromstring(file_bytes)
             gpx = gpxpy.parse(io.BytesIO(file_bytes))
         except Exception as exc:
             raise ValueError(f"Invalid GPX file: {exc}") from exc

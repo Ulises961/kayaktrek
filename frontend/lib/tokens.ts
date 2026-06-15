@@ -23,7 +23,7 @@ const palette = {
   ocean300: "#7ec4e4",
   ocean200: "#b3dcf0",
   ocean100: "#dbedf7",
-  ocean50:  "#f0f8fd",
+  ocean50: "#f0f8fd",
 
   // Sea foam / teal
   foam400: "#2aa8a0",
@@ -49,137 +49,137 @@ const palette = {
   slate300: "#cbd5e1",
   slate200: "#e2e8f0",
   slate100: "#f1f5f9",
-  slate50:  "#f8fafc",
+  slate50: "#f8fafc",
 
   // Semantic system
-  red600:   "#dc2626",
-  red400:   "#f87171",
+  red600: "#dc2626",
+  red400: "#f87171",
   green700: "#065f46",
   green400: "#34d399",
   green100: "#d1fae5",
-  blue700:  "#1d4ed8",
-  blue400:  "#60a5fa",
-  blue100:  "#dbeafe",
+  blue700: "#1d4ed8",
+  blue400: "#60a5fa",
+  blue100: "#dbeafe",
 } as const
 
 // ---------------------------------------------------------------------------
 // Semantic tokens — light mode
 // ---------------------------------------------------------------------------
 export const lightTokens = {
-  background:         palette.slate50,
-  foreground:         palette.ocean900,
+  background: palette.slate50,
+  foreground: palette.ocean900,
 
-  card:               "#ffffff",
-  cardForeground:     palette.ocean900,
+  card: "#ffffff",
+  cardForeground: palette.ocean900,
 
-  popover:            "#ffffff",
-  popoverForeground:  palette.ocean900,
+  popover: "#ffffff",
+  popoverForeground: palette.ocean900,
 
-  primary:            palette.ocean600,
-  primaryForeground:  palette.slate50,
+  primary: palette.ocean600,
+  primaryForeground: palette.slate50,
 
-  secondary:          palette.ocean100,
+  secondary: palette.ocean100,
   secondaryForeground: palette.ocean700,
 
-  muted:              palette.ocean50,
-  mutedForeground:    palette.ocean500,
+  muted: palette.ocean50,
+  mutedForeground: palette.ocean500,
 
-  accent:             palette.sunset500,
-  accentForeground:   palette.ocean900,
+  accent: palette.sunset500,
+  accentForeground: palette.ocean900,
 
-  destructive:        palette.red600,
+  destructive: palette.red600,
   destructiveForeground: palette.slate50,
 
-  border:             palette.ocean200,
-  input:              palette.ocean200,
-  ring:               palette.ocean500,
+  border: palette.ocean200,
+  input: palette.ocean200,
+  ring: palette.ocean500,
 
   // Sidebar
-  sidebar:            palette.ocean50,
-  sidebarForeground:  palette.ocean900,
-  sidebarPrimary:     palette.ocean600,
+  sidebar: palette.ocean50,
+  sidebarForeground: palette.ocean900,
+  sidebarPrimary: palette.ocean600,
   sidebarPrimaryForeground: palette.slate50,
-  sidebarAccent:      palette.ocean100,
+  sidebarAccent: palette.ocean100,
   sidebarAccentForeground: palette.ocean800,
-  sidebarBorder:      palette.ocean200,
-  sidebarRing:        palette.ocean500,
+  sidebarBorder: palette.ocean200,
+  sidebarRing: palette.ocean500,
 
   // Trip state badges
-  stateDraftBg:       palette.slate200,
-  stateDraftFg:       palette.slate600,
-  statePlanningBg:    palette.blue100,
-  statePlanningFg:    palette.blue700,
-  stateHappeningBg:   palette.green100,
-  stateHappeningFg:   palette.green700,
-  statePastBg:        palette.slate200,
-  statePastFg:        palette.slate500,
+  stateDraftBg: palette.slate200,
+  stateDraftFg: palette.slate600,
+  statePlanningBg: palette.blue100,
+  statePlanningFg: palette.blue700,
+  stateHappeningBg: palette.green100,
+  stateHappeningFg: palette.green700,
+  statePastBg: palette.slate200,
+  statePastFg: palette.slate500,
 } as const
 
 // ---------------------------------------------------------------------------
 // Semantic tokens — dark mode
 // ---------------------------------------------------------------------------
 export const darkTokens = {
-  background:         palette.ocean900,
-  foreground:         palette.ocean50,
+  background: palette.ocean900,
+  foreground: palette.ocean50,
 
-  card:               palette.ocean800,
-  cardForeground:     palette.ocean50,
+  card: palette.ocean800,
+  cardForeground: palette.ocean50,
 
-  popover:            palette.ocean800,
-  popoverForeground:  palette.ocean50,
+  popover: palette.ocean800,
+  popoverForeground: palette.ocean50,
 
-  primary:            palette.ocean400,
-  primaryForeground:  palette.ocean900,
+  primary: palette.ocean400,
+  primaryForeground: palette.ocean900,
 
-  secondary:          palette.ocean700,
+  secondary: palette.ocean700,
   secondaryForeground: palette.ocean50,
 
-  muted:              palette.ocean800,
-  mutedForeground:    palette.ocean300,
+  muted: palette.ocean800,
+  mutedForeground: palette.ocean300,
 
-  accent:             palette.sunset400,
-  accentForeground:   palette.ocean900,
+  accent: palette.sunset400,
+  accentForeground: palette.ocean900,
 
-  destructive:        palette.red400,
+  destructive: palette.red400,
   destructiveForeground: palette.ocean900,
 
-  border:             "rgba(255,255,255,0.10)",
-  input:              "rgba(255,255,255,0.12)",
-  ring:               palette.ocean400,
+  border: "rgba(255,255,255,0.10)",
+  input: "rgba(255,255,255,0.12)",
+  ring: palette.ocean400,
 
   // Sidebar
-  sidebar:            palette.ocean800,
-  sidebarForeground:  palette.ocean50,
-  sidebarPrimary:     palette.ocean400,
+  sidebar: palette.ocean800,
+  sidebarForeground: palette.ocean50,
+  sidebarPrimary: palette.ocean400,
   sidebarPrimaryForeground: palette.ocean900,
-  sidebarAccent:      palette.ocean700,
+  sidebarAccent: palette.ocean700,
   sidebarAccentForeground: palette.ocean50,
-  sidebarBorder:      "rgba(255,255,255,0.08)",
-  sidebarRing:        palette.ocean400,
+  sidebarBorder: "rgba(255,255,255,0.08)",
+  sidebarRing: palette.ocean400,
 
   // Trip state badges
-  stateDraftBg:       palette.slate800,
-  stateDraftFg:       palette.slate400,
-  statePlanningBg:    palette.ocean700,
-  statePlanningFg:    palette.blue400,
-  stateHappeningBg:   "#064e3b",
-  stateHappeningFg:   palette.green400,
-  statePastBg:        palette.slate800,
-  statePastFg:        palette.slate500,
+  stateDraftBg: palette.slate800,
+  stateDraftFg: palette.slate400,
+  statePlanningBg: palette.ocean700,
+  statePlanningFg: palette.blue400,
+  stateHappeningBg: "#064e3b",
+  stateHappeningFg: palette.green400,
+  statePastBg: palette.slate800,
+  statePastFg: palette.slate500,
 } as const
 
 // ---------------------------------------------------------------------------
 // Spacing scale (React Native uses numbers, web uses rem)
 // ---------------------------------------------------------------------------
 export const spacing = {
-  0:  0,
-  1:  4,
-  2:  8,
-  3:  12,
-  4:  16,
-  5:  20,
-  6:  24,
-  8:  32,
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
   10: 40,
   12: 48,
   16: 64,
@@ -189,10 +189,10 @@ export const spacing = {
 // Border radius
 // ---------------------------------------------------------------------------
 export const radius = {
-  sm:   4,
-  md:   6,
-  lg:   10,   // --radius base
-  xl:   14,
+  sm: 4,
+  md: 6,
+  lg: 10, // --radius base
+  xl: 14,
   full: 9999,
 } as const
 
@@ -200,29 +200,29 @@ export const radius = {
 // Typography
 // ---------------------------------------------------------------------------
 export const fontSize = {
-  xs:   12,
-  sm:   14,
+  xs: 12,
+  sm: 14,
   base: 16,
-  lg:   18,
-  xl:   20,
+  lg: 18,
+  xl: 20,
   "2xl": 24,
   "3xl": 30,
   "4xl": 36,
 } as const
 
 export const fontWeight = {
-  normal:   "400",
-  medium:   "500",
+  normal: "400",
+  medium: "500",
   semibold: "600",
-  bold:     "700",
+  bold: "700",
 } as const
 
 // ---------------------------------------------------------------------------
 // Convenience export for React Native usage
 // ---------------------------------------------------------------------------
 export const tokens = {
-  light:      lightTokens,
-  dark:       darkTokens,
+  light: lightTokens,
+  dark: darkTokens,
   palette,
   spacing,
   radius,

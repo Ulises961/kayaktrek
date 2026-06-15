@@ -95,7 +95,14 @@ describe("PointAccordionItem", () => {
   })
 
   it("shows Find nearby POIs button only for interest type", () => {
-    render(<PointAccordionItem {...defaultProps} isOpen point={{ ...basePoint, type: "interest" }} onFetchPois={vi.fn()} />)
+    render(
+      <PointAccordionItem
+        {...defaultProps}
+        isOpen
+        point={{ ...basePoint, type: "interest" }}
+        onFetchPois={vi.fn()}
+      />,
+    )
     expect(screen.getByRole("button", { name: /find nearby/i })).toBeTruthy()
   })
 
@@ -117,7 +124,7 @@ describe("PointAccordionItem", () => {
         onFetchPois={vi.fn()}
         poiResults={pois}
         onPoiSelect={vi.fn()}
-      />
+      />,
     )
     expect(screen.getByText("Lighthouse")).toBeTruthy()
     expect(screen.getByText("Cave")).toBeTruthy()
@@ -134,7 +141,7 @@ describe("PointAccordionItem", () => {
         onFetchPois={vi.fn()}
         poiResults={pois}
         onPoiSelect={onPoiSelect}
-      />
+      />,
     )
     fireEvent.click(screen.getByText("Lighthouse"))
     expect(onPoiSelect).toHaveBeenCalledWith("Lighthouse")

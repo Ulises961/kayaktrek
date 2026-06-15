@@ -5,8 +5,16 @@ import "leaflet/dist/leaflet.css"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 
 const ROUTE_COLORS = [
-  "#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
-  "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#6366f1",
+  "#0ea5e9",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#ec4899",
+  "#6366f1",
 ]
 
 type Props = {
@@ -15,12 +23,7 @@ type Props = {
 
 export default function PublicMap({ routes = [] }: Props) {
   return (
-    <MapContainer
-      center={[43, 13]}
-      zoom={5}
-      className="w-full h-full"
-      zoomControl={false}
-    >
+    <MapContainer center={[43, 13]} zoom={5} className="h-full w-full" zoomControl={false}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -39,7 +39,7 @@ export function MileageSummary({ planned, actual }: MileageSummaryProps) {
             key={u}
             onClick={() => toggleUnit(u)}
             aria-label={u}
-            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+            className={`rounded border px-2 py-0.5 text-xs transition-colors ${
               unit === u
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-background text-muted-foreground border-input hover:border-primary"
@@ -51,17 +51,17 @@ export function MileageSummary({ planned, actual }: MileageSummaryProps) {
       </div>
 
       {!hasData ? (
-        <p className="text-sm text-muted-foreground">No distance recorded yet.</p>
+        <p className="text-muted-foreground text-sm">No distance recorded yet.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Planned</span>
+            <span className="text-muted-foreground text-xs tracking-wide uppercase">Planned</span>
             <span className="text-sm font-medium">
               {planned != null ? convert(planned, unit) : "—"}
             </span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Actual</span>
+            <span className="text-muted-foreground text-xs tracking-wide uppercase">Actual</span>
             <span className="text-sm font-medium">
               {actual != null ? convert(actual, unit) : "—"}
             </span>

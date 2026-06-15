@@ -16,11 +16,11 @@ export default async function EditLogPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
+    <div className="flex max-w-lg flex-col gap-6">
       <h1 className="text-2xl font-semibold">Edit log</h1>
       <LogForm log={log} />
-      <div className="flex flex-col gap-3 border border-destructive/30 rounded-lg p-4">
-        <p className="text-sm font-medium text-destructive">Danger zone</p>
+      <div className="border-destructive/30 flex flex-col gap-3 rounded-lg border p-4">
+        <p className="text-destructive text-sm font-medium">Danger zone</p>
         <DeleteLogButton logId={id} />
       </div>
     </div>

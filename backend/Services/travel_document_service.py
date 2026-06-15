@@ -13,7 +13,7 @@ from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Schemas.base_schema import camelcase
 from Schemas.travel_document_schema import TravelDocumentSchema
-from Services.storage_service import StorageService, StorageValidationError
+from Services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export default function Loading() {
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">

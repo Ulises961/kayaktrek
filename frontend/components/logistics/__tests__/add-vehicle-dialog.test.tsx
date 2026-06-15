@@ -13,15 +13,21 @@ import { EditVehicleDialog } from "../edit-vehicle-dialog"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
-const TRIP_ID   = "01952f1a-0000-7000-8000-000000000001"
+const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const VEHICLE_ID = "01952f1a-0000-7000-8000-000000000010"
-const MEMBER_ID  = "01952f1a-0000-7000-8000-000000000020"
+const MEMBER_ID = "01952f1a-0000-7000-8000-000000000020"
 
 const MEMBERS: TripMember[] = [
   {
     id: MEMBER_ID,
     role: "leader",
-    user: { id: "01952f1a-0000-7000-8000-000000000021", mail: "ana@example.com", username: "ana", name: "Ana", surname: "Font" },
+    user: {
+      id: "01952f1a-0000-7000-8000-000000000021",
+      mail: "ana@example.com",
+      username: "ana",
+      name: "Ana",
+      surname: "Font",
+    },
   },
 ]
 
@@ -66,7 +72,7 @@ describe("AddVehicleDialog", () => {
     await userEvent.type(screen.getByPlaceholderText(/vehicle description/i), "Blue VW")
     await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
     await waitFor(() =>
-      expect(createShuttleVehicle).toHaveBeenCalledWith(TRIP_ID, expect.any(Object))
+      expect(createShuttleVehicle).toHaveBeenCalledWith(TRIP_ID, expect.any(Object)),
     )
   })
 
@@ -81,23 +87,47 @@ describe("AddVehicleDialog", () => {
 
 describe("EditVehicleDialog", () => {
   it("pre-fills vehicle description", async () => {
-    render(<EditVehicleDialog tripId={TRIP_ID} vehicle={VEHICLE} members={MEMBERS} open onOpenChange={vi.fn()} />)
+    render(
+      <EditVehicleDialog
+        tripId={TRIP_ID}
+        vehicle={VEHICLE}
+        members={MEMBERS}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
     const input = screen.getByPlaceholderText(/vehicle description/i)
     expect((input as HTMLInputElement).value).toBe("White Toyota")
   })
 
   it("calls updateShuttleVehicle on submit", async () => {
     vi.mocked(updateShuttleVehicle).mockResolvedValue({ success: true })
-    render(<EditVehicleDialog tripId={TRIP_ID} vehicle={VEHICLE} members={MEMBERS} open onOpenChange={vi.fn()} />)
+    render(
+      <EditVehicleDialog
+        tripId={TRIP_ID}
+        vehicle={VEHICLE}
+        members={MEMBERS}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
-      expect(updateShuttleVehicle).toHaveBeenCalledWith(TRIP_ID, VEHICLE_ID, expect.any(Object))
+      expect(updateShuttleVehicle).toHaveBeenCalledWith(TRIP_ID, VEHICLE_ID, expect.any(Object)),
     )
   })
 
   it("shows error when updateShuttleVehicle fails", async () => {
     vi.mocked(updateShuttleVehicle).mockResolvedValue({ success: false, error: "Trip is over." })
-    render(<EditVehicleDialog tripId={TRIP_ID} vehicle={VEHICLE} members={MEMBERS} open onOpenChange={vi.fn()} />)
+    render(
+      <EditVehicleDialog
+        tripId={TRIP_ID}
+        vehicle={VEHICLE}
+        members={MEMBERS}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() => expect(screen.getByText("Trip is over.")).toBeDefined())
   })

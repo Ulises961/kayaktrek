@@ -79,13 +79,29 @@ describe("MapBuilder", () => {
   })
 
   it("renders the point list pane in edit mode after clicking 'Edit route'", async () => {
-    render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" isLeader={true} tripState="building" />)
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        isLeader={true}
+        tripState="building"
+      />,
+    )
     await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
     expect(screen.getByTestId("point-list-pane")).toBeInTheDocument()
   })
 
   it("returns to view mode and shows day strip after clicking 'Done'", async () => {
-    render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" isLeader={true} tripState="building" />)
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        isLeader={true}
+        tripState="building"
+      />,
+    )
     await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
     await userEvent.click(screen.getByRole("button", { name: "Done" }))
     expect(screen.getByTestId("day-strip")).toBeInTheDocument()
@@ -95,11 +111,7 @@ describe("MapBuilder", () => {
   it("counts only numbered days (excludes Day 0)", () => {
     const withDays: Itinerary = {
       ...ITINERARY,
-      days: [
-        { dayNumber: 0 },
-        { dayNumber: 1 },
-        { dayNumber: 2 },
-      ],
+      days: [{ dayNumber: 0 }, { dayNumber: 1 }, { dayNumber: 2 }],
     }
     render(<MapBuilder itinerary={withDays} tripId={TRIP_ID} tripName="Cinque Terre" />)
     expect(within(screen.getByTestId("stats-strip")).getByText("2 days")).toBeInTheDocument()

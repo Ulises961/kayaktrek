@@ -75,15 +75,20 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
     setError(null)
     startTransition(async () => {
       const result = await upsertLogistics(tripId, values)
-      if (!result.success) { setError(result.error); return }
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
       setDisplayed(values)
       setIsEditing(false)
     })
   }
 
   if (!isEditing) {
-    const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } = displayed
-    const hasAny = shoreContactName || shoreContactPhone || shoreContactEmail || shoreContactRelationship
+    const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } =
+      displayed
+    const hasAny =
+      shoreContactName || shoreContactPhone || shoreContactEmail || shoreContactRelationship
 
     return (
       <div className="flex items-start justify-between gap-4">
@@ -96,7 +101,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
               <FieldRow label="Email" value={shoreContactEmail} />
             </>
           ) : (
-            <p className="text-sm text-muted-foreground italic">No shore contact recorded.</p>
+            <p className="text-muted-foreground text-sm italic">No shore contact recorded.</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleEdit} className="shrink-0 print:hidden">
@@ -109,14 +114,19 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scName">Name</Label>
           <Input id="scName" disabled={isPending} {...register("shoreContactName")} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scEmail">Email</Label>
-          <Input id="scEmail" type="email" disabled={isPending} {...register("shoreContactEmail")} />
+          <Input
+            id="scEmail"
+            type="email"
+            disabled={isPending}
+            {...register("shoreContactEmail")}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scPhone">Phone</Label>
@@ -124,17 +134,28 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scRelationship">Relationship</Label>
-          <Input id="scRelationship" placeholder="e.g. Partner" disabled={isPending} {...register("shoreContactRelationship")} />
+          <Input
+            id="scRelationship"
+            placeholder="e.g. Partner"
+            disabled={isPending}
+            {...register("shoreContactRelationship")}
+          />
         </div>
       </div>
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={isPending}>
           {isPending ? "Saving…" : "Save"}
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={handleCancel} disabled={isPending}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleCancel}
+          disabled={isPending}
+        >
           Cancel
         </Button>
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-xs">{error}</p>}
       </div>
     </form>
   )

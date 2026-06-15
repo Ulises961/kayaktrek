@@ -14,19 +14,21 @@ import { FloatPlanShareSection } from "@/components/trips/float-plan-share-secti
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—"
-  try { return format(new Date(iso), "d MMM yyyy") } catch { return iso }
+  try {
+    return format(new Date(iso), "d MMM yyyy")
+  } catch {
+    return iso
+  }
 }
 
 function SectionHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground border-b pb-1.5 mb-3">
+    <h2 className="text-muted-foreground mb-3 flex items-center gap-2 border-b pb-1.5 text-sm font-semibold tracking-[0.08em] uppercase">
       {icon}
       {children}
     </h2>
   )
 }
-
-
 
 export default async function FloatPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -53,11 +55,12 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
   const generatedAt = new Date()
 
   const dateRange = [trip.dateFrom, trip.dateTo].filter(Boolean)
-  const dateLabel = dateRange.length === 2
-    ? `${formatDate(dateRange[0])} – ${formatDate(dateRange[1])}`
-    : dateRange.length === 1
-    ? formatDate(dateRange[0])
-    : "Dates not set"
+  const dateLabel =
+    dateRange.length === 2
+      ? `${formatDate(dateRange[0])} – ${formatDate(dateRange[1])}`
+      : dateRange.length === 1
+        ? formatDate(dateRange[0])
+        : "Dates not set"
 
   const sortedCrew = [...travellers].sort((a, b) => {
     if (a.role === "leader") return -1
@@ -66,52 +69,56 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
   })
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <Link
             href={`/trips/${id}`}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors print:hidden w-fit"
+            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs transition-colors print:hidden"
           >
             <ArrowLeftIcon className="size-3" />
             Back to trip
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">Float Plan</h1>
           <p className="text-base font-medium">{trip.destination ?? "Unnamed expedition"}</p>
-          <p className="text-sm text-muted-foreground">{dateLabel}</p>
+          <p className="text-muted-foreground text-sm">{dateLabel}</p>
         </div>
         <div className="flex gap-2 print:hidden">
           <PrintButton />
         </div>
       </div>
 
-      <div className="rounded-md border border-border bg-muted/40 px-4 py-2 flex items-center gap-2 print:hidden">
-        <ShieldAlertIcon className="size-4 text-[#d97706] shrink-0" />
-        <p className="text-xs text-muted-foreground">
-          Generated {format(generatedAt, "d MMM yyyy 'at' HH:mm")}. Print or save a copy before departure.
+      <div className="border-border bg-muted/40 flex items-center gap-2 rounded-md border px-4 py-2 print:hidden">
+        <ShieldAlertIcon className="size-4 shrink-0 text-[#d97706]" />
+        <p className="text-muted-foreground text-xs">
+          Generated {format(generatedAt, "d MMM yyyy 'at' HH:mm")}. Print or save a copy before
+          departure.
         </p>
       </div>
 
       {/* Generated timestamp for print */}
-      <p className="hidden print:block text-xs text-muted-foreground border-t pt-2">
+      <p className="text-muted-foreground hidden border-t pt-2 text-xs print:block">
         Generated {format(generatedAt, "d MMM yyyy 'at' HH:mm")}
       </p>
 
       {/* Shore Contact */}
-      <section className="rounded-lg border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 p-4">
-        <SectionHeading icon={<AnchorIcon className="size-3.5 text-[#d97706]" />}>Shore Contact</SectionHeading>
-        <p className="text-xs text-muted-foreground mb-3 -mt-1">
+      <section className="rounded-lg border border-amber-200/70 bg-amber-50/60 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+        <SectionHeading icon={<AnchorIcon className="size-3.5 text-[#d97706]" />}>
+          Shore Contact
+        </SectionHeading>
+        <p className="text-muted-foreground -mt-1 mb-3 text-xs">
           Person who receives this float plan before departure.
         </p>
         <ShoreContactForm tripId={id} logistics={logistics} />
       </section>
 
       {/* Share link */}
-      <section className="rounded-lg border border-border bg-muted/30 p-4 print:hidden">
+      <section className="border-border bg-muted/30 rounded-lg border p-4 print:hidden">
         <SectionHeading icon={<LinkIcon className="size-3.5" />}>Share</SectionHeading>
-        <p className="text-xs text-muted-foreground mb-3 -mt-1">
-          Generate a read-only link for your shore contact. The link contains vessel descriptions and emergency contacts — no medical notes.
+        <p className="text-muted-foreground -mt-1 mb-3 text-xs">
+          Generate a read-only link for your shore contact. The link contains vessel descriptions
+          and emergency contacts — no medical notes.
         </p>
         <FloatPlanShareSection tripId={id} logistics={logistics} />
       </section>

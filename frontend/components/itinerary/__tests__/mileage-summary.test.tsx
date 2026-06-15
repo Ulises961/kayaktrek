@@ -5,9 +5,15 @@ import { MileageSummary } from "../mileage-summary"
 let store: Record<string, string> = {}
 const localStorageMock = {
   getItem: (key: string) => store[key] ?? null,
-  setItem: (key: string, value: string) => { store[key] = value },
-  removeItem: (key: string) => { delete store[key] },
-  clear: () => { store = {} },
+  setItem: (key: string, value: string) => {
+    store[key] = value
+  },
+  removeItem: (key: string) => {
+    delete store[key]
+  },
+  clear: () => {
+    store = {}
+  },
 }
 
 beforeEach(() => {

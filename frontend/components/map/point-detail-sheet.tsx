@@ -6,9 +6,23 @@ import { updatePoint } from "@/lib/itinerary/actions"
 import type { Point } from "@/lib/dtos/point"
 
 function TypeLabel({ type }: { type: string }) {
-  if (type === "stop") return <><Anchor className="size-3.5" /> Overnight stop</>
-  if (type === "interest") return <><Star className="size-3.5" /> Point of interest</>
-  return <><CircleDot className="size-3.5" /> Waypoint</>
+  if (type === "stop")
+    return (
+      <>
+        <Anchor className="size-3.5" /> Overnight stop
+      </>
+    )
+  if (type === "interest")
+    return (
+      <>
+        <Star className="size-3.5" /> Point of interest
+      </>
+    )
+  return (
+    <>
+      <CircleDot className="size-3.5" /> Waypoint
+    </>
+  )
 }
 
 function coordLabel(point: Point): string {
@@ -19,7 +33,8 @@ function coordLabel(point: Point): string {
 }
 
 export function PointDetailSheet() {
-  const { state, dispatch, selectedPointId, setSelectedPointId, isLeader, tripState } = useMapBuilder()
+  const { state, dispatch, selectedPointId, setSelectedPointId, isLeader, tripState } =
+    useMapBuilder()
 
   const point = selectedPointId
     ? (state.points.find((p) => p.id === selectedPointId) ?? null)
@@ -62,26 +77,28 @@ export function PointDetailSheet() {
 
   return (
     <div
-      className="absolute inset-0 z-[1002] animate-in fade-in duration-300"
+      className="animate-in fade-in absolute inset-0 z-[1002] duration-300"
       onClick={() => setSelectedPointId(null)}
     >
       <div
-        className="absolute bottom-0 left-0 right-0 bg-background border-t border-border rounded-t-2xl shadow-xl flex flex-col animate-in slide-in-from-bottom duration-300"
+        className="bg-background border-border animate-in slide-in-from-bottom absolute right-0 bottom-0 left-0 flex flex-col rounded-t-2xl border-t shadow-xl duration-300"
         style={{ maxHeight: "55vh" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-2 min-w-0 text-sm">
-            <span className="text-xs font-mono text-muted-foreground/70 shrink-0 w-4">{globalIdx}</span>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+        <div className="border-border flex shrink-0 items-center justify-between border-b px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="text-muted-foreground/70 w-4 shrink-0 font-mono text-xs">
+              {globalIdx}
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
               <TypeLabel type={point.type ?? "position"} />
             </span>
-            <span className="font-medium truncate">{displayName}</span>
+            <span className="truncate font-medium">{displayName}</span>
           </div>
           <button
             onClick={() => setSelectedPointId(null)}
-            className="shrink-0 ml-3 text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground ml-3 shrink-0 transition-colors"
             aria-label="Close"
           >
             <X className="size-4" />
@@ -89,17 +106,19 @@ export function PointDetailSheet() {
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto flex-1 flex flex-col gap-4 p-4">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+          <div className="text-muted-foreground flex items-center gap-1.5">
             <LocateFixed className="size-3.5 shrink-0" />
-            <span className="text-xs font-mono">{coordLabel(point)}</span>
+            <span className="font-mono text-xs">{coordLabel(point)}</span>
           </div>
 
           {canEdit ? (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
+              <label className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Name
+              </label>
               <input
-                className="w-full bg-transparent text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none border-b border-border/50 focus:border-border pb-1"
+                className="text-foreground placeholder-muted-foreground/60 border-border/50 focus:border-border w-full border-b bg-transparent pb-1 text-sm focus:outline-none"
                 value={draftName}
                 placeholder="Add a name…"
                 onChange={(e) => setDraftName(e.target.value)}
@@ -108,16 +127,20 @@ export function PointDetailSheet() {
             </div>
           ) : point.name ? (
             <div className="flex flex-col gap-1">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</p>
-              <p className="text-sm text-foreground">{point.name}</p>
+              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Name
+              </p>
+              <p className="text-foreground text-sm">{point.name}</p>
             </div>
           ) : null}
 
           {canEdit ? (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</label>
+              <label className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Notes
+              </label>
               <textarea
-                className="w-full bg-transparent text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none border border-border/50 focus:border-border rounded-md p-2 resize-none min-h-[80px]"
+                className="text-foreground placeholder-muted-foreground/60 border-border/50 focus:border-border min-h-[80px] w-full resize-none rounded-md border bg-transparent p-2 text-sm focus:outline-none"
                 value={draftNotes}
                 placeholder="Add notes…"
                 rows={4}
@@ -127,14 +150,18 @@ export function PointDetailSheet() {
             </div>
           ) : point.notes ? (
             <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</p>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{point.notes}</p>
+              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Notes
+              </p>
+              <p className="text-foreground text-sm whitespace-pre-wrap">{point.notes}</p>
             </div>
           ) : null}
 
           {point.images && point.images.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Photos</p>
+              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Photos
+              </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {point.images.map((img) => (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -142,7 +169,7 @@ export function PointDetailSheet() {
                     key={img.id}
                     src={img.location}
                     alt={img.name}
-                    className="h-32 w-auto rounded-lg shrink-0 object-cover"
+                    className="h-32 w-auto shrink-0 rounded-lg object-cover"
                   />
                 ))}
               </div>
@@ -150,7 +177,7 @@ export function PointDetailSheet() {
           )}
 
           {!canEdit && !point.notes && (!point.images || point.images.length === 0) && (
-            <p className="text-sm text-muted-foreground">No notes or photos for this point.</p>
+            <p className="text-muted-foreground text-sm">No notes or photos for this point.</p>
           )}
         </div>
       </div>

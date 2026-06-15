@@ -16,13 +16,13 @@ export const LogisticsSchema = z.object({
 
 export const LogisticsFieldsSchema = z.object({
   shoreContactName: z.string().max(200).refine(noHtmlTags.check, noHtmlTags.message).optional(),
-  shoreContactEmail: z
-    .string()
-    .email("Enter a valid email address.")
-    .or(z.literal(""))
-    .optional(),
+  shoreContactEmail: z.string().email("Enter a valid email address.").or(z.literal("")).optional(),
   shoreContactPhone: z.string().max(20).optional(),
-  shoreContactRelationship: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  shoreContactRelationship: z
+    .string()
+    .max(100)
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
   shuttleNotes: z.string().max(1000).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   shuttleMeetingTime: z.string().max(50).optional(),
 })

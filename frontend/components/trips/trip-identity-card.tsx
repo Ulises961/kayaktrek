@@ -44,7 +44,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] sm:text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
       {children}
     </span>
   )
@@ -56,28 +56,29 @@ function StateTimeline({ currentState }: { currentState: TripState }) {
     <div className="flex items-start">
       {TRIP_STATES.map((s, i) => (
         <Fragment key={s}>
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 flex-col items-center gap-1.5">
             <div
-              className={`size-3.5 rounded-full border-2 transition-colors ${i === currentIndex
+              className={`size-3.5 rounded-full border-2 transition-colors ${
+                i === currentIndex
                   ? "bg-primary border-primary"
                   : i < currentIndex
                     ? "bg-primary/30 border-primary/30"
                     : "bg-background border-border"
-                }`}
+              }`}
             />
             <span
-              className={`text-[10px] capitalize leading-none ${i === currentIndex
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground"
-                }`}
+              className={`text-[10px] leading-none capitalize ${
+                i === currentIndex ? "text-foreground font-semibold" : "text-muted-foreground"
+              }`}
             >
               {TRIP_STATE_LABELS[s]}
             </span>
           </div>
           {i < TRIP_STATES.length - 1 && (
             <div
-              className={`flex-1 h-0 min-w-4 mt-[5px] border-t border-dashed ${i < currentIndex ? "border-primary/40" : "border-border"
-                }`}
+              className={`mt-[5px] h-0 min-w-4 flex-1 border-t border-dashed ${
+                i < currentIndex ? "border-primary/40" : "border-border"
+              }`}
             />
           )}
         </Fragment>
@@ -102,22 +103,27 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
   const days =
     trip.dateFrom && trip.dateTo
       ? Math.round(
-        (new Date(trip.dateTo).getTime() - new Date(trip.dateFrom).getTime()) /
-        86_400_000
-      )
+          (new Date(trip.dateTo).getTime() - new Date(trip.dateFrom).getTime()) / 86_400_000,
+        )
       : null
 
-  const { register, handleSubmit, control, reset, setError, formState: { errors } } =
-    useForm<TripFields>({
-      resolver: zodResolver(TripFieldsSchema),
-      defaultValues: {
-        destination: trip.destination ?? "",
-        description: trip.description ?? "",
-        dateFrom: trip.dateFrom ?? "",
-        dateTo: trip.dateTo ?? "",
-        difficulty: trip.difficulty ?? null,
-      },
-    })
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<TripFields>({
+    resolver: zodResolver(TripFieldsSchema),
+    defaultValues: {
+      destination: trip.destination ?? "",
+      description: trip.description ?? "",
+      dateFrom: trip.dateFrom ?? "",
+      dateTo: trip.dateTo ?? "",
+      difficulty: trip.difficulty ?? null,
+    },
+  })
 
   function handleCancel() {
     setIsEditing(false)
@@ -150,8 +156,7 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
 
   return (
     <Card>
-      <CardContent className="pt-6 flex flex-col gap-4">
-
+      <CardContent className="flex flex-col gap-4 pt-6">
         {/* ── Title row ─────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-3">
           {isEditing ? (
@@ -162,18 +167,18 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
               {...register("destination")}
             />
           ) : (
-            <h1 className="text-2xl font-semibold leading-tight">
+            <h1 className="text-2xl leading-tight font-semibold">
               {trip.destination ?? "Untitled trip"}
             </h1>
           )}
-          <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
             {trip.state && <StateBadge state={trip.state} className="hidden sm:inline-flex" />}
             {isLeader && (
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label="Edit trip"
-                className="size-7 text-muted-foreground"
+                className="text-muted-foreground size-7"
                 onClick={() => (isEditing ? handleCancel() : setIsEditing(true))}
               >
                 {isEditing ? <XIcon className="size-3.5" /> : <PencilIcon className="size-3.5" />}
@@ -184,60 +189,69 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
 
         {/* ── Metadata grid ─────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-y-7 sm:grid-cols-2 sm:gap-x-20 sm:gap-y-5">
-
           {/* Dates */}
           <div className="flex flex-col gap-4">
             <FieldLabel>
-              <CalendarIcon className="inline size-3 mr-0.5 -mt-px" />
-              {" "}Dates   {days !== null && (
-                <span className="text-xs text-muted-foreground ml-1.5">({days} days)</span>
+              <CalendarIcon className="-mt-px mr-0.5 inline size-3" /> Dates{" "}
+              {days !== null && (
+                <span className="text-muted-foreground ml-1.5 text-xs">({days} days)</span>
               )}
             </FieldLabel>
             {isEditing ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 sm:gap-5">
-                  <span className="text-xs text-muted-foreground w-5 shrink-0">From</span>
+                  <span className="text-muted-foreground w-5 shrink-0 text-xs">From</span>
                   <div className="min-w-0 flex-1">
                     <Controller
                       name="dateFrom"
                       control={control}
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} disabled={isPending} />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isPending}
+                        />
                       )}
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-3 sm:gap-5">
-                  <span className="text-xs text-muted-foreground w-5 shrink-0">To</span>
+                  <span className="text-muted-foreground w-5 shrink-0 text-xs">To</span>
                   <div className="min-w-0 flex-1">
                     <Controller
                       name="dateTo"
                       control={control}
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} disabled={isPending} />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isPending}
+                        />
                       )}
                     />
                   </div>
                 </div>
                 {errors.dateTo && (
-                  <p className="text-xs text-destructive">{errors.dateTo.message}</p>
+                  <p className="text-destructive text-xs">{errors.dateTo.message}</p>
                 )}
               </div>
             ) : trip.dateFrom && trip.dateTo ? (
               <div className="flex flex-col gap-4 text-sm">
                 <div className="flex items-baseline gap-4">
-                  <span className="text-[10px] sm:text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground w-6 shrink-0">From</span>
+                  <span className="text-muted-foreground w-6 shrink-0 text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
+                    From
+                  </span>
                   <span>{trip.dateFrom}</span>
                 </div>
                 <div className="flex items-baseline gap-4">
-                  <span className="text-[10px] sm:text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground w-6 shrink-0">To</span>
-                  <span>
-                    {trip.dateTo}
+                  <span className="text-muted-foreground w-6 shrink-0 text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
+                    To
                   </span>
+                  <span>{trip.dateTo}</span>
                 </div>
               </div>
             ) : (
-              <span className="text-sm text-muted-foreground italic">Not set</span>
+              <span className="text-muted-foreground text-sm italic">Not set</span>
             )}
           </div>
 
@@ -248,12 +262,14 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
               {isEditing ? (
                 <select
                   disabled={isPending}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                  className="border-input bg-background focus:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus:ring-1 focus:outline-none disabled:opacity-50"
                   {...register("difficulty")}
                 >
                   <option value="">Not set</option>
                   {TRIP_DIFFICULTIES.map((d) => (
-                    <option key={d} value={d}>{DIFFICULTY_LABELS[d]}</option>
+                    <option key={d} value={d}>
+                      {DIFFICULTY_LABELS[d]}
+                    </option>
                   ))}
                 </select>
               ) : trip.difficulty ? (
@@ -261,14 +277,13 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
                   {DIFFICULTY_LABELS[trip.difficulty]}
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground italic">Not set</span>
+                <span className="text-muted-foreground text-sm italic">Not set</span>
               )}
             </div>
 
             <div className="flex flex-row gap-1.5">
               <FieldLabel>
-                <UsersIcon className="inline size-4 mr-0.5 -mt-px" />
-                {" "}Crew ({travellers.length})
+                <UsersIcon className="-mt-px mr-0.5 inline size-4" /> Crew ({travellers.length})
               </FieldLabel>
             </div>
           </div>
@@ -288,7 +303,9 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
                   {...register("description")}
                 />
               ) : (
-                <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed">{trip.description}</p>
+                <p className="text-foreground/80 text-xs leading-relaxed sm:text-sm">
+                  {trip.description}
+                </p>
               )}
             </div>
           </>
@@ -303,9 +320,7 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
             <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isPending}>
               Cancel
             </Button>
-            {errors.root && (
-              <p className="text-sm text-destructive">{errors.root.message}</p>
-            )}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
           </div>
         )}
 
@@ -331,7 +346,12 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
             <div className="flex flex-col gap-2">
               <FieldLabel>Float plan</FieldLabel>
               <div>
-                <Button variant="outline" size="sm" asChild className="w-full sm:w-auto sm:self-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="w-full sm:w-auto sm:self-start"
+                >
                   <Link href={`/trips/${trip.id}/float-plan`}>
                     <AnchorIcon className="size-3.5" />
                     View float plan
@@ -350,7 +370,6 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
             </div>
           </>
         )}
-
       </CardContent>
     </Card>
   )

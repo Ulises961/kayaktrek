@@ -13,7 +13,7 @@ export function SidebarLogoutButton() {
       <SidebarMenuButton
         onClick={() => startTransition(() => logout())}
         disabled={isPending}
-        className="xl:h-10 xl:[&>svg]:size-5 2xl:h-11 2xl:[&>svg]:size-6 text-muted-foreground"
+        className="text-muted-foreground xl:h-10 2xl:h-11 xl:[&>svg]:size-5 2xl:[&>svg]:size-6"
       >
         <LogOutIcon />
         <span className="mx-1 2xl:text-base">{isPending ? "Signing out…" : "Sign out"}</span>

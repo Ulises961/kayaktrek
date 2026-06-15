@@ -1,7 +1,7 @@
 from uuid import UUID as _UUID
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import UUID, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import UUID, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel

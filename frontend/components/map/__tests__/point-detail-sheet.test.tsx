@@ -57,12 +57,16 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setSelectedPointId: vi.fn(),
     tripState: null,
     isLeader: true,
+    selectedHour: 12,
+    setSelectedHour: vi.fn(),
     ...overrides,
   }
 }
 
 function renderWithCtx(ctx: MapBuilderContextValue) {
-  return render(createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointDetailSheet)))
+  return render(
+    createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointDetailSheet)),
+  )
 }
 
 beforeEach(() => vi.clearAllMocks())

@@ -129,19 +129,29 @@ describe("ChangePasswordSchema", () => {
   })
 
   it("rejects when passwords do not match", () => {
-    expect(ChangePasswordSchema.safeParse({ ...VALID, confirmPwd: "Different1!" }).success).toBe(false)
+    expect(ChangePasswordSchema.safeParse({ ...VALID, confirmPwd: "Different1!" }).success).toBe(
+      false,
+    )
   })
 
   it("rejects a new password without a special character", () => {
-    expect(ChangePasswordSchema.safeParse({ ...VALID, newPwd: "NewPass1", confirmPwd: "NewPass1" }).success).toBe(false)
+    expect(
+      ChangePasswordSchema.safeParse({ ...VALID, newPwd: "NewPass1", confirmPwd: "NewPass1" })
+        .success,
+    ).toBe(false)
   })
 
   it("rejects a new password without a number", () => {
-    expect(ChangePasswordSchema.safeParse({ ...VALID, newPwd: "NewPass!", confirmPwd: "NewPass!" }).success).toBe(false)
+    expect(
+      ChangePasswordSchema.safeParse({ ...VALID, newPwd: "NewPass!", confirmPwd: "NewPass!" })
+        .success,
+    ).toBe(false)
   })
 
   it("rejects a new password shorter than 8 characters", () => {
-    expect(ChangePasswordSchema.safeParse({ ...VALID, newPwd: "Sh0rt!", confirmPwd: "Sh0rt!" }).success).toBe(false)
+    expect(
+      ChangePasswordSchema.safeParse({ ...VALID, newPwd: "Sh0rt!", confirmPwd: "Sh0rt!" }).success,
+    ).toBe(false)
   })
 
   it("rejects an empty current password", () => {

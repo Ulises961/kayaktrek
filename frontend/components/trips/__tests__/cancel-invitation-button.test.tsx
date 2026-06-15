@@ -33,7 +33,11 @@ describe("CancelInvitationButton", () => {
 
   it("disables the button while the action is pending", async () => {
     let resolve: (v: { success: true }) => void
-    vi.mocked(cancelInvitation).mockReturnValue(new Promise((r) => { resolve = r }))
+    vi.mocked(cancelInvitation).mockReturnValue(
+      new Promise((r) => {
+        resolve = r
+      }),
+    )
     render(<CancelInvitationButton tripId={TRIP_ID} inviteeId={INVITEE_ID} />)
 
     await userEvent.click(screen.getByRole("button"))

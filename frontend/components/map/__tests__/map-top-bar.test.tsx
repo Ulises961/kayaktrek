@@ -155,7 +155,15 @@ describe("MapTopBar — mode pill and edit/done buttons", () => {
 
   it("calls onToggleViewMode when 'Edit route' is clicked", async () => {
     const onToggleViewMode = vi.fn()
-    render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={true} tripState="building" onToggleViewMode={onToggleViewMode} />)
+    render(
+      <MapTopBar
+        {...BASE_PROPS}
+        viewMode={true}
+        isLeader={true}
+        tripState="building"
+        onToggleViewMode={onToggleViewMode}
+      />,
+    )
     await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
     expect(onToggleViewMode).toHaveBeenCalledOnce()
   })

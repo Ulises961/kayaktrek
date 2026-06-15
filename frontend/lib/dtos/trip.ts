@@ -9,9 +9,9 @@ export const TRIP_STATES = ["building", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]
 
 export const TRIP_STATE_LABELS: Record<TripState, string> = {
-  building:  "Building",
+  building: "Building",
   happening: "Happening",
-  past:      "Past",
+  past: "Past",
 }
 
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
@@ -40,8 +40,16 @@ export const TripPageSchema = z.object({
 
 export const TripFieldsSchema = z
   .object({
-    destination: z.string().max(200, "Destination must be at most 200 characters.").refine(noHtmlTags.check, noHtmlTags.message).optional(),
-    description: z.string().max(2000, "Description must be at most 2000 characters.").refine(noHtmlTags.check, noHtmlTags.message).optional(),
+    destination: z
+      .string()
+      .max(200, "Destination must be at most 200 characters.")
+      .refine(noHtmlTags.check, noHtmlTags.message)
+      .optional(),
+    description: z
+      .string()
+      .max(2000, "Description must be at most 2000 characters.")
+      .refine(noHtmlTags.check, noHtmlTags.message)
+      .optional(),
     dateFrom: isoDateField,
     dateTo: isoDateField,
     difficulty: z.enum(TRIP_DIFFICULTIES).nullish(),
@@ -51,7 +59,7 @@ export const TripFieldsSchema = z
       if (d.dateFrom && d.dateTo) return d.dateFrom <= d.dateTo
       return true
     },
-    { message: "End date must be on or after the start date.", path: ["dateTo"] }
+    { message: "End date must be on or after the start date.", path: ["dateTo"] },
   )
 
 export const InviteUserSchema = z.object({

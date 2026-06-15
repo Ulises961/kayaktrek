@@ -19,17 +19,17 @@ export function MedicalNotesViewer({
   onView,
 }: MedicalNotesViewerProps) {
   if (!hasLeaderMedicalNotes) {
-    return <p className="text-sm text-muted-foreground italic">No medical notes shared.</p>
+    return <p className="text-muted-foreground text-sm italic">No medical notes shared.</p>
   }
 
   if (notes) {
     return (
-      <div className="rounded border border-destructive/30 bg-destructive/5 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-destructive mb-1 flex items-center gap-1">
+      <div className="border-destructive/30 bg-destructive/5 rounded border p-3">
+        <p className="text-destructive mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-[0.08em] uppercase">
           <ShieldAlert className="size-3" /> Medical Notes
         </p>
         <p className="text-sm whitespace-pre-wrap">{notes}</p>
-        {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+        {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
       </div>
     )
   }
@@ -37,10 +37,10 @@ export function MedicalNotesViewer({
   return (
     <div className="flex items-center gap-2">
       <Button size="sm" variant="outline" onClick={onView} disabled={loading}>
-        {loading ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
+        {loading ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
         View medical notes
       </Button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   )
 }

@@ -37,7 +37,12 @@ describe("TravelDocumentsSection", () => {
   })
 
   it("shows confirmation number when set", () => {
-    render(<TravelDocumentsSection documents={[makeDoc({ confirmationNumber: "CONF-1234" })]} today={TODAY} />)
+    render(
+      <TravelDocumentsSection
+        documents={[makeDoc({ confirmationNumber: "CONF-1234" })]}
+        today={TODAY}
+      />,
+    )
     expect(screen.getByText("CONF-1234")).toBeDefined()
   })
 
@@ -47,24 +52,41 @@ describe("TravelDocumentsSection", () => {
   })
 
   it("shows expiring-soon badge when expiryDate is within 30 days", () => {
-    render(<TravelDocumentsSection documents={[makeDoc({ expiryDate: "2026-08-01" })]} today={TODAY} />)
+    render(
+      <TravelDocumentsSection documents={[makeDoc({ expiryDate: "2026-08-01" })]} today={TODAY} />,
+    )
     expect(screen.getByText(/expir/i)).toBeDefined()
   })
 
   it("does not show a badge when date is in the future and expiry is far off", () => {
-    render(<TravelDocumentsSection documents={[makeDoc({ date: "2026-08-15", expiryDate: "2027-01-01" })]} today={TODAY} />)
+    render(
+      <TravelDocumentsSection
+        documents={[makeDoc({ date: "2026-08-15", expiryDate: "2027-01-01" })]}
+        today={TODAY}
+      />,
+    )
     expect(screen.queryByText(/overdue/i)).toBeNull()
     expect(screen.queryByText(/expir/i)).toBeNull()
   })
 
   it("shows a URL link when url is set", () => {
-    render(<TravelDocumentsSection documents={[makeDoc({ url: "https://booking.example.com" })]} today={TODAY} />)
+    render(
+      <TravelDocumentsSection
+        documents={[makeDoc({ url: "https://booking.example.com" })]}
+        today={TODAY}
+      />,
+    )
     const link = screen.getByRole("link")
     expect(link).toBeDefined()
   })
 
   it("shows a download button when attachmentPath is set", () => {
-    render(<TravelDocumentsSection documents={[makeDoc({ attachmentPath: "trips/abc/doc1/voucher.pdf" })]} today={TODAY} />)
+    render(
+      <TravelDocumentsSection
+        documents={[makeDoc({ attachmentPath: "trips/abc/doc1/voucher.pdf" })]}
+        today={TODAY}
+      />,
+    )
     expect(screen.getByText(/download/i)).toBeDefined()
   })
 

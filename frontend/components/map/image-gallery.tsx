@@ -9,21 +9,24 @@ type ImageGalleryProps = {
 
 export function ImageGallery({ images, onRemove }: ImageGalleryProps) {
   return (
-    <div className="flex flex-wrap gap-1.5 items-center">
+    <div className="flex flex-wrap items-center gap-1.5">
       {images.map((img) => (
-        <div key={img.id} className="relative group w-12 h-12 rounded overflow-hidden bg-muted border border-border/40 shrink-0">
+        <div
+          key={img.id}
+          className="group bg-muted border-border/40 relative h-12 w-12 shrink-0 overflow-hidden rounded border"
+        >
           {img.location ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={img.location} alt={img.name ?? ""} className="w-full h-full object-cover" />
+            <img src={img.location} alt={img.name ?? ""} className="h-full w-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="flex h-full w-full items-center justify-center">
               <ImageIcon size={16} className="text-muted-foreground" />
             </div>
           )}
           <button
             aria-label={`Remove image ${img.name ?? ""}`}
             onClick={() => onRemove(img.id!)}
-            className="absolute inset-0 bg-black/50 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
           >
             ×
           </button>
@@ -32,7 +35,7 @@ export function ImageGallery({ images, onRemove }: ImageGalleryProps) {
       <button
         disabled
         title="Photo upload coming in a future update"
-        className="w-12 h-12 rounded border border-dashed border-border/60 flex items-center justify-center text-muted-foreground/40 cursor-not-allowed"
+        className="border-border/60 text-muted-foreground/40 flex h-12 w-12 cursor-not-allowed items-center justify-center rounded border border-dashed"
         aria-label="Add photo (coming soon)"
       >
         <ImageIcon size={14} />

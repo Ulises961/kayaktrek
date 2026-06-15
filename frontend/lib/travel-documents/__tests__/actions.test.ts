@@ -61,7 +61,10 @@ describe("createTravelDocument", () => {
   it("posts to the correct path", async () => {
     vi.mocked(apiPost).mockResolvedValue(DOC_FIXTURE)
     await createTravelDocument(TRIP_ID, { type: "accommodation", name: "Hotel" })
-    expect(apiPost).toHaveBeenCalledWith(`/api/travel-document/${TRIP_ID}/create`, { type: "accommodation", name: "Hotel" })
+    expect(apiPost).toHaveBeenCalledWith(`/api/travel-document/${TRIP_ID}/create`, {
+      type: "accommodation",
+      name: "Hotel",
+    })
   })
 
   it("revalidates the trip path on success", async () => {
@@ -73,7 +76,10 @@ describe("createTravelDocument", () => {
   it("returns success: true with document on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(DOC_FIXTURE)
     const result = await createTravelDocument(TRIP_ID, { type: "accommodation", name: "Hotel" })
-    expect(result).toMatchObject({ success: true, document: expect.objectContaining({ name: "Hotel Cap de Creus" }) })
+    expect(result).toMatchObject({
+      success: true,
+      document: expect.objectContaining({ name: "Hotel Cap de Creus" }),
+    })
   })
 
   it("returns success: false when the API throws", async () => {
@@ -87,7 +93,9 @@ describe("updateTravelDocument", () => {
   it("patches the correct document", async () => {
     vi.mocked(apiPatch).mockResolvedValue(DOC_FIXTURE)
     await updateTravelDocument(TRIP_ID, DOC_ID, { name: "Updated Hotel" })
-    expect(apiPatch).toHaveBeenCalledWith(`/api/travel-document/${DOC_ID}`, { name: "Updated Hotel" })
+    expect(apiPatch).toHaveBeenCalledWith(`/api/travel-document/${DOC_ID}`, {
+      name: "Updated Hotel",
+    })
   })
 
   it("revalidates the trip path on success", async () => {

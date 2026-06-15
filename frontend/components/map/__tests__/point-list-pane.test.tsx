@@ -10,12 +10,17 @@ import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 
 vi.mock("@/lib/itinerary/actions", () => ({
-  createDay: vi.fn().mockResolvedValue({ success: true, day: { id: "new-day", dayNumber: 1, itineraryId: "itin" } }),
+  createDay: vi.fn().mockResolvedValue({
+    success: true,
+    day: { id: "new-day", dayNumber: 1, itineraryId: "itin" },
+  }),
   deleteDay: vi.fn().mockResolvedValue({ success: true }),
   updateDay: vi.fn().mockResolvedValue({ success: true }),
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
   deletePoint: vi.fn().mockResolvedValue({ success: true }),
-  applyBoundaries: vi.fn().mockResolvedValue({ success: true, itinerary: { id: "itin-1", days: [] } }),
+  applyBoundaries: vi
+    .fn()
+    .mockResolvedValue({ success: true, itinerary: { id: "itin-1", days: [] } }),
 }))
 
 vi.mock("@/lib/itinerary/boundaries", async (importOriginal) => {
@@ -36,11 +41,18 @@ const DAY2_ID = "day-2"
 const ITIN_ID = "itin-1"
 
 const pt = (id: string, dayId = DAY0_ID): Point => ({
-  id, type: "position", latitude: 44, longitude: 14, dayId,
+  id,
+  type: "position",
+  latitude: 44,
+  longitude: 14,
+  dayId,
 })
 
 const day = (id: string, dayNumber: number, extra: Partial<Day> = {}): Day => ({
-  id, dayNumber, itineraryId: ITIN_ID, ...extra,
+  id,
+  dayNumber,
+  itineraryId: ITIN_ID,
+  ...extra,
 })
 
 function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderContextValue {
@@ -75,13 +87,15 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     isLeader: true,
     selectedPointId: null,
     setSelectedPointId: vi.fn(),
+    selectedHour: 12,
+    setSelectedHour: vi.fn(),
     ...overrides,
   }
 }
 
 function renderWithCtx(ctx: MapBuilderContextValue) {
   return render(
-    createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointListPane))
+    createElement(MapBuilderContext.Provider, { value: ctx }, createElement(PointListPane)),
   )
 }
 
@@ -122,7 +136,16 @@ describe("PointListPane — drop mode (no draftSlices)", () => {
   })
 
   it("auto-expands the pending point row", () => {
-    const ctx = makeCtx({ state: { points: [pt("p1"), pt("p2"), pt("p3")], pointOrder: ["p1", "p2", "p3"], pendingPointId: "p2", pendingPointName: null, savingCount: 0, days: [] } })
+    const ctx = makeCtx({
+      state: {
+        points: [pt("p1"), pt("p2"), pt("p3")],
+        pointOrder: ["p1", "p2", "p3"],
+        pendingPointId: "p2",
+        pendingPointName: null,
+        savingCount: 0,
+        days: [],
+      },
+    })
     renderWithCtx(ctx)
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument()
   })
@@ -131,9 +154,7 @@ describe("PointListPane — drop mode (no draftSlices)", () => {
 // ─── boundary-edit mode ───────────────────────────────────────────────────────
 
 describe("PointListPane — boundary-edit mode (draftSlices non-null)", () => {
-  const draft: DaySlice[] = [
-    { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-  ]
+  const draft: DaySlice[] = [{ dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null }]
 
   it("shows 'Apply' and 'Cancel' buttons when draftSlices is non-null", () => {
     const ctx = makeCtx({ draftSlices: draft })
@@ -188,7 +209,10 @@ describe("PointListPane — boundary-edit mode (draftSlices non-null)", () => {
   })
 
   it("on failure dispatches STATE_REPLACE with snapshot to rollback", async () => {
-    vi.mocked(actions.applyBoundaries).mockResolvedValueOnce({ success: false, error: "Server error" })
+    vi.mocked(actions.applyBoundaries).mockResolvedValueOnce({
+      success: false,
+      error: "Server error",
+    })
     const dispatch = vi.fn()
     const ctx = makeCtx({ draftSlices: draft, dispatch })
     renderWithCtx(ctx)
@@ -207,9 +231,7 @@ describe("PointListPane — boundary-edit mode (draftSlices non-null)", () => {
 // ─── type change in boundary-edit mode ───────────────────────────────────────
 
 describe("PointListPane — type change in boundary-edit mode", () => {
-  const draft: DaySlice[] = [
-    { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
-  ]
+  const draft: DaySlice[] = [{ dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
 
   it("type buttons reflect dirty selection immediately without dispatching POINT_UPDATE", async () => {
     const dispatch = vi.fn()
@@ -218,9 +240,7 @@ describe("PointListPane — type change in boundary-edit mode", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
 
-    expect(dispatch).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "POINT_UPDATE" })
-    )
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: "POINT_UPDATE" }))
     expect(screen.getByRole("button", { name: /^stop$/i })).toHaveClass("bg-primary")
   })
 
@@ -234,10 +254,8 @@ describe("PointListPane — type change in boundary-edit mode", () => {
     expect(actions.applyBoundaries).toHaveBeenCalledWith(
       ITIN_ID,
       expect.objectContaining({
-        points: expect.arrayContaining([
-          expect.objectContaining({ id: "p1", type: "stop" }),
-        ]),
-      })
+        points: expect.arrayContaining([expect.objectContaining({ id: "p1", type: "stop" })]),
+      }),
     )
   })
 })
@@ -274,7 +292,9 @@ describe("PointListPane — delete day", () => {
     const dispatch = vi.fn()
     renderWithCtx(makeCtx({ dispatch, state: stateWithDay }))
     await userEvent.click(screen.getByRole("button", { name: /delete day 1/i }))
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "DAY_REMOVE", id: DAY1_ID }))
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "DAY_REMOVE", id: DAY1_ID }),
+    )
     expect(actions.deleteDay).toHaveBeenCalledWith(DAY1_ID)
   })
 

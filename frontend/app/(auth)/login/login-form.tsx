@@ -18,7 +18,11 @@ export function LoginForm() {
   const registered = searchParams.get("registered") === "1"
   const passwordReset = searchParams.get("reset") === "1"
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
     mode: "onBlur",
   })
@@ -46,9 +50,10 @@ export function LoginForm() {
       <AuthCardHeading title="Sign in" subtitle="Welcome back" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-
         <div className="flex flex-col gap-1.5" suppressHydrationWarning>
-          <label htmlFor="mail" className="auth-label">Email</label>
+          <label htmlFor="mail" className="auth-label">
+            Email
+          </label>
           <Input
             id="mail"
             type="email"
@@ -57,15 +62,18 @@ export function LoginForm() {
             className="auth-input"
             {...register("mail")}
           />
-          {errors.mail && (
-            <p className="text-[11px] text-red-600">{errors.mail.message}</p>
-          )}
+          {errors.mail && <p className="text-[11px] text-red-600">{errors.mail.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5" suppressHydrationWarning>
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="auth-label">Password</label>
-            <Link href="/forgot-password" className="text-[10px] tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]">
+            <label htmlFor="password" className="auth-label">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-[10px] tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]"
+            >
               Forgot password?
             </Link>
           </div>
@@ -76,13 +84,12 @@ export function LoginForm() {
             className="auth-input"
             {...register("password")}
           />
-          {errors.password && (
-            <p className="text-[11px] text-red-600">{errors.password.message}</p>
-          )}
+          {errors.password && <p className="text-[11px] text-red-600">{errors.password.message}</p>}
         </div>
 
-        {serverState && !serverState.success && (
-          serverState.code === "deletion_pending" ? (
+        {serverState &&
+          !serverState.success &&
+          (serverState.code === "deletion_pending" ? (
             <div className="auth-notice auth-notice-warning flex flex-col gap-1.5">
               <p className="font-medium">This account is scheduled for deletion.</p>
               <p>
@@ -94,9 +101,10 @@ export function LoginForm() {
               </p>
             </div>
           ) : (
-            <p className="text-[11px] text-red-600" data-testid="auth-error">{serverState.error}</p>
-          )
-        )}
+            <p className="text-[11px] text-red-600" data-testid="auth-error">
+              {serverState.error}
+            </p>
+          ))}
 
         <Button type="submit" disabled={isPending} className="auth-btn mt-1">
           {isPending ? "Signing in…" : "Sign in"}

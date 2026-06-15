@@ -2,7 +2,6 @@
 Point Service - Business logic for point operations.
 """
 import logging
-from sqlalchemy.exc import IntegrityError
 from typing import List, Optional, cast
 from uuid import UUID
 from geoalchemy2.functions import ST_DWithin, ST_Distance
@@ -29,7 +28,7 @@ def _require_editable(trip: Trip) -> None:
 
 class PointService:
     """Service class for Point-related business logic."""
-    _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "notes"})
+    _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "name", "notes"})
     
     @staticmethod
     def get_point_by_id(point_id: str) -> Optional[Point]:
@@ -104,7 +103,7 @@ class PointService:
             ValidationError: If data is invalid
             IntegrityError: If database constraints are violated
         """
-        logger.info(f"Creating new point")
+        logger.info("Creating new point")
         point: Point = cast(Point, PointSchema().load(point_data))
         day = db.session.query(Day).filter_by(id=point.day_id).first()
         itinerary = None

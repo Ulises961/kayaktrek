@@ -1,9 +1,9 @@
-import { z } from "zod";
-import { ImageSchema } from "./image";
-import { ItinerariesSchema } from "./itinerary";
-import { InventoriesSchema } from "./inventory";
-import { ItemsSchema } from "./item";
-import { LogsSchema } from "./log";
+import { z } from "zod"
+import { ImageSchema } from "./image"
+import { ItinerariesSchema } from "./itinerary"
+import { InventoriesSchema } from "./inventory"
+import { ItemsSchema } from "./item"
+import { LogsSchema } from "./log"
 
 // Shallow user representation used when a user is embedded inside a Trip
 // (travellers, pendingTravellers). Excludes nested collections to avoid
@@ -18,7 +18,7 @@ export const TravellerSchema = z.object({
   admin: z.boolean().nullish(),
   image: ImageSchema.nullish(),
   avatarUrl: z.string().url().nullish(),
-});
+})
 
 // Full user as returned by /api/user/:id or /api/user/me
 export const UserSchema = z.object({
@@ -50,11 +50,11 @@ export const UserSchema = z.object({
   deletionRequestedAt: z.string().nullish(),
   // Keypair presence flag (M3g)
   hasKeypair: z.boolean().nullish(),
-});
+})
 
-export type Traveller = z.infer<typeof TravellerSchema>;
-export type User = z.infer<typeof UserSchema>;
-export const UsersSchema = z.array(UserSchema);
+export type Traveller = z.infer<typeof TravellerSchema>
+export type User = z.infer<typeof UserSchema>
+export const UsersSchema = z.array(UserSchema)
 
 // Form validation schema for the edit-profile page
 export const ProfileFormSchema = z.object({
@@ -68,18 +68,18 @@ export const ProfileFormSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/, "Letters, numbers, _ and - only"),
   vesselMake: z.string().max(100).optional(),
   vesselModel: z.string().max(100).optional(),
-  vesselLengthCm: z.string().optional().refine(
-    (val) => !val || /^\d+$/.test(val),
-    "Must be a positive integer"
-  ),
+  vesselLengthCm: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d+$/.test(val), "Must be a positive integer"),
   vesselColorPrimary: z.string().max(50).optional(),
   vesselColorSecondary: z.string().max(50).optional(),
   emergencyContactName: z.string().max(200).optional(),
   emergencyContactPhone: z.string().max(20).optional(),
   emergencyContactRelationship: z.string().max(100).optional(),
-});
+})
 
-export type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
+export type ProfileFormValues = z.infer<typeof ProfileFormSchema>
 
 // Form validation schema for the change-password page
 export const ChangePasswordSchema = z
@@ -96,6 +96,6 @@ export const ChangePasswordSchema = z
   .refine((data) => data.newPwd === data.confirmPwd, {
     message: "Passwords do not match",
     path: ["confirmPwd"],
-  });
+  })
 
-export type ChangePasswordValues = z.infer<typeof ChangePasswordSchema>;
+export type ChangePasswordValues = z.infer<typeof ChangePasswordSchema>

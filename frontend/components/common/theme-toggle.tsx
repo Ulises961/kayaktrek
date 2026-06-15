@@ -16,7 +16,7 @@ export function ThemeToggle() {
     >
       {/* Both icons rendered on server and client — CSS controls visibility */}
       <Sun className="h-4 w-4 dark:hidden" />
-      <Moon className="h-4 w-4 hidden dark:block" />
+      <Moon className="hidden h-4 w-4 dark:block" />
     </Button>
   )
 }

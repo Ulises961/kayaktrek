@@ -14,7 +14,11 @@ export default function RegisterPage() {
   const [serverState, formAction] = useActionState(registerAction, null)
   const [isPending, startTransition] = useTransition()
 
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterInput>({
     resolver: zodResolver(RegisterSchema),
     mode: "onBlur",
   })
@@ -35,32 +39,72 @@ export default function RegisterPage() {
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="mail" className="auth-label">Email</label>
-          <Input id="mail" type="email" autoComplete="email" className="auth-input" {...register("mail")} />
+          <label htmlFor="mail" className="auth-label">
+            Email
+          </label>
+          <Input
+            id="mail"
+            type="email"
+            autoComplete="email"
+            className="auth-input"
+            {...register("mail")}
+          />
           {errors.mail && <p className="text-[11px] text-red-600">{errors.mail.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="username" className="auth-label">Username</label>
-          <Input id="username" type="text" autoComplete="username" className="auth-input" {...register("username")} />
+          <label htmlFor="username" className="auth-label">
+            Username
+          </label>
+          <Input
+            id="username"
+            type="text"
+            autoComplete="username"
+            className="auth-input"
+            {...register("username")}
+          />
           {errors.username && <p className="text-[11px] text-red-600">{errors.username.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="name" className="auth-label">Full name</label>
-          <Input id="name" type="text" autoComplete="name" className="auth-input" {...register("name")} />
+          <label htmlFor="name" className="auth-label">
+            Full name
+          </label>
+          <Input
+            id="name"
+            type="text"
+            autoComplete="name"
+            className="auth-input"
+            {...register("name")}
+          />
           {errors.name && <p className="text-[11px] text-red-600">{errors.name.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="phone" className="auth-label">Phone</label>
-          <Input id="phone" type="tel" autoComplete="tel" className="auth-input" {...register("phone")} />
+          <label htmlFor="phone" className="auth-label">
+            Phone
+          </label>
+          <Input
+            id="phone"
+            type="tel"
+            autoComplete="tel"
+            className="auth-input"
+            {...register("phone")}
+          />
           {errors.phone && <p className="text-[11px] text-red-600">{errors.phone.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="auth-label">Password</label>
-          <Input id="password" type="password" autoComplete="new-password" className="auth-input" {...register("password")} />
+          <label htmlFor="password" className="auth-label">
+            Password
+          </label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            className="auth-input"
+            {...register("password")}
+          />
           {errors.password && <p className="text-[11px] text-red-600">{errors.password.message}</p>}
         </div>
 
@@ -75,7 +119,9 @@ export default function RegisterPage() {
 
       <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
         Already have an account?{" "}
-        <Link href="/login" className="auth-link">Sign in</Link>
+        <Link href="/login" className="auth-link">
+          Sign in
+        </Link>
       </p>
     </AuthCard>
   )

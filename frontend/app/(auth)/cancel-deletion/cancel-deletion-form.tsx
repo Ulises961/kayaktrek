@@ -52,7 +52,9 @@ export function CancelDeletionForm() {
     return (
       <div className="flex flex-col gap-4">
         <p className="auth-notice auth-notice-success">{message}</p>
-        <Link href="/login" className="auth-link text-[11px]">Sign in</Link>
+        <Link href="/login" className="auth-link text-[11px]">
+          Sign in
+        </Link>
       </div>
     )
   }
@@ -70,7 +72,9 @@ export function CancelDeletionForm() {
       <div className="flex flex-col gap-4">
         {message && <p className="auth-notice auth-notice-error">{message}</p>}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="auth-label">Email address</label>
+          <label htmlFor="email" className="auth-label">
+            Email address
+          </label>
           <Input
             id="email"
             type="email"

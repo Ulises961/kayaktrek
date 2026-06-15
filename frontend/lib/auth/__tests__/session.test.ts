@@ -18,7 +18,7 @@ function makeToken(payload: object, expired = false): string {
 function mockCookies(token: string | undefined) {
   vi.mocked(cookies).mockResolvedValue({
     get: (name: string) => (name === "access_token" && token ? { name, value: token } : undefined),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any)
 }
 

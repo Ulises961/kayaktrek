@@ -1,0 +1,31 @@
+{% extends "email/base.html" %}
+
+{% block subject %}Someone tried to register with your Kayak Planner email{% endblock %}
+
+{% block body %}
+<p style="margin:0 0 16px;font-size:16px;color:#1e293b;">Hi {{ name }},</p>
+<p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+  Someone tried to create a Kayak Planner account using your email address, but an account already
+  exists for it. If that was you, just log in below — no new account was created.
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+  <tr>
+    <td style="background-color:#0c4a6e;border-radius:6px;">
+      <a href="{{ login_url }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+        Log in to my account
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0 0 24px;font-size:13px;color:#475569;line-height:1.6;">
+  Forgot your password? Use the <a href="{{ forgot_url }}" style="color:#0c4a6e;">forgot password</a>
+  page to set a new one.
+</p>
+
+<p style="margin:0;font-size:13px;color:#94a3b8;">
+  If you did not attempt to register, you can safely ignore this email — your account has not been
+  changed.
+</p>
+{% endblock %}

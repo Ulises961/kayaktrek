@@ -39,7 +39,9 @@ export default async function VerifyPage({
     return (
       <AuthCard>
         <AuthCardHeading title="Email verified" subtitle="Your account is now active." />
-        <Link href="/login" className="auth-link text-[11px]">Sign in</Link>
+        <Link href="/login" className="auth-link text-[11px]">
+          Sign in
+        </Link>
       </AuthCard>
     )
   }
@@ -48,7 +50,9 @@ export default async function VerifyPage({
     <AuthCard>
       <AuthCardHeading title="Verification failed" />
       <p className="auth-notice auth-notice-error">{errorMessage}</p>
-      <Link href="/login" className="auth-link text-[11px]">Back to sign in</Link>
+      <Link href="/login" className="auth-link text-[11px]">
+        Back to sign in
+      </Link>
     </AuthCard>
   )
 }

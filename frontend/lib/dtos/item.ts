@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod"
 
 export const ItemCategorySchema = z.enum([
   "firstAid",
@@ -7,9 +7,9 @@ export const ItemCategorySchema = z.enum([
   "travel",
   "generic",
   "food",
-]);
+])
 
-export type ItemCategory = z.infer<typeof ItemCategorySchema>;
+export type ItemCategory = z.infer<typeof ItemCategorySchema>
 
 export const ItemSchema = z.object({
   id: z.uuidv7().optional(),
@@ -17,7 +17,7 @@ export const ItemSchema = z.object({
   checked: z.boolean().nullish(),
   name: z.string(),
   userId: z.uuidv7().nullish(),
-});
+})
 
-export type Item = z.infer<typeof ItemSchema>;
-export const ItemsSchema = z.array(ItemSchema);
+export type Item = z.infer<typeof ItemSchema>
+export const ItemsSchema = z.array(ItemSchema)

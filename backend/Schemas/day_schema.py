@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields, post_load, pre_load, validates, ValidationError
+from marshmallow import fields, post_load, validates, ValidationError
 from Models.day import Day
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.point_schema import PointSchema, PointPublicSchema

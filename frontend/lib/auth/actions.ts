@@ -4,11 +4,21 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { API_URL } from "@/lib/api/config"
 import { z } from "zod"
-import { LoginSchema, RegisterSchema, ForgotPasswordSchema, ResetPasswordSchema } from "@/lib/auth/schemas"
+import {
+  LoginSchema,
+  RegisterSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from "@/lib/auth/schemas"
 
 export type AuthResult =
   | { success: true }
-  | { success: false; error: string; code?: string; fieldErrors?: ReturnType<typeof z.treeifyError> }
+  | {
+      success: false
+      error: string
+      code?: string
+      fieldErrors?: ReturnType<typeof z.treeifyError>
+    }
 
 async function setAuthCookies(accessToken: string, refreshToken: string) {
   const cookieStore = await cookies()
@@ -28,13 +38,20 @@ async function setAuthCookies(accessToken: string, refreshToken: string) {
   })
 }
 
-export async function login(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+export async function login(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
   const parsed = LoginSchema.safeParse({
     mail: formData.get("mail"),
     password: formData.get("password"),
   })
   if (!parsed.success) {
-    return { success: false, error: "Please fix the errors below.", fieldErrors: z.treeifyError(parsed.error) }
+    return {
+      success: false,
+      error: "Please fix the errors below.",
+      fieldErrors: z.treeifyError(parsed.error),
+    }
   }
 
   const { mail, password } = parsed.data
@@ -53,7 +70,11 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
   if (res.status === 403) {
     const body = await res.json().catch(() => ({}))
     if (body?.code === "deletion_pending") {
-      return { success: false, error: "This account is scheduled for deletion.", code: "deletion_pending" }
+      return {
+        success: false,
+        error: "This account is scheduled for deletion.",
+        code: "deletion_pending",
+      }
     }
     return { success: false, error: "Access denied." }
   }
@@ -69,7 +90,10 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
   redirect("/dashboard")
 }
 
-export async function register(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+export async function register(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
   const parsed = RegisterSchema.safeParse({
     mail: formData.get("mail"),
     username: formData.get("username"),
@@ -78,7 +102,11 @@ export async function register(_prevState: AuthResult | null, formData: FormData
     password: formData.get("password"),
   })
   if (!parsed.success) {
-    return { success: false, error: "Please fix the errors below.", fieldErrors: z.treeifyError(parsed.error) }
+    return {
+      success: false,
+      error: "Please fix the errors below.",
+      fieldErrors: z.treeifyError(parsed.error),
+    }
   }
 
   const { mail, username, name, phone, password } = parsed.data
@@ -105,7 +133,10 @@ export async function register(_prevState: AuthResult | null, formData: FormData
   redirect("/login?registered=1")
 }
 
-export async function forgotPassword(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+export async function forgotPassword(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
   const parsed = ForgotPasswordSchema.safeParse({ mail: formData.get("mail") })
   if (!parsed.success) {
     return { success: false, error: "Enter a valid email address." }
@@ -124,14 +155,20 @@ export async function forgotPassword(_prevState: AuthResult | null, formData: Fo
   return { success: true }
 }
 
-export async function resetPassword(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+export async function resetPassword(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
   const parsed = ResetPasswordSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   })
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Please fix the errors below." }
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Please fix the errors below.",
+    }
   }
 
   let res: Response
@@ -155,16 +192,22 @@ export async function resetPassword(_prevState: AuthResult | null, formData: For
 export async function cancelDeletion(token: string): Promise<AuthResult> {
   let res: Response
   try {
-    res = await fetch(`${API_URL}/api/user/me/deletion-request?token=${encodeURIComponent(token)}`, {
-      method: "DELETE",
-    })
+    res = await fetch(
+      `${API_URL}/api/user/me/deletion-request?token=${encodeURIComponent(token)}`,
+      {
+        method: "DELETE",
+      },
+    )
   } catch {
     return { success: false, error: "Could not reach the server. Please try again." }
   }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    return { success: false, error: body?.description ?? "The cancellation link is invalid or has expired." }
+    return {
+      success: false,
+      error: body?.description ?? "The cancellation link is invalid or has expired.",
+    }
   }
 
   return { success: true }

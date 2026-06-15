@@ -6,7 +6,6 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.itinerary_shema import ItinerarySchema, ItineraryPublicSchema, ItineraryExploreSchema
-from Models.itinerary import Itinerary
 from Api.database import db
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
@@ -176,6 +175,7 @@ def apply_boundaries(id: str):
 
 
 @itinerary_api.route("/<string:id>/export", methods=["GET"])
+@JWTService.authenticate_optional
 def export_gpx(id: str):
     """GET /api/itinerary/<id>/export?format=gpx
 

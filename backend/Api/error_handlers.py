@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 def register_error_handlers(app):
     """
     Register all error handlers with the Flask application.
-    
+
     Args:
         app: Flask application instance
     """
-    
+
     @app.errorhandler(NoResultFound)
     def handle_no_result_found(error):
         """Handle database query with no results."""
@@ -30,7 +30,7 @@ def register_error_handlers(app):
             "error": "Not Found",
             "message": "The requested resource does not exist"
         }), 404
-    
+
     @app.errorhandler(IntegrityError)
     def handle_integrity_error(error):
         """Handle database integrity constraint violations."""
@@ -40,7 +40,7 @@ def register_error_handlers(app):
             "error": "Integrity Error",
             "message": "Database constraint violation. This may be due to duplicate or invalid data.",
         }), 400
-    
+
     @app.errorhandler(ValidationError)
     def handle_validation_error(error):
         """Handle Marshmallow schema validation errors."""
@@ -50,7 +50,7 @@ def register_error_handlers(app):
             "message": "Invalid input data",
             "errors": error.messages
         }), 422
-    
+
     @app.errorhandler(SQLAlchemyError)
     def handle_sqlalchemy_error(error):
         """Handle general SQLAlchemy database errors."""
@@ -60,16 +60,16 @@ def register_error_handlers(app):
             "error": "Database Error",
             "message": "An error occurred while accessing the database"
         }), 500
-    
+
     @app.errorhandler(ValueError)
     def handle_value_error(error):
         """Handle ValueError exceptions."""
         logger.warning(f"Value error: {str(error)}")
         return jsonify({
             "error": "Invalid Value",
-            "message": str(error)
+            "message": "Invalid or missing request data"
         }), 400
-    
+
     @app.errorhandler(KeyError)
     def handle_key_error(error):
         """Handle missing required fields."""
@@ -78,7 +78,7 @@ def register_error_handlers(app):
             "error": "Missing Field",
             "message": f"Required field is missing: {str(error)}"
         }), 400
-    
+
     @app.errorhandler(RateLimitExceeded)
     def handle_rate_limit(error):
         """Handle rate limit breaches — always includes Retry-After."""
@@ -96,7 +96,7 @@ def register_error_handlers(app):
             "error": error.name,
             "message": error.description
         }), error.code
-    
+
     @app.errorhandler(404)
     def handle_404(error):
         """Handle 404 Not Found errors."""
@@ -104,7 +104,7 @@ def register_error_handlers(app):
             "error": "Not Found",
             "message": "The requested endpoint does not exist"
         }), 404
-    
+
     @app.errorhandler(405)
     def handle_405(error):
         """Handle 405 Method Not Allowed errors."""
@@ -112,7 +112,7 @@ def register_error_handlers(app):
             "error": "Method Not Allowed",
             "message": "The HTTP method is not allowed for this endpoint"
         }), 405
-    
+
     @app.errorhandler(500)
     def handle_500(error):
         """Handle 500 Internal Server Error."""
@@ -121,7 +121,7 @@ def register_error_handlers(app):
             "error": "Internal Server Error",
             "message": "An unexpected error occurred"
         }), 500
-    
+
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         """Catch-all handler for unexpected errors."""

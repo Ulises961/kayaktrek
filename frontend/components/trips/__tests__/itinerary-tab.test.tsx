@@ -20,47 +20,74 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
 
-const TRIP_ID    = "01952f1a-0000-7000-8000-000000000001"
-const ITIN_ID    = "01952f1a-0000-7000-8000-000000000002"
-const DAY_1_ID   = "01952f1a-0000-7000-8000-000000000010"
-const DAY_2_ID   = "01952f1a-0000-7000-8000-000000000011"
-const PT_A_ID    = "01952f1a-0000-7000-8000-100000000001"
-const PT_B_ID    = "01952f1a-0000-7000-8000-100000000002"
-const PT_C_ID    = "01952f1a-0000-7000-8000-100000000003"
+const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
+const ITIN_ID = "01952f1a-0000-7000-8000-000000000002"
+const DAY_1_ID = "01952f1a-0000-7000-8000-000000000010"
+const DAY_2_ID = "01952f1a-0000-7000-8000-000000000011"
+const PT_A_ID = "01952f1a-0000-7000-8000-100000000001"
+const PT_B_ID = "01952f1a-0000-7000-8000-100000000002"
+const PT_C_ID = "01952f1a-0000-7000-8000-100000000003"
 
 const PT_A: Point = {
-  id: PT_A_ID, type: "stop", latitude: 43.5, longitude: -8.0,
-  name: "Ribadeo", nextId: PT_B_ID, dayId: DAY_1_ID,
+  id: PT_A_ID,
+  type: "stop",
+  latitude: 43.5,
+  longitude: -8.0,
+  name: "Ribadeo",
+  nextId: PT_B_ID,
+  dayId: DAY_1_ID,
 }
 const PT_B: Point = {
-  id: PT_B_ID, type: "position", latitude: 43.6, longitude: -8.1,
-  name: null, nextId: PT_C_ID, dayId: DAY_1_ID,
+  id: PT_B_ID,
+  type: "position",
+  latitude: 43.6,
+  longitude: -8.1,
+  name: null,
+  nextId: PT_C_ID,
+  dayId: DAY_1_ID,
 }
 const PT_C: Point = {
-  id: PT_C_ID, type: "stop", latitude: 43.7, longitude: -7.9,
-  name: "Foz", nextId: null, dayId: DAY_1_ID,
+  id: PT_C_ID,
+  type: "stop",
+  latitude: 43.7,
+  longitude: -7.9,
+  name: "Foz",
+  nextId: null,
+  dayId: DAY_1_ID,
 }
 
 const DAY_WITH_POINTS: Day = {
-  id: DAY_1_ID, dayNumber: 1, date: "2026-07-01",
-  startPointId: PT_A_ID, endPointId: PT_C_ID,
+  id: DAY_1_ID,
+  dayNumber: 1,
+  date: "2026-07-01",
+  startPointId: PT_A_ID,
+  endPointId: PT_C_ID,
   points: [PT_A, PT_B, PT_C],
 }
 
 const DAY_REST: Day = {
-  id: DAY_2_ID, dayNumber: 2, date: "2026-07-03",
-  startPointId: null, endPointId: null,
+  id: DAY_2_ID,
+  dayNumber: 2,
+  date: "2026-07-03",
+  startPointId: null,
+  endPointId: null,
   points: [],
 }
 
 const ITIN_NO_DAYS: Itinerary = {
-  id: ITIN_ID, tripId: TRIP_ID,
-  isPublic: false, totalMiles: 0, days: [],
+  id: ITIN_ID,
+  tripId: TRIP_ID,
+  isPublic: false,
+  totalMiles: 0,
+  days: [],
 }
 
 const ITIN_WITH_DAYS: Itinerary = {
-  id: ITIN_ID, tripId: TRIP_ID, isPublic: false,
-  totalMiles: 22.4, avgSpeedKnots: 2.5,
+  id: ITIN_ID,
+  tripId: TRIP_ID,
+  isPublic: false,
+  totalMiles: 22.4,
+  avgSpeedKnots: 2.5,
   days: [DAY_WITH_POINTS, DAY_REST],
 }
 
@@ -69,11 +96,14 @@ const MANY_DAYS: Day[] = Array.from({ length: 6 }, (_, i) => ({
   id: `01952f1a-0000-7000-8000-00000000002${i}`,
   dayNumber: i + 1,
   date: `2026-07-0${i + 1}`,
-  startPointId: null, endPointId: null, points: [],
+  startPointId: null,
+  endPointId: null,
+  points: [],
 }))
 
 const ITIN_MANY_DAYS: Itinerary = {
-  ...ITIN_WITH_DAYS, days: MANY_DAYS,
+  ...ITIN_WITH_DAYS,
+  days: MANY_DAYS,
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -163,8 +193,8 @@ describe("ItineraryTab — itinerary with days", () => {
   it("shows day count in stats strip", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
     // day count and label are in nested spans; match the parent element's textContent
-    const el = screen.getByText((_, node) =>
-      node?.textContent?.replace(/\s+/g, " ").trim() === "2 days"
+    const el = screen.getByText(
+      (_, node) => node?.textContent?.replace(/\s+/g, " ").trim() === "2 days",
     )
     expect(el).toBeDefined()
   })

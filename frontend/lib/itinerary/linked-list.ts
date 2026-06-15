@@ -11,7 +11,12 @@ function resolveNextId(p: Linkable & { next?: { id?: string | null } | null }): 
 
 export function findHead<T extends Linkable>(points: T[]): T | null {
   if (points.length === 0) return null
-  const nextIds = new Set(points.flatMap((p) => { const n = p.nextId; return n ? [n] : [] }))
+  const nextIds = new Set(
+    points.flatMap((p) => {
+      const n = p.nextId
+      return n ? [n] : []
+    }),
+  )
   return points.find((p) => p.id != null && !nextIds.has(p.id)) ?? null
 }
 
@@ -20,9 +25,16 @@ export function findTail<T extends Linkable>(points: T[]): T | null {
   return points.find((p) => !p.nextId) ?? null
 }
 
-export function walkList<T extends Linkable & { next?: { id?: string | null } | null }>(points: T[]): T[] {
+export function walkList<T extends Linkable & { next?: { id?: string | null } | null }>(
+  points: T[],
+): T[] {
   if (points.length === 0) return []
-  const nextIds = new Set(points.flatMap((p) => { const n = resolveNextId(p); return n ? [n] : [] }))
+  const nextIds = new Set(
+    points.flatMap((p) => {
+      const n = resolveNextId(p)
+      return n ? [n] : []
+    }),
+  )
   const allHeads = points.filter((p) => p.id != null && !nextIds.has(p.id!))
   if (allHeads.length === 0) return [...points]
   allHeads.sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""))

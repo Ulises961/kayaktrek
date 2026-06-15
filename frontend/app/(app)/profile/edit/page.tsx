@@ -14,7 +14,7 @@ export default async function EditProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex max-w-2xl flex-col gap-6">
       <PageBreadcrumb crumbs={[{ label: "Profile", href: "/profile" }, { label: "Edit" }]} />
       <h1 className="text-2xl font-semibold">Edit profile</h1>
       <EditProfileForm user={user} />

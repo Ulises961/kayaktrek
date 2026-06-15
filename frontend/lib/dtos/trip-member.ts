@@ -26,10 +26,10 @@ export type TripMember = z.infer<typeof TripMemberSchema>
 export const FloatPlanFormSchema = z.object({
   vesselMake: z.string().max(100).optional(),
   vesselModel: z.string().max(100).optional(),
-  vesselLengthCm: z.string().optional().refine(
-    (val) => !val || /^\d+$/.test(val),
-    "Must be a positive integer"
-  ),
+  vesselLengthCm: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d+$/.test(val), "Must be a positive integer"),
   vesselColorPrimary: z.string().max(50).optional(),
   vesselColorSecondary: z.string().max(50).optional(),
   emergencyContactName: z.string().max(200).optional(),

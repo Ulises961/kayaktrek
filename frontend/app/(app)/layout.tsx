@@ -23,20 +23,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main className="flex overflow-auto min-h-screen w-full p-1 md:p-4">
-        <div className="w-full h-screen flex flex-col">
+      <main className="flex min-h-screen w-full overflow-auto p-1 md:p-4">
+        <div className="flex h-screen w-full flex-col">
           {/* Nav bar */}
-          <header className="h-12 border-b border-border flex flex-row items-center gap-2 px-4 mb-6 shrink-0">
+          <header className="border-border mb-6 flex h-12 shrink-0 flex-row items-center gap-2 border-b px-4">
             <SidebarTrigger className="md:hidden" />
             <Separator orientation="vertical" className="h-4 md:hidden" />
             {/* Breadcrumb — each page renders its own via slot pattern */}
-            <div id="breadcrumb-slot" className="flex-1 flex items-center" />
+            <div id="breadcrumb-slot" className="flex flex-1 items-center" />
             <ThemeToggle />
           </header>
           <KeypairPromptBanner hasKeypair={hasKeypair} />
-          <div className="flex-1 p-6 overflow-auto">
-            {children}
-          </div>
+          <div className="flex-1 overflow-auto p-6">{children}</div>
         </div>
       </main>
     </SidebarProvider>

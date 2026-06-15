@@ -6,7 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { reAuth, getMedicalNotes } from "@/lib/profile/actions"
-import { getTripMedicalNotes, setTripMedicalNotes, revokeTripMedicalNotes, shareMedicalNotes } from "@/lib/trip-member/actions"
+import {
+  getTripMedicalNotes,
+  setTripMedicalNotes,
+  revokeTripMedicalNotes,
+  shareMedicalNotes,
+} from "@/lib/trip-member/actions"
 
 interface FloatPlanMedicalTabSectionProps {
   tripId: string
@@ -37,13 +42,19 @@ export function FloatPlanMedicalTabSection({
     setError(null)
     startTransition(async () => {
       const authResult = await reAuth(password)
-      if (!authResult.success) { setError(authResult.error); return }
+      if (!authResult.success) {
+        setError(authResult.error)
+        return
+      }
 
       const token = authResult.elevatedToken
 
       // Try trip-level notes first; fall back to profile seed if none stored
       const tripResult = await getTripMedicalNotes(tripId, token, password)
-      if (!tripResult.success) { setError(tripResult.error); return }
+      if (!tripResult.success) {
+        setError(tripResult.error)
+        return
+      }
 
       let initialNotes = tripResult.notes ?? ""
       if (!initialNotes) {
@@ -64,7 +75,10 @@ export function FloatPlanMedicalTabSection({
     setSavedOk(false)
     startTransition(async () => {
       const result = await setTripMedicalNotes(tripId, notes, elevatedToken!, password)
-      if (!result.success) { setError(result.error); return }
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
       setHasNotes(true)
       setSavedOk(true)
     })
@@ -74,7 +88,10 @@ export function FloatPlanMedicalTabSection({
     setError(null)
     startTransition(async () => {
       const result = await revokeTripMedicalNotes(tripId, elevatedToken!)
-      if (!result.success) { setError(result.error); return }
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
       setHasNotes(false)
       setIsShared(false)
       setNotes("")
@@ -89,7 +106,10 @@ export function FloatPlanMedicalTabSection({
     setShareOk(false)
     startTransition(async () => {
       const result = await shareMedicalNotes(tripId, elevatedToken!, password)
-      if (!result.success) { setShareError(result.error); return }
+      if (!result.success) {
+        setShareError(result.error)
+        return
+      }
       setIsShared(true)
       setShareOk(true)
     })
@@ -115,7 +135,7 @@ export function FloatPlanMedicalTabSection({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {hasNotes
               ? "Notes stored — encrypted for this trip."
               : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
@@ -131,10 +151,8 @@ export function FloatPlanMedicalTabSection({
           </Button>
         </div>
         {hasNotes && (
-          <p className="text-xs text-muted-foreground">
-            {isShared
-              ? "Shared with trip leader."
-              : "Not shared with trip leader."}
+          <p className="text-muted-foreground text-xs">
+            {isShared ? "Shared with trip leader." : "Not shared with trip leader."}
           </p>
         )}
       </div>
@@ -144,18 +162,18 @@ export function FloatPlanMedicalTabSection({
   if (phase === "authenticating") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">
-          Enter your password to decrypt your notes.
-        </p>
-        <div className="flex gap-2 items-end max-w-sm">
-          <div className="flex-1 flex flex-col gap-1.5">
+        <p className="text-muted-foreground text-sm">Enter your password to decrypt your notes.</p>
+        <div className="flex max-w-sm items-end gap-2">
+          <div className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor="fp-medical-password">Password</Label>
             <Input
               id="fp-medical-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && password) handleDecrypt() }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && password) handleDecrypt()
+              }}
               disabled={isPending}
               autoComplete="current-password"
               autoFocus
@@ -165,11 +183,11 @@ export function FloatPlanMedicalTabSection({
             {isPending ? "Decrypting…" : "Continue"}
           </Button>
         </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p className="text-destructive text-xs">{error}</p>}
         <button
           type="button"
           onClick={handleCancel}
-          className="text-xs text-muted-foreground hover:text-foreground w-fit"
+          className="text-muted-foreground hover:text-foreground w-fit text-xs"
         >
           Cancel
         </button>
@@ -181,13 +199,16 @@ export function FloatPlanMedicalTabSection({
     <div className="flex flex-col gap-4">
       <Textarea
         value={notes}
-        onChange={(e) => { setNotes(e.target.value); setSavedOk(false) }}
+        onChange={(e) => {
+          setNotes(e.target.value)
+          setSavedOk(false)
+        }}
         placeholder="Allergies, medications, blood type, conditions relevant to rescue crews…"
         rows={4}
         disabled={isPending}
         autoFocus
       />
-      <div className="flex gap-2 flex-wrap items-center">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={handleSave} disabled={isPending || !notes.trim()}>
           {isPending ? "Saving…" : "Save"}
         </Button>
@@ -218,9 +239,11 @@ export function FloatPlanMedicalTabSection({
         )}
       </div>
       {savedOk && <p className="text-xs text-green-600 dark:text-green-400">Saved.</p>}
-      {shareOk && <p className="text-xs text-green-600 dark:text-green-400">Shared with trip leader.</p>}
-      {shareError && <p className="text-xs text-destructive">{shareError}</p>}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {shareOk && (
+        <p className="text-xs text-green-600 dark:text-green-400">Shared with trip leader.</p>
+      )}
+      {shareError && <p className="text-destructive text-xs">{shareError}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   )
 }

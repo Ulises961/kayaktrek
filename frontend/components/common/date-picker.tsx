@@ -16,7 +16,13 @@ interface DatePickerProps {
   id?: string
 }
 
-export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled, id }: DatePickerProps) {
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = "Pick a date",
+  disabled,
+  id,
+}: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   const selected = value && isValid(parseISO(value)) ? parseISO(value) : undefined
@@ -34,21 +40,18 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal overflow-hidden",
-            !selected && "text-muted-foreground"
+            "w-full justify-start overflow-hidden text-left font-normal",
+            !selected && "text-muted-foreground",
           )}
         >
           <CalendarIcon className="mr-2 size-4 shrink-0" />
-          <span className="truncate">{selected ? format(selected, "d MMM yyyy") : placeholder}</span>
+          <span className="truncate">
+            {selected ? format(selected, "d MMM yyyy") : placeholder}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={handleSelect}
-          initialFocus
-        />
+        <Calendar mode="single" selected={selected} onSelect={handleSelect} initialFocus />
       </PopoverContent>
     </Popover>
   )

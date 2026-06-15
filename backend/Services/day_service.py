@@ -10,7 +10,7 @@ from Models.trip import Trip, TripStateType
 from Models.weather import Weather
 from Api.database import db
 from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.exc import NoResultFound
 from datetime import date, time
 import logging
 

@@ -1,5 +1,5 @@
 from Api.database import db
-from sqlalchemy import UUID, Table, Column, Integer, ForeignKey
+from sqlalchemy import UUID, Table, Column, ForeignKey
 
 PointHasImage = Table(
     'point_has_image',

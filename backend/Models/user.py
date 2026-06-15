@@ -85,6 +85,11 @@ class User(BaseModel):
     # Stamped on every password change so stolen access tokens cannot outlive the window.
     password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Monotonic counter embedded in every issued token. Incrementing it instantly
+    # invalidates all outstanding access and refresh tokens (password change, explicit
+    # logout, account deletion request). Checked on every authenticated request.
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
     # Association object: full role-aware access
     trip_memberships: Mapped[List["TripMember"]] = relationship(
         "TripMember",

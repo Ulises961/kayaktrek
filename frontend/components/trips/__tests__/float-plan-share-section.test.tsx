@@ -155,7 +155,10 @@ describe("FloatPlanShareSection — regenerate flow", () => {
   })
 
   it("shows error and stays on token view when regeneration fails", async () => {
-    vi.mocked(generateFloatPlanShare).mockResolvedValue({ success: false, error: "Regeneration failed." })
+    vi.mocked(generateFloatPlanShare).mockResolvedValue({
+      success: false,
+      error: "Regeneration failed.",
+    })
     render(<FloatPlanShareSection tripId={TRIP_ID} logistics={LOGISTICS_WITH_TOKEN} />)
     await userEvent.click(screen.getByRole("button", { name: /regenerate/i }))
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }))

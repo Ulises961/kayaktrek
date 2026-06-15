@@ -4,8 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 export default function Loading() {
   return (
     <>
-      <Skeleton className="h-8 w-36 mb-6" />
-      <div className="flex flex-col gap-3 max-w-2xl">
+      <Skeleton className="mb-6 h-8 w-36" />
+      <div className="flex max-w-2xl flex-col gap-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i}>
             <CardHeader className="pb-2">

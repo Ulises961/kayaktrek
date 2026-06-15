@@ -38,6 +38,8 @@ celery_app = Celery(
         "Tasks.ping",
         "Tasks.data_export",
         "Tasks.erasure",
+        "Tasks.weather_fetch_task",
+        "Tasks.weather_beat_task",
     ],
 )
 
@@ -51,7 +53,11 @@ celery_app.conf.update(
     beat_schedule={
         "daily-gdpr-erasure": {
             "task": "Tasks.erasure.run_erasure",
-            "schedule": 86400,  # every 24 hours
+            "schedule": 86400,
+        },
+        "weather-refresh": {
+            "task": "Tasks.weather_beat_task.refresh_upcoming_weather",
+            "schedule": 86400,
         },
     },
 )

@@ -50,6 +50,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
+          prune-cache: false
 
       - name: Install backend dependencies
         working-directory: backend
@@ -70,6 +71,7 @@ jobs:
           SECRET_KEY: ci-secret-key-not-used-in-prod
           JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
           FRONTEND_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
+          RATELIMIT_STORAGE_URI: memory:// 
         run: |
           fuser -k "${CI_BACKEND_PORT}/tcp" 2>/dev/null || true
           setsid nohup uv run flask run --host=0.0.0.0 --port=${{ env.CI_BACKEND_PORT }} > /tmp/flask.log 2>&1 &

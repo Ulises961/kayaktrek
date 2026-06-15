@@ -8,6 +8,16 @@ import { PointMarker } from "./point-marker"
 import { haversineNm, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
+import { cn } from "@/lib/utils"
+import { VelocityLayer } from "@/components/weather/velocity-layer"
+import { LayersControl } from "./layers-control"
+import {
+  fetchWindVectors,
+  fetchWaveVectors,
+  fetchTidalStreamVectors,
+  fetchGlobalWindVectors,
+} from "@/lib/weather/actions"
+import type { VelocityGridData } from "@/lib/types/ui"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -19,11 +29,56 @@ export type MapCoreProps = {
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null
+  selectedHour?: number
   flyToPoint?: FlyToTarget | null
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
+}
+
+// Module-level constants so options objects are stable across renders.
+// leaflet-velocity needs hex colors — CSS custom properties are not resolved by canvas.
+// Wind: Windy.com / earth.nullschool Spectral palette — calm blue → gale deep red.
+const WIND_SCALE = [
+  "#3288bd",
+  "#66c2a5",
+  "#abdda4",
+  "#e6f598",
+  "#fffdbf",
+  "#fdae61",
+  "#f46d43",
+  "#d53e4f",
+  "#9e0142",
+]
+const WIND_OPTIONS = {
+  velocityScale: 0.005,
+  colorScale: WIND_SCALE,
+  particleAge: 64,
+  lineWidth: 2,
+}
+// Swell: white — direction matters more than speed, matches standard chart convention.
+const SWELL_OPTIONS = {
+  velocityScale: 0.012,
+  colorScale: ["#ffffff", "#e8f4fc"],
+  particleAge: 90,
+  lineWidth: 3,
+}
+// Tidal stream: blue-purple ramp indicating current strength.
+const TIDAL_OPTIONS = {
+  velocityScale: 0.05,
+  colorScale: ["#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
+  particleAge: 64,
+  lineWidth: 2,
+}
+// Global background: sparser, slower particles to show large-scale atmospheric context.
+// §8b fills the data; for now the backend stub returns an empty grid.
+const GLOBAL_WIND_OPTIONS = {
+  velocityScale: 0.003,
+  colorScale: WIND_SCALE,
+  particleAge: 120,
+  lineWidth: 1,
+  particleMultiplier: 0.002,
 }
 
 type ValidPoint = Point & { latitude: number; longitude: number }
@@ -38,7 +93,10 @@ type Segment = {
   dayNum: number
 }
 
-function resolvePosition(point: ValidPoint, drag: DragState | null): { latitude: number; longitude: number } {
+function resolvePosition(
+  point: ValidPoint,
+  drag: DragState | null,
+): { latitude: number; longitude: number } {
   if (drag && point.id === drag.id) return { latitude: drag.lat, longitude: drag.lng }
   return point
 }
@@ -49,7 +107,7 @@ function buildSegments(
   boundaryPointIds: Set<string>,
   distanceUnit: "nm" | "km",
   avgSpeedKnots: number,
-  drag: DragState | null
+  drag: DragState | null,
 ): Segment[] {
   const segments: Segment[] = []
   for (let i = 0; i < ordered.length - 1; i++) {
@@ -68,14 +126,21 @@ function buildSegments(
       dayNum = 0
     } else if (dayNumA === dayNumB) {
       dayNum = dayNumA
-    } else if (ordered[i].id != null && boundaryPointIds.has(ordered[i].id!) && dayNumB === dayNumA + 1) {
+    } else if (
+      ordered[i].id != null &&
+      boundaryPointIds.has(ordered[i].id!) &&
+      dayNumB === dayNumA + 1
+    ) {
       dayNum = dayNumB
     } else {
       dayNum = 0
     }
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
-      positions: [[a.latitude, a.longitude], [b.latitude, b.longitude]],
+      positions: [
+        [a.latitude, a.longitude],
+        [b.latitude, b.longitude],
+      ],
       color: getDayColor(dayNum),
       distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
       dayNum,
@@ -91,11 +156,14 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
   const prevIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!flyToPoint) { prevIdRef.current = null; return }
+    if (!flyToPoint) {
+      prevIdRef.current = null
+      return
+    }
     if (flyToPoint.id === prevIdRef.current) return
     prevIdRef.current = flyToPoint.id
 
-    const zoom = 12
+    const zoom = 13
     // Offset the target so the point centres in the visible area above the 55vh
     // point-detail sheet rather than at the geometric centre of the viewport.
     const px = map.project([flyToPoint.lat, flyToPoint.lng], zoom)
@@ -146,18 +214,25 @@ const ConnectedMarker = memo(function ConnectedMarker({
   // Memoize split icon when this is a boundary point. Regular icon is computed
   // inside PointMarker. Splitting here keeps PointMarker unaware of day topology.
   const customIcon = useMemo(
-    () => (boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right, index) : undefined),
+    () =>
+      boundaryColors ? splitRingIcon(boundaryColors.left, boundaryColors.right, index) : undefined,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boundaryColors?.left, boundaryColors?.right, index],
   )
 
-  const handleDragMove = useCallback((lat: number, lng: number) => {
-    if (point.id) onMarkerDragMove(point.id, lat, lng)
-  }, [point.id, onMarkerDragMove])
+  const handleDragMove = useCallback(
+    (lat: number, lng: number) => {
+      if (point.id) onMarkerDragMove(point.id, lat, lng)
+    },
+    [point.id, onMarkerDragMove],
+  )
 
-  const handleDragEnd = useCallback((lat: number, lng: number) => {
-    if (point.id) onMarkerDragEnd(point.id, lat, lng)
-  }, [point.id, onMarkerDragEnd])
+  const handleDragEnd = useCallback(
+    (lat: number, lng: number) => {
+      if (point.id) onMarkerDragEnd(point.id, lat, lng)
+    },
+    [point.id, onMarkerDragEnd],
+  )
 
   const handleClick = useMemo(
     () => (onMarkerClick && point.id ? () => onMarkerClick(point.id!) : undefined),
@@ -188,6 +263,7 @@ export default function MapCore({
   avgSpeedKnots = 2.5,
   viewMode = false,
   selectedDayId = null,
+  selectedHour = 12,
   flyToPoint = null,
   onMapClick,
   onMarkerDragEnd,
@@ -196,15 +272,49 @@ export default function MapCore({
 }: MapCoreProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
 
+  const [windData, setWindData] = useState<VelocityGridData | null>(null)
+  const [swellData, setSwellData] = useState<VelocityGridData | null>(null)
+  const [tidalData, setTidalData] = useState<VelocityGridData | null>(null)
+  const [globalWindData, setGlobalWindData] = useState<VelocityGridData | null>(null)
+  const [windEnabled, setWindEnabled] = useState(true)
+  const [swellEnabled, setSwellEnabled] = useState(true)
+  const [tidalEnabled, setTidalEnabled] = useState(true)
+
+  const selectedDayDate = useMemo(
+    () => days.find((d) => d.id === selectedDayId)?.date ?? null,
+    [days, selectedDayId],
+  )
+
+  useEffect(() => {
+    if (!selectedDayId) return
+    fetchWindVectors(selectedDayId, selectedHour).then((r) =>
+      setWindData(r.success ? r.data : null),
+    )
+    fetchWaveVectors(selectedDayId, selectedHour).then((r) =>
+      setSwellData(r.success ? r.data : null),
+    )
+    fetchTidalStreamVectors(selectedDayId, selectedHour).then((r) =>
+      setTidalData(r.success ? r.data : null),
+    )
+  }, [selectedDayId, selectedHour])
+
+  useEffect(() => {
+    if (!selectedDayId || !selectedDayDate) return
+    let cancelled = false
+    fetchGlobalWindVectors(selectedDayDate, selectedHour).then((r) => {
+      if (!cancelled) setGlobalWindData(r.success ? r.data : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedDayId, selectedDayDate, selectedHour])
+
   const selectedDayNum = useMemo(
     () => (selectedDayId ? (days.find((d) => d.id === selectedDayId)?.dayNumber ?? null) : null),
     [selectedDayId, days],
   )
 
-  const dayNumberById = useMemo(
-    () => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])),
-    [days],
-  )
+  const dayNumberById = useMemo(() => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])), [days])
 
   // Build boundary map: point id → { left, right } colors for split-ring markers.
   // A boundary point is startPointId of any numbered day (dayNumber > 0).
@@ -228,36 +338,55 @@ export default function MapCore({
     return map
   }, [days])
 
-  const boundaryPointIds = useMemo(
-    () => new Set(boundaryMap.keys()),
-    [boundaryMap],
-  )
+  const boundaryPointIds = useMemo(() => new Set(boundaryMap.keys()), [boundaryMap])
 
   const pointIndexById = useMemo(() => {
     const m = new Map<string, number>()
-    points.forEach((p, i) => { if (p.id) m.set(p.id, i + 1) })
+    points.forEach((p, i) => {
+      if (p.id) m.set(p.id, i + 1)
+    })
     return m
   }, [points])
 
   const validPoints = points.filter(
-    (p): p is ValidPoint => p.latitude != null && p.longitude != null
+    (p): p is ValidPoint => p.latitude != null && p.longitude != null,
   )
 
-  const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, distanceUnit, avgSpeedKnots, dragState)
+  const segments = buildSegments(
+    validPoints,
+    dayNumberById,
+    boundaryPointIds,
+    distanceUnit,
+    avgSpeedKnots,
+    dragState,
+  )
 
-  const handleMarkerDragMove = useCallback((id: string, lat: number, lng: number) => {
-    setDragState({ id, lat, lng })
-    onMarkerDragMove(id, lat, lng)
-  }, [onMarkerDragMove])
+  const handleMarkerDragMove = useCallback(
+    (id: string, lat: number, lng: number) => {
+      setDragState({ id, lat, lng })
+      onMarkerDragMove(id, lat, lng)
+    },
+    [onMarkerDragMove],
+  )
 
-  const handleMarkerDragEnd = useCallback((id: string, lat: number, lng: number) => {
-    setDragState(null)
-    onMarkerDragEnd(id, lat, lng)
-  }, [onMarkerDragEnd])
+  const handleMarkerDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      setDragState(null)
+      onMarkerDragEnd(id, lat, lng)
+    },
+    [onMarkerDragEnd],
+  )
+
+  const hasTidalLayer = selectedDayId !== null && tidalData !== null && tidalData.grid.length > 0
 
   return (
-    <div className={viewMode ? "w-full h-full" : "w-full h-full [&_.leaflet-container]:cursor-crosshair"}>
-      <MapContainer center={[43, 13]} zoom={6} className="w-full h-full" zoomControl>
+    <div
+      className={cn(
+        "relative h-full w-full",
+        !viewMode && "[&_.leaflet-container]:cursor-crosshair",
+      )}
+    >
+      <MapContainer center={[43, 13]} zoom={6} className="h-full w-full" zoomControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -267,13 +396,16 @@ export default function MapCore({
         <FlyToController flyToPoint={flyToPoint} />
 
         {segments.map((seg) => {
-          const dimmed = selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
+          const dimmed =
+            selectedDayNum !== null && seg.dayNum !== selectedDayNum && seg.dayNum !== 0
           return (
             <Polyline
               key={`${seg.key}-${seg.color}`}
               positions={seg.positions}
               color={seg.color}
-              weight={dimmed ? 2 : (selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5)}
+              weight={
+                dimmed ? 2 : selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5
+              }
               opacity={dimmed ? 0.2 : 0.85}
             >
               {!dragState && !viewMode && (
@@ -303,7 +435,33 @@ export default function MapCore({
             onMarkerClick={onMarkerClick}
           />
         ))}
+
+        {selectedDayId && globalWindData && windEnabled && (
+          <VelocityLayer data={globalWindData.grid} options={GLOBAL_WIND_OPTIONS} />
+        )}
+        {selectedDayId && windData && windEnabled && (
+          <VelocityLayer data={windData.grid} options={WIND_OPTIONS} />
+        )}
+        {selectedDayId && swellData && swellEnabled && (
+          <VelocityLayer data={swellData.grid} options={SWELL_OPTIONS} />
+        )}
+        {hasTidalLayer && tidalEnabled && (
+          <VelocityLayer data={tidalData!.grid} options={TIDAL_OPTIONS} />
+        )}
       </MapContainer>
+
+      {selectedDayId && (
+        <LayersControl
+          windEnabled={windEnabled}
+          swellEnabled={swellEnabled}
+          tidalEnabled={tidalEnabled}
+          hasTidalLayer={hasTidalLayer}
+          tidalSource={tidalData?.source}
+          onWindToggle={() => setWindEnabled((e) => !e)}
+          onSwellToggle={() => setSwellEnabled((e) => !e)}
+          onTidalToggle={() => setTidalEnabled((e) => !e)}
+        />
+      )}
     </div>
   )
 }

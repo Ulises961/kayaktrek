@@ -1,0 +1,16 @@
+Hi {{ name }},
+
+Someone tried to create a Kayak Planner account using your email address, but an account already
+exists for it. If that was you, just log in — no new account was created.
+
+Log in to your account:
+{{ login_url }}
+
+Forgot your password? Request a reset here:
+{{ forgot_url }}
+
+If you did not attempt to register, you can safely ignore this email — your account has not been
+changed.
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

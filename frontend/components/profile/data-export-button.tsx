@@ -23,7 +23,7 @@ export function DataExportButton() {
 
   if (sent) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         A download link has been sent to your email address.
       </p>
     )
@@ -31,11 +31,17 @@ export function DataExportButton() {
 
   return (
     <div className="flex flex-col gap-1">
-      <Button variant="outline" size="sm" disabled={isPending} onClick={handleClick} className="self-start">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={isPending}
+        onClick={handleClick}
+        className="self-start"
+      >
         <DownloadIcon className="size-4" />
         {isPending ? "Requesting…" : "Download my data"}
       </Button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   )
 }

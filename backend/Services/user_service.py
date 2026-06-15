@@ -16,9 +16,6 @@ from Api.database import db
 from Schemas.base_schema import camelcase
 from Services.crypto_service import encrypt, decrypt, generate_keypair
 from Services.storage_service import StorageService
-from Models.auth_token import AuthTokenType
-from Services.auth_service import AuthService
-from uuid import UUID
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
 
@@ -231,6 +228,7 @@ class UserService:
             raise ValueError("Current password is incorrect")
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
         user.password_changed_at = datetime.now(timezone.utc)
+        user.token_version += 1
         if user.public_key:
             private_key_b64 = decrypt(
                 user.private_key_ciphertext,  # type: ignore
@@ -359,6 +357,7 @@ class UserService:
         user = UserService.get_user_by_id(id)
         user.deletion_requested_at = datetime.now(timezone.utc)
         user.active = False
+        user.token_version += 1
         db.session.query(AuthToken).filter_by(user_id=user.id).delete()
         db.session.commit()
 
@@ -411,6 +410,20 @@ class UserService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.DELETION_CANCEL)
         logger.info("deletion_cancel_resent", extra={"user_id": str(user.id)})
         return raw_token, user.name
+
+    @staticmethod
+    def invalidate_sessions(id: str) -> None:
+        """
+        Bump token_version, instantly invalidating all outstanding access and
+        refresh tokens for the user. Used by explicit logout / "log out everywhere".
+
+        Raises:
+            NoResultFound: If the user does not exist
+        """
+        user = UserService.get_user_by_id(id)
+        user.token_version += 1
+        db.session.commit()
+        logger.info("sessions_invalidated", extra={"user_id": id})
 
     @staticmethod
     def delete_user(id: str) -> None:

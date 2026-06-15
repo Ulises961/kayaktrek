@@ -28,9 +28,6 @@ from Models.image import Image
 from Models.trip_member import TripMember, MemberRoleType
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
-from Models.logistics import Logistics
-from Models.user_has_inventory import user_has_inventory
-from Services.day_service import DayService
 from Services.itinerary_service import ItineraryService
 from Services.trip_service import TripService
 

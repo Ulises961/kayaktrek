@@ -4,13 +4,27 @@ import { useRef, useState, useTransition } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { FileIcon, PaperclipIcon, PlusIcon, XIcon } from "lucide-react"
-import { createTravelDocument, uploadTravelDocumentAttachment } from "@/lib/travel-documents/actions"
-import { TravelDocumentFieldsSchema, TRAVEL_DOCUMENT_TYPES, type TravelDocumentFields } from "@/lib/dtos/travel-document"
+import {
+  createTravelDocument,
+  uploadTravelDocumentAttachment,
+} from "@/lib/travel-documents/actions"
+import {
+  TravelDocumentFieldsSchema,
+  TRAVEL_DOCUMENT_TYPES,
+  type TravelDocumentFields,
+} from "@/lib/dtos/travel-document"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { DatePicker } from "@/components/common/date-picker"
 
 const TYPE_LABELS: Record<string, string> = {
@@ -26,7 +40,10 @@ const SELECT_CLASS =
 
 function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <Label
+      htmlFor={htmlFor}
+      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
+    >
       {children}
     </Label>
   )
@@ -42,7 +59,15 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { register, handleSubmit, setValue, control, setError, reset, formState: { errors } } = useForm<TravelDocumentFields>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    setError,
+    reset,
+    formState: { errors },
+  } = useForm<TravelDocumentFields>({
     resolver: zodResolver(TravelDocumentFieldsSchema),
     defaultValues: { type: "accommodation" },
   })
@@ -73,9 +98,16 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
       if (pendingFile && result.document.id) {
         const formData = new FormData()
         formData.append("file", pendingFile)
-        const uploadResult = await uploadTravelDocumentAttachment(tripId, result.document.id, formData)
+        const uploadResult = await uploadTravelDocumentAttachment(
+          tripId,
+          result.document.id,
+          formData,
+        )
         if (!uploadResult.success) {
-          setError("root", { message: "Document saved, but the file could not be uploaded. Add it from the edit dialog." })
+          setError("root", {
+            message:
+              "Document saved, but the file could not be uploaded. Add it from the edit dialog.",
+          })
           setOpen(false)
           return
         }
@@ -113,10 +145,12 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                   {...register("type")}
                 >
                   {TRAVEL_DOCUMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                    <option key={t} value={t}>
+                      {TYPE_LABELS[t]}
+                    </option>
                   ))}
                 </select>
-                {errors.type && <p className="text-xs text-destructive">{errors.type.message}</p>}
+                {errors.type && <p className="text-destructive text-xs">{errors.type.message}</p>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <FieldLabel htmlFor="name">Name</FieldLabel>
@@ -126,7 +160,7 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                   disabled={isPending}
                   {...register("name")}
                 />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
               </div>
             </div>
 
@@ -148,7 +182,9 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                   placeholder="Expiry date"
                   disabled={isPending}
                 />
-                {errors.expiryDate && <p className="text-xs text-destructive">{errors.expiryDate.message}</p>}
+                {errors.expiryDate && (
+                  <p className="text-destructive text-xs">{errors.expiryDate.message}</p>
+                )}
               </div>
             </div>
 
@@ -206,8 +242,10 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                   Choose file
                 </Button>
                 {pendingFile ? (
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="text-xs text-muted-foreground truncate">{pendingFile.name}</span>
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="text-muted-foreground truncate text-xs">
+                      {pendingFile.name}
+                    </span>
                     <Button
                       type="button"
                       variant="ghost"
@@ -220,15 +258,17 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
                     </Button>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">No file chosen</span>
+                  <span className="text-muted-foreground text-xs">No file chosen</span>
                 )}
               </div>
             </div>
 
-            {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+            {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
 
             <DialogFooter>
-              <Button type="submit" disabled={isPending}>Add</Button>
+              <Button type="submit" disabled={isPending}>
+                Add
+              </Button>
             </DialogFooter>
           </form>
         </div>

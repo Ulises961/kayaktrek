@@ -67,14 +67,17 @@ describe("ShoreContactForm — editing state", () => {
     await waitFor(() =>
       expect(upsertLogistics).toHaveBeenCalledWith(
         TRIP_ID,
-        expect.objectContaining({ shoreContactName: "Jane Doe" })
-      )
+        expect.objectContaining({ shoreContactName: "Jane Doe" }),
+      ),
     )
     await waitFor(() => expect(screen.queryByLabelText(/^name$/i)).toBeNull())
   })
 
   it("shows error and stays in editing on failure", async () => {
-    vi.mocked(upsertLogistics).mockResolvedValue({ success: false, error: "Failed to save logistics." })
+    vi.mocked(upsertLogistics).mockResolvedValue({
+      success: false,
+      error: "Failed to save logistics.",
+    })
     render(<ShoreContactForm tripId={TRIP_ID} logistics={LOGISTICS} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))

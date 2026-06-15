@@ -72,8 +72,8 @@ export function KeypairPromptBanner({ hasKeypair }: KeypairPromptBannerProps) {
           <DialogHeader>
             <DialogTitle>Set up encryption</DialogTitle>
             <DialogDescription>
-              Enter your password once to generate your encryption keypair. Crew members
-              can then share medical notes with you securely — only you can decrypt them.
+              Enter your password once to generate your encryption keypair. Crew members can then
+              share medical notes with you securely — only you can decrypt them.
             </DialogDescription>
           </DialogHeader>
           <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -86,11 +86,18 @@ export function KeypairPromptBanner({ hasKeypair }: KeypairPromptBannerProps) {
                 {...register("password")}
               />
               {errors.password && (
-                <p className="text-sm text-destructive">{errors.password.message}</p>
+                <p className="text-destructive text-sm">{errors.password.message}</p>
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => { setOpen(false); reset() }}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setOpen(false)
+                  reset()
+                }}
+              >
                 Later
               </Button>
               <Button type="submit" disabled={isSubmitting}>

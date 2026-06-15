@@ -7,21 +7,21 @@ const stateBadgeVariants = cva(
   {
     variants: {
       state: {
-        building:  "bg-[var(--state-planning-bg)]  text-[var(--state-planning-fg)]",
+        building: "bg-[var(--state-planning-bg)]  text-[var(--state-planning-fg)]",
         happening: "bg-[var(--state-happening-bg)] text-[var(--state-happening-fg)]",
-        past:      "bg-[var(--state-past-bg)]      text-[var(--state-past-fg)]",
+        past: "bg-[var(--state-past-bg)]      text-[var(--state-past-fg)]",
       },
     },
     defaultVariants: {
       state: "building",
     },
-  }
+  },
 )
 
 const labels: Record<TripState, string> = {
   building: "Building",
   happening: "Happening",
-  past:      "Past",
+  past: "Past",
 }
 
 interface StateBadgeProps extends VariantProps<typeof stateBadgeVariants> {

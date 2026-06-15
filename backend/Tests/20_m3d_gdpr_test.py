@@ -42,7 +42,7 @@ def _register_and_activate(app, client, *, mail, phone, username, pwd=_GDPR_PWD)
         user.active = True
         db.session.commit()
         user_id = str(user.id)
-        token = JWTService.generate_access_token(user_id, user.mail, user.admin)
+        token = JWTService.generate_access_token(user_id, user.mail, user.admin, user.token_version)
     return user_id, {"Authorization": f"Bearer {token}"}
 
 

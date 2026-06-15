@@ -33,7 +33,12 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm" disabled={isPending} className="w-full sm:w-auto sm:self-start">
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={isPending}
+          className="w-full sm:w-auto sm:self-start"
+        >
           Delete trip
         </Button>
       </AlertDialogTrigger>
@@ -46,7 +51,11 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+          <AlertDialogAction
+            onClick={handleConfirm}
+            disabled={isPending}
+            className="bg-destructive hover:bg-destructive/90"
+          >
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

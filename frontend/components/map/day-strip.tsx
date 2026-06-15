@@ -4,18 +4,15 @@ import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { haversineNm } from "@/lib/itinerary/distance"
 import { DayStripCard } from "./day-strip-card"
 import { DayDetailPanel } from "./day-detail-panel"
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel"
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel"
 import type { Point } from "@/lib/dtos/point"
 
 function dayDistanceNm(dayId: string, points: Point[], pointOrder: string[]): number {
   const ordered = pointOrder
     .map((id) => points.find((p) => p.id === id))
-    .filter((p): p is Point & { latitude: number; longitude: number } =>
-      p !== undefined && p.dayId === dayId && p.latitude != null && p.longitude != null
+    .filter(
+      (p): p is Point & { latitude: number; longitude: number } =>
+        p !== undefined && p.dayId === dayId && p.latitude != null && p.longitude != null,
     )
   let total = 0
   for (let i = 0; i < ordered.length - 1; i++) {
@@ -25,14 +22,8 @@ function dayDistanceNm(dayId: string, points: Point[], pointOrder: string[]): nu
 }
 
 export function DayStrip() {
-  const {
-    state,
-    distanceUnit,
-    avgSpeedKnots,
-    selectedDayId,
-    setSelectedDayId,
-    tripState,
-  } = useMapBuilder()
+  const { state, distanceUnit, avgSpeedKnots, selectedDayId, setSelectedDayId, tripState } =
+    useMapBuilder()
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
@@ -42,10 +33,10 @@ export function DayStrip() {
   )
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-[1001] flex flex-col">
+    <div className="absolute right-0 bottom-0 left-0 z-[1001] flex flex-col">
       {selectedDayId && <DayDetailPanel />}
 
-      <div className="bg-background/90 backdrop-blur-sm border-t border-border py-2">
+      <div className="bg-background/90 border-border border-t py-2 backdrop-blur-sm">
         <Carousel opts={{ align: "start", dragFree: true }}>
           <CarouselContent className="-ml-2 px-3">
             {numberedDays.map((day) => {
@@ -56,8 +47,9 @@ export function DayStrip() {
                 (tripState === "happening" && !!day.date && day.date < today)
 
               return (
-                <CarouselItem key={day.id} className="pl-2 basis-auto">
+                <CarouselItem key={day.id} className="basis-auto pl-2">
                   <DayStripCard
+                    dayId={day.id!}
                     dayNumber={day.dayNumber}
                     date={day.date ?? null}
                     distanceNm={dist}

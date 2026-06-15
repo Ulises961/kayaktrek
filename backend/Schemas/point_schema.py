@@ -1,10 +1,8 @@
-from marshmallow import Schema, fields, post_load, pre_load, validates, ValidationError, EXCLUDE
+from marshmallow import fields, post_load, pre_load, validates, ValidationError, EXCLUDE
 from Models.point import Point, PointType
-from Api.database import db
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.image_schema import ImageSchema
 import bleach
-import re
 
 
 class PointSchema(BaseSchema):

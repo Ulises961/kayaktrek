@@ -1,3 +1,5 @@
+from datetime import date as _date
+
 from sqlalchemy import UUID, UniqueConstraint, Integer, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
@@ -9,7 +11,6 @@ if TYPE_CHECKING:
     from Models.point import Point
     from Models.weather import Weather
     from Models.sea import Sea
-    from Models.itinerary import Itinerary
 
 
 class Day(BaseModel):
@@ -17,7 +18,7 @@ class Day(BaseModel):
 
     day_number: Mapped[int] = mapped_column(Integer)
     itinerary_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("itinerary.id"), index=True)
-    date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
+    date: Mapped[Optional[_date]] = mapped_column(Date, nullable=True)
     start_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
     end_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
 
