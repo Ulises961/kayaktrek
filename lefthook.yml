@@ -33,7 +33,7 @@ pre-push:
     backend-tests:
       run: cd backend && .venv/bin/pytest -n auto
     backend-flake8-full:
-      run: cd backend && .venv/bin/flake8 backend/
+      run: cd backend && .venv/bin/flake8 .
     frontend-lint:
       run: cd frontend && pnpm lint
     frontend-format:
