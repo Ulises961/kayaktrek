@@ -226,15 +226,22 @@ Two distinct cache layers serve different purposes and must not be conflated:
 - Web (PWA): Service Worker + Cache API. User triggers "Download for offline" before departure. Tiles for the route corridor bounding box at zoom levels 8–15 are cached. Best-effort; storage limits and eviction are not guaranteed.
 - Mobile M9 (React Native): device filesystem cache, explicitly downloaded and managed by the app via MapLibre's offline region API. More reliable; user-controlled. Tile source is our MinIO proxy — same origin as web.
 
-**Three tile sources**:
+**Tile sources — priority order**:
 
-| Layer | Source | Access model | Resolution | Who |
-|-------|--------|--------------|------------|-----|
-| Base map | OpenStreetMap | Cached in MinIO via nginx/Flask proxy | — | All users |
-| Satellite | Sentinel-2 L2A (Copernicus/ESA via AWS Open Data) | Rendered by titiler sidecar; cached in MinIO | 10 m | All users |
-| Satellite HD | Mapbox Satellite | Direct client↔Mapbox fetch; no server cache | < 1 m | Premium users |
+| Priority | Layer | Source | Access model | Resolution | Who |
+|----------|-------|--------|--------------|------------|-----|
+| 1 | Base map | OpenStreetMap | Cached in MinIO via nginx/Flask proxy | — | All users |
+| 2 | **Nautical charts (OpenSeaMap)** | OpenSeaMap tile overlay | Free transparent XYZ overlay on OSM; cached in MinIO | — | All users |
+| 3 | Satellite | Sentinel-2 L2A (Copernicus/ESA via AWS Open Data) | Rendered by titiler sidecar; cached in MinIO | 10 m | All users |
+| 4 | Satellite HD | Mapbox Satellite | Direct client↔Mapbox fetch; no server cache | < 1 m | Premium users |
 
-Sentinel-2 covers the route-level coastal planning use case (distinguishing beach from rocks, reading headland exposure). Mapbox HD enables sub-metre point inspection (landing beaches, rock platforms, hazard detail) and is the primary premium value proposition. A backend endpoint issues a short-lived, referrer-domain-restricted Mapbox token for the session — ToS-compliant (Mapbox restricts caching and re-serving tiles, not brokered client-direct access).
+**OpenSeaMap is the highest-priority addition after the base map.** Sea kayak planning depends on seamark data — buoys, rocks, depth contours, tidal diamonds, restricted areas — that OSM base tiles do not provide. OpenSeaMap is a free, community-maintained nautical chart overlay served as a standard XYZ tile URL (`https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png`). Zero infrastructure cost; a single transparent overlay layer in react-leaflet. This must land before the Sentinel-2 or Mapbox integrations, which serve secondary use cases (coastline imagery and sub-metre inspection respectively).
+
+**Layer toggle in the UI**: OSM base is always on. OpenSeaMap is on by default. Satellite (Sentinel-2) and Satellite HD (Mapbox) are optional overlays for users who need imagery, toggled via the layers control. The layers control UI is the same component for web and the future mobile map.
+
+**Sentinel-2 + titiler** covers route-level coastal planning (distinguishing beach from rocks, reading headland exposure). This is the Sentinel-2 use case — meaningful once nautical seamarks are already visible and users want to cross-reference imagery. **Deferred: do not build titiler infra before validating that beta users need it over OpenSeaMap + OSM alone.**
+
+**Mapbox HD** enables sub-metre point inspection (landing beaches, rock platforms, hazard detail) and is the primary premium value proposition. A backend endpoint issues a short-lived, referrer-domain-restricted Mapbox token for the session — ToS-compliant (Mapbox restricts caching and re-serving tiles, not brokered client-direct access). **Deferred to premium tier.**
 
 Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped as a dedicated milestone before M8, not bolted onto any single feature.
 
@@ -252,3 +259,4 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 | Route-first model, Day 0 staging, hover-slide (M4) | ADR-024 | 2026-05-19 | Hover-slide superseded by drag handles in ADR-026 |
 | Unified sidebar, drag boundaries, first-class itinerary (M4b) | ADR-026 | 2026-05-25 | Supersedes ADR-024 §3 (mode-toggle), §4-sidebar, §9 (drop popover) |
 | Trip detail structure, view/edit modes, tile caching (M4b) | ADR-027 | 2026-05-26 | Partially supersedes ADR-020 on tab content and ordering |
+| OpenSeaMap nautical overlay — first-class layer, priority over Sentinel-2 | — | 2026-06-15 | Free XYZ transparent overlay; zero infra; must land before titiler/Sentinel-2 pipeline; Sentinel-2 deferred until beta validates need |

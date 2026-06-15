@@ -6,13 +6,32 @@ This is the most architecturally complex milestone in the project. Nothing here 
 
 ---
 
+## Phasing — "bring the plan along" vs "live expedition"
+
+Mobile offline access addresses two distinct needs that must not be conflated:
+
+**1. Read the plan at sea (prototype → beta scope)**
+A paddler wants to view their finalized route, day structure, conditions, and float plan without connectivity. This is a **read-only** need. It is met before a native app exists, via:
+- **PWA offline**: the web client, Service Worker–cached, with frozen route data and OpenSeaMap tiles for the route corridor pre-downloaded. Route data is kilobytes; tile corridor is tens to low hundreds of MB.
+- **GPX export**: the decided `GET /api/itinerary/:id/export?format=gpx` endpoint loads the route onto any chartplotter, OsmAnd, or handheld GPS. Offline by definition.
+- **PDF float plan**: already built; offline by definition.
+
+These solve "bring the plan along" with zero native app work. Build them first.
+
+**2. Create, track, and log while on the water (M9 scope)**
+A paddler wants to check in at waypoints, adjust the route mid-expedition, track real-time position, and auto-generate expedition logs. These require **mutations at sea** — data created on the device that must survive lost connectivity and sync when reconnected. This is the use case that justifies WatermelonDB, RabbitMQ mutation queues, and the full sync protocol.
+
+**Trigger for building M9**: a real user (or Ulises on a real trip) tries to *create or edit data on the water* and the PWA falls short. Not before. "I wanted to check in at a waypoint while offshore" or "I rerouted a day mid-expedition" are the signals. The plan-reading need is already met by the time that signal arrives.
+
+---
+
 ## Why offline-first
 
 Sea kayaking expeditions happen in remote coastal environments where mobile connectivity is intermittent or absent for hours or days at a time. A mobile app that requires a network connection is not useful at sea.
 
 The mobile client must support the core expedition use cases — viewing the planned route, checking in, updating position, reviewing day conditions — without connectivity. Mutations made offline must be durably queued and replayed when connectivity is restored.
 
-This is not a "nice to have": it is the primary use case.
+This is not a "nice to have": it is the primary use case. But "offline-first" for the plan-reading use case is solved by the PWA; the full native sync architecture is justified only by the live-expedition use case (above).
 
 ---
 
@@ -257,3 +276,4 @@ These are not optional design work — M9 coding must not begin until each is an
 | External GPS device integration — BLE/NMEA + satellite feed polling | ADR-017 | 2026-05-09 | Proposed; design before M9 |
 | Map SDK: MapLibre React Native | Supersedes ADR-015 §"Map SDK: Mapbox Native" | 2026-06-10 | Open-source Mapbox fork; MIT license; works with our own tile server (MinIO + titiler); no usage fees |
 | Weather/sea data included in offline cache | Amends ADR-015 §"What is synced" | 2026-06-10 | Read-only; full row replaced when server `updated_at` is newer; "forecast as of" label in UI |
+| Mobile phasing — PWA-offline first, M9 sync when live-expedition use case justifies it | — | 2026-06-15 | "Bring the plan along" met by PWA + GPX + PDF float plan; M9 native app triggered by first real need to mutate/track at sea |
