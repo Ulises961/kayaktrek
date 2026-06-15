@@ -11,7 +11,12 @@ import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { LayersControl } from "./layers-control"
-import { fetchWindVectors, fetchWaveVectors, fetchTidalStreamVectors } from "@/lib/weather/actions"
+import {
+  fetchWindVectors,
+  fetchWaveVectors,
+  fetchTidalStreamVectors,
+  fetchGlobalWindVectors,
+} from "@/lib/weather/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
@@ -65,6 +70,15 @@ const TIDAL_OPTIONS = {
   colorScale: ["#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
   particleAge: 64,
   lineWidth: 2,
+}
+// Global background: sparser, slower particles to show large-scale atmospheric context.
+// §8b fills the data; for now the backend stub returns an empty grid.
+const GLOBAL_WIND_OPTIONS = {
+  velocityScale: 0.003,
+  colorScale: WIND_SCALE,
+  particleAge: 120,
+  lineWidth: 1,
+  particleMultiplier: 0.002,
 }
 
 type ValidPoint = Point & { latitude: number; longitude: number }
@@ -261,9 +275,15 @@ export default function MapCore({
   const [windData, setWindData] = useState<VelocityGridData | null>(null)
   const [swellData, setSwellData] = useState<VelocityGridData | null>(null)
   const [tidalData, setTidalData] = useState<VelocityGridData | null>(null)
+  const [globalWindData, setGlobalWindData] = useState<VelocityGridData | null>(null)
   const [windEnabled, setWindEnabled] = useState(true)
   const [swellEnabled, setSwellEnabled] = useState(true)
   const [tidalEnabled, setTidalEnabled] = useState(true)
+
+  const selectedDayDate = useMemo(
+    () => days.find((d) => d.id === selectedDayId)?.date ?? null,
+    [days, selectedDayId],
+  )
 
   useEffect(() => {
     if (!selectedDayId) return
@@ -277,6 +297,17 @@ export default function MapCore({
       setTidalData(r.success ? r.data : null),
     )
   }, [selectedDayId, selectedHour])
+
+  useEffect(() => {
+    if (!selectedDayId || !selectedDayDate) return
+    let cancelled = false
+    fetchGlobalWindVectors(selectedDayDate, selectedHour).then((r) => {
+      if (!cancelled) setGlobalWindData(r.success ? r.data : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedDayId, selectedDayDate, selectedHour])
 
   const selectedDayNum = useMemo(
     () => (selectedDayId ? (days.find((d) => d.id === selectedDayId)?.dayNumber ?? null) : null),
@@ -405,6 +436,9 @@ export default function MapCore({
           />
         ))}
 
+        {selectedDayId && globalWindData && windEnabled && (
+          <VelocityLayer data={globalWindData.grid} options={GLOBAL_WIND_OPTIONS} />
+        )}
         {selectedDayId && windData && windEnabled && (
           <VelocityLayer data={windData.grid} options={WIND_OPTIONS} />
         )}
@@ -427,21 +461,6 @@ export default function MapCore({
           onSwellToggle={() => setSwellEnabled((e) => !e)}
           onTidalToggle={() => setTidalEnabled((e) => !e)}
         />
-      )}
-      {selectedDayId && windEnabled && windData && (
-        <div
-          className="bg-card/85 ring-border/30 absolute bottom-6 left-2 z-[1001] flex flex-col gap-0.5 rounded-md px-2.5 py-1.5 shadow-md ring-1 backdrop-blur-sm"
-          data-testid="wind-legend"
-        >
-          <div
-            className="h-2 w-28 rounded-full"
-            style={{ background: `linear-gradient(to right, ${WIND_SCALE.join(", ")})` }}
-          />
-          <div className="text-muted-foreground flex justify-between text-[9px]">
-            <span>Calm</span>
-            <span>Gale</span>
-          </div>
-        </div>
       )}
     </div>
   )

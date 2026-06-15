@@ -8,6 +8,7 @@ import {
   fetchWindVectors,
   fetchWaveVectors,
   fetchTidalStreamVectors,
+  fetchGlobalWindVectors,
 } from "../actions"
 
 vi.mock("@/lib/api/client", () => ({
@@ -234,6 +235,21 @@ describe("fetchTidalStreamVectors", () => {
   it("returns error on failure", async () => {
     GET.mockRejectedValue(new Error("No data"))
     const result = await fetchTidalStreamVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "No data" })
+  })
+})
+
+describe("fetchGlobalWindVectors", () => {
+  it("gets /api/day/global-wind-vectors?date=2026-07-15&hour=12", async () => {
+    GET.mockResolvedValue({ source: "global_weather", grid: [] })
+    const result = await fetchGlobalWindVectors("2026-07-15", 12)
+    expect(GET).toHaveBeenCalledWith("/api/day/global-wind-vectors?date=2026-07-15&hour=12")
+    expect(result).toEqual({ success: true, data: { source: "global_weather", grid: [] } })
+  })
+
+  it("returns error on failure", async () => {
+    GET.mockRejectedValue(new Error("No data"))
+    const result = await fetchGlobalWindVectors("2026-07-15", 12)
     expect(result).toEqual({ success: false, error: "No data" })
   })
 })

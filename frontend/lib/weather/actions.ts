@@ -157,3 +157,21 @@ export async function fetchTidalStreamVectors(
     }
   }
 }
+
+export async function fetchGlobalWindVectors(
+  date: string,
+  hour: number,
+): Promise<VelocityGridResult> {
+  try {
+    const data = await apiGet<VelocityGridData>(
+      `/api/day/global-wind-vectors?date=${date}&hour=${hour}`,
+    )
+    return { success: true, data }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to fetch global wind vectors.",
+    }
+  }
+}

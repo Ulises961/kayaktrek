@@ -32,15 +32,22 @@ vi.mock("@/lib/weather/actions", () => ({
   fetchWindVectors: vi.fn(),
   fetchWaveVectors: vi.fn(),
   fetchTidalStreamVectors: vi.fn(),
+  fetchGlobalWindVectors: vi.fn(),
 }))
 
 import MapCore from "../map-core"
-import { fetchWindVectors, fetchWaveVectors, fetchTidalStreamVectors } from "@/lib/weather/actions"
+import {
+  fetchWindVectors,
+  fetchWaveVectors,
+  fetchTidalStreamVectors,
+  fetchGlobalWindVectors,
+} from "@/lib/weather/actions"
 import type { VelocityGridLayer } from "@/lib/types/ui"
 
 const WIND = fetchWindVectors as ReturnType<typeof vi.fn>
 const SWELL = fetchWaveVectors as ReturnType<typeof vi.fn>
 const TIDAL = fetchTidalStreamVectors as ReturnType<typeof vi.fn>
+const GLOBAL = fetchGlobalWindVectors as ReturnType<typeof vi.fn>
 
 const GRID_LAYER: VelocityGridLayer = {
   header: {
@@ -74,6 +81,7 @@ beforeEach(() => {
   WIND.mockResolvedValue({ success: false, error: "no data" })
   SWELL.mockResolvedValue({ success: false, error: "no data" })
   TIDAL.mockResolvedValue({ success: false, error: "no data" })
+  GLOBAL.mockResolvedValue({ success: false, error: "no data" })
 })
 
 describe("MapCore — velocity layer controls", () => {
@@ -184,5 +192,29 @@ describe("MapCore — velocity layer controls", () => {
 
     fireEvent.click(screen.getByTestId("wind-toggle"))
     expect(screen.queryByTestId("velocity-layer")).not.toBeInTheDocument()
+  })
+
+  it("fetches global wind vectors when a day with a date is selected", async () => {
+    WIND.mockResolvedValue({ success: false, error: "x" })
+    SWELL.mockResolvedValue({ success: false, error: "x" })
+    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    GLOBAL.mockResolvedValue({ success: false, error: "x" })
+
+    const daysWithDate = [{ id: "day-1", dayNumber: 1, date: "2026-07-15" }]
+    render(<MapCore {...BASE_PROPS} days={daysWithDate} selectedDayId="day-1" selectedHour={12} />)
+
+    await waitFor(() => expect(GLOBAL).toHaveBeenCalledWith("2026-07-15", 12))
+  })
+
+  it("renders a global wind VelocityLayer when global data arrives", async () => {
+    WIND.mockResolvedValue({ success: false, error: "x" })
+    SWELL.mockResolvedValue({ success: false, error: "x" })
+    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    GLOBAL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
+
+    const daysWithDate = [{ id: "day-1", dayNumber: 1, date: "2026-07-15" }]
+    render(<MapCore {...BASE_PROPS} days={daysWithDate} selectedDayId="day-1" />)
+
+    await waitFor(() => expect(screen.getByTestId("velocity-layer")).toBeInTheDocument())
   })
 })

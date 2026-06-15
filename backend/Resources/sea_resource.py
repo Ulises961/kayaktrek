@@ -10,14 +10,13 @@ from werkzeug.exceptions import HTTPException
 
 from Api.database import db
 from geoalchemy2 import Geography
-from Models.sea_state import SeaState
 from Models.tidal_station import TidalStation
-from Models.weather_state import WeatherState
 from Schemas.sea_schema import SeaSchema, _gate_schema
 from Schemas.weather_schema import WeatherSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.day_service import DayService
+from Services.open_meteo_service import OpenMeteoService
 from Services.sea_service import SeaService
 from Services.tidal_service import TidalService
 from Tasks.weather_fetch_task import fetch_weather
@@ -140,6 +139,23 @@ def trigger_weather_fetch(id: str):
         raise
     except Exception as e:
         logger.error("weather_fetch_trigger_error", extra={"day_id": id, "error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@sea_api.route('/global-wind-vectors', methods=['GET'])
+@JWTService.authenticate_restful
+def get_global_wind_vectors():
+    date_str = request.args.get("date")
+    try:
+        if not date_str:
+            abort(HTTPStatus.BAD_REQUEST, description="date parameter required")
+        hour = int(request.args.get("hour", 12))
+        grid = OpenMeteoService.fetch_global_wind(date_str, hour)
+        return jsonify(grid), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("global_wind_vectors_error", extra={"date": date_str, "error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 

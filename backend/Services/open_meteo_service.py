@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 _WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 _MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
+# Global background grid: 10° resolution, -80→80°N, -170→170°E = 17×35 = 595 points.
+_GLOBAL_LAT_STEP = 10
+_GLOBAL_LON_STEP = 10
+_GLOBAL_LATS = list(range(-80, 81, _GLOBAL_LAT_STEP))   # 17 values, south→north
+_GLOBAL_LONS = list(range(-170, 171, _GLOBAL_LON_STEP))  # 35 values, west→east
+
 _WEATHER_VARS = [
     "temperature_2m",
     "precipitation",
@@ -83,6 +89,17 @@ class OpenMeteoService:
         cache.set(cache_key, data)
         logger.info("open_meteo_weather_fetched", extra={"lat": lat, "lng": lng, "date": date_str})
         return data
+
+    @staticmethod
+    def fetch_global_wind(date_str: str, hour: int) -> dict:
+        """Fetch a global 10° wind velocity grid from OpenMeteo.
+
+        §8b — stub: returns empty grid. Real implementation queries OpenMeteo
+        at all 595 grid points (_GLOBAL_LATS × _GLOBAL_LONS), extracts U/V at
+        the requested hour, reverses row order (la1=80 north-first), and caches
+        with a 6 h TTL keyed by global_wind:{date}:{hour}.
+        """
+        return {"source": "global_weather", "grid": []}
 
     @staticmethod
     def fetch_marine(lat: float, lng: float, date_str: str) -> list[dict]:
