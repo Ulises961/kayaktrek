@@ -1,3 +1,13 @@
+---
+id: features
+title: "Features: Weather & Sea Data, Tidal Model & Expedition Log"
+abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables, leaflet-velocity overlays, and Celery dual-trigger expedition log auto-generation.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [weather, tidal, expedition-log, map]
+---
+
 # Features: Weather & Sea Data, Tidal Model & Expedition Log
 
 This document covers two concrete product features whose design required substantial decisions: how weather, sea, and tidal data is sourced, modelled, and displayed (M5); and how expedition logs are auto-generated at the close of each paddling day (M8).

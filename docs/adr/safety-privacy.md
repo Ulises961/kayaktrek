@@ -1,3 +1,13 @@
+---
+id: safety-privacy
+title: "Safety & Privacy: Float Plan, Medical Notes & Sharing"
+abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + ECIES E2E encryption for leader-visible copy, frozen snapshot sharing via opaque token with 30-day post-trip expiry.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [safety, privacy, encryption, float-plan]
+---
+
 # Safety & Privacy: Float Plan, Medical Notes & Sharing
 
 This document covers the float plan — the primary safety document for a sea kayaking expedition — and the privacy model that governs the sensitive data it contains. The float plan is treated as a safety-first feature, not a premium one.

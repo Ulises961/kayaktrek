@@ -1,3 +1,13 @@
+---
+id: trip-lifecycle
+title: "Trip Lifecycle: State Machine, Collaboration, Visibility & GDPR"
+abstract: Forward-only trip state machine (building→happening→past→archived), leader/crew authority split, itinerary visibility independent of trip privacy, pause/resume, and GDPR erasure with 30-day grace period.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [trip, state-machine, gdpr, collaboration]
+---
+
 # Trip Lifecycle: State Machine, Collaboration, Visibility & GDPR
 
 This document covers how a trip moves through its lifecycle — what states exist and what they gate, who controls what, how the itinerary's visibility is managed independently of trip privacy, and what happens to the data when the leader is gone.

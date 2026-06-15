@@ -1,3 +1,13 @@
+---
+id: foundation
+title: "Foundation: Infrastructure, Data Layer, Backend Patterns & Observability"
+abstract: Self-hosted stack (PostgreSQL/PostGIS, MinIO, RabbitMQ, Redis, Celery), UUID v7 keys, Alembic migrations, thin resource/service layer, structured JSON logging, and Logfire OTel plan.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [infrastructure, backend, observability]
+---
+
 # Foundation: Infrastructure, Data Layer, Backend Patterns & Observability
 
 This document covers the decisions that underpin every other part of the system — the stack we run on, how data is stored and identified, how the backend is structured, and how we observe it in production. These decisions were made early and have remained stable; they are the load-bearing walls of the architecture.

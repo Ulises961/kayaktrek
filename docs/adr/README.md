@@ -1,3 +1,13 @@
+---
+id: readme
+title: Architectural Decision Records
+abstract: Index of thematic ADR documents for the Kayak Expedition Planner.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: []
+---
+
 # Architectural Decision Records
 
 Decisions that shape the system are recorded here as a set of thematic knowledge-base documents. Each document covers a domain area as a coherent narrative — context, decisions made, consequences, and open questions — rather than isolated per-decision files.
