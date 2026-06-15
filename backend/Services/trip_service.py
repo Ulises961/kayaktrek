@@ -5,7 +5,7 @@ Trip Service - Business logic for trip operations.
 import logging
 import math
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import List
 from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID

@@ -1,3 +1,13 @@
+---
+id: itinerary-frontend
+title: "Itinerary & Frontend: Map-First UX, Next.js Architecture & the Builder Evolution"
+abstract: Map-first itinerary building (react-leaflet), Next.js 16 App Router with server actions, unified view/edit modes, drag-boundary day assignment, tile caching with OpenSeaMap priority, and GPX import/export.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [frontend, map, itinerary, tiles]
+---
+
 # Itinerary & Frontend: Map-First UX, Next.js Architecture & the Builder Evolution
 
 This document covers the frontend architecture and all decisions shaping the itinerary building experience — from the founding principle that the map is the primary surface, through the Next.js structural choices, to the detailed evolution of the itinerary builder across M4 and M4b.
@@ -80,20 +90,90 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 
 **View mode** (default on entry):
 - Full-bleed map with day colours.
-- Horizontal day strip: one card per day, like a weekly weather forecast. Cards show day number, date, distance, estimated paddling time, weather/sea summary chips (M5).
-- Clicking a day card expands to show the day's points with notes, type icons, and photos.
-- During `happening`: today's card is the hero — larger, front and centre. Past days greyed; future days readable.
-- During `past`: all days read-only.
+- Slim vertical day rail (left edge, ~112 px). Each entry shows: day number, date, Bft pill
+  (derived from `wind_speed_10m` in the day's `Weather` record; "—" if not yet fetched),
+  point count. Bft colour bands: 0–3 green · 4–5 amber · 6–7 orange · 8+ red.
+- Selecting a day opens a **feature drawer** (right panel, ~264 px, slides in). Three tabs
+  in order: **Route | Forecast | Tides** (see "Viewing mode — feature drawer" below).
+- Confirmed day boundaries visible in `PointListPane` as non-interactive dividers (day
+  label, date, distance). These are always present — not hidden behind a button.
+- During `past`: edit mode locked; drawer tabs are read-only.
 
 **Edit mode** (leader-only during `building` and `happening`):
 - The full M4b builder: PointListPane, drag-boundary editor, point dropping.
-- Entry: "Edit route" button in the top bar.
-- Exit: "Done" returns to view mode. Changes persisted via `apply-boundaries`.
-- During `past`: edit mode is locked.
+- Entry: `[Edit]` button in the top bar (or `[+ Add day]` which enters edit mode implicitly).
+- Confirmed boundary dividers become draggable in place — same visual, now interactive.
+- Exit: `[Apply]` commits via `apply-boundaries` and returns to view mode.
+  `[Cancel]` discards draft and returns to view mode.
+- During `past`: edit mode locked.
 
-Planning and happening are not distinct phases — a paddler adjusts the route throughout the expedition. Forcing a mode switch to make mid-expedition adjustments creates unnecessary friction. One page, one bundle, one set of tests.
+**Header states — PointListPane**:
 
-**Point detail — zoom-and-sheet interaction**: tapping a point card triggers a map `flyTo` and slides up a bottom sheet (~55 vh). The point centres in the visible map area above the sheet. Dismissing the sheet leaves the map at the zoomed level. A separate route (`/itinerary/[id]/point/[id]`) was rejected: navigation discards carousel position and day state.
+| Condition | Header |
+|-----------|--------|
+| `days.length === 0` | `[+ Add day]` only |
+| `days.length > 0`, view mode | `[Edit]` · `[+ Add day]` |
+| Edit mode active | `[Apply]` · `[Cancel]` |
+
+`[+ Add day]` from view mode enters edit mode then places the new handle. From edit mode
+it places another handle without exiting draft. Delete-day is no longer in the header — it
+lives on each BoundaryDivider in edit mode (generalised from "delete last" to "delete by
+dayId").
+
+**New handle placement**: when `[+ Add day]` is clicked, the new boundary is inserted at
+the midpoint of the last day's point range (`floor((startIdx + endIdx) / 2)`). The list
+auto-scrolls to show the new handle. If the last day has only one point the boundary lands
+immediately below it (zero-point new day; user must drag to assign at least one point —
+same constraint as today). No ghost divider is used: the handle is a standard
+interactive `BoundaryDivider` from the moment it appears.
+
+Planning and happening are not distinct phases — a paddler adjusts the route throughout
+the expedition. One page, one bundle, one set of tests.
+
+**Point detail — zoom-and-sheet interaction**: tapping a waypoint in the Route tab triggers
+a map `flyTo` and opens `PointDetailSheet` (existing component, unchanged). From within
+the sheet, tapping Notes or Images opens the **point detail modal** (see below).
+
+---
+
+## Viewing mode — feature drawer (M4c)
+
+Replaces `DayStrip` (horizontal bottom carousel) and `DayDetailPanel` (bottom accordion).
+The bottom of the map is kept free for the map canvas and the velocity overlays (M5 §8).
+
+### Feature drawer tabs
+
+**Route** — ordered waypoint list for the selected day. Each row: type icon, name,
+cumulative distance from day start. Tapping opens `PointDetailSheet` (unchanged).
+
+**Forecast** — read-only. Populated from the day's `Weather` and `Sea` records.
+- Wind & atmosphere: wind speed/direction, temperature, cloud cover, precipitation.
+- Sea state: wave height/period/direction, swell height, ocean current.
+- Hour slider in the drawer header controls the time slice for the map velocity overlays
+  and the data displayed; always visible regardless of which tab is active.
+- Empty state when no forecast fetched; shows fetch-prompt.
+
+**Tides** — mixed editable/read-only.
+- *Parameters* (editable): data source toggle (tide atlas from nearest station / manual),
+  HW time, HW height (m), springs–neaps coefficient (0–1 slider). Changes `PATCH`
+  to `/api/day/:id/sea`.
+- *Tidal gates* (read-only, calculated): fetched from `GET /api/day/:id/tidal-gates`.
+  Each gate shows passage name, slack time, and offset from HW in human-readable form.
+  Re-fetched after each parameter save.
+
+### Point detail modal
+
+Triggered from the Notes or Images slot in `PointDetailSheet`. Both slots open the same
+modal — no separate images-only lightbox.
+
+- Full-overlay `Dialog` (`z-[2000]`); shadcn `Dialog` handles focus trap and Escape.
+- Header: point name, type badge, coordinates (`lat°N · lon°E`).
+- Upper half (~42 %): image carousel. Prev/next chevrons; dot indicators; count badge.
+  Empty state when no images — no carousel rendered.
+- Lower half: `<textarea>` for notes with expedition-context placeholder.
+
+The point name and coordinates in the header serve as spatial orientation while writing
+notes or reviewing photos — the user never loses context of which waypoint they are on.
 
 ---
 
@@ -260,3 +340,5 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 | Unified sidebar, drag boundaries, first-class itinerary (M4b) | ADR-026 | 2026-05-25 | Supersedes ADR-024 §3 (mode-toggle), §4-sidebar, §9 (drop popover) |
 | Trip detail structure, view/edit modes, tile caching (M4b) | ADR-027 | 2026-05-26 | Partially supersedes ADR-020 on tab content and ordering |
 | OpenSeaMap nautical overlay — first-class layer, priority over Sentinel-2 | — | 2026-06-15 | Free XYZ transparent overlay; zero infra; must land before titiler/Sentinel-2 pipeline; Sentinel-2 deferred until beta validates need |
+| Planning flow redesign: always-visible boundaries, header states, midpoint handle placement (M4c) | — | 2026-06-15 | Supersedes ADR-026/027 on boundary-edit entry UX and PointListPane header; delete-day moves to BoundaryDivider |
+| Viewing mode: day rail + feature drawer, Route/Forecast/Tides tabs, point detail modal (M4c) | — | 2026-06-15 | Supersedes ADR-027 on view-mode layout; DayStrip and DayDetailPanel removed |

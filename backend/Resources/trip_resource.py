@@ -2,11 +2,8 @@ from http import HTTPStatus
 from typing import Any, Dict, cast
 from werkzeug.exceptions import HTTPException
 import logging
-from sqlalchemy.exc import IntegrityError
-from uuid import UUID
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
-from marshmallow import ValidationError
 from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
@@ -131,7 +128,7 @@ def post():
         return jsonify(TripSchema().dump(trip)), HTTPStatus.CREATED
     except HTTPException:
         raise
-    except IntegrityError as e:
+    except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
     except Exception as e:
         logger.exception(f"Error creating trip: {e}")

@@ -1,3 +1,13 @@
+---
+id: mobile-offline
+title: "Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration"
+abstract: PWA + GPX meets read-only offline needs; M9 React Native with WatermelonDB sync triggers only when live-expedition mutation use case is validated. MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
+status: accepted
+date: 2026-06-10
+deciders: []
+tags: [mobile, offline, sync, gps]
+---
+
 # Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration
 
 This document covers the design of the React Native mobile client (M9) — why offline-first is non-negotiable for a maritime app, how the local and server databases are kept in sync, how conflicts are resolved, what gets synced and what doesn't, and how external GPS devices fit into the position-tracking model.

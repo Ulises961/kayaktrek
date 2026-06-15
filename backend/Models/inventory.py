@@ -1,6 +1,3 @@
-import uuid_extension
-
-from Api.database import db
 from Models.base_model import BaseModel
 from sqlalchemy import UUID, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship

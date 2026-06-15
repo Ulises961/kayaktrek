@@ -10,7 +10,6 @@ Schedule: daily via Celery Beat (registered in Api/celery_app.py).
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 
 from Api.celery_app import celery_app
 from Api.database import db

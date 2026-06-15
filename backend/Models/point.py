@@ -1,6 +1,3 @@
-import uuid_extension
-
-from Api.database import db
 from geoalchemy2 import Geography
 from sqlalchemy import UUID, Numeric, Text, String, Enum, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship

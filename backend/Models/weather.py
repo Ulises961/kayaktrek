@@ -1,5 +1,5 @@
 from Api.database import db
-from sqlalchemy import UUID, Integer, String, ForeignKeyConstraint
+from sqlalchemy import UUID, String, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, TYPE_CHECKING
 from uuid import UUID as _UUID

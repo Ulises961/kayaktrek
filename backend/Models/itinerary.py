@@ -1,4 +1,3 @@
-from Api.database import db
 from sqlalchemy import UUID, Boolean, Numeric, ForeignKey, String, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING

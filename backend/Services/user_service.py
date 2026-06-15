@@ -16,9 +16,6 @@ from Api.database import db
 from Schemas.base_schema import camelcase
 from Services.crypto_service import encrypt, decrypt, generate_keypair
 from Services.storage_service import StorageService
-from Models.auth_token import AuthTokenType
-from Services.auth_service import AuthService
-from uuid import UUID
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
 

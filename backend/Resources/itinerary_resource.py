@@ -6,7 +6,6 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.itinerary_shema import ItinerarySchema, ItineraryPublicSchema, ItineraryExploreSchema
-from Models.itinerary import Itinerary
 from Api.database import db
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
