@@ -161,8 +161,11 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
           </Label>
           <Input
             id="highTide"
-            type="time"
-            className="h-8"
+            type="text"
+            inputMode="numeric"
+            placeholder="HH:MM"
+            maxLength={5}
+            className="h-8 text-xs tabular-nums"
             disabled={isPending}
             {...register("highTide")}
           />
@@ -173,8 +176,11 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
           </Label>
           <Input
             id="lowTide"
-            type="time"
-            className="h-8"
+            type="text"
+            inputMode="numeric"
+            placeholder="HH:MM"
+            maxLength={5}
+            className="h-8 text-xs tabular-nums"
             disabled={isPending}
             {...register("lowTide")}
           />
@@ -188,7 +194,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
             type="number"
             step="0.1"
             min={0}
-            className="h-8"
+            className="h-8 text-xs"
             disabled={isPending}
             {...register("tidalRangeM", numberOpts)}
           />
@@ -203,7 +209,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
           </Label>
           <Input
             id="referencePortName"
-            className="h-8"
+            className="h-8 text-xs"
             placeholder="e.g. Milford Haven"
             disabled={isPending}
             {...register("referencePortName")}
@@ -216,8 +222,11 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
             </Label>
             <Input
               id="baseHighTide"
-              type="time"
-              className="h-8"
+              type="text"
+              inputMode="numeric"
+              placeholder="HH:MM"
+              maxLength={5}
+              className="h-8 text-xs tabular-nums"
               disabled={isPending}
               {...register("baseHighTide")}
             />
@@ -230,7 +239,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               id="hwTimeOffsetMinutes"
               type="number"
               step="1"
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("hwTimeOffsetMinutes", numberOpts)}
             />
@@ -241,8 +250,11 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
             </Label>
             <Input
               id="baseLowTide"
-              type="time"
-              className="h-8"
+              type="text"
+              inputMode="numeric"
+              placeholder="HH:MM"
+              maxLength={5}
+              className="h-8 text-xs tabular-nums"
               disabled={isPending}
               {...register("baseLowTide")}
             />
@@ -255,7 +267,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               id="lwTimeOffsetMinutes"
               type="number"
               step="1"
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("lwTimeOffsetMinutes", numberOpts)}
             />
@@ -269,7 +281,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.1"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("baseHwHeightM", numberOpts)}
             />
@@ -283,7 +295,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.01"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("hwHeightRatio", numberOpts)}
             />
@@ -297,7 +309,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.1"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("baseLwHeightM", numberOpts)}
             />
@@ -311,7 +323,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.01"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("lwHeightRatio", numberOpts)}
             />
@@ -351,7 +363,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               step="1"
               min={0}
               max={360}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("floodDirectionDegrees", numberOpts)}
             />
@@ -366,7 +378,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               step="1"
               min={0}
               max={360}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("ebbDirectionDegrees", numberOpts)}
             />
@@ -380,7 +392,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.1"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("maxSpringRateKnots", numberOpts)}
             />
@@ -394,7 +406,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
               type="number"
               step="0.1"
               min={0}
-              className="h-8"
+              className="h-8 text-xs"
               disabled={isPending}
               {...register("maxNeapRateKnots", numberOpts)}
             />

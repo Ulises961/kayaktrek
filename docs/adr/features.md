@@ -151,9 +151,14 @@ This method returns warnings surfaced on the day detail panel and as marker anno
 |-------|--------|---------|
 | Wind (animated particles) | `WeatherState.wind_force` / `wind_direction` | **On** |
 | Swell (animated particles) | `SeaState.swell_wave_height` / `swell_wave_direction` | **On** |
-| Tidal stream (animated particles) | `TidalStation`/`TidalStreamEntry` or `Sea` manual fields | On when station data present |
+| ~~Tidal stream (animated particles)~~ | — | **Superseded by §6a (M4d)** |
 
-**Tidal stream layer — two sources, one layer, priority fallback**:
+> **Superseded (M4d).** Rendering a tidal stream as a continuous particle field was wrong: a tidal
+> stream is a *point* phenomenon (a tidal diamond), not a field, and a wind-like flow misrepresents
+> it. See **§6a — Tidal streams as chart diamonds**. Wind and swell remain particle fields — they
+> genuinely are fields.
+
+**Tidal stream layer — two sources, one layer, priority fallback** *(superseded — see §6a)*:
 
 1. `TidalStation` / `TidalStreamEntry` within the day's bounding box (hydrographic, highest accuracy): per-station vectors synthesised into a local velocity grid. Spatially varying.
 2. `Sea` manual stream fields (`flood_direction_degrees` etc.) when no station coverage: uniform vector field for the whole day's bounding box. Clearly labelled as "manually entered (atlas / local knowledge)".
@@ -165,6 +170,36 @@ OpenMeteo ocean current vectors remain stored in `SeaState` but are not exposed 
 - Wind: Beaufort-matched — green (B0–3) → yellow (B4–5) → orange (B6–7) → red (B8+)
 - Swell: height-matched — green (< 0.5 m) → yellow (0.5–1.5 m) → orange (1.5–2.5 m) → red (> 2.5 m)
 - Tidal stream: speed-matched — green (< 1 kn) → yellow (1–2 kn) → orange (2–3 kn) → red (> 3 kn)
+
+### 6a. Tidal streams as chart diamonds (M4d) — supersedes the §6 stream-particle decision
+
+A tidal stream is documented in atlases and skippers' charts as a **tidal diamond**: a single
+labelled point with a flow direction and rate that varies by the hour relative to HW, valid over a
+small radius. This is exactly what the existing data model already captures — `TidalStation` (a POINT
+location + mean spring range) and `TidalStreamEntry` (per-`hours_from_hw` direction + spring/neap
+rate). The §6 decision discarded that structure by smearing each diamond into a uniform velocity
+grid; M4d renders the diamonds directly.
+
+**Rendering**: each in-range diamond is a chart-style ◇ marker at its real lat/lng with a direction
+arrow, a rate label ("1.8 kn"), the existing speed colour ramp, and a faint **radius circle**
+(display-only, default ~500 m, **user-configurable per diamond** via `radius_m`). Click → popup with
+the hour-by-hour rate/direction table. Diamonds re-resolve as the hour slider moves. Tidal stream is
+removed from the `leaflet-velocity` layer; wind/swell stay particle fields.
+
+**User-created diamonds**: `TidalStation` gains nullable `itinerary_id`, `created_by_user_id`,
+`radius_m`, `entry_mode` (`atlas | simple`). Any trip member can drop a pin and enter data; it is
+persisted as a trip-scoped station (not a route `Point` — the route linked list stays clean, and the
+existing `ST_DWithin` tidal-gate logic picks user diamonds up for free). Global seeded stations keep
+null ownership and stay read-only to users.
+
+**Rate model**: atlas diamonds carry actual per-hour rates (spring↔neap interpolated by the day's
+range vs `mean_spring_range_m`). The simplified "I only know the peak rate" entry is expanded across
+the cycle by the **rule of thirds** — `1/3, 2/3, 3/3, 3/3, 2/3, 1/3` of max rate from slack — the
+speed analogue of the rule of 12s (already implemented in `TidalService.stream_rate_from_sea`). Saved
+simple-mode entries are synthesised into `TidalStreamEntry` rows so the read path stays uniform.
+
+**Out of scope (roadmap):** automated tidal fetch via a user-supplied API key (BYOK) fills the same
+diamond entities once the manual model exists. See ROADMAP.
 
 **react-leaflet integration pattern** — `leaflet-velocity` is a vanilla Leaflet plugin with no react-leaflet wrapper. The correct integration is a `"use client"` component that:
 
@@ -303,3 +338,4 @@ GPS tracks on log records are personal data. Apply the same GDPR erasure rules a
 |----------|-------------|------|-------|
 | Weather & sea: OpenMeteo, tidal model, rule of 12s, velocity overlays, UI language | ADR-028 | 2026-05-27 | Tidal automation deferred; manual path comprehensive in M5; `Sea` schema ready for automation |
 | Expedition log auto-generation — Celery dual-trigger | ADR-021 | 2026-05-11 | Requires M8 GPS infrastructure; stub logs for trips without GPS data |
+| Tidal streams as chart diamonds, not a velocity field (supersedes §6 stream-particles); trip-scoped user-created diamonds; rule of thirds for simple entry; BYOK tidal API deferred to roadmap | M4d | 2026-06-18 | §6a; reuses `TidalStation`/`TidalStreamEntry`; radius display-only, user-configurable (~500 m default) |

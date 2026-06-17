@@ -196,8 +196,12 @@ export function FeatureDrawer() {
           <div className="flex flex-col gap-3 p-3">
             {hasForecast ? (
               <>
-                {!!weather?.weatherStates?.length && <WeatherGrid states={weather.weatherStates} />}
-                {!!sea?.seaStates?.length && <SeaGrid states={sea.seaStates} />}
+                {!!weather?.weatherStates?.length && (
+                  <WeatherGrid states={weather.weatherStates} selectedHour={selectedHour} />
+                )}
+                {!!sea?.seaStates?.length && (
+                  <SeaGrid states={sea.seaStates} selectedHour={selectedHour} />
+                )}
                 {canFetch && (
                   <button
                     type="button"

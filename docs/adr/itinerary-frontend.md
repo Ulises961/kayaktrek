@@ -360,6 +360,23 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 
 ---
 
+## Tidal diamonds — drop-a-pin manual entry (M4d)
+
+Tidal streams stop being a `leaflet-velocity` flow field (see `features.md §6a` for the full
+rationale) and become **chart diamonds**: discrete ◇ markers at a real location, with a direction
+arrow, a rate label, the speed colour ramp, and a faint user-configurable radius circle (default
+~500 m). Click → popup with the hour-by-hour rate table.
+
+**Entry UX**: any trip member can drop a diamond pin on the sea and enter its data in a popup, with
+**simple** (peak rate + flood/ebb direction, expanded across the cycle by the rule of thirds) and
+**advanced** (full atlas hour table) modes. Persisted as a trip-scoped `TidalStation`, *not* a route
+`Point` — the route linked list stays clean and existing tidal-gate proximity logic picks user
+diamonds up automatically. Forms follow the react-hook-form + zod + `lib/dtos` pattern.
+
+**Tides tab**: keeps day-level height entry only (HW/LW/range, rule-of-12s table, gate warnings).
+The stream-data section moves to the diamond popup. The tab is read-only for non-leaders and shows
+an empty state (not a form) when no tidal data exists.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -375,3 +392,4 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 | Viewing mode: day rail + feature drawer, Route/Forecast/Tides tabs, point detail modal (M4c) | — | 2026-06-15 | Supersedes ADR-027 on view-mode layout; DayStrip and DayDetailPanel removed |
 | App-wide date UI: shared `DatePicker` (shadcn Popover+Calendar) for editing, `d MMM yyyy` (`formatDayDate`) for display; boundary handle styled as draggable Day 1 header; Day 1 is the permanent anchor; day rail shows all numbered days with placeholders, empty days greyed/disabled (M4c) | — | 2026-06-16 | Replaces native `<input type=date>` (locale mm/dd/yyyy) and interim DD/MM/YYYY text input; drag confined to grip so inline picker works |
 | View-mode weather fetch (`useDayConditions` hook, Forecast-tab fetch/refresh, `conditionsVersion` rail refresh); point detail = summary bottom sheet → full detail modal; wireframe layout parity (M4c §6–§8) | — | 2026-06-17 | Weather no longer fetchable only from edit/top-bar; `PointDetailSheet` reworked from all-in-one to tiles; matches `ItineraryLayoutWireframe` |
+| Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d) | — | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass |

@@ -38,7 +38,12 @@ class SeaService:
 
     @staticmethod
     def update(day_id: str, data: dict) -> Sea:
-        sea = SeaService.get_by_day_id(day_id)
+        # Upsert: Sea is a 1:1 sub-resource of Day, lazily materialised on first edit.
+        # The frontend only ever PATCHes, so delegate to create() the first time rather
+        # than 404ing the first save for a day.
+        sea = db.session.query(Sea).filter_by(day_id=day_id).one_or_none()
+        if sea is None:
+            return SeaService.create(day_id, data)
         for key in _MUTABLE:
             if key in data:
                 setattr(sea, key, data[key])

@@ -51,4 +51,16 @@ describe("WeatherGrid", () => {
     expect(screen.getByLabelText("10% cloud")).toBeInTheDocument()
     expect(screen.getByLabelText("70% cloud")).toBeInTheDocument()
   })
+
+  it("marks the card matching selectedHour as active", () => {
+    const { container } = render(<WeatherGrid states={states} selectedHour={12} />)
+    const active = container.querySelectorAll("[data-active]")
+    expect(active).toHaveLength(1)
+    expect(active[0]).toHaveTextContent("12:00")
+  })
+
+  it("marks no card active when selectedHour matches no state", () => {
+    const { container } = render(<WeatherGrid states={states} selectedHour={3} />)
+    expect(container.querySelectorAll("[data-active]")).toHaveLength(0)
+  })
 })

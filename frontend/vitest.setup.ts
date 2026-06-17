@@ -9,6 +9,12 @@ if (!Element.prototype.setPointerCapture) {
   Element.prototype.hasPointerCapture = () => false
 }
 
+// jsdom does not implement Element.scrollTo. The forecast carousels call it to centre
+// the card matching the map's hour slider.
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => {}
+}
+
 // jsdom does not implement ResizeObserver. The map's ResizeHandler observes its
 // container to call Leaflet's invalidateSize() when the side panels resize it.
 if (typeof globalThis.ResizeObserver === "undefined") {

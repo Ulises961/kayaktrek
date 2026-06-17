@@ -39,37 +39,46 @@ export type MapCoreProps = {
 
 // Module-level constants so options objects are stable across renders.
 // leaflet-velocity needs hex colors — CSS custom properties are not resolved by canvas.
-// Wind: Windy.com / earth.nullschool Spectral palette — calm blue → gale deep red.
+// Wind: saturated calm-blue → gale-red ramp. The earlier Spectral palette had pastel
+// green/yellow midtones (the most common light-wind range) that washed out against the
+// light-blue sea tiles, so every stop here is high-chroma to stay legible over water.
 const WIND_SCALE = [
-  "#3288bd",
-  "#66c2a5",
-  "#abdda4",
-  "#e6f598",
-  "#fffdbf",
-  "#fdae61",
-  "#f46d43",
-  "#d53e4f",
-  "#9e0142",
+  "#0d47a1",
+  "#0091ea",
+  "#00bfa5",
+  "#00c853",
+  "#aeea00",
+  "#ffd600",
+  "#ff9100",
+  "#ff3d00",
+  "#d50000",
 ]
+// Particle density (particleMultiplier) and lineWidth are tuned sparser + thicker
+// across all layers so individual streaks read clearly instead of blurring into a
+// dense field. velocityScale is left forecast-driven — particle speed reflects the
+// actual modelled wind/wave/stream speed, not a cosmetic constant.
 const WIND_OPTIONS = {
   velocityScale: 0.005,
   colorScale: WIND_SCALE,
   particleAge: 64,
-  lineWidth: 2,
+  lineWidth: 2.5,
+  particleMultiplier: 0.0016,
 }
 // Swell: white — direction matters more than speed, matches standard chart convention.
 const SWELL_OPTIONS = {
   velocityScale: 0.012,
   colorScale: ["#ffffff", "#e8f4fc"],
   particleAge: 90,
-  lineWidth: 3,
+  lineWidth: 3.5,
+  particleMultiplier: 0.0014,
 }
 // Tidal stream: blue-purple ramp indicating current strength.
 const TIDAL_OPTIONS = {
   velocityScale: 0.05,
   colorScale: ["#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
   particleAge: 64,
-  lineWidth: 2,
+  lineWidth: 3,
+  particleMultiplier: 0.0016,
 }
 // Global background: sparser, slower particles to show large-scale atmospheric context.
 // §8b fills the data; for now the backend stub returns an empty grid.
@@ -171,6 +180,32 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
     const offsetLatLng = map.unproject([px.x, px.y + sheetOffset] as [number, number], zoom)
     map.flyTo(offsetLatLng, zoom, { animate: true, duration: 0.6 })
   }, [flyToPoint, map])
+
+  return null
+}
+
+// ── FitBoundsController ───────────────────────────────────────────────────────
+
+// On first load, frame the map around the actual route rather than the continent-scale
+// default zoom — a kayak trip spans at most a few hundred miles, so a far-out view just
+// collapses the itinerary and velocity layers. Fits once: it does not re-frame while the
+// user edits (that would yank the view every time a pin is dropped). maxZoom caps how far
+// in a single point / tight cluster zooms.
+function FitBoundsController({ points }: { points: ValidPoint[] }) {
+  const map = useMap()
+  const hasFitRef = useRef(false)
+
+  useEffect(() => {
+    if (hasFitRef.current || points.length === 0) return
+    const lats = points.map((p) => p.latitude)
+    const lngs = points.map((p) => p.longitude)
+    const bounds: [[number, number], [number, number]] = [
+      [Math.min(...lats), Math.min(...lngs)],
+      [Math.max(...lats), Math.max(...lngs)],
+    ]
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 13 })
+    hasFitRef.current = true
+  }, [points, map])
 
   return null
 }
@@ -403,14 +438,22 @@ export default function MapCore({
         !viewMode && "[&_.leaflet-container]:cursor-crosshair",
       )}
     >
-      <MapContainer center={[43, 13]} zoom={6} className="h-full w-full" zoomControl>
+      <MapContainer center={[43, 13]} zoom={9} className="h-full w-full" zoomControl>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        {/* OpenSeaMap seamark overlay — transparent nautical chart tiles (buoys, beacons,
+            depth/seamark data) layered over the OSM base. Default-on: go/no-go relevant
+            for kayak planning. Decided in docs/adr/itinerary-frontend.md. */}
+        <TileLayer
+          attribution='Seamarks &copy; <a href="https://www.openseamap.org">OpenSeaMap</a>'
+          url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
+        />
 
         {!viewMode && <MapEvents onMapClick={onMapClick} />}
         <ResizeHandler />
+        <FitBoundsController points={validPoints} />
         <FlyToController flyToPoint={flyToPoint} />
 
         {segments.map((seg) => {

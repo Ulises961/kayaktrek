@@ -72,10 +72,15 @@ def test_patch_sea_updates_fields(client, auth_headers, itinerary):
     _cleanup_sea(day_id)
 
 
-def test_patch_sea_404_when_not_exists(client, auth_headers, itinerary):
+def test_patch_sea_upserts_when_not_exists(client, auth_headers, itinerary):
+    # Sea is lazily materialised: the first PATCH for a day creates the record
+    # rather than 404ing, since the frontend only ever PATCHes.
     day_id = itinerary["days"][0]["id"]
     resp = client.patch(f"/api/day/{day_id}/sea", json={"tidalRangeM": 1.0}, headers=auth_headers)
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.get_json()["tidalRangeM"] == pytest.approx(1.0)
+
+    _cleanup_sea(day_id)
 
 
 def test_get_sea_returns_created_record(client, auth_headers, itinerary):
