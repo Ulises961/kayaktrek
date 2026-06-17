@@ -87,6 +87,18 @@ The `TripMemberSchema` exposes `has_leader_medical_notes` (boolean) — the lead
 
 Users registered before this feature deployed have `public_key = NULL`. On their next login the frontend detects `hasKeypair: false` and prompts for a one-time keypair generation. Existing `TripMember.medical_notes` plaintext rows are nulled in the migration.
 
+### Password reset — unavoidable data loss
+
+A keypair's private key (and `User.medical_notes_ciphertext`) is wrapped with a key derived from the user's password. A **password change** can re-wrap it because the old password is supplied. A **forgot-password reset** cannot — the old password is gone, so the wrapped key is permanently undecryptable. `reset_password` therefore clears the keypair and all medical-notes ciphertext; holding orphaned, unreadable ciphertext would only mislead the UI.
+
+The data loss is unavoidable, so the design makes it **visible and recoverable** rather than silent:
+
+- When a reset actually wiped notes (`medical_notes_ciphertext` was non-null), `User.medical_notes_reset_at` is stamped and a `medical_notes_cleared` email is sent. Users who never stored notes are neither flagged nor emailed.
+- `medical_notes_reset_at` is exposed via `UserSchema` (`medicalNotesResetAt`, dump-only). The profile medical section and the trip float-plan medical tab render a re-entry prompt while it is set.
+- Re-entering notes (`grant_medical_consent`) or explicitly opting out (`revoke_medical_consent`) clears the flag.
+
+This was deliberately chosen over the alternative of prompting the user to re-enter notes *during* the reset flow, which would require holding plaintext through an unauthenticated reset — a worse security posture.
+
 ---
 
 ## Float plan sharing — frozen snapshot, opaque token
@@ -179,3 +191,4 @@ Expired tokens are not automatically nulled — they simply return 404. A Celery
 | Float plan as computed view | ADR-018 | 2026-05-09 | No `FloatPlan` table; copy-on-join + consent-to-share model |
 | Float plan sharing — frozen snapshot | ADR-022 | 2026-05-16 | Supersedes ADR-018 §"Float plan delivery"; medical notes excluded from snapshot |
 | Medical notes ECIES encryption | ADR-023 | 2026-05-16 | Amends ADR-018 §"Medical notes — copy-on-join, consent-to-share"; plaintext column dropped |
+| Password-reset medical-notes data loss — notify + re-entry prompt | — | 2026-06-16 | Reset clears unreadable ciphertext; `medical_notes_reset_at` flag + `medical_notes_cleared` email + in-app prompt; rejected re-entry during the reset flow (would hold plaintext unauthenticated). Closes 2026-06-11 security review Step 4. |

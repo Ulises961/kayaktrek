@@ -56,6 +56,34 @@ describe("MedicalNotesSection — idle state", () => {
   })
 })
 
+describe("MedicalNotesSection — reset prompt", () => {
+  it("shows a re-entry prompt when resetAt is set and no notes are stored", () => {
+    render(<MedicalNotesSection hasStoredNotes={false} resetAt="2026-06-16T10:00:00Z" />)
+    expect(screen.getByText(/reset your password/i)).toBeDefined()
+    expect(screen.getByText(/re-enter/i)).toBeDefined()
+  })
+
+  it("does not show the prompt when resetAt is absent", () => {
+    render(<MedicalNotesSection hasStoredNotes={false} />)
+    expect(screen.queryByText(/reset your password/i)).toBeNull()
+  })
+
+  it("hides the prompt once notes have been re-entered", async () => {
+    vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
+    render(<MedicalNotesSection hasStoredNotes={false} resetAt="2026-06-16T10:00:00Z" />)
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
+    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, notes: null })
+    await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
+    await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
+    await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
+    await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
+    await userEvent.click(screen.getByRole("button", { name: /done/i }))
+    expect(screen.queryByText(/reset your password/i)).toBeNull()
+  })
+})
+
 describe("MedicalNotesSection — authenticating state", () => {
   it("shows a password field and Continue button after clicking Edit", async () => {
     render(<MedicalNotesSection hasStoredNotes={true} />)

@@ -2,12 +2,12 @@ import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from Api.database import db
+from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
-from Services.auth_service import AuthService
+from Schemas.user_schema import UserSchema
+from Services.user_service import UserService
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +255,77 @@ class TestPasswordReset:
     def test_forgot_password_missing_mail_returns_400(self, client):
         r = client.post("/api/auth/forgot-password", json={})
         assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Medical-notes data loss on reset (security remediation Step 4)
+# ---------------------------------------------------------------------------
+
+class TestMedicalNotesReset:
+
+    def _activated_user(self, client):
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
+        user.active = True
+        db.session.commit()
+        return d, user
+
+    def test_reset_with_notes_clears_data_sets_flag_and_emails(self, app, client):
+        """A user who had medical notes gets them wiped, the reset flag set, and an email."""
+        d, user = self._activated_user(client)
+        user.medical_notes_ciphertext = "ciphertext"
+        user.medical_notes_nonce = "nonce"
+        user.medical_notes_salt = "salt"
+        user.public_key = "pubkey"
+        db.session.commit()
+        raw = _insert_token(user.id, AuthTokenType.RESET)
+
+        with mail.record_messages() as outbox:
+            r = client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewSecure9$"})
+        assert r.status_code == 200
+
+        db.session.refresh(user)
+        assert user.medical_notes_ciphertext is None
+        assert user.medical_notes_reset_at is not None
+        assert any("medical notes" in m.subject.lower() for m in outbox)
+
+    def test_reset_without_notes_no_flag_no_email(self, app, client):
+        """A user with no medical notes is not flagged and not emailed about data loss."""
+        d, user = self._activated_user(client)
+        raw = _insert_token(user.id, AuthTokenType.RESET)
+
+        with mail.record_messages() as outbox:
+            r = client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewSecure9$"})
+        assert r.status_code == 200
+
+        db.session.refresh(user)
+        assert user.medical_notes_reset_at is None
+        assert not any("medical notes" in m.subject.lower() for m in outbox)
+
+    def test_reset_flag_exposed_in_user_schema(self, app, client):
+        """medical_notes_reset_at is serialised (camelCase) so the UI can drive the prompt."""
+        _, user = self._activated_user(client)
+        user.medical_notes_ciphertext = "ciphertext"
+        db.session.commit()
+        raw = _insert_token(user.id, AuthTokenType.RESET)
+        client.post("/api/auth/reset-password", json={"token": raw, "pwd": "NewSecure9$"})
+
+        db.session.refresh(user)
+        dumped = UserSchema().dump(user)
+        assert dumped.get("medicalNotesResetAt") is not None
+
+    def test_granting_consent_clears_reset_flag(self, app, client):
+        """Re-entering notes dismisses the pending reset prompt."""
+        _, user = self._activated_user(client)
+        user.medical_notes_reset_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        UserService.grant_medical_consent(str(user.id), "Allergic to penicillin", "AuthFlow9$")
+
+        db.session.refresh(user)
+        assert user.medical_notes_reset_at is None
+        assert user.medical_notes_ciphertext is not None
 
 
 # ---------------------------------------------------------------------------

@@ -30,6 +30,8 @@ interface TripDetailTabsProps {
   currentMemberId?: string
   currentUserId?: string
   leaderId?: string
+  /** Current user's medical-notes reset flag — drives the re-entry prompt on the float-plan tab. */
+  medicalNotesResetAt?: string | null
 }
 
 export function TripDetailTabs({
@@ -45,6 +47,7 @@ export function TripDetailTabs({
   currentMemberId,
   currentUserId,
   leaderId,
+  medicalNotesResetAt,
 }: TripDetailTabsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -94,7 +97,11 @@ export function TripDetailTabs({
 
       {currentMember && (
         <TabsContent value="float-plan" className="p-6 pt-5">
-          <FloatPlanTab tripId={tripId} currentMember={currentMember} />
+          <FloatPlanTab
+            tripId={tripId}
+            currentMember={currentMember}
+            medicalNotesResetAt={medicalNotesResetAt}
+          />
         </TabsContent>
       )}
 
