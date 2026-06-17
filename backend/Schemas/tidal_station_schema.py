@@ -1,10 +1,19 @@
 import bleach
-from marshmallow import fields, validates, ValidationError, post_load
+from marshmallow import fields, pre_load, validates, ValidationError, post_load
 
 from Models.tidal_station import TidalStation
 from Schemas.base_schema import BaseSchema
 from Schemas.geometry_field import GeometryField
 from Schemas.tidal_stream_entry_schema import TidalStreamEntrySchema
+
+_SANITIZE_FIELDS = ("name", "source", "notes")
+
+
+def _sanitize_station_text(data):
+    for key in _SANITIZE_FIELDS:
+        if data.get(key) is not None:
+            data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+    return data
 
 
 class TidalStationSchema(BaseSchema):
@@ -17,12 +26,15 @@ class TidalStationSchema(BaseSchema):
         fields.Nested(TidalStreamEntrySchema), allow_none=True, load_default=[]
     )
 
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        return _sanitize_station_text(data)
+
     @validates("name")
     def validate_name(self, value, **kwargs):
-        sanitized = bleach.clean(value.strip(), tags=[], strip=True)
-        if len(sanitized) == 0:
+        if len(value.strip()) == 0:
             raise ValidationError("Station name cannot be empty")
-        if len(sanitized) > 255:
+        if len(value) > 255:
             raise ValidationError("Station name cannot exceed 255 characters")
 
     @validates("mean_spring_range_m")
@@ -46,12 +58,15 @@ class TidalStationUpdateSchema(BaseSchema):
     notes = fields.String(allow_none=True)
     mean_spring_range_m = fields.Float(allow_none=True)
 
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        return _sanitize_station_text(data)
+
     @validates("name")
     def validate_name(self, value, **kwargs):
-        sanitized = bleach.clean(value.strip(), tags=[], strip=True)
-        if len(sanitized) == 0:
+        if len(value.strip()) == 0:
             raise ValidationError("Station name cannot be empty")
-        if len(sanitized) > 255:
+        if len(value) > 255:
             raise ValidationError("Station name cannot exceed 255 characters")
 
     @validates("mean_spring_range_m")

@@ -24,7 +24,7 @@ export const LogisticsFieldsSchema = z.object({
     .refine(noHtmlTags.check, noHtmlTags.message)
     .optional(),
   shuttleNotes: z.string().max(1000).refine(noHtmlTags.check, noHtmlTags.message).optional(),
-  shuttleMeetingTime: z.string().max(50).optional(),
+  shuttleMeetingTime: z.string().max(50).refine(noHtmlTags.check, noHtmlTags.message).optional(),
 })
 
 export type Logistics = z.infer<typeof LogisticsSchema>

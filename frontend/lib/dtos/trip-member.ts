@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { noHtmlTags } from "../validators"
 import { TravellerSchema } from "./user"
 
 export const TripMemberSchema = z.object({
@@ -24,17 +25,21 @@ export type TripMember = z.infer<typeof TripMemberSchema>
 
 // Form validation for PATCH /api/trip/:id/member/me
 export const FloatPlanFormSchema = z.object({
-  vesselMake: z.string().max(100).optional(),
-  vesselModel: z.string().max(100).optional(),
+  vesselMake: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  vesselModel: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselLengthCm: z
     .string()
     .optional()
     .refine((val) => !val || /^\d+$/.test(val), "Must be a positive integer"),
-  vesselColorPrimary: z.string().max(50).optional(),
-  vesselColorSecondary: z.string().max(50).optional(),
-  emergencyContactName: z.string().max(200).optional(),
+  vesselColorPrimary: z.string().max(50).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  vesselColorSecondary: z.string().max(50).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  emergencyContactName: z.string().max(200).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   emergencyContactPhone: z.string().max(20).optional(),
-  emergencyContactRelationship: z.string().max(100).optional(),
+  emergencyContactRelationship: z
+    .string()
+    .max(100)
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
 })
 
 export type FloatPlanFormValues = z.infer<typeof FloatPlanFormSchema>

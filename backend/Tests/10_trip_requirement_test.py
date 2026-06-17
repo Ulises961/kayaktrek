@@ -50,6 +50,23 @@ def test_add_requirement(client, auth_headers, trip_with_crew):
     assert data['contributors'] == []
 
 
+def test_add_requirement_strips_html(client, auth_headers, trip_with_crew):
+    """Free-text name and category have HTML stripped before storage."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    response = _add_requirement(
+        client, auth_headers, inventory_id,
+        name="<script>xss</script>First Aid Kit",
+        category="<b>first_aid</b>",
+    )
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    for field in ("name", "category"):
+        assert "<" not in data[field] and ">" not in data[field], (
+            f"HTML not stripped from {field}: {data[field]!r}"
+        )
+
+
 def test_add_requirement_crew_member(client, trip_with_crew):
     """Crew members can also add requirements (no leader restriction on this endpoint)."""
     inventory_id = trip_with_crew['trip']['inventory']['id']

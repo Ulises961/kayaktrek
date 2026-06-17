@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { LogSchema, LogPageSchema } from "../log"
+import { LogSchema, LogPageSchema, LogFieldsSchema } from "../log"
 
 const LOG_FIXTURE = {
   id: "01952f1a-0000-7000-8000-000000000020",
@@ -79,5 +79,15 @@ describe("LogPageSchema", () => {
   it("rejects a response missing total", () => {
     const { total: _, ...noTotal } = page
     expect(LogPageSchema.safeParse(noTotal).success).toBe(false)
+  })
+})
+
+describe("LogFieldsSchema", () => {
+  it("accepts plain-text notes", () => {
+    expect(LogFieldsSchema.safeParse({ notes: "Calm seas, F2 from the NW." }).success).toBe(true)
+  })
+
+  it("rejects HTML tags in notes", () => {
+    expect(LogFieldsSchema.safeParse({ notes: "<script>xss</script>" }).success).toBe(false)
   })
 })

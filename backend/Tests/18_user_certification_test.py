@@ -82,6 +82,25 @@ def test_add_certification_success(client, auth_headers):
     assert "id" in data
 
 
+def test_add_certification_strips_html(client, auth_headers):
+    headers = _elevated_headers(client, auth_headers)
+    response = client.post(
+        CERT_ENDPOINT,
+        json={
+            "organization": "<script>xss</script>BCU",
+            "award": "4 Star <b>Sea</b> Kayak",
+            "membershipNumber": "<img src=x>BCU-1",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    for field in ("organization", "award", "membershipNumber"):
+        assert "<" not in data[field] and ">" not in data[field], (
+            f"HTML not stripped from {field}: {data[field]!r}"
+        )
+
+
 def test_add_certification_with_expiry(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
     response = client.post(CERT_ENDPOINT, json=_BLSD_CERT, headers=headers)
