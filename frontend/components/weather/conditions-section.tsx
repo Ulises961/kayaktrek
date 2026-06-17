@@ -1,20 +1,10 @@
 "use client"
-import { useCallback, useEffect, useState, useTransition } from "react"
+import { useState } from "react"
 import { ChevronDown, RefreshCw, Navigation2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  fetchDayWeather,
-  fetchDaySea,
-  fetchTidalGates,
-  triggerWeatherFetch,
-} from "@/lib/weather/actions"
-import {
-  knotsToBeaufort,
-  beaufortLabel,
-  degreesToCompass,
-  combinedSeaState,
-} from "@/lib/weather/beaufort"
+import { useDayConditions } from "@/lib/weather/use-day-conditions"
+import { beaufortLabel, degreesToCompass, combinedSeaState } from "@/lib/weather/beaufort"
 import { representativeHour } from "@/lib/weather/hourly"
 import { ConditionsBadge } from "@/components/weather/conditions-badge"
 import { WeatherGrid } from "@/components/weather/weather-grid"
@@ -23,8 +13,6 @@ import { TidalEntryForm } from "@/components/weather/tidal-entry-form"
 import { RuleOfTwelfthsTable } from "@/components/weather/rule-of-twelfths-table"
 import { TidalGateWarnings } from "@/components/weather/tidal-gate-warnings"
 import type { Sea } from "@/lib/dtos/sea"
-import type { Weather } from "@/lib/dtos/weather"
-import type { TidalGateWarning } from "@/lib/dtos/tidal-station"
 
 interface ConditionsSectionProps {
   dayId: string
@@ -78,38 +66,7 @@ function Accordion({
 export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
   const [hourlyOpen, setHourlyOpen] = useState(false)
   const [tidalOpen, setTidalOpen] = useState(false)
-  const [weather, setWeather] = useState<Weather | null>(null)
-  const [sea, setSea] = useState<Sea | null>(null)
-  const [gates, setGates] = useState<TidalGateWarning[]>([])
-  const [isRefreshing, startRefresh] = useTransition()
-
-  const load = useCallback(() => {
-    fetchDayWeather(dayId).then((r) => r.success && setWeather(r.data))
-    fetchDaySea(dayId).then((r) => r.success && setSea(r.data))
-    fetchTidalGates(dayId).then((r) => r.success && setGates(r.data))
-  }, [dayId])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  function handleRefresh() {
-    startRefresh(async () => {
-      const result = await triggerWeatherFetch(dayId)
-      if (!result.success) return
-      // Poll until both weather and sea states arrive from the Celery task.
-      for (let i = 0; i < 10; i++) {
-        await new Promise<void>((res) => setTimeout(res, 2000))
-        const [wr, sr] = await Promise.all([fetchDayWeather(dayId), fetchDaySea(dayId)])
-        const gotWeather = wr.success && (wr.data.weatherStates?.length ?? 0) > 0
-        const gotSea = sr.success && (sr.data.seaStates?.length ?? 0) > 0
-        if (gotWeather) setWeather(wr.data)
-        if (gotSea) setSea(sr.data)
-        if (gotWeather && gotSea) return
-      }
-      load()
-    })
-  }
+  const { weather, sea, gates, isRefreshing, refresh, setSea } = useDayConditions(dayId)
 
   const weatherStates = weather?.weatherStates ?? []
   const seaStates = sea?.seaStates ?? []
@@ -173,7 +130,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
             variant="ghost"
             size="sm"
             className="h-6 shrink-0 gap-1 text-xs"
-            onClick={handleRefresh}
+            onClick={refresh}
             disabled={isRefreshing}
           >
             <RefreshCw className={cn("size-3", isRefreshing && "animate-spin")} aria-hidden />

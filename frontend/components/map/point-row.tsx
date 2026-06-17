@@ -69,7 +69,13 @@ export function PointRow({
       data-testid="point-row"
       className="bg-muted/30 border-border flex flex-col gap-2 border-b px-3 py-2"
     >
-      <div className="flex items-center gap-2 text-sm font-medium">
+      <button
+        type="button"
+        aria-expanded
+        aria-label="Collapse point"
+        className="flex items-center gap-2 text-left text-sm font-medium"
+        onClick={() => point.id && onExpand(point.id)}
+      >
         <span className="h-4 w-1 shrink-0 rounded-sm" style={{ backgroundColor: dayColor }} />
         <TypeIcon className="text-muted-foreground size-3.5 shrink-0" />
         {label ? (
@@ -79,7 +85,7 @@ export function PointRow({
             {typeConfig.label} {index}
           </span>
         )}
-      </div>
+      </button>
 
       {!isBoundary && onTypeChange && (
         <div className="flex gap-1">

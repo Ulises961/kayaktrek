@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
+import { formatDayDate } from "@/lib/itinerary/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
@@ -100,7 +101,9 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
             Day {day.dayNumber}
           </span>
           {day.date && (
-            <span className="text-muted-foreground/60 truncate text-[10px]">· {day.date}</span>
+            <span className="text-muted-foreground/60 truncate text-[10px]">
+              · {formatDayDate(day.date)}
+            </span>
           )}
         </div>
         {!stats.isRestDay && stats.distanceNm > 0 && (
@@ -118,7 +121,9 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
         ) : routeLabel ? (
           <span className="text-foreground text-sm leading-snug">{routeLabel}</span>
         ) : day.date ? (
-          <span className="text-muted-foreground text-sm leading-snug">{day.date}</span>
+          <span className="text-muted-foreground text-sm leading-snug">
+            {formatDayDate(day.date)}
+          </span>
         ) : null}
       </div>
     </div>
@@ -220,7 +225,7 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
       {/* Date span */}
       {firstDate && lastDate && (
         <p className="text-muted-foreground -mt-2 text-xs">
-          {firstDate} → {lastDate}
+          {formatDayDate(firstDate)} → {formatDayDate(lastDate)}
         </p>
       )}
 

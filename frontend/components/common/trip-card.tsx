@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { format, parseISO } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StateBadge } from "@/components/common/state-badge"
 import { UsersIcon, CalendarIcon, ClockIcon } from "lucide-react"
@@ -22,13 +23,12 @@ function daysBetween(from: string, to: string): number {
 }
 
 function formatDateRange(from: string, to: string): string {
-  const f = new Date(from + "T12:00:00")
-  const t = new Date(to + "T12:00:00")
+  const f = parseISO(from)
+  const t = parseISO(to)
   const sameYear = f.getFullYear() === t.getFullYear()
-  const short = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  const full = (d: Date) =>
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-  return sameYear ? `${short(f)} – ${full(t)}` : `${full(f)} – ${full(t)}`
+  return sameYear
+    ? `${format(f, "d MMM")} – ${format(t, "d MMM yyyy")}`
+    : `${format(f, "d MMM yyyy")} – ${format(t, "d MMM yyyy")}`
 }
 
 export function TripCard({ trip, hero = false }: TripCardProps) {

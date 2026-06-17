@@ -89,6 +89,22 @@ describe("PointRow — collapsed", () => {
 })
 
 describe("PointRow — expanded", () => {
+  it("collapses (calls onExpand with the point id) when the header is clicked", async () => {
+    const onExpand = vi.fn()
+    render(
+      <PointRow
+        point={pt("abc")}
+        index={1}
+        isExpanded={true}
+        onExpand={onExpand}
+        isBoundary={false}
+        dayColor="#888"
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /collapse point/i }))
+    expect(onExpand).toHaveBeenCalledWith("abc")
+  })
+
   it("shows the type selector chips", () => {
     render(
       <PointRow

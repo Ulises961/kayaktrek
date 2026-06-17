@@ -1,6 +1,6 @@
 "use client"
-import { useState, useCallback, Fragment } from "react"
-import { PlusIcon, Trash2Icon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react"
+import { useState, useCallback, useMemo, useRef, Fragment } from "react"
+import { PlusIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
@@ -13,6 +13,8 @@ import {
   applyBoundaries,
 } from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
+import { formatDayDate } from "@/lib/itinerary/format"
+import { DatePicker } from "@/components/common/date-picker"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
@@ -77,6 +79,7 @@ export function PointListPane() {
   const [collapsed, setCollapsed] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 768,
   )
+  const listRef = useRef<HTMLDivElement>(null)
 
   const dayNumberById = new Map(state.days.map((d) => [d.id, d.dayNumber]))
   dayNumberById.set(day0Id ?? "", 0)
@@ -87,7 +90,14 @@ export function PointListPane() {
     if (day.endPointId) boundaryIds.add(day.endPointId)
   }
 
-  const renderList = buildRenderList(state.pointOrder, draftSlices)
+  const viewSlices = useMemo(
+    () => (state.days.length > 0 ? initDaySlices(state.days, state.pointOrder) : null),
+    [state.days, state.pointOrder],
+  )
+  const activeSlices = draftSlices ?? viewSlices
+  const isInteractive = draftSlices !== null
+
+  const renderList = buildRenderList(state.pointOrder, activeSlices)
 
   function getSliceDistance(slice: DaySlice): number {
     const ownedStart = slice.startIdx // includes the shared boundary stop
@@ -206,8 +216,46 @@ export function PointListPane() {
     dispatch({ type: "SAVING_END" })
     if (!result.success) return
     dispatch({ type: "DAY_ADD", day: result.day })
-    setDraftSlices(initDaySlices([...state.days, result.day], state.pointOrder))
-  }, [itineraryId, state.days, state.pointOrder, dispatch, setDraftSlices])
+
+    const M = state.pointOrder.length
+    let newSlices: DaySlice[]
+
+    if (!activeSlices || activeSlices.length === 0) {
+      newSlices = [
+        {
+          dayId: result.day.id!,
+          dayNumber: nextDayNumber,
+          startIdx: 0,
+          endIdx: M > 0 ? M - 1 : 0,
+          date: null,
+        },
+      ]
+    } else {
+      const lastSlice = activeSlices[activeSlices.length - 1]
+      const midIdx = Math.floor((lastSlice.startIdx + lastSlice.endIdx) / 2)
+      newSlices = [
+        ...activeSlices.slice(0, -1),
+        { ...lastSlice, endIdx: midIdx },
+        {
+          dayId: result.day.id!,
+          dayNumber: nextDayNumber,
+          startIdx: midIdx,
+          endIdx: lastSlice.endIdx,
+          date: null,
+        },
+      ]
+    }
+
+    setDraftSlices(newSlices)
+
+    // Scroll the new boundary handle into view after React re-renders
+    requestAnimationFrame(() => {
+      if (!listRef.current) return
+      const dividerIdx = newSlices.length >= 2 ? newSlices[newSlices.length - 2].endIdx : 0
+      const target = listRef.current.querySelector<HTMLElement>(`[data-point-idx="${dividerIdx}"]`)
+      target?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    })
+  }, [itineraryId, activeSlices, state.days.length, state.pointOrder, dispatch, setDraftSlices])
 
   const handleApply = useCallback(async () => {
     if (!draftSlices || !day0Id) return
@@ -242,6 +290,7 @@ export function PointListPane() {
     dispatch({ type: "BOUNDARIES_APPLY", slices: draftSlices, pointUpdates, day0Id })
     setDirtyPoints(new Map())
     setDraftSlices(null)
+    setActivePointId(null)
 
     dispatch({ type: "SAVING_START" })
     const result = await applyBoundaries(itineraryId, payload)
@@ -254,12 +303,22 @@ export function PointListPane() {
     } else {
       dispatch({ type: "STATE_REPLACE", state: snapshot })
     }
-  }, [draftSlices, day0Id, state, dirtyPoints, dispatch, setDraftSlices, itineraryId])
+  }, [
+    draftSlices,
+    day0Id,
+    state,
+    dirtyPoints,
+    dispatch,
+    setDraftSlices,
+    setActivePointId,
+    itineraryId,
+  ])
 
   const handleCancel = useCallback(() => {
     setDirtyPoints(new Map())
     setDraftSlices(null)
-  }, [setDraftSlices])
+    setActivePointId(null)
+  }, [setDraftSlices, setActivePointId])
 
   const handleDateChange = useCallback(
     (dayId: string, date: string | null) => {
@@ -269,24 +328,23 @@ export function PointListPane() {
     [draftSlices, setDraftSlices],
   )
 
-  const handleDeleteDay = useCallback(async () => {
-    if (!state.days.length || !day0Id) return
-    const lastDay = state.days.reduce(
-      (max, d) => (d.dayNumber > max.dayNumber ? d : max),
-      state.days[0],
-    )
-    if (!lastDay.id) return
-    dispatch({ type: "DAY_REMOVE", id: lastDay.id, day0Id })
-    dispatch({ type: "SAVING_START" })
-    await deleteDay(lastDay.id)
-    dispatch({ type: "SAVING_END" })
-  }, [state.days, day0Id, dispatch])
+  const handleDeleteDay = useCallback(
+    async (dayId: string) => {
+      if (!day0Id) return
+      setDraftSlices(null)
+      dispatch({ type: "DAY_REMOVE", id: dayId, day0Id })
+      dispatch({ type: "SAVING_START" })
+      await deleteDay(dayId)
+      dispatch({ type: "SAVING_END" })
+    },
+    [day0Id, dispatch, setDraftSlices],
+  )
 
   // ── render ────────────────────────────────────────────────────────────────
 
   if (collapsed) {
     return (
-      <div className="bg-background/95 border-border absolute top-0 right-0 bottom-0 z-[1001] flex w-10 flex-col items-center overflow-hidden border-l">
+      <div className="bg-background/95 border-border z-[1001] flex w-10 shrink-0 flex-col items-center overflow-hidden border-l">
         <div className="border-border flex w-full shrink-0 items-center justify-center border-b px-0 py-2">
           <button
             type="button"
@@ -312,7 +370,7 @@ export function PointListPane() {
   return (
     <div
       data-testid="point-list-pane"
-      className="bg-background/95 border-border absolute top-0 right-0 bottom-0 z-[1001] flex w-56 flex-col overflow-hidden border-l sm:w-64"
+      className="bg-background/95 border-border z-[1001] flex w-56 shrink-0 flex-col overflow-hidden border-l sm:w-64"
     >
       {/* Header */}
       <div className="border-border flex shrink-0 items-center gap-2 border-b px-3 py-2">
@@ -341,17 +399,25 @@ export function PointListPane() {
               Cancel
             </button>
           </>
+        ) : state.days.length === 0 ? (
+          <button
+            type="button"
+            aria-label="Add day"
+            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+            onClick={handleAddDay}
+          >
+            <PlusIcon className="size-3.5" />
+            <span>Add day</span>
+          </button>
         ) : (
           <>
-            {state.days.length > 0 && (
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
-                onClick={handleEditBoundaries}
-              >
-                Edit boundaries
-              </button>
-            )}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
+              onClick={handleEditBoundaries}
+            >
+              Edit boundaries
+            </button>
             <button
               type="button"
               aria-label="Add day"
@@ -361,35 +427,17 @@ export function PointListPane() {
               <PlusIcon className="size-3.5" />
               <span>Add day</span>
             </button>
-            {state.days.length > 0 &&
-              (() => {
-                const lastDay = state.days.reduce(
-                  (max, d) => (d.dayNumber > max.dayNumber ? d : max),
-                  state.days[0],
-                )
-                return (
-                  <button
-                    type="button"
-                    aria-label={`Delete day ${lastDay.dayNumber}`}
-                    className="text-muted-foreground hover:text-destructive flex items-center gap-1 text-xs transition-colors"
-                    onClick={handleDeleteDay}
-                  >
-                    <Trash2Icon className="size-3.5" />
-                    <span>Day {lastDay.dayNumber}</span>
-                  </button>
-                )
-              })()}
           </>
         )}
       </div>
 
       {/* Point list */}
-      <div className="flex-1 overflow-y-auto" data-point-list="true">
-        {/* Static Day 1 header */}
-        {draftSlices &&
-          draftSlices.length > 0 &&
+      <div ref={listRef} className="flex-1 overflow-y-auto" data-point-list="true">
+        {/* Static Day 1 header — visible in both view and edit mode */}
+        {activeSlices &&
+          activeSlices.length > 0 &&
           (() => {
-            const s0 = draftSlices[0]
+            const s0 = activeSlices[0]
             return (
               <div
                 data-testid="day-1-header"
@@ -397,13 +445,17 @@ export function PointListPane() {
               >
                 <span>Day 1</span>
                 <span className="text-muted-foreground">·</span>
-                <input
-                  type="date"
-                  value={s0.date ?? ""}
-                  placeholder="No date"
-                  onChange={(e) => handleDateChange(s0.dayId, e.target.value || null)}
-                  className="text-muted-foreground w-[6.5rem] cursor-pointer border-none bg-transparent text-xs outline-none"
-                />
+                {isInteractive ? (
+                  <DatePicker
+                    value={s0.date ?? ""}
+                    onChange={(v) => handleDateChange(s0.dayId, v || null)}
+                    placeholder="Add date"
+                    size="sm"
+                    className="h-6 w-auto border-none bg-transparent px-1 text-xs shadow-none"
+                  />
+                ) : (
+                  <span className="text-muted-foreground">{formatDayDate(s0.date)}</span>
+                )}
                 <span className="text-muted-foreground">·</span>
                 <span className="text-muted-foreground">
                   {legLabel(getSliceDistance(s0), avgSpeedKnots, distanceUnit)}
@@ -446,7 +498,7 @@ export function PointListPane() {
 
           // kind === "divider"
           const { slice, sliceIdx } = item
-          const nextSlice = draftSlices![sliceIdx + 1]
+          const nextSlice = activeSlices![sliceIdx + 1]
           return (
             <Fragment key={`divider-${slice.dayId}`}>
               <BoundaryDivider
@@ -456,8 +508,20 @@ export function PointListPane() {
                 avgSpeedKnots={avgSpeedKnots}
                 labelDayNumber={slice.dayNumber + 1}
                 labelDate={nextSlice?.date ?? null}
-                onDateChange={(date) => nextSlice && handleDateChange(nextSlice.dayId, date)}
-                onBoundaryMove={(newEndIdx) => handleBoundaryMove(slice.dayId, newEndIdx)}
+                interactive={isInteractive}
+                onDateChange={
+                  isInteractive
+                    ? (date) => nextSlice && handleDateChange(nextSlice.dayId, date)
+                    : undefined
+                }
+                onBoundaryMove={
+                  isInteractive
+                    ? (newEndIdx) => handleBoundaryMove(slice.dayId, newEndIdx)
+                    : undefined
+                }
+                onDelete={
+                  isInteractive && nextSlice ? () => handleDeleteDay(nextSlice.dayId) : undefined
+                }
               />
             </Fragment>
           )

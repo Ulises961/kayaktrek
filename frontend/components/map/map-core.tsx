@@ -175,6 +175,23 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
   return null
 }
 
+// ── ResizeHandler ─────────────────────────────────────────────────────────────
+
+// The map now shares horizontal space with the side panels (DayRail / drawer) as
+// flex siblings rather than being covered by them. When a panel opens or closes,
+// or the viewport changes, the map container width changes — Leaflet must be told
+// to recompute its size or it renders grey tiles and misplaced markers.
+function ResizeHandler() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const observer = new ResizeObserver(() => map.invalidateSize({ animate: false }))
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
 // ── MapEvents ─────────────────────────────────────────────────────────────────
 
 function MapEvents({ onMapClick }: { onMapClick: (lat: number, lng: number) => Promise<void> }) {
@@ -393,6 +410,7 @@ export default function MapCore({
         />
 
         {!viewMode && <MapEvents onMapClick={onMapClick} />}
+        <ResizeHandler />
         <FlyToController flyToPoint={flyToPoint} />
 
         {segments.map((seg) => {

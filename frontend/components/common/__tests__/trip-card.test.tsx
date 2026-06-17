@@ -53,8 +53,8 @@ describe("TripCard", () => {
 
   it("renders the date range", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    // Dates are shown as "Jul 1 – Jul 5, 2026" (en-US locale, same-year format)
-    expect(screen.getByText("Jul 1 – Jul 5, 2026")).toBeDefined()
+    // Dates are shown as "1 Jul – 5 Jul 2026" (unified d MMM yyyy format, same-year)
+    expect(screen.getByText("1 Jul – 5 Jul 2026")).toBeDefined()
   })
 
   it("renders the crew count", () => {

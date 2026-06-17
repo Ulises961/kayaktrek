@@ -1,8 +1,10 @@
 "use client"
 import { useRef } from "react"
-import { GripVerticalIcon } from "lucide-react"
+import { GripVerticalIcon, Trash2Icon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import { legLabel } from "@/lib/itinerary/distance"
+import { formatDayDate } from "@/lib/itinerary/format"
+import { DatePicker } from "@/components/common/date-picker"
 
 export type BoundaryDividerProps = {
   boundary: DaySlice
@@ -11,8 +13,10 @@ export type BoundaryDividerProps = {
   avgSpeedKnots: number
   labelDayNumber: number
   labelDate: string | null
+  interactive?: boolean
   onDateChange?: (date: string | null) => void
-  onBoundaryMove: (newEndPointIdx: number) => void
+  onBoundaryMove?: (newEndPointIdx: number) => void
+  onDelete?: () => void
 }
 
 type RowSnapshot = {
@@ -31,8 +35,10 @@ export function BoundaryDivider({
   avgSpeedKnots,
   labelDayNumber,
   labelDate,
+  interactive = true,
   onDateChange,
   onBoundaryMove,
+  onDelete,
 }: BoundaryDividerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const snapshotRef = useRef<RowSnapshot | null>(null)
@@ -121,7 +127,7 @@ export function BoundaryDivider({
       containerRef.current.style.transform = ""
       containerRef.current.style.zIndex = ""
     }
-    onBoundaryMove(dragTargetRef.current)
+    onBoundaryMove?.(dragTargetRef.current)
     snapshotRef.current = null
     scrollElRef.current = null
   }
@@ -136,42 +142,52 @@ export function BoundaryDivider({
     scrollElRef.current = null
   }
 
+  // The day boundary handle mirrors the static Day 1 header: a full-width bar
+  // with "Day N · date · distance". Drag-to-reassign is confined to the grip so
+  // the inline date picker and delete button receive normal clicks.
   return (
     <div
       ref={containerRef}
-      className="border-border bg-muted/50 flex items-center gap-1.5 border-y px-2 py-1"
+      data-testid={interactive ? "boundary-drag-handle" : "boundary-label"}
+      className="border-border bg-muted/30 flex items-center gap-1.5 border-y px-3 py-1 text-xs font-medium select-none"
     >
-      <div className="bg-border h-px min-w-[0.5rem] flex-1 shrink-0" />
-      <div
-        data-testid="boundary-drag-handle"
-        className="bg-background border-border flex shrink-0 cursor-ns-resize items-center gap-1.5 rounded-lg border px-2 py-1 select-none"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-      >
-        <GripVerticalIcon className="text-muted-foreground size-3 shrink-0" />
-        {/* 1/3 — day number */}
-        <span className="w-10 shrink-0 text-center text-xs font-semibold">
-          Day {labelDayNumber}
+      {interactive && (
+        <span
+          data-testid="boundary-grip"
+          className="-ml-1 shrink-0 cursor-ns-resize touch-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+        >
+          <GripVerticalIcon className="text-muted-foreground size-3.5" />
         </span>
-        <div className="bg-border h-7 w-px shrink-0" />
-        {/* 2/3 — date + distance stacked */}
-        <div className="flex flex-col gap-0.5">
-          <input
-            type="date"
-            value={labelDate ?? ""}
-            placeholder="No date"
-            onChange={(e) => onDateChange?.(e.target.value || null)}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="text-foreground w-28 cursor-pointer border-none bg-transparent text-xs outline-none sm:w-32"
-          />
-          <span className="text-muted-foreground text-[10px] leading-none whitespace-nowrap">
-            {displayDist}
-          </span>
-        </div>
-      </div>
-      <div className="bg-border h-px min-w-[0.5rem] flex-1 shrink-0" />
+      )}
+      <span>Day {labelDayNumber}</span>
+      <span className="text-muted-foreground">·</span>
+      {interactive ? (
+        <DatePicker
+          value={labelDate ?? ""}
+          onChange={(v) => onDateChange?.(v || null)}
+          placeholder="Add date"
+          size="sm"
+          className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
+        />
+      ) : (
+        <span className="text-muted-foreground">{formatDayDate(labelDate)}</span>
+      )}
+      <span className="text-muted-foreground">·</span>
+      <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+      {interactive && onDelete && (
+        <button
+          type="button"
+          aria-label={`Delete day ${labelDayNumber}`}
+          onClick={onDelete}
+          className="text-muted-foreground hover:text-destructive ml-auto shrink-0 transition-colors"
+        >
+          <Trash2Icon className="size-3.5" />
+        </button>
+      )}
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { WavesIcon, UsersIcon, RadioIcon } from "lucide-react"
 import { TRIP_STATES, type Trip } from "@/lib/dtos/trip"
 import { TestEmailButton } from "@/components/profile/test-email-button"
+import { ItineraryLayoutWireframe } from "@/components/wireframes/itinerary-layout-wireframe"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -392,6 +393,14 @@ export default function DesignPage() {
             )
           })}
         </div>
+      </Section>
+
+      {/* ── 9. Itinerary layout wireframe ────────────────────────────────────── */}
+      <Section
+        title="9 — Itinerary layout wireframe"
+        subtitle="Day strip → Feature drawer → Bottom sheet. Click a day, switch tabs, then click a route point."
+      >
+        <ItineraryLayoutWireframe />
       </Section>
 
       {/* ── Dev tools ────────────────────────────────────────────────────────── */}

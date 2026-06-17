@@ -15,7 +15,11 @@ vi.mock("react-leaflet", () => ({
   TileLayer: () => null,
   Polyline: () => null,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useMap: vi.fn(() => ({ removeLayer: vi.fn() })),
+  useMap: vi.fn(() => ({
+    removeLayer: vi.fn(),
+    getContainer: () => document.createElement("div"),
+    invalidateSize: vi.fn(),
+  })),
   useMapEvents: vi.fn(() => null),
 }))
 

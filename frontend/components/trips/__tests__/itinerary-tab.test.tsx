@@ -206,7 +206,7 @@ describe("ItineraryTab — itinerary with days", () => {
 
   it("shows date range", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
-    expect(screen.getByText(/2026-07-01.*2026-07-03/)).toBeDefined()
+    expect(screen.getByText(/1 Jul 2026.*3 Jul 2026/)).toBeDefined()
   })
 
   it("renders a row for each day", () => {

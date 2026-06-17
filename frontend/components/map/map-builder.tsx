@@ -12,7 +12,8 @@ import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
-import { DayStrip } from "./day-strip"
+import { DayRail } from "./day-rail"
+import { FeatureDrawer } from "./feature-drawer"
 import { PointDetailSheet } from "./point-detail-sheet"
 
 const MapCore = dynamic(() => import("./map-core"), {
@@ -44,6 +45,9 @@ export function MapBuilder({
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
   const [selectedHour, setSelectedHour] = useState(12)
+  const [conditionsVersion, setConditionsVersion] = useState(0)
+
+  const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
 
   const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -82,6 +86,9 @@ export function MapBuilder({
   const handleMapClick = async (lat: number, lng: number) => {
     if (!day0Id) return
     const tempId = `tmp-${Date.now()}`
+
+    // Collapse any expanded point row so the newly added point is the only focus.
+    setActivePointId(null)
 
     dispatch({
       type: "POINT_ADD",
@@ -146,6 +153,7 @@ export function MapBuilder({
       draftSlices,
       setDraftSlices,
       tripId: tripId ?? null,
+      tripName,
       itineraryId: itinerary.id ?? "",
       distanceUnit,
       setDistanceUnit,
@@ -164,12 +172,15 @@ export function MapBuilder({
       isLeader,
       selectedHour,
       setSelectedHour,
+      conditionsVersion,
+      bumpConditions,
     }),
     [
       state,
       dispatch,
       draftSlices,
       tripId,
+      tripName,
       itinerary.id,
       distanceUnit,
       avgSpeedKnots,
@@ -181,6 +192,8 @@ export function MapBuilder({
       tripState,
       isLeader,
       selectedHour,
+      conditionsVersion,
+      bumpConditions,
     ],
   )
 
@@ -202,29 +215,28 @@ export function MapBuilder({
           isLeader={isLeader}
           tripState={tripState}
         />
-        <div className="absolute top-[100px] right-0 bottom-0 left-0 md:top-12">
-          <MapCore
-            points={orderedPoints}
-            days={allDaysForMap}
-            distanceUnit={distanceUnit}
-            viewMode={viewMode}
-            selectedDayId={selectedDayId}
-            selectedHour={selectedHour}
-            flyToPoint={flyToPoint}
-            onMapClick={handleMapClick}
-            onMarkerDragEnd={handleMarkerDragEnd}
-            onMarkerDragMove={handleMarkerDragMove}
-            onMarkerClick={handleMarkerClick}
-            avgSpeedKnots={avgSpeedKnots}
-          />
-          {viewMode ? (
-            <>
-              <DayStrip />
-              <PointDetailSheet />
-            </>
-          ) : (
-            <PointListPane />
-          )}
+        {/* Panels are layout siblings of the map, not overlays — they push the map
+            narrower instead of covering it, so no information is hidden. */}
+        <div className="absolute top-[100px] right-0 bottom-0 left-0 flex md:top-12">
+          {viewMode && <DayRail />}
+          <div className="relative min-w-0 flex-1">
+            <MapCore
+              points={orderedPoints}
+              days={allDaysForMap}
+              distanceUnit={distanceUnit}
+              viewMode={viewMode}
+              selectedDayId={selectedDayId}
+              selectedHour={selectedHour}
+              flyToPoint={flyToPoint}
+              onMapClick={handleMapClick}
+              onMarkerDragEnd={handleMarkerDragEnd}
+              onMarkerDragMove={handleMarkerDragMove}
+              onMarkerClick={handleMarkerClick}
+              avgSpeedKnots={avgSpeedKnots}
+            />
+            {viewMode && <PointDetailSheet />}
+          </div>
+          {viewMode ? <FeatureDrawer /> : <PointListPane />}
         </div>
       </div>
     </MapBuilderContext.Provider>

@@ -1,186 +1,151 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
-import { X, Anchor, Star, CircleDot, LocateFixed } from "lucide-react"
+import { useState } from "react"
+import { X, Anchor, Star, CircleDot } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { updatePoint } from "@/lib/itinerary/actions"
+import { haversineNm, formatDistance } from "@/lib/itinerary/distance"
+import { cn } from "@/lib/utils"
+import { PointDetailModal } from "./point-detail-modal"
 import type { Point } from "@/lib/dtos/point"
 
-function TypeLabel({ type }: { type: string }) {
-  if (type === "stop")
-    return (
-      <>
-        <Anchor className="size-3.5" /> Overnight stop
-      </>
-    )
-  if (type === "interest")
-    return (
-      <>
-        <Star className="size-3.5" /> Point of interest
-      </>
-    )
-  return (
-    <>
-      <CircleDot className="size-3.5" /> Waypoint
-    </>
-  )
+function TypeIcon({ type }: { type: string }) {
+  if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
+  if (type === "interest") return <Star className="size-3.5 shrink-0" />
+  return <CircleDot className="size-3.5 shrink-0" />
 }
 
-function coordLabel(point: Point): string {
-  if (point.latitude != null && point.longitude != null) {
-    return `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`
+/** Cumulative distance from the day's first point to the given point. */
+function cumulativeDistanceLabel(
+  point: Point,
+  state: ReturnType<typeof useMapBuilder>["state"],
+  unit: "nm" | "km",
+): string | null {
+  if (!point.dayId) return null
+  const dayPoints = state.pointOrder
+    .map((id) => state.points.find((p) => p.id === id))
+    .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === point.dayId)
+  const idx = dayPoints.findIndex((p) => p.id === point.id)
+  if (idx <= 0) return idx === 0 ? "Start" : null
+  let nm = 0
+  for (let i = 1; i <= idx; i++) {
+    const a = dayPoints[i - 1]
+    const b = dayPoints[i]
+    if (a.latitude != null && a.longitude != null && b.latitude != null && b.longitude != null) {
+      nm += haversineNm(
+        { latitude: a.latitude, longitude: a.longitude },
+        { latitude: b.latitude, longitude: b.longitude },
+      )
+    }
   }
-  return "—"
+  return `${formatDistance(nm, unit)} ${unit}`
 }
 
 export function PointDetailSheet() {
-  const { state, dispatch, selectedPointId, setSelectedPointId, isLeader, tripState } =
+  const { state, selectedPointId, setSelectedPointId, distanceUnit, isLeader, tripState } =
     useMapBuilder()
+  const [modalOpen, setModalOpen] = useState(false)
 
   const point = selectedPointId
     ? (state.points.find((p) => p.id === selectedPointId) ?? null)
     : null
 
+  // Close the modal whenever the selected point changes or clears (render-time).
+  const [prevPointId, setPrevPointId] = useState(selectedPointId)
+  if (selectedPointId !== prevPointId) {
+    setPrevPointId(selectedPointId)
+    setModalOpen(false)
+  }
+
+  if (!point) return null
+
   const canEdit = isLeader && tripState !== "past"
-
-  const [draftName, setDraftName] = useState(point?.name ?? "")
-  const [draftNotes, setDraftNotes] = useState(point?.notes ?? "")
-
-  // Reset drafts when the selected point changes
-  useEffect(() => {
-    setDraftName(point?.name ?? "")
-    setDraftNotes(point?.notes ?? "")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [point?.id])
-
-  const handleNameBlur = useCallback(async () => {
-    if (!point) return
-    const trimmed = draftName.trim()
-    if (trimmed !== (point.name ?? "")) {
-      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { name: trimmed } })
-      await updatePoint(point.id!, { name: trimmed })
-    }
-  }, [draftName, point, dispatch])
-
-  const handleNotesBlur = useCallback(async () => {
-    if (!point) return
-    const trimmed = draftNotes.trim()
-    if (trimmed !== (point.notes ?? "")) {
-      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { notes: trimmed } })
-      await updatePoint(point.id!, { notes: trimmed })
-    }
-  }, [draftNotes, point, dispatch])
-
-  if (!selectedPointId || !point) return null
-
-  const globalIdx = state.pointOrder.indexOf(selectedPointId) + 1
-  const displayName = point.name || coordLabel(point)
+  const distLabel = cumulativeDistanceLabel(point, state, distanceUnit) ?? "—"
+  const imageCount = point.images?.length ?? 0
+  const displayName = point.name || `${point.type ?? "position"}`
 
   return (
-    <div
-      className="animate-in fade-in absolute inset-0 z-[1002] duration-300"
-      onClick={() => setSelectedPointId(null)}
-    >
+    <>
       <div
-        className="bg-background border-border animate-in slide-in-from-bottom absolute right-0 bottom-0 left-0 flex flex-col rounded-t-2xl border-t shadow-xl duration-300"
-        style={{ maxHeight: "55vh" }}
-        onClick={(e) => e.stopPropagation()}
+        data-testid="point-detail-sheet"
+        className="border-border bg-background animate-in slide-in-from-bottom absolute inset-x-0 bottom-0 z-[1002] rounded-t-xl border-t shadow-2xl duration-200"
       >
-        {/* Header */}
-        <div className="border-border flex shrink-0 items-center justify-between border-b px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="text-muted-foreground/70 w-4 shrink-0 font-mono text-xs">
-              {globalIdx}
-            </span>
-            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
-              <TypeLabel type={point.type ?? "position"} />
-            </span>
-            <span className="truncate font-medium">{displayName}</span>
+        {/* drag handle */}
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="bg-border h-1 w-8 rounded-full" />
+        </div>
+
+        {/* header */}
+        <div className="flex items-start justify-between px-4 pb-2">
+          <div className="min-w-0">
+            <div className="mb-0.5 flex items-center gap-1.5">
+              <TypeIcon type={point.type ?? "position"} />
+              <span className="text-muted-foreground text-[9px] font-bold tracking-widest uppercase">
+                {point.type ?? "position"}
+              </span>
+            </div>
+            <p className="truncate text-sm font-semibold">{displayName}</p>
           </div>
           <button
-            onClick={() => setSelectedPointId(null)}
-            className="text-muted-foreground hover:text-foreground ml-3 shrink-0 transition-colors"
+            type="button"
             aria-label="Close"
+            onClick={() => setSelectedPointId(null)}
+            className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 transition-colors"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-          <div className="text-muted-foreground flex items-center gap-1.5">
-            <LocateFixed className="size-3.5 shrink-0" />
-            <span className="font-mono text-xs">{coordLabel(point)}</span>
+        {/* tiles */}
+        <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+          <div className="bg-muted/40 rounded-lg px-2.5 py-2">
+            <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
+              Distance
+            </p>
+            <p className="text-[11px] font-medium">{distLabel}</p>
           </div>
 
-          {canEdit ? (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Name
-              </label>
-              <input
-                className="text-foreground placeholder-muted-foreground/60 border-border/50 focus:border-border w-full border-b bg-transparent pb-1 text-sm focus:outline-none"
-                value={draftName}
-                placeholder="Add a name…"
-                onChange={(e) => setDraftName(e.target.value)}
-                onBlur={handleNameBlur}
-              />
-            </div>
-          ) : point.name ? (
-            <div className="flex flex-col gap-1">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Name
-              </p>
-              <p className="text-foreground text-sm">{point.name}</p>
-            </div>
-          ) : null}
+          <button
+            type="button"
+            data-testid="point-notes-tile"
+            onClick={() => setModalOpen(true)}
+            className="bg-muted/40 hover:bg-muted/70 rounded-lg px-2.5 py-2 text-left transition-colors"
+          >
+            <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
+              Notes
+            </p>
+            <p
+              className={cn(
+                "truncate text-[11px]",
+                point.notes ? "text-foreground" : "text-muted-foreground/60 italic",
+              )}
+            >
+              {point.notes ? point.notes : canEdit ? "Add…" : "—"}
+            </p>
+          </button>
 
-          {canEdit ? (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Notes
-              </label>
-              <textarea
-                className="text-foreground placeholder-muted-foreground/60 border-border/50 focus:border-border min-h-[80px] w-full resize-none rounded-md border bg-transparent p-2 text-sm focus:outline-none"
-                value={draftNotes}
-                placeholder="Add notes…"
-                rows={4}
-                onChange={(e) => setDraftNotes(e.target.value)}
-                onBlur={handleNotesBlur}
-              />
-            </div>
-          ) : point.notes ? (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Notes
-              </p>
-              <p className="text-foreground text-sm whitespace-pre-wrap">{point.notes}</p>
-            </div>
-          ) : null}
-
-          {point.images && point.images.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Photos
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {point.images.map((img) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={img.id}
-                    src={img.location}
-                    alt={img.name}
-                    className="h-32 w-auto shrink-0 rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!canEdit && !point.notes && (!point.images || point.images.length === 0) && (
-            <p className="text-muted-foreground text-sm">No notes or photos for this point.</p>
-          )}
+          <button
+            type="button"
+            data-testid="point-images-tile"
+            onClick={() => setModalOpen(true)}
+            className="bg-muted/40 hover:bg-muted/70 rounded-lg px-2.5 py-2 text-left transition-colors"
+          >
+            <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
+              Images
+            </p>
+            <p
+              className={cn(
+                "text-[11px] font-medium",
+                imageCount > 0 ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              {imageCount}
+            </p>
+          </button>
         </div>
       </div>
-    </div>
+
+      {modalOpen && (
+        <PointDetailModal point={point} canEdit={canEdit} onClose={() => setModalOpen(false)} />
+      )}
+    </>
   )
 }
