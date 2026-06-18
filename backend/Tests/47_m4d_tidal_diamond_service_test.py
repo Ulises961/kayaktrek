@@ -1,0 +1,115 @@
+"""§1 M4d tidal diamond service tests — rule-of-thirds synthesis and
+trip-scoped user-diamond CRUD (create / patch / rebuild)."""
+import pytest
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point as ShapelyPoint
+
+from Models.tidal_station import StreamEntryMode
+from Models.tidal_stream_entry import TidalStreamEntry
+from Services.tidal_service import TidalService
+from Services.tidal_station_service import TidalStationService
+
+
+def _loc(lng=-4.1, lat=50.3):
+    return from_shape(ShapelyPoint(lng, lat), srid=4326)
+
+
+# ── synthesise_stream_entries (rule of thirds) ───────────────────────────────
+
+def test_synthesis_returns_13_entries_spanning_minus6_to_plus6(app):
+    entries = TidalService.synthesise_stream_entries(3.0, 45, 225)
+    assert len(entries) == 13
+    assert [e.hours_from_hw for e in entries] == list(range(-6, 7))
+
+
+def test_synthesis_assigns_flood_and_ebb_directions_by_phase(app):
+    entries = {e.hours_from_hw: e for e in TidalService.synthesise_stream_entries(3.0, 45, 225)}
+    # LW→HW half (and the LW boundary at +6) floods; HW→LW half ebbs.
+    for h in (-6, -5, -4, -3, -2, -1, 6):
+        assert entries[h].direction_degrees == 45
+    for h in (0, 1, 2, 3, 4, 5):
+        assert entries[h].direction_degrees == 225
+
+
+def test_synthesis_peaks_at_mid_tide_and_thirds_at_slack(app):
+    entries = {e.hours_from_hw: e for e in TidalService.synthesise_stream_entries(3.0, 45, 225)}
+    # Peak (3/3) at mid-flood / mid-ebb.
+    assert entries[-3].spring_rate_knots == pytest.approx(3.0)
+    assert entries[3].spring_rate_knots == pytest.approx(3.0)
+    # 1/3 of peak at the HW and LW turns.
+    assert entries[0].spring_rate_knots == pytest.approx(1.0)
+    assert entries[-6].spring_rate_knots == pytest.approx(1.0)
+
+
+def test_synthesis_neap_defaults_to_spring_when_omitted(app):
+    entries = TidalService.synthesise_stream_entries(3.0, 45, 225)
+    for e in entries:
+        assert e.neap_rate_knots == pytest.approx(e.spring_rate_knots)
+
+
+def test_synthesis_neap_scales_independently_when_provided(app):
+    entries = {e.hours_from_hw: e for e in
+               TidalService.synthesise_stream_entries(3.0, 45, 225, max_neap_rate_knots=1.5)}
+    assert entries[-3].neap_rate_knots == pytest.approx(1.5)
+    assert entries[0].neap_rate_knots == pytest.approx(0.5)
+
+
+# ── create_user_diamond ──────────────────────────────────────────────────────
+
+def test_create_simple_diamond_persists_13_synthesised_entries(app, itinerary, id):
+    data = {
+        "name": "Race", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+        "max_spring_rate_knots": 3.0, "flood_direction_degrees": 45,
+        "ebb_direction_degrees": 225, "radius_m": 500,
+    }
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+    assert str(station.itinerary_id) == itinerary["id"]
+    assert str(station.created_by_user_id) == id
+    assert station.entry_mode == StreamEntryMode.SIMPLE
+    assert station.is_user_created is True
+    assert len(station.tidal_stream_entries) == 13
+
+
+def test_create_advanced_diamond_stores_supplied_table_verbatim(app, itinerary, id):
+    rows = [TidalStreamEntry(hours_from_hw=h, direction_degrees=90,
+                             spring_rate_knots=2.0, neap_rate_knots=1.0) for h in range(-6, 7)]
+    data = {
+        "name": "Atlas pt", "location": _loc(), "entry_mode": StreamEntryMode.ATLAS,
+        "tidal_stream_entries": rows,
+    }
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+    assert station.entry_mode == StreamEntryMode.ATLAS
+    assert {e.direction_degrees for e in station.tidal_stream_entries} == {90}
+
+
+def test_create_simple_diamond_missing_peak_fields_raises(app, itinerary, id):
+    data = {"name": "Bad", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+            "flood_direction_degrees": 45, "ebb_direction_degrees": 225}
+    with pytest.raises(ValueError):
+        TidalStationService.create_user_diamond(itinerary["id"], id, data)
+
+
+# ── update_user_diamond ──────────────────────────────────────────────────────
+
+def test_update_diamond_field_only_does_not_rebuild_entries(app, itinerary, id):
+    data = {"name": "Race", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+            "max_spring_rate_knots": 3.0, "flood_direction_degrees": 45, "ebb_direction_degrees": 225}
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+    entry_ids_before = {(e.station_id, e.hours_from_hw) for e in station.tidal_stream_entries}
+
+    updated = TidalStationService.update_user_diamond(str(station.id), {"notes": "spring ebb sets E"})
+    assert updated.notes == "spring ebb sets E"
+    assert {(e.station_id, e.hours_from_hw) for e in updated.tidal_stream_entries} == entry_ids_before
+
+
+def test_update_diamond_rate_change_resynthesises_entries(app, itinerary, id):
+    data = {"name": "Race", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+            "max_spring_rate_knots": 3.0, "flood_direction_degrees": 45, "ebb_direction_degrees": 225}
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+
+    updated = TidalStationService.update_user_diamond(str(station.id), {
+        "max_spring_rate_knots": 6.0, "flood_direction_degrees": 45, "ebb_direction_degrees": 225,
+    })
+    peak = next(e for e in updated.tidal_stream_entries if e.hours_from_hw == -3)
+    assert peak.spring_rate_knots == pytest.approx(6.0)
+    assert len(updated.tidal_stream_entries) == 13

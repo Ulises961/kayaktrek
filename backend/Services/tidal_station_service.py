@@ -1,16 +1,23 @@
 import logging
-from typing import List
+from typing import List, Optional
 from sqlalchemy.exc import NoResultFound
 from geoalchemy2 import Geography
 from geoalchemy2.functions import ST_DWithin
 from sqlalchemy import cast
 
 from Api.database import db
-from Models.tidal_station import TidalStation
+from Models.tidal_station import StreamEntryMode, TidalStation
+from Services.tidal_service import TidalService
 
 logger = logging.getLogger(__name__)
 
 _MUTABLE = frozenset({"name", "source", "notes", "mean_spring_range_m"})
+
+# Station fields a user may set/patch on their own diamond.
+_DIAMOND_MUTABLE = frozenset({"name", "location", "source", "notes", "radius_m", "mean_spring_range_m"})
+
+# Simple-mode peak inputs that drive rule-of-thirds synthesis of the hourly entries.
+_SIMPLE_FIELDS = ("max_spring_rate_knots", "flood_direction_degrees", "ebb_direction_degrees")
 
 
 class TidalStationService:
@@ -54,3 +61,80 @@ class TidalStationService:
         db.session.delete(station)
         db.session.commit()
         logger.info("tidal_station_deleted", extra={"station_id": station_id})
+
+    @staticmethod
+    def _build_entries(data: dict) -> list:
+        """
+        Resolve the hourly TidalStreamEntry rows for a user diamond from its
+        entry mode. Simple mode synthesises the 13 rows via the rule of thirds;
+        advanced mode takes the supplied per-hour table verbatim.
+        """
+        if data.get("entry_mode") == StreamEntryMode.SIMPLE:
+            missing = [f for f in _SIMPLE_FIELDS if data.get(f) is None]
+            if missing:
+                raise ValueError(f"Simple-mode diamond requires: {', '.join(missing)}")
+            return TidalService.synthesise_stream_entries(
+                max_spring_rate_knots=data["max_spring_rate_knots"],
+                flood_direction_degrees=data["flood_direction_degrees"],
+                ebb_direction_degrees=data["ebb_direction_degrees"],
+                max_neap_rate_knots=data.get("max_neap_rate_knots"),
+            )
+        return data.get("tidal_stream_entries") or []
+
+    @staticmethod
+    def create_user_diamond(itinerary_id: str, user_id: str, data: dict) -> TidalStation:
+        """
+        Create a tidal diamond scoped to one itinerary, owned by the creating user.
+
+        `data` is the validated diamond payload (station fields + entry_mode +
+        either the simple-mode peak inputs or an advanced per-hour table).
+        """
+        station = TidalStation(
+            itinerary_id=itinerary_id,
+            created_by_user_id=user_id,
+            entry_mode=data["entry_mode"],
+            **{k: v for k, v in data.items() if k in _DIAMOND_MUTABLE},
+        )
+        station.tidal_stream_entries = TidalStationService._build_entries(data)
+        db.session.add(station)
+        db.session.commit()
+        logger.info(
+            "tidal_diamond_created",
+            extra={
+                "station_id": str(station.id),
+                "itinerary_id": itinerary_id,
+                "entry_mode": station.entry_mode.value if station.entry_mode else None,
+            },
+        )
+        return station
+
+    @staticmethod
+    def update_user_diamond(station_id: str, data: dict) -> TidalStation:
+        """
+        Patch a user diamond. Station fields update in place; if the entry mode
+        or any stream input is present the hourly entries are fully rebuilt
+        (orphan-cascade replaces the old rows).
+        """
+        station = TidalStationService.get_by_id(station_id)
+
+        for key in _DIAMOND_MUTABLE:
+            if key in data:
+                setattr(station, key, data[key])
+
+        new_mode: Optional[StreamEntryMode] = data.get("entry_mode")
+        if new_mode is not None:
+            station.entry_mode = new_mode
+
+        rebuild = (
+            new_mode is not None
+            or any(k in data for k in _SIMPLE_FIELDS)
+            or "max_neap_rate_knots" in data
+            or "tidal_stream_entries" in data
+        )
+        if rebuild:
+            resolved = {**data, "entry_mode": station.entry_mode}
+            station.tidal_stream_entries = TidalStationService._build_entries(resolved)
+
+        db.session.commit()
+        logger.info("tidal_diamond_updated", extra={"station_id": station_id})
+        return station

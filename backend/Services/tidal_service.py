@@ -214,6 +214,47 @@ class TidalService:
         ]
 
     @staticmethod
+    def synthesise_stream_entries(
+        max_spring_rate_knots: float,
+        flood_direction_degrees: float,
+        ebb_direction_degrees: float,
+        max_neap_rate_knots: Optional[float] = None,
+    ) -> list:
+        """
+        Build the 13 hourly TidalStreamEntry rows (hours_from_hw -6..+6) for a
+        simple-mode diamond using the rule of thirds.
+
+        Slack is assumed at HW and LW; the peak rate is reached at mid-flood and
+        mid-ebb (±3 h from HW). Each hour's rate is a third-fraction of the peak
+        (1/3, 2/3, 3/3, 3/3, 2/3, 1/3) across each 6-hour half-cycle. The flood
+        half (LW→HW) takes the flood direction, the ebb half (HW→LW) the ebb.
+
+        When max_neap_rate_knots is omitted the neap rate mirrors the spring rate
+        (no spring/neap swing), so the entered peak is rendered as-is regardless
+        of the day's range.
+
+        Returns detached TidalStreamEntry rows (no station_id) — the caller
+        attaches them via the station relationship so the cascade stamps the FK.
+        """
+        neap_peak = max_neap_rate_knots if max_neap_rate_knots is not None else max_spring_rate_knots
+        entries = []
+        for hours_from_hw in range(-6, 7):
+            # LW sits 6 h before HW, so hour-from-LW = hour-from-HW + 6 (mod 12).
+            hour_from_lw = (hours_from_hw + 6) % 12
+            fraction_idx = hour_from_lw if hour_from_lw < 6 else 11 - hour_from_lw
+            fraction = _STREAM_FRACTIONS[fraction_idx]
+            is_flood = hour_from_lw < 6
+            entries.append(
+                TidalStreamEntry(
+                    hours_from_hw=hours_from_hw,
+                    direction_degrees=(flood_direction_degrees if is_flood else ebb_direction_degrees),
+                    spring_rate_knots=round(fraction * max_spring_rate_knots, 3),
+                    neap_rate_knots=round(fraction * neap_peak, 3),
+                )
+            )
+        return entries
+
+    @staticmethod
     def interpolate_stream_rate(entry: TidalStreamEntry, sea: Sea) -> Optional[float]:
         """
         Interpolate stream rate between neap and spring using the day's actual tidal range
