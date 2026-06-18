@@ -4,6 +4,7 @@ import {
   TidalStationSchema,
   TidalDiamondSchema,
   TidalGateWarningSchema,
+  TidalDiamondFormSchema,
 } from "../tidal-station"
 
 const STREAM_ENTRY_FIXTURE = {
@@ -138,6 +139,67 @@ describe("TidalDiamondSchema", () => {
   it("rejects a missing hourlyTable", () => {
     const { hourlyTable: _, ...noTable } = TIDAL_DIAMOND_FIXTURE
     expect(TidalDiamondSchema.safeParse(noTable).success).toBe(false)
+  })
+})
+
+describe("TidalDiamondFormSchema", () => {
+  const SIMPLE = {
+    name: "The Race",
+    entryMode: "simple" as const,
+    radiusM: 500,
+    maxSpringRateKnots: 3.0,
+    maxNeapRateKnots: 1.5,
+    floodDirectionDegrees: 45,
+    ebbDirectionDegrees: 225,
+  }
+
+  it("accepts a complete simple-mode entry", () => {
+    expect(TidalDiamondFormSchema.safeParse(SIMPLE).success).toBe(true)
+  })
+
+  it("rejects simple mode missing the peak rate", () => {
+    const result = TidalDiamondFormSchema.safeParse({ ...SIMPLE, maxSpringRateKnots: null })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path[0] === "maxSpringRateKnots")).toBe(true)
+    }
+  })
+
+  it("rejects simple mode missing a stream direction", () => {
+    const result = TidalDiamondFormSchema.safeParse({ ...SIMPLE, floodDirectionDegrees: null })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects an empty name", () => {
+    expect(TidalDiamondFormSchema.safeParse({ ...SIMPLE, name: "  " }).success).toBe(false)
+  })
+
+  it("rejects a direction outside 0–360", () => {
+    expect(
+      TidalDiamondFormSchema.safeParse({ ...SIMPLE, floodDirectionDegrees: 400 }).success,
+    ).toBe(false)
+  })
+
+  it("accepts an atlas entry with at least one hourly rate", () => {
+    const result = TidalDiamondFormSchema.safeParse({
+      name: "Atlas point",
+      entryMode: "atlas",
+      tidalStreamEntries: [
+        { hoursFromHw: -3, directionDegrees: 90, springRateKnots: 2.0, neapRateKnots: 1.0 },
+      ],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an atlas entry with no rates entered", () => {
+    const result = TidalDiamondFormSchema.safeParse({
+      name: "Atlas point",
+      entryMode: "atlas",
+      tidalStreamEntries: [
+        { hoursFromHw: -3, directionDegrees: null, springRateKnots: null, neapRateKnots: null },
+      ],
+    })
+    expect(result.success).toBe(false)
   })
 })
 

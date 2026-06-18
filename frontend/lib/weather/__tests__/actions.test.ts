@@ -9,22 +9,28 @@ import {
   fetchWaveVectors,
   fetchTidalDiamonds,
   fetchGlobalWindVectors,
+  createTidalDiamond,
+  repositionTidalDiamond,
+  deleteTidalDiamond,
 } from "../actions"
+import type { TidalDiamondForm } from "@/lib/dtos/tidal-station"
 
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPatch: vi.fn(),
+  apiDelete: vi.fn(),
   isRedirectError: vi.fn().mockReturnValue(false),
 }))
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
-import { apiGet, apiPost, apiPatch } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
 
 const GET = apiGet as ReturnType<typeof vi.fn>
 const POST = apiPost as ReturnType<typeof vi.fn>
 const PATCH = apiPatch as ReturnType<typeof vi.fn>
+const DELETE = apiDelete as ReturnType<typeof vi.fn>
 
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 const POINT_ID = "01900000-0000-7000-8000-000000000002"
@@ -249,6 +255,103 @@ describe("fetchTidalDiamonds", () => {
     GET.mockRejectedValue(new Error("No data"))
     const result = await fetchTidalDiamonds(DAY_ID, 12)
     expect(result).toEqual({ success: false, error: "No data" })
+  })
+})
+
+const stationFixture = {
+  id: "01900000-0000-7000-8000-0000000000bb",
+  name: "The Race",
+  location: { type: "Point" as const, coordinates: [-4.1, 50.3] },
+  source: null,
+  notes: null,
+  meanSpringRangeM: null,
+  tidalStreamEntries: [],
+}
+
+const ITINERARY_ID = "01900000-0000-7000-8000-0000000000cc"
+
+const simpleForm: TidalDiamondForm = {
+  name: "The Race",
+  entryMode: "simple",
+  radiusM: 500,
+  maxSpringRateKnots: 3.0,
+  maxNeapRateKnots: 1.5,
+  floodDirectionDegrees: 45,
+  ebbDirectionDegrees: 225,
+}
+
+describe("createTidalDiamond", () => {
+  it("posts itineraryId, GeoJSON location and the simple-mode body", async () => {
+    POST.mockResolvedValue(stationFixture)
+    const result = await createTidalDiamond(ITINERARY_ID, 50.3, -4.1, simpleForm)
+    expect(POST).toHaveBeenCalledWith("/api/tidal-diamond/create", {
+      itineraryId: ITINERARY_ID,
+      location: { type: "Point", coordinates: [-4.1, 50.3] },
+      name: "The Race",
+      entryMode: "simple",
+      radiusM: 500,
+      maxSpringRateKnots: 3.0,
+      maxNeapRateKnots: 1.5,
+      floodDirectionDegrees: 45,
+      ebbDirectionDegrees: 225,
+    })
+    expect(result).toEqual({ success: true, data: expect.objectContaining({ name: "The Race" }) })
+  })
+
+  it("sends the per-hour table for atlas mode", async () => {
+    POST.mockResolvedValue(stationFixture)
+    const rows = [{ hoursFromHw: -3, directionDegrees: 90, springRateKnots: 2, neapRateKnots: 1 }]
+    await createTidalDiamond(ITINERARY_ID, 50.3, -4.1, {
+      name: "Atlas",
+      entryMode: "atlas",
+      tidalStreamEntries: rows,
+    })
+    expect(POST).toHaveBeenCalledWith("/api/tidal-diamond/create", {
+      itineraryId: ITINERARY_ID,
+      location: { type: "Point", coordinates: [-4.1, 50.3] },
+      name: "Atlas",
+      entryMode: "atlas",
+      radiusM: null,
+      tidalStreamEntries: rows,
+    })
+  })
+
+  it("returns an error on failure", async () => {
+    POST.mockRejectedValue(new Error("Forbidden"))
+    const result = await createTidalDiamond(ITINERARY_ID, 50.3, -4.1, simpleForm)
+    expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+})
+
+describe("repositionTidalDiamond", () => {
+  it("patches only the location as GeoJSON", async () => {
+    PATCH.mockResolvedValue(stationFixture)
+    const result = await repositionTidalDiamond(stationFixture.id, 51.0, -5.0)
+    expect(PATCH).toHaveBeenCalledWith(`/api/tidal-diamond/${stationFixture.id}`, {
+      location: { type: "Point", coordinates: [-5.0, 51.0] },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("returns an error on failure", async () => {
+    PATCH.mockRejectedValue(new Error("Nope"))
+    const result = await repositionTidalDiamond(stationFixture.id, 51.0, -5.0)
+    expect(result).toEqual({ success: false, error: "Nope" })
+  })
+})
+
+describe("deleteTidalDiamond", () => {
+  it("deletes the diamond by id", async () => {
+    DELETE.mockResolvedValue(undefined)
+    const result = await deleteTidalDiamond(stationFixture.id)
+    expect(DELETE).toHaveBeenCalledWith(`/api/tidal-diamond/${stationFixture.id}`)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error on failure", async () => {
+    DELETE.mockRejectedValue(new Error("Boom"))
+    const result = await deleteTidalDiamond(stationFixture.id)
+    expect(result).toEqual({ success: false, error: "Boom" })
   })
 })
 

@@ -1,12 +1,21 @@
 "use server"
 
-import { apiGet, apiPost, apiPatch, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { SeaSchema } from "@/lib/dtos/sea"
 import type { Sea } from "@/lib/dtos/sea"
 import { WeatherSchema } from "@/lib/dtos/weather"
 import type { Weather } from "@/lib/dtos/weather"
-import { TidalGateWarningSchema, TidalDiamondSchema } from "@/lib/dtos/tidal-station"
-import type { TidalGateWarning, TidalDiamond } from "@/lib/dtos/tidal-station"
+import {
+  TidalGateWarningSchema,
+  TidalDiamondSchema,
+  TidalStationSchema,
+} from "@/lib/dtos/tidal-station"
+import type {
+  TidalGateWarning,
+  TidalDiamond,
+  TidalStation,
+  TidalDiamondForm,
+} from "@/lib/dtos/tidal-station"
 import type { VelocityGridData } from "@/lib/types/ui"
 import { z } from "zod"
 
@@ -27,6 +36,12 @@ export type TidalGatesResult =
 export type TidalDiamondsResult =
   | { success: true; data: TidalDiamond[] }
   | { success: false; error: string }
+
+export type DiamondMutationResult =
+  | { success: true; data: TidalStation }
+  | { success: false; error: string }
+
+export type DiamondDeleteResult = { success: true } | { success: false; error: string }
 
 export type VelocityGridResult =
   | { success: true; data: VelocityGridData }
@@ -175,6 +190,76 @@ export async function fetchGlobalWindVectors(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Failed to fetch global wind vectors.",
+    }
+  }
+}
+
+// Maps the validated entry form to the API body, sending only the fields the
+// chosen entry mode uses (simple peaks vs. an atlas per-hour table).
+function diamondBody(fields: TidalDiamondForm) {
+  const base = { name: fields.name, entryMode: fields.entryMode, radiusM: fields.radiusM ?? null }
+  if (fields.entryMode === "simple") {
+    return {
+      ...base,
+      maxSpringRateKnots: fields.maxSpringRateKnots ?? null,
+      maxNeapRateKnots: fields.maxNeapRateKnots ?? null,
+      floodDirectionDegrees: fields.floodDirectionDegrees ?? null,
+      ebbDirectionDegrees: fields.ebbDirectionDegrees ?? null,
+    }
+  }
+  return { ...base, tidalStreamEntries: fields.tidalStreamEntries ?? [] }
+}
+
+export async function createTidalDiamond(
+  itineraryId: string,
+  lat: number,
+  lng: number,
+  fields: TidalDiamondForm,
+): Promise<DiamondMutationResult> {
+  try {
+    const raw = await apiPost<unknown>(`/api/tidal-diamond/create`, {
+      itineraryId,
+      location: { type: "Point", coordinates: [lng, lat] },
+      ...diamondBody(fields),
+    })
+    return { success: true, data: TidalStationSchema.parse(raw) }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to create tidal diamond.",
+    }
+  }
+}
+
+export async function repositionTidalDiamond(
+  diamondId: string,
+  lat: number,
+  lng: number,
+): Promise<DiamondMutationResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/tidal-diamond/${diamondId}`, {
+      location: { type: "Point", coordinates: [lng, lat] },
+    })
+    return { success: true, data: TidalStationSchema.parse(raw) }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to move tidal diamond.",
+    }
+  }
+}
+
+export async function deleteTidalDiamond(diamondId: string): Promise<DiamondDeleteResult> {
+  try {
+    await apiDelete(`/api/tidal-diamond/${diamondId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to delete tidal diamond.",
     }
   }
 }
