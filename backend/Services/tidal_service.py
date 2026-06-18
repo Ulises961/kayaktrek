@@ -5,6 +5,7 @@ from typing import Optional
 
 from geoalchemy2 import Geography
 from geoalchemy2.functions import ST_DWithin
+from geoalchemy2.shape import to_shape
 from sqlalchemy import cast
 
 from Api.database import db
@@ -338,78 +339,110 @@ class TidalService:
         )
 
     @staticmethod
-    def stream_rate_from_sea(sea: Sea, hour_from_lw: int) -> Optional[tuple]:
+    def _entry_rate(entry: TidalStreamEntry, sea: Optional[Sea]) -> Optional[float]:
         """
-        Returns (rate_knots, direction_degrees) using rule-of-12s fractions and
-        the manual stream fields on the Sea record.
-
-        max_spring_rate_knots is the peak rate (at hours 2-3 from LW).
-        Hours 0-5 → flood direction; hours 6-11 → ebb direction.
-        Returns None if any required field is absent.
+        Rate (knots) for one stream entry, interpolated for the day's range when a
+        Sea record is available, else the raw spring rate. Rounded to 3 dp.
         """
-        if (sea.flood_direction_degrees is None
-                or sea.ebb_direction_degrees is None
-                or sea.max_spring_rate_knots is None):
-            return None
-
-        h = int(hour_from_lw) % 12
-        fraction_idx = h if h < 6 else 11 - h
-        fraction = _STREAM_FRACTIONS[max(0, min(fraction_idx, 5))]
-
-        rate = fraction * float(sea.max_spring_rate_knots)
-        direction = (float(sea.flood_direction_degrees) if h < 6
-                     else float(sea.ebb_direction_degrees))
-        return rate, direction
+        rate = (
+            TidalService.interpolate_stream_rate(entry, sea)
+            if sea is not None
+            else (float(entry.spring_rate_knots) if entry.spring_rate_knots is not None else None)
+        )
+        return round(rate, 3) if rate is not None else None
 
     @staticmethod
-    def build_stream_velocity_grid(
-        bounding_box: tuple,
-        hour_from_lw: int,
-        sea: Optional[Sea],
-        stations: list,
-    ) -> dict:
+    def _hours_from_hw_at(minutes_from_midnight: int, hw_min: Optional[int]) -> int:
         """
-        Build a leaflet-velocity compatible velocity grid dict.
+        Clamp an offset from HW into the diamond table's -6..+6 range.
 
-        Priority: TidalStation entry data > Sea manual stream fields.
-        Returns { "source": "station"|"manual"|None, "grid": [...] }.
+        Falls back to 0 (HW slack) when HW is unknown — the same conservative
+        assumption `tidal_gates_for_day` makes.
         """
-        lat_min, lat_max, lon_min, lon_max = bounding_box
+        if hw_min is None:
+            return 0
+        return max(-6, min(6, round((minutes_from_midnight - hw_min) / 60)))
 
-        if stations:
-            station = stations[0]
-            clamped = max(-6, min(6, hour_from_lw - 6))
-            entry = next(
-                (e for e in station.tidal_stream_entries if e.hours_from_hw == clamped),
-                None,
+    @staticmethod
+    def _diamonds_for_day(day: Day) -> list:
+        """
+        The tidal stations relevant to a day: the itinerary's user-created
+        diamonds plus any globally seeded atlas stations within 50 km of the
+        route centre. The two sets are disjoint (user diamonds carry an
+        itinerary_id, atlas stations do not), so no de-duplication is needed.
+        """
+        user_diamonds = (
+            db.session.query(TidalStation)
+            .filter(TidalStation.itinerary_id == day.itinerary_id)
+            .all()
+        )
+
+        lats = [float(p.latitude) for p in (day.points or []) if p.latitude is not None]
+        lons = [float(p.longitude) for p in (day.points or []) if p.longitude is not None]
+        if not lats or not lons:
+            return user_diamonds
+
+        centre_ewkt = f"SRID=4326;POINT({sum(lons) / len(lons)} {sum(lats) / len(lats)})"
+        nearby_atlas = (
+            db.session.query(TidalStation)
+            .filter(
+                TidalStation.itinerary_id.is_(None),
+                ST_DWithin(cast(TidalStation.location, Geography), centre_ewkt, 50000),
             )
-            if entry is None or entry.direction_degrees is None:
-                return {"source": "station", "grid": []}
+            .all()
+        )
+        return user_diamonds + nearby_atlas
 
-            rate = (
-                TidalService.interpolate_stream_rate(entry, sea)
-                if sea is not None
-                else (float(entry.spring_rate_knots) if entry.spring_rate_knots else None)
-            )
-            if rate is None:
-                return {"source": "station", "grid": []}
+    @staticmethod
+    def day_diamonds(day: Day, sea: Optional[Sea], hour: int) -> list:
+        """
+        Resolve every tidal diamond relevant to a day at the given clock hour.
 
-            return _build_uniform_velocity_grid(
-                lat_min, lat_max, lon_min, lon_max,
-                rate * 0.514444, float(entry.direction_degrees), "station",
-            )
+        Each diamond reports its rate/direction for the hour — the day's HW time
+        (from the Sea record) maps the clock hour onto the station's hourly table
+        — plus the full hour-by-hour table for the popup. Spring↔neap is
+        interpolated by the day's range via `interpolate_stream_rate`.
 
-        if sea is not None:
-            result = TidalService.stream_rate_from_sea(sea, hour_from_lw)
-            if result is None:
-                return {"source": "manual", "grid": []}
-            rate, direction = result
-            return _build_uniform_velocity_grid(
-                lat_min, lat_max, lon_min, lon_max,
-                rate * 0.514444, direction, "manual",
-            )
+        Returns a list of snake_case dicts; `TidalDiamondSchema` serialises them.
+        """
+        hw_min = sea.high_tide.hour * 60 + sea.high_tide.minute if sea and sea.high_tide else None
+        hours_from_hw = TidalService._hours_from_hw_at(hour * 60, hw_min)
 
-        return {"source": None, "grid": []}
+        diamonds = []
+        for station in TidalService._diamonds_for_day(day):
+            if station.location is None:
+                continue
+            shape = to_shape(station.location)
+
+            entries = sorted(station.tidal_stream_entries, key=lambda e: e.hours_from_hw)
+            resolved = next((e for e in entries if e.hours_from_hw == hours_from_hw), None)
+
+            diamonds.append({
+                "id": str(station.id),
+                "name": station.name,
+                "lat": shape.y,
+                "lng": shape.x,
+                "rate_knots": TidalService._entry_rate(resolved, sea) if resolved else None,
+                "direction_degrees": (
+                    float(resolved.direction_degrees)
+                    if resolved and resolved.direction_degrees is not None
+                    else None
+                ),
+                "source": station.source,
+                "radius_m": float(station.radius_m) if station.radius_m is not None else None,
+                "is_user_created": station.is_user_created,
+                "hourly_table": [
+                    {
+                        "hour_from_hw": e.hours_from_hw,
+                        "rate_knots": TidalService._entry_rate(e, sea),
+                        "direction_degrees": (
+                            float(e.direction_degrees) if e.direction_degrees is not None else None
+                        ),
+                    }
+                    for e in entries
+                ],
+            })
+        return diamonds
 
     @staticmethod
     def tidal_gates_for_day(day: Day, points: list, sea: Optional[Sea]) -> list:

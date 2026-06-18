@@ -1,9 +1,15 @@
-"""§1 M4d tidal diamond service tests — rule-of-thirds synthesis and
-trip-scoped user-diamond CRUD (create / patch / rebuild)."""
+"""M4d tidal diamond service tests — §1 rule-of-thirds synthesis and
+trip-scoped user-diamond CRUD (create / patch / rebuild); §2 day-diamond
+resolution at a clock hour."""
+from datetime import time
+
 import pytest
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point as ShapelyPoint
 
+from Api.database import db
+from Models.day import Day
+from Models.sea import Sea
 from Models.tidal_station import StreamEntryMode
 from Models.tidal_stream_entry import TidalStreamEntry
 from Services.tidal_service import TidalService
@@ -113,3 +119,62 @@ def test_update_diamond_rate_change_resynthesises_entries(app, itinerary, id):
     peak = next(e for e in updated.tidal_stream_entries if e.hours_from_hw == -3)
     assert peak.spring_rate_knots == pytest.approx(6.0)
     assert len(updated.tidal_stream_entries) == 13
+
+
+# ── day_diamonds (§2 — resolved at clock hour) ───────────────────────────────
+
+def _simple_diamond(itinerary, user_id, **overrides):
+    data = {"name": "Race", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+            "max_spring_rate_knots": 3.0, "flood_direction_degrees": 45, "ebb_direction_degrees": 225}
+    data.update(overrides)
+    return TidalStationService.create_user_diamond(itinerary["id"], user_id, data)
+
+
+def _day_with_sea(itinerary, hw=time(12, 0), lw=time(6, 0), range_m=4.0):
+    """The itinerary's first day, given a Sea record so the clock hour maps onto the table."""
+    day = db.session.get(Day, itinerary["days"][0]["id"])
+    day.sea = Sea(day_id=day.id, high_tide=hw, low_tide=lw, tidal_range_m=range_m)
+    db.session.commit()
+    return day
+
+
+def test_day_diamonds_resolves_user_diamond_at_hour(app, itinerary, id):
+    day = _day_with_sea(itinerary)
+    _simple_diamond(itinerary, id, radius_m=500)
+
+    # hour 9 → 3 h before HW(12) → hours_from_hw = -3 → mid-flood peak, flood dir.
+    diamonds = TidalService.day_diamonds(day, day.sea, 9)
+    assert len(diamonds) == 1
+    d = diamonds[0]
+    assert d["is_user_created"] is True
+    assert d["lat"] == pytest.approx(50.3)
+    assert d["lng"] == pytest.approx(-4.1)
+    assert d["radius_m"] == pytest.approx(500.0)
+    assert d["rate_knots"] == pytest.approx(3.0)
+    assert d["direction_degrees"] == pytest.approx(45.0)
+    assert len(d["hourly_table"]) == 13
+
+
+def test_day_diamonds_hour_at_hw_is_ebb_turn(app, itinerary, id):
+    day = _day_with_sea(itinerary)
+    _simple_diamond(itinerary, id)
+
+    # hour 12 == HW → hours_from_hw = 0 → 1/3 peak at the ebb turn.
+    d = TidalService.day_diamonds(day, day.sea, 12)[0]
+    assert d["rate_knots"] == pytest.approx(1.0)
+    assert d["direction_degrees"] == pytest.approx(225.0)
+
+
+def test_day_diamonds_falls_back_to_hw_slack_without_sea(app, itinerary, id):
+    day = db.session.get(Day, itinerary["days"][0]["id"])
+    _simple_diamond(itinerary, id)
+
+    # No Sea → HW unknown → hours_from_hw defaults to 0 regardless of the hour.
+    d = TidalService.day_diamonds(day, None, 9)[0]
+    assert d["rate_knots"] == pytest.approx(1.0)
+    assert d["direction_degrees"] == pytest.approx(225.0)
+
+
+def test_day_diamonds_empty_when_none_exist(app, itinerary):
+    day = db.session.get(Day, itinerary["days"][0]["id"])
+    assert TidalService.day_diamonds(day, None, 12) == []
