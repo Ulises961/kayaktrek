@@ -6,12 +6,11 @@ import { cn } from "@/lib/utils"
 export type LayersControlProps = {
   windEnabled: boolean
   swellEnabled: boolean
-  tidalEnabled: boolean
-  hasTidalLayer: boolean
-  tidalSource?: string | null
+  diamondsEnabled: boolean
+  hasDiamonds: boolean
   onWindToggle: () => void
   onSwellToggle: () => void
-  onTidalToggle: () => void
+  onDiamondsToggle: () => void
 }
 
 function Toggle({
@@ -57,12 +56,11 @@ function Toggle({
 export function LayersControl({
   windEnabled,
   swellEnabled,
-  tidalEnabled,
-  hasTidalLayer,
-  tidalSource,
+  diamondsEnabled,
+  hasDiamonds,
   onWindToggle,
   onSwellToggle,
-  onTidalToggle,
+  onDiamondsToggle,
 }: LayersControlProps) {
   const [open, setOpen] = useState(false)
 
@@ -124,23 +122,18 @@ export function LayersControl({
             Swell
           </Toggle>
 
-          {hasTidalLayer && (
+          {hasDiamonds && (
             <Toggle
-              enabled={tidalEnabled}
-              onClick={onTidalToggle}
-              testId="tidal-toggle"
-              aria-checked={tidalEnabled}
+              enabled={diamondsEnabled}
+              onClick={onDiamondsToggle}
+              testId="diamonds-toggle"
+              aria-checked={diamondsEnabled}
             >
               <span
-                className="inline-block h-1.5 w-4 rounded-full bg-gradient-to-r from-[#b3cde3] to-[#810f7c]"
+                className="inline-block size-2.5 shrink-0 rotate-45 rounded-[2px] border border-[#f97316] bg-[#f97316]/30"
                 aria-hidden
               />
-              Stream
-              {tidalSource && (
-                <span className="text-muted-foreground text-[9px] font-normal">
-                  ({tidalSource === "station" ? "atlas" : "manual"})
-                </span>
-              )}
+              Tidal diamonds
             </Toggle>
           )}
         </div>

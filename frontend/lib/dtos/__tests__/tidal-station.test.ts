@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   TidalStreamEntrySchema,
   TidalStationSchema,
+  TidalDiamondSchema,
   TidalGateWarningSchema,
 } from "../tidal-station"
 
@@ -90,6 +91,53 @@ describe("TidalStationSchema", () => {
   it("rejects missing id", () => {
     const { id: _, ...noId } = TIDAL_STATION_FIXTURE
     expect(TidalStationSchema.safeParse(noId).success).toBe(false)
+  })
+})
+
+const TIDAL_DIAMOND_FIXTURE = {
+  id: "01952f1a-0000-7000-8000-000000000020",
+  name: "Race off the point",
+  lat: 50.3,
+  lng: -4.1,
+  directionDegrees: 225.0,
+  rateKnots: 1.8,
+  source: "simple",
+  radiusM: 500,
+  isUserCreated: true,
+  hourlyTable: [
+    { hourFromHw: -1, rateKnots: 1.0, directionDegrees: 45.0 },
+    { hourFromHw: 0, rateKnots: 1.0, directionDegrees: 225.0 },
+    { hourFromHw: 3, rateKnots: 3.0, directionDegrees: 225.0 },
+  ],
+}
+
+describe("TidalDiamondSchema", () => {
+  it("parses a full tidal diamond fixture", () => {
+    expect(TidalDiamondSchema.safeParse(TIDAL_DIAMOND_FIXTURE).success).toBe(true)
+  })
+
+  it("accepts a null resolved rate/direction (no data at the requested hour)", () => {
+    const result = TidalDiamondSchema.safeParse({
+      ...TIDAL_DIAMOND_FIXTURE,
+      directionDegrees: null,
+      rateKnots: null,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts an absent radius and source", () => {
+    const { radiusM: _r, source: _s, ...minimal } = TIDAL_DIAMOND_FIXTURE
+    expect(TidalDiamondSchema.safeParse(minimal).success).toBe(true)
+  })
+
+  it("rejects a missing isUserCreated flag", () => {
+    const { isUserCreated: _, ...noFlag } = TIDAL_DIAMOND_FIXTURE
+    expect(TidalDiamondSchema.safeParse(noFlag).success).toBe(false)
+  })
+
+  it("rejects a missing hourlyTable", () => {
+    const { hourlyTable: _, ...noTable } = TIDAL_DIAMOND_FIXTURE
+    expect(TidalDiamondSchema.safeParse(noTable).success).toBe(false)
   })
 })
 

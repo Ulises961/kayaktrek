@@ -5,8 +5,8 @@ import { SeaSchema } from "@/lib/dtos/sea"
 import type { Sea } from "@/lib/dtos/sea"
 import { WeatherSchema } from "@/lib/dtos/weather"
 import type { Weather } from "@/lib/dtos/weather"
-import { TidalGateWarningSchema } from "@/lib/dtos/tidal-station"
-import type { TidalGateWarning } from "@/lib/dtos/tidal-station"
+import { TidalGateWarningSchema, TidalDiamondSchema } from "@/lib/dtos/tidal-station"
+import type { TidalGateWarning, TidalDiamond } from "@/lib/dtos/tidal-station"
 import type { VelocityGridData } from "@/lib/types/ui"
 import { z } from "zod"
 
@@ -22,6 +22,10 @@ export type TriggerWeatherResult =
 
 export type TidalGatesResult =
   | { success: true; data: TidalGateWarning[] }
+  | { success: false; error: string }
+
+export type TidalDiamondsResult =
+  | { success: true; data: TidalDiamond[] }
   | { success: false; error: string }
 
 export type VelocityGridResult =
@@ -140,20 +144,19 @@ export async function fetchWaveVectors(dayId: string, hour: number): Promise<Vel
   }
 }
 
-export async function fetchTidalStreamVectors(
+export async function fetchTidalDiamonds(
   dayId: string,
   hour: number,
-): Promise<VelocityGridResult> {
+): Promise<TidalDiamondsResult> {
   try {
-    const data = await apiGet<VelocityGridData>(
-      `/api/day/${dayId}/tidal-stream-vectors?hour=${hour}`,
-    )
+    const raw = await apiGet<unknown>(`/api/day/${dayId}/tidal-diamonds?hour=${hour}`)
+    const data = z.array(TidalDiamondSchema).parse(raw)
     return { success: true, data }
   } catch (e) {
     if (isRedirectError(e)) throw e
     return {
       success: false,
-      error: e instanceof Error ? e.message : "Failed to fetch tidal stream vectors.",
+      error: e instanceof Error ? e.message : "Failed to fetch tidal diamonds.",
     }
   }
 }

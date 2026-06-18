@@ -7,7 +7,7 @@ import {
   fetchTidalGates,
   fetchWindVectors,
   fetchWaveVectors,
-  fetchTidalStreamVectors,
+  fetchTidalDiamonds,
   fetchGlobalWindVectors,
 } from "../actions"
 
@@ -224,17 +224,30 @@ describe("fetchWaveVectors", () => {
   })
 })
 
-describe("fetchTidalStreamVectors", () => {
-  it("gets /api/day/:id/tidal-stream-vectors?hour=12", async () => {
-    GET.mockResolvedValue({ source: "manual", grid: [] })
-    const result = await fetchTidalStreamVectors(DAY_ID, 12)
-    expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/tidal-stream-vectors?hour=12`)
-    expect(result).toEqual({ success: true, data: { source: "manual", grid: [] } })
+describe("fetchTidalDiamonds", () => {
+  const DIAMOND = {
+    id: "01900000-0000-7000-8000-0000000000aa",
+    name: "Race",
+    lat: 50.3,
+    lng: -4.1,
+    directionDegrees: 225,
+    rateKnots: 1.8,
+    source: "simple",
+    radiusM: 500,
+    isUserCreated: true,
+    hourlyTable: [{ hourFromHw: 0, rateKnots: 1.0, directionDegrees: 225 }],
+  }
+
+  it("gets /api/day/:id/tidal-diamonds?hour=12 and parses the list", async () => {
+    GET.mockResolvedValue([DIAMOND])
+    const result = await fetchTidalDiamonds(DAY_ID, 12)
+    expect(GET).toHaveBeenCalledWith(`/api/day/${DAY_ID}/tidal-diamonds?hour=12`)
+    expect(result).toEqual({ success: true, data: [DIAMOND] })
   })
 
   it("returns error on failure", async () => {
     GET.mockRejectedValue(new Error("No data"))
-    const result = await fetchTidalStreamVectors(DAY_ID, 12)
+    const result = await fetchTidalDiamonds(DAY_ID, 12)
     expect(result).toEqual({ success: false, error: "No data" })
   })
 })

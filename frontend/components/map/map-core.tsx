@@ -11,13 +11,15 @@ import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { LayersControl } from "./layers-control"
+import { TidalDiamondMarker } from "./tidal-diamond-marker"
 import {
   fetchWindVectors,
   fetchWaveVectors,
-  fetchTidalStreamVectors,
+  fetchTidalDiamonds,
   fetchGlobalWindVectors,
 } from "@/lib/weather/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
+import type { TidalDiamond } from "@/lib/dtos/tidal-station"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -71,14 +73,6 @@ const SWELL_OPTIONS = {
   particleAge: 90,
   lineWidth: 3.5,
   particleMultiplier: 0.0014,
-}
-// Tidal stream: blue-purple ramp indicating current strength.
-const TIDAL_OPTIONS = {
-  velocityScale: 0.05,
-  colorScale: ["#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
-  particleAge: 64,
-  lineWidth: 3,
-  particleMultiplier: 0.0016,
 }
 // Global background: sparser, slower particles to show large-scale atmospheric context.
 // §8b fills the data; for now the backend stub returns an empty grid.
@@ -326,11 +320,11 @@ export default function MapCore({
 
   const [windData, setWindData] = useState<VelocityGridData | null>(null)
   const [swellData, setSwellData] = useState<VelocityGridData | null>(null)
-  const [tidalData, setTidalData] = useState<VelocityGridData | null>(null)
+  const [diamonds, setDiamonds] = useState<TidalDiamond[]>([])
   const [globalWindData, setGlobalWindData] = useState<VelocityGridData | null>(null)
   const [windEnabled, setWindEnabled] = useState(true)
   const [swellEnabled, setSwellEnabled] = useState(true)
-  const [tidalEnabled, setTidalEnabled] = useState(true)
+  const [diamondsEnabled, setDiamondsEnabled] = useState(true)
 
   const selectedDayDate = useMemo(
     () => days.find((d) => d.id === selectedDayId)?.date ?? null,
@@ -345,8 +339,8 @@ export default function MapCore({
     fetchWaveVectors(selectedDayId, selectedHour).then((r) =>
       setSwellData(r.success ? r.data : null),
     )
-    fetchTidalStreamVectors(selectedDayId, selectedHour).then((r) =>
-      setTidalData(r.success ? r.data : null),
+    fetchTidalDiamonds(selectedDayId, selectedHour).then((r) =>
+      setDiamonds(r.success ? r.data : []),
     )
   }, [selectedDayId, selectedHour])
 
@@ -429,7 +423,7 @@ export default function MapCore({
     [onMarkerDragEnd],
   )
 
-  const hasTidalLayer = selectedDayId !== null && tidalData !== null && tidalData.grid.length > 0
+  const hasDiamonds = selectedDayId !== null && diamonds.length > 0
 
   return (
     <div
@@ -506,21 +500,20 @@ export default function MapCore({
         {selectedDayId && swellData && swellEnabled && (
           <VelocityLayer data={swellData.grid} options={SWELL_OPTIONS} />
         )}
-        {hasTidalLayer && tidalEnabled && (
-          <VelocityLayer data={tidalData!.grid} options={TIDAL_OPTIONS} />
-        )}
+        {hasDiamonds &&
+          diamondsEnabled &&
+          diamonds.map((d) => <TidalDiamondMarker key={d.id} diamond={d} />)}
       </MapContainer>
 
       {selectedDayId && (
         <LayersControl
           windEnabled={windEnabled}
           swellEnabled={swellEnabled}
-          tidalEnabled={tidalEnabled}
-          hasTidalLayer={hasTidalLayer}
-          tidalSource={tidalData?.source}
+          diamondsEnabled={diamondsEnabled}
+          hasDiamonds={hasDiamonds}
           onWindToggle={() => setWindEnabled((e) => !e)}
           onSwellToggle={() => setSwellEnabled((e) => !e)}
-          onTidalToggle={() => setTidalEnabled((e) => !e)}
+          onDiamondsToggle={() => setDiamondsEnabled((e) => !e)}
         />
       )}
     </div>

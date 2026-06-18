@@ -6,12 +6,11 @@ import { LayersControl } from "../layers-control"
 const BASE_PROPS = {
   windEnabled: true,
   swellEnabled: true,
-  tidalEnabled: true,
-  hasTidalLayer: false,
-  tidalSource: null,
+  diamondsEnabled: true,
+  hasDiamonds: false,
   onWindToggle: vi.fn(),
   onSwellToggle: vi.fn(),
-  onTidalToggle: vi.fn(),
+  onDiamondsToggle: vi.fn(),
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -54,25 +53,20 @@ describe("LayersControl", () => {
     expect(BASE_PROPS.onSwellToggle).toHaveBeenCalledOnce()
   })
 
-  it("does not render tidal-toggle when hasTidalLayer is false", () => {
-    render(<LayersControl {...BASE_PROPS} hasTidalLayer={false} />)
-    expect(screen.queryByTestId("tidal-toggle")).not.toBeInTheDocument()
+  it("does not render diamonds-toggle when hasDiamonds is false", () => {
+    render(<LayersControl {...BASE_PROPS} hasDiamonds={false} />)
+    expect(screen.queryByTestId("diamonds-toggle")).not.toBeInTheDocument()
   })
 
-  it("renders tidal-toggle containing 'atlas' when source is station", () => {
-    render(<LayersControl {...BASE_PROPS} hasTidalLayer tidalSource="station" />)
-    expect(screen.getByTestId("tidal-toggle")).toHaveTextContent("atlas")
+  it("renders the diamonds-toggle labelled 'Tidal diamonds' when diamonds exist", () => {
+    render(<LayersControl {...BASE_PROPS} hasDiamonds />)
+    expect(screen.getByTestId("diamonds-toggle")).toHaveTextContent("Tidal diamonds")
   })
 
-  it("renders tidal-toggle containing 'manual' when source is manual", () => {
-    render(<LayersControl {...BASE_PROPS} hasTidalLayer tidalSource="manual" />)
-    expect(screen.getByTestId("tidal-toggle")).toHaveTextContent("manual")
-  })
-
-  it("calls onTidalToggle when tidal-toggle is clicked", () => {
-    render(<LayersControl {...BASE_PROPS} hasTidalLayer tidalSource="station" />)
-    fireEvent.click(screen.getByTestId("tidal-toggle"))
-    expect(BASE_PROPS.onTidalToggle).toHaveBeenCalledOnce()
+  it("calls onDiamondsToggle when diamonds-toggle is clicked", () => {
+    render(<LayersControl {...BASE_PROPS} hasDiamonds />)
+    fireEvent.click(screen.getByTestId("diamonds-toggle"))
+    expect(BASE_PROPS.onDiamondsToggle).toHaveBeenCalledOnce()
   })
 
   it("reflects windEnabled=false with aria-checked false on wind-toggle", () => {

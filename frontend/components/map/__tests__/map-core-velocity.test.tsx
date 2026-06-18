@@ -25,6 +25,9 @@ vi.mock("react-leaflet", () => ({
 
 vi.mock("../point-marker", () => ({ PointMarker: () => null }))
 vi.mock("../ring-icon", () => ({ splitRingIcon: () => null }))
+vi.mock("../tidal-diamond-marker", () => ({
+  TidalDiamondMarker: () => <div data-testid="diamond-marker" />,
+}))
 
 vi.mock("@/components/weather/velocity-layer", () => ({
   VelocityLayer: ({ data }: { data: unknown[] }) => (
@@ -35,7 +38,7 @@ vi.mock("@/components/weather/velocity-layer", () => ({
 vi.mock("@/lib/weather/actions", () => ({
   fetchWindVectors: vi.fn(),
   fetchWaveVectors: vi.fn(),
-  fetchTidalStreamVectors: vi.fn(),
+  fetchTidalDiamonds: vi.fn(),
   fetchGlobalWindVectors: vi.fn(),
 }))
 
@@ -43,15 +46,28 @@ import MapCore from "../map-core"
 import {
   fetchWindVectors,
   fetchWaveVectors,
-  fetchTidalStreamVectors,
+  fetchTidalDiamonds,
   fetchGlobalWindVectors,
 } from "@/lib/weather/actions"
 import type { VelocityGridLayer } from "@/lib/types/ui"
 
 const WIND = fetchWindVectors as ReturnType<typeof vi.fn>
 const SWELL = fetchWaveVectors as ReturnType<typeof vi.fn>
-const TIDAL = fetchTidalStreamVectors as ReturnType<typeof vi.fn>
+const DIAMONDS = fetchTidalDiamonds as ReturnType<typeof vi.fn>
 const GLOBAL = fetchGlobalWindVectors as ReturnType<typeof vi.fn>
+
+const DIAMOND = {
+  id: "01952f1a-0000-7000-8000-000000000020",
+  name: "Race",
+  lat: 50.3,
+  lng: -4.1,
+  directionDegrees: 225,
+  rateKnots: 1.8,
+  source: "simple",
+  radiusM: 500,
+  isUserCreated: true,
+  hourlyTable: [],
+}
 
 const GRID_LAYER: VelocityGridLayer = {
   header: {
@@ -84,7 +100,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   WIND.mockResolvedValue({ success: false, error: "no data" })
   SWELL.mockResolvedValue({ success: false, error: "no data" })
-  TIDAL.mockResolvedValue({ success: false, error: "no data" })
+  DIAMONDS.mockResolvedValue({ success: true, data: [] })
   GLOBAL.mockResolvedValue({ success: false, error: "no data" })
 })
 
@@ -97,7 +113,7 @@ describe("MapCore — velocity layer controls", () => {
   it("renders wind and swell toggle buttons when a day is selected", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
-    TIDAL.mockResolvedValue({ success: true, data: { grid: [] } })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" selectedHour={12} />)
 
@@ -109,7 +125,7 @@ describe("MapCore — velocity layer controls", () => {
   it("renders wind and swell VelocityLayer components when data is fetched", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
-    TIDAL.mockResolvedValue({ success: true, data: { grid: [] } })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" selectedHour={12} />)
 
@@ -118,49 +134,44 @@ describe("MapCore — velocity layer controls", () => {
     })
   })
 
-  it("hides the tidal stream toggle when tidal grid is empty", async () => {
+  it("hides the diamonds toggle when there are no diamonds", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
-    TIDAL.mockResolvedValue({ success: true, data: { grid: [] } })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
 
     await waitFor(() => expect(WIND).toHaveBeenCalled())
-    expect(screen.queryByTestId("tidal-toggle")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("diamonds-toggle")).not.toBeInTheDocument()
   })
 
-  it("shows the tidal stream toggle and source label when tidal grid has data", async () => {
+  it("shows the diamonds toggle and renders a marker per diamond when present", async () => {
     WIND.mockResolvedValue({ success: false, error: "x" })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({
-      success: true,
-      data: { source: "station", grid: [GRID_LAYER] },
-    })
+    DIAMONDS.mockResolvedValue({ success: true, data: [DIAMOND, { ...DIAMOND, id: "x2" }] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
 
-    const tidalToggle = await screen.findByTestId("tidal-toggle")
-    expect(tidalToggle).toHaveTextContent("atlas")
+    expect(await screen.findByTestId("diamonds-toggle")).toHaveTextContent("Tidal diamonds")
+    expect(screen.getAllByTestId("diamond-marker")).toHaveLength(2)
   })
 
-  it("shows (manual) label when tidal source is manual", async () => {
+  it("hides diamond markers when the diamonds layer is toggled off", async () => {
     WIND.mockResolvedValue({ success: false, error: "x" })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({
-      success: true,
-      data: { source: "manual", grid: [GRID_LAYER] },
-    })
+    DIAMONDS.mockResolvedValue({ success: true, data: [DIAMOND] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
+    await waitFor(() => expect(screen.getByTestId("diamond-marker")).toBeInTheDocument())
 
-    const tidalToggle = await screen.findByTestId("tidal-toggle")
-    expect(tidalToggle).toHaveTextContent("manual")
+    fireEvent.click(screen.getByTestId("diamonds-toggle"))
+    expect(screen.queryByTestId("diamond-marker")).not.toBeInTheDocument()
   })
 
   it("re-fetches with the new hour when selectedHour prop changes", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     const { rerender } = render(<MapCore {...BASE_PROPS} selectedDayId="day-1" selectedHour={12} />)
     await waitFor(() => expect(WIND).toHaveBeenCalledWith("day-1", 12))
@@ -168,7 +179,7 @@ describe("MapCore — velocity layer controls", () => {
     vi.clearAllMocks()
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     rerender(<MapCore {...BASE_PROPS} selectedDayId="day-1" selectedHour={18} />)
     await waitFor(() => expect(WIND).toHaveBeenCalledWith("day-1", 18))
@@ -177,7 +188,7 @@ describe("MapCore — velocity layer controls", () => {
   it("clears layer data when selectedDayId becomes null", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     const { rerender } = render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
     await waitFor(() => expect(screen.getAllByTestId("velocity-layer")).toHaveLength(2))
@@ -189,7 +200,7 @@ describe("MapCore — velocity layer controls", () => {
   it("toggles the wind layer off when wind button is clicked", async () => {
     WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
 
     render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
     await waitFor(() => expect(screen.getByTestId("velocity-layer")).toBeInTheDocument())
@@ -201,7 +212,7 @@ describe("MapCore — velocity layer controls", () => {
   it("fetches global wind vectors when a day with a date is selected", async () => {
     WIND.mockResolvedValue({ success: false, error: "x" })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
     GLOBAL.mockResolvedValue({ success: false, error: "x" })
 
     const daysWithDate = [{ id: "day-1", dayNumber: 1, date: "2026-07-15" }]
@@ -213,7 +224,7 @@ describe("MapCore — velocity layer controls", () => {
   it("renders a global wind VelocityLayer when global data arrives", async () => {
     WIND.mockResolvedValue({ success: false, error: "x" })
     SWELL.mockResolvedValue({ success: false, error: "x" })
-    TIDAL.mockResolvedValue({ success: false, error: "x" })
+    DIAMONDS.mockResolvedValue({ success: true, data: [] })
     GLOBAL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
 
     const daysWithDate = [{ id: "day-1", dayNumber: 1, date: "2026-07-15" }]
