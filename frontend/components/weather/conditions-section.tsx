@@ -20,16 +20,15 @@ interface ConditionsSectionProps {
 }
 
 function sourceLabel(sea: Sea | null): string | null {
+  // Day-level tidal heights only — streams now live on diamonds (M4d §5), not Sea.
   if (!sea) return null
-  const hasStream = sea.floodDirectionDegrees != null || sea.maxSpringRateKnots != null
   const hasTide = sea.highTide != null || sea.lowTide != null || sea.tidalRangeM != null
-  if (!hasTide && !hasStream) return null
+  if (!hasTide) return null
   if (sea.tidalSource === "manual_corrected") {
     return sea.referencePortName
       ? `Tidal data: manually corrected from ${sea.referencePortName}`
       : "Tidal data: manually corrected"
   }
-  if (!hasTide && hasStream) return "Tidal data: from atlas"
   return "Tidal data: manual"
 }
 

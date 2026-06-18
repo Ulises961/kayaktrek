@@ -32,6 +32,13 @@ describe("TidalEntryForm — crew", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
+
+  it("shows an empty state (not a form) when no tidal data exists", () => {
+    render(<TidalEntryForm dayId={DAY_ID} sea={null} isLeader={false} onSaved={vi.fn()} />)
+    expect(screen.getByTestId("tidal-empty")).toBeInTheDocument()
+    expect(screen.queryByTestId("tidal-readonly")).not.toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+  })
 })
 
 describe("TidalEntryForm — leader", () => {
@@ -84,22 +91,23 @@ describe("TidalEntryForm — leader", () => {
     expect(fields).toMatchObject({ tidalSource: "manual_corrected", hwTimeOffsetMinutes: 35 })
   })
 
-  it("saves stream data fields", async () => {
+  it("no longer renders the stream-data section (moved to the diamond popup)", () => {
+    render(<TidalEntryForm dayId={DAY_ID} sea={null} isLeader onSaved={vi.fn()} />)
+    expect(screen.queryByRole("button", { name: /stream data/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Flood dir (°)")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Max spring (kn)")).not.toBeInTheDocument()
+  })
+
+  it("omits stream fields from the save payload", async () => {
     const user = userEvent.setup()
     render(<TidalEntryForm dayId={DAY_ID} sea={null} isLeader onSaved={vi.fn()} />)
 
-    await user.click(screen.getByRole("button", { name: /stream data/i }))
-    await user.type(screen.getByLabelText("Flood dir (°)"), "200")
-    await user.type(screen.getByLabelText("Ebb dir (°)"), "20")
-    await user.type(screen.getByLabelText("Max spring (kn)"), "5.5")
+    await user.type(screen.getByLabelText("High water"), "09:42")
     await user.click(screen.getByRole("button", { name: /save tidal data/i }))
 
     await waitFor(() => expect(UPDATE).toHaveBeenCalled())
     const [, fields] = UPDATE.mock.calls[0]
-    expect(fields).toMatchObject({
-      floodDirectionDegrees: 200,
-      ebbDirectionDegrees: 20,
-      maxSpringRateKnots: 5.5,
-    })
+    expect(fields).not.toHaveProperty("floodDirectionDegrees")
+    expect(fields).not.toHaveProperty("maxSpringRateKnots")
   })
 })
