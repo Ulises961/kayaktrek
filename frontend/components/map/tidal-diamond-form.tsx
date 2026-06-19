@@ -212,7 +212,11 @@ export function TidalDiamondForm({
           </div>
           {errors.tidalStreamEntries && (
             <p className="text-destructive mt-1 text-xs">
-              {errors.tidalStreamEntries.message ?? "Check the hourly table."}
+              {/* A superRefine issue on the array itself lands on `.root` for a
+                  useFieldArray field; per-row issues carry their own `.message`. */}
+              {errors.tidalStreamEntries.root?.message ??
+                errors.tidalStreamEntries.message ??
+                "Check the hourly table."}
             </p>
           )}
         </TabsContent>
