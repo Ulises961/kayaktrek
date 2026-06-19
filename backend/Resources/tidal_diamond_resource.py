@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 
 from Schemas.tidal_station_schema import (
     TidalDiamondCreateSchema,
+    TidalDiamondEditSchema,
     TidalDiamondUpdateSchema,
     TidalStationSchema,
 )
@@ -24,6 +25,7 @@ tidal_diamond_api = Blueprint('tidal_diamond', __name__)
 _create_schema = TidalDiamondCreateSchema()
 _update_schema = TidalDiamondUpdateSchema()
 _dump_schema = TidalStationSchema()
+_edit_schema = TidalDiamondEditSchema()
 
 
 @tidal_diamond_api.route('/api/tidal-diamond/create', methods=['POST'])
@@ -46,6 +48,23 @@ def create_diamond():
         raise
     except Exception as e:
         logger.error("create_diamond_error", extra={"error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@tidal_diamond_api.route('/api/tidal-diamond/<string:id>', methods=['GET'])
+@JWTService.authenticate_restful
+@require_owner('tidal_diamond')
+def get_diamond(id: str):
+    """Raw editable view of a user diamond, for prefilling the edit form."""
+    try:
+        view = TidalStationService.get_diamond_edit_view(id)
+        return jsonify(_edit_schema.dump(view)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("get_diamond_error", extra={"station_id": id, "error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 

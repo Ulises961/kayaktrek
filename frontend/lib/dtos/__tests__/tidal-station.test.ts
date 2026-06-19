@@ -5,6 +5,8 @@ import {
   TidalDiamondSchema,
   TidalGateWarningSchema,
   TidalDiamondFormSchema,
+  TidalDiamondEditSchema,
+  diamondEditToFormValues,
 } from "../tidal-station"
 
 const STREAM_ENTRY_FIXTURE = {
@@ -200,6 +202,48 @@ describe("TidalDiamondFormSchema", () => {
       ],
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe("TidalDiamondEditSchema + diamondEditToFormValues", () => {
+  const SIMPLE_EDIT = {
+    id: "01952f1a-0000-7000-8000-000000000020",
+    name: "The Race",
+    entryMode: "simple" as const,
+    radiusM: 800,
+    isUserCreated: true,
+    maxSpringRateKnots: 3.0,
+    maxNeapRateKnots: null,
+    floodDirectionDegrees: 45,
+    ebbDirectionDegrees: 225,
+    tidalStreamEntries: [
+      { hoursFromHw: -3, directionDegrees: 45, springRateKnots: 3.0, neapRateKnots: 3.0 },
+    ],
+  }
+
+  it("parses the raw edit view", () => {
+    expect(TidalDiamondEditSchema.safeParse(SIMPLE_EDIT).success).toBe(true)
+  })
+
+  it("maps simple peaks and pads the table to the full -6…+6 grid", () => {
+    const values = diamondEditToFormValues(SIMPLE_EDIT)
+    expect(values.name).toBe("The Race")
+    expect(values.entryMode).toBe("simple")
+    expect(values.radiusM).toBe(800)
+    expect(values.maxSpringRateKnots).toBe(3.0)
+    expect(values.maxNeapRateKnots).toBeNull()
+    expect(values.floodDirectionDegrees).toBe(45)
+    // Always 13 rows even though only one was stored; the stored hour is filled.
+    expect(values.tidalStreamEntries).toHaveLength(13)
+    const minus3 = values.tidalStreamEntries!.find((e) => e.hoursFromHw === -3)
+    expect(minus3?.springRateKnots).toBe(3.0)
+    const plus5 = values.tidalStreamEntries!.find((e) => e.hoursFromHw === 5)
+    expect(plus5?.springRateKnots).toBeNull()
+  })
+
+  it("defaults radius to 500 when the diamond carries none", () => {
+    const values = diamondEditToFormValues({ ...SIMPLE_EDIT, radiusM: null })
+    expect(values.radiusM).toBe(500)
   })
 })
 

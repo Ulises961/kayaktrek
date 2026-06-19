@@ -22,9 +22,14 @@ logger = logging.getLogger(__name__)
 # Cumulative fractions at each hour from LW: 0, 1/12, 3/12, 6/12, 9/12, 11/12, 12/12
 _RULE_12_FRACTIONS = [0.0, 1 / 12, 3 / 12, 6 / 12, 9 / 12, 11 / 12, 1.0]
 
-# Per-hour rate fractions normalized to peak (h=2 or h=3): [1/3, 2/3, 1, 1, 2/3, 1/3]
-# max_spring_rate_knots is treated as the peak current speed.
-_STREAM_FRACTIONS = [1 / 3, 2 / 3, 1.0, 1.0, 2 / 3, 1 / 3]
+# Rule-of-thirds rate fractions at the hour MARKS across one 6-hour half-cycle,
+# indexed by hours from the slack at its start: slack→1/3→2/3→peak→2/3→1/3 (and
+# 0 again at the next slack, which is index 0 of the following half). The stream
+# is slack at HW and LW and peaks at mid-tide; max_spring_rate_knots is the peak.
+# (The classic "1/3, 2/3, 3/3, 3/3, 2/3, 1/3" phrasing gives *hourly-average*
+# rates over the six intervals — sampled onto the 13 hour marks it would put a
+# non-zero rate at slack and a double peak, which is wrong for a diamond table.)
+_STREAM_FRACTIONS = [0.0, 1 / 3, 2 / 3, 1.0, 2 / 3, 1 / 3]
 
 # Assumed paddling start (minutes from midnight) when no explicit start time exists
 _DEFAULT_START_MIN = 9 * 60  # 09:00
@@ -225,10 +230,11 @@ class TidalService:
         Build the 13 hourly TidalStreamEntry rows (hours_from_hw -6..+6) for a
         simple-mode diamond using the rule of thirds.
 
-        Slack is assumed at HW and LW; the peak rate is reached at mid-flood and
-        mid-ebb (±3 h from HW). Each hour's rate is a third-fraction of the peak
-        (1/3, 2/3, 3/3, 3/3, 2/3, 1/3) across each 6-hour half-cycle. The flood
-        half (LW→HW) takes the flood direction, the ebb half (HW→LW) the ebb.
+        Slack (zero rate) is assumed at HW and LW; the peak rate is reached at
+        mid-flood and mid-ebb (±3 h from HW). Each hour mark is a third-fraction
+        of the peak — 0 → 1/3 → 2/3 → peak → 2/3 → 1/3 → 0 across each 6-hour
+        half-cycle. The flood half (LW→HW) takes the flood direction, the ebb
+        half (HW→LW) the ebb.
 
         When max_neap_rate_knots is omitted the neap rate mirrors the spring rate
         (no spring/neap swing), so the entered peak is rendered as-is regardless
@@ -241,9 +247,10 @@ class TidalService:
         entries = []
         for hours_from_hw in range(-6, 7):
             # LW sits 6 h before HW, so hour-from-LW = hour-from-HW + 6 (mod 12).
+            # Within each 6-hour half (flood 0..5, ebb 6..11) the position from
+            # that half's opening slack indexes the rule-of-thirds fractions.
             hour_from_lw = (hours_from_hw + 6) % 12
-            fraction_idx = hour_from_lw if hour_from_lw < 6 else 11 - hour_from_lw
-            fraction = _STREAM_FRACTIONS[fraction_idx]
+            fraction = _STREAM_FRACTIONS[hour_from_lw % 6]
             is_flood = hour_from_lw < 6
             entries.append(
                 TidalStreamEntry(

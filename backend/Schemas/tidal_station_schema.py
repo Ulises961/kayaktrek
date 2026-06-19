@@ -164,6 +164,25 @@ class TidalDiamondCreateSchema(_DiamondFieldValidators, BaseSchema):
             )
 
 
+class TidalDiamondEditSchema(BaseSchema):
+    """Dump-only raw view of a user diamond for edit-form prefill.
+
+    Carries the per-hour table verbatim plus the reconstructed simple-mode peak
+    inputs (null for atlas diamonds). The matching write path is the PATCH body
+    validated by TidalDiamondUpdateSchema.
+    """
+
+    name = fields.String()
+    entry_mode = fields.String()
+    radius_m = fields.Float(allow_none=True)
+    is_user_created = fields.Boolean()
+    max_spring_rate_knots = fields.Float(allow_none=True)
+    max_neap_rate_knots = fields.Float(allow_none=True)
+    flood_direction_degrees = fields.Float(allow_none=True)
+    ebb_direction_degrees = fields.Float(allow_none=True)
+    tidal_stream_entries = fields.List(fields.Nested(TidalStreamEntrySchema))
+
+
 class TidalDiamondUpdateSchema(_DiamondFieldValidators, BaseSchema):
     """Validates a partial PATCH for a user diamond → dict for the service.
 

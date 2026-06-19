@@ -9,12 +9,14 @@ import {
   TidalGateWarningSchema,
   TidalDiamondSchema,
   TidalStationSchema,
+  TidalDiamondEditSchema,
 } from "@/lib/dtos/tidal-station"
 import type {
   TidalGateWarning,
   TidalDiamond,
   TidalStation,
   TidalDiamondForm,
+  TidalDiamondEdit,
 } from "@/lib/dtos/tidal-station"
 import type { VelocityGridData } from "@/lib/types/ui"
 import { z } from "zod"
@@ -42,6 +44,10 @@ export type DiamondMutationResult =
   | { success: false; error: string }
 
 export type DiamondDeleteResult = { success: true } | { success: false; error: string }
+
+export type DiamondEditViewResult =
+  | { success: true; data: TidalDiamondEdit }
+  | { success: false; error: string }
 
 export type VelocityGridResult =
   | { success: true; data: VelocityGridData }
@@ -228,6 +234,35 @@ export async function createTidalDiamond(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Failed to create tidal diamond.",
+    }
+  }
+}
+
+export async function fetchTidalDiamondForEdit(diamondId: string): Promise<DiamondEditViewResult> {
+  try {
+    const raw = await apiGet<unknown>(`/api/tidal-diamond/${diamondId}`)
+    return { success: true, data: TidalDiamondEditSchema.parse(raw) }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to load tidal diamond.",
+    }
+  }
+}
+
+export async function editTidalDiamond(
+  diamondId: string,
+  fields: TidalDiamondForm,
+): Promise<DiamondMutationResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/tidal-diamond/${diamondId}`, diamondBody(fields))
+    return { success: true, data: TidalStationSchema.parse(raw) }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update tidal diamond.",
     }
   }
 }

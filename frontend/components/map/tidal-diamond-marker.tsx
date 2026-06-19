@@ -46,10 +46,11 @@ export function diamondIconHtml(
 
 type TidalDiamondMarkerProps = {
   diamond: TidalDiamond
-  // When true the marker can be dragged to reposition and shows a delete control.
-  // The caller gates this on ownership (isUserCreated + manage permission).
+  // When true the marker can be dragged to reposition and shows edit/delete
+  // controls. The caller gates this on ownership (isUserCreated + manage permission).
   editable?: boolean
   onDragEnd?: (lat: number, lng: number) => void
+  onEdit?: () => void
   onDelete?: () => void
 }
 
@@ -57,6 +58,7 @@ export function TidalDiamondMarker({
   diamond,
   editable = false,
   onDragEnd,
+  onEdit,
   onDelete,
 }: TidalDiamondMarkerProps) {
   const color = diamondColor(diamond.rateKnots)
@@ -128,14 +130,27 @@ export function TidalDiamondMarker({
                 ))}
               </tbody>
             </table>
-            {editable && onDelete && (
-              <button
-                type="button"
-                onClick={onDelete}
-                className="text-destructive hover:bg-destructive/10 mt-2 w-full rounded px-2 py-1 text-[11px] font-medium transition-colors"
-              >
-                Delete diamond
-              </button>
+            {editable && (onEdit || onDelete) && (
+              <div className="mt-2 flex gap-1">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="text-foreground hover:bg-muted flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="text-destructive hover:bg-destructive/10 flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors"
+                  >
+                    Delete diamond
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </Popup>

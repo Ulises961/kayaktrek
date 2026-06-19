@@ -37,14 +37,18 @@ def test_synthesis_assigns_flood_and_ebb_directions_by_phase(app):
         assert entries[h].direction_degrees == 225
 
 
-def test_synthesis_peaks_at_mid_tide_and_thirds_at_slack(app):
+def test_synthesis_peaks_at_mid_tide_and_slacks_at_turns(app):
     entries = {e.hours_from_hw: e for e in TidalService.synthesise_stream_entries(3.0, 45, 225)}
     # Peak (3/3) at mid-flood / mid-ebb.
     assert entries[-3].spring_rate_knots == pytest.approx(3.0)
     assert entries[3].spring_rate_knots == pytest.approx(3.0)
-    # 1/3 of peak at the HW and LW turns.
-    assert entries[0].spring_rate_knots == pytest.approx(1.0)
-    assert entries[-6].spring_rate_knots == pytest.approx(1.0)
+    # Slack (zero rate) at the HW and LW turns.
+    assert entries[0].spring_rate_knots == pytest.approx(0.0)
+    assert entries[-6].spring_rate_knots == pytest.approx(0.0)
+    assert entries[6].spring_rate_knots == pytest.approx(0.0)
+    # Thirds building between slack and peak.
+    assert entries[-5].spring_rate_knots == pytest.approx(1.0)
+    assert entries[-4].spring_rate_knots == pytest.approx(2.0)
 
 
 def test_synthesis_neap_defaults_to_spring_when_omitted(app):
@@ -56,8 +60,8 @@ def test_synthesis_neap_defaults_to_spring_when_omitted(app):
 def test_synthesis_neap_scales_independently_when_provided(app):
     entries = {e.hours_from_hw: e for e in
                TidalService.synthesise_stream_entries(3.0, 45, 225, max_neap_rate_knots=1.5)}
-    assert entries[-3].neap_rate_knots == pytest.approx(1.5)
-    assert entries[0].neap_rate_knots == pytest.approx(0.5)
+    assert entries[-3].neap_rate_knots == pytest.approx(1.5)  # peak neap
+    assert entries[0].neap_rate_knots == pytest.approx(0.0)   # slack at HW
 
 
 # ── create_user_diamond ──────────────────────────────────────────────────────
@@ -121,6 +125,48 @@ def test_update_diamond_rate_change_resynthesises_entries(app, itinerary, id):
     assert len(updated.tidal_stream_entries) == 13
 
 
+# ── get_diamond_edit_view (raw form prefill) ─────────────────────────────────
+
+def test_edit_view_reconstructs_simple_peaks_and_sets(app, itinerary, id):
+    data = {"name": "Race", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+            "max_spring_rate_knots": 3.0, "max_neap_rate_knots": 1.5,
+            "flood_direction_degrees": 45, "ebb_direction_degrees": 225, "radius_m": 800}
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+
+    view = TidalStationService.get_diamond_edit_view(str(station.id))
+    assert view["entry_mode"] == "simple"
+    assert view["radius_m"] == pytest.approx(800)
+    assert view["max_spring_rate_knots"] == pytest.approx(3.0)
+    assert view["max_neap_rate_knots"] == pytest.approx(1.5)
+    assert view["flood_direction_degrees"] == pytest.approx(45)
+    assert view["ebb_direction_degrees"] == pytest.approx(225)
+    assert len(view["tidal_stream_entries"]) == 13
+
+
+def test_edit_view_omits_neap_when_it_mirrors_spring(app, itinerary, id):
+    # Neap left blank on create → entries carry neap == spring; the view should
+    # report no neap so the prefill matches the original blank input.
+    station = _simple_diamond(itinerary, id)  # no max_neap_rate_knots
+    view = TidalStationService.get_diamond_edit_view(str(station.id))
+    assert view["max_spring_rate_knots"] == pytest.approx(3.0)
+    assert view["max_neap_rate_knots"] is None
+
+
+def test_edit_view_atlas_returns_raw_table_and_no_peaks(app, itinerary, id):
+    rows = [TidalStreamEntry(hours_from_hw=h, direction_degrees=90,
+                             spring_rate_knots=2.0, neap_rate_knots=1.0) for h in range(-6, 7)]
+    data = {"name": "Atlas pt", "location": _loc(), "entry_mode": StreamEntryMode.ATLAS,
+            "tidal_stream_entries": rows}
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, data)
+
+    view = TidalStationService.get_diamond_edit_view(str(station.id))
+    assert view["entry_mode"] == "atlas"
+    assert view["max_spring_rate_knots"] is None
+    assert view["flood_direction_degrees"] is None
+    assert len(view["tidal_stream_entries"]) == 13
+    assert {e.spring_rate_knots for e in view["tidal_stream_entries"]} == {2.0}
+
+
 # ── day_diamonds (§2 — resolved at clock hour) ───────────────────────────────
 
 def _simple_diamond(itinerary, user_id, **overrides):
@@ -159,9 +205,9 @@ def test_day_diamonds_hour_at_hw_is_ebb_turn(app, itinerary, id):
     day = _day_with_sea(itinerary)
     _simple_diamond(itinerary, id)
 
-    # hour 12 == HW → hours_from_hw = 0 → 1/3 peak at the ebb turn.
+    # hour 12 == HW → hours_from_hw = 0 → slack (zero rate) at the ebb turn.
     d = TidalService.day_diamonds(day, day.sea, 12)[0]
-    assert d["rate_knots"] == pytest.approx(1.0)
+    assert d["rate_knots"] == pytest.approx(0.0)
     assert d["direction_degrees"] == pytest.approx(225.0)
 
 
@@ -169,9 +215,9 @@ def test_day_diamonds_falls_back_to_hw_slack_without_sea(app, itinerary, id):
     day = db.session.get(Day, itinerary["days"][0]["id"])
     _simple_diamond(itinerary, id)
 
-    # No Sea → HW unknown → hours_from_hw defaults to 0 regardless of the hour.
+    # No Sea → HW unknown → hours_from_hw defaults to 0 (HW slack) regardless of the hour.
     d = TidalService.day_diamonds(day, None, 9)[0]
-    assert d["rate_knots"] == pytest.approx(1.0)
+    assert d["rate_knots"] == pytest.approx(0.0)
     assert d["direction_degrees"] == pytest.approx(225.0)
 
 

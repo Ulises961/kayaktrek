@@ -109,6 +109,54 @@ class TidalStationService:
         return station
 
     @staticmethod
+    def get_diamond_edit_view(station_id: str) -> dict:
+        """
+        Build the raw editable view of a user diamond for form prefill.
+
+        The resolved day-diamonds shape is lossy (rates are interpolated to a
+        day's range at one hour), so an edit form cannot be populated from it.
+        This returns the inputs the user originally supplied: the per-hour table
+        verbatim, plus — for simple-mode diamonds — the peak rates and flood/ebb
+        set reconstructed from the synthesised entries (peak = max rate; the set
+        is carried on the mid-flood/mid-ebb hours at -3/+3 from HW).
+        """
+        station = TidalStationService.get_by_id(station_id)
+        entries = sorted(station.tidal_stream_entries, key=lambda e: e.hours_from_hw)
+
+        view = {
+            "id": str(station.id),
+            "name": station.name,
+            "entry_mode": station.entry_mode.value if station.entry_mode else None,
+            "radius_m": float(station.radius_m) if station.radius_m is not None else None,
+            "is_user_created": station.is_user_created,
+            "max_spring_rate_knots": None,
+            "max_neap_rate_knots": None,
+            "flood_direction_degrees": None,
+            "ebb_direction_degrees": None,
+            "tidal_stream_entries": entries,
+        }
+
+        if station.entry_mode == StreamEntryMode.SIMPLE and entries:
+            by_hour = {e.hours_from_hw: e for e in entries}
+            springs = [e.spring_rate_knots for e in entries if e.spring_rate_knots is not None]
+            neaps = [e.neap_rate_knots for e in entries if e.neap_rate_knots is not None]
+            max_spring = max(springs) if springs else None
+            max_neap = max(neaps) if neaps else None
+            view["max_spring_rate_knots"] = max_spring
+            # Omit neap when it equals spring (no spring/neap swing) so the prefill
+            # mirrors a creator who left the optional neap field blank.
+            if max_neap is not None and max_spring is not None and abs(max_neap - max_spring) > 1e-9:
+                view["max_neap_rate_knots"] = max_neap
+            flood = by_hour.get(-3)
+            ebb = by_hour.get(3)
+            if flood is not None:
+                view["flood_direction_degrees"] = flood.direction_degrees
+            if ebb is not None:
+                view["ebb_direction_degrees"] = ebb.direction_degrees
+
+        return view
+
+    @staticmethod
     def update_user_diamond(station_id: str, data: dict) -> TidalStation:
         """
         Patch a user diamond. Station fields update in place; if the entry mode

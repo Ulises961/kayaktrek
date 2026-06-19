@@ -29,13 +29,16 @@ import {
   fetchTidalDiamonds,
   fetchGlobalWindVectors,
   createTidalDiamond,
+  editTidalDiamond,
+  fetchTidalDiamondForEdit,
   repositionTidalDiamond,
   deleteTidalDiamond,
 } from "@/lib/weather/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
-import type {
-  TidalDiamond,
-  TidalDiamondForm as TidalDiamondFormValues,
+import {
+  diamondEditToFormValues,
+  type TidalDiamond,
+  type TidalDiamondForm as TidalDiamondFormValues,
 } from "@/lib/dtos/tidal-station"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
@@ -365,12 +368,16 @@ export default function MapCore({
   const [swellEnabled, setSwellEnabled] = useState(true)
   const [diamondsEnabled, setDiamondsEnabled] = useState(true)
 
-  // Drop-a-pin create flow: `placing` arms the next map click; `draft` holds the
-  // chosen location while the entry dialog is open.
+  // Diamond entry dialog drives two flows through one form:
+  //  • create — `placing` arms the next map click; `draft` holds the dropped spot
+  //  • edit   — `editing` holds the diamond id + the prefilled form values
   const [placing, setPlacing] = useState(false)
   const [draft, setDraft] = useState<{ lat: number; lng: number } | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [isCreating, startCreate] = useTransition()
+  const [editing, setEditing] = useState<{ id: string; values: TidalDiamondFormValues } | null>(
+    null,
+  )
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const [isMutating, startMutation] = useTransition()
 
   const selectedDayDate = useMemo(
     () => days.find((d) => d.id === selectedDayId)?.date ?? null,
@@ -404,26 +411,50 @@ export default function MapCore({
 
   const handlePlace = useCallback((lat: number, lng: number) => {
     setPlacing(false)
-    setCreateError(null)
+    setMutationError(null)
     setDraft({ lat, lng })
   }, [])
 
-  const handleCreateSubmit = useCallback(
+  const closeDialog = useCallback(() => {
+    setDraft(null)
+    setEditing(null)
+    setMutationError(null)
+  }, [])
+
+  // One submit path for both flows: edit PATCHes the existing diamond, create
+  // POSTs at the dropped location. Both re-resolve the markers on success.
+  const handleDialogSubmit = useCallback(
     (fields: TidalDiamondFormValues) => {
-      if (!itineraryId || !draft) return
-      setCreateError(null)
-      startCreate(async () => {
-        const result = await createTidalDiamond(itineraryId, draft.lat, draft.lng, fields)
+      setMutationError(null)
+      startMutation(async () => {
+        const result = editing
+          ? await editTidalDiamond(editing.id, fields)
+          : itineraryId && draft
+            ? await createTidalDiamond(itineraryId, draft.lat, draft.lng, fields)
+            : null
+        if (!result) return
         if (result.success) {
-          setDraft(null)
+          closeDialog()
           reloadDiamonds()
         } else {
-          setCreateError(result.error)
+          setMutationError(result.error)
         }
       })
     },
-    [itineraryId, draft, reloadDiamonds],
+    [editing, itineraryId, draft, reloadDiamonds, closeDialog],
   )
+
+  const handleDiamondEdit = useCallback((id: string) => {
+    setMutationError(null)
+    startMutation(async () => {
+      const result = await fetchTidalDiamondForEdit(id)
+      if (result.success) {
+        setEditing({ id, values: diamondEditToFormValues(result.data) })
+      } else {
+        setMutationError(result.error)
+      }
+    })
+  }, [])
 
   const handleDiamondDragEnd = useCallback(
     (id: string, lat: number, lng: number) => {
@@ -604,6 +635,7 @@ export default function MapCore({
               diamond={d}
               editable={canManageDiamonds && d.isUserCreated}
               onDragEnd={(lat, lng) => handleDiamondDragEnd(d.id, lat, lng)}
+              onEdit={() => handleDiamondEdit(d.id)}
               onDelete={() => handleDiamondDelete(d.id)}
             />
           ))}
@@ -662,20 +694,25 @@ export default function MapCore({
       )}
 
       <Dialog
-        open={draft != null}
+        open={draft != null || editing != null}
         onOpenChange={(open) => {
-          if (!open) setDraft(null)
+          if (!open) closeDialog()
         }}
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>New tidal diamond</DialogTitle>
+            <DialogTitle>{editing ? "Edit tidal diamond" : "New tidal diamond"}</DialogTitle>
           </DialogHeader>
+          {/* Remount per flow so the field array resets cleanly between create
+              (empty) and edit (prefilled). */}
           <TidalDiamondForm
-            isPending={isCreating}
-            error={createError}
-            onSubmit={handleCreateSubmit}
-            onCancel={() => setDraft(null)}
+            key={editing?.id ?? "create"}
+            values={editing?.values}
+            submitLabel={editing ? "Save changes" : "Save diamond"}
+            isPending={isMutating}
+            error={mutationError}
+            onSubmit={handleDialogSubmit}
+            onCancel={closeDialog}
           />
         </DialogContent>
       </Dialog>

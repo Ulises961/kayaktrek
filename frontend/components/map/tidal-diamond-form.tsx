@@ -1,5 +1,5 @@
 "use client"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   TidalDiamondFormSchema,
@@ -34,6 +34,8 @@ export type TidalDiamondFormProps = {
   submitLabel?: string
   isPending?: boolean
   error?: string | null
+  // Prefill for editing an existing diamond; omitted for a fresh create.
+  values?: TidalDiamondFormValues
   onSubmit: (fields: TidalDiamondFormValues) => void
   onCancel?: () => void
 }
@@ -42,6 +44,7 @@ export function TidalDiamondForm({
   submitLabel = "Save diamond",
   isPending = false,
   error = null,
+  values,
   onSubmit,
   onCancel,
 }: TidalDiamondFormProps) {
@@ -60,10 +63,11 @@ export function TidalDiamondForm({
       radiusM: 500,
       tidalStreamEntries: emptyEntries(),
     },
+    values,
   })
 
   const { fields } = useFieldArray({ control, name: "tidalStreamEntries" })
-  const entryMode = watch("entryMode")
+  const entryMode = useWatch({ control, name: "entryMode" })
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">

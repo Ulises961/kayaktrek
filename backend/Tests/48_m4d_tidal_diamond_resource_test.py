@@ -76,6 +76,43 @@ def test_create_requires_auth(client, itinerary):
     assert resp.status_code in (401, 403)
 
 
+# ── get (raw edit view) ───────────────────────────────────────────────────────
+
+def test_get_simple_diamond_returns_raw_edit_view(client, auth_headers, itinerary):
+    diamond_id = _create(client, auth_headers, itinerary).get_json()["id"]
+    resp = client.get(f"{DIAMOND_BASE}/{diamond_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["entryMode"] == "simple"
+    assert data["maxSpringRateKnots"] == pytest.approx(3.0)
+    assert data["floodDirectionDegrees"] == pytest.approx(45)
+    assert data["ebbDirectionDegrees"] == pytest.approx(225)
+    assert len(data["tidalStreamEntries"]) == 13
+
+
+def test_get_nonexistent_returns_404(client, auth_headers):
+    resp = client.get(f"{DIAMOND_BASE}/{uuid4()}", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_global_station_returns_403(client, auth_headers):
+    station = TidalStation(name="Seeded", location=from_shape(ShapelyPoint(-4.0, 50.0), srid=4326))
+    _db.session.add(station)
+    _db.session.commit()
+    try:
+        resp = client.get(f"{DIAMOND_BASE}/{station.id}", headers=auth_headers)
+        assert resp.status_code == 403
+    finally:
+        _db.session.delete(station)
+        _db.session.commit()
+
+
+def test_get_by_non_member_returns_403(client, auth_headers, auth_headers_2, itinerary):
+    diamond_id = _create(client, auth_headers, itinerary).get_json()["id"]
+    resp = client.get(f"{DIAMOND_BASE}/{diamond_id}", headers=auth_headers_2)
+    assert resp.status_code == 403
+
+
 # ── patch ────────────────────────────────────────────────────────────────────
 
 def test_patch_renames_without_rebuilding_entries(client, auth_headers, itinerary):

@@ -97,9 +97,51 @@ export const TidalDiamondFormSchema = z
     }
   })
 
+// Raw editable view of a user diamond (GET /api/tidal-diamond/<id>): the inputs
+// the creator supplied, for prefilling the edit form. Simple peaks are null for
+// atlas diamonds; the per-hour table is always present.
+export const TidalDiamondEditSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  entryMode: z.enum(["simple", "atlas"]),
+  radiusM: z.number().nullable().optional(),
+  isUserCreated: z.boolean(),
+  maxSpringRateKnots: z.number().nullable().optional(),
+  maxNeapRateKnots: z.number().nullable().optional(),
+  floodDirectionDegrees: z.number().nullable().optional(),
+  ebbDirectionDegrees: z.number().nullable().optional(),
+  tidalStreamEntries: z.array(TidalStreamEntrySchema),
+})
+
 export type TidalStreamEntry = z.infer<typeof TidalStreamEntrySchema>
 export type TidalStation = z.infer<typeof TidalStationSchema>
 export type TidalDiamondHour = z.infer<typeof TidalDiamondHourSchema>
 export type TidalDiamond = z.infer<typeof TidalDiamondSchema>
 export type TidalGateWarning = z.infer<typeof TidalGateWarningSchema>
 export type TidalDiamondForm = z.infer<typeof TidalDiamondFormSchema>
+export type TidalDiamondEdit = z.infer<typeof TidalDiamondEditSchema>
+
+// Map the raw edit view onto entry-form values. The advanced table is rebuilt as
+// the full −6…+6 grid (one row per DIAMOND_HOURS), filled from any stored rows so
+// the field array always has its fixed 13 slots regardless of what was persisted.
+export function diamondEditToFormValues(edit: TidalDiamondEdit): TidalDiamondForm {
+  const byHour = new Map(edit.tidalStreamEntries.map((e) => [e.hoursFromHw, e]))
+  return {
+    name: edit.name,
+    entryMode: edit.entryMode,
+    radiusM: edit.radiusM ?? 500,
+    maxSpringRateKnots: edit.maxSpringRateKnots ?? null,
+    maxNeapRateKnots: edit.maxNeapRateKnots ?? null,
+    floodDirectionDegrees: edit.floodDirectionDegrees ?? null,
+    ebbDirectionDegrees: edit.ebbDirectionDegrees ?? null,
+    tidalStreamEntries: DIAMOND_HOURS.map((h) => {
+      const e = byHour.get(h)
+      return {
+        hoursFromHw: h,
+        springRateKnots: e?.springRateKnots ?? null,
+        neapRateKnots: e?.neapRateKnots ?? null,
+        directionDegrees: e?.directionDegrees ?? null,
+      }
+    }),
+  }
+}
