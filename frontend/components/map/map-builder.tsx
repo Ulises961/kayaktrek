@@ -228,6 +228,8 @@ export function MapBuilder({
               selectedDayId={selectedDayId}
               selectedHour={selectedHour}
               flyToPoint={flyToPoint}
+              itineraryId={itinerary.id ?? ""}
+              canManageDiamonds
               onMapClick={handleMapClick}
               onMarkerDragEnd={handleMarkerDragEnd}
               onMarkerDragMove={handleMarkerDragMove}

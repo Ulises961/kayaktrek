@@ -1,15 +1,32 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import React from "react"
 
 vi.mock("leaflet", () => ({
   default: { divIcon: (opts: unknown) => ({ opts }) },
 }))
 
+// Capture the last Marker props so tests can assert draggability and fire the
+// dragend handler that the real Leaflet marker would emit.
+let lastMarkerProps: {
+  draggable?: boolean
+  eventHandlers?: { dragend?: (e: unknown) => void }
+} = {}
+
 vi.mock("react-leaflet", () => ({
-  Marker: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="diamond-marker">{children}</div>
-  ),
+  Marker: (props: {
+    children?: React.ReactNode
+    draggable?: boolean
+    eventHandlers?: { dragend?: (e: unknown) => void }
+  }) => {
+    lastMarkerProps = props
+    return (
+      <div data-testid="diamond-marker" data-draggable={props.draggable ? "true" : "false"}>
+        {props.children}
+      </div>
+    )
+  },
   Circle: ({ radius }: { radius: number }) => (
     <div data-testid="diamond-radius" data-radius={radius} />
   ),
@@ -84,5 +101,29 @@ describe("TidalDiamondMarker", () => {
     // One row per hourly entry, keyed by hours-from-HW.
     expect(screen.getByText("+3")).toBeInTheDocument()
     expect(screen.getByText("-1")).toBeInTheDocument()
+  })
+
+  it("is read-only by default: not draggable and no delete control", () => {
+    render(<TidalDiamondMarker diamond={DIAMOND} />)
+    expect(screen.getByTestId("diamond-marker")).toHaveAttribute("data-draggable", "false")
+    expect(screen.queryByText(/delete diamond/i)).not.toBeInTheDocument()
+  })
+
+  it("is draggable and reports the new position on dragend when editable", () => {
+    const onDragEnd = vi.fn()
+    render(<TidalDiamondMarker diamond={DIAMOND} editable onDragEnd={onDragEnd} />)
+    expect(screen.getByTestId("diamond-marker")).toHaveAttribute("data-draggable", "true")
+
+    lastMarkerProps.eventHandlers?.dragend?.({
+      target: { getLatLng: () => ({ lat: 51, lng: -3 }) },
+    })
+    expect(onDragEnd).toHaveBeenCalledWith(51, -3)
+  })
+
+  it("renders a delete control that calls onDelete when editable", async () => {
+    const onDelete = vi.fn()
+    render(<TidalDiamondMarker diamond={DIAMOND} editable onDelete={onDelete} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete diamond/i }))
+    expect(onDelete).toHaveBeenCalled()
   })
 })

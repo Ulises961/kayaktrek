@@ -46,9 +46,19 @@ export function diamondIconHtml(
 
 type TidalDiamondMarkerProps = {
   diamond: TidalDiamond
+  // When true the marker can be dragged to reposition and shows a delete control.
+  // The caller gates this on ownership (isUserCreated + manage permission).
+  editable?: boolean
+  onDragEnd?: (lat: number, lng: number) => void
+  onDelete?: () => void
 }
 
-export function TidalDiamondMarker({ diamond }: TidalDiamondMarkerProps) {
+export function TidalDiamondMarker({
+  diamond,
+  editable = false,
+  onDragEnd,
+  onDelete,
+}: TidalDiamondMarkerProps) {
   const color = diamondColor(diamond.rateKnots)
   const radius = diamond.radiusM ?? DEFAULT_RADIUS_M
   const position = useMemo<[number, number]>(
@@ -70,6 +80,19 @@ export function TidalDiamondMarker({ diamond }: TidalDiamondMarkerProps) {
     [diamond.rateKnots, diamond.directionDegrees, color],
   )
 
+  const eventHandlers = useMemo(
+    () =>
+      editable && onDragEnd
+        ? {
+            dragend: (e: L.LeafletEvent) => {
+              const { lat, lng } = (e.target as L.Marker).getLatLng()
+              onDragEnd(lat, lng)
+            },
+          }
+        : undefined,
+    [editable, onDragEnd],
+  )
+
   return (
     <>
       <Circle
@@ -78,7 +101,7 @@ export function TidalDiamondMarker({ diamond }: TidalDiamondMarkerProps) {
         pathOptions={{ color, weight: 1, opacity: 0.35, fillOpacity: 0.05 }}
         interactive={false}
       />
-      <Marker position={position} icon={icon}>
+      <Marker position={position} icon={icon} draggable={editable} eventHandlers={eventHandlers}>
         <Popup>
           <div className="min-w-44">
             <p className="text-foreground text-sm font-semibold">{diamond.name}</p>
@@ -105,6 +128,15 @@ export function TidalDiamondMarker({ diamond }: TidalDiamondMarkerProps) {
                 ))}
               </tbody>
             </table>
+            {editable && onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="text-destructive hover:bg-destructive/10 mt-2 w-full rounded px-2 py-1 text-[11px] font-medium transition-colors"
+              >
+                Delete diamond
+              </button>
+            )}
           </div>
         </Popup>
       </Marker>

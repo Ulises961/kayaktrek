@@ -1,7 +1,16 @@
 "use client"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapContainer, TileLayer, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet"
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import {
+  MapContainer,
+  TileLayer,
+  Polyline,
+  Tooltip,
+  Circle,
+  useMap,
+  useMapEvents,
+} from "react-leaflet"
 import "leaflet/dist/leaflet.css"
+import { Plus } from "lucide-react"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
@@ -12,14 +21,22 @@ import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { LayersControl } from "./layers-control"
 import { TidalDiamondMarker } from "./tidal-diamond-marker"
+import { TidalDiamondForm } from "./tidal-diamond-form"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   fetchWindVectors,
   fetchWaveVectors,
   fetchTidalDiamonds,
   fetchGlobalWindVectors,
+  createTidalDiamond,
+  repositionTidalDiamond,
+  deleteTidalDiamond,
 } from "@/lib/weather/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
-import type { TidalDiamond } from "@/lib/dtos/tidal-station"
+import type {
+  TidalDiamond,
+  TidalDiamondForm as TidalDiamondFormValues,
+} from "@/lib/dtos/tidal-station"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -33,6 +50,12 @@ export type MapCoreProps = {
   selectedDayId?: string | null
   selectedHour?: number
   flyToPoint?: FlyToTarget | null
+  // Itinerary that user-created tidal diamonds are scoped to. Required for the
+  // drop-a-pin create flow; absent on the public/unauthenticated map.
+  itineraryId?: string
+  // Any trip member may add/move/delete diamonds. Off by default so the public
+  // map and edit-only contexts never expose the affordance.
+  canManageDiamonds?: boolean
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -232,6 +255,20 @@ function MapEvents({ onMapClick }: { onMapClick: (lat: number, lng: number) => P
   return null
 }
 
+// ── DiamondPlacer ───────────────────────────────────────────────────────────
+
+// Mounted only while the user is placing a new tidal diamond. Captures the next
+// map click as the diamond's location — works in view mode too, where the route
+// MapEvents handler is not mounted.
+function DiamondPlacer({ onPlace }: { onPlace: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onPlace(e.latlng.lat, e.latlng.lng)
+    },
+  })
+  return null
+}
+
 // ── ConnectedMarker ───────────────────────────────────────────────────────────
 
 type ConnectedMarkerProps = {
@@ -311,6 +348,8 @@ export default function MapCore({
   selectedDayId = null,
   selectedHour = 12,
   flyToPoint = null,
+  itineraryId,
+  canManageDiamonds = false,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
@@ -326,6 +365,13 @@ export default function MapCore({
   const [swellEnabled, setSwellEnabled] = useState(true)
   const [diamondsEnabled, setDiamondsEnabled] = useState(true)
 
+  // Drop-a-pin create flow: `placing` arms the next map click; `draft` holds the
+  // chosen location while the entry dialog is open.
+  const [placing, setPlacing] = useState(false)
+  const [draft, setDraft] = useState<{ lat: number; lng: number } | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreating, startCreate] = useTransition()
+
   const selectedDayDate = useMemo(
     () => days.find((d) => d.id === selectedDayId)?.date ?? null,
     [days, selectedDayId],
@@ -339,10 +385,59 @@ export default function MapCore({
     fetchWaveVectors(selectedDayId, selectedHour).then((r) =>
       setSwellData(r.success ? r.data : null),
     )
+  }, [selectedDayId, selectedHour])
+
+  // Diamonds re-resolve on day/hour change and after every mutation, so the
+  // create/reposition/delete handlers all funnel through this one fetch. When no
+  // day is selected we leave state untouched — the hasDiamonds guard hides the
+  // markers — so the effect never sets state synchronously.
+  const reloadDiamonds = useCallback(() => {
+    if (!selectedDayId) return
     fetchTidalDiamonds(selectedDayId, selectedHour).then((r) =>
       setDiamonds(r.success ? r.data : []),
     )
   }, [selectedDayId, selectedHour])
+
+  useEffect(() => {
+    reloadDiamonds()
+  }, [reloadDiamonds])
+
+  const handlePlace = useCallback((lat: number, lng: number) => {
+    setPlacing(false)
+    setCreateError(null)
+    setDraft({ lat, lng })
+  }, [])
+
+  const handleCreateSubmit = useCallback(
+    (fields: TidalDiamondFormValues) => {
+      if (!itineraryId || !draft) return
+      setCreateError(null)
+      startCreate(async () => {
+        const result = await createTidalDiamond(itineraryId, draft.lat, draft.lng, fields)
+        if (result.success) {
+          setDraft(null)
+          reloadDiamonds()
+        } else {
+          setCreateError(result.error)
+        }
+      })
+    },
+    [itineraryId, draft, reloadDiamonds],
+  )
+
+  const handleDiamondDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      repositionTidalDiamond(id, lat, lng).then(reloadDiamonds)
+    },
+    [reloadDiamonds],
+  )
+
+  const handleDiamondDelete = useCallback(
+    (id: string) => {
+      deleteTidalDiamond(id).then(reloadDiamonds)
+    },
+    [reloadDiamonds],
+  )
 
   useEffect(() => {
     if (!selectedDayId || !selectedDayDate) return
@@ -429,7 +524,7 @@ export default function MapCore({
     <div
       className={cn(
         "relative h-full w-full",
-        !viewMode && "[&_.leaflet-container]:cursor-crosshair",
+        (!viewMode || placing) && "[&_.leaflet-container]:cursor-crosshair",
       )}
     >
       <MapContainer center={[43, 13]} zoom={9} className="h-full w-full" zoomControl>
@@ -445,7 +540,8 @@ export default function MapCore({
           url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
         />
 
-        {!viewMode && <MapEvents onMapClick={onMapClick} />}
+        {!viewMode && !placing && <MapEvents onMapClick={onMapClick} />}
+        {placing && <DiamondPlacer onPlace={handlePlace} />}
         <ResizeHandler />
         <FitBoundsController points={validPoints} />
         <FlyToController flyToPoint={flyToPoint} />
@@ -502,7 +598,25 @@ export default function MapCore({
         )}
         {hasDiamonds &&
           diamondsEnabled &&
-          diamonds.map((d) => <TidalDiamondMarker key={d.id} diamond={d} />)}
+          diamonds.map((d) => (
+            <TidalDiamondMarker
+              key={d.id}
+              diamond={d}
+              editable={canManageDiamonds && d.isUserCreated}
+              onDragEnd={(lat, lng) => handleDiamondDragEnd(d.id, lat, lng)}
+              onDelete={() => handleDiamondDelete(d.id)}
+            />
+          ))}
+
+        {/* Draft pin shown while the entry dialog is open over the chosen spot. */}
+        {draft && (
+          <Circle
+            center={[draft.lat, draft.lng]}
+            radius={60}
+            pathOptions={{ color: "#0ea5e9", weight: 2, fillOpacity: 0.2 }}
+            interactive={false}
+          />
+        )}
       </MapContainer>
 
       {selectedDayId && (
@@ -516,6 +630,55 @@ export default function MapCore({
           onDiamondsToggle={() => setDiamondsEnabled((e) => !e)}
         />
       )}
+
+      {/* Drop-a-pin affordance — top-centre, clear of the top-left zoom control
+          and the top-right LayersControl. Only when a day is selected (the
+          conditions context) and the viewer may manage diamonds. */}
+      {canManageDiamonds && selectedDayId && itineraryId && (
+        <div className="absolute top-2 left-1/2 z-[1001] -translate-x-1/2">
+          {placing ? (
+            <div className="bg-card/95 ring-border/40 flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium shadow-md ring-1 backdrop-blur-sm">
+              <span>Click the map to place the diamond</span>
+              <button
+                type="button"
+                onClick={() => setPlacing(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="add-diamond-button"
+              onClick={() => setPlacing(true)}
+              className="bg-card/95 text-foreground ring-border/40 hover:bg-card flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-colors"
+            >
+              <Plus className="size-3.5" aria-hidden />
+              Add tidal diamond
+            </button>
+          )}
+        </div>
+      )}
+
+      <Dialog
+        open={draft != null}
+        onOpenChange={(open) => {
+          if (!open) setDraft(null)
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New tidal diamond</DialogTitle>
+          </DialogHeader>
+          <TidalDiamondForm
+            isPending={isCreating}
+            error={createError}
+            onSubmit={handleCreateSubmit}
+            onCancel={() => setDraft(null)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
