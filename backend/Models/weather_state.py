@@ -1,11 +1,11 @@
-from Api.database import db
+from Api.database import Base
 from sqlalchemy import UUID, Time, Numeric, String, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from uuid import UUID as _UUID
 
 
-class WeatherState (db.Model):
+class WeatherState(Base):
     __table_args__ = (
         ForeignKeyConstraint(['day_id'], ['weather.day_id'], name="weather_day_foreign_keys_in_weather_state"),
     )

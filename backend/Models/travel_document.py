@@ -1,5 +1,5 @@
 import enum
-from datetime import date
+from datetime import date as _date
 from uuid import UUID as _UUID
 from typing import Optional, TYPE_CHECKING
 
@@ -36,8 +36,8 @@ class TravelDocument(BaseModel):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(300), nullable=False)
-    date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    date: Mapped[Optional[_date]] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[Optional[_date]] = mapped_column(Date, nullable=True)
     confirmation_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

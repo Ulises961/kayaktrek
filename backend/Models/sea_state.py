@@ -1,11 +1,11 @@
-from Api.database import db
+from Api.database import Base
 from sqlalchemy import UUID, Time, Numeric, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from uuid import UUID as _UUID
 
 
-class SeaState(db.Model):
+class SeaState(Base):
     __table_args__ = (
         ForeignKeyConstraint(['day_id'], ['sea.day_id'], name="sea_day_foreign_key_in_sea_state"),
     )

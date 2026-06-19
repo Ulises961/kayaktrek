@@ -1,4 +1,4 @@
-from Api.database import db
+from Api.database import Base
 from sqlalchemy import UUID, String, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, TYPE_CHECKING
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from Models.weather_state import WeatherState
 
 
-class Weather (db.Model):
+class Weather(Base):
     __table_args__ = (
         ForeignKeyConstraint(['day_id'],['day.id'], name="day_foreign_key_in_weather"),
     )

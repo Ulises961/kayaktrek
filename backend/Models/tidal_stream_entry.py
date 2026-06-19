@@ -4,13 +4,13 @@ from uuid import UUID as _UUID
 from sqlalchemy import ForeignKey, Integer, Numeric, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from Api.database import db
+from Api.database import Base
 
 if TYPE_CHECKING:
     from Models.tidal_station import TidalStation
 
 
-class TidalStreamEntry(db.Model):
+class TidalStreamEntry(Base):
     __tablename__ = "tidal_stream_entry"
 
     station_id: Mapped[_UUID] = mapped_column(

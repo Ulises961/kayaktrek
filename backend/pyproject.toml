@@ -40,12 +40,28 @@ dependencies = [
 [dependency-groups]
 dev = [
     "flake8",
+    "mypy",
     "pytest",
     "pytest-cov",
     "pytest-dotenv",
     "pytest-xdist",
     "path",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["Api", "Models", "Resources", "Schemas", "Services", "Tasks"]
+# Gradual adoption: third-party deps without stubs (geoalchemy2, openmeteo_requests,
+# flask_bcrypt, camel_converter, …) must not flood the report while we annotate.
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+# Per-layer strictness is tightened in the overrides below as each layer's
+# annotation pass lands (Models → Schemas → Services → Resources).
+
+[[tool.mypy.overrides]]
+module = "Models.*"
+disallow_incomplete_defs = true
 
 [build-system]
 requires = ["setuptools>=68"]
