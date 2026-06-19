@@ -51,7 +51,6 @@ export function TidalDiamondForm({
   const {
     register,
     handleSubmit,
-    watch,
     setValue,
     control,
     formState: { errors },
