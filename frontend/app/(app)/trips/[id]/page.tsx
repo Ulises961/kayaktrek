@@ -3,6 +3,7 @@ import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { UserSchema } from "@/lib/dtos/user"
+import { ItemsSchema } from "@/lib/dtos/item"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { TravelDocumentSchema } from "@/lib/dtos/travel-document"
 import { ShuttleVehicleSchema } from "@/lib/dtos/shuttle-vehicle"
@@ -30,7 +31,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   const currentMember = session ? travellers.find((m) => m.user.id === session.userId) : undefined
   const isMember = !!currentMember
 
-  const [logisticsResult, documentsResult, vehiclesResult, profileResult] =
+  const [logisticsResult, documentsResult, vehiclesResult, profileResult, itemsResult] =
     await Promise.allSettled([
       apiGet(`/api/logistics/${id}`)
         .then((raw) => LogisticsSchema.parse(raw))
@@ -46,11 +47,17 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             .then((raw) => UserSchema.parse(raw))
             .catch(() => null)
         : Promise.resolve(null),
+      isMember
+        ? apiGet("/api/item/all")
+            .then((raw) => ItemsSchema.parse(raw))
+            .catch(() => [])
+        : Promise.resolve([]),
     ])
   const logistics = logisticsResult.status === "fulfilled" ? logisticsResult.value : null
   const travelDocuments = documentsResult.status === "fulfilled" ? documentsResult.value : []
   const shuttleVehicles = vehiclesResult.status === "fulfilled" ? vehiclesResult.value : []
   const userProfile = profileResult.status === "fulfilled" ? profileResult.value : null
+  const myItems = itemsResult.status === "fulfilled" ? itemsResult.value : []
 
   // Merge TripMember snapshot with User profile fallback for float plan pre-fill.
   // TripMember data always wins; profile fills gaps (e.g. profile updated after trip creation).
@@ -93,6 +100,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             currentUserId={session?.userId}
             leaderId={leader?.user.id}
             medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
+            myItems={myItems}
           />
         </CardContent>
       </Card>

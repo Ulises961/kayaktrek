@@ -3,18 +3,27 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { PackageIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { Inventory } from "@/lib/dtos/inventory"
+import type { Item } from "@/lib/dtos/item"
 import { createInventory } from "@/lib/inventory/actions"
+import { RequirementsChecklist } from "@/components/inventory/requirements-checklist"
 import { Button } from "@/components/ui/button"
 
 interface ItemsTabProps {
   tripId: string
   inventory?: Inventory | null
   isLeader: boolean
+  isMember?: boolean
+  myItems?: Item[]
 }
 
-export function ItemsTab({ tripId, inventory, isLeader }: ItemsTabProps) {
+export function ItemsTab({
+  tripId,
+  inventory,
+  isLeader,
+  isMember = false,
+  myItems = [],
+}: ItemsTabProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -55,8 +64,6 @@ export function ItemsTab({ tripId, inventory, isLeader }: ItemsTabProps) {
     )
   }
 
-  const requirements = inventory.requirements ?? []
-
   return (
     <div className="flex flex-col gap-3">
       <p className="flex items-center gap-2 text-sm font-medium">
@@ -64,30 +71,13 @@ export function ItemsTab({ tripId, inventory, isLeader }: ItemsTabProps) {
         Trip inventory
       </p>
 
-      {requirements.length === 0 ? (
-        <p className="text-muted-foreground text-sm italic">No requirements yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {requirements.map((req) => (
-            <li
-              key={req.id}
-              className="flex items-center justify-between gap-3 rounded-lg border p-3"
-            >
-              <span className="font-medium">{req.name}</span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase",
-                  req.status === "covered"
-                    ? "bg-[var(--state-happening-bg)] text-[var(--state-happening-fg)]"
-                    : "bg-[var(--state-planning-bg)] text-[var(--state-planning-fg)]",
-                )}
-              >
-                {req.status ?? "needed"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <RequirementsChecklist
+        inventoryId={inventory.id!}
+        tripId={tripId}
+        requirements={inventory.requirements ?? []}
+        myItems={myItems}
+        canManage={isMember}
+      />
     </div>
   )
 }

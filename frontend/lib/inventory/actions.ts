@@ -78,3 +78,87 @@ export async function deleteItem(itemId: string): Promise<InventoryActionResult>
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete gear." }
   }
 }
+
+export interface AddRequirementInput {
+  name: string
+  category?: string
+}
+
+// Adds a requirement slot to a trip inventory. Any trip member may manage
+// requirements (backend gates on inventory ownership = trip membership).
+export async function addRequirement(
+  inventoryId: string,
+  input: AddRequirementInput,
+  tripId?: string,
+): Promise<InventoryActionResult> {
+  try {
+    await apiPost(`/api/inventory/${inventoryId}/requirements`, {
+      name: input.name,
+      category: input.category,
+    })
+    if (tripId) revalidatePath(`/trips/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to add requirement.",
+    }
+  }
+}
+
+export async function removeRequirement(
+  inventoryId: string,
+  reqId: string,
+  tripId?: string,
+): Promise<InventoryActionResult> {
+  try {
+    await apiDelete(`/api/inventory/${inventoryId}/requirements/${reqId}`)
+    if (tripId) revalidatePath(`/trips/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to remove requirement.",
+    }
+  }
+}
+
+// Covers a requirement with one of the caller's owned personal items.
+export async function contributeItem(
+  inventoryId: string,
+  reqId: string,
+  itemId: string,
+  tripId?: string,
+): Promise<InventoryActionResult> {
+  try {
+    await apiPost(`/api/inventory/${inventoryId}/requirements/${reqId}/contribute`, { itemId })
+    if (tripId) revalidatePath(`/trips/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to contribute item.",
+    }
+  }
+}
+
+export async function unclaimRequirement(
+  inventoryId: string,
+  reqId: string,
+  tripId?: string,
+): Promise<InventoryActionResult> {
+  try {
+    await apiDelete(`/api/inventory/${inventoryId}/requirements/${reqId}/contribute`)
+    if (tripId) revalidatePath(`/trips/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to withdraw contribution.",
+    }
+  }
+}

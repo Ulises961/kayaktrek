@@ -14,6 +14,7 @@ import type { Logistics } from "@/lib/dtos/logistics"
 import type { TravelDocument } from "@/lib/dtos/travel-document"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
+import type { Item } from "@/lib/dtos/item"
 
 type TabId = "crew" | "float-plan" | "logistics" | "itinerary" | "items"
 
@@ -32,6 +33,8 @@ interface TripDetailTabsProps {
   leaderId?: string
   /** Current user's medical-notes reset flag — drives the re-entry prompt on the float-plan tab. */
   medicalNotesResetAt?: string | null
+  /** Current user's owned personal gear — feeds the contribute picker on the items tab. */
+  myItems?: Item[]
 }
 
 export function TripDetailTabs({
@@ -48,6 +51,7 @@ export function TripDetailTabs({
   currentUserId,
   leaderId,
   medicalNotesResetAt,
+  myItems = [],
 }: TripDetailTabsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -131,7 +135,13 @@ export function TripDetailTabs({
       </TabsContent>
 
       <TabsContent value="items" className="p-6 pt-5">
-        <ItemsTab tripId={tripId} inventory={trip.inventory} isLeader={isLeader} />
+        <ItemsTab
+          tripId={tripId}
+          inventory={trip.inventory}
+          isLeader={isLeader}
+          isMember={isMember}
+          myItems={myItems}
+        />
       </TabsContent>
     </Tabs>
   )
