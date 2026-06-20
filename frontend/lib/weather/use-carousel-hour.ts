@@ -14,6 +14,7 @@ export function useCarouselHour(
     if (!api || states.length === 0 || selectedHour === null) return
 
     const targetIndex = states.findIndex((s) => {
+      if (!s.time) return false
       const hour = parseInt(s.time.split(":")[0], 10)
       return hour === selectedHour
     })
@@ -34,7 +35,7 @@ export function useCarouselHour(
     const onSelect = () => {
       const selectedIndex = api.selectedScrollSnap()
       const selectedState = states[selectedIndex]
-      if (selectedState) {
+      if (selectedState && selectedState.time) {
         const hour = parseInt(selectedState.time.split(":")[0], 10)
         onHourChange(hour)
       }
