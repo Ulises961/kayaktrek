@@ -1,12 +1,15 @@
 import enum
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
 
 from geoalchemy2 import Geography
 from sqlalchemy import Enum, ForeignKey, String, Text, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel
+
+if TYPE_CHECKING:
+    from Models.place_category import PlaceCategory
 
 
 class PlaceVisibility(enum.Enum):
@@ -47,6 +50,10 @@ class Place(BaseModel):
         nullable=False,
         default=PlaceVisibility.PRIVATE,
     )
+
+    # Eager-loaded so a marker list dumps each place's category (slug/name/icon)
+    # without an N+1 — the category drives the marker glyph.
+    category: Mapped["PlaceCategory"] = relationship(lazy="joined")
 
     @property
     def is_community(self) -> bool:
