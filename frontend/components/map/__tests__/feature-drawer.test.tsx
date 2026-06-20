@@ -133,18 +133,6 @@ describe("FeatureDrawer — header", () => {
     await userEvent.click(screen.getByRole("button", { name: /close/i }))
     expect(setSelectedDayId).toHaveBeenCalledWith(null)
   })
-
-  it("renders the hour slider", () => {
-    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID }))
-    expect(screen.getByTestId("hour-slider")).toBeInTheDocument()
-  })
-
-  it("hour slider calls setSelectedHour on change", () => {
-    const setSelectedHour = vi.fn()
-    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID, setSelectedHour }))
-    fireEvent.change(screen.getByTestId("hour-slider"), { target: { value: "13" } })
-    expect(setSelectedHour).toHaveBeenCalledWith(13)
-  })
 })
 
 // ─── tabs ─────────────────────────────────────────────────────────────────────
@@ -233,6 +221,24 @@ describe("FeatureDrawer — Route tab", () => {
       }),
     )
     expect(screen.getByText(/no waypoints/i)).toBeInTheDocument()
+  })
+})
+
+// ─── forecast tab ─────────────────────────────────────────────────────────────────
+
+describe("FeatureDrawer — Forecast tab", () => {
+  it("renders the hour slider when forecast tab is active", async () => {
+    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID }))
+    await userEvent.click(screen.getByRole("button", { name: /^forecast$/i }))
+    expect(screen.getByTestId("hour-slider")).toBeInTheDocument()
+  })
+
+  it("hour slider calls setSelectedHour on change", async () => {
+    const setSelectedHour = vi.fn()
+    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID, setSelectedHour }))
+    await userEvent.click(screen.getByRole("button", { name: /^forecast$/i }))
+    fireEvent.change(screen.getByTestId("hour-slider"), { target: { value: "13" } })
+    expect(setSelectedHour).toHaveBeenCalledWith(13)
   })
 })
 
