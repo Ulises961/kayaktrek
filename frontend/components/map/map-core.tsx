@@ -6,7 +6,7 @@ import { Plus } from "lucide-react"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { routeLegs, legLabel, formatDistance, totalDistanceNm } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
@@ -517,23 +517,26 @@ export default function MapCore({
 
   const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, dragState)
 
-  // On-map distance labels differ by mode (decided in docs/adr/itinerary-frontend.md):
-  //  • viewing — a stop's leg from the previous stop, on each stop of the selected
-  //    day only, so the whole-trip view stays clean;
-  //  • planning — a single "so far" running total on the route's growing tip, so you
-  //    see distance covered as you drop waypoints without carpeting every leg.
+  // On-map distance labels (decided in docs/adr/itinerary-frontend.md): each stop —
+  // and, while planning, the route's growing tip — carries its leg from the previous
+  // stop, the stretch paddled to reach it, so the stops read as steps. routeLegs
+  // already treats the last point of a day as an anchor, so the tip is labelled with
+  // the in-progress stretch from the last stop (not a cumulative total). Viewing
+  // scopes to the selected day for a clean overview; planning labels every day since
+  // you're building the whole route.
   const stopLabelById = new Map<string, string>()
-  if (viewMode && selectedDayId != null) {
-    const dayPoints = validPoints.filter((p) => p.dayId === selectedDayId)
+  const labelDayIds = viewMode
+    ? selectedDayId != null
+      ? [selectedDayId]
+      : []
+    : Array.from(new Set(validPoints.map((p) => p.dayId ?? null)))
+  for (const dayId of labelDayIds) {
+    const dayPoints = validPoints.filter((p) => (p.dayId ?? null) === dayId)
     for (const leg of routeLegs(dayPoints)) {
       if (leg.isStart || !leg.isAnchor || !leg.point.id) continue
       stopLabelById.set(leg.point.id, legLabel(leg.legNm, avgSpeedKnots, distanceUnit))
     }
   }
-  const tipPoint = !viewMode && validPoints.length > 1 ? validPoints[validPoints.length - 1] : null
-  const tipLabel = tipPoint
-    ? `${formatDistance(totalDistanceNm(validPoints), distanceUnit)} ${distanceUnit} so far`
-    : null
 
   const handleMarkerDragMove = useCallback(
     (id: string, lat: number, lng: number) => {
@@ -603,15 +606,7 @@ export default function MapCore({
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
             draggable={!viewMode}
-            label={
-              viewMode
-                ? point.id
-                  ? (stopLabelById.get(point.id) ?? null)
-                  : null
-                : point === tipPoint
-                  ? tipLabel
-                  : null
-            }
+            label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerClick={onMarkerClick}
