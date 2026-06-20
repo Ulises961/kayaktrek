@@ -98,11 +98,19 @@ describe("PointDetailSheet — content", () => {
     expect(screen.getByText("interest")).toBeInTheDocument()
   })
 
-  it("shows Distance, Notes and Images tiles", () => {
+  it("shows Leg, Notes and Images tiles", () => {
     renderWithCtx(makeCtx())
-    expect(screen.getByText("Distance")).toBeInTheDocument()
+    // p1 is the day's first point — no inbound leg, so the tile reads "Leg" / "Start".
+    expect(screen.getByText("Leg")).toBeInTheDocument()
+    expect(screen.getByText("Start")).toBeInTheDocument()
     expect(screen.getByTestId("point-notes-tile")).toBeInTheDocument()
     expect(screen.getByTestId("point-images-tile")).toBeInTheDocument()
+  })
+
+  it("labels the leg tile with the planning speed for a point with an inbound leg", () => {
+    // p2 follows p1 on the same day, so its tile shows the ETA at the avg speed.
+    renderWithCtx(makeCtx({ selectedPointId: "p2" }))
+    expect(screen.getByText("Avg speed 2.5 kn")).toBeInTheDocument()
   })
 
   it("shows a notes preview when notes are present", () => {

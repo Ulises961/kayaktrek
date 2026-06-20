@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { X, Anchor, Star, CircleDot } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { haversineNm, formatDistance } from "@/lib/itinerary/distance"
+import { haversineNm, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { cn } from "@/lib/utils"
 import { PointDetailModal } from "./point-detail-modal"
 import type { Point } from "@/lib/dtos/point"
@@ -13,35 +13,53 @@ function TypeIcon({ type }: { type: string }) {
   return <CircleDot className="size-3.5 shrink-0" />
 }
 
-/** Cumulative distance from the day's first point to the given point. */
-function cumulativeDistanceLabel(
+/**
+ * Inbound leg (distance + ETA at the planning speed) for the given point, plus
+ * cumulative distance from the day's first point. The leg is the actionable "this
+ * hop" figure; the total is secondary context. Returns null for the day's first
+ * point (no inbound leg) and for points not on a day's route.
+ */
+function legDistance(
   point: Point,
   state: ReturnType<typeof useMapBuilder>["state"],
   unit: "nm" | "km",
-): string | null {
+  speedKnots: number,
+): { legText: string; totalText: string } | null {
   if (!point.dayId) return null
   const dayPoints = state.pointOrder
     .map((id) => state.points.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === point.dayId)
   const idx = dayPoints.findIndex((p) => p.id === point.id)
-  if (idx <= 0) return idx === 0 ? "Start" : null
+  if (idx <= 0) return null
   let nm = 0
+  let legNm = 0
   for (let i = 1; i <= idx; i++) {
     const a = dayPoints[i - 1]
     const b = dayPoints[i]
     if (a.latitude != null && a.longitude != null && b.latitude != null && b.longitude != null) {
-      nm += haversineNm(
+      legNm = haversineNm(
         { latitude: a.latitude, longitude: a.longitude },
         { latitude: b.latitude, longitude: b.longitude },
       )
+      nm += legNm
     }
   }
-  return `${formatDistance(nm, unit)} ${unit}`
+  return {
+    legText: legLabel(legNm, speedKnots, unit),
+    totalText: `${formatDistance(nm, unit)} ${unit} total`,
+  }
 }
 
 export function PointDetailSheet() {
-  const { state, selectedPointId, setSelectedPointId, distanceUnit, isLeader, tripState } =
-    useMapBuilder()
+  const {
+    state,
+    selectedPointId,
+    setSelectedPointId,
+    distanceUnit,
+    avgSpeedKnots,
+    isLeader,
+    tripState,
+  } = useMapBuilder()
   const [modalOpen, setModalOpen] = useState(false)
 
   const point = selectedPointId
@@ -58,7 +76,7 @@ export function PointDetailSheet() {
   if (!point) return null
 
   const canEdit = isLeader && tripState !== "past"
-  const distLabel = cumulativeDistanceLabel(point, state, distanceUnit) ?? "—"
+  const leg = legDistance(point, state, distanceUnit, avgSpeedKnots)
   const imageCount = point.images?.length ?? 0
   const displayName = point.name || `${point.type ?? "position"}`
 
@@ -98,9 +116,16 @@ export function PointDetailSheet() {
         <div className="grid grid-cols-3 gap-2 px-4 pb-4">
           <div className="bg-muted/40 rounded-lg px-2.5 py-2">
             <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
-              Distance
+              {leg ? `Avg speed ${avgSpeedKnots} kn` : "Leg"}
             </p>
-            <p className="text-[11px] font-medium">{distLabel}</p>
+            {leg ? (
+              <>
+                <p className="text-[11px] font-medium">{leg.legText}</p>
+                <p className="text-muted-foreground/70 text-[9px]">{leg.totalText}</p>
+              </>
+            ) : (
+              <p className="text-[11px] font-medium">Start</p>
+            )}
           </div>
 
           <button

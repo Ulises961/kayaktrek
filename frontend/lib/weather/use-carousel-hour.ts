@@ -5,7 +5,7 @@ type CarouselApi = UseEmblaCarouselType[1]
 
 export function useCarouselHour(
   api: CarouselApi,
-  states: Array<{ time: string }>,
+  states: Array<{ time?: string | null }>,
   selectedHour: number | null,
   onHourChange: (hour: number) => void,
 ) {
