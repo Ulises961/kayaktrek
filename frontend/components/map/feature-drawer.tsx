@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { useDayConditions } from "@/lib/weather/use-day-conditions"
-import { totalDistanceNm, formatDistance } from "@/lib/itinerary/distance"
+import { haversineNm, totalDistanceNm, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/itinerary/format"
 import { WeatherGrid } from "@/components/weather/weather-grid"
 import { SeaGrid } from "@/components/weather/sea-grid"
@@ -46,6 +46,7 @@ export function FeatureDrawer() {
     selectedHour,
     setSelectedHour,
     distanceUnit,
+    avgSpeedKnots,
     isLeader,
     tripState,
     bumpConditions,
@@ -75,7 +76,9 @@ export function FeatureDrawer() {
   // (map-core numbers markers by their position in pointOrder, 1-based).
   const absIndexById = new Map(state.pointOrder.map((id, i) => [id, i + 1]))
 
-  // Day waypoints with cumulative distance from the day's first point.
+  // Day waypoints. Each row leads with the inbound leg (distance + ETA at the
+  // planning speed) — the actionable "this hop" number — with cumulative distance
+  // from the day's first point kept as secondary context.
   const dayPoints = selectedDayId
     ? state.pointOrder
         .map((id) => state.points.find((p) => p.id === id))
@@ -84,14 +87,23 @@ export function FeatureDrawer() {
 
   const waypoints = dayPoints.map((point, i) => {
     const idx = absIndexById.get(point.id ?? "") ?? i + 1
-    if (i === 0) return { point, idx, distLabel: "start" }
-    const legPoints = dayPoints
+    if (i === 0) return { point, idx, legText: null, totalText: null }
+    const placed = dayPoints
       .slice(0, i + 1)
       .filter(
         (p): p is typeof p & { latitude: number; longitude: number } =>
           p.latitude != null && p.longitude != null,
       )
-    return { point, idx, distLabel: formatDistance(totalDistanceNm(legPoints), distanceUnit) }
+    const prev = placed[placed.length - 2]
+    const curr = placed[placed.length - 1]
+    const legText =
+      prev && curr ? legLabel(haversineNm(prev, curr), avgSpeedKnots, distanceUnit) : null
+    return {
+      point,
+      idx,
+      legText,
+      totalText: `${formatDistance(totalDistanceNm(placed), distanceUnit)} ${distanceUnit} total`,
+    }
   })
 
   const hasForecast = !!weather?.weatherStates?.length || !!sea?.seaStates?.length
@@ -148,28 +160,41 @@ export function FeatureDrawer() {
                 No waypoints for this day.
               </p>
             ) : (
-              waypoints.map(({ point, idx, distLabel }) => (
-                <button
-                  key={point.id}
-                  type="button"
-                  data-testid="route-waypoint"
-                  onClick={() => setSelectedPointId(point.id!)}
-                  className="border-border/40 hover:bg-muted/40 flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left transition-colors last:border-0"
-                >
-                  <TypeIcon type={point.type ?? "position"} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-medium">
-                      {point.name || `Point ${idx}`}
-                    </p>
-                    {distLabel !== "start" && (
-                      <p className="text-muted-foreground font-mono text-[9px]">
-                        {distLabel} {distanceUnit}
+              <>
+                <p className="text-muted-foreground/70 border-border/40 border-b px-3 py-1.5 text-[9px] tracking-wider uppercase">
+                  Avg speed {avgSpeedKnots} kn
+                </p>
+                {waypoints.map(({ point, idx, legText, totalText }) => (
+                  <button
+                    key={point.id}
+                    type="button"
+                    data-testid="route-waypoint"
+                    onClick={() => setSelectedPointId(point.id!)}
+                    className="border-border/40 hover:bg-muted/40 flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left transition-colors last:border-0"
+                  >
+                    <TypeIcon type={point.type ?? "position"} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-medium">
+                        {point.name || `Point ${idx}`}
                       </p>
-                    )}
-                  </div>
-                  <ChevronRight className="text-muted-foreground/40 size-3 shrink-0" aria-hidden />
-                </button>
-              ))
+                      {legText ? (
+                        <p className="text-muted-foreground font-mono text-[9px]">
+                          {legText}
+                          {totalText && (
+                            <span className="text-muted-foreground/60"> · {totalText}</span>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground/60 font-mono text-[9px]">start</p>
+                      )}
+                    </div>
+                    <ChevronRight
+                      className="text-muted-foreground/40 size-3 shrink-0"
+                      aria-hidden
+                    />
+                  </button>
+                ))}
+              </>
             )}
           </>
         )}
