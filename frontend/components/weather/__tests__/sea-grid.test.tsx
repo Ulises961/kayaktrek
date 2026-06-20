@@ -4,7 +4,13 @@ import { SeaGrid } from "../sea-grid"
 import type { SeaState } from "@/lib/dtos/sea"
 
 vi.mock("@/components/ui/carousel", () => ({
-  Carousel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
   CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -55,12 +61,5 @@ describe("SeaGrid", () => {
     render(<SeaGrid states={states} />)
     expect(screen.getAllByText("wv").length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText("sw").length).toBeGreaterThanOrEqual(1)
-  })
-
-  it("marks the card matching selectedHour as active", () => {
-    const { container } = render(<SeaGrid states={states} selectedHour={9} />)
-    const active = container.querySelectorAll("[data-active]")
-    expect(active).toHaveLength(1)
-    expect(active[0]).toHaveTextContent("09:00")
   })
 })

@@ -12,7 +12,13 @@ vi.mock("@/lib/weather/actions", () => ({
 }))
 
 vi.mock("@/components/ui/carousel", () => ({
-  Carousel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
   CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))

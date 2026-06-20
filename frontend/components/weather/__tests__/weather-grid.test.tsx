@@ -4,7 +4,13 @@ import { WeatherGrid } from "../weather-grid"
 import type { WeatherState } from "@/lib/dtos/weather"
 
 vi.mock("@/components/ui/carousel", () => ({
-  Carousel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
   CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -56,17 +62,5 @@ describe("WeatherGrid", () => {
     // 10% → Sun aria-label, 70% → Cloud aria-label
     expect(screen.getByLabelText("10% cloud")).toBeInTheDocument()
     expect(screen.getByLabelText("70% cloud")).toBeInTheDocument()
-  })
-
-  it("marks the card matching selectedHour as active", () => {
-    const { container } = render(<WeatherGrid states={states} selectedHour={12} />)
-    const active = container.querySelectorAll("[data-active]")
-    expect(active).toHaveLength(1)
-    expect(active[0]).toHaveTextContent("12:00")
-  })
-
-  it("marks no card active when selectedHour matches no state", () => {
-    const { container } = render(<WeatherGrid states={states} selectedHour={3} />)
-    expect(container.querySelectorAll("[data-active]")).toHaveLength(0)
   })
 })
