@@ -131,7 +131,7 @@ export function TripDetailTabs({
       </TabsContent>
 
       <TabsContent value="items" className="p-6 pt-5">
-        <ItemsTab />
+        <ItemsTab tripId={tripId} inventory={trip.inventory} isLeader={isLeader} />
       </TabsContent>
     </Tabs>
   )
