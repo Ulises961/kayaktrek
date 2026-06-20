@@ -9,7 +9,8 @@ from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 
 from Models.inventory import Inventory
-from Models.trip_requirement import TripRequirement, RequirementStatusType
+from Models.trip_requirement import TripRequirement
+from Models.requirement_contribution import RequirementContribution
 from Models.trip_member import TripMember
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_requirement_schema import TripRequirementSchema
@@ -187,18 +188,31 @@ class InventoryService:
 
     @staticmethod
     def add_requirement(inventory_id: str, req_data: dict) -> TripRequirement:
-        InventoryService.get_inventory_by_id(inventory_id)  # existence check
+        inventory = InventoryService.get_inventory_by_id(inventory_id)
+        member = InventoryService._get_trip_member(inventory)
         req_data['inventory_id'] = inventory_id
         req = cast(TripRequirement, TripRequirementSchema().load(req_data))
+        req.proposed_by_member_id = member.id
         db.session.add(req)
         db.session.commit()
         db.session.refresh(req)
-        logger.info(f"Requirement {req.id} added to inventory {inventory_id}")
+        logger.info(
+            f"Requirement {req.id} added to inventory {inventory_id} "
+            f"by member {member.id}"
+        )
         return req
 
     @staticmethod
     def remove_requirement(inventory_id: str, req_id: str) -> None:
+        """Authorship-scoped: you may remove a requirement only if you proposed it.
+
+        Raises PermissionError (→ 403) when the caller is not the proposer. There is
+        no leader override — the leader owns only the requirements they proposed
+        (which includes the seeded defaults).
+        """
         req = InventoryService._get_requirement(inventory_id, req_id)
+        if req.proposed_by.user_id != UUID(g.current_user_id):
+            raise PermissionError("You may only remove a requirement you proposed")
         db.session.delete(req)
         db.session.commit()
         logger.info(f"Requirement {req_id} removed from inventory {inventory_id}")
@@ -207,7 +221,8 @@ class InventoryService:
     def contribute_item(inventory_id: str, req_id: str, item_id: str) -> TripRequirement:
         inventory = InventoryService.get_inventory_by_id(inventory_id)
         req = InventoryService._get_requirement(inventory_id, req_id)
-        trip_member = InventoryService._get_trip_member(inventory)
+        # Resolves the caller's TripMember and confirms they own the item in one query.
+        trip_member = InventoryService._get_trip_member(inventory, item_id)
 
         item = db.session.get(Item, UUID(item_id))
         if item is None:
@@ -218,11 +233,21 @@ class InventoryService:
                 "confirm you possess this item first"
             )
 
-        req.covering_item_id = UUID(item_id)
-        if trip_member not in req.contributors:
-            req.contributors.append(trip_member)
-        req.status = RequirementStatusType.COVERED
+        existing = db.session.query(RequirementContribution).filter_by(
+            requirement_id=req.id, trip_member_id=trip_member.id
+        ).first()
+        if existing is not None:
+            raise ValueError(
+                "You are already contributing an item to this requirement; "
+                "withdraw it first to swap"
+            )
 
+        contribution = RequirementContribution(
+            requirement_id=req.id,
+            trip_member_id=trip_member.id,
+            item_id=UUID(item_id),
+        )
+        db.session.add(contribution)
         db.session.commit()
         db.session.refresh(req)
         logger.info(
@@ -233,20 +258,21 @@ class InventoryService:
 
     @staticmethod
     def unclaim_requirement(inventory_id: str, req_id: str) -> TripRequirement:
+        """Withdraw only the caller's own contribution. 404 if they have none."""
         inventory = InventoryService.get_inventory_by_id(inventory_id)
         req = InventoryService._get_requirement(inventory_id, req_id)
-        if (item_id := req.covering_item_id) is not None:
-            trip_member = InventoryService._get_trip_member(inventory, str(item_id))
-            if trip_member in req.contributors:
-                req.contributors.remove(trip_member)
+        trip_member = InventoryService._get_trip_member(inventory)
 
-            if not req.contributors:
-                req.covering_item_id = None
-                req.status = RequirementStatusType.NEEDED
-
-            db.session.commit()
-            db.session.refresh(req)
-            logger.info(
-                f"User {g.current_user_id} unclaimed requirement {req_id}"
+        contribution = db.session.query(RequirementContribution).filter_by(
+            requirement_id=req.id, trip_member_id=trip_member.id
+        ).first()
+        if contribution is None:
+            raise NoResultFound(
+                "You have no contribution to withdraw from this requirement"
             )
+
+        db.session.delete(contribution)
+        db.session.commit()
+        db.session.refresh(req)
+        logger.info(f"User {g.current_user_id} unclaimed requirement {req_id}")
         return req

@@ -52,8 +52,9 @@ def test_add_requirement(client, auth_headers, trip_with_crew):
     data = json.loads(response.data)
     assert data['name'] == "First Aid Kit"
     assert data['status'] == "needed"
-    assert data['checked'] == False
-    assert data['contributors'] == []
+    assert data['contributions'] == []
+    # Authorship is stamped from the caller (the leader, here).
+    assert data['proposedBy']['user']['username'] is not None
 
 
 def test_add_requirement_strips_html(client, auth_headers, trip_with_crew):
@@ -144,11 +145,12 @@ def test_contribute_item(client, auth_headers, trip_with_crew):
 
     data = json.loads(response.data)
     assert data['status'] == "covered"
-    assert data['coveringItemId'] == item_id
-    assert len(data['contributors']) == 1
-    contributor = data['contributors'][0]
-    assert contributor.get('id') is not None
-    assert contributor.get('username') is not None, "contributor must be a User, not a TripMember stub"
+    assert len(data['contributions']) == 1
+    contribution = data['contributions'][0]
+    assert contribution['item']['id'] == item_id
+    assert contribution['checked'] is False
+    assert contribution['member']['user']['username'] is not None, \
+        "contribution member must carry its User identity"
 
     # Cleanup item
     client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
@@ -230,15 +232,14 @@ def test_unclaim_requirement(client, auth_headers, trip_with_crew):
 
     data = json.loads(response.data)
     assert data['status'] == "needed"
-    assert data['coveringItemId'] is None
-    assert data['contributors'] == []
+    assert data['contributions'] == []
 
     # Cleanup item
     client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
 
 
-def test_unclaim_no_op_when_not_covered(client, auth_headers, trip_with_crew):
-    """Unclaiming a requirement that is not covered returns 200 without side-effects."""
+def test_unclaim_without_contribution_404(client, auth_headers, trip_with_crew):
+    """Withdrawing when the caller has no contribution on the requirement returns 404."""
     inventory_id = trip_with_crew['trip']['inventory']['id']
     req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
 
@@ -246,8 +247,4 @@ def test_unclaim_no_op_when_not_covered(client, auth_headers, trip_with_crew):
         f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
         headers=auth_headers,
     )
-    assert response.status_code == 200
-
-    data = json.loads(response.data)
-    assert data['status'] == "needed"
-    assert data['coveringItemId'] is None
+    assert response.status_code == 404

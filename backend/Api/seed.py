@@ -5,6 +5,7 @@ from Api.database import db
 from Models.item_category import ItemCategory
 
 DEFAULT_CATEGORIES = [
+    {"slug": "gear",       "name": "Gear"},
     {"slug": "first_aid",  "name": "First Aid"},
     {"slug": "camping",    "name": "Camping"},
     {"slug": "repair",     "name": "Repair"},

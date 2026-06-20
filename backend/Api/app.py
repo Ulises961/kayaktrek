@@ -21,6 +21,7 @@ from Resources.itinerary_resource import itinerary_api
 from Resources.day_resource import day_api
 from Resources.point_resource import point_api
 from Resources.inventory_resource import inventory_api
+from Resources.personal_packing_resource import personal_packing_api
 from Resources.item_resource import item_api
 from Resources.item_category_resource import item_category_api
 from Resources.log_resource import log_api
@@ -69,6 +70,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(authApi)
     app.register_blueprint(day_api)
     app.register_blueprint(inventory_api)
+    app.register_blueprint(personal_packing_api)
     app.register_blueprint(item_api)
     app.register_blueprint(item_category_api)
     app.register_blueprint(itinerary_api)
