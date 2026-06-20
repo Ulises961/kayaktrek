@@ -127,10 +127,10 @@ describe("TripDetailTabs", () => {
     expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 
-  it("shows items placeholder when items tab is active", async () => {
+  it("shows the create-inventory action for a leader when the items tab is active", async () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
     await userEvent.click(screen.getByRole("tab", { name: /items/i }))
-    expect(screen.getByText(/M6/i)).toBeDefined()
+    expect(screen.getByRole("button", { name: /create trip inventory/i })).toBeDefined()
   })
 
   it("shows logistics content when logistics tab is active", async () => {
