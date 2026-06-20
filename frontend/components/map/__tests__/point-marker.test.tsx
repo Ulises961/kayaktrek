@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import type { Point } from "@/lib/dtos/point"
 
 vi.mock("leaflet", () => ({ default: {} }))
-vi.mock("react-leaflet", () => ({ Marker: vi.fn(() => null) }))
+vi.mock("react-leaflet", () => ({
+  Marker: vi.fn(({ children }) => children ?? null),
+  Tooltip: vi.fn(({ children }) => children ?? null),
+}))
 vi.mock("../ring-icon", () => ({ ringIcon: vi.fn(() => ({ _mocked: true })) }))
 
 import { PointMarker } from "../point-marker"
@@ -72,5 +75,17 @@ describe("PointMarker — icon memoization", () => {
 
     expect(ringIconModule.ringIcon).toHaveBeenCalledTimes(1)
     expect(ringIconModule.ringIcon).toHaveBeenCalledWith("#4a90d9", "position", 2)
+  })
+})
+
+describe("PointMarker — distance label", () => {
+  it("renders the label tooltip when a label is provided", () => {
+    render(<PointMarker {...BASE_PROPS} label="6.2 nm · 2h 30min" />)
+    expect(screen.getByText("6.2 nm · 2h 30min")).toBeInTheDocument()
+  })
+
+  it("renders no label tooltip when label is null", () => {
+    render(<PointMarker {...BASE_PROPS} label={null} />)
+    expect(screen.queryByText(/nm/)).not.toBeInTheDocument()
   })
 })

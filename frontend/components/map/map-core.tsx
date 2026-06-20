@@ -1,20 +1,12 @@
 "use client"
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
-import {
-  MapContainer,
-  TileLayer,
-  Polyline,
-  Tooltip,
-  Circle,
-  useMap,
-  useMapEvents,
-} from "react-leaflet"
+import { MapContainer, TileLayer, Polyline, Circle, useMap, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import { Plus } from "lucide-react"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { haversineNm, legLabel } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, formatDistance, totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
@@ -118,7 +110,6 @@ type Segment = {
   key: string
   positions: [[number, number], [number, number]]
   color: string
-  distLabel: string
   dayNum: number
 }
 
@@ -134,8 +125,6 @@ function buildSegments(
   ordered: ValidPoint[],
   dayNumberById: Map<string | undefined, number>,
   boundaryPointIds: Set<string>,
-  distanceUnit: "nm" | "km",
-  avgSpeedKnots: number,
   drag: DragState | null,
 ): Segment[] {
   const segments: Segment[] = []
@@ -171,7 +160,6 @@ function buildSegments(
         [b.latitude, b.longitude],
       ],
       color: getDayColor(dayNum),
-      distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
       dayNum,
     })
   }
@@ -280,6 +268,7 @@ type ConnectedMarkerProps = {
   dayNum: number
   boundaryColors: { left: string; right: string } | null
   draggable?: boolean
+  label?: string | null
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
@@ -291,6 +280,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
   dayNum,
   boundaryColors,
   draggable = true,
+  label,
   onMarkerDragMove,
   onMarkerDragEnd,
   onMarkerClick,
@@ -333,6 +323,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
       index={index}
       customIcon={customIcon}
       draggable={draggable}
+      label={label}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
@@ -524,14 +515,25 @@ export default function MapCore({
     (p): p is ValidPoint => p.latitude != null && p.longitude != null,
   )
 
-  const segments = buildSegments(
-    validPoints,
-    dayNumberById,
-    boundaryPointIds,
-    distanceUnit,
-    avgSpeedKnots,
-    dragState,
-  )
+  const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, dragState)
+
+  // On-map distance labels differ by mode (decided in docs/adr/itinerary-frontend.md):
+  //  • viewing — a stop's leg from the previous stop, on each stop of the selected
+  //    day only, so the whole-trip view stays clean;
+  //  • planning — a single "so far" running total on the route's growing tip, so you
+  //    see distance covered as you drop waypoints without carpeting every leg.
+  const stopLabelById = new Map<string, string>()
+  if (viewMode && selectedDayId != null) {
+    const dayPoints = validPoints.filter((p) => p.dayId === selectedDayId)
+    for (const leg of routeLegs(dayPoints)) {
+      if (leg.isStart || !leg.isAnchor || !leg.point.id) continue
+      stopLabelById.set(leg.point.id, legLabel(leg.legNm, avgSpeedKnots, distanceUnit))
+    }
+  }
+  const tipPoint = !viewMode && validPoints.length > 1 ? validPoints[validPoints.length - 1] : null
+  const tipLabel = tipPoint
+    ? `${formatDistance(totalDistanceNm(validPoints), distanceUnit)} ${distanceUnit} so far`
+    : null
 
   const handleMarkerDragMove = useCallback(
     (id: string, lat: number, lng: number) => {
@@ -589,18 +591,7 @@ export default function MapCore({
                 dimmed ? 2 : selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5
               }
               opacity={dimmed ? 0.2 : 0.85}
-            >
-              {!dragState && !viewMode && (
-                <Tooltip
-                  key={`${seg.positions[0][0]},${seg.positions[0][1]}-${seg.positions[1][0]},${seg.positions[1][1]}`}
-                  permanent
-                  direction="top"
-                  className="distance-label"
-                >
-                  {seg.distLabel}
-                </Tooltip>
-              )}
-            </Polyline>
+            />
           )
         })}
 
@@ -612,6 +603,15 @@ export default function MapCore({
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
             draggable={!viewMode}
+            label={
+              viewMode
+                ? point.id
+                  ? (stopLabelById.get(point.id) ?? null)
+                  : null
+                : point === tipPoint
+                  ? tipLabel
+                  : null
+            }
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerClick={onMarkerClick}
