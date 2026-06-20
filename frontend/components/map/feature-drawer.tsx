@@ -6,11 +6,11 @@ import {
   Star,
   CircleDot,
   ChevronRight,
-  SlidersHorizontal,
   Navigation,
   Cloud,
   Waves,
   RefreshCw,
+  SlidersHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
@@ -119,24 +119,6 @@ export function FeatureDrawer() {
         </button>
       </div>
 
-      {/* Hour slider */}
-      <div className="border-border/50 bg-muted/20 flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-        <SlidersHorizontal className="text-muted-foreground size-3 shrink-0" aria-hidden />
-        <input
-          type="range"
-          min={0}
-          max={23}
-          value={selectedHour}
-          onChange={(e) => setSelectedHour(Number(e.target.value))}
-          className="accent-primary min-w-0 flex-1"
-          aria-label="Map overlay hour"
-          data-testid="hour-slider"
-        />
-        <span className="text-foreground w-9 text-right font-mono text-[11px]">
-          {String(selectedHour).padStart(2, "0")}:00
-        </span>
-      </div>
-
       {/* Tab bar */}
       <div className="border-border flex shrink-0 border-b">
         {TABS.map(({ id, label, Icon }) => (
@@ -193,52 +175,80 @@ export function FeatureDrawer() {
         )}
 
         {tab === "forecast" && (
-          <div className="flex flex-col gap-3 p-3">
-            {hasForecast ? (
-              <>
-                {!!weather?.weatherStates?.length && (
-                  <WeatherGrid states={weather.weatherStates} selectedHour={selectedHour} />
-                )}
-                {!!sea?.seaStates?.length && (
-                  <SeaGrid states={sea.seaStates} selectedHour={selectedHour} />
-                )}
-                {canFetch && (
-                  <button
-                    type="button"
-                    onClick={refresh}
-                    disabled={isRefreshing}
-                    className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 py-1 text-[11px] transition-colors disabled:opacity-60"
-                  >
-                    <RefreshCw
-                      className={cn("size-3", isRefreshing && "animate-spin")}
-                      aria-hidden
-                    />
-                    {isRefreshing ? "Refreshing…" : "Refresh forecast"}
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <Cloud className="text-muted-foreground/30 size-6" aria-hidden />
-                <p className="text-muted-foreground text-[11px]">
-                  No forecast fetched for this day.
-                </p>
-                {canFetch && (
-                  <button
-                    type="button"
-                    onClick={refresh}
-                    disabled={isRefreshing}
-                    className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity disabled:opacity-60"
-                  >
-                    <RefreshCw
-                      className={cn("size-3.5", isRefreshing && "animate-spin")}
-                      aria-hidden
-                    />
-                    {isRefreshing ? "Fetching…" : "Fetch forecast"}
-                  </button>
-                )}
+          <div className="flex flex-col gap-0">
+            {hasForecast && (
+              <div className="border-border/50 bg-muted/20 flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+                <SlidersHorizontal className="text-muted-foreground size-3 shrink-0" aria-hidden />
+                <input
+                  type="range"
+                  min={0}
+                  max={23}
+                  value={selectedHour ?? 0}
+                  onChange={(e) => setSelectedHour(Number(e.target.value))}
+                  className="accent-primary min-w-0 flex-1"
+                  aria-label="Map overlay hour"
+                  data-testid="hour-slider"
+                />
+                <span className="text-foreground w-9 text-right font-mono text-[11px]">
+                  {String(selectedHour ?? 0).padStart(2, "0")}:00
+                </span>
               </div>
             )}
+            <div className="flex flex-col gap-3 p-3">
+              {hasForecast ? (
+                <>
+                  {!!weather?.weatherStates?.length && (
+                    <WeatherGrid
+                      states={weather.weatherStates}
+                      selectedHour={selectedHour ?? undefined}
+                      onHourChange={setSelectedHour}
+                    />
+                  )}
+                  {!!sea?.seaStates?.length && (
+                    <SeaGrid
+                      states={sea.seaStates}
+                      selectedHour={selectedHour ?? undefined}
+                      onHourChange={setSelectedHour}
+                    />
+                  )}
+                  {canFetch && (
+                    <button
+                      type="button"
+                      onClick={refresh}
+                      disabled={isRefreshing}
+                      className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 py-1 text-[11px] transition-colors disabled:opacity-60"
+                    >
+                      <RefreshCw
+                        className={cn("size-3", isRefreshing && "animate-spin")}
+                        aria-hidden
+                      />
+                      {isRefreshing ? "Refreshing…" : "Refresh forecast"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                  <Cloud className="text-muted-foreground/30 size-6" aria-hidden />
+                  <p className="text-muted-foreground text-[11px]">
+                    No forecast fetched for this day.
+                  </p>
+                  {canFetch && (
+                    <button
+                      type="button"
+                      onClick={refresh}
+                      disabled={isRefreshing}
+                      className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity disabled:opacity-60"
+                    >
+                      <RefreshCw
+                        className={cn("size-3.5", isRefreshing && "animate-spin")}
+                        aria-hidden
+                      />
+                      {isRefreshing ? "Fetching…" : "Fetch forecast"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
