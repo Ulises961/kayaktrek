@@ -38,6 +38,7 @@ class TestingConfig(Config):
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "test-jwt-secret-key-minimum-32-bytes!")
     SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     MAIL_SUPPRESS_SEND = True
+    MAIL_DEFAULT_SENDER = "noreply@test.local"
     RATELIMIT_ENABLED = False
     RATELIMIT_STORAGE_URI = "memory://"
     CACHE_TYPE = "SimpleCache"
