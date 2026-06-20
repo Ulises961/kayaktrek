@@ -87,16 +87,33 @@ export function FeatureDrawer() {
         .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === selectedDayId)
     : []
 
-  const stops = routeLegs(dayPoints)
-    .filter((leg) => leg.isAnchor)
-    .map((leg) => ({
+  // Collapse to anchors, carrying `via` — how many pass-through positions were
+  // aggregated into the leg reaching this stop. `via > 0` marks the rail dashed so
+  // the list reads as a continuous route rather than a dislocated set of points.
+  const stops: {
+    point: (typeof dayPoints)[number]
+    idx: number
+    legText: string | null
+    totalText: string | null
+    via: number
+  }[] = []
+  let via = 0
+  for (const leg of routeLegs(dayPoints)) {
+    if (!leg.isAnchor) {
+      via++
+      continue
+    }
+    stops.push({
       point: leg.point,
       idx: absIndexById.get(leg.point.id ?? "") ?? 0,
       legText: leg.isStart ? null : legLabel(leg.legNm, avgSpeedKnots, distanceUnit),
       totalText: leg.isStart
         ? null
         : `${formatDistance(leg.cumulativeNm, distanceUnit)} ${distanceUnit} total`,
-    }))
+      via,
+    })
+    via = 0
+  }
 
   const hasForecast = !!weather?.weatherStates?.length || !!sea?.seaStates?.length
 
@@ -156,36 +173,68 @@ export function FeatureDrawer() {
                 <p className="text-muted-foreground/70 border-border/40 border-b px-3 py-1.5 text-[9px] tracking-wider uppercase">
                   Avg speed {avgSpeedKnots} kn
                 </p>
-                {stops.map(({ point, idx, legText, totalText }) => (
-                  <button
-                    key={point.id}
-                    type="button"
-                    data-testid="route-waypoint"
-                    onClick={() => setSelectedPointId(point.id!)}
-                    className="border-border/40 hover:bg-muted/40 flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left transition-colors last:border-0"
-                  >
-                    <TypeIcon type={point.type ?? "position"} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] font-medium">
-                        {point.name || `Point ${idx}`}
-                      </p>
-                      {legText ? (
-                        <p className="text-muted-foreground font-mono text-[9px]">
-                          {legText}
-                          {totalText && (
-                            <span className="text-muted-foreground/60"> · {totalText}</span>
-                          )}
+                {stops.map(({ point, idx, legText, totalText, via }, i) => {
+                  // A dashed rail segment above a stop means positions were aggregated
+                  // into the leg reaching it; solid means the two stops are adjacent.
+                  const topDashed = via > 0
+                  const bottomDashed = (stops[i + 1]?.via ?? 0) > 0
+                  const connector = (dashed: boolean, hidden: boolean) =>
+                    cn(
+                      "w-0 flex-1",
+                      hidden
+                        ? ""
+                        : dashed
+                          ? "border-l border-dashed border-border"
+                          : "border-l border-border",
+                    )
+                  return (
+                    <button
+                      key={point.id}
+                      type="button"
+                      data-testid="route-waypoint"
+                      onClick={() => setSelectedPointId(point.id!)}
+                      className="border-border/40 hover:bg-muted/40 flex w-full items-stretch gap-2.5 border-b px-3 text-left transition-colors last:border-0"
+                    >
+                      {/* timeline rail: stops strung on a thread, dashed where positions collapse */}
+                      <div className="relative flex w-4 shrink-0 flex-col items-center self-stretch">
+                        <span aria-hidden className={connector(topDashed, i === 0)} />
+                        <span
+                          className="bg-background text-muted-foreground z-10 my-1 flex"
+                          title={
+                            via > 0
+                              ? `${via} waypoint${via === 1 ? "" : "s"} along the way`
+                              : undefined
+                          }
+                        >
+                          <TypeIcon type={point.type ?? "position"} />
+                        </span>
+                        <span
+                          aria-hidden
+                          className={connector(bottomDashed, i === stops.length - 1)}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 py-2.5">
+                        <p className="truncate text-[11px] font-medium">
+                          {point.name || `Point ${idx}`}
                         </p>
-                      ) : (
-                        <p className="text-muted-foreground/60 font-mono text-[9px]">start</p>
-                      )}
-                    </div>
-                    <ChevronRight
-                      className="text-muted-foreground/40 size-3 shrink-0"
-                      aria-hidden
-                    />
-                  </button>
-                ))}
+                        {legText ? (
+                          <p className="text-muted-foreground font-mono text-[9px]">
+                            {legText}
+                            {totalText && (
+                              <span className="text-muted-foreground/60"> · {totalText}</span>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground/60 font-mono text-[9px]">start</p>
+                        )}
+                      </div>
+                      <ChevronRight
+                        className="text-muted-foreground/40 size-3 shrink-0 self-center"
+                        aria-hidden
+                      />
+                    </button>
+                  )
+                })}
               </>
             )}
           </>

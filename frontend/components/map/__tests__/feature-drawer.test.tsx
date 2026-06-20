@@ -201,6 +201,8 @@ describe("FeatureDrawer — Route tab", () => {
     expect(screen.getByText("Launch")).toBeInTheDocument()
     expect(screen.getByText("Camp")).toBeInTheDocument()
     expect(screen.queryByText("Waypoint")).not.toBeInTheDocument()
+    // The collapsed position is signalled on the rail reaching Camp.
+    expect(screen.getByTitle("1 waypoint along the way")).toBeInTheDocument()
   })
 
   it("clicking a waypoint calls setSelectedPointId with its id", async () => {
