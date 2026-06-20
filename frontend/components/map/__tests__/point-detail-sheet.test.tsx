@@ -41,6 +41,7 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     draftSlices: null,
     setDraftSlices: vi.fn(),
     tripId: null,
+    tripName: "Test Trip",
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
     setDistanceUnit: vi.fn(),
@@ -59,6 +60,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     isLeader: true,
     selectedHour: 12,
     setSelectedHour: vi.fn(),
+    conditionsVersion: 0,
+    bumpConditions: vi.fn(),
     ...overrides,
   }
 }
@@ -72,72 +75,74 @@ function renderWithCtx(ctx: MapBuilderContextValue) {
 beforeEach(() => vi.clearAllMocks())
 
 describe("PointDetailSheet — visibility", () => {
-  it("renders nothing when selectedPointId is null", () => {
+  it("renders nothing when no point is selected", () => {
     const { container } = renderWithCtx(makeCtx({ selectedPointId: null }))
     expect(container.firstChild).toBeNull()
   })
 
-  it("renders the sheet when selectedPointId is set", () => {
+  it("renders the sheet when a point is selected", () => {
     renderWithCtx(makeCtx())
+    expect(screen.getByTestId("point-detail-sheet")).toBeInTheDocument()
     expect(screen.getByText("Harbour")).toBeInTheDocument()
   })
 })
 
 describe("PointDetailSheet — content", () => {
-  it("shows the global index", () => {
-    renderWithCtx(makeCtx())
-    expect(screen.getByText("1")).toBeInTheDocument()
-  })
-
   it("shows the point name", () => {
     renderWithCtx(makeCtx())
     expect(screen.getByText("Harbour")).toBeInTheDocument()
   })
 
-  it("falls back to coordinates when point has no name", () => {
-    renderWithCtx(makeCtx({ selectedPointId: "p2" }))
-    expect(screen.getAllByText("43.12340, 14.56780").length).toBeGreaterThan(0)
+  it("shows the point type for a point of interest", () => {
+    renderWithCtx(makeCtx({ selectedPointId: "p3" }))
+    expect(screen.getByText("interest")).toBeInTheDocument()
   })
 
-  it("shows notes when present", () => {
+  it("shows Leg, Notes and Images tiles", () => {
+    renderWithCtx(makeCtx())
+    // p1 is the day's first point — no inbound leg, so the tile reads "Leg" / "Start".
+    expect(screen.getByText("Leg")).toBeInTheDocument()
+    expect(screen.getByText("Start")).toBeInTheDocument()
+    expect(screen.getByTestId("point-notes-tile")).toBeInTheDocument()
+    expect(screen.getByTestId("point-images-tile")).toBeInTheDocument()
+  })
+
+  it("labels the leg tile with the planning speed for a point with an inbound leg", () => {
+    // p2 follows p1 on the same day, so its tile shows the ETA at the avg speed.
+    renderWithCtx(makeCtx({ selectedPointId: "p2" }))
+    expect(screen.getByText("Avg speed 2.5 kn")).toBeInTheDocument()
+  })
+
+  it("shows a notes preview when notes are present", () => {
     renderWithCtx(makeCtx())
     expect(screen.getByText("Tricky entrance at low tide")).toBeInTheDocument()
   })
 
-  it("shows empty state when no notes or photos (read-only view)", () => {
-    renderWithCtx(makeCtx({ selectedPointId: "p2", isLeader: false }))
-    expect(screen.getByText("No notes or photos for this point.")).toBeInTheDocument()
-  })
-
-  it("shows the type label for a stop", () => {
+  it("shows an 'Add…' notes affordance when editable and no notes", () => {
     renderWithCtx(makeCtx({ selectedPointId: "p2" }))
-    expect(screen.getByText(/Overnight stop/)).toBeInTheDocument()
+    expect(screen.getByText("Add…")).toBeInTheDocument()
   })
+})
 
-  it("shows the type label for a waypoint", () => {
+describe("PointDetailSheet — detail modal", () => {
+  it("opens the detail modal with an editable notes field when the Notes tile is clicked", async () => {
     renderWithCtx(makeCtx())
-    expect(screen.getByText(/Waypoint/)).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId("point-notes-tile"))
+    expect(screen.getByRole("textbox")).toBeInTheDocument()
   })
 
-  it("shows the type label for a point of interest", () => {
-    renderWithCtx(makeCtx({ selectedPointId: "p3" }))
-    expect(screen.getByText(/Point of interest/)).toBeInTheDocument()
+  it("opens the detail modal showing coordinates when the Images tile is clicked", async () => {
+    renderWithCtx(makeCtx())
+    await userEvent.click(screen.getByTestId("point-images-tile"))
+    expect(screen.getByText(/43\.123°N · 14\.568°E/)).toBeInTheDocument()
   })
 })
 
 describe("PointDetailSheet — close", () => {
-  it("calls setSelectedPointId(null) when close button is clicked", async () => {
+  it("calls setSelectedPointId(null) when the close button is clicked", async () => {
     const setSelectedPointId = vi.fn()
     renderWithCtx(makeCtx({ setSelectedPointId }))
     await userEvent.click(screen.getByRole("button", { name: /close/i }))
-    expect(setSelectedPointId).toHaveBeenCalledWith(null)
-  })
-
-  it("calls setSelectedPointId(null) when the backdrop is clicked", async () => {
-    const setSelectedPointId = vi.fn()
-    const { container } = renderWithCtx(makeCtx({ setSelectedPointId }))
-    // The backdrop is the outermost div (first child)
-    await userEvent.click(container.firstChild as HTMLElement)
     expect(setSelectedPointId).toHaveBeenCalledWith(null)
   })
 })

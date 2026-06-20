@@ -43,6 +43,43 @@ class TidalGateWarningSchema(Schema):
 _gate_schema = TidalGateWarningSchema(many=True)
 
 
+class TidalDiamondHourSchema(Schema):
+
+    class Meta:
+        unknown = EXCLUDE
+
+    hour_from_hw = fields.Integer()
+    rate_knots = fields.Float(allow_none=True)
+    direction_degrees = fields.Float(allow_none=True)
+
+    def on_bind_field(self, field_name, field_obj):
+        field_obj.data_key = camelcase(field_obj.data_key or field_name)
+
+
+class TidalDiamondSchema(Schema):
+    """A tidal diamond resolved at a given hour, with its full hourly table."""
+
+    class Meta:
+        unknown = EXCLUDE
+
+    id = fields.String()
+    name = fields.String()
+    lat = fields.Float()
+    lng = fields.Float()
+    rate_knots = fields.Float(allow_none=True)
+    direction_degrees = fields.Float(allow_none=True)
+    source = fields.String(allow_none=True)
+    radius_m = fields.Float(allow_none=True)
+    is_user_created = fields.Boolean()
+    hourly_table = fields.List(fields.Nested(TidalDiamondHourSchema))
+
+    def on_bind_field(self, field_name, field_obj):
+        field_obj.data_key = camelcase(field_obj.data_key or field_name)
+
+
+_diamond_schema = TidalDiamondSchema(many=True)
+
+
 class SeaSchema(Schema):
     """Sea serialisation schema.
 

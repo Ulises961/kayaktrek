@@ -1,6 +1,6 @@
 from datetime import time as _time
 
-from Api.database import db
+from Api.database import Base, db
 from sqlalchemy import UUID, DateTime, Integer, Numeric, String, Time, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from Models.sea_state import SeaState
 
 
-class Sea(db.Model):
+class Sea(Base):
     __table_args__ = (
         ForeignKeyConstraint(['day_id'], ['day.id'], name="day_foreign_key_in_sea"),
     )

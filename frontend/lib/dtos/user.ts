@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { noHtmlTags } from "../validators"
 import { ImageSchema } from "./image"
 import { ItinerariesSchema } from "./itinerary"
 import { InventoriesSchema } from "./inventory"
@@ -47,6 +48,7 @@ export const UserSchema = z.object({
   emergencyContactRelationship: z.string().nullish(),
   // Consent + GDPR timestamps (ISO strings, never raw medical notes)
   medicalNotesConsentAt: z.string().nullish(),
+  medicalNotesResetAt: z.string().nullish(),
   deletionRequestedAt: z.string().nullish(),
   // Keypair presence flag (M3g)
   hasKeypair: z.boolean().nullish(),
@@ -58,25 +60,29 @@ export const UsersSchema = z.array(UserSchema)
 
 // Form validation schema for the edit-profile page
 export const ProfileFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  surname: z.string().max(100).optional(),
+  name: z.string().min(1, "Name is required").max(100).refine(noHtmlTags.check, noHtmlTags.message),
+  surname: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   phone: z.string().max(20).optional(),
   username: z
     .string()
     .min(3, "At least 3 characters")
     .max(50)
     .regex(/^[a-zA-Z0-9_-]+$/, "Letters, numbers, _ and - only"),
-  vesselMake: z.string().max(100).optional(),
-  vesselModel: z.string().max(100).optional(),
+  vesselMake: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  vesselModel: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselLengthCm: z
     .string()
     .optional()
     .refine((val) => !val || /^\d+$/.test(val), "Must be a positive integer"),
-  vesselColorPrimary: z.string().max(50).optional(),
-  vesselColorSecondary: z.string().max(50).optional(),
-  emergencyContactName: z.string().max(200).optional(),
+  vesselColorPrimary: z.string().max(50).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  vesselColorSecondary: z.string().max(50).refine(noHtmlTags.check, noHtmlTags.message).optional(),
+  emergencyContactName: z.string().max(200).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   emergencyContactPhone: z.string().max(20).optional(),
-  emergencyContactRelationship: z.string().max(100).optional(),
+  emergencyContactRelationship: z
+    .string()
+    .max(100)
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
 })
 
 export type ProfileFormValues = z.infer<typeof ProfileFormSchema>

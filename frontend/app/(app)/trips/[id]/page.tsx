@@ -92,6 +92,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
             currentMemberId={currentMember?.id}
             currentUserId={session?.userId}
             leaderId={leader?.user.id}
+            medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
           />
         </CardContent>
       </Card>

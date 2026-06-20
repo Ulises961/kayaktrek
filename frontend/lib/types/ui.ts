@@ -33,8 +33,9 @@ export interface VelocityGridLayer {
   data: number[]
 }
 
-// Shape returned by wind-vectors, wave-vectors, and tidal-stream-vectors endpoints.
+// Shape returned by the wind-vectors and wave-vectors endpoints.
 // `grid` is passed directly to leaflet-velocity; `source` labels the data origin.
+// (Tidal streams render as discrete diamonds, not a velocity field — see TidalDiamond.)
 export interface VelocityGridData {
   source?: "station" | "manual"
   grid: VelocityGridLayer[]

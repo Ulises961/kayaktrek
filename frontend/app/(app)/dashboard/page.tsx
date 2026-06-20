@@ -2,18 +2,17 @@ import Link from "next/link"
 import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
-import { TRIP_STATE_LABELS, TripsSchema } from "@/lib/dtos/trip"
+import { TRIP_STATE_LABELS, TripPageSchema } from "@/lib/dtos/trip"
 import { StateBadge } from "@/components/common/state-badge"
 import { Button } from "@/components/ui/button"
 import type { Trip } from "@/lib/dtos/trip"
 
 async function fetchTrips(userId: string): Promise<Trip[]> {
-  try {
-    const raw = await apiGet<unknown[]>(`/api/trip/${userId}/all`)
-    return TripsSchema.parse(raw)
-  } catch {
-    return []
-  }
+  // No catch: let apiGet's redirect("/login") (a thrown NEXT_REDIRECT) propagate, and
+  // let a genuine fetch/parse failure surface rather than masquerade as "no trips".
+  // /api/trip/<id>/all returns a paginated envelope { items, total, page, pages }.
+  const raw = await apiGet<unknown>(`/api/trip/${userId}/all`)
+  return TripPageSchema.parse(raw).items
 }
 
 function HeroTrip({ trip }: { trip: Trip }) {

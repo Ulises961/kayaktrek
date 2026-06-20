@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { isoDateField } from "../validators"
+import { isoDateField, noHtmlTags } from "../validators"
 
 export const LogSchema = z.object({
   id: z.uuidv7().optional(),
@@ -25,7 +25,11 @@ export const LogFieldsSchema = z.object({
   hours: z.number().min(0, "Min 0").max(24, "Max 24 hours").optional(),
   avgSea: z.number().int().min(0, "Min 0").max(12, "Max 12 (Beaufort)").optional(),
   distance: z.number().min(0, "Must be positive").optional(),
-  notes: z.string().max(2000, "Max 2000 characters").optional(),
+  notes: z
+    .string()
+    .max(2000, "Max 2000 characters")
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
 })
 
 export type Log = z.infer<typeof LogSchema>

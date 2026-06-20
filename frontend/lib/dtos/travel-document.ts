@@ -34,7 +34,7 @@ export const TravelDocumentFieldsSchema = z
       .refine(noHtmlTags.check, noHtmlTags.message),
     date: isoDateField,
     expiryDate: isoDateField,
-    confirmationNumber: z.string().max(100).optional(),
+    confirmationNumber: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
     url: z.string().max(500).optional(),
     notes: z.string().max(2000).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   })

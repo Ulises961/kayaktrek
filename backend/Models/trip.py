@@ -95,8 +95,8 @@ class Trip(BaseModel):
         default=TripStateType.BUILDING,
         index=True,
     )
-    destination: Mapped[String] = mapped_column(String, nullable=True)
-    description: Mapped[String] = mapped_column(String, nullable=True)
+    destination: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     date_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     date_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 

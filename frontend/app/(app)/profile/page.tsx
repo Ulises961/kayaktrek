@@ -206,7 +206,10 @@ export default async function ProfilePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <MedicalNotesSection hasStoredNotes={!!user.medicalNotesConsentAt} />
+          <MedicalNotesSection
+            hasStoredNotes={!!user.medicalNotesConsentAt}
+            resetAt={user.medicalNotesResetAt}
+          />
         </CardContent>
       </Card>
 

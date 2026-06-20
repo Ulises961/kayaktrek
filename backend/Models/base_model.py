@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 from sqlalchemy import UUID, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 import uuid_extension
-from Api.database import db
+from Api.database import Base
 from uuid import UUID as _UUID
 
-class BaseModel(db.Model):
+class BaseModel(Base):
     __abstract__ = True
     id: Mapped[_UUID] = mapped_column(
         UUID,

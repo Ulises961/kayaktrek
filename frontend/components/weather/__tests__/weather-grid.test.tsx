@@ -3,6 +3,18 @@ import { render, screen } from "@testing-library/react"
 import { WeatherGrid } from "../weather-grid"
 import type { WeatherState } from "@/lib/dtos/weather"
 
+vi.mock("@/components/ui/carousel", () => ({
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
+  CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 
 const states: WeatherState[] = [

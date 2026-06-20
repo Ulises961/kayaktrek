@@ -1,0 +1,16 @@
+Hi {{ name }},
+
+Your Kayak Planner password was just reset. Because your medical notes are encrypted with
+your password, they could not be recovered and have been permanently removed from your account.
+
+Nothing else is affected — your trips, logs, and other data are intact. The next time you open
+your profile, Kayak Planner will prompt you to re-enter your medical notes so they are available
+again for your float plans.
+
+Re-enter your medical notes:
+{{ profile_url }}
+
+If you did not reset your password, please contact support immediately.
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

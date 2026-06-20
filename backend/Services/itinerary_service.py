@@ -1,5 +1,4 @@
 """Itinerary Service — business logic for itinerary operations."""
-import io
 import logging
 from typing import Dict, List, Optional, Set, Tuple
 from uuid import UUID
@@ -178,7 +177,8 @@ class ItineraryService:
             )
             db.session.add(new_day)
             old_to_new_day[str(old_day.id)] = new_day
-            all_source_points.extend(old_day.points)
+            if old_day.points:
+                all_source_points.extend(old_day.points)
 
         db.session.flush()
 
@@ -234,7 +234,7 @@ class ItineraryService:
         """
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
 
-        all_points: List[Point] = [p for day in itinerary.days for p in day.points]
+        all_points: List[Point] = [p for day in itinerary.days for p in (day.points or [])]
         # Also collect points whose day was deleted (day_id = NULL) by chasing
         # next_id chains forward from the known set.
         known_ids: Set[str] = {str(p.id) for p in all_points}
@@ -288,15 +288,15 @@ class ItineraryService:
             start_i = point_idx[start_pid]
             end_i = point_idx[end_pid]
 
-            day = day_map.get(day_id_str)
-            if day is None:
+            boundary_day: Optional[Day] = day_map.get(day_id_str)
+            if boundary_day is None:
                 raise ValueError(f"Day {day_id_str} does not belong to this itinerary")
 
-            for pid in point_order[start_i: end_i + 1]:
-                point_to_day[pid] = day.id
+            for point_id in point_order[start_i: end_i + 1]:
+                point_to_day[point_id] = boundary_day.id
 
-            day.start_point_id = UUID(start_pid)
-            day.end_point_id = UUID(end_pid)
+            boundary_day.start_point_id = UUID(start_pid)
+            boundary_day.end_point_id = UUID(end_pid)
             if boundary.get("date"):
                 day.date = boundary["date"]
 
@@ -347,14 +347,14 @@ class ItineraryService:
         include_private=False strips point notes (used for unauthenticated export).
         """
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
-        all_points: List[Point] = [p for day in itinerary.days for p in day.points]
+        all_points: List[Point] = [p for day in itinerary.days for p in (day.points or [])]
         point_order = ItineraryService._walk_linked_list(all_points)
         point_map: Dict[str, Point] = {str(p.id): p for p in all_points}
 
         point_to_day_number: Dict[str, int] = {}
         for day in itinerary.days:
-            for point in day.points:
-                point_to_day_number[str(point.id)] = day.day_number
+            for point_in_day in (day.points or []):
+                point_to_day_number[str(point_in_day.id)] = day.day_number
 
         gpx = gpxpy.gpx.GPX()
         gpx.name = itinerary.name
@@ -362,21 +362,21 @@ class ItineraryService:
         route.name = itinerary.name
         gpx.routes.append(route)
 
-        for pid in point_order:
-            point = point_map.get(pid)
+        for point_id in point_order:
+            point: Optional[Point] = point_map.get(point_id)
             if point is None or point.latitude is None or point.longitude is None:
                 continue
-            rp = gpxpy.gpx.GPXRoutePoint(
+            route_point = gpxpy.gpx.GPXRoutePoint(
                 latitude=float(point.latitude),
                 longitude=float(point.longitude),
                 name=point.name or "",
             )
-            rp.symbol = point.type.value if point.type else "position"
-            day_num = point_to_day_number.get(pid, 0)
-            rp.comment = f"Day {day_num}" if day_num > 0 else "Staging"
+            route_point.symbol = point.type.value if point.type else "position"
+            day_number = point_to_day_number.get(point_id, 0)
+            route_point.comment = f"Day {day_number}" if day_number > 0 else "Staging"
             if include_private and point.notes:
-                rp.description = point.notes
-            route.points.append(rp)
+                route_point.description = point.notes
+            route.points.append(route_point)
 
         return gpx.to_xml().encode("utf-8")
 
@@ -397,7 +397,7 @@ class ItineraryService:
 
         try:
             defusedxml.ElementTree.fromstring(file_bytes)
-            gpx = gpxpy.parse(io.BytesIO(file_bytes))
+            gpx = gpxpy.parse(file_bytes.decode('utf-8'))
         except Exception as exc:
             raise ValueError(f"Invalid GPX file: {exc}") from exc
 

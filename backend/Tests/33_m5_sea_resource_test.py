@@ -10,9 +10,10 @@ from shapely.geometry import Point as ShapelyPoint
 from Api.database import db as _db
 from Models.day import Day
 from Models.sea import Sea
-from Models.tidal_station import TidalStation
+from Models.tidal_station import StreamEntryMode, TidalStation
 from Models.weather import Weather
 from Models.weather_state import WeatherState
+from Services.tidal_station_service import TidalStationService
 
 
 # ── Sea CRUD ─────────────────────────────────────────────────────────────────
@@ -72,10 +73,15 @@ def test_patch_sea_updates_fields(client, auth_headers, itinerary):
     _cleanup_sea(day_id)
 
 
-def test_patch_sea_404_when_not_exists(client, auth_headers, itinerary):
+def test_patch_sea_upserts_when_not_exists(client, auth_headers, itinerary):
+    # Sea is lazily materialised: the first PATCH for a day creates the record
+    # rather than 404ing, since the frontend only ever PATCHes.
     day_id = itinerary["days"][0]["id"]
     resp = client.patch(f"/api/day/{day_id}/sea", json={"tidalRangeM": 1.0}, headers=auth_headers)
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.get_json()["tidalRangeM"] == pytest.approx(1.0)
+
+    _cleanup_sea(day_id)
 
 
 def test_get_sea_returns_created_record(client, auth_headers, itinerary):
@@ -344,36 +350,47 @@ def test_wave_vectors_returns_empty_grid_when_no_sea_states(client, auth_headers
     assert data["grid"] == []
 
 
-def test_tidal_stream_vectors_empty_when_no_data(client, auth_headers, itinerary):
+def test_tidal_diamonds_empty_when_none_exist(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/tidal-stream-vectors?hour=3", headers=auth_headers)
+    resp = client.get(f"/api/day/{day_id}/tidal-diamonds?hour=12", headers=auth_headers)
     assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["grid"] == []
+    assert resp.get_json() == []
 
 
-def test_tidal_stream_vectors_returns_manual_grid_when_sea_has_stream_fields(
-    client, auth_headers, itinerary
+def test_tidal_diamonds_returns_user_diamond_resolved_at_hour(
+    client, auth_headers, itinerary, id
 ):
     day_id = itinerary["days"][0]["id"]
+    # HW at 12:00 so the clock hour maps onto the diamond's hourly table.
     client.post(
         f"/api/day/{day_id}/sea",
-        json={
-            "highTide": "12:00",
-            "lowTide": "06:00",
-            "tidalRangeM": 4.0,
-            "floodDirectionDegrees": 45.0,
-            "ebbDirectionDegrees": 225.0,
-            "maxSpringRateKnots": 3.0,
-        },
+        json={"highTide": "12:00", "lowTide": "06:00", "tidalRangeM": 4.0},
         headers=auth_headers,
     )
+    TidalStationService.create_user_diamond(itinerary["id"], id, {
+        "name": "The Race",
+        "location": from_shape(ShapelyPoint(-4.1, 50.3), srid=4326),
+        "entry_mode": StreamEntryMode.SIMPLE,
+        "max_spring_rate_knots": 3.0,
+        "flood_direction_degrees": 45,
+        "ebb_direction_degrees": 225,
+        "radius_m": 500,
+    })
 
-    resp = client.get(f"/api/day/{day_id}/tidal-stream-vectors?hour=3", headers=auth_headers)
+    # hour 9 → 3 h before HW(12) → hours_from_hw = -3 → mid-flood peak.
+    resp = client.get(f"/api/day/{day_id}/tidal-diamonds?hour=9", headers=auth_headers)
     assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["source"] == "manual"
-    assert len(data["grid"]) == 2
+    diamonds = resp.get_json()
+    assert len(diamonds) == 1
+    d = diamonds[0]
+    assert d["name"] == "The Race"
+    assert d["isUserCreated"] is True
+    assert d["radiusM"] == pytest.approx(500.0)
+    assert d["lat"] == pytest.approx(50.3)
+    assert d["lng"] == pytest.approx(-4.1)
+    assert d["rateKnots"] == pytest.approx(3.0)
+    assert d["directionDegrees"] == pytest.approx(45.0)
+    assert len(d["hourlyTable"]) == 13
 
     _cleanup_sea(day_id)
 

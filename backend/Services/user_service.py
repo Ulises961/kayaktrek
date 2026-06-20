@@ -289,6 +289,8 @@ class UserService:
         user.medical_notes_nonce = nonce
         user.medical_notes_salt = salt
         user.medical_notes_consent_at = datetime.now(timezone.utc)
+        # Notes have been re-entered — clear any pending "lost on reset" prompt.
+        user.medical_notes_reset_at = None
         db.session.commit()
         db.session.refresh(user)
         logger.info("medical_consent_granted", extra={"user_id": id})
@@ -308,6 +310,8 @@ class UserService:
         user.medical_notes_nonce = None
         user.medical_notes_salt = None
         user.medical_notes_consent_at = None
+        # Explicit opt-out — dismiss any pending "lost on reset" prompt as well.
+        user.medical_notes_reset_at = None
         db.session.query(TripMember).filter_by(user_id=user.id).update({
             "medical_notes_ciphertext": None,
             "medical_notes_nonce": None,

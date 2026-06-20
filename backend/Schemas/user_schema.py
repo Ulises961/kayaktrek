@@ -40,6 +40,8 @@ class UserSchema(BaseSchema):
 
     # Consent timestamp only — ciphertext fields are never exposed via API
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
+    # Set when a password reset wiped the notes — drives the re-entry prompt in the UI
+    medical_notes_reset_at = fields.DateTime(allow_none=True, dump_only=True)
     deletion_requested_at = fields.DateTime(allow_none=True, dump_only=True)
 
     # Presence flag — clients use this to show the keypair-generation prompt

@@ -14,11 +14,13 @@ import {
 
 interface MedicalNotesSectionProps {
   hasStoredNotes: boolean
+  /** Set when a password reset wiped the notes — drives a one-time re-entry prompt. */
+  resetAt?: string | null
 }
 
 type Phase = "idle" | "authenticating" | "editing"
 
-export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps) {
+export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSectionProps) {
   const [phase, setPhase] = useState<Phase>("idle")
   const [password, setPassword] = useState("")
   const [elevatedToken, setElevatedToken] = useState<string | null>(null)
@@ -27,6 +29,9 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
   const [error, setError] = useState<string | null>(null)
   const [savedOk, setSavedOk] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  // The prompt clears once notes are re-entered (hasNotes flips true after a save).
+  const showResetPrompt = !!resetAt && !hasNotes
 
   function handleDecrypt() {
     setError(null)
@@ -96,21 +101,33 @@ export function MedicalNotesSection({ hasStoredNotes }: MedicalNotesSectionProps
 
   if (phase === "idle") {
     return (
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-muted-foreground text-sm">
-          {hasNotes
-            ? "Notes stored — encrypted on your account."
-            : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => setPhase("authenticating")}
-        >
-          {hasNotes ? "Edit" : "Add notes"}
-        </Button>
+      <div className="flex flex-col gap-3">
+        {showResetPrompt && (
+          <div
+            role="alert"
+            className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            Your medical notes were removed when you reset your password — they are encrypted with
+            your password and could not be recovered. Please re-enter them so they are available for
+            your float plans.
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-muted-foreground text-sm">
+            {hasNotes
+              ? "Notes stored — encrypted on your account."
+              : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setPhase("authenticating")}
+          >
+            {hasNotes ? "Edit" : "Add notes"}
+          </Button>
+        </div>
       </div>
     )
   }

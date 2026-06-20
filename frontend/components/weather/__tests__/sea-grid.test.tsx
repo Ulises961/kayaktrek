@@ -1,7 +1,19 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { SeaGrid } from "../sea-grid"
 import type { SeaState } from "@/lib/dtos/sea"
+
+vi.mock("@/components/ui/carousel", () => ({
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
+  CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
 
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 

@@ -28,6 +28,7 @@ from Models.image import Image
 from Models.trip_member import TripMember, MemberRoleType
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
+from Models.tidal_station import TidalStation
 from Services.itinerary_service import ItineraryService
 from Services.trip_service import TripService
 
@@ -261,6 +262,9 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
 
         elif resource_type == "shuttle_vehicle":
             return _check_shuttle_vehicle_access(g.current_user_id, str(resource_id))
+
+        elif resource_type == "tidal_diamond":
+            return _check_tidal_diamond_ownership(g.current_user_id, str(resource_id))
 
         else:
             logger.error(f"Unknown resource type: {resource_type}")
@@ -519,3 +523,17 @@ def _check_shuttle_vehicle_access(user_id: str, vehicle_id: str) -> Optional[boo
         .filter_by(user_id=UUID(user_id), trip_id=vehicle.trip_id)
         .first()
     ) is not None
+
+
+def _check_tidal_diamond_ownership(user_id: str, station_id: str) -> Optional[bool]:
+    """Check access to a user-created tidal diamond through its itinerary.
+
+    Globally seeded stations have no itinerary and are not user-editable, so they
+    return False (read-only) rather than granting access.
+    """
+    station = db.session.query(TidalStation).filter_by(id=UUID(station_id)).first()
+    if not station:
+        return None
+    if station.itinerary_id is None:
+        return False
+    return _check_itinerary_ownership(user_id, str(station.itinerary_id))

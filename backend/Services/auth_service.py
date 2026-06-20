@@ -87,11 +87,15 @@ class AuthService:
         db.session.add(user)
         db.session.commit()
 
-        user = db.session.query(User).filter_by(mail=mail_addr).first()
-        if not user:
+        persisted_user: Optional[User] = db.session.query(User).filter_by(mail=mail_addr).first()
+        if not persisted_user:
             raise ValueError("User generated incorrectly")
+        user = persisted_user
 
-        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(user_json.get("pwd"))
+        pwd = user_json.get("pwd")
+        if not pwd:
+            raise ValueError("Password is required for registration")
+        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(pwd)
         user.public_key = public_key_b64
         user.private_key_ciphertext = pk_ct
         user.private_key_nonce = pk_nonce
@@ -194,6 +198,7 @@ class AuthService:
         # The private key is derived from the old password; after a reset it is
         # undecryptable. Clear the keypair and any medical notes ciphertext so
         # the UI reflects reality rather than holding orphaned encrypted data.
+        had_medical_notes = user.medical_notes_ciphertext is not None
         user.medical_notes_ciphertext = None
         user.medical_notes_nonce = None
         user.medical_notes_salt = None
@@ -202,8 +207,17 @@ class AuthService:
         user.private_key_ciphertext = None
         user.private_key_nonce = None
         user.private_key_salt = None
+        # Flag the data loss so the UI can prompt the user to re-enter their notes.
+        # Only set + notify when notes actually existed — never nag users who never used the feature.
+        if had_medical_notes:
+            user.medical_notes_reset_at = datetime.now(timezone.utc)
         db.session.commit()
-        logger.info("password_reset", extra={"user_id": str(user.id)})
+        if had_medical_notes:
+            AuthService._send_medical_notes_cleared_email(user)
+        logger.info(
+            "password_reset",
+            extra={"user_id": str(user.id), "medical_notes_cleared": had_medical_notes},
+        )
         return user
 
     # ------------------------------------------------------------------
@@ -266,6 +280,19 @@ class AuthService:
             "account_verification",
             name=user.name,
             verify_url=verify_url,
+            support_email=support_email,
+        )
+
+    @staticmethod
+    def _send_medical_notes_cleared_email(user: User) -> None:
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+        send_template_email(
+            user.mail,
+            "Your Kayak Planner medical notes were removed",
+            "medical_notes_cleared",
+            name=user.name,
+            profile_url=f"{frontend_url}/profile",
             support_email=support_email,
         )
 

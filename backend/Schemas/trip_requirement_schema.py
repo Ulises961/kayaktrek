@@ -1,6 +1,9 @@
-from marshmallow import fields, post_load, validates, ValidationError
+import bleach
+from marshmallow import fields, post_load, pre_load, validates, ValidationError
 from Models.trip_requirement import TripRequirement, RequirementStatusType
 from Schemas.base_schema import BaseSchema
+
+_SANITIZE_FIELDS = ("name", "category")
 
 
 class TripRequirementSchema(BaseSchema):
@@ -27,12 +30,24 @@ class TripRequirementSchema(BaseSchema):
         load_default=list,
     )
 
+    @pre_load
+    def sanitize_text_fields(self, data, **kwargs):
+        for key in _SANITIZE_FIELDS:
+            if data.get(key) is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+        return data
+
     @validates('name')
     def validate_name(self, value, **kwargs):
         if not value or not value.strip():
             raise ValidationError("Requirement name cannot be empty")
         if len(value) > 255:
             raise ValidationError("Requirement name cannot exceed 255 characters")
+
+    @validates('category')
+    def validate_category(self, value, **kwargs):
+        if value is not None and len(value) > 255:
+            raise ValidationError("Requirement category cannot exceed 255 characters")
 
     @post_load
     def make_requirement(self, data, **kwargs):

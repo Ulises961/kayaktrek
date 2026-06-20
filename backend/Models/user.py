@@ -69,6 +69,11 @@ class User(BaseModel):
     medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Set when a forgot-password reset wiped the user's medical notes (the wrapping key is
+    # derived from the old password and cannot be recovered). Drives a one-time "re-enter
+    # your medical notes" prompt in the UI; cleared once the user grants consent again.
+    medical_notes_reset_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # X25519 keypair — public key stored in plaintext; private key AES-GCM encrypted with
     # the user's password (same PBKDF2+AES-GCM pattern as medical_notes_ciphertext).
     # Generated at registration. Used to encrypt TripMember leader-visible medical notes

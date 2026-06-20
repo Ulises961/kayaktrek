@@ -1,10 +1,9 @@
 """HTTP-layer tests for the sea resource — sea CRUD validation, tidal-gates,
-and the wind/wave/tidal-stream velocity-vector endpoints (including the branch
-where the day has route points with coordinates).
+the wind/wave velocity-vector endpoints, and the day tidal-diamonds endpoint
+(including the branch where the day has route points with coordinates).
 """
 import pytest
 
-from Resources.day_resource import DAY_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
 
 SEA_BASE = "/api/day"
@@ -95,9 +94,9 @@ def test_wave_vectors_returns_200(client, auth_headers, day_with_points):
     assert resp.json["source"] == "marine"
 
 
-def test_tidal_stream_vectors_with_points_returns_200(client, auth_headers, day_with_points):
-    """Day has coords → exercises the station spatial-query branch."""
-    resp = client.get(f"{SEA_BASE}/{day_with_points['id']}/tidal-stream-vectors?hour=6",
+def test_tidal_diamonds_with_points_returns_200(client, auth_headers, day_with_points):
+    """Day has coords → exercises the nearby-atlas spatial-query branch."""
+    resp = client.get(f"{SEA_BASE}/{day_with_points['id']}/tidal-diamonds?hour=12",
                       headers=auth_headers)
     assert resp.status_code == 200
-    assert "source" in resp.json
+    assert isinstance(resp.json, list)

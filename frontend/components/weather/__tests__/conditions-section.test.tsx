@@ -11,6 +11,18 @@ vi.mock("@/lib/weather/actions", () => ({
   updateDaySea: vi.fn(),
 }))
 
+vi.mock("@/components/ui/carousel", () => ({
+  Carousel: ({
+    children,
+    "data-testid": testid,
+  }: {
+    children: React.ReactNode
+    "data-testid"?: string
+  }) => <div data-testid={testid}>{children}</div>,
+  CarouselContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CarouselItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
 import {
   fetchDayWeather,
   fetchDaySea,

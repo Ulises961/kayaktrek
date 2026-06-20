@@ -112,6 +112,18 @@ describe("ProfileFormSchema", () => {
     expect(ProfileFormSchema.safeParse({ ...VALID, vesselLengthCm: "abc" }).success).toBe(false)
   })
 
+  it("rejects HTML tags in free-text fields", () => {
+    expect(ProfileFormSchema.safeParse({ ...VALID, name: "<script>x</script>" }).success).toBe(
+      false,
+    )
+    expect(ProfileFormSchema.safeParse({ ...VALID, vesselMake: "<b>Prijon</b>" }).success).toBe(
+      false,
+    )
+    expect(
+      ProfileFormSchema.safeParse({ ...VALID, emergencyContactName: "<img src=x>" }).success,
+    ).toBe(false)
+  })
+
   it("accepts an empty vesselLengthCm (optional field)", () => {
     expect(ProfileFormSchema.safeParse({ ...VALID, vesselLengthCm: "" }).success).toBe(true)
   })

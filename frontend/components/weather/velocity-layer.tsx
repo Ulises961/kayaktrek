@@ -13,7 +13,10 @@ export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
     if (!data || data.length === 0) return
     let cancelled = false
     const lv = L as unknown as { velocityLayer: (opts: Record<string, unknown>) => L.Layer }
-    const layer = lv.velocityLayer({ displayValues: true, data, ...options })
+    // displayValues:false — the bottom-left hover readout is ambiguous when several
+    // layers (wind/swell/tidal) are active and can't be labelled per-layer cleanly.
+    // The per-hour cards and the colour legend convey the same data unambiguously.
+    const layer = lv.velocityLayer({ displayValues: false, data, ...options })
 
     // Defer past React Strict Mode's synchronous cleanup phase. The first (double-invoke)
     // run's rAF is cancelled by cleanup before it fires, so addTo is called exactly once.

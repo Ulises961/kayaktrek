@@ -14,6 +14,9 @@ interface DatePickerProps {
   placeholder?: string
   disabled?: boolean
   id?: string
+  /** Override the trigger button styling (e.g. for compact inline use). */
+  className?: string
+  size?: React.ComponentProps<typeof Button>["size"]
 }
 
 export function DatePicker({
@@ -22,6 +25,8 @@ export function DatePicker({
   placeholder = "Pick a date",
   disabled,
   id,
+  className,
+  size,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -38,10 +43,12 @@ export function DatePicker({
         <Button
           id={id}
           variant="outline"
+          size={size}
           disabled={disabled}
           className={cn(
             "w-full justify-start overflow-hidden text-left font-normal",
             !selected && "text-muted-foreground",
+            className,
           )}
         >
           <CalendarIcon className="mr-2 size-4 shrink-0" />

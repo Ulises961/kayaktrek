@@ -14,6 +14,7 @@ export type MapBuilderContextValue = {
   draftSlices: DaySlice[] | null
   setDraftSlices: (s: DaySlice[] | null) => void
   tripId: string | null
+  tripName: string
   itineraryId: string
   distanceUnit: "nm" | "km"
   setDistanceUnit: (u: "nm" | "km") => void
@@ -32,6 +33,9 @@ export type MapBuilderContextValue = {
   isLeader: boolean
   selectedHour: number
   setSelectedHour: (h: number) => void
+  /** Bumped after a weather fetch so day-rail entries re-read their conditions. */
+  conditionsVersion: number
+  bumpConditions: () => void
 }
 
 export const MapBuilderContext = createContext<MapBuilderContextValue | null>(null)

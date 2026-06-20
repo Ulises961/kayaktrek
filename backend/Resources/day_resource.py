@@ -96,7 +96,7 @@ def update_day(id: str):
     try:
         raw = request.get_json()
         validated = DayUpdateSchema().load(raw)
-        day_data = {**raw, **validated}  # type: ignore[arg-type]
+        day_data = {**raw, **validated}
         updated_day = DayService.update_day(id, day_data)
         return jsonify(DaySchema().dump(updated_day)), HTTPStatus.OK
     except ValidationError as e:

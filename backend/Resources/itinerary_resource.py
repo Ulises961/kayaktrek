@@ -50,7 +50,7 @@ def get_itinerary(id: str):
     """GET /api/itinerary/<id> — Return itinerary by ID (owner or trip member)."""
     itinerary = ItineraryService.get_itinerary_by_id(id)
     schema = ItinerarySchema()
-    schema.include_staging = True
+    schema.include_staging = True  # type: ignore[attr-defined]
     return jsonify(schema.dump(itinerary)), HTTPStatus.OK
 
 
@@ -159,7 +159,7 @@ def apply_boundaries(id: str):
     try:
         itinerary = ItineraryService.apply_boundaries(id, boundaries, point_updates)
         schema = ItinerarySchema()
-        schema.include_staging = True
+        schema.include_staging = True  # type: ignore[attr-defined]
         return jsonify(schema.dump(itinerary)), HTTPStatus.OK
 
     except HTTPException:

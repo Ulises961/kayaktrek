@@ -17,6 +17,8 @@ interface FloatPlanMedicalTabSectionProps {
   tripId: string
   hasStoredNotes: boolean
   sharedAt: string | null
+  /** Set when a password reset wiped the user's notes — prompts re-entry. */
+  profileResetAt?: string | null
 }
 
 type Phase = "idle" | "authenticating" | "editing"
@@ -25,6 +27,7 @@ export function FloatPlanMedicalTabSection({
   tripId,
   hasStoredNotes,
   sharedAt,
+  profileResetAt,
 }: FloatPlanMedicalTabSectionProps) {
   const [phase, setPhase] = useState<Phase>("idle")
   const [password, setPassword] = useState("")
@@ -37,6 +40,9 @@ export function FloatPlanMedicalTabSection({
   const [savedOk, setSavedOk] = useState(false)
   const [shareOk, setShareOk] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  // The prompt clears once notes are re-entered (hasNotes flips true after a save).
+  const showResetPrompt = !!profileResetAt && !hasNotes
 
   function handleDecrypt() {
     setError(null)
@@ -134,6 +140,15 @@ export function FloatPlanMedicalTabSection({
   if (phase === "idle") {
     return (
       <div className="flex flex-col gap-2">
+        {showResetPrompt && (
+          <div
+            role="alert"
+            className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            Your medical notes were removed when you reset your password. Re-enter them here (or on
+            your profile) so they are available for this trip&apos;s float plan.
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4">
           <p className="text-muted-foreground text-sm">
             {hasNotes

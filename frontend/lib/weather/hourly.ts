@@ -6,6 +6,14 @@ export function formatHour(time: string | undefined | null): string {
   return time.slice(0, 5)
 }
 
+// Hour-of-day (0–23) parsed from an "HH:MM:SS" time string, or null if absent.
+// Used to align the forecast carousels with the map's hour slider.
+export function hourOf(time: string | undefined | null): number | null {
+  if (!time) return null
+  const h = parseInt(time.slice(0, 2), 10)
+  return Number.isNaN(h) ? null : h
+}
+
 // The day strip shows a single representative value per condition — prefer the
 // midday (12:00) reading, falling back to the middle of the available hours.
 export function representativeHour<T extends { time?: string }>(

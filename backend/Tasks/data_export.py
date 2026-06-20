@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from datetime import UTC, date, datetime
+from typing import cast
 from uuid import UUID
 
 from Api.celery_app import celery_app
@@ -120,7 +121,7 @@ def _build_export(user: User) -> dict:
             {
                 "id": str(log.id),
                 "date": log.date.isoformat() if log.date else None,
-                "distanceKm": float(log.distance) if log.distance else None,
+                "distanceKm": cast(float, log.distance) if log.distance else None,
                 "notes": log.notes,
             }
             for log in user.logs
@@ -129,7 +130,7 @@ def _build_export(user: User) -> dict:
             {
                 "id": str(log.id),
                 "date": log.date.isoformat() if log.date else None,
-                "distanceKm": float(log.distance) if log.distance else None,
+                "distanceKm": cast(float, log.distance) if log.distance else None,
                 "notes": log.notes,
                 "authorId": str(log.user_id) if log.user_id else None,
             }

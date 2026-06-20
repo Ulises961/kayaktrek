@@ -72,6 +72,8 @@ class TripMemberService:
         membership = TripMemberService.get_my_membership(trip_id)
         if not membership.medical_notes_ciphertext:
             return None
+        assert membership.medical_notes_nonce is not None
+        assert membership.medical_notes_salt is not None
         return decrypt(
             membership.medical_notes_ciphertext,
             membership.medical_notes_nonce,

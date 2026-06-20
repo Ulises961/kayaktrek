@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { noHtmlTags } from "../validators"
 
 export const SeaStateSchema = z.object({
   dayId: z.string().uuid().optional(),
@@ -58,7 +59,12 @@ export const TidalEntryFieldsSchema = z.object({
   lowTide: optionalTime,
   tidalRangeM: z.number().min(0).max(20).optional(),
   // port-referenced correction
-  referencePortName: z.string().max(255).optional().or(z.literal("")),
+  referencePortName: z
+    .string()
+    .max(255)
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional()
+    .or(z.literal("")),
   baseHighTide: optionalTime,
   baseLowTide: optionalTime,
   baseHwHeightM: z.number().min(0).max(20).optional(),

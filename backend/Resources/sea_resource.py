@@ -2,16 +2,12 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
-from geoalchemy2.functions import ST_DWithin
 from marshmallow import ValidationError
-from sqlalchemy import cast
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from werkzeug.exceptions import HTTPException
 
 from Api.database import db
-from geoalchemy2 import Geography
-from Models.tidal_station import TidalStation
-from Schemas.sea_schema import SeaSchema, _gate_schema
+from Schemas.sea_schema import SeaSchema, _diamond_schema, _gate_schema
 from Schemas.weather_schema import WeatherSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
@@ -210,36 +206,19 @@ def get_wave_vectors(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@sea_api.route('/<string:id>/tidal-stream-vectors', methods=['GET'])
+@sea_api.route('/<string:id>/tidal-diamonds', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_tidal_stream_vectors(id: str):
+def get_tidal_diamonds(id: str):
     try:
-        hour = int(request.args.get("hour", 6))
+        hour = int(request.args.get("hour", 12))
         day = DayService.get_day_by_id(id)
-        sea = day.sea
-        bbox = _day_bounding_box(day)
-
-        lats = [float(p.latitude) for p in (day.points or []) if p.latitude is not None]
-        lons = [float(p.longitude) for p in (day.points or []) if p.longitude is not None]
-        if lats and lons:
-            centre_lat = sum(lats) / len(lats)
-            centre_lon = sum(lons) / len(lons)
-            centre_ewkt = f"SRID=4326;POINT({centre_lon} {centre_lat})"
-            stations = (
-                db.session.query(TidalStation)
-                .filter(ST_DWithin(cast(TidalStation.location, Geography), centre_ewkt, 50000))
-                .all()
-            )
-        else:
-            stations = []
-
-        grid = TidalService.build_stream_velocity_grid(bbox, hour, sea, stations)
-        return jsonify(grid), HTTPStatus.OK
+        diamonds = TidalService.day_diamonds(day, day.sea, hour)
+        return jsonify(_diamond_schema.dump(diamonds)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("tidal_stream_vectors_error", extra={"day_id": id, "error": str(e)})
+        logger.error("tidal_diamonds_error", extra={"day_id": id, "error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -16,6 +16,8 @@ import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 interface FloatPlanTabProps {
   tripId: string
   currentMember: TripMember
+  /** Current user's medical-notes reset flag — drives the re-entry prompt. */
+  medicalNotesResetAt?: string | null
 }
 
 function SectionLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
@@ -77,7 +79,7 @@ function EmergencyReadOnly({ member }: { member: TripMember }) {
   )
 }
 
-export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
+export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: FloatPlanTabProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -280,6 +282,7 @@ export function FloatPlanTab({ tripId, currentMember }: FloatPlanTabProps) {
           tripId={tripId}
           hasStoredNotes={!!currentMember.hasTripMedicalNotes}
           sharedAt={currentMember.medicalNotesConsentAt ?? null}
+          profileResetAt={medicalNotesResetAt}
         />
       </div>
     </div>

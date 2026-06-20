@@ -22,6 +22,7 @@ const MOCK_CTX: MapBuilderContextValue = {
   draftSlices: null,
   setDraftSlices: () => {},
   tripId: null,
+  tripName: "Test Trip",
   itineraryId: ITIN_ID,
   distanceUnit: "nm",
   setDistanceUnit: () => {},
@@ -40,6 +41,8 @@ const MOCK_CTX: MapBuilderContextValue = {
   isLeader: true,
   selectedHour: 12,
   setSelectedHour: () => {},
+  conditionsVersion: 0,
+  bumpConditions: () => {},
 }
 
 describe("useMapBuilder", () => {

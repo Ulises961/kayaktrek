@@ -58,7 +58,7 @@ describe("VelocityLayer", () => {
     render(<VelocityLayer data={[GRID_LAYER]} />)
     expect(
       (L as unknown as { velocityLayer: ReturnType<typeof vi.fn> }).velocityLayer,
-    ).toHaveBeenCalledWith(expect.objectContaining({ displayValues: true, data: [GRID_LAYER] }))
+    ).toHaveBeenCalledWith(expect.objectContaining({ displayValues: false, data: [GRID_LAYER] }))
     expect(mockAddTo).toHaveBeenCalledWith(mockMap)
   })
 

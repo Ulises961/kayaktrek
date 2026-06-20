@@ -91,8 +91,12 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 **View mode** (default on entry):
 - Full-bleed map with day colours.
 - Slim vertical day rail (left edge, ~112 px). Each entry shows: day number, date, Bft pill
-  (derived from `wind_speed_10m` in the day's `Weather` record; "—" if not yet fetched),
-  point count. Bft colour bands: 0–3 green · 4–5 amber · 6–7 orange · 8+ red.
+  (derived from `wind_speed_10m` in the day's `Weather` record), point count. Bft colour
+  bands: 0–3 green · 4–5 amber · 6–7 orange · 8+ red. Missing values render as meaningful
+  placeholders rather than a bare dash — "Add date" (no date), "No forecast" (not yet
+  fetched), "No points". Every numbered day is listed; a day with zero assigned points is
+  shown greyed and disabled (not selectable) so the day's existence is visible without
+  implying it has a route yet.
 - Selecting a day opens a **feature drawer** (right panel, ~264 px, slides in). Three tabs
   in order: **Route | Forecast | Tides** (see "Viewing mode — feature drawer" below).
 - Confirmed day boundaries visible in `PointListPane` as non-interactive dividers (day
@@ -118,7 +122,24 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 `[+ Add day]` from view mode enters edit mode then places the new handle. From edit mode
 it places another handle without exiting draft. Delete-day is no longer in the header — it
 lives on each BoundaryDivider in edit mode (generalised from "delete last" to "delete by
-dayId").
+dayId"). **Day 1 is the permanent anchor**: it renders as a static header at the top of
+`PointListPane` (not a `BoundaryDivider`) and has no delete control, so once any day exists
+the itinerary cannot be reduced below Day 1. Deleting a later day reassigns its points to
+the preceding day.
+
+**Boundary handle = Day 1 header, made draggable.** A `BoundaryDivider` in edit mode is a
+full-width bar visually identical to the static Day 1 header (`Day N · date · distance`).
+Drag-to-reassign is confined to a small grip icon on the left; the rest of the bar (date
+picker, delete button) receives normal clicks. Confining the pointer-capture region to the
+grip is what lets the inline date picker work — previously the whole pill captured pointer
+events and swallowed the picker's clicks.
+
+**Date display and editing are unified app-wide.** All day dates (Day 1 header, boundary
+dividers, day rail) and trip date ranges use the shared `DatePicker` (shadcn Popover +
+Calendar) for editing and the `d MMM yyyy` format (`formatDayDate`, date-fns) for display.
+This replaces the native `<input type="date">` (browser-locale-dependent, rendered
+mm/dd/yyyy for some users) and an interim DD/MM/YYYY text input. The calendar widget is
+locale-independent and always visible.
 
 **New handle placement**: when `[+ Add day]` is clicked, the new boundary is inserted at
 the midpoint of the last day's point range (`floor((startIdx + endIdx) / 2)`). The list
@@ -131,8 +152,11 @@ Planning and happening are not distinct phases — a paddler adjusts the route t
 the expedition. One page, one bundle, one set of tests.
 
 **Point detail — zoom-and-sheet interaction**: tapping a waypoint in the Route tab triggers
-a map `flyTo` and opens `PointDetailSheet` (existing component, unchanged). From within
-the sheet, tapping Notes or Images opens the **point detail modal** (see below).
+a map `flyTo` and opens `PointDetailSheet` — a slim bottom sheet (positioned between the day
+rail and the feature drawer) showing the point name, type, and three tiles: Distance
+(read-only cumulative), Notes, Images. Tapping the Notes or Images tile opens the
+**point detail modal** (see below). The earlier all-in-one M4b sheet was reworked into this
+summary-tiles form so the deep content lives in the modal.
 
 ---
 
@@ -144,14 +168,21 @@ The bottom of the map is kept free for the map canvas and the velocity overlays 
 ### Feature drawer tabs
 
 **Route** — ordered waypoint list for the selected day. Each row: type icon, name,
-cumulative distance from day start. Tapping opens `PointDetailSheet` (unchanged).
+cumulative distance from day start, chevron. Tapping opens the `PointDetailSheet` bottom
+sheet (see "Point detail" above).
 
-**Forecast** — read-only. Populated from the day's `Weather` and `Sea` records.
+**Forecast** — read-only data, leader-triggered fetch. Populated from the day's `Weather`
+and `Sea` records via the shared `useDayConditions` hook (`lib/weather/use-day-conditions.ts`,
+also used by the trip-detail conditions section).
 - Wind & atmosphere: wind speed/direction, temperature, cloud cover, precipitation.
 - Sea state: wave height/period/direction, swell height, ocean current.
 - Hour slider in the drawer header controls the time slice for the map velocity overlays
   and the data displayed; always visible regardless of which tab is active.
-- Empty state when no forecast fetched; shows fetch-prompt.
+- **Fetch in view mode**: when no forecast exists, the empty state shows a leader-only
+  "Fetch forecast" button (hidden for crew and for `past` trips); when data exists, a
+  "Refresh forecast" affordance. Both call `triggerWeatherFetch` and poll until the Celery
+  task lands data. On success the hook bumps `MapBuilderContext.conditionsVersion` so the
+  day rail re-reads its Bft pills.
 
 **Tides** — mixed editable/read-only.
 - *Parameters* (editable): data source toggle (tide atlas from nearest station / manual),
@@ -329,6 +360,54 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 
 ---
 
+## Tidal diamonds — drop-a-pin manual entry (M4d)
+
+Tidal streams stop being a `leaflet-velocity` flow field (see `features.md §6a` for the full
+rationale) and become **chart diamonds**: discrete ◇ markers at a real location, with a direction
+arrow, a rate label, the speed colour ramp, and a faint user-configurable radius circle (default
+~500 m). Click → popup with the hour-by-hour rate table.
+
+**Entry UX**: any trip member can drop a diamond pin on the sea and enter its data in a popup, with
+**simple** (peak rate + flood/ebb direction, expanded across the cycle by the rule of thirds) and
+**advanced** (full atlas hour table) modes. Persisted as a trip-scoped `TidalStation`, *not* a route
+`Point` — the route linked list stays clean and existing tidal-gate proximity logic picks user
+diamonds up automatically. Forms follow the react-hook-form + zod + `lib/dtos` pattern.
+
+**Tides tab**: keeps day-level height entry only (HW/LW/range, rule-of-12s table, gate warnings).
+The stream-data section moves to the diamond popup. The tab is read-only for non-leaders and shows
+an empty state (not a form) when no tidal data exists.
+
+## Paddle-time legs: stop-anchored, positions aggregate
+
+Distance/time between points was first surfaced as a per-segment label on every consecutive pair
+(map tooltips while planning; route tab + point sheet in view mode). That is mechanically honest but
+noisy: a detailed route has many `position` points, and a position is **geometry, not a destination**
+— its only job is to bend the polyline round a headland or through a channel. You never *arrive* at
+one.
+
+**Decision: a leg runs stop-to-stop; intervening positions aggregate into the leg total.** A `stop`
+is any point the planner deliberately marks for any reason — toilet, lunch, leg-stretch, or the first
+point after a long crossing where you just want the elapsed time, a bar, and a breath. The leg calc
+anchors on `type === "stop"` (which already includes the auto-stamped day-boundary stops) and sums
+the haversine distance across all positions back to the previous stop; ETA uses the itinerary's
+planning speed (`avgSpeedKnots`, the figure set in the top bar — its wording is mirrored on the leg
+labels so the estimate's source is discoverable).
+
+UI consequence: the **route tab lists stops**, each showing the leg from the previous stop, with
+cumulative distance secondary. Positions drop out of the list (still visible and draggable on the
+map) — a shorter, more meaningful list. The point sheet's Leg tile aggregates intervening positions
+back to the last stop. Where a day has no mid-day stop, stop-to-stop collapses to the whole day,
+which the `BoundaryDivider` already totals — so granular legs only earn their place once intermediate
+stops exist, which is exactly when they matter.
+
+## Point-type simplification: `interest` removed from the route
+
+`stop` and `position` are the route. `interest` is **deprecated as a `Point` type** — POIs are not
+part of the paddled line and are reintroduced as a standalone map-annotation entity (the
+tidal-diamond pattern). Full design in `features.md` (Map Annotations); this is the route-model side:
+the linked list and `pointOrder` carry only `stop`/`position`, and the type icon legend drops the
+interest star.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -342,3 +421,8 @@ Tile caching is shared infrastructure for M4b, M8, and M9. It should be scoped a
 | OpenSeaMap nautical overlay — first-class layer, priority over Sentinel-2 | — | 2026-06-15 | Free XYZ transparent overlay; zero infra; must land before titiler/Sentinel-2 pipeline; Sentinel-2 deferred until beta validates need |
 | Planning flow redesign: always-visible boundaries, header states, midpoint handle placement (M4c) | — | 2026-06-15 | Supersedes ADR-026/027 on boundary-edit entry UX and PointListPane header; delete-day moves to BoundaryDivider |
 | Viewing mode: day rail + feature drawer, Route/Forecast/Tides tabs, point detail modal (M4c) | — | 2026-06-15 | Supersedes ADR-027 on view-mode layout; DayStrip and DayDetailPanel removed |
+| App-wide date UI: shared `DatePicker` (shadcn Popover+Calendar) for editing, `d MMM yyyy` (`formatDayDate`) for display; boundary handle styled as draggable Day 1 header; Day 1 is the permanent anchor; day rail shows all numbered days with placeholders, empty days greyed/disabled (M4c) | — | 2026-06-16 | Replaces native `<input type=date>` (locale mm/dd/yyyy) and interim DD/MM/YYYY text input; drag confined to grip so inline picker works |
+| View-mode weather fetch (`useDayConditions` hook, Forecast-tab fetch/refresh, `conditionsVersion` rail refresh); point detail = summary bottom sheet → full detail modal; wireframe layout parity (M4c §6–§8) | — | 2026-06-17 | Weather no longer fetchable only from edit/top-bar; `PointDetailSheet` reworked from all-in-one to tiles; matches `ItineraryLayoutWireframe` |
+| Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d) | — | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass |
+| Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar | — | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists |
+| `Point.interest` removed from the route model; POIs become standalone map annotations | — | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position` |

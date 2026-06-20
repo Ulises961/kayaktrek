@@ -57,7 +57,7 @@ def _parse_hourly(response, var_names: list[str]) -> list[dict]:
     records = []
     for i in range(n):
         t = datetime.fromtimestamp(start_ts + i * interval, tz=timezone.utc)
-        record = {"time": t.strftime("%H:%M")}
+        record: dict[str, str | float | None] = {"time": t.strftime("%H:%M")}
         for j, name in enumerate(var_names):
             record[name] = _float_or_none(arrays[j][i])
         records.append(record)

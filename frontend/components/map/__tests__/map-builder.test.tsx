@@ -21,8 +21,16 @@ vi.mock("../point-list-pane", () => ({
   PointListPane: () => <div data-testid="point-list-pane" />,
 }))
 
-vi.mock("../day-strip", () => ({
-  DayStrip: () => <div data-testid="day-strip" />,
+vi.mock("../day-rail", () => ({
+  DayRail: () => <div data-testid="day-rail" />,
+}))
+
+vi.mock("../feature-drawer", () => ({
+  FeatureDrawer: () => <div data-testid="feature-drawer" />,
+}))
+
+vi.mock("../point-detail-sheet", () => ({
+  PointDetailSheet: () => null,
 }))
 
 vi.mock("@/lib/itinerary/actions", () => ({
@@ -70,7 +78,7 @@ describe("MapBuilder", () => {
 
   it("renders the day strip in view mode (default)", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
-    expect(screen.getByTestId("day-strip")).toBeInTheDocument()
+    expect(screen.getByTestId("day-rail")).toBeInTheDocument()
   })
 
   it("does not render point list pane in view mode (default)", () => {
@@ -104,7 +112,7 @@ describe("MapBuilder", () => {
     )
     await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
     await userEvent.click(screen.getByRole("button", { name: "Done" }))
-    expect(screen.getByTestId("day-strip")).toBeInTheDocument()
+    expect(screen.getByTestId("day-rail")).toBeInTheDocument()
     expect(screen.queryByTestId("point-list-pane")).not.toBeInTheDocument()
   })
 
