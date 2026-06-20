@@ -42,7 +42,7 @@ export function SeaGrid({ states, selectedHour = null, onHourChange }: SeaGridPr
       <h4 className="text-muted-foreground text-xs font-semibold tracking-[0.06em] uppercase">
         Sea &amp; swell
       </h4>
-      <Carousel setApi={setApi} opts={{ loop: false }} data-testid="sea-grid">
+      <Carousel setApi={setApi} opts={{ loop: false, align: "center" }} data-testid="sea-grid">
         <CarouselContent className="ml-0 gap-1">
           {states.map((s) => (
             <CarouselItem key={s.time} className="basis-auto pl-0">

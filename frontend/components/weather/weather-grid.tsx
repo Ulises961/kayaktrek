@@ -45,7 +45,7 @@ export function WeatherGrid({ states, selectedHour = null, onHourChange }: Weath
       <h4 className="text-muted-foreground text-xs font-semibold tracking-[0.06em] uppercase">
         Wind &amp; weather
       </h4>
-      <Carousel setApi={setApi} opts={{ loop: false }} data-testid="weather-grid">
+      <Carousel setApi={setApi} opts={{ loop: false, align: "center" }} data-testid="weather-grid">
         <CarouselContent className="ml-0 gap-1">
           {states.map((s) => (
             <CarouselItem key={s.time} className="basis-auto pl-0">
