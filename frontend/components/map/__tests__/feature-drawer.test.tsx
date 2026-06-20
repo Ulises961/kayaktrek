@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
@@ -227,18 +227,16 @@ describe("FeatureDrawer — Route tab", () => {
 // ─── forecast tab ─────────────────────────────────────────────────────────────────
 
 describe("FeatureDrawer — Forecast tab", () => {
-  it("renders the hour slider when forecast tab is active", async () => {
+  it("shows empty state when no forecast is fetched", async () => {
     renderWithCtx(makeCtx({ selectedDayId: DAY1_ID }))
     await userEvent.click(screen.getByRole("button", { name: /^forecast$/i }))
-    expect(screen.getByTestId("hour-slider")).toBeInTheDocument()
+    expect(screen.getByText(/no forecast/i)).toBeInTheDocument()
   })
 
-  it("hour slider calls setSelectedHour on change", async () => {
-    const setSelectedHour = vi.fn()
-    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID, setSelectedHour }))
+  it("shows fetch forecast button for a leader with no data", async () => {
+    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID, isLeader: true }))
     await userEvent.click(screen.getByRole("button", { name: /^forecast$/i }))
-    fireEvent.change(screen.getByTestId("hour-slider"), { target: { value: "13" } })
-    expect(setSelectedHour).toHaveBeenCalledWith(13)
+    expect(screen.getByRole("button", { name: /fetch forecast/i })).toBeInTheDocument()
   })
 })
 

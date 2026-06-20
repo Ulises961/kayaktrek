@@ -114,6 +114,8 @@ The trip itself is always private — crew lists, emergency contacts, logistics,
 
 **Route cloning**: copying a public route creates a new trip with a new itinerary pre-populated from the source geometry. The original trip's crew, logistics, and personal data are never accessible or transferred. An optional `created_from_id` FK on the copy tracks lineage for attribution and community deduplication.
 
+**Map annotations are a second, independent public shape.** Route visibility (above) attaches to `Itinerary`. Community POIs — the map-annotation entity that replaces `Point.interest` (see `features.md`, Map Annotations) — are public on their *own* terms, decoupled from any trip or itinerary: a freshwater tap or a good landing beach is community knowledge whether or not anyone has published a route through it. A global annotation (`itinerary_id = null`, `visibility = public`) appears on the landing-page map alongside public itineraries but is not gated by one. Because public contributions need moderation/dedup/edit-trust, this public tier is deferred to the M7 community milestone; trip-scoped annotations (`itinerary_id` set, private) ship first.
+
 ---
 
 ## Rest days — inferred from calendar gaps
@@ -164,3 +166,4 @@ Revoking medical consent nulls the field on both the `User` record and every `Tr
 | GDPR erasure model | ADR-013 | 2025-03-01 | 30-day grace period; targeted hard-delete |
 | Trip collaboration model | ADR-019 | 2026-05-09 | Itinerary: leader-only decided for M4 |
 | Rest days and paused expedition state | ADR-025 | 2026-05-24 | Pause/resume on `Trip`; rest days inferred from date gaps |
+| Community map annotations are a second public shape, independent of `Itinerary` visibility | — | 2026-06-20 | Global POIs (`itinerary_id = null`, `visibility = public`) on the landing map, not gated by a route; public tier deferred to M7; see `features.md` (Map Annotations) |

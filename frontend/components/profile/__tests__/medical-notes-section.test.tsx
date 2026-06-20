@@ -147,8 +147,10 @@ describe("MedicalNotesSection — editing state", () => {
   it("shows a saved confirmation after successful save", async () => {
     vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
     await openToEdit(true)
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
-    await waitFor(() => expect(screen.getByText(/saved/i)).toBeDefined())
+    const saveBtn = screen.getByRole("button", { name: /^save$/i })
+    await userEvent.click(saveBtn)
+    await waitFor(() => expect(grantMedicalConsent).toHaveBeenCalled())
+    expect(screen.getByText(/saved/i)).toBeDefined()
   })
 
   it("shows an error when save fails", async () => {

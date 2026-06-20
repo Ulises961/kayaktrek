@@ -377,6 +377,37 @@ diamonds up automatically. Forms follow the react-hook-form + zod + `lib/dtos` p
 The stream-data section moves to the diamond popup. The tab is read-only for non-leaders and shows
 an empty state (not a form) when no tidal data exists.
 
+## Paddle-time legs: stop-anchored, positions aggregate
+
+Distance/time between points was first surfaced as a per-segment label on every consecutive pair
+(map tooltips while planning; route tab + point sheet in view mode). That is mechanically honest but
+noisy: a detailed route has many `position` points, and a position is **geometry, not a destination**
+— its only job is to bend the polyline round a headland or through a channel. You never *arrive* at
+one.
+
+**Decision: a leg runs stop-to-stop; intervening positions aggregate into the leg total.** A `stop`
+is any point the planner deliberately marks for any reason — toilet, lunch, leg-stretch, or the first
+point after a long crossing where you just want the elapsed time, a bar, and a breath. The leg calc
+anchors on `type === "stop"` (which already includes the auto-stamped day-boundary stops) and sums
+the haversine distance across all positions back to the previous stop; ETA uses the itinerary's
+planning speed (`avgSpeedKnots`, the figure set in the top bar — its wording is mirrored on the leg
+labels so the estimate's source is discoverable).
+
+UI consequence: the **route tab lists stops**, each showing the leg from the previous stop, with
+cumulative distance secondary. Positions drop out of the list (still visible and draggable on the
+map) — a shorter, more meaningful list. The point sheet's Leg tile aggregates intervening positions
+back to the last stop. Where a day has no mid-day stop, stop-to-stop collapses to the whole day,
+which the `BoundaryDivider` already totals — so granular legs only earn their place once intermediate
+stops exist, which is exactly when they matter.
+
+## Point-type simplification: `interest` removed from the route
+
+`stop` and `position` are the route. `interest` is **deprecated as a `Point` type** — POIs are not
+part of the paddled line and are reintroduced as a standalone map-annotation entity (the
+tidal-diamond pattern). Full design in `features.md` (Map Annotations); this is the route-model side:
+the linked list and `pointOrder` carry only `stop`/`position`, and the type icon legend drops the
+interest star.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -393,3 +424,5 @@ an empty state (not a form) when no tidal data exists.
 | App-wide date UI: shared `DatePicker` (shadcn Popover+Calendar) for editing, `d MMM yyyy` (`formatDayDate`) for display; boundary handle styled as draggable Day 1 header; Day 1 is the permanent anchor; day rail shows all numbered days with placeholders, empty days greyed/disabled (M4c) | — | 2026-06-16 | Replaces native `<input type=date>` (locale mm/dd/yyyy) and interim DD/MM/YYYY text input; drag confined to grip so inline picker works |
 | View-mode weather fetch (`useDayConditions` hook, Forecast-tab fetch/refresh, `conditionsVersion` rail refresh); point detail = summary bottom sheet → full detail modal; wireframe layout parity (M4c §6–§8) | — | 2026-06-17 | Weather no longer fetchable only from edit/top-bar; `PointDetailSheet` reworked from all-in-one to tiles; matches `ItineraryLayoutWireframe` |
 | Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d) | — | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass |
+| Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar | — | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists |
+| `Point.interest` removed from the route model; POIs become standalone map annotations | — | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position` |
