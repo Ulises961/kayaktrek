@@ -2,7 +2,7 @@ import { z } from "zod"
 import { ImageSchema } from "./image"
 import { noHtmlTags } from "../validators"
 
-export const PointTypeSchema = z.enum(["stop", "position", "interest"])
+export const PointTypeSchema = z.enum(["stop", "position"])
 export type PointType = z.infer<typeof PointTypeSchema>
 
 // Point is self-referencing (next: Point), so the type and schema are defined

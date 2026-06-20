@@ -25,7 +25,7 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
   const points = [
     pt("p1", { name: "Harbour", notes: "Tricky entrance at low tide" }),
     pt("p2", { type: "stop" }),
-    pt("p3", { type: "interest", name: "Cave" }),
+    pt("p3", { type: "position", name: "Cave" }),
   ]
   const state: MapState = {
     points,
@@ -93,9 +93,9 @@ describe("PointDetailSheet — content", () => {
     expect(screen.getByText("Harbour")).toBeInTheDocument()
   })
 
-  it("shows the point type for a point of interest", () => {
+  it("shows the point type for a waypoint", () => {
     renderWithCtx(makeCtx({ selectedPointId: "p3" }))
-    expect(screen.getByText("interest")).toBeInTheDocument()
+    expect(screen.getByText("position")).toBeInTheDocument()
   })
 
   it("shows Leg, Notes and Images tiles", () => {

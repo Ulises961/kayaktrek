@@ -147,7 +147,7 @@ describe("updatePoint", () => {
 
   it("returns error result when the API throws", async () => {
     mockApiPatch.mockRejectedValue(new Error("Not Found"))
-    const result = await updatePoint(POINT_ID, { type: "interest" })
+    const result = await updatePoint(POINT_ID, { type: "stop" })
     expect(result).toEqual({ success: false, error: "Not Found" })
   })
 

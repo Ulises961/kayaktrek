@@ -372,9 +372,20 @@ deferred to the M7 community milestone**; trip-scoped (private) annotations ship
 logic as BYOK tidal and the public route library: build the model with the flag now, gate the
 community surface behind moderation later.
 
-**Migration**: pre-production and solo, so existing `interest` points are removed with the type — no
-data to preserve. Open items (entity name — `Annotation` / `Spot` / `POI`, final category taxonomy +
-icon set, moderation model) are scoped in the annotation milestone plan, not fixed here.
+**Resolved on implementation (M4e, 2026-06-21).** The entity shipped as **`Place`** (not
+`Annotation`/`Spot`/`POI`) — neutral enough for a hazard or a café and reads as a future community
+directory. **Category is its own entity, `PlaceCategory`** (slug/name/icon, seeded at startup, read
+via a public `GET`; the authoring gate stays closed) — the M2 `ItemCategory` decision, so the
+catalogue grows without a migration. The seeded set: freshwater, food, campsite, slipway, toilet,
+hazard, viewpoint, shelter, other.
+
+**Migration**: although pre-production, the dev database held real `interest` rows, so the migration
+(`b3e7c1a9d240`) **converts `interest` → `position`** (rather than deleting) and recreates the
+`pointtype` enum without `interest` (Postgres has no `DROP VALUE`). The former POI consumers
+(`GET /api/point/pois`, `PointService.get_points_in_range`, the `interest` guards in `tidal_service`
+and `weather_fetch_task`) were removed; proximity queries now live on `Place`
+(`GET /api/place/by-itinerary/<id>/range`). Open items remaining: moderation/dedup/edit-trust for the
+public tier (M7).
 
 ## Decision log
 
@@ -384,3 +395,4 @@ icon set, moderation model) are scoped in the annotation milestone plan, not fix
 | Expedition log auto-generation — Celery dual-trigger | ADR-021 | 2026-05-11 | Requires M8 GPS infrastructure; stub logs for trips without GPS data |
 | Tidal streams as chart diamonds, not a velocity field (supersedes §6 stream-particles); trip-scoped user-created diamonds; rule of thirds for simple entry; BYOK tidal API deferred to roadmap | M4d | 2026-06-18 | §6a; reuses `TidalStation`/`TidalStreamEntry`; radius display-only, user-configurable (~500 m default) |
 | Deprecate `Point.interest`; reintroduce POIs as standalone map annotations (tidal-diamond pattern, own geometry, survive day boundary); `visibility` flag, trip-scoped first → public community gazetteer deferred to M7 | — | 2026-06-20 | Reverses the `interest` point-type decision; public POIs are a new public shape independent of `Itinerary` (cross-ref `trip-lifecycle.md`); scoped in annotation milestone plan |
+| M4e landed: annotation entity is **`Place`** + **`PlaceCategory`** (category an entity, not an enum); `interest` removed from `PointType` (migration converts existing rows → `position`); place markers as a day-independent toggleable layer, drop-a-pin via a top-centre "+ Add" control | — | 2026-06-21 | Resolves the open entity-name/taxonomy items above; POI proximity query moves from `/api/point/pois` to `/api/place/by-itinerary/<id>/range`; public/community tier still deferred to M7 |

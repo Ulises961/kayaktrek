@@ -197,7 +197,7 @@ def test_fetch_weather_replaces_existing_states(app, weather_day):
 
 
 def test_fetch_weather_skips_when_no_route_points(app, user_1):
-    """Day with only INTEREST points (or no points) produces no Weather/Sea rows."""
+    """A day with no coordinate-bearing points produces no Weather/Sea rows."""
     with app.app_context():
         trip = Trip()
         _db.session.add(trip)
@@ -207,8 +207,8 @@ def test_fetch_weather_skips_when_no_route_points(app, user_1):
         _db.session.flush()
         day = Day(day_number=1, itinerary_id=itin.id, date=date(2026, 8, 11))
         _db.session.add(day)
-        poi = Point(latitude=50.15, longitude=-5.05, type=PointType.INTEREST, day_id=day.id)
-        _db.session.add(poi)
+        coordless = Point(latitude=None, longitude=None, type=PointType.STOP, day_id=day.id)
+        _db.session.add(coordless)
         _db.session.commit()
         day_id = str(day.id)
         trip_id = str(trip.id)

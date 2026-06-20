@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Layers } from "lucide-react"
+import { Layers, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type LayersControlProps = {
@@ -8,9 +8,15 @@ export type LayersControlProps = {
   swellEnabled: boolean
   diamondsEnabled: boolean
   hasDiamonds: boolean
+  placesEnabled: boolean
+  hasPlaces: boolean
+  // Wind/swell/diamonds resolve per selected day; hidden when no day is selected.
+  // Places are itinerary-scoped, so their toggle can show on its own.
+  showConditions: boolean
   onWindToggle: () => void
   onSwellToggle: () => void
   onDiamondsToggle: () => void
+  onPlacesToggle: () => void
 }
 
 function Toggle({
@@ -58,9 +64,13 @@ export function LayersControl({
   swellEnabled,
   diamondsEnabled,
   hasDiamonds,
+  placesEnabled,
+  hasPlaces,
+  showConditions,
   onWindToggle,
   onSwellToggle,
   onDiamondsToggle,
+  onPlacesToggle,
 }: LayersControlProps) {
   const [open, setOpen] = useState(false)
 
@@ -96,31 +106,47 @@ export function LayersControl({
         </div>
 
         <div className="divide-border/20 flex flex-col divide-y">
-          <Toggle
-            enabled={windEnabled}
-            onClick={onWindToggle}
-            testId="wind-toggle"
-            aria-checked={windEnabled}
-          >
-            <span
-              className="inline-block h-1.5 w-4 shrink-0 rounded-full bg-gradient-to-r from-[#0d47a1] via-[#ffd600] to-[#d50000]"
-              aria-hidden
-            />
-            Wind
-          </Toggle>
+          {showConditions && (
+            <Toggle
+              enabled={windEnabled}
+              onClick={onWindToggle}
+              testId="wind-toggle"
+              aria-checked={windEnabled}
+            >
+              <span
+                className="inline-block h-1.5 w-4 shrink-0 rounded-full bg-gradient-to-r from-[#0d47a1] via-[#ffd600] to-[#d50000]"
+                aria-hidden
+              />
+              Wind
+            </Toggle>
+          )}
 
-          <Toggle
-            enabled={swellEnabled}
-            onClick={onSwellToggle}
-            testId="swell-toggle"
-            aria-checked={swellEnabled}
-          >
-            <span
-              className="ring-border/40 inline-block h-1.5 w-4 rounded-full bg-white/80 ring-1"
-              aria-hidden
-            />
-            Swell
-          </Toggle>
+          {showConditions && (
+            <Toggle
+              enabled={swellEnabled}
+              onClick={onSwellToggle}
+              testId="swell-toggle"
+              aria-checked={swellEnabled}
+            >
+              <span
+                className="ring-border/40 inline-block h-1.5 w-4 rounded-full bg-white/80 ring-1"
+                aria-hidden
+              />
+              Swell
+            </Toggle>
+          )}
+
+          {hasPlaces && (
+            <Toggle
+              enabled={placesEnabled}
+              onClick={onPlacesToggle}
+              testId="places-toggle"
+              aria-checked={placesEnabled}
+            >
+              <MapPin className="size-3 shrink-0 text-[#0e7490]" aria-hidden />
+              Places
+            </Toggle>
+          )}
 
           {hasDiamonds && (
             <Toggle
@@ -138,7 +164,7 @@ export function LayersControl({
           )}
         </div>
 
-        {windEnabled && (
+        {showConditions && windEnabled && (
           <div className="border-border/20 border-t px-3 pt-1.5 pb-2" data-testid="wind-legend">
             <p className="text-muted-foreground mb-1 text-[9px] font-semibold tracking-widest uppercase">
               Wind speed

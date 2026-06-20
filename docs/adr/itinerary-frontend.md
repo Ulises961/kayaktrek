@@ -265,7 +265,7 @@ The explicit Drop points / Assign days mode toggle is removed from the top bar. 
 
 A single `PointListPane` replaces `DropSidebar` and `DaySidebar`. It renders the route as a vertical ordered list of point rows — the same list in both contexts.
 
-**Point row format**: ordinal index + name if present — `12 (Cedeira harbour)` or `12`. Four-pixel day-colour strip on the left, type icon (anchor = stop, dot = position, star = interest) on the right.
+**Point row format**: ordinal index + name if present — `12 (Cedeira harbour)` or `12`. Four-pixel day-colour strip on the left, type icon (anchor = stop, dot = position) on the right.
 
 **Type is always editable in the sidebar** regardless of context. The only exception: boundary points (type locked to `stop`). The map and any floating panels are not editing surfaces — the sidebar is.
 
@@ -402,11 +402,13 @@ stops exist, which is exactly when they matter.
 
 ## Point-type simplification: `interest` removed from the route
 
-`stop` and `position` are the route. `interest` is **deprecated as a `Point` type** — POIs are not
-part of the paddled line and are reintroduced as a standalone map-annotation entity (the
-tidal-diamond pattern). Full design in `features.md` (Map Annotations); this is the route-model side:
-the linked list and `pointOrder` carry only `stop`/`position`, and the type icon legend drops the
-interest star.
+`stop` and `position` are the route. `interest` is **removed as a `Point` type** (landed M4e,
+2026-06-21) — POIs are not part of the paddled line and were reintroduced as the standalone `Place`
+entity (the tidal-diamond pattern; full design in `features.md`, Map Annotations). Route-model side:
+the linked list and `pointOrder` carry only `stop`/`position`, the type selectors offer only those
+two, and the type-icon legend dropped the interest star. The `Place` marker layer is day-independent
+and toggleable from the Overlays control; places and tidal diamonds are dropped from one top-centre
+**"+ Add"** disclosure (`MapAddControl`), the create-action counterpart to Overlays.
 
 ## Decision log
 
@@ -426,3 +428,4 @@ interest star.
 | Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d) | — | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass |
 | Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar | — | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists |
 | `Point.interest` removed from the route model; POIs become standalone map annotations | — | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position` |
+| M4e landed: `interest` gone from `PointType`; `Place` marker layer (day-independent, toggleable) + drop-a-pin; place/diamond add-actions unified in a top-centre `MapAddControl` "+ Add" disclosure | — | 2026-06-21 | Type selectors and icon legend now `stop`/`position` only; star icon removed; see `features.md` decision log for the `Place`/`PlaceCategory` entity |

@@ -285,7 +285,6 @@ class TestUnauthenticatedReturns401:
     # Point
     def test_point_endpoints(self, client):
         D = DUMMY_ID
-        self._401(client, "GET",    f"{POINT_ENDPOINT}/pois")
         self._401(client, "POST",   f"{POINT_ENDPOINT}/create")
         self._401(client, "GET",    f"{POINT_ENDPOINT}/{D}")
         self._401(client, "PATCH",  f"{POINT_ENDPOINT}/{D}")

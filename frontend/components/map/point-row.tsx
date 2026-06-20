@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { TrashIcon, AnchorIcon, CircleDotIcon, StarIcon } from "lucide-react"
+import { TrashIcon, AnchorIcon, CircleDotIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Point, PointType } from "@/lib/dtos/point"
 
@@ -24,7 +24,6 @@ const TYPE_OPTIONS: {
 }[] = [
   { type: "stop", label: "Stop", Icon: AnchorIcon },
   { type: "position", label: "Position", Icon: CircleDotIcon },
-  { type: "interest", label: "Interest", Icon: StarIcon },
 ]
 
 export function PointRow({

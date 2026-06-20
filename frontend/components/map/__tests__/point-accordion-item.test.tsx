@@ -49,7 +49,6 @@ describe("PointAccordionItem", () => {
     render(<PointAccordionItem {...defaultProps} isOpen />)
     expect(screen.getByRole("button", { name: /stop/i })).toBeTruthy()
     expect(screen.getByRole("button", { name: /position/i })).toBeTruthy()
-    expect(screen.getByRole("button", { name: /interest/i })).toBeTruthy()
     expect(screen.getByPlaceholderText(/name/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/notes/i)).toBeTruthy()
     expect(screen.getByRole("button", { name: /delete point/i })).toBeTruthy()
@@ -92,58 +91,5 @@ describe("PointAccordionItem", () => {
     render(<PointAccordionItem {...defaultProps} isOpen onDelete={onDelete} />)
     fireEvent.click(screen.getByRole("button", { name: /delete point/i }))
     expect(onDelete).toHaveBeenCalledWith(P_ID)
-  })
-
-  it("shows Find nearby POIs button only for interest type", () => {
-    render(
-      <PointAccordionItem
-        {...defaultProps}
-        isOpen
-        point={{ ...basePoint, type: "interest" }}
-        onFetchPois={vi.fn()}
-      />,
-    )
-    expect(screen.getByRole("button", { name: /find nearby/i })).toBeTruthy()
-  })
-
-  it("does not show Find nearby POIs button for non-interest types", () => {
-    render(<PointAccordionItem {...defaultProps} isOpen />)
-    expect(screen.queryByRole("button", { name: /find nearby/i })).toBeNull()
-  })
-
-  it("renders POI results as a list when provided", () => {
-    const pois: Point[] = [
-      { id: "poi-1", type: "interest", name: "Lighthouse" },
-      { id: "poi-2", type: "interest", name: "Cave" },
-    ]
-    render(
-      <PointAccordionItem
-        {...defaultProps}
-        isOpen
-        point={{ ...basePoint, type: "interest" }}
-        onFetchPois={vi.fn()}
-        poiResults={pois}
-        onPoiSelect={vi.fn()}
-      />,
-    )
-    expect(screen.getByText("Lighthouse")).toBeTruthy()
-    expect(screen.getByText("Cave")).toBeTruthy()
-  })
-
-  it("calls onPoiSelect with the POI name when a POI result is clicked", () => {
-    const onPoiSelect = vi.fn()
-    const pois: Point[] = [{ id: "poi-1", type: "interest", name: "Lighthouse" }]
-    render(
-      <PointAccordionItem
-        {...defaultProps}
-        isOpen
-        point={{ ...basePoint, type: "interest" }}
-        onFetchPois={vi.fn()}
-        poiResults={pois}
-        onPoiSelect={onPoiSelect}
-      />,
-    )
-    fireEvent.click(screen.getByText("Lighthouse"))
-    expect(onPoiSelect).toHaveBeenCalledWith("Lighthouse")
   })
 })

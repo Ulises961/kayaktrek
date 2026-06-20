@@ -3,7 +3,6 @@ import { useState } from "react"
 import {
   X,
   Anchor,
-  Star,
   CircleDot,
   ChevronRight,
   Navigation,
@@ -33,7 +32,6 @@ const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
 
 function TypeIcon({ type }: { type: string }) {
   if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
-  if (type === "interest") return <Star className="size-3.5 shrink-0" />
   return <CircleDot className="size-3.5 shrink-0" />
 }
 

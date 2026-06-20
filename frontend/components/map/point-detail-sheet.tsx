@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { X, Anchor, Star, CircleDot } from "lucide-react"
+import { X, Anchor, CircleDot } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { cn } from "@/lib/utils"
@@ -9,7 +9,6 @@ import type { Point } from "@/lib/dtos/point"
 
 function TypeIcon({ type }: { type: string }) {
   if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
-  if (type === "interest") return <Star className="size-3.5 shrink-0" />
   return <CircleDot className="size-3.5 shrink-0" />
 }
 
