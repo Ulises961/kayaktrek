@@ -59,6 +59,8 @@ from Models.shuttle_vehicle import ShuttleVehicle     # noqa: F401
 from Models.shuttle_passenger import ShuttlePassenger # noqa: F401
 from Models.tidal_station import TidalStation         # noqa: F401
 from Models.tidal_stream_entry import TidalStreamEntry # noqa: F401
+from Models.place_category import PlaceCategory        # noqa: F401
+from Models.place import Place                         # noqa: F401
 
 with _app.app_context():
     target_metadata = db.metadata
