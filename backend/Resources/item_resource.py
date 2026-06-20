@@ -1,6 +1,6 @@
 from http import HTTPStatus
 import logging
-from flask import Blueprint, jsonify, request, abort
+from flask import Blueprint, jsonify, request, abort, g
 from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
@@ -13,6 +13,20 @@ logger = logging.getLogger(__name__)
 
 ITEM_ENDPOINT = "/api/item"
 item_api = Blueprint('item', __name__, url_prefix=ITEM_ENDPOINT)
+
+@item_api.route("/all", methods=["GET"])
+@JWTService.authenticate_restful
+def get_all_items():
+    """GET /api/item/all - Retrieve all personal items owned by the current user."""
+    try:
+        items = ItemService.get_items_by_user(g.current_user_id)
+        return jsonify([ItemSchema().dump(item) for item in items]), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving items: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @item_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
@@ -33,9 +47,13 @@ def get_item(id: str):
 
 @item_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-@require_owner('item', parent_resource=('inventory', 'inventoryId'), from_body=True)
 def create_item():
-    """POST /api/item/create - Create new item"""
+    """POST /api/item/create - Create a new personal item.
+
+    Items are personal gear owned by the authenticated user (stamped from the
+    auth context in ItemSchema), not scoped to any inventory — so creation
+    requires only a valid session, no inventory ownership.
+    """
     try:
         item_data = request.get_json()
         item = ItemService.create_item(item_data)

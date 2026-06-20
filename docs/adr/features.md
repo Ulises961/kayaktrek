@@ -376,6 +376,48 @@ community surface behind moderation later.
 data to preserve. Open items (entity name — `Annotation` / `Spot` / `POI`, final category taxonomy +
 icon set, moderation model) are scoped in the annotation milestone plan, not fixed here.
 
+## Inventory & Gear (M6)
+
+### The problem
+
+The original M6 plan assumed items live *inside* an inventory — `createItem(inventoryId, …)`,
+inventories showing an "item count", an inventory nesting an `items` array. The backend built in
+M2 had already settled on a different, cleaner shape, and the plan had drifted from it.
+
+### Decision — two separable concerns
+
+**Personal gear is owned by the *user*, not by an inventory. Trip needs are *requirement slots* on a
+trip's inventory. Contribution links one personal item to one slot.**
+
+- **`Item`** is personal gear: it carries `user_id` and **no `inventory_id`**. A paddler's gear
+  closet is just "every `Item` where `user_id = me`", served by `GET /api/item/all` (scoped by the
+  authenticated user — no `@require_owner`, mirroring `GET /api/inventory/all`).
+- **`Inventory`** belongs to a trip (or, for a personal list, to a user) and holds **`TripRequirement`
+  slots** — never items directly. A requirement is a named need (`name`, optional `category`,
+  `status: needed | covered`).
+- **Contribution** (`POST …/requirements/:id/contribute`, body `{ itemId }`) is the act that ties a
+  personal item to a requirement slot via `covering_item_id` + the `requirement_contributors`
+  junction. It is a distinct action from owning the item.
+
+### Item lifecycle — three distinct states, plus packing
+
+1. `suggested` — the app or a template proposed it; the paddler may not own it yet.
+2. `owned` — the paddler confirmed possession (promoted via `PATCH /api/item/:id { status }`).
+3. *assigned to a trip* — the separate `contribute` act. **Only `owned` items qualify** —
+   `contribute` rejects any item whose `status != owned` (`400`), so unconfirmed gear can't be
+   committed to a trip. Pre-departure packing confirmation (`checked`) is a fourth moment, scoped to
+   the item/requirement, not the same as ownership.
+
+### Item creation requires only authentication
+
+Because items are personal and not inventory-scoped, **creating an item needs only a valid session**
+— `POST /api/item/create` no longer gates on inventory ownership. (Previously it ran
+`@require_owner('item', parent_resource=('inventory', 'inventoryId'))`, forcing the client to pass an
+owned `inventoryId` that the service then *discarded* — pure ceremony that contradicted the
+personal-gear model.) `user_id` is stamped from the auth context in `ItemSchema`.
+
+This supersedes the M6 plan's "items live in inventory" framing; the plan was updated to match.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -384,3 +426,4 @@ icon set, moderation model) are scoped in the annotation milestone plan, not fix
 | Expedition log auto-generation — Celery dual-trigger | ADR-021 | 2026-05-11 | Requires M8 GPS infrastructure; stub logs for trips without GPS data |
 | Tidal streams as chart diamonds, not a velocity field (supersedes §6 stream-particles); trip-scoped user-created diamonds; rule of thirds for simple entry; BYOK tidal API deferred to roadmap | M4d | 2026-06-18 | §6a; reuses `TidalStation`/`TidalStreamEntry`; radius display-only, user-configurable (~500 m default) |
 | Deprecate `Point.interest`; reintroduce POIs as standalone map annotations (tidal-diamond pattern, own geometry, survive day boundary); `visibility` flag, trip-scoped first → public community gazetteer deferred to M7 | — | 2026-06-20 | Reverses the `interest` point-type decision; public POIs are a new public shape independent of `Itinerary` (cross-ref `trip-lifecycle.md`); scoped in annotation milestone plan |
+| Inventory & Gear model: items are personal (user-owned, no `inventory_id`); inventories hold `TripRequirement` slots; `contribute` links an `owned` item to a slot; item lifecycle `suggested → owned → assigned`; `contribute` rejects non-`owned` items; item creation requires only auth (decoupled from inventory ownership) | M6 | 2026-06-20 | Supersedes the M6 plan's "items live in inventory" assumption; backend additions: `GET /api/item/all`, `status` in item PATCH whitelist, `owned`-only contribute guard |

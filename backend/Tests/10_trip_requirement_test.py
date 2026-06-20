@@ -23,12 +23,18 @@ def _add_requirement(client, headers, inventory_id, name="First Aid Kit", catego
     )
 
 
-def _create_item(client, headers, inventory_id, name="paddle", category="travel"):
-    """Create a personal item. inventoryId is only used for auth middleware."""
+def _create_item(client, headers, inventory_id, name="paddle", category="travel",
+                 status="owned"):
+    """Create a personal item. inventoryId is only used for auth middleware.
+
+    Defaults to ``owned`` so the item is eligible to cover a requirement; pass
+    ``status="suggested"`` to exercise the contribute guard.
+    """
     return client.post(
         f"{ITEM_ENDPOINT}/create",
         headers=headers,
-        json={"inventoryId": inventory_id, "name": name, "category": category},
+        json={"inventoryId": inventory_id, "name": name, "category": category,
+              "status": status},
     )
 
 
@@ -159,6 +165,29 @@ def test_contribute_item_outsider_403(client, outsider_headers, auth_headers, tr
         json={"itemId": "00000000-0000-0000-0000-000000000001"},
     )
     assert response.status_code == 403
+
+
+def test_contribute_suggested_item_rejected(client, auth_headers, trip_with_crew):
+    """A suggested (unconfirmed) item cannot cover a requirement — must be owned first."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+    item_id = json.loads(
+        _create_item(client, auth_headers, inventory_id, status="suggested").data
+    )['id']
+
+    response = client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers,
+        json={"itemId": item_id},
+    )
+    assert response.status_code == 400
+
+    # Requirement stays needed
+    inv = json.loads(client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data)
+    req = next(r for r in inv['requirements'] if r['id'] == req_id)
+    assert req['status'] == "needed"
+
+    client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
 
 
 def test_contribute_requires_item_id(client, auth_headers, trip_with_crew):
