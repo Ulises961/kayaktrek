@@ -104,10 +104,10 @@ class TripService:
             IntegrityError: If database constraints are violated
         """        
         logger.info("Creating new trip")
-        
+
         current_user = UserService.get_user_by_id(str(g.current_user_id))
 
-        trip: Trip = TripSchema().load(trip_data)  # type: ignore
+        trip: Trip = TripSchema().load(trip_data)
         db.session.add(trip)
         db.session.flush()  # obtain trip.id before creating membership
 

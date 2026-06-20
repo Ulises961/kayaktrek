@@ -87,11 +87,15 @@ class AuthService:
         db.session.add(user)
         db.session.commit()
 
-        user = db.session.query(User).filter_by(mail=mail_addr).first()
-        if not user:
+        persisted_user: Optional[User] = db.session.query(User).filter_by(mail=mail_addr).first()
+        if not persisted_user:
             raise ValueError("User generated incorrectly")
+        user = persisted_user
 
-        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(user_json.get("pwd"))
+        pwd = user_json.get("pwd")
+        if not pwd:
+            raise ValueError("Password is required for registration")
+        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(pwd)
         user.public_key = public_key_b64
         user.private_key_ciphertext = pk_ct
         user.private_key_nonce = pk_nonce

@@ -39,8 +39,8 @@ def get_poi():
 
         schema = PointSchema()
         return jsonify([
-            {**schema.dump(r['point']), 'distanceKm': r['distance_km']}  # type: ignore[arg-type]
-            for r in results
+            {**schema.dump(result['point']), 'distanceKm': result['distance_km']}
+            for result in results
         ])
     except Exception as e:
         logger.error(f"Error retrieving POIs: {e}")
@@ -96,7 +96,7 @@ def update_point(id: str):
     try:
         raw = request.get_json()
         validated = PointUpdateSchema().load(raw)
-        point_data = {**raw, **validated}  # type: ignore[arg-type]
+        point_data = {**raw, **validated}
         point = PointService.update_point(id, point_data)
         return jsonify(PointSchema().dump(point)), HTTPStatus.OK
 

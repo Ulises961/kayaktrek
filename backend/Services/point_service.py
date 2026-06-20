@@ -2,7 +2,7 @@
 Point Service - Business logic for point operations.
 """
 import logging
-from typing import List, Optional, cast
+from typing import List, cast
 from uuid import UUID
 from geoalchemy2.functions import ST_DWithin, ST_Distance
 from sqlalchemy.exc import NoResultFound
@@ -31,16 +31,16 @@ class PointService:
     _MUTABLE_FIELDS = frozenset({"type", "latitude", "longitude", "name", "notes"})
     
     @staticmethod
-    def get_point_by_id(point_id: str) -> Optional[Point]:
+    def get_point_by_id(point_id: str) -> Point:
         """
         Retrieve a point by its ID.
-        
+
         Args:
             point_id: The ID of the point to retrieve
-            
+
         Returns:
-            Point object if found, None otherwise
-            
+            Point object
+
         Raises:
             NoResultFound: If point doesn't exist
         """

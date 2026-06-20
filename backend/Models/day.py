@@ -22,7 +22,6 @@ class Day(BaseModel):
     start_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
     end_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
 
-    # Relationships with proper Mapped[] syntax
     points: Mapped[Optional[List["Point"]]] = relationship(foreign_keys="Point.day_id")
     weather: Mapped[Optional["Weather"]] = relationship(
         foreign_keys="Weather.day_id", uselist=False, cascade="all,delete,save-update"

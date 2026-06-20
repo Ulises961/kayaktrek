@@ -29,6 +29,8 @@ def _require_arranger_or_leader(vehicle: ShuttleVehicle, user_id: str, trip_id) 
     membership = db.session.query(TripMember).filter_by(
         user_id=UUID(user_id), trip_id=trip_id
     ).first()
+    if not membership:
+        raise PermissionError("User is not a member of this trip")
     is_leader = membership.role == MemberRoleType.LEADER
     is_arranger = vehicle.arranged_by_id == membership.id
     if not is_leader and not is_arranger:
@@ -150,6 +152,8 @@ class ShuttleService:
         acting_member = db.session.query(TripMember).filter_by(
             user_id=UUID(user_id), trip_id=vehicle.trip_id
         ).first()
+        if not acting_member:
+            raise PermissionError("User is not a member of this trip")
         is_leader = acting_member.role == MemberRoleType.LEADER
         is_arranger = vehicle.arranged_by_id == acting_member.id
         adding_self = acting_member.id == UUID(member_id)
@@ -202,6 +206,8 @@ class ShuttleService:
         acting_member = db.session.query(TripMember).filter_by(
             user_id=UUID(user_id), trip_id=vehicle.trip_id
         ).first()
+        if not acting_member:
+            raise PermissionError("User is not a member of this trip")
         is_leader = acting_member.role == MemberRoleType.LEADER
         is_arranger = vehicle.arranged_by_id == acting_member.id
         removing_self = acting_member.id == UUID(member_id)
