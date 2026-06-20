@@ -19,7 +19,8 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
 from Api.app import createApp
 from Api.database import db as _db
-from Api.seed import seed_item_categories
+from Api.seed import seed_item_categories, seed_place_categories
+from Models.place_category import PlaceCategory
 
 
 def _get_worker_id(request) -> str:
@@ -51,6 +52,7 @@ def app(request):
     ctx.push()
     _db.create_all()
     seed_item_categories()
+    seed_place_categories()
 
     def teardown():
         _db.session.remove()
@@ -183,6 +185,13 @@ def category_ids(app):
     without creating a nested context (which would open a separate session).
     """
     rows = _db.session.query(ItemCategory.slug, ItemCategory.id).all()
+    return {slug: str(cat_id) for slug, cat_id in rows}
+
+
+@pytest.fixture(scope="session")
+def place_category_ids(app):
+    """Return a slug→id mapping for all seeded place categories."""
+    rows = _db.session.query(PlaceCategory.slug, PlaceCategory.id).all()
     return {slug: str(cat_id) for slug, cat_id in rows}
 
 
