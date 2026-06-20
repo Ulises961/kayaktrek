@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { useDayConditions } from "@/lib/weather/use-day-conditions"
-import { haversineNm, totalDistanceNm, legLabel, formatDistance } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/itinerary/format"
 import { WeatherGrid } from "@/components/weather/weather-grid"
 import { SeaGrid } from "@/components/weather/sea-grid"
@@ -76,35 +76,27 @@ export function FeatureDrawer() {
   // (map-core numbers markers by their position in pointOrder, 1-based).
   const absIndexById = new Map(state.pointOrder.map((id, i) => [id, i + 1]))
 
-  // Day waypoints. Each row leads with the inbound leg (distance + ETA at the
-  // planning speed) — the actionable "this hop" number — with cumulative distance
-  // from the day's first point kept as secondary context.
+  // The route is reckoned stop-to-stop: positions are pass-through geometry whose
+  // distance aggregates into the leg toward the next stop, so the list shows stops
+  // only (the day's start/end and any mid-day stop). Each row leads with the leg
+  // from the previous stop, cumulative distance secondary. See
+  // docs/adr/itinerary-frontend.md (Paddle-time legs).
   const dayPoints = selectedDayId
     ? state.pointOrder
         .map((id) => state.points.find((p) => p.id === id))
         .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === selectedDayId)
     : []
 
-  const waypoints = dayPoints.map((point, i) => {
-    const idx = absIndexById.get(point.id ?? "") ?? i + 1
-    if (i === 0) return { point, idx, legText: null, totalText: null }
-    const placed = dayPoints
-      .slice(0, i + 1)
-      .filter(
-        (p): p is typeof p & { latitude: number; longitude: number } =>
-          p.latitude != null && p.longitude != null,
-      )
-    const prev = placed[placed.length - 2]
-    const curr = placed[placed.length - 1]
-    const legText =
-      prev && curr ? legLabel(haversineNm(prev, curr), avgSpeedKnots, distanceUnit) : null
-    return {
-      point,
-      idx,
-      legText,
-      totalText: `${formatDistance(totalDistanceNm(placed), distanceUnit)} ${distanceUnit} total`,
-    }
-  })
+  const stops = routeLegs(dayPoints)
+    .filter((leg) => leg.isAnchor)
+    .map((leg) => ({
+      point: leg.point,
+      idx: absIndexById.get(leg.point.id ?? "") ?? 0,
+      legText: leg.isStart ? null : legLabel(leg.legNm, avgSpeedKnots, distanceUnit),
+      totalText: leg.isStart
+        ? null
+        : `${formatDistance(leg.cumulativeNm, distanceUnit)} ${distanceUnit} total`,
+    }))
 
   const hasForecast = !!weather?.weatherStates?.length || !!sea?.seaStates?.length
 
@@ -155,7 +147,7 @@ export function FeatureDrawer() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "route" && (
           <>
-            {waypoints.length === 0 ? (
+            {stops.length === 0 ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-xs">
                 No waypoints for this day.
               </p>
@@ -164,7 +156,7 @@ export function FeatureDrawer() {
                 <p className="text-muted-foreground/70 border-border/40 border-b px-3 py-1.5 text-[9px] tracking-wider uppercase">
                   Avg speed {avgSpeedKnots} kn
                 </p>
-                {waypoints.map(({ point, idx, legText, totalText }) => (
+                {stops.map(({ point, idx, legText, totalText }) => (
                   <button
                     key={point.id}
                     type="button"

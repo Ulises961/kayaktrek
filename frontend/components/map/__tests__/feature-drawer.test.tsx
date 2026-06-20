@@ -178,6 +178,31 @@ describe("FeatureDrawer — Route tab", () => {
     expect(screen.getByText("End")).toBeInTheDocument()
   })
 
+  it("lists stops only — mid-day positions are aggregated, not shown as rows", () => {
+    renderWithCtx(
+      makeCtx({
+        selectedDayId: DAY1_ID,
+        state: {
+          // Launch (stop) → waypoint (position, pass-through) → camp (stop).
+          points: [
+            pt("p1", DAY1_ID, { name: "Launch", type: "stop" }),
+            pt("p2", DAY1_ID, { name: "Waypoint", type: "position" }),
+            pt("p3", DAY1_ID, { name: "Camp", type: "stop" }),
+          ],
+          pointOrder: ["p1", "p2", "p3"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1)],
+        },
+      }),
+    )
+    expect(screen.getAllByTestId("route-waypoint")).toHaveLength(2)
+    expect(screen.getByText("Launch")).toBeInTheDocument()
+    expect(screen.getByText("Camp")).toBeInTheDocument()
+    expect(screen.queryByText("Waypoint")).not.toBeInTheDocument()
+  })
+
   it("clicking a waypoint calls setSelectedPointId with its id", async () => {
     const setSelectedPointId = vi.fn()
     renderWithCtx(makeCtx({ selectedDayId: DAY1_ID, setSelectedPointId }))

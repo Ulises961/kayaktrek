@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { X, Anchor, Star, CircleDot } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { haversineNm, legLabel, formatDistance } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { cn } from "@/lib/utils"
 import { PointDetailModal } from "./point-detail-modal"
 import type { Point } from "@/lib/dtos/point"
@@ -14,10 +14,11 @@ function TypeIcon({ type }: { type: string }) {
 }
 
 /**
- * Inbound leg (distance + ETA at the planning speed) for the given point, plus
- * cumulative distance from the day's first point. The leg is the actionable "this
- * hop" figure; the total is secondary context. Returns null for the day's first
- * point (no inbound leg) and for points not on a day's route.
+ * Leg from the previous stop to the given point (aggregating any intervening
+ * pass-through positions), plus cumulative distance from the day's first point.
+ * The leg is the actionable "since the last stop" figure; the total is secondary
+ * context. Returns null for the day's first point (no inbound leg) and for points
+ * not on a day's route. See `docs/adr/itinerary-frontend.md` (Paddle-time legs).
  */
 function legDistance(
   point: Point,
@@ -29,24 +30,11 @@ function legDistance(
   const dayPoints = state.pointOrder
     .map((id) => state.points.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === point.dayId)
-  const idx = dayPoints.findIndex((p) => p.id === point.id)
-  if (idx <= 0) return null
-  let nm = 0
-  let legNm = 0
-  for (let i = 1; i <= idx; i++) {
-    const a = dayPoints[i - 1]
-    const b = dayPoints[i]
-    if (a.latitude != null && a.longitude != null && b.latitude != null && b.longitude != null) {
-      legNm = haversineNm(
-        { latitude: a.latitude, longitude: a.longitude },
-        { latitude: b.latitude, longitude: b.longitude },
-      )
-      nm += legNm
-    }
-  }
+  const leg = routeLegs(dayPoints).find((l) => l.point.id === point.id)
+  if (!leg || leg.isStart) return null
   return {
-    legText: legLabel(legNm, speedKnots, unit),
-    totalText: `${formatDistance(nm, unit)} ${unit} total`,
+    legText: legLabel(leg.legNm, speedKnots, unit),
+    totalText: `${formatDistance(leg.cumulativeNm, unit)} ${unit} total`,
   }
 }
 
