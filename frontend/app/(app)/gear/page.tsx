@@ -18,7 +18,8 @@ export default async function GearPage() {
       <div>
         <h1 className="text-2xl font-semibold">Gear closet</h1>
         <p className="text-muted-foreground text-sm">
-          Your personal kit. Confirm what you own, then contribute it to a trip&rsquo;s requirements.
+          Your personal kit. Confirm what you own, then contribute it to a trip&rsquo;s
+          requirements.
         </p>
       </div>
 

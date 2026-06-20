@@ -88,8 +88,6 @@ describe("GearCloset", () => {
     await user.type(screen.getByPlaceholderText(/add gear/i), "Spare paddle")
     await user.click(screen.getByRole("button", { name: /^add$/i }))
 
-    expect(mockCreateItem).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Spare paddle" }),
-    )
+    expect(mockCreateItem).toHaveBeenCalledWith(expect.objectContaining({ name: "Spare paddle" }))
   })
 })

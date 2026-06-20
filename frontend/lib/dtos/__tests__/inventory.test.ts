@@ -1,13 +1,7 @@
 import { describe, it, expect } from "vitest"
-import {
-  ItemCategorySchema,
-  ItemCategoriesSchema,
-} from "../item-category"
+import { ItemCategorySchema, ItemCategoriesSchema } from "../item-category"
 import { ItemSchema, ItemsSchema } from "../item"
-import {
-  InventorySchema,
-  TripRequirementSchema,
-} from "../inventory"
+import { InventorySchema, TripRequirementSchema } from "../inventory"
 
 const CATEGORY_ID = "01952f1a-0000-7000-8000-0000000000c1"
 const ITEM_ID = "01952f1a-0000-7000-8000-000000000a01"
@@ -41,9 +35,7 @@ const REQUIREMENT_FIXTURE = {
   coveringItem: ITEM_FIXTURE,
   checked: false,
   status: "covered",
-  contributors: [
-    { id: USER_ID, username: "paddler", name: "Pat" },
-  ],
+  contributors: [{ id: USER_ID, username: "paddler", name: "Pat" }],
 }
 
 const INVENTORY_FIXTURE = {

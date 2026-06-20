@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/dtos/item"
 import type { ItemCategory } from "@/lib/dtos/item-category"
 import { createItem } from "@/lib/inventory/actions"
+import { ItemRow } from "@/components/inventory/item-row"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -15,12 +16,6 @@ interface GearClosetProps {
 }
 
 const UNCATEGORISED = "__none__"
-
-function statusBadgeClass(status: Item["status"]) {
-  return status === "owned"
-    ? "bg-[var(--state-happening-bg)] text-[var(--state-happening-fg)]"
-    : "bg-[var(--state-planning-bg)] text-[var(--state-planning-fg)]"
-}
 
 export function GearCloset({ items, categories }: GearClosetProps) {
   const router = useRouter()
@@ -97,11 +92,7 @@ export function GearCloset({ items, categories }: GearClosetProps) {
               All
             </FilterChip>
             {categories.map((c) => (
-              <FilterChip
-                key={c.id}
-                active={filter === c.slug}
-                onClick={() => setFilter(c.slug)}
-              >
+              <FilterChip key={c.id} active={filter === c.slug} onClick={() => setFilter(c.slug)}>
                 {c.name}
               </FilterChip>
             ))}
@@ -109,25 +100,7 @@ export function GearCloset({ items, categories }: GearClosetProps) {
 
           <ul className="flex flex-col gap-2">
             {visible.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-3"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{item.name}</span>
-                  {item.category && (
-                    <span className="text-muted-foreground text-xs">{item.category.name}</span>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase",
-                    statusBadgeClass(item.status),
-                  )}
-                >
-                  {item.status ?? "suggested"}
-                </span>
-              </li>
+              <ItemRow key={item.id} item={item} />
             ))}
           </ul>
         </>
@@ -151,9 +124,7 @@ function FilterChip({
       onClick={onClick}
       className={cn(
         "rounded-full border px-3 py-1 text-xs transition-colors",
-        active
-          ? "bg-sky-100 text-blue-600"
-          : "text-muted-foreground hover:bg-muted",
+        active ? "bg-sky-100 text-blue-600" : "text-muted-foreground hover:bg-muted",
       )}
     >
       {children}
