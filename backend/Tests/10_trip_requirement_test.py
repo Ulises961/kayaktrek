@@ -248,3 +248,123 @@ def test_unclaim_without_contribution_404(client, auth_headers, trip_with_crew):
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Authorship-scoped delete (M6b) — you may remove a requirement iff you proposed it
+# ---------------------------------------------------------------------------
+
+def test_remove_requirement_non_proposer_403(client, auth_headers, trip_with_crew):
+    """A member who did NOT propose a requirement cannot delete it. Authorship, not
+    mere membership, governs removal — and there is no leader override either way."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+    crew_headers = trip_with_crew['crew_headers']
+
+    # Leader proposes the requirement.
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+
+    # Crew member (a trip member, but not the proposer) is refused.
+    response = client.delete(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}",
+        headers=crew_headers,
+    )
+    assert response.status_code == 403
+
+    # The requirement survives.
+    inv = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    assert any(r['id'] == req_id for r in inv['requirements'])
+
+
+def test_proposer_can_remove_own_requirement(client, trip_with_crew):
+    """The proposer — here a crew member — can delete the requirement they added."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+    crew_headers = trip_with_crew['crew_headers']
+
+    req_id = json.loads(
+        _add_requirement(client, crew_headers, inventory_id, name="Crew tent").data
+    )['id']
+    response = client.delete(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}",
+        headers=crew_headers,
+    )
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Multi-contributor cover & per-member duplicate guard (M6b)
+# ---------------------------------------------------------------------------
+
+def test_multiple_members_cover_one_requirement(client, auth_headers, trip_with_crew):
+    """Two different members may each contribute their own item to the same
+    requirement (e.g. a spare) — both contributions are recorded."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+    crew_headers = trip_with_crew['crew_headers']
+
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+    leader_item = json.loads(
+        _create_item(client, auth_headers, inventory_id, name="leader pump").data
+    )['id']
+    crew_item = json.loads(
+        _create_item(client, crew_headers, inventory_id, name="crew pump").data
+    )['id']
+
+    client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers, json={"itemId": leader_item},
+    )
+    resp = client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=crew_headers, json={"itemId": crew_item},
+    )
+    assert resp.status_code == 200
+
+    data = json.loads(resp.data)
+    assert data['status'] == "covered"
+    assert len(data['contributions']) == 2
+    assert {c['item']['id'] for c in data['contributions']} == {leader_item, crew_item}
+
+    client.delete(f"{ITEM_ENDPOINT}/{leader_item}", headers=auth_headers)
+    client.delete(f"{ITEM_ENDPOINT}/{crew_item}", headers=crew_headers)
+
+
+def test_duplicate_contribution_same_member_rejected(client, auth_headers, trip_with_crew):
+    """A member already covering a requirement cannot add a second item to it (400)."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+    first = json.loads(_create_item(client, auth_headers, inventory_id, name="pump A").data)['id']
+    second = json.loads(_create_item(client, auth_headers, inventory_id, name="pump B").data)['id']
+
+    client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers, json={"itemId": first},
+    )
+    dup = client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers, json={"itemId": second},
+    )
+    assert dup.status_code == 400
+
+    client.delete(f"{ITEM_ENDPOINT}/{first}", headers=auth_headers)
+    client.delete(f"{ITEM_ENDPOINT}/{second}", headers=auth_headers)
+
+
+# ---------------------------------------------------------------------------
+# Seeded default requirements (M6b §5)
+# ---------------------------------------------------------------------------
+
+def test_trip_create_seeds_leader_owned_requirements(client, auth_headers, id, trip_with_crew):
+    """A new trip's inventory is pre-seeded with the default requirement set: every
+    entry proposed by the leader and initially needed."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+    inv = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    reqs = inv['requirements']
+
+    assert len(reqs) >= 10, "expected a seeded default requirement set"
+    assert all(r['status'] == "needed" for r in reqs)
+    assert all(r['proposedBy']['user']['id'] == id for r in reqs), "defaults are leader-owned"
+    assert "Repair kit" in {r['name'] for r in reqs}
