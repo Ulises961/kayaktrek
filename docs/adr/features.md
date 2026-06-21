@@ -375,9 +375,31 @@ community surface behind moderation later.
 **Resolved on implementation (M4e, 2026-06-21).** The entity shipped as **`Place`** (not
 `Annotation`/`Spot`/`POI`) — neutral enough for a hazard or a café and reads as a future community
 directory. **Category is its own entity, `PlaceCategory`** (slug/name/icon, seeded at startup, read
-via a public `GET`; the authoring gate stays closed) — the M2 `ItemCategory` decision, so the
+via an authenticated `GET`) — the M2 `ItemCategory` decision, so the
 catalogue grows without a migration. The seeded set: freshwater, food, campsite, slipway, toilet,
 hazard, viewpoint, shelter, other.
+
+**Category authoring opened to admins (2026-06-21, post-M4e).** Initial testing showed the seeded
+taxonomy was too narrow, and extending it by hand (edit-seed-and-restart, or raw DB inserts) is slow.
+Because `PlaceCategory` is an entity by design and a global `admin` flag + `require_admin()` already
+exist, an **admin-only `POST /api/place-categories`** is the cheap, consistent bridge: it extends the
+catalogue at runtime without a migration. Create-only for now — delete is risky while `Place` rows
+FK-reference categories, and is deferred until there's a real need plus an in-use guard. Caveat: the
+endpoint relieves the backend fully, but a new `icon` only renders as a distinct glyph once its
+kebab-case name is in the frontend `place-icons` map — unknown names fall back to a plain pin. Given
+that the admin endpoint without a frontend authoring UI is barely more than a validated `INSERT`,
+the near-term value is the **seed taxonomy itself**; runtime category management proper rides with
+the M7 community milestone. This is explicitly a **stepping-stone admin tool, not the M7 community
+feature**, which still owns the public taxonomy, moderation, and final icon set.
+
+**Seed broadened to 23 categories (2026-06-21), kayaker-curated.** Added: water/resupply (shop, fuel,
+pub), accommodation, land transport (parking, harbour, bus, train), on-water (ferry), safety & comms
+(lifeboat/coastguard, first_aid, phone_signal), scenery (beach), wildlife. Deliberately **dropped**:
+*lighthouse* (the OpenSeaMap seamark overlay is a more reliable source than user input), *tide_race*
+(the tidal-diamond layer already owns tidal turbulence), *swimming* (no honest glyph — `waves` reads
+as hazard), *portage* (niche for coastal work; a labelled `hazard`/`other` covers it). `placeColor`
+now keys off a `HAZARD_SLUGS` set so any future hazard subtype tints red without a code change.
+Capped near ~24 so the drop-a-pin picker stays browsable; `label`/`note` cover the long tail.
 
 **Migration**: although pre-production, the dev database held real `interest` rows, so the migration
 (`b3e7c1a9d240`) **converts `interest` → `position`** (rather than deleting) and recreates the
@@ -396,3 +418,4 @@ public tier (M7).
 | Tidal streams as chart diamonds, not a velocity field (supersedes §6 stream-particles); trip-scoped user-created diamonds; rule of thirds for simple entry; BYOK tidal API deferred to roadmap | M4d | 2026-06-18 | §6a; reuses `TidalStation`/`TidalStreamEntry`; radius display-only, user-configurable (~500 m default) |
 | Deprecate `Point.interest`; reintroduce POIs as standalone map annotations (tidal-diamond pattern, own geometry, survive day boundary); `visibility` flag, trip-scoped first → public community gazetteer deferred to M7 | — | 2026-06-20 | Reverses the `interest` point-type decision; public POIs are a new public shape independent of `Itinerary` (cross-ref `trip-lifecycle.md`); scoped in annotation milestone plan |
 | M4e landed: annotation entity is **`Place`** + **`PlaceCategory`** (category an entity, not an enum); `interest` removed from `PointType` (migration converts existing rows → `position`); place markers as a day-independent toggleable layer, drop-a-pin via a top-centre "+ Add" control | — | 2026-06-21 | Resolves the open entity-name/taxonomy items above; POI proximity query moves from `/api/point/pois` to `/api/place/by-itinerary/<id>/range`; public/community tier still deferred to M7 |
+| Admin-only `POST /api/place-categories` to extend the catalogue at runtime (create-only); seed broadened to 23 kayaker-curated categories | — | 2026-06-21 | Bridge tool, not the M7 community feature; reuses existing `admin` flag + `require_admin()`; added safety/comms (lifeboat/first_aid/phone_signal), transport (bus/train), accommodation, beach, etc.; dropped lighthouse (→ OpenSeaMap seamarks), tide_race (→ tidal diamonds), swimming, portage; `placeColor` now uses a `HAZARD_SLUGS` set; new icons render only once added to the frontend `place-icons` map, else fall back to a pin |

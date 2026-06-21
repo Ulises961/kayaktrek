@@ -3,13 +3,13 @@ import logging
 
 from flask import Blueprint, jsonify, request, abort, g
 from marshmallow import ValidationError
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from werkzeug.exceptions import HTTPException
 
 from Schemas.place_schema import PlaceSchema, PlaceUpdateSchema
-from Schemas.place_category_schema import PlaceCategorySchema
+from Schemas.place_category_schema import PlaceCategorySchema, PlaceCategoryCreateSchema
 from Services.Middleware.auth_middleware import JWTService
-from Services.Middleware.privileges_middleware import require_owner
+from Services.Middleware.privileges_middleware import require_admin, require_owner
 from Services.place_service import PlaceService
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ _create_schema = PlaceSchema()
 _update_schema = PlaceUpdateSchema()
 _dump_schema = PlaceSchema()
 _category_schema = PlaceCategorySchema()
+_category_create_schema = PlaceCategoryCreateSchema()
 
 
 @place_api.route('/api/place-categories', methods=['GET'])
@@ -36,6 +37,27 @@ def get_place_categories():
         raise
     except Exception as e:
         logger.error("get_place_categories_error", extra={"error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@place_api.route('/api/place-categories', methods=['POST'])
+@JWTService.authenticate_restful
+@require_admin()
+def create_place_category():
+    """Admin-only: extend the seeded place-category catalogue without a migration or a
+    raw DB insert. A bridge tool — the public/community taxonomy is M7."""
+    try:
+        data = _category_create_schema.load(request.get_json() or {})
+        category = PlaceService.create_category(data)
+        return jsonify(_category_schema.dump(category)), HTTPStatus.CREATED
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
+    except IntegrityError:
+        abort(HTTPStatus.CONFLICT, description="A category with that slug or name already exists")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("create_place_category_error", extra={"error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 

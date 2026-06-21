@@ -3,7 +3,7 @@ from typing import List
 from uuid import UUID
 
 from geoalchemy2.functions import ST_DWithin, ST_Distance
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Api.database import db
 from Models.place import Place, PlaceVisibility
@@ -23,6 +23,20 @@ class PlaceService:
     @staticmethod
     def list_categories() -> List[PlaceCategory]:
         return db.session.query(PlaceCategory).order_by(PlaceCategory.name).all()
+
+    @staticmethod
+    def create_category(data: dict) -> PlaceCategory:
+        """Admin-only: extend the seeded catalogue. A duplicate slug or name trips the
+        unique constraints — rollback and re-raise so the resource maps it to 409."""
+        category = PlaceCategory(slug=data["slug"], name=data["name"], icon=data.get("icon"))
+        db.session.add(category)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise
+        logger.info("place_category_created", extra={"slug": category.slug})
+        return category
 
     @staticmethod
     def get_by_id(place_id: str) -> Place:

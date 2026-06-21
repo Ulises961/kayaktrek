@@ -9,10 +9,11 @@ from Models.base_model import BaseModel
 class PlaceCategory(BaseModel):
     """A kind of map place — freshwater, food, campsite, slipway, hazard… Modelled
     as an entity (not an enum) so the catalogue can grow without a migration, the
-    same decision taken for ItemCategory in M2. `icon` names the marker glyph so a
-    new category brings its own icon without a frontend change. The create gate is
-    deliberately closed for now: categories are seeded at startup and read via a
-    public GET; user/admin authoring is a future step."""
+    same decision taken for ItemCategory in M2. `icon` names the marker glyph (a
+    kebab-case Lucide name) so a new category carries its own icon. Categories are
+    seeded at startup, read via an authenticated GET, and authored via an admin-only
+    POST (the bridge tool that extends the catalogue without a migration). The
+    public/community taxonomy + moderation is M7."""
 
     __tablename__ = "place_categories"
 

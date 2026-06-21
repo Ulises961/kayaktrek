@@ -1,9 +1,43 @@
 """M4e §2 — HTTP layer for map places: create (itinerary-scoped, any trip member),
-list / range / get, and creator-only patch/delete, plus the seeded category catalogue."""
+list / range / get, and creator-only patch/delete, plus the seeded category catalogue
+and the admin-only category create endpoint."""
+import uuid
 from uuid import uuid4
+
+import pytest
+
+from Api.database import db
+from Models.place_category import PlaceCategory
+from Models.user import User
+from Services.Middleware.auth_middleware import JWTService
 
 PLACE_BASE = "/api/place"
 CATEGORIES = "/api/place-categories"
+
+
+@pytest.fixture(scope="function")
+def admin_headers(client):
+    """Register a fresh user, promote them to admin in the DB, return their headers."""
+    suffix = uuid.uuid4().hex[:8]
+    mail = f"place.admin.{suffix}@example.com"
+    resp = client.post("/api/auth/register", json={
+        "mail": mail, "pwd": "AdminPass9$", "phone": f"+39{uuid.uuid4().int % 10**10:010d}",
+        "name": "Admin", "username": f"place_admin_{suffix}",
+    })
+    assert resp.status_code == 201
+    user = db.session.query(User).filter_by(mail=mail).first()
+    user.active = True
+    user.admin = True
+    db.session.commit()
+    uid = str(user.id)
+    token = JWTService.generate_access_token(user.id, user.mail, True, user.token_version)
+
+    yield {"Authorization": f"Bearer {token}"}
+
+    user = db.session.query(User).filter_by(id=uuid.UUID(uid)).first()
+    if user:
+        db.session.delete(user)
+        db.session.commit()
 
 
 def _body(itinerary, place_category_ids, **overrides):
@@ -37,6 +71,75 @@ def test_categories_returns_seeded_catalogue(client, auth_headers):
 
 def test_categories_requires_auth(client):
     assert client.get(CATEGORIES).status_code in (401, 403)
+
+
+# ── create category (admin only) ─────────────────────────────────────────────
+
+def _cleanup_category(slug):
+    row = db.session.query(PlaceCategory).filter_by(slug=slug).first()
+    if row:
+        db.session.delete(row)
+        db.session.commit()
+
+
+def test_create_category_as_admin_returns_201(client, admin_headers):
+    slug = f"sea_cave_{uuid4().hex[:6]}"
+    try:
+        resp = client.post(CATEGORIES, headers=admin_headers,
+                           json={"slug": slug, "name": "Sea Cave", "icon": "waves"})
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["slug"] == slug
+        assert data["name"] == "Sea Cave"
+        assert data["icon"] == "waves"
+        # The new category is now in the catalogue any member reads.
+        listed = client.get(CATEGORIES, headers=admin_headers).get_json()
+        assert slug in {c["slug"] for c in listed}
+    finally:
+        _cleanup_category(slug)
+
+
+def test_create_category_normalises_slug_and_strips_name(client, admin_headers):
+    slug = f"Tide_Race_{uuid4().hex[:6]}"
+    try:
+        resp = client.post(CATEGORIES, headers=admin_headers,
+                           json={"slug": slug, "name": "  <b>Tide Race</b>  "})
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["slug"] == slug.lower()
+        assert data["name"] == "Tide Race"
+    finally:
+        _cleanup_category(slug.lower())
+
+
+def test_create_category_non_admin_returns_403(client, auth_headers_2):
+    resp = client.post(CATEGORIES, headers=auth_headers_2,
+                       json={"slug": "nope", "name": "Nope"})
+    assert resp.status_code == 403
+
+
+def test_create_category_requires_auth(client):
+    resp = client.post(CATEGORIES, json={"slug": "nope", "name": "Nope"})
+    assert resp.status_code in (401, 403)
+
+
+def test_create_category_duplicate_slug_returns_409(client, admin_headers):
+    # "freshwater" is seeded, so a second one trips the unique constraint.
+    resp = client.post(CATEGORIES, headers=admin_headers,
+                       json={"slug": "freshwater", "name": "Fresh Water 2"})
+    assert resp.status_code == 409
+
+
+def test_create_category_invalid_slug_returns_400(client, admin_headers):
+    resp = client.post(CATEGORIES, headers=admin_headers,
+                       json={"slug": "Not A Slug!", "name": "Bad"})
+    assert resp.status_code == 400
+
+
+def test_create_category_empty_name_returns_400(client, admin_headers):
+    resp = client.post(CATEGORIES, headers=admin_headers,
+                       json={"slug": "blank_name", "name": "   "})
+    assert resp.status_code == 400
 
 
 # ── create ───────────────────────────────────────────────────────────────────
