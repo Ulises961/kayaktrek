@@ -12,21 +12,6 @@ export interface CreateItemInput {
   status?: ItemStatus
 }
 
-// Creates an inventory for a trip (or a personal one when tripId is omitted).
-export async function createInventory(tripId?: string): Promise<InventoryActionResult> {
-  try {
-    await apiPost("/api/inventory/create", { tripId })
-    if (tripId) revalidatePath(`/trips/${tripId}`)
-    return { success: true }
-  } catch (e) {
-    if (isRedirectError(e)) throw e
-    return {
-      success: false,
-      error: e instanceof Error ? e.message : "Failed to create inventory.",
-    }
-  }
-}
-
 // Creates a personal gear item. Requires only auth — items are not tied to an
 // inventory (a user's gear closet is all their items).
 export async function createItem(input: CreateItemInput): Promise<InventoryActionResult> {

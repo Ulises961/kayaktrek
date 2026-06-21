@@ -1,18 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 
-const { mockCreateInventory, mockRefresh } = vi.hoisted(() => ({
-  mockCreateInventory: vi.fn(),
-  mockRefresh: vi.fn(),
+vi.mock("@/components/inventory/requirements-checklist", () => ({
+  RequirementsChecklist: ({ requirements }: { requirements: { id?: string; name?: string }[] }) => (
+    <div data-testid="checklist">
+      {requirements.map((r) => (
+        <span key={r.id}>{r.name}</span>
+      ))}
+    </div>
+  ),
 }))
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
-}))
-
-vi.mock("@/lib/inventory/actions", () => ({
-  createInventory: mockCreateInventory,
+vi.mock("@/components/inventory/personal-packing", () => ({
+  PersonalPacking: () => <div data-testid="personal-packing" />,
 }))
 
 import { ItemsTab } from "../items-tab"
@@ -27,46 +27,38 @@ const INVENTORY: Inventory = {
       id: "01952f1a-0000-7000-8000-000000000b01",
       name: "Tow line",
       status: "needed",
-      checked: false,
     },
     {
       id: "01952f1a-0000-7000-8000-000000000b02",
       name: "Bilge pump",
       status: "covered",
-      checked: false,
     },
   ],
 }
 
 describe("ItemsTab", () => {
-  beforeEach(() => {
-    mockCreateInventory.mockReset()
-    mockRefresh.mockReset()
-    mockCreateInventory.mockResolvedValue({ success: true })
-  })
-
-  it("offers a create-inventory action to the leader when there is no inventory", () => {
-    render(<ItemsTab tripId={TRIP_ID} inventory={null} isLeader={true} />)
-    expect(screen.getByRole("button", { name: /create trip inventory/i })).toBeTruthy()
-  })
-
-  it("does not offer create-inventory to a non-leader when there is no inventory", () => {
-    render(<ItemsTab tripId={TRIP_ID} inventory={null} isLeader={false} />)
-    expect(screen.queryByRole("button", { name: /create trip inventory/i })).toBeNull()
-  })
-
-  it("creates the trip inventory when the leader clicks the button", async () => {
-    const user = userEvent.setup()
-    render(<ItemsTab tripId={TRIP_ID} inventory={null} isLeader={true} />)
-
-    await user.click(screen.getByRole("button", { name: /create trip inventory/i }))
-
-    expect(mockCreateInventory).toHaveBeenCalledWith(TRIP_ID)
-  })
-
-  it("shows the linked inventory's requirements when one exists", () => {
+  it("renders the inventory's requirements (every trip auto-creates one)", () => {
     render(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} />)
+    expect(screen.getByTestId("checklist")).toBeTruthy()
     expect(screen.getByText("Tow line")).toBeTruthy()
     expect(screen.getByText("Bilge pump")).toBeTruthy()
+  })
+
+  it("shows a fallback message (and no create button) when the inventory is missing", () => {
+    render(<ItemsTab tripId={TRIP_ID} inventory={null} isLeader={true} />)
+    expect(screen.queryByTestId("checklist")).toBeNull()
+    expect(screen.queryByRole("button", { name: /create trip inventory/i })).toBeNull()
+    expect(screen.getByText(/inventory isn.t available yet/i)).toBeTruthy()
+  })
+
+  it("renders the private 'My kit' section only for members", () => {
+    const { rerender } = render(
+      <ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} isMember={false} />,
+    )
+    expect(screen.queryByTestId("personal-packing")).toBeNull()
+
+    rerender(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} isMember={true} />)
+    expect(screen.getByTestId("personal-packing")).toBeTruthy()
+    expect(screen.getByText("My kit")).toBeTruthy()
   })
 })

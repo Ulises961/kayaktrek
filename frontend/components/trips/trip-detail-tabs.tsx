@@ -15,6 +15,7 @@ import type { TravelDocument } from "@/lib/dtos/travel-document"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
 import type { Item } from "@/lib/dtos/item"
+import type { PersonalPackingItem } from "@/lib/dtos/personal-packing"
 
 type TabId = "crew" | "float-plan" | "logistics" | "itinerary" | "items"
 
@@ -35,6 +36,8 @@ interface TripDetailTabsProps {
   medicalNotesResetAt?: string | null
   /** Current user's owned personal gear — feeds the contribute picker on the items tab. */
   myItems?: Item[]
+  /** Current user's private packing list for this trip — feeds the "My kit" section. */
+  packingItems?: PersonalPackingItem[]
 }
 
 export function TripDetailTabs({
@@ -52,6 +55,7 @@ export function TripDetailTabs({
   leaderId,
   medicalNotesResetAt,
   myItems = [],
+  packingItems = [],
 }: TripDetailTabsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -141,6 +145,8 @@ export function TripDetailTabs({
           isLeader={isLeader}
           isMember={isMember}
           myItems={myItems}
+          packingItems={packingItems}
+          currentUserId={currentUserId}
         />
       </TabsContent>
     </Tabs>

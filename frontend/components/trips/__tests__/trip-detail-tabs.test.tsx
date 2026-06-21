@@ -127,10 +127,12 @@ describe("TripDetailTabs", () => {
     expect(screen.getByRole("button", { name: /create itinerary/i })).toBeDefined()
   })
 
-  it("shows the create-inventory action for a leader when the items tab is active", async () => {
+  it("shows the trip inventory section when the items tab is active", async () => {
     render(<TripDetailTabs {...BASE_PROPS} />)
     await userEvent.click(screen.getByRole("tab", { name: /items/i }))
-    expect(screen.getByRole("button", { name: /create trip inventory/i })).toBeDefined()
+    // Every trip auto-creates its inventory, so there is no create-inventory button.
+    expect(screen.getByText(/trip inventory/i)).toBeDefined()
+    expect(screen.queryByRole("button", { name: /create trip inventory/i })).toBeNull()
   })
 
   it("shows logistics content when logistics tab is active", async () => {

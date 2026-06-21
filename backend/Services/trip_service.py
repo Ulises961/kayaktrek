@@ -13,6 +13,9 @@ from uuid import UUID
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
+from Models.inventory import Inventory
+from Models.trip_requirement import TripRequirement
+from Api.seed import DEFAULT_TRIP_REQUIREMENTS
 from Models.user import User
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -112,6 +115,7 @@ class TripService:
         db.session.flush()  # obtain trip.id before creating membership
 
         # Add the creator as leader, snapshotting their profile vessel/emergency defaults
+        membership = None
         if current_user:
             prefill = {}
             for field in (
@@ -131,6 +135,25 @@ class TripService:
                 **prefill,
             })
             db.session.add(membership)
+            db.session.flush()  # obtain membership.id before seeding requirements
+
+        # Every trip owns exactly one inventory, pre-populated with a leader-owned
+        # default requirement set so the gear checklist never starts empty. The trip
+        # payload may already carry a nested inventory (TripSchema builds one); reuse
+        # it rather than creating a second — Inventory.trip_id is unique.
+        inventory = trip.inventory
+        if inventory is None:
+            inventory = Inventory(trip_id=trip.id)
+            db.session.add(inventory)
+        db.session.flush()  # obtain inventory.id before seeding requirements
+        if membership:
+            for spec in DEFAULT_TRIP_REQUIREMENTS:
+                db.session.add(TripRequirement(
+                    inventory_id=inventory.id,
+                    name=spec["name"],
+                    category=spec["category"],
+                    proposed_by_member_id=membership.id,
+                ))
         db.session.commit()
 
         # Refresh to get relationships

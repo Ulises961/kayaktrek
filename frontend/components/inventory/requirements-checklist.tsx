@@ -21,7 +21,10 @@ interface RequirementsChecklistProps {
   tripId: string
   requirements: TripRequirement[]
   myItems: Item[]
+  /** Whether the current user is a trip member (may add requirements / contribute). */
   canManage: boolean
+  /** The current user's id — drives proposer-gated remove and own-contribution withdraw. */
+  currentUserId?: string
 }
 
 function statusBadgeClass(status: TripRequirement["status"]) {
@@ -36,6 +39,7 @@ export function RequirementsChecklist({
   requirements,
   myItems,
   canManage,
+  currentUserId,
 }: RequirementsChecklistProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -81,6 +85,7 @@ export function RequirementsChecklist({
               requirement={req}
               ownedItems={ownedItems}
               canManage={canManage}
+              currentUserId={currentUserId}
             />
           ))}
         </ul>
@@ -124,6 +129,7 @@ interface RequirementRowProps {
   requirement: TripRequirement
   ownedItems: Item[]
   canManage: boolean
+  currentUserId?: string
 }
 
 function RequirementRow({
@@ -132,13 +138,17 @@ function RequirementRow({
   requirement: req,
   ownedItems,
   canManage,
+  currentUserId,
 }: RequirementRowProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const covered = req.status === "covered"
-  const contributors = req.contributors ?? []
+  const contributions = req.contributions ?? []
+  const myContribution = currentUserId
+    ? contributions.find((c) => c.member?.user?.id === currentUserId)
+    : undefined
+  const isProposer = !!currentUserId && req.proposedBy?.user?.id === currentUserId
 
   function run(fn: () => Promise<InventoryActionResult>) {
     setError(null)
@@ -166,15 +176,7 @@ function RequirementRow({
   return (
     <li className="flex flex-col gap-2 rounded-lg border p-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{req.name}</span>
-          {covered && req.coveringItem && (
-            <span className="text-muted-foreground text-xs">
-              {req.coveringItem.name}
-              {contributors.length > 0 && ` · ${contributors.map((c) => c.name).join(", ")}`}
-            </span>
-          )}
-        </div>
+        <span className="font-medium">{req.name}</span>
         <div className="flex items-center gap-2">
           <span
             className={cn(
@@ -184,12 +186,12 @@ function RequirementRow({
           >
             {req.status ?? "needed"}
           </span>
-          {canManage && covered && (
+          {canManage && myContribution && (
             <Button variant="outline" size="sm" disabled={isPending} onClick={handleWithdraw}>
               Withdraw
             </Button>
           )}
-          {canManage && (
+          {canManage && isProposer && (
             <Button
               size="icon"
               variant="ghost"
@@ -204,8 +206,19 @@ function RequirementRow({
         </div>
       </div>
 
+      {contributions.length > 0 && (
+        <ul className="flex flex-col gap-0.5">
+          {contributions.map((c) => (
+            <li key={c.id} className="text-muted-foreground text-xs">
+              {c.item?.name}
+              {c.member?.user?.name && ` · ${c.member.user.name}`}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {canManage &&
-        !covered &&
+        !myContribution &&
         (ownedItems.length > 0 ? (
           <select
             aria-label={`Contribute to ${req.name}`}
