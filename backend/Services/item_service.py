@@ -6,7 +6,7 @@ from typing import cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
 
-from Models.item import Item
+from Models.item import Item, ItemStatusType
 from Schemas.item_schema import ItemSchema
 from Api.database import db
 from Schemas.base_schema import camelcase
@@ -14,11 +14,27 @@ from Schemas.base_schema import camelcase
 logger = logging.getLogger(__name__)
 
 # Fields a client is permitted to change on an existing item.
-_MUTABLE_FIELDS = {"name", "checked", "category_id"}
+# `status` promotes a suggested item to owned (the confirmation step before it
+# can be contributed to a trip requirement).
+_MUTABLE_FIELDS = {"name", "checked", "category_id", "status"}
 
 
 class ItemService:
     """Service class for Item-related business logic."""
+
+    @staticmethod
+    def get_items_by_user(user_id: str) -> list[Item]:
+        """Return every personal item owned by the given user.
+
+        Backs the personal gear closet (GET /api/item/all) and the
+        contribute-item picker.
+        """
+        return (
+            db.session.query(Item)
+            .filter(Item.user_id == UUID(str(user_id)))
+            .order_by(Item.created)
+            .all()
+        )
 
     @staticmethod
     def get_item_by_id(item_id: str) -> Item:
@@ -56,7 +72,6 @@ class ItemService:
             IntegrityError: If database constraints are violated
         """
         logger.info("Creating new item")
-        item_data.pop("inventoryId", None)  # auth middleware metadata, not item data
         item = cast(Item, ItemSchema().load(item_data))
         db.session.add(item)
         db.session.commit()
@@ -89,7 +104,10 @@ class ItemService:
         for field in _MUTABLE_FIELDS:
             key = camelcase(field)
             if key in item_data:
-                setattr(item, field, item_data[key])
+                value = item_data[key]
+                if field == "status" and value is not None:
+                    value = ItemStatusType(value)
+                setattr(item, field, value)
 
         try:
             db.session.commit()

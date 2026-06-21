@@ -1,16 +1,16 @@
 ---
 id: features
-title: "Features: Weather & Sea Data, Tidal Model & Expedition Log"
-abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables, leaflet-velocity overlays, and Celery dual-trigger expedition log auto-generation.
+title: "Features: Weather & Sea Data, Tidal Model, Expedition Log, Map Annotations & Inventory"
+abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables and chart-diamond overlays, Celery dual-trigger expedition log auto-generation, map annotations as standalone Place entities (replacing Point.interest), and a two-tier personal-gear / trip-requirement inventory model.
 status: accepted
 date: 2026-06-10
 deciders: []
-tags: [weather, tidal, expedition-log, map]
+tags: [weather, tidal, expedition-log, map, places, inventory]
 ---
 
-# Features: Weather & Sea Data, Tidal Model & Expedition Log
+# Features: Weather & Sea Data, Tidal Model, Expedition Log, Map Annotations & Inventory
 
-This document covers two concrete product features whose design required substantial decisions: how weather, sea, and tidal data is sourced, modelled, and displayed (M5); and how expedition logs are auto-generated at the close of each paddling day (M8).
+This document covers the concrete product features whose design required substantial decisions: how weather, sea, and tidal data is sourced, modelled, and displayed (M5); how expedition logs are auto-generated at the close of each paddling day (M8); how map annotations (POIs) are modelled as standalone `Place` entities rather than route points (M4e); and how personal gear and trip gear requirements are kept as two separable concerns (M6).
 
 ---
 
@@ -409,6 +409,48 @@ and `weather_fetch_task`) were removed; proximity queries now live on `Place`
 (`GET /api/place/by-itinerary/<id>/range`). Open items remaining: moderation/dedup/edit-trust for the
 public tier (M7).
 
+## Inventory & Gear (M6)
+
+### The problem
+
+The original M6 plan assumed items live *inside* an inventory — `createItem(inventoryId, …)`,
+inventories showing an "item count", an inventory nesting an `items` array. The backend built in
+M2 had already settled on a different, cleaner shape, and the plan had drifted from it.
+
+### Decision — two separable concerns
+
+**Personal gear is owned by the *user*, not by an inventory. Trip needs are *requirement slots* on a
+trip's inventory. Contribution links one personal item to one slot.**
+
+- **`Item`** is personal gear: it carries `user_id` and **no `inventory_id`**. A paddler's gear
+  closet is just "every `Item` where `user_id = me`", served by `GET /api/item/all` (scoped by the
+  authenticated user — no `@require_owner`, mirroring `GET /api/inventory/all`).
+- **`Inventory`** belongs to a trip (or, for a personal list, to a user) and holds **`TripRequirement`
+  slots** — never items directly. A requirement is a named need (`name`, optional `category`,
+  `status: needed | covered`).
+- **Contribution** (`POST …/requirements/:id/contribute`, body `{ itemId }`) is the act that ties a
+  personal item to a requirement slot via `covering_item_id` + the `requirement_contributors`
+  junction. It is a distinct action from owning the item.
+
+### Item lifecycle — three distinct states, plus packing
+
+1. `suggested` — the app or a template proposed it; the paddler may not own it yet.
+2. `owned` — the paddler confirmed possession (promoted via `PATCH /api/item/:id { status }`).
+3. *assigned to a trip* — the separate `contribute` act. **Only `owned` items qualify** —
+   `contribute` rejects any item whose `status != owned` (`400`), so unconfirmed gear can't be
+   committed to a trip. Pre-departure packing confirmation (`checked`) is a fourth moment, scoped to
+   the item/requirement, not the same as ownership.
+
+### Item creation requires only authentication
+
+Because items are personal and not inventory-scoped, **creating an item needs only a valid session**
+— `POST /api/item/create` no longer gates on inventory ownership. (Previously it ran
+`@require_owner('item', parent_resource=('inventory', 'inventoryId'))`, forcing the client to pass an
+owned `inventoryId` that the service then *discarded* — pure ceremony that contradicted the
+personal-gear model.) `user_id` is stamped from the auth context in `ItemSchema`.
+
+This supersedes the M6 plan's "items live in inventory" framing; the plan was updated to match.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -419,3 +461,5 @@ public tier (M7).
 | Deprecate `Point.interest`; reintroduce POIs as standalone map annotations (tidal-diamond pattern, own geometry, survive day boundary); `visibility` flag, trip-scoped first → public community gazetteer deferred to M7 | — | 2026-06-20 | Reverses the `interest` point-type decision; public POIs are a new public shape independent of `Itinerary` (cross-ref `trip-lifecycle.md`); scoped in annotation milestone plan |
 | M4e landed: annotation entity is **`Place`** + **`PlaceCategory`** (category an entity, not an enum); `interest` removed from `PointType` (migration converts existing rows → `position`); place markers as a day-independent toggleable layer, drop-a-pin via a top-centre "+ Add" control | — | 2026-06-21 | Resolves the open entity-name/taxonomy items above; POI proximity query moves from `/api/point/pois` to `/api/place/by-itinerary/<id>/range`; public/community tier still deferred to M7 |
 | Admin-only `POST /api/place-categories` to extend the catalogue at runtime (create-only); seed broadened to 23 kayaker-curated categories | — | 2026-06-21 | Bridge tool, not the M7 community feature; reuses existing `admin` flag + `require_admin()`; added safety/comms (lifeboat/first_aid/phone_signal), transport (bus/train), accommodation, beach, etc.; dropped lighthouse (→ OpenSeaMap seamarks), tide_race (→ tidal diamonds), swimming, portage; `placeColor` now uses a `HAZARD_SLUGS` set; new icons render only once added to the frontend `place-icons` map, else fall back to a pin |
+| Inventory & Gear model: items are personal (user-owned, no `inventory_id`); inventories hold `TripRequirement` slots; `contribute` links an `owned` item to a slot; item lifecycle `suggested → owned → assigned`; `contribute` rejects non-`owned` items; item creation requires only auth (decoupled from inventory ownership) | M6 | 2026-06-20 | Supersedes the M6 plan's "items live in inventory" assumption; backend additions: `GET /api/item/all`, `status` in item PATCH whitelist, `owned`-only contribute guard |
+| Inventory authorship & multi-contributor model: each member is sovereign over their own entries. `TripRequirement.proposed_by_member_id` (NOT NULL; defaults/templates → leader) — delete iff you proposed it (no leader override). Contribution becomes a true M2M via a `RequirementContribution(requirement, member, item, checked)` association (unique per member/requirement), replacing the single `covering_item_id` + plain `requirement_contributors` junction; `unclaim` is caller-scoped. `status` becomes **derived** (≥1 contribution = covered), not stored. Member-leave and account deletion cascade proposed requirements + contributions but never the personal `Item`. | M6b | 2026-06-20 | Fixes M6's unenforceable removal (no authorship) and incoherent multi-contributor `unclaim`; deliberate divergence from leader-gated trip/itinerary management — gear coordination is collaborative; cascade removes any need for a leader cleanup escape hatch. Plan: `plans/M6b.md` |

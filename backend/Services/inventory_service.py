@@ -14,7 +14,7 @@ from Models.trip_member import TripMember
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_requirement_schema import TripRequirementSchema
 from Api.database import db
-from Models.item import Item
+from Models.item import Item, ItemStatusType
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +208,15 @@ class InventoryService:
         inventory = InventoryService.get_inventory_by_id(inventory_id)
         req = InventoryService._get_requirement(inventory_id, req_id)
         trip_member = InventoryService._get_trip_member(inventory)
+
+        item = db.session.get(Item, UUID(item_id))
+        if item is None:
+            raise NoResultFound(f"Item {item_id} not found in database")
+        if item.status != ItemStatusType.OWNED:
+            raise ValueError(
+                "Only owned items can be contributed to a trip requirement; "
+                "confirm you possess this item first"
+            )
 
         req.covering_item_id = UUID(item_id)
         if trip_member not in req.contributors:

@@ -16,7 +16,7 @@ export function NavigationItems() {
     { title: "Itineraries", url: "/itinerary", icon: MapPinIcon },
     { title: "Explore", url: "/explore", icon: CompassIcon },
     { title: "Invitations", url: "/invitations", icon: MailIcon },
-    { title: "Inventory", url: "#", icon: LifeBuoyIcon },
+    { title: "Gear", url: "/gear", icon: LifeBuoyIcon },
     { title: "Buddies", url: "#", icon: UserGroupIcon },
     { title: "Logs", url: "/logs", icon: NewspaperIcon },
   ]
