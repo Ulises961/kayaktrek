@@ -16,7 +16,7 @@ import * as actions from "@/lib/itinerary/actions"
 
 const POINT: Point = {
   id: "p1",
-  type: "interest",
+  type: "stop",
   name: "Vikten Sea Caves",
   notes: "Only enter near slack water.",
   latitude: 68.071,
@@ -80,7 +80,7 @@ describe("PointDetailModal", () => {
   it("shows the point name, type and coordinates", () => {
     renderModal(POINT)
     expect(screen.getByText("Vikten Sea Caves")).toBeInTheDocument()
-    expect(screen.getByText("interest")).toBeInTheDocument()
+    expect(screen.getByText("stop")).toBeInTheDocument()
     expect(screen.getByText(/68\.071°N · 13\.512°E/)).toBeInTheDocument()
   })
 

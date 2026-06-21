@@ -29,6 +29,7 @@ from Models.trip_member import TripMember, MemberRoleType
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
 from Models.tidal_station import TidalStation
+from Models.place import Place
 from Services.itinerary_service import ItineraryService
 from Services.trip_service import TripService
 
@@ -265,6 +266,9 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
 
         elif resource_type == "tidal_diamond":
             return _check_tidal_diamond_ownership(g.current_user_id, str(resource_id))
+
+        elif resource_type == "place":
+            return _check_place_ownership(g.current_user_id, str(resource_id))
 
         else:
             logger.error(f"Unknown resource type: {resource_type}")
@@ -537,3 +541,16 @@ def _check_tidal_diamond_ownership(user_id: str, station_id: str) -> Optional[bo
     if station.itinerary_id is None:
         return False
     return _check_itinerary_ownership(user_id, str(station.itinerary_id))
+
+
+def _check_place_ownership(user_id: str, place_id: str) -> Optional[bool]:
+    """Access to a map place through its itinerary. Membership in the itinerary's
+    trip grants read/write at this layer; creator-only edit is enforced separately
+    in PlaceService. Community places (no itinerary) are not user-editable here.
+    """
+    place = db.session.query(Place).filter_by(id=UUID(place_id)).first()
+    if not place:
+        return None
+    if place.itinerary_id is None:
+        return False
+    return _check_itinerary_ownership(user_id, str(place.itinerary_id))

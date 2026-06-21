@@ -6,7 +6,6 @@ from uuid import UUID
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.day import Day
-from Models.point import PointType
 from Models.sea import Sea
 from Models.sea_state import SeaState
 from Models.weather import Weather
@@ -65,8 +64,7 @@ def _midpoint_of_route(day) -> tuple[float, float] | None:
     """
     candidates = {
         p.id: p for p in (day.points or [])
-        if p.type != PointType.INTEREST
-        and p.latitude is not None
+        if p.latitude is not None
         and p.longitude is not None
     }
     if not candidates:

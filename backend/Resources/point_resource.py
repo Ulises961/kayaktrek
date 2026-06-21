@@ -19,34 +19,10 @@ POINT_ENDPOINT = "/api/point"
 point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 
 
-# TODO: POI points need to run as a separate microservice that can be cached and served
-# TODO: When a PoI is created it is shared to RabbitMQ and saved into the db
-# TODO: Check permissions to create or modify points from parent entity itinerary
-@point_api.route("/pois", methods=["GET"])
-@JWTService.authenticate_restful
-def get_poi():
-    """
-    PointResource GET method. Retrieves point(s) of interest.
-
-    Returns:
-        JSON response with point data and 200 status code
-    """
-    try:
-        range_km: float = request.args.get('range', 0.0, type=float)
-        longitude: float = request.args.get('long', 0.0, type=float)
-        latitude: float = request.args.get('lat', 0.0, type=float)
-        results = PointService.get_points_in_range(range_km, longitude, latitude)
-
-        schema = PointSchema()
-        return jsonify([
-            {**schema.dump(result['point']), 'distanceKm': result['distance_km']}
-            for result in results
-        ])
-    except Exception as e:
-        logger.error(f"Error retrieving POIs: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
-
-
+# Points of interest are no longer route points — they are standalone Place
+# entities, queried by proximity through the place API (GET /api/place/by-itinerary/
+# <id>/range). The old GET /api/point/pois range query was removed with the
+# `interest` PointType in M4e §1.
 @point_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("point", parent_resource=("day", "dayId"), from_body=True)

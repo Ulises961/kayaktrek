@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 class PointType(enum.Enum):
     STOP = 'stop'
     POSITION = 'position'
-    INTEREST = 'interest'
 
 class Point(BaseModel):
     __table_args__ = (

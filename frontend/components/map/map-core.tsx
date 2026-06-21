@@ -1,20 +1,11 @@
 "use client"
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
-import {
-  MapContainer,
-  TileLayer,
-  Polyline,
-  Tooltip,
-  Circle,
-  useMap,
-  useMapEvents,
-} from "react-leaflet"
+import { MapContainer, TileLayer, Polyline, Circle, useMap, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import { Plus } from "lucide-react"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { haversineNm, legLabel } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
@@ -22,6 +13,9 @@ import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { LayersControl } from "./layers-control"
 import { TidalDiamondMarker } from "./tidal-diamond-marker"
 import { TidalDiamondForm } from "./tidal-diamond-form"
+import { PlaceMarker } from "./place-marker"
+import { PlaceForm } from "./place-form"
+import { MapAddControl } from "./map-add-control"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   fetchWindVectors,
@@ -34,12 +28,26 @@ import {
   repositionTidalDiamond,
   deleteTidalDiamond,
 } from "@/lib/weather/actions"
+import {
+  fetchPlaceCategories,
+  fetchPlaces,
+  createPlace,
+  updatePlace,
+  repositionPlace,
+  deletePlace,
+} from "@/lib/places/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
 import {
   diamondEditToFormValues,
   type TidalDiamond,
   type TidalDiamondForm as TidalDiamondFormValues,
 } from "@/lib/dtos/tidal-station"
+import {
+  placeToFormValues,
+  type PlaceCategory,
+  type PlaceWithOwnership,
+  type PlaceForm as PlaceFormValues,
+} from "@/lib/dtos/place"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -59,6 +67,9 @@ export type MapCoreProps = {
   // Any trip member may add/move/delete diamonds. Off by default so the public
   // map and edit-only contexts never expose the affordance.
   canManageDiamonds?: boolean
+  // Any trip member may add places; edit/move/delete is creator-only (gated per
+  // marker on place.mine). Off by default for the public/read-only map.
+  canManagePlaces?: boolean
   onMapClick: (lat: number, lng: number) => Promise<void>
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
@@ -118,7 +129,6 @@ type Segment = {
   key: string
   positions: [[number, number], [number, number]]
   color: string
-  distLabel: string
   dayNum: number
 }
 
@@ -134,8 +144,6 @@ function buildSegments(
   ordered: ValidPoint[],
   dayNumberById: Map<string | undefined, number>,
   boundaryPointIds: Set<string>,
-  distanceUnit: "nm" | "km",
-  avgSpeedKnots: number,
   drag: DragState | null,
 ): Segment[] {
   const segments: Segment[] = []
@@ -171,7 +179,6 @@ function buildSegments(
         [b.latitude, b.longitude],
       ],
       color: getDayColor(dayNum),
-      distLabel: legLabel(haversineNm(a, b), avgSpeedKnots, distanceUnit),
       dayNum,
     })
   }
@@ -280,6 +287,7 @@ type ConnectedMarkerProps = {
   dayNum: number
   boundaryColors: { left: string; right: string } | null
   draggable?: boolean
+  label?: string | null
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
@@ -291,6 +299,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
   dayNum,
   boundaryColors,
   draggable = true,
+  label,
   onMarkerDragMove,
   onMarkerDragEnd,
   onMarkerClick,
@@ -333,6 +342,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
       index={index}
       customIcon={customIcon}
       draggable={draggable}
+      label={label}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
@@ -353,6 +363,7 @@ export default function MapCore({
   flyToPoint = null,
   itineraryId,
   canManageDiamonds = false,
+  canManagePlaces = false,
   onMapClick,
   onMarkerDragEnd,
   onMarkerDragMove,
@@ -378,6 +389,20 @@ export default function MapCore({
   )
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [isMutating, startMutation] = useTransition()
+
+  // Places are itinerary-scoped (not day-scoped) so they load once and stay
+  // visible across day changes. Same two-flow dialog as diamonds: create arms a
+  // map click then holds the dropped spot; edit holds the place id + form values.
+  const [places, setPlaces] = useState<PlaceWithOwnership[]>([])
+  const [categories, setCategories] = useState<PlaceCategory[]>([])
+  const [placesEnabled, setPlacesEnabled] = useState(true)
+  const [placingPlace, setPlacingPlace] = useState(false)
+  const [placeDraft, setPlaceDraft] = useState<{ lat: number; lng: number } | null>(null)
+  const [editingPlace, setEditingPlace] = useState<{ id: string; values: PlaceFormValues } | null>(
+    null,
+  )
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [isPlaceMutating, startPlaceMutation] = useTransition()
 
   const selectedDayDate = useMemo(
     () => days.find((d) => d.id === selectedDayId)?.date ?? null,
@@ -470,6 +495,81 @@ export default function MapCore({
     [reloadDiamonds],
   )
 
+  // ── Places ──────────────────────────────────────────────────────────────────
+
+  const reloadPlaces = useCallback(() => {
+    if (!itineraryId) return
+    fetchPlaces(itineraryId).then((r) => setPlaces(r.success ? r.data : []))
+  }, [itineraryId])
+
+  useEffect(() => {
+    reloadPlaces()
+  }, [reloadPlaces])
+
+  // Category catalogue is needed only by the create/edit form, so it loads once
+  // when the viewer can actually manage places.
+  useEffect(() => {
+    if (!canManagePlaces) return
+    fetchPlaceCategories().then((r) => setCategories(r.success ? r.data : []))
+  }, [canManagePlaces])
+
+  const handlePlaceDrop = useCallback((lat: number, lng: number) => {
+    setPlacingPlace(false)
+    setPlaceError(null)
+    setPlaceDraft({ lat, lng })
+  }, [])
+
+  const closePlaceDialog = useCallback(() => {
+    setPlaceDraft(null)
+    setEditingPlace(null)
+    setPlaceError(null)
+  }, [])
+
+  const handlePlaceSubmit = useCallback(
+    (fields: PlaceFormValues) => {
+      setPlaceError(null)
+      startPlaceMutation(async () => {
+        const result = editingPlace
+          ? await updatePlace(editingPlace.id, fields)
+          : itineraryId && placeDraft
+            ? await createPlace(itineraryId, placeDraft.lat, placeDraft.lng, fields)
+            : null
+        if (!result) return
+        if (result.success) {
+          closePlaceDialog()
+          reloadPlaces()
+        } else {
+          setPlaceError(result.error)
+        }
+      })
+    },
+    [editingPlace, itineraryId, placeDraft, reloadPlaces, closePlaceDialog],
+  )
+
+  const handlePlaceEdit = useCallback(
+    (id: string) => {
+      const place = places.find((p) => p.id === id)
+      if (!place) return
+      setPlaceError(null)
+      setEditingPlace({ id, values: placeToFormValues(place) })
+    },
+    [places],
+  )
+
+  const handlePlaceDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      repositionPlace(id, lat, lng).then(reloadPlaces)
+    },
+    [reloadPlaces],
+  )
+
+  const handlePlaceDelete = useCallback(
+    (id: string) => {
+      deletePlace(id).then(reloadPlaces)
+    },
+    [reloadPlaces],
+  )
+
   useEffect(() => {
     if (!selectedDayId || !selectedDayDate) return
     let cancelled = false
@@ -524,14 +624,28 @@ export default function MapCore({
     (p): p is ValidPoint => p.latitude != null && p.longitude != null,
   )
 
-  const segments = buildSegments(
-    validPoints,
-    dayNumberById,
-    boundaryPointIds,
-    distanceUnit,
-    avgSpeedKnots,
-    dragState,
-  )
+  const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, dragState)
+
+  // On-map distance labels (decided in docs/adr/itinerary-frontend.md): each stop —
+  // and, while planning, the route's growing tip — carries its leg from the previous
+  // stop, the stretch paddled to reach it, so the stops read as steps. routeLegs
+  // already treats the last point of a day as an anchor, so the tip is labelled with
+  // the in-progress stretch from the last stop (not a cumulative total). Viewing
+  // scopes to the selected day for a clean overview; planning labels every day since
+  // you're building the whole route.
+  const stopLabelById = new Map<string, string>()
+  const labelDayIds = viewMode
+    ? selectedDayId != null
+      ? [selectedDayId]
+      : []
+    : Array.from(new Set(validPoints.map((p) => p.dayId ?? null)))
+  for (const dayId of labelDayIds) {
+    const dayPoints = validPoints.filter((p) => (p.dayId ?? null) === dayId)
+    for (const leg of routeLegs(dayPoints)) {
+      if (leg.isStart || !leg.isAnchor || !leg.point.id) continue
+      stopLabelById.set(leg.point.id, legLabel(leg.legNm, avgSpeedKnots, distanceUnit))
+    }
+  }
 
   const handleMarkerDragMove = useCallback(
     (id: string, lat: number, lng: number) => {
@@ -550,12 +664,18 @@ export default function MapCore({
   )
 
   const hasDiamonds = selectedDayId !== null && diamonds.length > 0
+  const hasPlaces = places.length > 0
+
+  // Add-action availability. Places are itinerary-scoped; diamonds resolve per
+  // day, so their entry needs a selected day.
+  const canAddPlace = canManagePlaces
+  const canAddDiamond = canManageDiamonds && selectedDayId != null
 
   return (
     <div
       className={cn(
         "relative h-full w-full",
-        (!viewMode || placing) && "[&_.leaflet-container]:cursor-crosshair",
+        (!viewMode || placing || placingPlace) && "[&_.leaflet-container]:cursor-crosshair",
       )}
     >
       <MapContainer center={[43, 13]} zoom={9} className="h-full w-full" zoomControl>
@@ -571,8 +691,9 @@ export default function MapCore({
           url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
         />
 
-        {!viewMode && !placing && <MapEvents onMapClick={onMapClick} />}
+        {!viewMode && !placing && !placingPlace && <MapEvents onMapClick={onMapClick} />}
         {placing && <DiamondPlacer onPlace={handlePlace} />}
+        {placingPlace && <DiamondPlacer onPlace={handlePlaceDrop} />}
         <ResizeHandler />
         <FitBoundsController points={validPoints} />
         <FlyToController flyToPoint={flyToPoint} />
@@ -589,18 +710,7 @@ export default function MapCore({
                 dimmed ? 2 : selectedDayNum !== null && seg.dayNum === selectedDayNum ? 3.5 : 2.5
               }
               opacity={dimmed ? 0.2 : 0.85}
-            >
-              {!dragState && !viewMode && (
-                <Tooltip
-                  key={`${seg.positions[0][0]},${seg.positions[0][1]}-${seg.positions[1][0]},${seg.positions[1][1]}`}
-                  permanent
-                  direction="top"
-                  className="distance-label"
-                >
-                  {seg.distLabel}
-                </Tooltip>
-              )}
-            </Polyline>
+            />
           )
         })}
 
@@ -612,6 +722,7 @@ export default function MapCore({
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
             draggable={!viewMode}
+            label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerClick={onMarkerClick}
@@ -640,10 +751,24 @@ export default function MapCore({
             />
           ))}
 
-        {/* Draft pin shown while the entry dialog is open over the chosen spot. */}
-        {draft && (
+        {/* Places — itinerary-scoped marks, day-independent. Creator-only edit. */}
+        {hasPlaces &&
+          placesEnabled &&
+          places.map((place) => (
+            <PlaceMarker
+              key={place.id}
+              place={place}
+              editable={canManagePlaces && place.mine}
+              onDragEnd={(lat, lng) => handlePlaceDragEnd(place.id, lat, lng)}
+              onEdit={() => handlePlaceEdit(place.id)}
+              onDelete={() => handlePlaceDelete(place.id)}
+            />
+          ))}
+
+        {/* Draft pin shown while an entry dialog is open over the chosen spot. */}
+        {(draft || placeDraft) && (
           <Circle
-            center={[draft.lat, draft.lng]}
+            center={[(draft ?? placeDraft)!.lat, (draft ?? placeDraft)!.lng]}
             radius={60}
             pathOptions={{ color: "#0ea5e9", weight: 2, fillOpacity: 0.2 }}
             interactive={false}
@@ -651,46 +776,45 @@ export default function MapCore({
         )}
       </MapContainer>
 
-      {selectedDayId && (
+      {(selectedDayId || hasPlaces) && (
         <LayersControl
           windEnabled={windEnabled}
           swellEnabled={swellEnabled}
           diamondsEnabled={diamondsEnabled}
           hasDiamonds={hasDiamonds}
+          placesEnabled={placesEnabled}
+          hasPlaces={hasPlaces}
+          showConditions={selectedDayId != null}
           onWindToggle={() => setWindEnabled((e) => !e)}
           onSwellToggle={() => setSwellEnabled((e) => !e)}
           onDiamondsToggle={() => setDiamondsEnabled((e) => !e)}
+          onPlacesToggle={() => setPlacesEnabled((e) => !e)}
         />
       )}
 
-      {/* Drop-a-pin affordance — top-centre, clear of the top-left zoom control
-          and the top-right LayersControl. Only when a day is selected (the
-          conditions context) and the viewer may manage diamonds. */}
-      {canManageDiamonds && selectedDayId && itineraryId && (
-        <div className="absolute top-2 left-1/2 z-[1001] -translate-x-1/2">
-          {placing ? (
-            <div className="bg-card/95 ring-border/40 flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium shadow-md ring-1 backdrop-blur-sm">
-              <span>Click the map to place the diamond</span>
-              <button
-                type="button"
-                onClick={() => setPlacing(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              data-testid="add-diamond-button"
-              onClick={() => setPlacing(true)}
-              className="bg-card/95 text-foreground ring-border/40 hover:bg-card flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-colors"
-            >
-              <Plus className="size-3.5" aria-hidden />
-              Add tidal diamond
-            </button>
-          )}
-        </div>
+      {/* Drop-a-pin affordances, consolidated into a top-centre "+ Add" disclosure
+          (the create-action counterpart to the top-right Overlays control). Clear
+          of the top-left zoom control and the bottom point-detail sheet. The
+          diamond entry needs a selected day; places are itinerary-scoped. Arming
+          one disarms the other. */}
+      {itineraryId && (canAddPlace || canAddDiamond) && (
+        <MapAddControl
+          canAddPlace={canAddPlace}
+          canAddDiamond={canAddDiamond}
+          placingMode={placing ? "diamond" : placingPlace ? "place" : null}
+          onStartPlace={() => {
+            setPlacing(false)
+            setPlacingPlace(true)
+          }}
+          onStartDiamond={() => {
+            setPlacingPlace(false)
+            setPlacing(true)
+          }}
+          onCancel={() => {
+            setPlacing(false)
+            setPlacingPlace(false)
+          }}
+        />
       )}
 
       <Dialog
@@ -713,6 +837,31 @@ export default function MapCore({
             error={mutationError}
             onSubmit={handleDialogSubmit}
             onCancel={closeDialog}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={placeDraft != null || editingPlace != null}
+        onOpenChange={(open) => {
+          if (!open) closePlaceDialog()
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPlace ? "Edit place" : "New place"}</DialogTitle>
+          </DialogHeader>
+          {/* Remount per flow so the fields reset cleanly between create (empty)
+              and edit (prefilled). */}
+          <PlaceForm
+            key={editingPlace?.id ?? "create"}
+            categories={categories}
+            values={editingPlace?.values}
+            submitLabel={editingPlace ? "Save changes" : "Save place"}
+            isPending={isPlaceMutating}
+            error={placeError}
+            onSubmit={handlePlaceSubmit}
+            onCancel={closePlaceDialog}
           />
         </DialogContent>
       </Dialog>

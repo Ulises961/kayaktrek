@@ -347,21 +347,19 @@ def test_tidal_gates_empty_when_no_date(app, itinerary):
     assert TidalService.tidal_gates_for_day(day, [], None) == []
 
 
-def test_tidal_gates_skips_interest_and_coordless_points(app, itinerary):
+def test_tidal_gates_skips_coordless_points(app, itinerary):
     day_id = itinerary["days"][0]["id"]
     day = _db.session.get(Day, UUID(day_id))
 
-    interest = Point(latitude=50.3, longitude=-4.1, type=PointType.INTEREST, day_id=day.id)
     no_coords = Point(latitude=None, longitude=None, type=PointType.STOP, day_id=day.id)
     no_geo = Point(latitude=50.3, longitude=-4.1, geo=None, type=PointType.STOP, day_id=day.id)
-    _db.session.add_all([interest, no_coords, no_geo])
+    _db.session.add_all([no_coords, no_geo])
     _db.session.commit()
 
     try:
-        gates = TidalService.tidal_gates_for_day(day, [interest, no_coords, no_geo], None)
+        gates = TidalService.tidal_gates_for_day(day, [no_coords, no_geo], None)
         assert gates == []
     finally:
-        _db.session.delete(interest)
         _db.session.delete(no_coords)
         _db.session.delete(no_geo)
         _db.session.commit()

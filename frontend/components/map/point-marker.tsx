@@ -1,6 +1,6 @@
 "use client"
 import { useCallback, useMemo } from "react"
-import { Marker } from "react-leaflet"
+import { Marker, Tooltip } from "react-leaflet"
 import L from "leaflet"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { ringIcon } from "./ring-icon"
@@ -12,6 +12,9 @@ type PointMarkerProps = {
   index?: number
   customIcon?: L.Icon | L.DivIcon
   draggable?: boolean
+  // Permanent distance label shown above the marker (e.g. a stop's leg in view
+  // mode, or the route tip's running total while planning). Null hides it.
+  label?: string | null
   onDragMove: (lat: number, lng: number) => void
   onDragEnd: (lat: number, lng: number) => void
   onClick?: () => void
@@ -25,6 +28,7 @@ export function PointMarker({
   index,
   customIcon,
   draggable = true,
+  label,
   onDragMove,
   onDragEnd,
   onClick,
@@ -71,6 +75,12 @@ export function PointMarker({
   )
 
   return (
-    <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers} />
+    <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers}>
+      {label ? (
+        <Tooltip permanent direction="top" className="distance-label">
+          {label}
+        </Tooltip>
+      ) : null}
+    </Marker>
   )
 }

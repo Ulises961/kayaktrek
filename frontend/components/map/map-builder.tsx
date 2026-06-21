@@ -230,6 +230,7 @@ export function MapBuilder({
               flyToPoint={flyToPoint}
               itineraryId={itinerary.id ?? ""}
               canManageDiamonds
+              canManagePlaces
               onMapClick={handleMapClick}
               onMarkerDragEnd={handleMarkerDragEnd}
               onMarkerDragMove={handleMarkerDragMove}

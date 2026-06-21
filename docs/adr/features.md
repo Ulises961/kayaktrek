@@ -1,16 +1,16 @@
 ---
 id: features
-title: "Features: Weather & Sea Data, Tidal Model & Expedition Log"
-abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables, leaflet-velocity overlays, and Celery dual-trigger expedition log auto-generation.
+title: "Features: Weather & Sea Data, Tidal Model, Expedition Log, Map Annotations & Inventory"
+abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables and chart-diamond overlays, Celery dual-trigger expedition log auto-generation, map annotations as standalone Place entities (replacing Point.interest), and a two-tier personal-gear / trip-requirement inventory model.
 status: accepted
 date: 2026-06-10
 deciders: []
-tags: [weather, tidal, expedition-log, map]
+tags: [weather, tidal, expedition-log, map, places, inventory]
 ---
 
-# Features: Weather & Sea Data, Tidal Model & Expedition Log
+# Features: Weather & Sea Data, Tidal Model, Expedition Log, Map Annotations & Inventory
 
-This document covers two concrete product features whose design required substantial decisions: how weather, sea, and tidal data is sourced, modelled, and displayed (M5); and how expedition logs are auto-generated at the close of each paddling day (M8).
+This document covers the concrete product features whose design required substantial decisions: how weather, sea, and tidal data is sourced, modelled, and displayed (M5); how expedition logs are auto-generated at the close of each paddling day (M8); how map annotations (POIs) are modelled as standalone `Place` entities rather than route points (M4e); and how personal gear and trip gear requirements are kept as two separable concerns (M6).
 
 ---
 
@@ -372,9 +372,42 @@ deferred to the M7 community milestone**; trip-scoped (private) annotations ship
 logic as BYOK tidal and the public route library: build the model with the flag now, gate the
 community surface behind moderation later.
 
-**Migration**: pre-production and solo, so existing `interest` points are removed with the type — no
-data to preserve. Open items (entity name — `Annotation` / `Spot` / `POI`, final category taxonomy +
-icon set, moderation model) are scoped in the annotation milestone plan, not fixed here.
+**Resolved on implementation (M4e, 2026-06-21).** The entity shipped as **`Place`** (not
+`Annotation`/`Spot`/`POI`) — neutral enough for a hazard or a café and reads as a future community
+directory. **Category is its own entity, `PlaceCategory`** (slug/name/icon, seeded at startup, read
+via an authenticated `GET`) — the M2 `ItemCategory` decision, so the
+catalogue grows without a migration. The seeded set: freshwater, food, campsite, slipway, toilet,
+hazard, viewpoint, shelter, other.
+
+**Category authoring opened to admins (2026-06-21, post-M4e).** Initial testing showed the seeded
+taxonomy was too narrow, and extending it by hand (edit-seed-and-restart, or raw DB inserts) is slow.
+Because `PlaceCategory` is an entity by design and a global `admin` flag + `require_admin()` already
+exist, an **admin-only `POST /api/place-categories`** is the cheap, consistent bridge: it extends the
+catalogue at runtime without a migration. Create-only for now — delete is risky while `Place` rows
+FK-reference categories, and is deferred until there's a real need plus an in-use guard. Caveat: the
+endpoint relieves the backend fully, but a new `icon` only renders as a distinct glyph once its
+kebab-case name is in the frontend `place-icons` map — unknown names fall back to a plain pin. Given
+that the admin endpoint without a frontend authoring UI is barely more than a validated `INSERT`,
+the near-term value is the **seed taxonomy itself**; runtime category management proper rides with
+the M7 community milestone. This is explicitly a **stepping-stone admin tool, not the M7 community
+feature**, which still owns the public taxonomy, moderation, and final icon set.
+
+**Seed broadened to 23 categories (2026-06-21), kayaker-curated.** Added: water/resupply (shop, fuel,
+pub), accommodation, land transport (parking, harbour, bus, train), on-water (ferry), safety & comms
+(lifeboat/coastguard, first_aid, phone_signal), scenery (beach), wildlife. Deliberately **dropped**:
+*lighthouse* (the OpenSeaMap seamark overlay is a more reliable source than user input), *tide_race*
+(the tidal-diamond layer already owns tidal turbulence), *swimming* (no honest glyph — `waves` reads
+as hazard), *portage* (niche for coastal work; a labelled `hazard`/`other` covers it). `placeColor`
+now keys off a `HAZARD_SLUGS` set so any future hazard subtype tints red without a code change.
+Capped near ~24 so the drop-a-pin picker stays browsable; `label`/`note` cover the long tail.
+
+**Migration**: although pre-production, the dev database held real `interest` rows, so the migration
+(`b3e7c1a9d240`) **converts `interest` → `position`** (rather than deleting) and recreates the
+`pointtype` enum without `interest` (Postgres has no `DROP VALUE`). The former POI consumers
+(`GET /api/point/pois`, `PointService.get_points_in_range`, the `interest` guards in `tidal_service`
+and `weather_fetch_task`) were removed; proximity queries now live on `Place`
+(`GET /api/place/by-itinerary/<id>/range`). Open items remaining: moderation/dedup/edit-trust for the
+public tier (M7).
 
 ## Inventory & Gear (M6)
 
@@ -426,6 +459,8 @@ This supersedes the M6 plan's "items live in inventory" framing; the plan was up
 | Expedition log auto-generation — Celery dual-trigger | ADR-021 | 2026-05-11 | Requires M8 GPS infrastructure; stub logs for trips without GPS data |
 | Tidal streams as chart diamonds, not a velocity field (supersedes §6 stream-particles); trip-scoped user-created diamonds; rule of thirds for simple entry; BYOK tidal API deferred to roadmap | M4d | 2026-06-18 | §6a; reuses `TidalStation`/`TidalStreamEntry`; radius display-only, user-configurable (~500 m default) |
 | Deprecate `Point.interest`; reintroduce POIs as standalone map annotations (tidal-diamond pattern, own geometry, survive day boundary); `visibility` flag, trip-scoped first → public community gazetteer deferred to M7 | — | 2026-06-20 | Reverses the `interest` point-type decision; public POIs are a new public shape independent of `Itinerary` (cross-ref `trip-lifecycle.md`); scoped in annotation milestone plan |
+| M4e landed: annotation entity is **`Place`** + **`PlaceCategory`** (category an entity, not an enum); `interest` removed from `PointType` (migration converts existing rows → `position`); place markers as a day-independent toggleable layer, drop-a-pin via a top-centre "+ Add" control | — | 2026-06-21 | Resolves the open entity-name/taxonomy items above; POI proximity query moves from `/api/point/pois` to `/api/place/by-itinerary/<id>/range`; public/community tier still deferred to M7 |
+| Admin-only `POST /api/place-categories` to extend the catalogue at runtime (create-only); seed broadened to 23 kayaker-curated categories | — | 2026-06-21 | Bridge tool, not the M7 community feature; reuses existing `admin` flag + `require_admin()`; added safety/comms (lifeboat/first_aid/phone_signal), transport (bus/train), accommodation, beach, etc.; dropped lighthouse (→ OpenSeaMap seamarks), tide_race (→ tidal diamonds), swimming, portage; `placeColor` now uses a `HAZARD_SLUGS` set; new icons render only once added to the frontend `place-icons` map, else fall back to a pin |
 | Inventory & Gear model: items are personal (user-owned, no `inventory_id`); inventories hold `TripRequirement` slots; `contribute` links an `owned` item to a slot; item lifecycle `suggested → owned → assigned`; `contribute` rejects non-`owned` items; item creation requires only auth (decoupled from inventory ownership) | M6 | 2026-06-20 | Supersedes the M6 plan's "items live in inventory" assumption; backend additions: `GET /api/item/all`, `status` in item PATCH whitelist, `owned`-only contribute guard |
 | Inventory authorship & multi-contributor model: each member is sovereign over their own entries. `TripRequirement.proposed_by_member_id` (NOT NULL; defaults/templates → leader) — delete iff you proposed it (no leader override). Contribution becomes a true M2M via a `RequirementContribution(requirement, member, item, checked)` association (unique per member/requirement), replacing the single `covering_item_id` + plain `requirement_contributors` junction; `unclaim` is caller-scoped. `status` becomes **derived** (≥1 contribution = covered), not stored. Member-leave and account deletion cascade proposed requirements + contributions but never the personal `Item`. | M6b | 2026-06-20 | Fixes M6's unenforceable removal (no authorship) and incoherent multi-contributor `unclaim`; deliberate divergence from leader-gated trip/itinerary management — gear coordination is collaborative; cascade removes any need for a leader cleanup escape hatch. Plan: `plans/M6b.md` |
 | Inventory seeding + private personal packing (folded into M6b): (1) a trip's checklist no longer starts empty — `Inventory` is **auto-created at trip creation** and pre-seeded with a leader-owned default requirement set (`DEFAULT_TRIP_REQUIREMENTS` in `Api/seed.py`), retiring the M6 §4 "leader create inventory" button; the leader-authorship default makes the seeded set the leader's to prune. (2) New `gear` item category (paddling kit) added to the seed. (3) New `PersonalPackingItem(trip_member, item, checked)` association — a **private** per-member, per-trip "My kit" list of your own gear-closet items, distinct from group requirements; only the owner reads/writes it (no leader access); cascades on member-leave / account deletion, never the `Item`. | M6b | 2026-06-21 | Driven by user feedback that the original intent was a seeded per-trip requirement set, that the `gear` category was missing, and that personal carried-kit needs tracking separate from collective contributions. `CatalogItem` template entity still deferred (flat hardcoded default list for now). Plan: `plans/M6b.md` |

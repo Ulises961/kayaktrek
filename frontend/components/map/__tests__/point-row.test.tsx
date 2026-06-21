@@ -119,7 +119,6 @@ describe("PointRow — expanded", () => {
     )
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /position/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /interest/i })).toBeInTheDocument()
   })
 
   it("shows the name input field", () => {
