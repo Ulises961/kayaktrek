@@ -14,18 +14,42 @@ DEFAULT_CATEGORIES = [
     {"slug": "food",       "name": "Food"},
 ]
 
-# Map-place categories (the kinds a paddler can drop). `icon` names a marker glyph
-# (Lucide where available); the frontend may refine the mapping in §3.
+# Map-place categories (the kinds a paddler can drop). `icon` is a kebab-case Lucide
+# glyph name; admins can extend this catalogue at runtime via POST /api/place-categories,
+# but a new icon only renders distinctly once it's added to the frontend place-icons map.
 DEFAULT_PLACE_CATEGORIES = [
-    {"slug": "freshwater", "name": "Freshwater",  "icon": "droplet"},
-    {"slug": "food",       "name": "Food",        "icon": "utensils"},
-    {"slug": "campsite",   "name": "Campsite",    "icon": "tent"},
-    {"slug": "slipway",    "name": "Slipway",     "icon": "anchor"},
-    {"slug": "toilet",     "name": "Toilet",      "icon": "toilet"},
-    {"slug": "hazard",     "name": "Hazard",      "icon": "triangle-alert"},
-    {"slug": "viewpoint",  "name": "Viewpoint",   "icon": "eye"},
-    {"slug": "shelter",    "name": "Shelter",     "icon": "house"},
-    {"slug": "other",      "name": "Other",       "icon": "map-pin"},
+    # Water & sustenance
+    {"slug": "freshwater",   "name": "Freshwater",    "icon": "droplet"},
+    {"slug": "food",         "name": "Food",          "icon": "utensils"},
+    {"slug": "shop",         "name": "Shop",          "icon": "store"},
+    {"slug": "fuel",         "name": "Fuel",          "icon": "fuel"},
+    {"slug": "pub",          "name": "Pub",           "icon": "beer"},
+    # Sleep & shelter
+    {"slug": "campsite",     "name": "Campsite",      "icon": "tent"},
+    {"slug": "shelter",      "name": "Shelter",       "icon": "house"},
+    {"slug": "accommodation", "name": "Accommodation", "icon": "bed"},
+    # Launch & land transport
+    {"slug": "slipway",      "name": "Slipway",       "icon": "anchor"},
+    {"slug": "parking",      "name": "Parking",       "icon": "square-parking"},
+    {"slug": "harbour",      "name": "Harbour",       "icon": "sailboat"},
+    {"slug": "bus",          "name": "Bus stop",      "icon": "bus"},
+    {"slug": "train",        "name": "Train station", "icon": "train-front"},
+    # On-water transport
+    {"slug": "ferry",        "name": "Ferry",         "icon": "ship"},
+    # Hazards
+    {"slug": "hazard",       "name": "Hazard",        "icon": "triangle-alert"},
+    # Safety & comms
+    {"slug": "lifeboat",     "name": "Lifeboat / coastguard", "icon": "life-buoy"},
+    {"slug": "first_aid",    "name": "First aid",     "icon": "cross"},
+    {"slug": "phone_signal", "name": "Phone signal",  "icon": "signal"},
+    # Nature & scenery
+    {"slug": "viewpoint",    "name": "Viewpoint",     "icon": "eye"},
+    {"slug": "beach",        "name": "Beach",         "icon": "umbrella"},
+    {"slug": "wildlife",     "name": "Wildlife",      "icon": "bird"},
+    # Facilities
+    {"slug": "toilet",       "name": "Toilet",        "icon": "toilet"},
+    # Catch-all
+    {"slug": "other",        "name": "Other",         "icon": "map-pin"},
 ]
 
 
