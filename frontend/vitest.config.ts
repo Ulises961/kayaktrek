@@ -8,6 +8,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
+    // Headroom for heavier RTL flows (Radix Dialog + React transitions) when the
+    // full suite runs all workers in parallel under CPU contention — the pre-push
+    // hook locally and, especially, 2-core GitHub runners, where an otherwise-fast
+    // test can blow past the default 5s. Generous on purpose: a real hang still
+    // fails, just later, while genuine work no longer flakes.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
   resolve: {
     alias: {
