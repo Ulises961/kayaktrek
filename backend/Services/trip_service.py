@@ -15,7 +15,7 @@ from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.inventory import Inventory
 from Models.trip_requirement import TripRequirement
-from Api.seed import DEFAULT_TRIP_REQUIREMENTS
+from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Models.user import User
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -154,6 +154,8 @@ class TripService:
                     category=spec["category"],
                     proposed_by_member_id=membership.id,
                 ))
+            # Seed the leader's private packing list from their default kit.
+            seed_member_packing(membership)
         db.session.commit()
 
         # Refresh to get relationships
@@ -372,6 +374,9 @@ class TripService:
                 **prefill,
             })
             db.session.add(membership)
+            db.session.flush()  # obtain membership.id before seeding packing
+            # Seed the new crew member's private packing list from their default kit.
+            seed_member_packing(membership)
             logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
         else:
             logger.info(f"User {user_id} declined invitation to trip {trip_id}")
