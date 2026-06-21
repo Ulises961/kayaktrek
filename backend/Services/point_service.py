@@ -4,7 +4,6 @@ Point Service - Business logic for point operations.
 import logging
 from typing import List, cast
 from uuid import UUID
-from geoalchemy2.functions import ST_DWithin, ST_Distance
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
@@ -247,30 +246,3 @@ class PointService:
         logger.info(f"Found {len(points)} points for day {day_id}")
         return points
 
-    @staticmethod
-    def get_points_in_range(range_km: float, longitude: float, latitude: float) -> List[dict]:
-        """
-        Return all INTEREST points within range_km of (longitude, latitude),
-        ordered by ascending distance, with distance_km attached.
-
-        Uses ST_DWithin on the GEOGRAPHY column (metres) with the GiST index,
-        then ST_Distance for the exact geodetic distance in the SELECT list.
-        """
-        center = f'SRID=4326;POINT({longitude} {latitude})'
-        range_m = range_km * 1000
-        distance_col = ST_Distance(Point.geo, center).label('distance_m')
-
-        rows = (
-            db.session.query(Point, distance_col)
-            .filter(Point.type == PointType.INTEREST)
-            .filter(Point.geo.isnot(None))
-            .filter(ST_DWithin(Point.geo, center, range_m))
-            .order_by(distance_col)
-            .limit(100)
-            .all()
-        )
-
-        return [
-            {'point': point, 'distance_km': round(float(distance_m) / 1000, 3)}
-            for point, distance_m in rows
-        ]

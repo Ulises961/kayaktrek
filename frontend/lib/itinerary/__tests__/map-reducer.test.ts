@@ -475,7 +475,7 @@ describe("POINTS_ASSIGN", () => {
 // §4 — BOUNDARIES_APPLY + STATE_REPLACE
 // ---------------------------------------------------------------------------
 
-const makePoint = (id: string, type: "stop" | "position" | "interest" = "position"): Point => ({
+const makePoint = (id: string, type: "stop" | "position" = "position"): Point => ({
   id,
   type,
   latitude: 44,

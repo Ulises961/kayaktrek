@@ -1,13 +1,11 @@
 """
-Pagination tests for GET /api/log/all, GET /api/trip/<user_id>/all,
-and the hard cap on GET /api/point/pois.
+Pagination tests for GET /api/log/all and GET /api/trip/<user_id>/all.
 """
 import json
 import pytest
 
 from Resources.log_resource import LOG_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
-from Resources.point_resource import POINT_ENDPOINT
 
 
 # ---------------------------------------------------------------------------

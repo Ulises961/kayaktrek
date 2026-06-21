@@ -8,9 +8,13 @@ const BASE_PROPS = {
   swellEnabled: true,
   diamondsEnabled: true,
   hasDiamonds: false,
+  placesEnabled: true,
+  hasPlaces: false,
+  showConditions: true,
   onWindToggle: vi.fn(),
   onSwellToggle: vi.fn(),
   onDiamondsToggle: vi.fn(),
+  onPlacesToggle: vi.fn(),
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -87,5 +91,28 @@ describe("LayersControl", () => {
   it("hides the wind speed legend when windEnabled is false", () => {
     render(<LayersControl {...BASE_PROPS} windEnabled={false} />)
     expect(screen.queryByTestId("wind-legend")).not.toBeInTheDocument()
+  })
+
+  it("does not render places-toggle when hasPlaces is false", () => {
+    render(<LayersControl {...BASE_PROPS} hasPlaces={false} />)
+    expect(screen.queryByTestId("places-toggle")).not.toBeInTheDocument()
+  })
+
+  it("renders the places-toggle labelled 'Places' when places exist", () => {
+    render(<LayersControl {...BASE_PROPS} hasPlaces />)
+    expect(screen.getByTestId("places-toggle")).toHaveTextContent("Places")
+  })
+
+  it("calls onPlacesToggle when places-toggle is clicked", () => {
+    render(<LayersControl {...BASE_PROPS} hasPlaces />)
+    fireEvent.click(screen.getByTestId("places-toggle"))
+    expect(BASE_PROPS.onPlacesToggle).toHaveBeenCalledOnce()
+  })
+
+  it("hides wind/swell toggles when showConditions is false but still shows places", () => {
+    render(<LayersControl {...BASE_PROPS} showConditions={false} hasPlaces />)
+    expect(screen.queryByTestId("wind-toggle")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("swell-toggle")).not.toBeInTheDocument()
+    expect(screen.getByTestId("places-toggle")).toBeInTheDocument()
   })
 })

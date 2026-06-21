@@ -34,7 +34,11 @@ async function openToEdit(hasStoredNotes = false) {
   )
   await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
-  await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
+  // Wait for the editing phase to fully settle: the Save button only renders with
+  // the name "Save" once the decrypt transition's isPending clears (it reads
+  // "Saving…" while pending). Waiting on the textbox alone can resolve mid-
+  // transition under load, leaving the button disabled and unmatchable.
+  await waitFor(() => expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument())
 }
 
 describe("MedicalNotesSection — idle state", () => {

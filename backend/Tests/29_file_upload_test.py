@@ -69,7 +69,7 @@ def point(client, auth_headers, itinerary):
         headers=auth_headers,
         json={
             "dayId": itinerary["days"][0]["id"],
-            "type": "interest",
+            "type": "position",
             "latitude": 44.4,
             "longitude": 8.9,
             "notes": "upload test point",

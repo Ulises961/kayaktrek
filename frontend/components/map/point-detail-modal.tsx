@@ -1,6 +1,6 @@
 "use client"
 import { useState, useCallback } from "react"
-import { ChevronLeft, ChevronRight, ImageIcon, Anchor, Star, CircleDot } from "lucide-react"
+import { ChevronLeft, ChevronRight, ImageIcon, Anchor, CircleDot } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { updatePoint } from "@/lib/itinerary/actions"
@@ -14,7 +14,7 @@ type PointDetailModalProps = {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const Icon = type === "stop" ? Anchor : type === "interest" ? Star : CircleDot
+  const Icon = type === "stop" ? Anchor : CircleDot
   return (
     <span className="text-muted-foreground flex items-center gap-1.5 text-[9px] font-bold tracking-widest uppercase">
       <Icon className="size-3" />

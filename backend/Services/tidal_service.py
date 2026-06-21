@@ -11,7 +11,6 @@ from sqlalchemy import cast
 from Api.database import db
 from Models.day import Day
 from Models.itinerary import Itinerary
-from Models.point import PointType
 from Models.sea import Sea
 from Models.tidal_station import TidalStation
 from Models.tidal_stream_entry import TidalStreamEntry
@@ -475,9 +474,6 @@ class TidalService:
         gates = []
 
         for point in points:
-            if point.type == PointType.INTEREST:
-                continue
-
             lat = float(point.latitude) if point.latitude is not None else None
             lon = float(point.longitude) if point.longitude is not None else None
             if lat is None or lon is None:

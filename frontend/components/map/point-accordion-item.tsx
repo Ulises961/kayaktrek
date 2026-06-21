@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Trash2, MapPin } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { POINT_TYPE_META } from "@/lib/itinerary/point-icons"
 import { ImageGallery } from "./image-gallery"
@@ -12,9 +12,6 @@ type PointAccordionItemProps = {
   onToggle: () => void
   onPointChange: (id: string, fields: Partial<Point>) => void
   onDelete: (id: string) => void
-  onFetchPois?: () => Promise<void>
-  poiResults?: Point[]
-  onPoiSelect?: (name: string) => void
 }
 
 export function PointAccordionItem({
@@ -24,13 +21,9 @@ export function PointAccordionItem({
   onToggle,
   onPointChange,
   onDelete,
-  onFetchPois,
-  poiResults = [],
-  onPoiSelect,
 }: PointAccordionItemProps) {
   const [nameVal, setNameVal] = useState(point.name ?? "")
   const [notesVal, setNotesVal] = useState(point.notes ?? "")
-  const [isFetchingPois, setIsFetchingPois] = useState(false)
 
   const { Icon } = POINT_TYPE_META[point.type]
 
@@ -51,13 +44,6 @@ export function PointAccordionItem({
     onPointChange(point.id!, { notes: trimmed || null })
   }
 
-  const handleFetchPois = async () => {
-    if (!onFetchPois) return
-    setIsFetchingPois(true)
-    await onFetchPois()
-    setIsFetchingPois(false)
-  }
-
   return (
     <div className="border-border/40 border-b last:border-b-0">
       <button
@@ -76,7 +62,7 @@ export function PointAccordionItem({
       {isOpen && (
         <div className="space-y-2 pb-2 pl-7">
           <div className="flex gap-1">
-            {(["stop", "position", "interest"] as PointType[]).map((t) => {
+            {(["stop", "position"] as PointType[]).map((t) => {
               const { label, Icon: TIcon } = POINT_TYPE_META[t]
               const active = point.type === t
               return (
@@ -117,35 +103,6 @@ export function PointAccordionItem({
 
           {(point.images?.length ?? 0) > 0 && (
             <ImageGallery images={point.images!} onRemove={() => {}} />
-          )}
-
-          {point.type === "interest" && onFetchPois && (
-            <div className="space-y-1">
-              <button
-                onClick={handleFetchPois}
-                disabled={isFetchingPois}
-                aria-label="Find nearby POIs"
-                className="text-primary flex items-center gap-1 text-[10px] hover:underline disabled:opacity-50"
-              >
-                <MapPin size={10} />
-                {isFetchingPois ? "Searching…" : "Find nearby POIs"}
-              </button>
-
-              {poiResults.length > 0 && (
-                <ul className="space-y-0.5">
-                  {poiResults.map((poi) => (
-                    <li key={poi.id}>
-                      <button
-                        onClick={() => onPoiSelect?.(poi.name ?? "")}
-                        className="text-foreground hover:text-primary w-full truncate text-left text-[10px] hover:underline"
-                      >
-                        {poi.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           )}
 
           <button

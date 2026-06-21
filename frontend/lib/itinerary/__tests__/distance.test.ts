@@ -8,6 +8,7 @@ import {
   estimatedTime,
   formatTime,
   legLabel,
+  routeLegs,
 } from "../distance"
 
 describe("haversineNm", () => {
@@ -107,5 +108,48 @@ describe("legLabel", () => {
 
   it("formats leg label in kilometers", () => {
     expect(legLabel(4.2, 2.5, "km")).toBe("7.8 km · 1h 41min")
+  })
+})
+
+describe("routeLegs", () => {
+  // Points along a meridian (lon 0); each 0.5° latitude step ≈ 30 nm.
+  const at = (lat: number, type: string, id: string) => ({ id, latitude: lat, longitude: 0, type })
+
+  it("aggregates intervening positions into the leg toward the next stop", () => {
+    const legs = routeLegs([at(0, "stop", "a"), at(0.5, "position", "b"), at(1.0, "stop", "c")])
+    const anchors = legs.filter((l) => l.isAnchor)
+    expect(anchors.map((l) => l.point.id)).toEqual(["a", "c"]) // position dropped from anchors
+    expect(anchors[1].legNm).toBeCloseTo(60, 0) // a→c via b, not a single segment
+    expect(anchors[1].cumulativeNm).toBeCloseTo(60, 0)
+  })
+
+  it("marks the day's first point as the start with no leg", () => {
+    const [first] = routeLegs([at(0, "stop", "a"), at(0.5, "stop", "b")])
+    expect(first.isStart).toBe(true)
+    expect(first.legNm).toBe(0)
+  })
+
+  it("treats the first and last points as anchors even when typed position", () => {
+    const legs = routeLegs([at(0, "position", "a"), at(0.5, "position", "b")])
+    expect(legs.every((l) => l.isAnchor)).toBe(true)
+    expect(legs[1].legNm).toBeCloseTo(30, 0)
+  })
+
+  it("reports a position's running distance from the last anchor", () => {
+    const legs = routeLegs([at(0, "stop", "a"), at(0.5, "position", "b"), at(1.0, "position", "c")])
+    const b = legs.find((l) => l.point.id === "b")!
+    const c = legs.find((l) => l.point.id === "c")!
+    expect(b.isAnchor).toBe(false)
+    expect(b.legNm).toBeCloseTo(30, 0)
+    expect(c.legNm).toBeCloseTo(60, 0) // aggregated from stop "a" across "b"
+  })
+
+  it("skips points without coordinates", () => {
+    const legs = routeLegs([
+      at(0, "stop", "a"),
+      { id: "b", latitude: null, longitude: null, type: "position" },
+      at(1.0, "stop", "c"),
+    ])
+    expect(legs.map((l) => l.point.id)).toEqual(["a", "c"])
   })
 })
