@@ -1,33 +1,61 @@
 import bleach
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
+
 from Models.trip_requirement import TripRequirement, RequirementStatusType
+from Models.item import ItemStatusType
 from Schemas.base_schema import BaseSchema
 
 _SANITIZE_FIELDS = ("name", "category")
 
 
+class _ShallowUserSchema(BaseSchema):
+    """Minimal user shape — never leaks credentials or related collections."""
+    id = fields.UUID(dump_only=True)
+    username = fields.String(dump_only=True)
+    name = fields.String(dump_only=True)
+
+
+class _ShallowMemberSchema(BaseSchema):
+    """A TripMember reduced to identity + its user. Deliberately excludes all the
+    member's vessel / emergency / encrypted-medical fields."""
+    id = fields.UUID(dump_only=True)
+    user = fields.Nested(_ShallowUserSchema, dump_only=True)
+
+
+class _ShallowItemSchema(BaseSchema):
+    id = fields.UUID(dump_only=True)
+    name = fields.String(dump_only=True)
+    status = fields.Enum(ItemStatusType, by_value=True, dump_only=True)
+
+
+class _ContributionSchema(BaseSchema):
+    """One member bringing one item to cover the requirement."""
+    id = fields.UUID(dump_only=True)
+    member = fields.Nested(_ShallowMemberSchema, dump_only=True)
+    item = fields.Nested(_ShallowItemSchema, dump_only=True)
+    checked = fields.Boolean(dump_only=True)
+
+
 class TripRequirementSchema(BaseSchema):
-    """Serialises and deserialises TripRequirement entities."""
+    """Serialises and deserialises TripRequirement entities.
+
+    Authorship (`proposed_by_member_id`) and contributions are server-managed: the
+    proposer is stamped in the service from the caller, and contributions are created
+    through the dedicated contribute endpoint. None of those are client-loadable here.
+    """
 
     inventory_id = fields.UUID(load_only=True, required=False, allow_none=True)
     name = fields.String(required=True)
     category = fields.String(allow_none=True, load_default=None)
     catalog_item_id = fields.UUID(allow_none=True, load_default=None)
-    covering_item_id = fields.UUID(allow_none=True, load_default=None)
-    checked = fields.Boolean(load_default=False)
-    status = fields.Enum(
-        RequirementStatusType, by_value=True, load_default=RequirementStatusType.NEEDED
+
+    proposed_by = fields.Nested(_ShallowMemberSchema, dump_only=True)
+    contributions = fields.List(
+        fields.Nested(_ContributionSchema), dump_only=True
     )
-    covering_item = fields.Nested('ItemSchema', dump_only=True, allow_none=True)
-    contributors = fields.List(
-        fields.Nested(
-            'UserSchema',
-            exclude=['pwd', 'trips', 'itineraries', 'inventories', 'items',
-                     'endorsed_logs', 'logs'],
-        ),
-        attribute='contributor_users',
-        dump_only=True,
-        load_default=list,
+    # Derived on the model (covered when ≥1 contribution, else needed) — never stored.
+    status = fields.Enum(
+        RequirementStatusType, by_value=True, dump_only=True
     )
 
     @pre_load

@@ -12,7 +12,6 @@ from Models.trip_member import MemberRoleType
 from Schemas.trip_member_schema import TripMemberSchema
 from uuid import UUID
 from Resources.inventory_resource import INVENTORY_ENDPOINT
-from Resources.item_category_resource import ITEM_CATEGORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
@@ -56,14 +55,19 @@ def app(request):
 
     def teardown():
         _db.session.remove()
-        _db.drop_all()
-        cleanup = create_engine(db_url, poolclass=_NullPool)
-        with cleanup.connect() as conn:
-            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
-            conn.commit()
-        cleanup.dispose()
-        _db.engine.dispose()
-        ctx.pop()
+        # DROP SCHEMA ... CASCADE is the authoritative cleanup, so run it even if
+        # drop_all() fails — otherwise a failed drop_all (e.g. stale tables left by
+        # a different branch's models) strands the schema and corrupts the next run.
+        try:
+            _db.drop_all()
+        finally:
+            cleanup = create_engine(db_url, poolclass=_NullPool)
+            with cleanup.connect() as conn:
+                conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+                conn.commit()
+            cleanup.dispose()
+            _db.engine.dispose()
+            ctx.pop()
 
     request.addfinalizer(teardown)
     return app

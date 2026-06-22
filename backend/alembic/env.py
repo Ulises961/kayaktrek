@@ -43,6 +43,8 @@ from Models.inventory import Inventory                # noqa: F401
 from Models.item import Item                          # noqa: F401
 from Models.item_category import ItemCategory         # noqa: F401
 from Models.trip_requirement import TripRequirement   # noqa: F401
+from Models.requirement_contribution import RequirementContribution  # noqa: F401
+from Models.personal_packing_item import PersonalPackingItem  # noqa: F401
 from Models.log import Log                            # noqa: F401
 from Models.image import Image                        # noqa: F401
 from Models.sea import Sea                            # noqa: F401

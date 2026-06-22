@@ -143,6 +143,8 @@ def remove_requirement(id: str, req_id: str):
         return jsonify({"message": "Requirement removed"}), HTTPStatus.OK
     except HTTPException:
         raise
+    except PermissionError as e:
+        abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Requirement {req_id} not found")
     except Exception as e:

@@ -13,6 +13,9 @@ from uuid import UUID
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
+from Models.inventory import Inventory
+from Models.trip_requirement import TripRequirement
+from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Models.user import User
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -83,7 +86,7 @@ class TripService:
             )
         )
         total = query.count()
-        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        items = query.order_by(Trip.created.desc(), Trip.id).offset((page - 1) * per_page).limit(per_page).all()
         pages = math.ceil(total / per_page) if total > 0 else 1
         logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page})")
         return {"items": items, "total": total, "page": page, "pages": pages}
@@ -112,6 +115,7 @@ class TripService:
         db.session.flush()  # obtain trip.id before creating membership
 
         # Add the creator as leader, snapshotting their profile vessel/emergency defaults
+        membership = None
         if current_user:
             prefill = {}
             for field in (
@@ -131,6 +135,27 @@ class TripService:
                 **prefill,
             })
             db.session.add(membership)
+            db.session.flush()  # obtain membership.id before seeding requirements
+
+        # Every trip owns exactly one inventory, pre-populated with a leader-owned
+        # default requirement set so the gear checklist never starts empty. The trip
+        # payload may already carry a nested inventory (TripSchema builds one); reuse
+        # it rather than creating a second — Inventory.trip_id is unique.
+        inventory = trip.inventory
+        if inventory is None:
+            inventory = Inventory(trip_id=trip.id)
+            db.session.add(inventory)
+        db.session.flush()  # obtain inventory.id before seeding requirements
+        if membership:
+            for spec in DEFAULT_TRIP_REQUIREMENTS:
+                db.session.add(TripRequirement(
+                    inventory_id=inventory.id,
+                    name=spec["name"],
+                    category=spec["category"],
+                    proposed_by_member_id=membership.id,
+                ))
+            # Seed the leader's private packing list from their default kit.
+            seed_member_packing(membership)
         db.session.commit()
 
         # Refresh to get relationships
@@ -349,6 +374,9 @@ class TripService:
                 **prefill,
             })
             db.session.add(membership)
+            db.session.flush()  # obtain membership.id before seeding packing
+            # Seed the new crew member's private packing list from their default kit.
+            seed_member_packing(membership)
             logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
         else:
             logger.info(f"User {user_id} declined invitation to trip {trip_id}")

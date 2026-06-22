@@ -24,4 +24,9 @@ class Item(BaseModel):
         Enum(ItemStatusType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=True,
     )
+    # Should this gear be auto-suggested onto a trip's private packing list when the
+    # user joins? Distinct axis from `status` (own vs. suggest, a user-level fact):
+    # this is trip-packing intent. The default kit (DEFAULT_PERSONAL_KIT) is seeded
+    # True; custom user items default to NULL/False and the user opts in per item.
+    default_pack: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey('users.id', ondelete="CASCADE"), nullable=False, index=True)

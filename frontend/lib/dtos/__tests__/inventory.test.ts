@@ -26,16 +26,26 @@ const ITEM_FIXTURE = {
   category: CATEGORY_FIXTURE,
 }
 
+const MEMBER_FIXTURE = {
+  id: "01952f1a-0000-7000-8000-000000000f01",
+  user: { id: USER_ID, username: "paddler", name: "Pat" },
+}
+
 const REQUIREMENT_FIXTURE = {
   id: REQ_ID,
   name: "Bilge pump",
   category: "safety",
   catalogItemId: null,
-  coveringItemId: ITEM_ID,
-  coveringItem: ITEM_FIXTURE,
-  checked: false,
+  proposedBy: MEMBER_FIXTURE,
   status: "covered",
-  contributors: [{ id: USER_ID, username: "paddler", name: "Pat" }],
+  contributions: [
+    {
+      id: "01952f1a-0000-7000-8000-000000000c99",
+      member: MEMBER_FIXTURE,
+      item: { id: ITEM_ID, name: "Bilge pump", status: "owned" },
+      checked: false,
+    },
+  ],
 }
 
 const INVENTORY_FIXTURE = {
@@ -97,21 +107,22 @@ describe("ItemSchema", () => {
 })
 
 describe("TripRequirementSchema", () => {
-  it("parses a covered requirement with its covering item and contributors", () => {
+  it("parses a covered requirement with its proposer and contributions", () => {
     const result = TripRequirementSchema.safeParse(REQUIREMENT_FIXTURE)
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.status).toBe("covered")
-      expect(result.data.coveringItem?.name).toBe("Bilge pump")
-      expect(result.data.contributors).toHaveLength(1)
+      expect(result.data.proposedBy?.user?.username).toBe("paddler")
+      expect(result.data.contributions).toHaveLength(1)
+      expect(result.data.contributions?.[0].item?.name).toBe("Bilge pump")
+      expect(result.data.contributions?.[0].member?.user?.name).toBe("Pat")
     }
   })
 
-  it("parses a needed requirement with no covering item", () => {
+  it("parses a needed requirement with no contributions", () => {
     const result = TripRequirementSchema.safeParse({
       id: REQ_ID,
       name: "Tow line",
-      checked: false,
       status: "needed",
     })
     expect(result.success).toBe(true)
