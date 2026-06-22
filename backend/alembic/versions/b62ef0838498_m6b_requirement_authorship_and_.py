@@ -11,6 +11,8 @@ Create Date: 2026-06-21 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
+from uuid_extension import uuid7
 
 
 # revision identifiers, used by Alembic.
@@ -105,12 +107,11 @@ def upgrade() -> None:
     # 4. Backfill contributions from the old single covering_item_id. The member is
     #    the covering item's owner; rows where that owner is no longer a trip member
     #    are dropped (the cover is simply lost — derived status handles it).
-    op.execute(
+    # UUID v7 is generated in Python (PostgreSQL has no built-in v7 generator).
+    conn = op.get_bind()
+    rows = conn.execute(text(
         """
-        INSERT INTO requirement_contribution
-            (id, created, updated, requirement_id, trip_member_id, item_id, checked)
-        SELECT gen_random_uuid(), now(), now(), tr.id, tm.id, tr.covering_item_id,
-               COALESCE(tr.checked, false)
+        SELECT tr.id, tm.id, tr.covering_item_id, COALESCE(tr.checked, false)
         FROM trip_requirement AS tr
         JOIN item AS it ON it.id = tr.covering_item_id
         JOIN inventory AS inv ON inv.id = tr.inventory_id
@@ -118,7 +119,16 @@ def upgrade() -> None:
           ON tm.trip_id = inv.trip_id AND tm.user_id = it.user_id
         WHERE tr.covering_item_id IS NOT NULL
         """
-    )
+    )).fetchall()
+    for req_id, member_id, item_id, checked in rows:
+        conn.execute(text(
+            """
+            INSERT INTO requirement_contribution
+                (id, created, updated, requirement_id, trip_member_id, item_id, checked)
+            VALUES (:id, now(), now(), :req_id, :member_id, :item_id, :checked)
+            """
+        ), {"id": str(uuid7()), "req_id": str(req_id), "member_id": str(member_id),
+            "item_id": str(item_id), "checked": checked})
 
     # 5. Enforce authorship + wire the FK/index.
     op.alter_column('trip_requirement', 'proposed_by_member_id', nullable=False)
@@ -145,16 +155,17 @@ def upgrade() -> None:
     # 8. Invariant: every trip has exactly one inventory. Backfill an empty one for
     #    any pre-existing trip that lacks it (no requirements injected retroactively —
     #    only new trips get the seeded default set, via trip_service).
-    op.execute(
+    # UUID v7 is generated in Python (PostgreSQL has no built-in v7 generator).
+    trip_ids = conn.execute(text(
         """
-        INSERT INTO inventory (id, created, updated, trip_id)
-        SELECT gen_random_uuid(), now(), now(), t.id
-        FROM trip AS t
-        WHERE NOT EXISTS (
-            SELECT 1 FROM inventory AS i WHERE i.trip_id = t.id
-        )
+        SELECT t.id FROM trip AS t
+        WHERE NOT EXISTS (SELECT 1 FROM inventory AS i WHERE i.trip_id = t.id)
         """
-    )
+    )).fetchall()
+    for (trip_id,) in trip_ids:
+        conn.execute(text(
+            "INSERT INTO inventory (id, created, updated, trip_id) VALUES (:id, now(), now(), :trip_id)"
+        ), {"id": str(uuid7()), "trip_id": str(trip_id)})
 
 
 def downgrade() -> None:
