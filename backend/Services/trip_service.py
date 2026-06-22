@@ -86,7 +86,7 @@ class TripService:
             )
         )
         total = query.count()
-        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        items = query.order_by(Trip.created.desc(), Trip.id).offset((page - 1) * per_page).limit(per_page).all()
         pages = math.ceil(total / per_page) if total > 0 else 1
         logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page})")
         return {"items": items, "total": total, "page": page, "pages": pages}
