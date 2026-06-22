@@ -62,22 +62,31 @@ jobs:
           DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5435/kayak_e2e
         run: uv run alembic upgrade head
 
+      # Runs under gunicorn (not `flask run`) so the backend serves requests
+      # concurrently, mirroring production (entrypoint.sh). The trip-detail Server
+      # Component fans out ~7 backend calls per render; the single-threaded Werkzeug
+      # dev server served them serially, racing the e2e assertion timeouts. See
+      # ADR-030 in docs/adr/foundation.md.
       - name: Start backend
         working-directory: backend
         env:
-          FLASK_APP: wsgi:app
           CONFIG_MODE: testing
           DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5435/kayak_e2e
           SECRET_KEY: ci-secret-key-not-used-in-prod
           JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
           FRONTEND_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
-          RATELIMIT_STORAGE_URI: memory:// 
+          RATELIMIT_STORAGE_URI: memory://
         run: |
           fuser -k "${CI_BACKEND_PORT}/tcp" 2>/dev/null || true
-          setsid nohup uv run flask run --host=0.0.0.0 --port=${{ env.CI_BACKEND_PORT }} > /tmp/flask.log 2>&1 &
-          FLASK_PID=$!
+          setsid nohup uv run gunicorn \
+            --bind 0.0.0.0:${{ env.CI_BACKEND_PORT }} \
+            --workers 2 --threads 4 \
+            --timeout 120 \
+            --access-logfile - --error-logfile - \
+            wsgi:app > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
           sleep 3
-          kill -0 $FLASK_PID 2>/dev/null || { cat /tmp/flask.log; exit 1; }
+          kill -0 $BACKEND_PID 2>/dev/null || { cat /tmp/backend.log; exit 1; }
 
       # --- Frontend ---
       - name: Set up pnpm
