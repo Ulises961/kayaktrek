@@ -15,6 +15,12 @@ if (!Element.prototype.scrollTo) {
   Element.prototype.scrollTo = () => {}
 }
 
+// jsdom does not implement Element.scrollIntoView. The point-list-pane calls it
+// inside a requestAnimationFrame to scroll the new boundary handle into view.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+
 // jsdom does not implement ResizeObserver. The map's ResizeHandler observes its
 // container to call Leaflet's invalidateSize() when the side panels resize it.
 if (typeof globalThis.ResizeObserver === "undefined") {
