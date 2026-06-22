@@ -1,6 +1,8 @@
 """
 Seed helpers — idempotent inserts run once at app startup.
 """
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from Api.database import db
 from Models.item_category import ItemCategory
 from Models.item import Item, ItemStatusType
@@ -135,16 +137,19 @@ DEFAULT_PLACE_CATEGORIES = [
 
 
 def seed_item_categories() -> None:
-    """Insert the default item categories if they don't already exist."""
-    existing_slugs = {row.slug for row in db.session.query(ItemCategory.slug).all()}
-    new_categories = [
-        ItemCategory(slug=c["slug"], name=c["name"])
-        for c in DEFAULT_CATEGORIES
-        if c["slug"] not in existing_slugs
-    ]
-    if new_categories:
-        db.session.add_all(new_categories)
-        db.session.commit()
+    """Insert the default item categories if they don't already exist.
+
+    Uses an atomic ON CONFLICT DO NOTHING upsert so that concurrent startups
+    (backend, worker and migrate containers all call createApp at once) never
+    race on the check-then-insert and crash on a UniqueViolation.
+    """
+    stmt = (
+        pg_insert(ItemCategory)
+        .values(DEFAULT_CATEGORIES)
+        .on_conflict_do_nothing(index_elements=["slug"])
+    )
+    db.session.execute(stmt)
+    db.session.commit()
 
 
 def seed_member_packing(member) -> None:
@@ -201,13 +206,15 @@ def seed_member_packing(member) -> None:
             already_listed.add(item.id)
             
 def seed_place_categories() -> None:
-    """Insert the default map-place categories if they don't already exist."""
-    existing_slugs = {row.slug for row in db.session.query(PlaceCategory.slug).all()}
-    new_categories = [
-        PlaceCategory(slug=c["slug"], name=c["name"], icon=c["icon"])
-        for c in DEFAULT_PLACE_CATEGORIES
-        if c["slug"] not in existing_slugs
-    ]
-    if new_categories:
-        db.session.add_all(new_categories)
-        db.session.commit()
+    """Insert the default map-place categories if they don't already exist.
+
+    Atomic ON CONFLICT DO NOTHING upsert — concurrency-safe across simultaneous
+    container startups (see seed_item_categories).
+    """
+    stmt = (
+        pg_insert(PlaceCategory)
+        .values(DEFAULT_PLACE_CATEGORIES)
+        .on_conflict_do_nothing(index_elements=["slug"])
+    )
+    db.session.execute(stmt)
+    db.session.commit()
