@@ -142,7 +142,6 @@ export function TripDetailTabs({
         <ItemsTab
           tripId={tripId}
           inventory={trip.inventory}
-          isLeader={isLeader}
           isMember={isMember}
           myItems={myItems}
           packingItems={packingItems}

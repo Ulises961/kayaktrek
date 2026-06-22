@@ -10,7 +10,6 @@ import { PersonalPacking } from "@/components/inventory/personal-packing"
 interface ItemsTabProps {
   tripId: string
   inventory?: Inventory | null
-  isLeader: boolean
   isMember?: boolean
   myItems?: Item[]
   packingItems?: PersonalPackingItem[]

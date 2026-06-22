@@ -67,10 +67,14 @@ def update_packing(id: str):
         checked = body.get("checked")
         if checked is None:
             abort(HTTPStatus.BAD_REQUEST, description="checked is required")
-        entry = PersonalPackingService.set_checked(id, bool(checked))
+        if not isinstance(checked, bool):
+            abort(HTTPStatus.BAD_REQUEST, description="checked must be a boolean")
+        entry = PersonalPackingService.set_checked(id, checked)
         return jsonify(PersonalPackingItemSchema().dump(entry)), HTTPStatus.OK
     except HTTPException:
         raise
+    except PermissionError as e:
+        abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except Exception as e:

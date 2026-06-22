@@ -49,6 +49,18 @@ def test_trip_create_seeds_leader_packing(client, auth_headers, trip_with_crew):
     assert "PFD (buoyancy aid)" in {e['item']['name'] for e in data}
 
 
+def test_invitation_accept_seeds_crew_packing(client, trip_with_user2_as_crew):
+    """Accepting an invitation seeds the new member's private packing list."""
+    trip_id = trip_with_user2_as_crew['trip']['id']
+    crew_headers = trip_with_user2_as_crew['crew_headers']
+
+    resp = client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=crew_headers)
+    assert resp.status_code == 200
+    data = json.loads(resp.data)
+    assert len(data) >= 10, "crew member should receive a seeded default kit on join"
+    assert "PFD (buoyancy aid)" in {e['item']['name'] for e in data}
+
+
 # ---------------------------------------------------------------------------
 # Add / toggle / remove (own entries)
 # ---------------------------------------------------------------------------

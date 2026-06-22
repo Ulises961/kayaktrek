@@ -38,14 +38,14 @@ const INVENTORY: Inventory = {
 
 describe("ItemsTab", () => {
   it("renders the inventory's requirements (every trip auto-creates one)", () => {
-    render(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} />)
+    render(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} />)
     expect(screen.getByTestId("checklist")).toBeTruthy()
     expect(screen.getByText("Tow line")).toBeTruthy()
     expect(screen.getByText("Bilge pump")).toBeTruthy()
   })
 
   it("shows a fallback message (and no create button) when the inventory is missing", () => {
-    render(<ItemsTab tripId={TRIP_ID} inventory={null} isLeader={true} />)
+    render(<ItemsTab tripId={TRIP_ID} inventory={null} />)
     expect(screen.queryByTestId("checklist")).toBeNull()
     expect(screen.queryByRole("button", { name: /create trip inventory/i })).toBeNull()
     expect(screen.getByText(/inventory isn.t available yet/i)).toBeTruthy()
@@ -53,12 +53,17 @@ describe("ItemsTab", () => {
 
   it("renders the private 'My kit' section only for members", () => {
     const { rerender } = render(
-      <ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} isMember={false} />,
+      <ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isMember={false} />,
     )
     expect(screen.queryByTestId("personal-packing")).toBeNull()
 
-    rerender(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isLeader={false} isMember={true} />)
+    rerender(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} isMember={true} />)
     expect(screen.getByTestId("personal-packing")).toBeTruthy()
     expect(screen.getByText("My kit")).toBeTruthy()
+  })
+
+  it("renders without crashing when currentUserId is undefined (unauthenticated / public view)", () => {
+    render(<ItemsTab tripId={TRIP_ID} inventory={INVENTORY} currentUserId={undefined} />)
+    expect(screen.getByTestId("checklist")).toBeTruthy()
   })
 })

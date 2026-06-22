@@ -45,6 +45,7 @@ class TripRequirement(BaseModel):
         "RequirementContribution",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        lazy="subquery",
     )
 
     @property
