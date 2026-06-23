@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip, apiInviteByEmail, apiAcceptInvitation } from "../fixtures/trips"
+import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Logistics — shore contact and float plan", () => {
   let tripId: string
@@ -68,7 +69,7 @@ test.describe("Logistics — travel documents", () => {
     await page.getByRole("button", { name: /add document/i }).click()
     await page.getByLabel(/name/i).fill("Camping Permit")
     await page.getByLabel(/type/i).selectOption("permit")
-    await page.getByRole("button", { name: /^add$/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /^add$/i }).click())
 
     await expect(page.getByText("Camping Permit")).toBeVisible()
   })
@@ -103,7 +104,7 @@ test.describe("Logistics — shuttle vehicle", () => {
     await page.getByLabel(/vehicle description/i).fill("Toyota Land Cruiser")
     // Select crew member as driver from the unlabeled select inside the dialog
     await page.getByRole("dialog").locator("select").selectOption({ label: CREW.name })
-    await page.getByRole("button", { name: /^add$/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /^add$/i }).click())
 
     await expect(page.getByText("Toyota Land Cruiser")).toBeVisible()
     await expect(page.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name).first()).toBeVisible()
@@ -116,7 +117,7 @@ test.describe("Logistics — shuttle vehicle", () => {
     await page.getByRole("button", { name: /shuttle/i }).click()
     await page.getByRole("button", { name: /add vehicle/i }).click()
     await page.getByLabel(/vehicle description/i).fill("Toyota Land Cruiser")
-    await page.getByRole("button", { name: /^add$/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /^add$/i }).click())
     await expect(page.getByText("Toyota Land Cruiser")).toBeVisible()
 
     // Crew member joins the vehicle
@@ -125,7 +126,7 @@ test.describe("Logistics — shuttle vehicle", () => {
     await crewPage.goto(`/trips/${tripId}`)
     await crewPage.getByRole("tab", { name: /logistics/i }).click()
     await crewPage.getByRole("button", { name: /shuttle/i }).click()
-    await crewPage.getByRole("button", { name: /join/i }).click()
+    await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /join/i }).click())
     await expect(crewPage.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name)).toBeVisible()
     await crewContext.close()
 

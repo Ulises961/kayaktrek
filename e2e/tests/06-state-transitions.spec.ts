@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
+import { mutateAndSettle } from "../fixtures/ui"
 import { API_URL } from "../playwright.config"
 
 // NOTE: This spec requires the frontend advance-state-button.tsx to be updated
@@ -26,7 +27,7 @@ test.describe("Trip state transitions", () => {
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("button", { name: /begin expedition/i }).click()
     // Confirmation dialog
-    await page.getByRole("button", { name: /confirm/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click())
     // "Mark as past" appearing is the end-state signal: state is now "happening" AND RSC has re-rendered
     await expect(page.getByRole("button", { name: /mark as past/i })).toBeVisible()
   })
@@ -44,7 +45,7 @@ test.describe("Trip state transitions", () => {
 
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("button", { name: /mark as past/i }).click()
-    await page.getByRole("button", { name: /confirm/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click())
     await expect(page.locator('[data-slot="state-badge"]').filter({ hasText: /past/i })).toBeVisible()
   })
 

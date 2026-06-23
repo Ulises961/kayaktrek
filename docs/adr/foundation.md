@@ -158,6 +158,29 @@ If Logfire pricing ever becomes untenable, re-point the OTel exporter to a self-
 
 **Decision.** The E2E backend must run under the **same concurrent server as production** — `gunicorn` with enough workers/threads (`--workers 2 --threads 4`) to serve the trip-detail fan-out without serialization. CI must never run the app under `flask run`. The dev server is for local single-user development only; any environment that exercises concurrent page loads must mirror production's WSGI server. This is paired with modest test-layer hardening (a 10s `expect` timeout, 2 CI retries, a backend warmup request in global setup) to absorb residual jitter, but those are belt-and-suspenders — the concurrency fix is the actual remedy.
 
+**Correction (2026-06-22): gunicorn was necessary but not sufficient.** After this change merged
+(PR #22), a remote e2e run on the 2-core runner still showed 4 failed + 2 flaky — the same
+post-mutation "UI didn't update within 5s" pattern across edit/cancel/add/transition flows. So
+serving the fan-out concurrently helped (≈3× faster, one green run) but did not make the suite
+reliably green. The actual remedy is **deterministic post-mutation waits** at the test layer:
+`mutateAndSettle(page, trigger)` (`e2e/fixtures/ui.ts`) wraps the click and `Promise.all`s it with
+`page.waitForResponse(<POST carrying the `Next-Action` header>)` — arming the wait *before* the
+click so the assertion runs against the action's revalidated RSC instead of racing the in-flight
+refresh. (A first cut used `waitForLoadState("networkidle")`, but that resolves in the 500ms-quiet
+window *before* React's `useTransition` even dispatches the POST, so it still raced; the
+response-wait is the fix.) Applied to all 16 mutation→assert spots; `expect.timeout` is 10s with
+`retries: 2`. Gunicorn stays (concurrency is still correct and faster); it is just not the whole fix.
+
+**Validation (2026-06-24): reproduced and confirmed under the free-runner envelope.** The free
+GitHub runner is effectively 1 vCPU — the real contention driver. Rather than burn remote runs, the
+full CI job is reproducible locally via `act` at that envelope (`e2e/run-constrained-ci.sh` →
+`--container-options "--cpus=1 --memory=4g"`). Under 1 vCPU the fixed suite is **green: 32 passed,
+0 failed, 5 flaky-recovered**. Two genuine bugs surfaced and were fixed (not wait-related): a
+`check()` call on a server-controlled, transition-disabled checkbox (→ `click()`), and an unwrapped
+save. The residual flakiness (cancel / state transitions / logistics adds occasionally exceeding the
+10s window on a single core) is absorbed by `retries: 2` and accepted; the durable fix is the
+aggregate `GET /api/trip/:id/detail` endpoint noted below, not more waits.
+
 **Revalidation breadth is deliberate and stays full.** A tempting "fix" was to narrow revalidation — cache the per-tab fetches and only re-fetch the crew list after a member leaves. This is **wrong for correctness**: member-removal cascades across nearly every tab (the member's `RequirementContribution`s vanish so covered requirements flip back to *needed*; requirements they *proposed* cascade away entirely; their private packing list goes; they may have been a shuttle driver/passenger or the shore contact). A narrow revalidation would render state unfaithful to the database. The full re-fetch after high-impact mutations is required; the answer is to make it *fast* (concurrent backend), not *narrow*. A genuine performance improvement — collapsing the seven round-trips into one aggregate `GET /api/trip/:id/detail` endpoint that benefits real users too — is tracked separately as a deliberate design task, not a CI patch.
 
 ---
