@@ -451,6 +451,47 @@ personal-gear model.) `user_id` is stamped from the auth context in `ItemSchema`
 
 This supersedes the M6 plan's "items live in inventory" framing; the plan was updated to match.
 
+## Community safety data — what the app will NOT crowdsource (M7)
+
+When M7 ("Logs, Profile & Community") was scoped (2026-06-22), two features that earlier ADRs had
+*deferred to M7* — a public community gazetteer of `Place` POIs and a peer-endorsed shared atlas of
+community tidal-stream diamonds — were re-evaluated against liability and moderation cost, and
+**removed or deferred unscheduled**. This supersedes the "deferred to M7" framing in the Map
+Annotations section above and in `trip-lifecycle.md`'s second-public-shape note.
+
+**Community tidal-stream diamonds — DROPPED, not deferred.** Tidal-stream data is life-safety data: a
+wrong rate or direction at a tidal race is a drowning, not an inconvenience. The decisive point is not
+that a moderation/trust system is hard to build — it is that **applying an endorsement/publish gate
+turns the app from a neutral conduit into a publisher that *vouched* for third-party safety data**,
+which is precisely what manufactures a duty of care and legal exposure. Building the trust system is
+what *creates* the liability. User-created diamonds therefore stay **trip-private** (M4d status quo).
+The only sanctioned path to automated tidal data is the roadmap's **BYOK** model — the user fetches
+under their *own* licence from an authoritative source; the app never publishes or vouches. This is a
+deliberate, recorded refusal so it cannot quietly creep back into a later milestone.
+
+**Public community gazetteer of Places — DEFERRED, unscheduled.** Lower stakes (a wrong campsite is an
+inconvenience), but it still needs a community and a trust answer that does not exist, and would impose
+a standing moderation queue on a solo operator. If it ever ships, the model is **report-and-takedown,
+never endorsement-to-publish**: contributions auto-publish, attributed; users flag; the operator
+removes on report — the app never *endorses* a contribution. Places stay **trip-private** (M4e status
+quo) until real traffic justifies otherwise. Net effect: the "moderation/trust substrate" is not built;
+nothing in shipped M7 (M7a–M7c) needs it.
+
+**Log endorsement — same-trip mutual attestation.** Log endorsement (M7a) is the *only* surviving
+endorsement surface, and it is **relational verification of a shared experience**, not a social "like."
+A user may endorse a log only if they shared the **exact trip the log documents** with its author —
+both (have) held a `TripMember` for that trip, and self-endorsement is blocked. This is two-way
+validation: the endorser corroborates the author's record, and the log corroborates the endorser's
+presence. It requires `Log.trip_id` (added in M7a; populated by M8 auto-generation); a standalone log
+with no trip is non-endorsable. The today-open `endorse_log` (any user, any log, self included) is
+tightened to this rule in M7a.
+
+**Safety disclaimer (pre-production).** The app already surfaces planning-grade safety data (tidal-gate
+warnings, weather, rule-of-12s). A "planning aid only — not a substitute for official charts, tide
+tables, and sound seamanship" disclaimer must appear **both in the app UI** (where safety data is
+shown) **and in the Terms of Use** (the TOU is what limits liability; the banner alone does not).
+Tracked on the `CLAUDE.md` Production Readiness checklist and ROADMAP Privacy & Legal.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -464,3 +505,4 @@ This supersedes the M6 plan's "items live in inventory" framing; the plan was up
 | Inventory & Gear model: items are personal (user-owned, no `inventory_id`); inventories hold `TripRequirement` slots; `contribute` links an `owned` item to a slot; item lifecycle `suggested → owned → assigned`; `contribute` rejects non-`owned` items; item creation requires only auth (decoupled from inventory ownership) | M6 | 2026-06-20 | Supersedes the M6 plan's "items live in inventory" assumption; backend additions: `GET /api/item/all`, `status` in item PATCH whitelist, `owned`-only contribute guard |
 | Inventory authorship & multi-contributor model: each member is sovereign over their own entries. `TripRequirement.proposed_by_member_id` (NOT NULL; defaults/templates → leader) — delete iff you proposed it (no leader override). Contribution becomes a true M2M via a `RequirementContribution(requirement, member, item, checked)` association (unique per member/requirement), replacing the single `covering_item_id` + plain `requirement_contributors` junction; `unclaim` is caller-scoped. `status` becomes **derived** (≥1 contribution = covered), not stored. Member-leave and account deletion cascade proposed requirements + contributions but never the personal `Item`. | M6b | 2026-06-20 | Fixes M6's unenforceable removal (no authorship) and incoherent multi-contributor `unclaim`; deliberate divergence from leader-gated trip/itinerary management — gear coordination is collaborative; cascade removes any need for a leader cleanup escape hatch. Plan: `plans/M6b.md` |
 | Inventory seeding + private personal packing (folded into M6b): (1) a trip's checklist no longer starts empty — `Inventory` is **auto-created at trip creation** and pre-seeded with a leader-owned default requirement set (`DEFAULT_TRIP_REQUIREMENTS` in `Api/seed.py`), retiring the M6 §4 "leader create inventory" button; the leader-authorship default makes the seeded set the leader's to prune. (2) New `gear` item category (paddling kit) added to the seed. (3) New `PersonalPackingItem(trip_member, item, checked)` association — a **private** per-member, per-trip "My kit" list of your own gear-closet items, distinct from group requirements; only the owner reads/writes it (no leader access); cascades on member-leave / account deletion, never the `Item`. | M6b | 2026-06-21 | Driven by user feedback that the original intent was a seeded per-trip requirement set, that the `gear` category was missing, and that personal carried-kit needs tracking separate from collective contributions. `CatalogItem` template entity still deferred (flat hardcoded default list for now). Plan: `plans/M6b.md` |
+| M7 carve-up + no crowdsourced safety data: M7 splits into **M7a (logs/stats/profile) → M7b (route discovery) → M7c (trip narrative)**. **Community tidal diamonds DROPPED** (publishing/vouching for crowdsourced life-safety tidal data manufactures duty-of-care liability; BYOK is the only sanctioned automation path; diamonds stay trip-private). **Public Place gazetteer DEFERRED unscheduled** (report-and-takedown only if ever built, never endorsement-to-publish; Places stay trip-private). Log endorsement is the only endorsement surface: **same-trip mutual attestation** — endorse only a log of the *exact trip you shared* with the author, self-endorse blocked; requires `Log.trip_id`. Safety-disclaimer required in both app UI and Terms of Use. | M7 | 2026-06-22 | Supersedes the "deferred to M7" framing on public Places/diamonds in this doc's Map Annotations section and in `trip-lifecycle.md`; no moderation/trust substrate is built. Plan: `plans/M7.md` |
