@@ -97,9 +97,11 @@ test.describe("Trip inventory — requirements & authorship", () => {
     // Proposer (leader) removes it. Removal goes through a window.confirm().
     page.on("dialog", (d) => d.accept())
     await page.goto(`/trips/${tripId}?tab=items`)
-    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click(), {
-      refresh: true,
-    })
+    // NB: POST-only (no `refresh: true`). The revalidated RSC in the action POST
+    // already reflects the removal. Awaiting the trailing router.refresh() refetch
+    // instead races the inventory GET, which re-seeds the removed *default*
+    // requirement ("VHF radio") — so it reappears and the assertion flaps.
+    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click())
     await expect(page.locator("li").filter({ hasText: REQ })).toHaveCount(0)
   })
 
