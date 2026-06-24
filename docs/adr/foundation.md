@@ -179,7 +179,21 @@ full CI job is reproducible locally via `act` at that envelope (`e2e/run-constra
 `check()` call on a server-controlled, transition-disabled checkbox (→ `click()`), and an unwrapped
 save. The residual flakiness (cancel / state transitions / logistics adds occasionally exceeding the
 10s window on a single core) is absorbed by `retries: 2` and accepted; the durable fix is the
-aggregate `GET /api/trip/:id/detail` endpoint noted below, not more waits.
+trip-detail tab → route-segment refactor noted below, not more waits.
+
+**Final decision (2026-06-25): E2E is officially demoted to a LOCAL-ONLY gate.** The post-mutation
+fixes are sound — the same `act` repro that was green at 1 vCPU shows the failures are now pure
+*runner variance*: the free GitHub runner's wall-time for the identical suite swung from ~5 min to
+**13.5 min**, and under that 3× slowdown two flaky-class specs (`02` edit, `03` cancel) simply
+exhaust `retries: 2` while everything else flakes. A check whose red/green is governed by the
+runner's mood, not the diff, is not a useful required gate. So `e2e-ci.yml` drops its `push` /
+`pull_request` triggers (now `workflow_dispatch`-only — it never runs on the PR path) and the suite
+becomes an internal pre-commit/pre-merge gate run locally via `e2e/run-constrained-ci.sh` (act runs
+this exact workflow). We **keep and extend** the suite; we just stop letting an unreliable remote
+runner block merges on it. The durable cure that would let it return as a remote gate is the
+trip-detail tab → route-segment refactor (lighter per-tab loads → insensitive to runner speed);
+the aggregate-endpoint idea is parked in favour of that. Tracked in `plans/e2e-hardening.md` and
+the `trip-detail-tabs-direction` memory.
 
 **Revalidation breadth is deliberate and stays full.** A tempting "fix" was to narrow revalidation — cache the per-tab fetches and only re-fetch the crew list after a member leaves. This is **wrong for correctness**: member-removal cascades across nearly every tab (the member's `RequirementContribution`s vanish so covered requirements flip back to *needed*; requirements they *proposed* cascade away entirely; their private packing list goes; they may have been a shuttle driver/passenger or the shore contact). A narrow revalidation would render state unfaithful to the database. The full re-fetch after high-impact mutations is required; the answer is to make it *fast* (concurrent backend), not *narrow*. A genuine performance improvement — collapsing the seven round-trips into one aggregate `GET /api/trip/:id/detail` endpoint that benefits real users too — is tracked separately as a deliberate design task, not a CI patch.
 
