@@ -30,7 +30,9 @@ test.describe("Member removal", () => {
     // Leader removes crew via UI
     await page.getByText(CREW.name).hover()
     await page.getByRole("button", { name: /remove/i }).click()
-    await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click())
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
+      refresh: true,
+    })
     await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible()
 
     // Crew: attempt to navigate to the trip — should get 403 or redirect

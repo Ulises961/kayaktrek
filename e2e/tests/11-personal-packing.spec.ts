@@ -37,8 +37,10 @@ test.describe("Personal packing — private kit", () => {
     await apiCreateItem(request, leaderToken, { name: "E2E Headtorch", status: "owned" })
     await page.goto(`/trips/${tripId}?tab=items`)
 
-    await mutateAndSettle(page, () =>
-      page.getByLabel("Add to your kit").selectOption({ label: "E2E Headtorch" }),
+    await mutateAndSettle(
+      page,
+      () => page.getByLabel("Add to your kit").selectOption({ label: "E2E Headtorch" }),
+      { refresh: true },
     )
     await expect(page.getByRole("checkbox", { name: "E2E Headtorch" })).toBeVisible()
   })
@@ -55,7 +57,7 @@ test.describe("Personal packing — private kit", () => {
     // then synchronously verifies the checked state — throws under a slow
     // round-trip. Use `click()` (no post-state assertion) + settle on the POST;
     // persistence is then verified after reload.
-    await mutateAndSettle(page, () => box.click())
+    await mutateAndSettle(page, () => box.click(), { refresh: true })
 
     await page.reload()
     await expect(page.getByRole("checkbox", { name: "E2E Spray Deck" })).toBeChecked()
@@ -67,8 +69,10 @@ test.describe("Personal packing — private kit", () => {
     await page.goto(`/trips/${tripId}?tab=items`)
 
     await expect(page.getByRole("checkbox", { name: "E2E Bivvy" })).toBeVisible()
-    await mutateAndSettle(page, () =>
-      page.getByRole("button", { name: "Remove E2E Bivvy from your kit" }).click(),
+    await mutateAndSettle(
+      page,
+      () => page.getByRole("button", { name: "Remove E2E Bivvy from your kit" }).click(),
+      { refresh: true },
     )
     await expect(page.getByRole("checkbox", { name: "E2E Bivvy" })).toHaveCount(0)
   })

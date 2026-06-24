@@ -45,8 +45,10 @@ test.describe("Trip inventory — requirements & authorship", () => {
     await apiCreateItem(request, leaderToken, { name: "E2E Drysuit", status: "owned" })
     await page.goto(`/trips/${tripId}?tab=items`)
 
-    await mutateAndSettle(page, () =>
-      page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Drysuit" }),
+    await mutateAndSettle(
+      page,
+      () => page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Drysuit" }),
+      { refresh: true },
     )
 
     const row = page.locator("li").filter({ hasText: REQ })
@@ -67,8 +69,10 @@ test.describe("Trip inventory — requirements & authorship", () => {
     // Leader contributes their own item through the UI; the row then shows both.
     await apiCreateItem(request, leaderToken, { name: "E2E Leader VHF", status: "owned" })
     await page.goto(`/trips/${tripId}?tab=items`)
-    await mutateAndSettle(page, () =>
-      page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Leader VHF" }),
+    await mutateAndSettle(
+      page,
+      () => page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Leader VHF" }),
+      { refresh: true },
     )
 
     const row = page.locator("li").filter({ hasText: REQ })
@@ -93,7 +97,9 @@ test.describe("Trip inventory — requirements & authorship", () => {
     // Proposer (leader) removes it. Removal goes through a window.confirm().
     page.on("dialog", (d) => d.accept())
     await page.goto(`/trips/${tripId}?tab=items`)
-    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click())
+    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click(), {
+      refresh: true,
+    })
     await expect(page.locator("li").filter({ hasText: REQ })).toHaveCount(0)
   })
 
@@ -106,7 +112,9 @@ test.describe("Trip inventory — requirements & authorship", () => {
     const row = page.locator("li").filter({ hasText: REQ })
     await expect(row.getByText("covered")).toBeVisible()
 
-    await mutateAndSettle(page, () => row.getByRole("button", { name: /withdraw/i }).click())
+    await mutateAndSettle(page, () => row.getByRole("button", { name: /withdraw/i }).click(), {
+      refresh: true,
+    })
     await expect(row.getByText("needed")).toBeVisible()
   })
 })
