@@ -1,6 +1,7 @@
 import { test, expect, Browser } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
+import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Crew invitation flow", () => {
   let tripId: string
@@ -51,7 +52,9 @@ test.describe("Crew invitation flow", () => {
     await expect(leaderPage.getByText(CREW.name)).toBeVisible()
 
     // Cancel
-    await leaderPage.getByRole("button", { name: /cancel invitation/i }).click()
+    await mutateAndSettle(leaderPage, () =>
+      leaderPage.getByRole("button", { name: /cancel invitation/i }).click(),
+    )
     await expect(leaderPage.getByText(CREW.name)).not.toBeVisible()
   })
 })
