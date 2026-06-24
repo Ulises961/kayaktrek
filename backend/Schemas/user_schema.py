@@ -38,6 +38,12 @@ class UserSchema(BaseSchema):
 
     certifications = fields.List(fields.Nested(UserCertificationSchema), dump_only=True)
 
+    # Public profile (M7a) — opt-in, privacy-first. bio/home_location are free text;
+    # profile_is_public gates the entire public projection.
+    bio = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 1000)
+    home_location = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 255)
+    profile_is_public = fields.Boolean()
+
     # Consent timestamp only — ciphertext fields are never exposed via API
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
     # Set when a password reset wiped the notes — drives the re-entry prompt in the UI
@@ -52,7 +58,7 @@ class UserSchema(BaseSchema):
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
-        for key in ('name', 'surname'):
+        for key in ('name', 'surname', 'bio', 'homeLocation', 'home_location'):
             if key in data and data[key] is not None:
                 data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
         return data
@@ -161,3 +167,27 @@ class UserUpdateSchema(UserSchema):
     @post_load
     def make_user(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}  # camelCase dict for the service
+
+
+class PublicUserSchema(BaseSchema):
+    """Privacy-safe public projection of a paddler (M7a).
+
+    Exposes ONLY self-presentation + opt-in certifications. Aggregate `stats` are
+    attached by the resource. Deliberately NEVER serialises: mail, phone, vessel,
+    emergency contact, medical notes/consent, deletion state, keys, admin, or
+    individual logs. Certifications drop membership_number — a semi-identifier that
+    has no place on a public page.
+    """
+    username = fields.String(dump_only=True)
+    name = fields.String(dump_only=True)
+    surname = fields.String(dump_only=True)
+    avatar_url = fields.String(dump_only=True)
+    bio = fields.String(dump_only=True)
+    home_location = fields.String(dump_only=True)
+    certifications = fields.List(
+        fields.Nested(
+            UserCertificationSchema,
+            only=("organization", "award", "awarded_at", "valid_until"),
+        ),
+        dump_only=True,
+    )

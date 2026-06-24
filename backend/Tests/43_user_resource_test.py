@@ -39,6 +39,56 @@ def test_get_other_user_returns_403(client, auth_headers, id_2):
     assert resp.status_code == 403
 
 
+# ── PATCH public-profile fields + GET /api/user/<username>/public ────────────
+
+def test_update_public_profile_fields(client, auth_headers, id):
+    """bio / homeLocation / profileIsPublic are mutable via the profile PATCH path."""
+    resp = client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers,
+                        json={"bio": "Sea kayaker", "homeLocation": "Wales", "profileIsPublic": True})
+    assert resp.status_code == 200
+    me = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers).json
+    assert me["bio"] == "Sea kayaker"
+    assert me["homeLocation"] == "Wales"
+    assert me["profileIsPublic"] is True
+    # Restore so the session-scoped user_1 carries no public state into other tests.
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers,
+                 json={"profileIsPublic": False, "bio": None, "homeLocation": None})
+
+
+def test_public_profile_missing_returns_404(client):
+    resp = client.get(f"{USER_ENDPOINT}/no_such_paddler_xyz/public")
+    assert resp.status_code == 404
+
+
+def test_public_profile_private_returns_404(client, user_2):
+    """user_2 is private by default — a single neutral 404, no existence oracle."""
+    resp = client.get(f"{USER_ENDPOINT}/{user_2.username}/public")
+    assert resp.status_code == 404
+
+
+def test_public_profile_public_hides_private_fields(client, auth_headers_2, id_2, user_2):
+    """A public profile is readable anonymously and leaks no private fields."""
+    patch = client.patch(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers_2,
+                         json={"profileIsPublic": True, "bio": "Tidal paddler",
+                               "homeLocation": "Pembrokeshire"})
+    assert patch.status_code == 200
+    try:
+        resp = client.get(f"{USER_ENDPOINT}/{user_2.username}/public")  # no auth header
+        assert resp.status_code == 200
+        data = resp.json
+        assert data["username"] == user_2.username
+        assert data["bio"] == "Tidal paddler"
+        assert data["homeLocation"] == "Pembrokeshire"
+        assert "totalDistance" in data["stats"]
+        for forbidden in ("mail", "phone", "vesselMake", "emergencyContactName",
+                          "medicalNotesConsentAt", "admin", "deletionRequestedAt",
+                          "logs", "endorsedLogs", "hasKeypair"):
+            assert forbidden not in data
+    finally:
+        client.patch(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers_2,
+                     json={"profileIsPublic": False, "bio": None, "homeLocation": None})
+
+
 # ── PATCH /api/user/me/password ──────────────────────────────────────────────
 
 def test_change_password_body_not_dict_returns_400(client, auth_headers):

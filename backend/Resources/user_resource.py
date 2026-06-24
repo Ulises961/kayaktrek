@@ -10,8 +10,9 @@ import os
 
 from flask import current_app, send_file
 
-from Schemas.user_schema import UserSchema, UserUpdateSchema
+from Schemas.user_schema import UserSchema, UserUpdateSchema, PublicUserSchema
 from Services.user_service import UserService
+from Services.log_service import LogService
 from Services.storage_service import StorageValidationError
 from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
@@ -70,6 +71,31 @@ def search_users():
         return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
 
     except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/<string:username>/public", methods=["GET"])
+@JWTService.authenticate_optional
+def get_public_profile(username: str):
+    """
+    Retrieve a paddler's public profile by username. Auth-optional (mirrors
+    GET /api/itinerary/explore): anonymous and authenticated callers both allowed.
+
+    Returns a privacy-safe projection (identity, bio, home location, opt-in
+    certifications, aggregate stats). Returns a single 404 for a missing, inactive,
+    deletion-pending, or non-public profile — no existence oracle.
+    """
+    try:
+        viewer_id = getattr(g, "current_user_id", None)
+        user = UserService.get_public_profile(username, viewer_id)
+        data = PublicUserSchema().dump(user)
+        data["stats"] = LogService.stats_for_user(str(user.id))
+        return jsonify(data), HTTPStatus.OK
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Profile not found")
+    except Exception as e:
+        logger.error(f"Error retrieving public profile for {username}: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
