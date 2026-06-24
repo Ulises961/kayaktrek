@@ -42,6 +42,23 @@ def add_certification():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_certification_api.route("/<cert_id>", methods=["PATCH"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def update_certification(cert_id: str):
+    try:
+        cert = UserCertificationService.update_certification(
+            g.current_user_id, cert_id, request.get_json(silent=True) or {}
+        )
+        return jsonify(UserCertificationSchema().dump(cert)), HTTPStatus.OK
+    except ValidationError as e:
+        abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Certification not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_certification_api.route("/<cert_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
