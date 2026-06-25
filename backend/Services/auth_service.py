@@ -50,13 +50,20 @@ class AuthService:
         if not user:
             check_password_hash(_DUMMY_HASH, password)
             return None
+        # Verify the password before disclosing any account state. Until the password is
+        # proven, every path must return the same generic failure — otherwise the distinct
+        # deletion_pending PermissionError is an enumeration oracle that lets anyone probe
+        # which addresses are mid-deletion (a deletion-pending account is also inactive).
+        if not check_password_hash(user.pwd, password):
+            return None
+        # Password proven below. A legitimate owner still gets the actionable
+        # "cancel deletion" signal; a deletion-pending account is inactive, so this
+        # must be checked before the generic inactive branch.
         if user.deletion_requested_at is not None:
             raise PermissionError("deletion_pending")
         if not user.active:
             return None
-        if check_password_hash(user.pwd, password):
-            return user
-        return None
+        return user
 
     @staticmethod
     def register_user(user_json: dict) -> User:

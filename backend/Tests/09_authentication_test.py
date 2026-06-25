@@ -272,6 +272,61 @@ class TestAuthenticationEndpoints:
         # Flask returns 415 when Content-Type is not application/json
         assert response.status_code in [400, 415]
 
+    def test_login_deletion_pending_wrong_password_is_generic(self, client):
+        """A deletion-pending account must not be disclosed without a valid password.
+
+        Probing with a wrong password returns the same generic 401 as any other
+        failure — no deletion_pending oracle for an unauthenticated attacker.
+        """
+        unique_suffix = uuid.uuid4().hex[:8]
+        user_data = {
+            "username": f"delpending_{unique_suffix}",
+            "mail": f"delpending_{unique_suffix}@example.com",
+            "pwd": "CorrectPass123!",
+            "phone": f"+777777{random.randint(1000, 9999)}",
+            "name": "Pending",
+        }
+        client.post('/api/auth/register', json=user_data)
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = False
+        user.deletion_requested_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        response = client.post('/api/auth/login', json={
+            "mail": user_data['mail'],
+            "pwd": "WrongPassword123!",
+        })
+
+        assert response.status_code == 401
+        data = response.get_json()
+        assert data['status'] == 'fail'
+        assert data.get('code') != 'deletion_pending'
+
+    def test_login_deletion_pending_correct_password_discloses(self, client):
+        """The legitimate owner (correct password) still gets the actionable
+        deletion_pending signal so they can cancel the pending deletion."""
+        unique_suffix = uuid.uuid4().hex[:8]
+        user_data = {
+            "username": f"delowner_{unique_suffix}",
+            "mail": f"delowner_{unique_suffix}@example.com",
+            "pwd": "CorrectPass123!",
+            "phone": f"+888888{random.randint(1000, 9999)}",
+            "name": "Owner",
+        }
+        client.post('/api/auth/register', json=user_data)
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = False
+        user.deletion_requested_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        response = client.post('/api/auth/login', json={
+            "mail": user_data['mail'],
+            "pwd": user_data['pwd'],
+        })
+
+        assert response.status_code == 403
+        assert response.get_json().get('code') == 'deletion_pending'
+
     def test_refresh_token_valid(self, client):
         """Test refreshing access token with valid refresh token"""
         unique_suffix = uuid.uuid4().hex[:8]
