@@ -94,7 +94,7 @@ def user_1(app):
         "username": "test",
         "admin": True
     }
-    response = client.post("/api/auth/register", json=user1)
+    response = client.post("/api/v1/auth/register", json=user1)
     assert response.status_code == 201
     return _activate_user("test.user@gmail.com")
 
@@ -110,7 +110,7 @@ def user_2(app):
         "surname": "charles",
         "username": "charles99"
     }
-    response = client.post("/api/auth/register", json=user2)
+    response = client.post("/api/v1/auth/register", json=user2)
     assert response.status_code == 201
     return _activate_user("test1.user@gmail.com")
 
@@ -167,7 +167,7 @@ def outsider_headers(app, client):
         "name": "Outsider",
         "username": "outsider_tmp",
     }
-    client.post("/api/auth/register", json=outsider_data)
+    client.post("/api/v1/auth/register", json=outsider_data)
     with app.app_context():
         outsider = _activate_user("outsider.tmp@example.com")
         token = JWTService.generate_access_token(str(outsider.id), outsider.mail, outsider.admin, outsider.token_version)
@@ -420,7 +420,7 @@ def trip_with_crew(app, client, auth_headers):
         "name": "Crew",
         "username": "crew_member_tmp",
     }
-    client.post("/api/auth/register", json=crew_data)
+    client.post("/api/v1/auth/register", json=crew_data)
 
     with app.app_context():
         crew_user = _activate_user("crew.member@example.com")

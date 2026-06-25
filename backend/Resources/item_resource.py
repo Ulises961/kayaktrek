@@ -11,7 +11,7 @@ from Services.Middleware.privileges_middleware import require_owner
 from Api.database import db
 logger = logging.getLogger(__name__)
 
-ITEM_ENDPOINT = "/api/item"
+ITEM_ENDPOINT = "/api/v1/item"
 item_api = Blueprint('item', __name__, url_prefix=ITEM_ENDPOINT)
 
 @item_api.route("/all", methods=["GET"])

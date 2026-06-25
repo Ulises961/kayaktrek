@@ -25,7 +25,7 @@ from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
-USER_ENDPOINT = "/api/user"
+USER_ENDPOINT = "/api/v1/user"
 user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
 
 

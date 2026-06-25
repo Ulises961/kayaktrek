@@ -13,7 +13,7 @@ from Services.Middleware.privileges_middleware import require_owner
 
 logger = logging.getLogger(__name__)
 
-LOGISTICS_ENDPOINT = "/api/logistics"
+LOGISTICS_ENDPOINT = "/api/v1/logistics"
 logistics_api = Blueprint("logistics", __name__, url_prefix=LOGISTICS_ENDPOINT)
 
 

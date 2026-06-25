@@ -162,6 +162,38 @@ If Logfire pricing ever becomes untenable, re-point the OTel exporter to a self-
 
 ---
 
+## API versioning — URL-path `/api/v1`
+
+**Context.** All routes shipped unversioned (`/api/<resource>`) through M6b. With M9 mobile
+(offline-first, deployed *independently* of the backend) and the PWA-offline tier on the roadmap,
+the canonical trigger for versioning is imminent: an old client in the field hitting a newer
+backend. There are currently zero external consumers and the only clients (web frontend, future
+mobile) live in this monorepo, so introducing a version scheme now is free of any flag-day
+migration — the first mobile release is simply born versioned.
+
+**Decision (2026-06-26).** Adopt **URL-path versioning** — every route moves to `/api/v1/<resource>`.
+Chosen over header negotiation (`Accept: application/vnd.kayak.v1+json`) because path versioning is
+trivial to route and debug, survives in share links and offline cache keys, and needs no content
+negotiation. A future breaking surface ships as a parallel `/api/v2` blueprint set run alongside
+`v1`, not an in-place rewrite — so `v1`'s literal paths are stable and never edited again.
+
+**Implementation.**
+- **Backend.** Each blueprint's `url_prefix` (or `X_ENDPOINT` constant) carries `/api/v1`; the three
+  blueprints that hardcoded full route paths (auth, place, tidal-diamond) carry it inline. No new
+  indirection forced through the literal-path blueprints — full constant centralisation isn't
+  achievable (3 literal-path blueprints + ~155 test path literals) and has low payoff given v2 is a
+  parallel set, not a flip.
+- **Frontend.** Versioning lives in **one place** — `apiFetch`/`apiGetPublic`/`apiUpload` in
+  `lib/api/client.ts` rewrite the leading `/api` of every caller path to `API_PREFIX` (`lib/api/config.ts`,
+  `/api/${API_VERSION}`). The ~35 action files and their tests keep passing unversioned `/api/...`
+  paths untouched. The 11 raw `fetch` sites that bypass the client (auth server actions, public
+  float-plan page, export/download route handlers) build `${API_URL}${API_PREFIX}/...` directly.
+
+**Hard-cut, no alias.** Since the only clients are in-repo and deploy with the backend, `/api` is not
+kept as an unversioned alias — frontend and backend tests moved to `/api/v1` in the same change.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -178,3 +210,4 @@ If Logfire pricing ever becomes untenable, re-point the OTel exporter to a self-
 | Self-hosted architecture | ADR-016 | 2026-05-09 | Logfire is the only managed exception |
 | Static type checking with mypy | ADR-029 | 2026-06-19 | Gradual, layer-by-layer; for correctness/tooling not perf; `TYPE_CHECKING` `Base` shim for `db.Model` |
 | E2E backend mirrors prod concurrency (gunicorn, not `flask run`) | ADR-030 | 2026-06-22 | Single-threaded dev server serialized the 7-call trip-detail fan-out → flaky post-mutation assertions; M6b's +2 calls tipped it over. Full revalidation breadth stays (member-removal cascades); fix is concurrency, not caching. Aggregate `/api/trip/:id/detail` tracked separately |
+| API versioning — URL-path `/api/v1` | ADR-031 | 2026-06-26 | Hard-cut all routes to `/api/v1` before mobile/PWA-offline clients ship (independently-deployed → need versioning); URL-path over header negotiation; frontend versions centrally in `apiFetch` (callers unchanged); v2 will be a parallel blueprint set, not an in-place rewrite |

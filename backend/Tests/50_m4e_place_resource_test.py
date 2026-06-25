@@ -11,8 +11,8 @@ from Models.place_category import PlaceCategory
 from Models.user import User
 from Services.Middleware.auth_middleware import JWTService
 
-PLACE_BASE = "/api/place"
-CATEGORIES = "/api/place-categories"
+PLACE_BASE = "/api/v1/place"
+CATEGORIES = "/api/v1/place-categories"
 
 
 @pytest.fixture(scope="function")
@@ -20,7 +20,7 @@ def admin_headers(client):
     """Register a fresh user, promote them to admin in the DB, return their headers."""
     suffix = uuid.uuid4().hex[:8]
     mail = f"place.admin.{suffix}@example.com"
-    resp = client.post("/api/auth/register", json={
+    resp = client.post("/api/v1/auth/register", json={
         "mail": mail, "pwd": "AdminPass9$", "phone": f"+39{uuid.uuid4().int % 10**10:010d}",
         "name": "Admin", "username": f"place_admin_{suffix}",
     })

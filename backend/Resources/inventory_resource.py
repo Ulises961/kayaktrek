@@ -12,7 +12,7 @@ from Services.Middleware.privileges_middleware import require_owner
 
 logger = logging.getLogger(__name__)
 
-INVENTORY_ENDPOINT = "/api/inventory"
+INVENTORY_ENDPOINT = "/api/v1/inventory"
 inventory_api = Blueprint('inventory', __name__, url_prefix=INVENTORY_ENDPOINT)
 
 @inventory_api.route("/all", methods=["GET"])

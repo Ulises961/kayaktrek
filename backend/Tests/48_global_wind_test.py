@@ -3,12 +3,12 @@ from unittest.mock import patch
 
 
 def test_global_wind_requires_auth(client):
-    resp = client.get("/api/day/global-wind-vectors?date=2026-07-15&hour=12")
+    resp = client.get("/api/v1/day/global-wind-vectors?date=2026-07-15&hour=12")
     assert resp.status_code == 401
 
 
 def test_global_wind_missing_date_returns_400(client, auth_headers):
-    resp = client.get("/api/day/global-wind-vectors?hour=12", headers=auth_headers)
+    resp = client.get("/api/v1/day/global-wind-vectors?hour=12", headers=auth_headers)
     assert resp.status_code == 400
 
 
@@ -58,7 +58,7 @@ def test_global_wind_returns_grid_from_service(client, auth_headers):
         return_value=fake_grid,
     ):
         resp = client.get(
-            "/api/day/global-wind-vectors?date=2026-07-15&hour=12",
+            "/api/v1/day/global-wind-vectors?date=2026-07-15&hour=12",
             headers=auth_headers,
         )
 
@@ -77,7 +77,7 @@ def test_global_wind_default_hour_is_12(client, auth_headers):
         "Resources.sea_resource.OpenMeteoService.fetch_global_wind",
         return_value={"source": "global_weather", "grid": []},
     ) as mock_fetch:
-        client.get("/api/day/global-wind-vectors?date=2026-07-15", headers=auth_headers)
+        client.get("/api/v1/day/global-wind-vectors?date=2026-07-15", headers=auth_headers)
 
     mock_fetch.assert_called_once_with("2026-07-15", 12)
 
@@ -87,6 +87,6 @@ def test_global_wind_passes_hour_to_service(client, auth_headers):
         "Resources.sea_resource.OpenMeteoService.fetch_global_wind",
         return_value={"source": "global_weather", "grid": []},
     ) as mock_fetch:
-        client.get("/api/day/global-wind-vectors?date=2026-07-15&hour=18", headers=auth_headers)
+        client.get("/api/v1/day/global-wind-vectors?date=2026-07-15&hour=18", headers=auth_headers)
 
     mock_fetch.assert_called_once_with("2026-07-15", 18)

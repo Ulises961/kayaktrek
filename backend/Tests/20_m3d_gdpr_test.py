@@ -29,7 +29,7 @@ _GDPR_PWD = "GdprPass9$"
 # =============================================================================
 
 def _register_and_activate(app, client, *, mail, phone, username, pwd=_GDPR_PWD):
-    r = client.post("/api/auth/register", json={
+    r = client.post("/api/v1/auth/register", json={
         "mail": mail,
         "pwd": pwd,
         "phone": phone,

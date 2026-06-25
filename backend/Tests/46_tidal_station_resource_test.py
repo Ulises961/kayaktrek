@@ -10,7 +10,7 @@ from Api.database import db
 from Models.user import User
 from Services.Middleware.auth_middleware import JWTService
 
-STATION_ENDPOINT = "/api/tidal-station"
+STATION_ENDPOINT = "/api/v1/tidal-station"
 _FAKE_UUID = "00000000-0000-7000-8000-000000000111"
 
 
@@ -23,7 +23,7 @@ def admin_headers(client):
     """Register a fresh user, promote them to admin in the DB, return their headers."""
     suffix = uuid.uuid4().hex[:8]
     mail = f"admin.{suffix}@example.com"
-    resp = client.post("/api/auth/register", json={
+    resp = client.post("/api/v1/auth/register", json={
         "mail": mail, "pwd": "AdminPass9$", "phone": f"+39{uuid.uuid4().int % 10**10:010d}",
         "name": "Admin", "username": f"admin_{suffix}",
     })

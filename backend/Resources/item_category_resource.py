@@ -8,7 +8,7 @@ from Api.database import db
 
 logger = logging.getLogger(__name__)
 
-ITEM_CATEGORY_ENDPOINT = "/api/item-categories"
+ITEM_CATEGORY_ENDPOINT = "/api/v1/item-categories"
 item_category_api = Blueprint('item_category', __name__, url_prefix=ITEM_CATEGORY_ENDPOINT)
 
 

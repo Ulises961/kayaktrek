@@ -15,7 +15,7 @@ from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
 
-TRIP_ENDPOINT = "/api/trip"
+TRIP_ENDPOINT = "/api/v1/trip"
 ## TODO: Trip creation needs a separate microservice different from trip execution to avoid bogging down service through trip creation
 ## TODO: A trip created is published in Kafka and then stored in db
 trip_api = Blueprint("trip", __name__, url_prefix=TRIP_ENDPOINT)

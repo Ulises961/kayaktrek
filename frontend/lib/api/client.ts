@@ -3,7 +3,13 @@ export { isRedirectError } from "next/dist/client/components/redirect-error"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { refreshSession } from "@/lib/auth/actions"
-import { API_URL } from "@/lib/api/config"
+import { API_URL, API_PREFIX } from "@/lib/api/config"
+
+// Callers pass unversioned `/api/...` paths; rewrite the leading `/api` segment to
+// the versioned prefix in this single place so the API version lives in one constant.
+function versionPath(path: string): string {
+  return path.replace(/^\/api(?=\/|$)/, API_PREFIX)
+}
 
 async function getAccessToken(): Promise<string | null> {
   const cookieStore = await cookies()
@@ -13,7 +19,7 @@ async function getAccessToken(): Promise<string | null> {
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}${versionPath(path)}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -82,7 +88,7 @@ export async function apiDelete(
 
 // Unauthenticated GET — for public endpoints that must not redirect to /login on failure.
 export async function apiGetPublic<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}${versionPath(path)}`, {
     headers: { "Content-Type": "application/json" },
     next: { revalidate: 300 },
   })
@@ -93,7 +99,7 @@ export async function apiGetPublic<T>(path: string): Promise<T> {
 // Multipart upload — omits Content-Type so the browser sets the boundary.
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   const token = await getAccessToken()
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}${versionPath(path)}`, {
     method: "POST",
     body: formData,
     headers: {

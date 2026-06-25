@@ -13,7 +13,7 @@ from Services.tidal_station_service import TidalStationService
 
 logger = logging.getLogger(__name__)
 
-tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/tidal-station')
+tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tidal-station')
 
 
 @tidal_station_api.route('/nearby', methods=['GET'])

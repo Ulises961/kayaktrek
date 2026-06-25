@@ -11,7 +11,7 @@ from Services.Middleware.auth_middleware import JWTService
 
 logger = logging.getLogger(__name__)
 
-CERT_ENDPOINT = "/api/user/me/certifications"
+CERT_ENDPOINT = "/api/v1/user/me/certifications"
 user_certification_api = Blueprint("user_certification", __name__, url_prefix=CERT_ENDPOINT)
 
 

@@ -37,7 +37,7 @@ def make_user(app, client):
         mail = f"svc.{suffix}@example.com"
         username = f"svc_{suffix}"
         phone = f"+39{counter['n']:010d}"
-        resp = client.post("/api/auth/register", json={
+        resp = client.post("/api/v1/auth/register", json={
             "mail": mail, "pwd": pwd, "phone": phone,
             "name": "Svc", "username": username,
         })

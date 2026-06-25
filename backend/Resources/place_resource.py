@@ -26,7 +26,7 @@ _category_schema = PlaceCategorySchema()
 _category_create_schema = PlaceCategoryCreateSchema()
 
 
-@place_api.route('/api/place-categories', methods=['GET'])
+@place_api.route('/api/v1/place-categories', methods=['GET'])
 @JWTService.authenticate_restful
 def get_place_categories():
     """The seeded catalogue of place kinds, for the create picker and marker icons."""
@@ -40,7 +40,7 @@ def get_place_categories():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place-categories', methods=['POST'])
+@place_api.route('/api/v1/place-categories', methods=['POST'])
 @JWTService.authenticate_restful
 @require_admin()
 def create_place_category():
@@ -61,7 +61,7 @@ def create_place_category():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/create', methods=['POST'])
+@place_api.route('/api/v1/place/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_place():
@@ -82,7 +82,7 @@ def create_place():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/by-itinerary/<string:itinerary_id>', methods=['GET'])
+@place_api.route('/api/v1/place/by-itinerary/<string:itinerary_id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
 def list_places(itinerary_id: str):
@@ -97,7 +97,7 @@ def list_places(itinerary_id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/by-itinerary/<string:itinerary_id>/range', methods=['GET'])
+@place_api.route('/api/v1/place/by-itinerary/<string:itinerary_id>/range', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
 def list_places_in_range(itinerary_id: str):
@@ -127,7 +127,7 @@ def list_places_in_range(itinerary_id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/<string:id>', methods=['GET'])
+@place_api.route('/api/v1/place/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('place', read_only=True)
 def get_place(id: str):
@@ -143,7 +143,7 @@ def get_place(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/<string:id>', methods=['PATCH'])
+@place_api.route('/api/v1/place/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('place')
 def update_place(id: str):
@@ -165,7 +165,7 @@ def update_place(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@place_api.route('/api/place/<string:id>', methods=['DELETE'])
+@place_api.route('/api/v1/place/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('place')
 def delete_place(id: str):

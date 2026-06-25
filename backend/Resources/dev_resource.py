@@ -8,7 +8,7 @@ from Api.mail import mail
 from Services.Middleware.auth_middleware import JWTService
 from Services.user_service import UserService
 
-dev_api = Blueprint("dev", __name__, url_prefix="/api/dev")
+dev_api = Blueprint("dev", __name__, url_prefix="/api/v1/dev")
 
 
 @dev_api.before_request

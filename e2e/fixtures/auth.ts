@@ -31,10 +31,10 @@ export async function registerAndActivate(
 ): Promise<void> {
   // Registration is idempotent from our perspective — a 400/409 just means
   // the user already exists from a prior run, which is fine.
-  await request.post(`${API_URL}/api/auth/register`, { data: creds })
+  await request.post(`${API_URL}/api/v1/auth/register`, { data: creds })
 
   // Activation sets active=true unconditionally — safe to call every run.
-  const activate = await request.post(`${API_URL}/api/auth/activate-test`, {
+  const activate = await request.post(`${API_URL}/api/v1/auth/activate-test`, {
     data: { mail: creds.mail },
   })
   if (!activate.ok()) {
@@ -46,7 +46,7 @@ export async function apiLogin(
   request: APIRequestContext,
   creds: UserCredentials,
 ): Promise<{ accessToken: string; refreshToken: string }> {
-  const res = await request.post(`${API_URL}/api/auth/login`, {
+  const res = await request.post(`${API_URL}/api/v1/auth/login`, {
     data: { mail: creds.mail, pwd: creds.pwd },
   })
   if (!res.ok()) throw new Error(`Login failed for ${creds.mail}: ${res.status()}`)

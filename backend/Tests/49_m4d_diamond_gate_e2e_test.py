@@ -58,7 +58,7 @@ def test_user_diamond_raises_gate_warning_service(app, itinerary, id):
 def test_user_diamond_surfaces_in_tidal_gates_endpoint_e2e(client, auth_headers, itinerary):
     day, _point, _sea = _seed_route_point_and_sea(itinerary)
 
-    create = client.post("/api/tidal-diamond/create", headers=auth_headers, json={
+    create = client.post("/api/v1/tidal-diamond/create", headers=auth_headers, json={
         "itineraryId": itinerary["id"],
         "name": "The Race",
         "location": {"type": "Point", "coordinates": [_LON, _LAT]},
@@ -70,7 +70,7 @@ def test_user_diamond_surfaces_in_tidal_gates_endpoint_e2e(client, auth_headers,
     })
     assert create.status_code == 201
 
-    resp = client.get(f"/api/day/{day.id}/tidal-gates", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day.id}/tidal-gates", headers=auth_headers)
     assert resp.status_code == 200
     gates = resp.get_json()
     race = next((g for g in gates if g["stationName"] == "The Race"), None)

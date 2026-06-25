@@ -126,7 +126,7 @@ class TestAuthenticationEndpoints:
             "surname": "User"
         }
 
-        response = client.post('/api/auth/register', json=new_user_data)
+        response = client.post('/api/v1/auth/register', json=new_user_data)
 
         assert response.status_code == 201
         data = response.get_json()
@@ -154,7 +154,7 @@ class TestAuthenticationEndpoints:
             "name": "First"
         }
 
-        response1 = client.post('/api/auth/register', json=user_data)
+        response1 = client.post('/api/v1/auth/register', json=user_data)
         assert response1.status_code == 201
 
         # Try to register with same username but different email — non-disclosure:
@@ -163,7 +163,7 @@ class TestAuthenticationEndpoints:
         duplicate_data['mail'] = f"second_{unique_suffix}@example.com"
         duplicate_data['phone'] = f"+111111{phone_suffix}"
 
-        response2 = client.post('/api/auth/register', json=duplicate_data)
+        response2 = client.post('/api/v1/auth/register', json=duplicate_data)
         assert response2.status_code == 201
 
     def test_register_missing_fields(self, client):
@@ -173,7 +173,7 @@ class TestAuthenticationEndpoints:
             # Missing mail, pwd, phone, name
         }
 
-        response = client.post('/api/auth/register', json=incomplete_data)
+        response = client.post('/api/v1/auth/register', json=incomplete_data)
 
         # Should fail validation
         assert response.status_code in [400, 422]
@@ -190,7 +190,7 @@ class TestAuthenticationEndpoints:
             "name": "Login"
         }
 
-        register_response = client.post('/api/auth/register', json=user_data)
+        register_response = client.post('/api/v1/auth/register', json=user_data)
         assert register_response.status_code == 201
 
         user = User.query.filter_by(mail=user_data['mail']).first()
@@ -205,7 +205,7 @@ class TestAuthenticationEndpoints:
             "pwd": user_data['pwd']
         }
 
-        response = client.post('/api/auth/login', json=login_data)
+        response = client.post('/api/v1/auth/login', json=login_data)
 
         assert response.status_code == 200
         data = response.get_json()
@@ -232,7 +232,7 @@ class TestAuthenticationEndpoints:
             "name": "Wrong"
         }
 
-        client.post('/api/auth/register', json=user_data)
+        client.post('/api/v1/auth/register', json=user_data)
 
         user = User.query.filter_by(mail=user_data['mail']).first()
         assert user is not None
@@ -247,7 +247,7 @@ class TestAuthenticationEndpoints:
             "pwd": "WrongPassword123!"
         }
 
-        response = client.post('/api/auth/login', json=login_data)
+        response = client.post('/api/v1/auth/login', json=login_data)
 
         assert response.status_code == 401
         data = response.get_json()
@@ -261,13 +261,13 @@ class TestAuthenticationEndpoints:
             "pwd": "SomePassword123!"
         }
 
-        response = client.post('/api/auth/login', json=login_data)
+        response = client.post('/api/v1/auth/login', json=login_data)
 
         assert response.status_code == 401
 
     def test_login_missing_body(self, client):
         """Test login with missing request body"""
-        response = client.post('/api/auth/login', json=None)
+        response = client.post('/api/v1/auth/login', json=None)
 
         # Flask returns 415 when Content-Type is not application/json
         assert response.status_code in [400, 415]
@@ -286,13 +286,13 @@ class TestAuthenticationEndpoints:
             "phone": f"+777777{random.randint(1000, 9999)}",
             "name": "Pending",
         }
-        client.post('/api/auth/register', json=user_data)
+        client.post('/api/v1/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
         user.active = False
         user.deletion_requested_at = datetime.now(timezone.utc)
         db.session.commit()
 
-        response = client.post('/api/auth/login', json={
+        response = client.post('/api/v1/auth/login', json={
             "mail": user_data['mail'],
             "pwd": "WrongPassword123!",
         })
@@ -313,13 +313,13 @@ class TestAuthenticationEndpoints:
             "phone": f"+888888{random.randint(1000, 9999)}",
             "name": "Owner",
         }
-        client.post('/api/auth/register', json=user_data)
+        client.post('/api/v1/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
         user.active = False
         user.deletion_requested_at = datetime.now(timezone.utc)
         db.session.commit()
 
-        response = client.post('/api/auth/login', json={
+        response = client.post('/api/v1/auth/login', json={
             "mail": user_data['mail'],
             "pwd": user_data['pwd'],
         })
@@ -337,16 +337,16 @@ class TestAuthenticationEndpoints:
             "phone": f"+777777{random.randint(1000, 9999)}",
             "name": "Refresh"
         }
-        client.post('/api/auth/register', json=user_data)
+        client.post('/api/v1/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
         assert user is not None
         user.active = True
         db.session.commit()
 
-        login_resp = client.post('/api/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
+        login_resp = client.post('/api/v1/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
         refresh_token = login_resp.get_json()['refresh_token']
 
-        response = client.post('/api/auth/refresh', json={"refresh_token": refresh_token})
+        response = client.post('/api/v1/auth/refresh', json={"refresh_token": refresh_token})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -357,7 +357,7 @@ class TestAuthenticationEndpoints:
 
     def test_refresh_token_missing(self, client):
         """Test refresh endpoint with missing token"""
-        response = client.post('/api/auth/refresh', json={})
+        response = client.post('/api/v1/auth/refresh', json={})
 
         assert response.status_code == 400
 
@@ -371,22 +371,22 @@ class TestAuthenticationEndpoints:
             "phone": f"+888888{random.randint(1000, 9999)}",
             "name": "Wrong"
         }
-        client.post('/api/auth/register', json=user_data)
+        client.post('/api/v1/auth/register', json=user_data)
         user = User.query.filter_by(mail=user_data['mail']).first()
         assert user is not None
         user.active = True
         db.session.commit()
 
-        login_resp = client.post('/api/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
+        login_resp = client.post('/api/v1/auth/login', json={"mail": user_data['mail'], "pwd": user_data['pwd']})
         access_token = login_resp.get_json()['access_token']
 
-        response = client.post('/api/auth/refresh', json={"refresh_token": access_token})
+        response = client.post('/api/v1/auth/refresh', json={"refresh_token": access_token})
 
         assert response.status_code == 401
 
     def test_refresh_with_invalid_token(self, client):
         """Test refresh with completely invalid token"""
-        response = client.post('/api/auth/refresh', json={
+        response = client.post('/api/v1/auth/refresh', json={
             "refresh_token": "invalid.token.here"
         })
 

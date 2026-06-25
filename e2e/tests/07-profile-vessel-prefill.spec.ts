@@ -11,11 +11,11 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
 
     // Get leader's user ID, then set vessel info on their profile via API
-    const meRes = await request.get(`${API_URL}/api/user/me`, {
+    const meRes = await request.get(`${API_URL}/api/v1/user/me`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
     })
     const me = await meRes.json()
-    await request.patch(`${API_URL}/api/user/${me.id}`, {
+    await request.patch(`${API_URL}/api/v1/user/${me.id}`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
       data: {
         vesselMake: "Seabird",
@@ -47,11 +47,11 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     const crewToken = await apiGetAccessToken(request, "e2e.crew@example.com", "Crew$ecure1!")
 
     // Invite crew and have them accept via API
-    await request.post(`${API_URL}/api/trip/${tripId}/invite`, {
+    await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
       data: { email: "e2e.crew@example.com" },
     })
-    await request.post(`${API_URL}/api/trip/${tripId}/invitation`, {
+    await request.post(`${API_URL}/api/v1/trip/${tripId}/invitation`, {
       headers: { Authorization: `Bearer ${crewToken}` },
       data: { accepted: true },
     })
@@ -72,7 +72,7 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     await crewContext.close()
 
     // Leader generates share → snapshot must reflect override
-    const shareRes = await request.post(`${API_URL}/api/logistics/${tripId}/share`, {
+    const shareRes = await request.post(`${API_URL}/api/v1/logistics/${tripId}/share`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
     })
     const { shareToken } = await shareRes.json()
