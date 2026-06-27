@@ -132,7 +132,7 @@ function fmtDeg(value: number, pos: string, neg: string): string {
 function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<span style="font-family:var(--font-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:${INK};opacity:0.5;text-shadow:0 1px 2px ${PAPER_GLOW};">${text}</span>`,
+    html: `<span style="font-family:var(--font-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:${INK};opacity:0.68;text-shadow:0 1px 2px ${PAPER_GLOW};">${text}</span>`,
     iconSize: [0, 0],
     iconAnchor: anchor,
   })
@@ -151,7 +151,7 @@ function Graticule() {
   const north = b.getNorth()
   const west = b.getWest()
   const east = b.getEast()
-  const lineOpts = { color: INK, weight: 0.6, opacity: 0.3, interactive: false } as const
+  const lineOpts = { color: INK, weight: 0.7, opacity: 0.42, interactive: false } as const
 
   const els: ReactNode[] = []
   for (let lon = Math.ceil(west / step) * step; lon <= east; lon += step) {
