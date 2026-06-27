@@ -1,0 +1,308 @@
+"use client"
+
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react"
+import {
+  MapContainer,
+  TileLayer,
+  Polyline,
+  Circle,
+  Marker,
+  useMap,
+  useMapEvents,
+} from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+import { VelocityLayer } from "@/components/weather/velocity-layer"
+import { cellForRoutes, CURRENT_COLOR_SCALE } from "@/lib/landing/ambient-current"
+import type { RouteData } from "@/lib/itinerary/public-routes"
+
+type Props = {
+  routes?: RouteData[]
+  center?: [number, number]
+  zoom?: number
+}
+
+// Esri Ocean Basemap — soft bathymetric Mediterranean blue, water-forward.
+const ESRI_OCEAN =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
+
+// Ambient, decorative current — carries motion + palette. No legend: see
+// lib/landing/ambient-current.ts for why this must never read as a forecast.
+//
+// Streak length = (velocityScale × magnitude) × (frames the trail survives).
+// - velocityScale → distance a particle travels per frame; the main lever for
+//   long, flowing streaks vs. minimal dots. Doesn't accumulate, so it lengthens
+//   trails WITHOUT the "heatmap" smear.
+// - opacity → trail-fade (how much of the previous frame is kept). High + dense
+//   = smear; with the per-zoom multiplier holding the count down it can sit a bit
+//   higher for visible trails. particleAge keeps particles alive longer (steadier).
+const VELOCITY_BASE = {
+  colorScale: CURRENT_COLOR_SCALE,
+  velocityScale: 0.07,
+  particleAge: 90,
+  lineWidth: 1.8,
+  opacity: 0.8,
+  frameRate: 20,
+  minVelocity: 0,
+  maxVelocity: 0.8,
+}
+
+// Particle density vs zoom. leaflet-velocity ties particleCount to the viewport
+// (count = viewportPx × particleMultiplier), and masked cells only survive inside
+// the disc — so on-screen density inside the disc equals the multiplier. This
+// tapers it deliberately: fewer particles zoomed OUT (a clean, sparse patch, never
+// a thick blob), more as you zoom IN and the cell opens up. Flip the exponent sign
+// to reverse the feel; clamps stop it ever blobbing (max) or emptying (min).
+const REF_ZOOM = 8
+const BASE_MULTIPLIER = 1 / 900
+function multiplierForZoom(zoom: number): number {
+  const factor = Math.pow(2, (zoom - REF_ZOOM) * 0.5)
+  return Math.min(1 / 250, Math.max(1 / 5000, BASE_MULTIPLIER * factor))
+}
+
+// Zoom is locked to Esri Ocean's useful range for this region: it thins to
+// "no data" past ~z11, and the landing is a calm discovery chart, not the
+// route-detail planner (which uses OSM). Locking keeps the chart aesthetic
+// intact rather than swapping to a busy street basemap mid-interaction.
+const MIN_ZOOM = 6
+const MAX_ZOOM = 10
+
+// ── Graticule ────────────────────────────────────────────────────────────────
+// A real geographic lat/lon grid drawn across the whole chart (the old ticks were
+// CSS marginalia fixed to the frame border). Lines are meridians/parallels at a
+// per-zoom degree step; they pan and zoom with the map like a true chart graticule.
+function niceStep(zoom: number): number {
+  if (zoom >= 10) return 0.25
+  if (zoom >= 8) return 0.5
+  return 1
+}
+
+function fmtDeg(value: number, pos: string, neg: string): string {
+  const a = Math.abs(value)
+  const s = Number.isInteger(a) ? `${a}` : a.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
+  return `${s}°${value >= 0 ? pos : neg}`
+}
+
+function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    html: `<span style="font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:#1a3554;opacity:0.5;text-shadow:0 1px 2px rgba(247,244,236,0.9);">${text}</span>`,
+    iconSize: [0, 0],
+    iconAnchor: anchor,
+  })
+}
+
+function Graticule() {
+  const [, bump] = useState(0)
+  const map = useMapEvents({
+    moveend: () => bump((n) => n + 1),
+    zoomend: () => bump((n) => n + 1),
+  })
+
+  const b = map.getBounds()
+  const step = niceStep(map.getZoom())
+  const south = b.getSouth()
+  const north = b.getNorth()
+  const west = b.getWest()
+  const east = b.getEast()
+  const lineOpts = { color: "#1a3554", weight: 0.6, opacity: 0.3, interactive: false } as const
+
+  const els: ReactNode[] = []
+  for (let lon = Math.ceil(west / step) * step; lon <= east; lon += step) {
+    const k = `m${lon.toFixed(3)}`
+    els.push(
+      <Polyline
+        key={k}
+        positions={[
+          [south, lon],
+          [north, lon],
+        ]}
+        pathOptions={lineOpts}
+      />,
+    )
+    // Drop the label below the top edge so it clears the header strip.
+    els.push(
+      <Marker
+        key={`${k}t`}
+        position={[north, lon]}
+        icon={gratLabelIcon(fmtDeg(lon, "E", "W"), [10, -64])}
+        interactive={false}
+        keyboard={false}
+      />,
+    )
+  }
+  for (let lat = Math.ceil(south / step) * step; lat <= north; lat += step) {
+    const k = `p${lat.toFixed(3)}`
+    els.push(
+      <Polyline
+        key={k}
+        positions={[
+          [lat, west],
+          [lat, east],
+        ]}
+        pathOptions={lineOpts}
+      />,
+    )
+    // Labels on the right edge — the left is occupied by the cartouche.
+    els.push(
+      <Marker
+        key={`${k}l`}
+        position={[lat, east]}
+        icon={gratLabelIcon(fmtDeg(lat, "N", "S"), [34, -4], 600)}
+        interactive={false}
+        keyboard={false}
+      />,
+    )
+  }
+  return <>{els}</>
+}
+
+// ── Scale bar ────────────────────────────────────────────────────────────────
+// The ruler every chart carries — a segmented nautical-style bar showing the real
+// ground distance at the current center/zoom, so the graticule's degrees have a
+// metric reference. Built as a Leaflet control (correctly positioned, above map).
+const EARTH_CIRCUMFERENCE_M = 40075016.686
+const SCALE_TARGET_PX = 130
+
+function metersPerPixel(lat: number, zoom: number): number {
+  return (EARTH_CIRCUMFERENCE_M * Math.cos((lat * Math.PI) / 180)) / 2 ** (zoom + 8)
+}
+
+// Largest 1/2/5 × 10ⁿ metres that fits the target width — the "nice round number"
+// a chart ruler always lands on.
+function niceScaleMeters(maxMeters: number): number {
+  const pow = 10 ** Math.floor(Math.log10(maxMeters))
+  for (const mult of [5, 2, 1]) {
+    if (mult * pow <= maxMeters) return mult * pow
+  }
+  return pow / 2
+}
+
+function fmtDistance(m: number): string {
+  return m >= 1000 ? `${m / 1000} km` : `${m} m`
+}
+
+function scaleBarHtml(px: number, meters: number): string {
+  const segs = 4
+  const segPx = px / segs
+  const cells = Array.from({ length: segs }, (_, i) => {
+    const fill = i % 2 === 0 ? "#1a3554" : "#f7f4ec"
+    return `<div style="width:${segPx}px;height:6px;background:${fill};border-right:1px solid #1a3554;"></div>`
+  }).join("")
+  return `<div style="font-family:var(--font-geist-mono),ui-monospace,monospace;color:#1a3554;text-shadow:0 1px 2px rgba(247,244,236,0.9);">
+    <div style="display:flex;width:${px}px;border:1px solid #1a3554;border-right:none;">${cells}</div>
+    <div style="display:flex;justify-content:space-between;width:${px}px;font-size:9px;letter-spacing:0.04em;margin-top:3px;opacity:0.8;"><span>0</span><span>${fmtDistance(meters)}</span></div>
+  </div>`
+}
+
+function ScaleBar() {
+  const map = useMap()
+  useEffect(() => {
+    const control = new L.Control({ position: "bottomright" })
+    let el: HTMLElement | null = null
+    const render = () => {
+      if (!el) return
+      const mpp = metersPerPixel(map.getCenter().lat, map.getZoom())
+      const meters = niceScaleMeters(SCALE_TARGET_PX * mpp)
+      el.innerHTML = scaleBarHtml(meters / mpp, meters)
+    }
+    control.onAdd = () => {
+      el = L.DomUtil.create("div")
+      el.style.margin = "0 16px 18px 0"
+      render()
+      return el
+    }
+    control.addTo(map)
+    map.on("zoomend moveend", render)
+    return () => {
+      map.off("zoomend moveend", render)
+      control.remove()
+    }
+  }, [map])
+  return null
+}
+
+// Small chart-marginalia note pinned to the cell's south rim. Honest by design:
+// "illustrative", no scale/time — a bounded label can't masquerade as forecast.
+function noteIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    html: `<div style="white-space:nowrap;font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:#1a3554;opacity:0.7;text-shadow:0 1px 2px rgba(247,244,236,0.9);">surface current · illustrative</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [-8, -6],
+  })
+}
+
+function ForecastCellLayer({ routes }: { routes: RouteData[] }) {
+  // Track LIVE zoom (the prop was the static initial value). zoomend is enough —
+  // density only needs to settle after the gesture, not update mid-animation.
+  const map = useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
+  const [zoom, setZoom] = useState(() => map.getZoom())
+
+  const cell = useMemo(() => cellForRoutes(routes.flatMap((r) => r.positions)), [routes])
+  // A NEW object each time zoom changes, so VelocityLayer's options effect fires
+  // and applies the multiplier in place (mutating a shared const would not).
+  const options = useMemo(
+    () => ({ ...VELOCITY_BASE, particleMultiplier: multiplierForZoom(zoom) }),
+    [zoom],
+  )
+
+  const radiusM = cell.radiusKm * 1000
+  const southRim: [number, number] = [cell.center[0] - cell.radiusKm / 111, cell.center[1]]
+
+  return (
+    <>
+      <VelocityLayer data={cell.grid} options={options} />
+      {/* Contour ring — chart neat-line language. Outline only: a fill would
+          tint the map (the very "heatmap on top" we're removing). */}
+      <Circle
+        center={cell.center}
+        radius={radiusM}
+        pathOptions={{
+          color: "#1a3554",
+          weight: 1.25,
+          opacity: 0.5,
+          dashArray: "2 7",
+          fill: false,
+        }}
+      />
+      <Marker position={southRim} icon={noteIcon()} interactive={false} keyboard={false} />
+    </>
+  )
+}
+
+export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Props) {
+  return (
+    <MapContainer
+      center={center}
+      zoom={zoom}
+      minZoom={MIN_ZOOM}
+      maxZoom={MAX_ZOOM}
+      className="h-full w-full"
+      zoomControl={false}
+      attributionControl={false}
+    >
+      <TileLayer url={ESRI_OCEAN} />
+      <TileLayer url={SEAMARK} />
+      <Graticule />
+      <ScaleBar />
+      <ForecastCellLayer routes={routes} />
+      {routes.map((route) =>
+        route.positions.length === 0 ? null : (
+          <Fragment key={route.id}>
+            {/* White halo under ocean ink — the engraved chart-line look. */}
+            <Polyline
+              positions={route.positions}
+              pathOptions={{ color: "#f7f4ec", weight: 5.5, opacity: 0.85 }}
+            />
+            <Polyline
+              positions={route.positions}
+              pathOptions={{ color: "#0d1b2e", weight: 2.5, opacity: 0.95 }}
+            />
+          </Fragment>
+        ),
+      )}
+    </MapContainer>
+  )
+}

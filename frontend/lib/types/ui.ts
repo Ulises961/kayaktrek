@@ -30,7 +30,9 @@ export interface VelocityGridHeader {
 
 export interface VelocityGridLayer {
   header: VelocityGridHeader
-  data: number[]
+  // `null` marks a masked cell — leaflet-velocity treats it as out-of-field and
+  // spawns no particle there. Used to clip a field to a disc (the forecast cell).
+  data: (number | null)[]
 }
 
 // Shape returned by the wind-vectors and wave-vectors endpoints.
