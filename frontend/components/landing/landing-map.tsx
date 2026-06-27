@@ -15,6 +15,15 @@ import "leaflet/dist/leaflet.css"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { cellForRoutes, CURRENT_COLOR_SCALE } from "@/lib/landing/ambient-current"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { palette } from "@/lib/tokens"
+
+// Chart chrome palette — named aliases over the maritime tokens so the
+// engraved graticule/scale/ink language reads at a glance.
+const INK = palette.ocean700 // graticule, scale bar, marginalia
+const DEEP = palette.ocean900 // route line core
+const PAPER = palette.chartPaper // route halo + alternating scale-bar cells
+// chartPaper (#f7f4ec) at 0.9 alpha — legibility glow behind chart marginalia.
+const PAPER_GLOW = "rgba(247,244,236,0.9)"
 
 type Props = {
   routes?: RouteData[]
@@ -119,7 +128,7 @@ function fmtDeg(value: number, pos: string, neg: string): string {
 function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<span style="font-family:var(--font-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:#1a3554;opacity:0.5;text-shadow:0 1px 2px rgba(247,244,236,0.9);">${text}</span>`,
+    html: `<span style="font-family:var(--font-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:${INK};opacity:0.5;text-shadow:0 1px 2px ${PAPER_GLOW};">${text}</span>`,
     iconSize: [0, 0],
     iconAnchor: anchor,
   })
@@ -138,7 +147,7 @@ function Graticule() {
   const north = b.getNorth()
   const west = b.getWest()
   const east = b.getEast()
-  const lineOpts = { color: "#1a3554", weight: 0.6, opacity: 0.3, interactive: false } as const
+  const lineOpts = { color: INK, weight: 0.6, opacity: 0.3, interactive: false } as const
 
   const els: ReactNode[] = []
   for (let lon = Math.ceil(west / step) * step; lon <= east; lon += step) {
@@ -219,11 +228,11 @@ function scaleBarHtml(px: number, meters: number): string {
   const segs = 4
   const segPx = px / segs
   const cells = Array.from({ length: segs }, (_, i) => {
-    const fill = i % 2 === 0 ? "#1a3554" : "#f7f4ec"
-    return `<div style="width:${segPx}px;height:9px;background:${fill};border-right:1px solid #1a3554;"></div>`
+    const fill = i % 2 === 0 ? INK : PAPER
+    return `<div style="width:${segPx}px;height:9px;background:${fill};border-right:1px solid ${INK};"></div>`
   }).join("")
-  return `<div style="font-family:var(--font-mono),ui-monospace,monospace;color:#1a3554;text-shadow:0 1px 2px rgba(247,244,236,0.9);">
-    <div style="display:flex;width:${px}px;border:1px solid #1a3554;border-right:none;">${cells}</div>
+  return `<div style="font-family:var(--font-mono),ui-monospace,monospace;color:${INK};text-shadow:0 1px 2px ${PAPER_GLOW};">
+    <div style="display:flex;width:${px}px;border:1px solid ${INK};border-right:none;">${cells}</div>
     <div style="display:flex;justify-content:space-between;width:${px}px;font-size:11px;letter-spacing:0.04em;margin-top:4px;opacity:0.85;"><span>0</span><span>${fmtDistance(meters)}</span></div>
   </div>`
 }
@@ -260,7 +269,7 @@ function ScaleBar() {
 function noteIcon(): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:#1a3554;opacity:0.7;text-shadow:0 1px 2px rgba(247,244,236,0.9);">surface current · illustrative</div>`,
+    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">surface current · illustrative</div>`,
     iconSize: [0, 0],
     iconAnchor: [-8, -6],
   })
@@ -292,7 +301,7 @@ function ForecastCellLayer({ routes }: { routes: RouteData[] }) {
         center={cell.center}
         radius={radiusM}
         pathOptions={{
-          color: "#1a3554",
+          color: INK,
           weight: 1.25,
           opacity: 0.5,
           dashArray: "2 7",
@@ -326,11 +335,11 @@ export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Pr
             {/* White halo under ocean ink — the engraved chart-line look. */}
             <Polyline
               positions={route.positions}
-              pathOptions={{ color: "#f7f4ec", weight: 5.5, opacity: 0.85 }}
+              pathOptions={{ color: PAPER, weight: 5.5, opacity: 0.85 }}
             />
             <Polyline
               positions={route.positions}
-              pathOptions={{ color: "#0d1b2e", weight: 2.5, opacity: 0.95 }}
+              pathOptions={{ color: DEEP, weight: 2.5, opacity: 0.95 }}
             />
           </Fragment>
         ),

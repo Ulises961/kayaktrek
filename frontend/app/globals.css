@@ -115,6 +115,10 @@
   --input: oklch(0.865 0.042 218);
   --ring: oklch(0.52 0.065 240);
 
+  /* Chart-paper ivory — scoped to the landing nautical-chart variant
+     (cartouche, neat-line, ticks, header). #f7f4ec in tokens.ts. */
+  --chart-paper: oklch(0.966 0.009 92);
+
   /* Sidebar — slightly deeper than background */
   --sidebar: oklch(0.965 0.006 90);
   --sidebar-foreground: oklch(0.155 0.04 245);
@@ -491,7 +495,7 @@
    over the base `* { border }` reset. */
 /* Header — slim chart publication strip. */
 .chart-header {
-  background: oklch(0.99 0.006 90 / 0.78);
+  background: color-mix(in oklch, var(--chart-paper) 78%, transparent);
   border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
   backdrop-filter: blur(8px);
 }
@@ -508,7 +512,7 @@
   position: absolute;
   inset: 16px;
   border: 1px solid oklch(0.155 0.04 245 / 0.32);
-  box-shadow: 0 0 0 3px oklch(0.99 0.006 90 / 0.4) inset;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--chart-paper) 40%, transparent) inset;
   pointer-events: none;
 }
 .chart-tick {
@@ -517,13 +521,13 @@
   font-size: 0.5625rem;
   letter-spacing: 0.08em;
   color: oklch(0.155 0.04 245 / 0.5);
-  background: oklch(0.99 0.006 90 / 0.55);
+  background: color-mix(in oklch, var(--chart-paper) 55%, transparent);
   padding: 0 0.25rem;
 }
 
 /* Cartouche — chart title block, the page's signature element. */
 .chart-cartouche {
-  background: oklch(0.99 0.008 88 / 0.9);
+  background: color-mix(in oklch, var(--chart-paper) 90%, transparent);
   border: 1px solid oklch(0.43 0.165 243 / 0.26);
   border-radius: 2px;
   box-shadow:
@@ -561,36 +565,8 @@
   background: linear-gradient(to right, oklch(0.43 0.165 243 / 0.5), oklch(0.43 0.165 243 / 0.06));
 }
 
-/* Actions. */
-.chart-btn-primary {
-  font-family: var(--font-sans), sans-serif;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  border-radius: 2px;
-  background: oklch(0.43 0.165 243);
-  color: oklch(0.985 0.008 220);
-  transition:
-    background-color 0.15s ease,
-    transform 0.1s ease;
-}
-.chart-btn-primary:hover {
-  background: oklch(0.38 0.165 243);
-}
-.chart-btn-primary:active {
-  transform: scale(0.98);
-}
-.chart-link {
-  font-family: var(--font-sans), sans-serif;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: oklch(0.155 0.04 245);
-  transition: color 0.15s ease;
-}
-.chart-link:hover {
-  color: oklch(0.43 0.165 243);
-}
+/* Actions use the shadcn `Button` primitive (default + link variants) with the
+   chart-variant overrides applied in landing-hero.tsx — no bespoke classes. */
 
 /* Orchestrated load sequence — quiet, one-shot, reduced-motion safe. */
 @keyframes chart-rise {

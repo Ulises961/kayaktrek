@@ -1,7 +1,16 @@
 import Link from "next/link"
 import { LandingMapLoader } from "./landing-map-loader"
 import { CompassRose } from "./compass-rose"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+
+// Chart-variant overrides on the DS Button: square neat-line corners + the
+// wider letter-spacing of engraved chart lettering. The colours, hover and
+// focus states all come from the primary/link variants.
+const chartCta = "rounded-[2px] text-xs tracking-[0.04em]"
+const chartLink =
+  "text-foreground hover:text-primary px-0 text-xs tracking-[0.02em] no-underline hover:no-underline"
 
 export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
   return (
@@ -23,12 +32,17 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
           </span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-3">
-          <Link href="/login" className="chart-link hidden px-2 py-1.5 sm:inline-block">
-            Log in
-          </Link>
-          <Link href="/register" className="chart-btn-primary px-3.5 py-2 sm:px-4">
-            Start planning
-          </Link>
+          <Button
+            asChild
+            variant="link"
+            size="sm"
+            className={cn(chartLink, "hidden sm:inline-flex")}
+          >
+            <Link href="/login">Log in</Link>
+          </Button>
+          <Button asChild size="sm" className={chartCta}>
+            <Link href="/register">Start planning</Link>
+          </Button>
         </nav>
       </header>
 
@@ -45,12 +59,12 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
           A growing chart of paddled waters — add the one you know best.
         </p>
         <div className="mt-5 flex items-center gap-4">
-          <Link href="/register" className="chart-btn-primary px-4 py-2.5">
-            Start planning
-          </Link>
-          <Link href="/login" className="chart-link">
-            browse the chart →
-          </Link>
+          <Button asChild className={chartCta}>
+            <Link href="/register">Start planning</Link>
+          </Button>
+          <Button asChild variant="link" className={chartLink}>
+            <Link href="/login">browse the chart →</Link>
+          </Button>
         </div>
       </div>
     </div>

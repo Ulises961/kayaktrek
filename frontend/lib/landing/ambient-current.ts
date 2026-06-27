@@ -10,6 +10,7 @@
  * each a row-major grid from la1/lo1 (top-left) to la2/lo2 (bottom-right).
  */
 import type { VelocityGridLayer } from "@/lib/types/ui"
+import { palette } from "@/lib/tokens"
 
 type Bounds = { la1: number; la2: number; lo1: number; lo2: number }
 
@@ -227,12 +228,12 @@ export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): 
 // Token-derived ramp: calm azure/teal → warm amber highlight on the faster
 // filaments. Carries the Mediterranean palette over a neutral base.
 export const CURRENT_COLOR_SCALE = [
-  "#1a3554", // deep ocean ink (slowest)
-  "#1a5c9a",
-  "#2272b6",
-  "#4fa8d4",
-  "#2aa8a0", // foam teal
-  "#7ec4e4",
-  "#fcd34d",
-  "#f59e0b", // sunset amber (fastest filaments)
+  palette.ocean700, // deep ocean ink (slowest)
+  palette.ocean600,
+  palette.ocean500,
+  palette.ocean400,
+  palette.foam400, // foam teal
+  palette.ocean300,
+  palette.sunset300,
+  palette.sunset400, // sunset amber (fastest filaments)
 ]
