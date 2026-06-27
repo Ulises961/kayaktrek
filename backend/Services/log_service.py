@@ -3,6 +3,7 @@ Log Service - Business logic for log operations.
 """
 import logging
 import math
+from datetime import datetime, timezone
 from typing import Any, List, Optional, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
@@ -13,6 +14,10 @@ from Schemas.base_schema import camelcase
 from Models.log import Log
 from Models.user import User
 from Models.trip_member import TripMember
+from Models.endorsement_request import (
+    EndorsementRequest,
+    EndorsementRequestStatusType,
+)
 from Schemas.log_schema import LogSchema
 from Api.database import db
 from Services.block_service import BlockService
@@ -222,10 +227,27 @@ class LogService:
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
+        # Resolve any pending endorsement request the author sent this endorser (M7b §2b).
+        pending_request = (
+            db.session.query(EndorsementRequest)
+            .filter_by(
+                log_id=log.id,
+                addressee_id=endorser_id,
+                status=EndorsementRequestStatusType.PENDING,
+            )
+            .first()
+        )
+        if pending_request is not None:
+            pending_request.status = EndorsementRequestStatusType.ACTIONED
+            pending_request.responded_at = datetime.now(timezone.utc)
+
         if user not in log.user_endorsed_logs:
             log.user_endorsed_logs.append(user)
             db.session.commit()
             logger.info("log_endorsed", extra={"log_id": id, "endorser_id": user_id})
+        elif pending_request is not None:
+            db.session.commit()
+            logger.info("log_endorse_request_resolved", extra={"log_id": id, "endorser_id": user_id})
         else:
             logger.info("log_endorse_noop", extra={"log_id": id, "endorser_id": user_id})
 
