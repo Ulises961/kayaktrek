@@ -11,6 +11,7 @@ import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
 import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
+import { CertificationsSection } from "@/components/profile/certifications-section"
 import {
   MailIcon,
   PhoneIcon,
@@ -24,6 +25,7 @@ import {
   LockIcon,
   MapPinIcon,
   GlobeIcon,
+  AwardIcon,
 } from "lucide-react"
 
 export default async function ProfilePage() {
@@ -220,6 +222,19 @@ export default async function ProfilePage() {
             hasStoredNotes={!!user.medicalNotesConsentAt}
             resetAt={user.medicalNotesResetAt}
           />
+        </CardContent>
+      </Card>
+
+      {/* Certifications */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AwardIcon className="size-4" />
+            Certifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CertificationsSection initialCerts={user.certifications ?? []} />
         </CardContent>
       </Card>
 
