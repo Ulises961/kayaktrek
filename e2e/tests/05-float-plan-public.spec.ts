@@ -14,7 +14,7 @@ test.describe("Public float plan viewer", () => {
     tripId = trip.id as string
 
     // Generate share token via API
-    const shareRes = await request.post(`${API_URL}/api/logistics/${tripId}/share`, {
+    const shareRes = await request.post(`${API_URL}/api/v1/logistics/${tripId}/share`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
     })
     expect(shareRes.ok()).toBeTruthy()

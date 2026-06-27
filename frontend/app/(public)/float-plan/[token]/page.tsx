@@ -1,12 +1,13 @@
 import { format } from "date-fns"
 import { AlertTriangleIcon, AnchorIcon, ShipWheelIcon, UserIcon } from "lucide-react"
 import { FloatPlanSnapshotSchema, type SnapshotCrewMember } from "@/lib/dtos/float-plan-snapshot"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"
+import { API_URL, API_PREFIX } from "@/lib/api/config"
 
 async function fetchSnapshot(token: string) {
   try {
-    const res = await fetch(`${API_URL}/api/float-plan/public/${token}`, { cache: "no-store" })
+    const res = await fetch(`${API_URL}${API_PREFIX}/float-plan/public/${token}`, {
+      cache: "no-store",
+    })
     if (!res.ok) return null
     const raw = await res.json()
     const parsed = FloatPlanSnapshotSchema.safeParse(raw)

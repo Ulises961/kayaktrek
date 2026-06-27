@@ -110,7 +110,7 @@ def test_register_with_admin_true_is_not_admin(client):
         "name": "Hacker",
         "admin": True,
     }
-    response = client.post("/api/auth/register", json=payload)
+    response = client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201
 
     user = User.query.filter_by(mail=payload["mail"]).first()

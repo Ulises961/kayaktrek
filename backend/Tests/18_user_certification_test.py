@@ -175,3 +175,75 @@ def test_delete_all_certifications(client, auth_headers):
         r = client.delete(f"{CERT_ENDPOINT}/{cert['id']}", headers=headers)
         assert r.status_code == 204
     assert json.loads(client.get(CERT_ENDPOINT, headers=auth_headers).data) == []
+
+
+# =============================================================================
+# PATCH /api/user/me/certifications/<cert_id>
+# Self-contained: each test creates and deletes its own cert (leaves state empty).
+# =============================================================================
+
+def _add_cert(client, headers, payload=_BLSD_CERT):
+    resp = client.post(CERT_ENDPOINT, json=payload, headers=headers)
+    assert resp.status_code == 201
+    return json.loads(resp.data)["id"]
+
+
+def test_update_certification_requires_elevated_token(client, auth_headers):
+    headers = _elevated_headers(client, auth_headers)
+    cert_id = _add_cert(client, headers)
+    try:
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                            json={"validUntil": "2027-01-10"}, headers=auth_headers)
+        assert resp.status_code == 403
+    finally:
+        client.delete(f"{CERT_ENDPOINT}/{cert_id}", headers=headers)
+
+
+def test_update_certification_success(client, auth_headers):
+    headers = _elevated_headers(client, auth_headers)
+    cert_id = _add_cert(client, headers)
+    try:
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                            json={"validUntil": "2030-05-01", "membershipNumber": "RC-999"},
+                            headers=headers)
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["validUntil"] == "2030-05-01"
+        assert data["membershipNumber"] == "RC-999"
+        # Omitted fields are left unchanged.
+        assert data["organization"] == _BLSD_CERT["organization"]
+        assert data["award"] == _BLSD_CERT["award"]
+    finally:
+        client.delete(f"{CERT_ENDPOINT}/{cert_id}", headers=headers)
+
+
+def test_update_certification_strips_html(client, auth_headers):
+    headers = _elevated_headers(client, auth_headers)
+    cert_id = _add_cert(client, headers)
+    try:
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                            json={"award": "Advanced <b>Sea</b> Leader"}, headers=headers)
+        assert resp.status_code == 200
+        award = json.loads(resp.data)["award"]
+        assert "<" not in award and ">" not in award
+    finally:
+        client.delete(f"{CERT_ENDPOINT}/{cert_id}", headers=headers)
+
+
+def test_update_other_users_certification_returns_404(client, auth_headers, auth_headers_2):
+    headers = _elevated_headers(client, auth_headers)
+    cert_id = _add_cert(client, headers)
+    try:
+        headers_2 = _elevated_headers(client, auth_headers_2, password=_USER_2_PWD)
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                            json={"validUntil": "2030-01-01"}, headers=headers_2)
+        assert resp.status_code == 404
+    finally:
+        client.delete(f"{CERT_ENDPOINT}/{cert_id}", headers=headers)
+
+
+def test_update_nonexistent_certification_returns_404(client, auth_headers):
+    headers = _elevated_headers(client, auth_headers)
+    resp = client.patch(f"{CERT_ENDPOINT}/00000000-0000-0000-0000-000000000000",
+                        json={"validUntil": "2030-01-01"}, headers=headers)
+    assert resp.status_code == 404

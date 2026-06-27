@@ -22,6 +22,10 @@ export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
+// Cookie-gated routes. Anonymous-facing routes deliberately live outside this
+// matcher under the `app/(public)/` route group (landing, float-plan share,
+// export download, public paddler profiles) — keep that grouping in sync so it
+// stays obvious which routes are reachable without auth.
 export const config = {
   matcher: ["/dashboard/:path*", "/trips/:path*", "/invitations/:path*"],
 }

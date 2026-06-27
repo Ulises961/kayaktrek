@@ -15,7 +15,7 @@ from Api.database import db
 
 logger = logging.getLogger(__name__)
 
-POINT_ENDPOINT = "/api/point"
+POINT_ENDPOINT = "/api/v1/point"
 point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 
 

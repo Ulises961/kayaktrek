@@ -11,7 +11,7 @@ from Services.Middleware.auth_middleware import JWTService
 
 logger = logging.getLogger(__name__)
 
-PACKING_ENDPOINT = "/api/packing"
+PACKING_ENDPOINT = "/api/v1/packing"
 personal_packing_api = Blueprint('personal_packing', __name__, url_prefix=PACKING_ENDPOINT)
 
 

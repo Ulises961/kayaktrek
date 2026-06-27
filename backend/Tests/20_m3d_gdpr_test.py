@@ -4,7 +4,6 @@ integration tests.
 """
 import hashlib
 import json
-import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from uuid import UUID
@@ -19,6 +18,7 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
 from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
+from Tasks.data_export import export_user_data
 from Tasks.erasure import run_erasure
 
 _GDPR_PWD = "GdprPass9$"
@@ -29,7 +29,7 @@ _GDPR_PWD = "GdprPass9$"
 # =============================================================================
 
 def _register_and_activate(app, client, *, mail, phone, username, pwd=_GDPR_PWD):
-    r = client.post("/api/auth/register", json={
+    r = client.post("/api/v1/auth/register", json={
         "mail": mail,
         "pwd": pwd,
         "phone": phone,
@@ -171,6 +171,21 @@ def test_data_export_queues_task_and_returns_202(client, export_user):
 # §11 — GET /api/user/me/data-export/<token>
 # =============================================================================
 
+def test_export_task_uploads_to_object_storage(app, export_user):
+    """Regression (issue #23): the task must upload the export to shared object
+    storage, not local disk — the worker and web run in separate containers."""
+    with app.app_context(), \
+         patch("Tasks.data_export.StorageService.upload_export") as mock_upload, \
+         patch("Tasks.data_export.send_template_email") as mock_mail:
+        export_user_data.apply(args=[export_user["id"]])
+
+    mock_upload.assert_called_once()
+    object_key, data = mock_upload.call_args.args
+    assert object_key.endswith(".json")
+    assert b"profile" in data
+    mock_mail.assert_called_once()
+
+
 def test_download_export_invalid_token_returns_400(client):
     r = client.get(f"{USER_ENDPOINT}/me/data-export/not-a-real-token-at-all")
     assert r.status_code == 400
@@ -181,35 +196,27 @@ def test_download_export_valid_token_streams_file(app, client, export_user):
         user = db.session.query(User).filter_by(id=UUID(export_user["id"])).first()
         raw_token = AuthService._create_token(user.id, AuthTokenType.DATA_EXPORT)
 
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    exports_dir = os.path.join(app.root_path, "static", "exports")
-    os.makedirs(exports_dir, exist_ok=True)
-    filepath = os.path.join(exports_dir, f"{token_hash}.json")
-    with open(filepath, "w") as fh:
-        json.dump({"profile": {"id": export_user["id"]}}, fh)
+    blob = json.dumps({"profile": {"id": export_user["id"]}}).encode("utf-8")
+    with patch("Resources.user_resource.StorageService.download_export", return_value=blob), \
+         patch("Resources.user_resource.StorageService.delete_export"):
+        r = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
 
-    r = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
     assert r.status_code == 200
     assert "attachment" in r.headers.get("Content-Disposition", "")
-
-    if os.path.isfile(filepath):
-        os.remove(filepath)
+    assert r.data == blob
 
 
-def test_download_export_deletes_file_after_serving(app, client, export_user):
+def test_download_export_deletes_object_after_serving(app, client, export_user):
     with app.app_context():
         user = db.session.query(User).filter_by(id=UUID(export_user["id"])).first()
         raw_token = AuthService._create_token(user.id, AuthTokenType.DATA_EXPORT)
 
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    exports_dir = os.path.join(app.root_path, "static", "exports")
-    os.makedirs(exports_dir, exist_ok=True)
-    filepath = os.path.join(exports_dir, f"{token_hash}.json")
-    with open(filepath, "w") as fh:
-        json.dump({"test": "payload"}, fh)
+    with patch("Resources.user_resource.StorageService.download_export", return_value=b"{}"), \
+         patch("Resources.user_resource.StorageService.delete_export") as mock_delete:
+        client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
 
-    client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
-    assert not os.path.isfile(filepath)
+    mock_delete.assert_called_once_with(f"{token_hash}.json")
 
 
 def test_download_export_token_is_single_use(app, client, export_user):
@@ -217,28 +224,24 @@ def test_download_export_token_is_single_use(app, client, export_user):
         user = db.session.query(User).filter_by(id=UUID(export_user["id"])).first()
         raw_token = AuthService._create_token(user.id, AuthTokenType.DATA_EXPORT)
 
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    exports_dir = os.path.join(app.root_path, "static", "exports")
-    os.makedirs(exports_dir, exist_ok=True)
-    filepath = os.path.join(exports_dir, f"{token_hash}.json")
-    with open(filepath, "w") as fh:
-        json.dump({"test": "payload"}, fh)
+    with patch("Resources.user_resource.StorageService.download_export", return_value=b"{}"), \
+         patch("Resources.user_resource.StorageService.delete_export"):
+        first = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
+        # Token consumed on the first call → reuse is rejected before storage is touched.
+        second = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
 
-    client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
-    r = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
-    assert r.status_code == 400
-
-    if os.path.isfile(filepath):
-        os.remove(filepath)
+    assert first.status_code == 200
+    assert second.status_code == 400
 
 
-def test_download_export_missing_file_returns_404(app, client, export_user):
-    """Token is valid but the file does not exist (task not yet complete)."""
+def test_download_export_missing_object_returns_404(app, client, export_user):
+    """Token is valid but the object does not exist (task not yet complete)."""
     with app.app_context():
         user = db.session.query(User).filter_by(id=UUID(export_user["id"])).first()
         raw_token = AuthService._create_token(user.id, AuthTokenType.DATA_EXPORT)
 
-    r = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
+    with patch("Resources.user_resource.StorageService.download_export", return_value=None):
+        r = client.get(f"{USER_ENDPOINT}/me/data-export/{raw_token}")
     assert r.status_code == 404
 
 

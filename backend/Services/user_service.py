@@ -29,6 +29,7 @@ class UserService:
         "vessel_color_primary", "vessel_color_secondary",
         "emergency_contact_name", "emergency_contact_phone",
         "emergency_contact_relationship",
+        "bio", "home_location", "profile_is_public",
     })
 
     @staticmethod
@@ -90,6 +91,32 @@ class UserService:
             .limit(limit)
             .all()
         )
+
+    @staticmethod
+    def get_public_profile(username: str, viewer_id: Optional[str] = None) -> User:
+        """Resolve a paddler's public profile by username, applying visibility.
+
+        Single choke-point for the public-profile read. Raises NoResultFound — mapped to a
+        single 404 by the resource — for ALL of: unknown username, inactive or
+        deletion-pending account, or profile_is_public = False. These are deliberately
+        indistinguishable to avoid an existence/enumeration oracle.
+
+        `viewer_id` (the optional authenticated caller) is accepted now so M7b can fold a
+        block check into this one method without changing the signature or any caller — the
+        block-awareness seam. Unused in M7a.
+
+        Raises:
+            NoResultFound: If the profile does not exist or is not publicly visible.
+        """
+        user = db.session.query(User).filter_by(username=username).first()
+        if (
+            user is None
+            or not user.active
+            or user.deletion_requested_at is not None
+            or not user.profile_is_public
+        ):
+            raise NoResultFound(f"Public profile for '{username}' is not available")
+        return user
 
     @staticmethod
     def update_user(id: str, user_data: Dict[str, Any]) -> User:

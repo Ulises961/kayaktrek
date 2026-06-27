@@ -186,14 +186,14 @@ def test_delete_trip_for_everyone_false_only_removes_for_requester(client, auth_
 # ---------------------------------------------------------------------------
 
 def test_login_wrong_email_returns_401(client):
-    r = client.post("/api/auth/login", json={"mail": "ghost@nowhere.com", "pwd": "Pass123!"})
+    r = client.post("/api/v1/auth/login", json={"mail": "ghost@nowhere.com", "pwd": "Pass123!"})
     assert r.status_code == 401
     assert json.loads(r.data)["message"] == "Invalid credentials"
 
 
 def test_login_wrong_password_returns_401(client, app):
     unique = "logincheck001"
-    client.post("/api/auth/register", json={
+    client.post("/api/v1/auth/register", json={
         "mail": f"{unique}@example.com", "pwd": "RealPass9$",
         "phone": "+39090909090", "name": "Check", "username": unique,
     })
@@ -201,7 +201,7 @@ def test_login_wrong_password_returns_401(client, app):
     user.active = True
     db.session.commit()
 
-    r = client.post("/api/auth/login", json={"mail": f"{unique}@example.com", "pwd": "WrongPass9$"})
+    r = client.post("/api/v1/auth/login", json={"mail": f"{unique}@example.com", "pwd": "WrongPass9$"})
     assert r.status_code == 401
     assert json.loads(r.data)["message"] == "Invalid credentials"
 
@@ -209,12 +209,12 @@ def test_login_wrong_password_returns_401(client, app):
 def test_login_inactive_account_returns_401(client):
     """Inactive (unverified) account must return the same 401 as wrong credentials."""
     unique = "inactivecheck001"
-    client.post("/api/auth/register", json={
+    client.post("/api/v1/auth/register", json={
         "mail": f"{unique}@example.com", "pwd": "RealPass9$",
         "phone": "+39080808080", "name": "Inactive", "username": unique,
     })
     # Do NOT activate the user
-    r = client.post("/api/auth/login", json={"mail": f"{unique}@example.com", "pwd": "RealPass9$"})
+    r = client.post("/api/v1/auth/login", json={"mail": f"{unique}@example.com", "pwd": "RealPass9$"})
     assert r.status_code == 401
     assert json.loads(r.data)["message"] == "Invalid credentials"
 
@@ -222,7 +222,7 @@ def test_login_inactive_account_returns_401(client):
 def test_login_with_username_instead_of_email(client, app):
     """Login succeeds when username is supplied instead of mail."""
     unique = "usernamelogin001"
-    client.post("/api/auth/register", json={
+    client.post("/api/v1/auth/register", json={
         "mail": f"{unique}@example.com", "pwd": "RealPass9$",
         "phone": "+39070707070", "name": "ByUsername", "username": unique,
     })
@@ -230,7 +230,7 @@ def test_login_with_username_instead_of_email(client, app):
     user.active = True
     db.session.commit()
 
-    r = client.post("/api/auth/login", json={"username": unique, "pwd": "RealPass9$"})
+    r = client.post("/api/v1/auth/login", json={"username": unique, "pwd": "RealPass9$"})
     assert r.status_code == 200
     assert "access_token" in json.loads(r.data)
 
@@ -247,7 +247,7 @@ def test_register_response_has_no_tokens(client):
         "name": "NoTokens",
         "username": f"notokens_{random.randint(1000,9999)}",
     }
-    r = client.post("/api/auth/register", json=data)
+    r = client.post("/api/v1/auth/register", json=data)
     assert r.status_code == 201
     body = json.loads(r.data)
     assert "access_token" not in body

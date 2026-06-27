@@ -10,7 +10,7 @@ from shapely.geometry import Point as ShapelyPoint
 from Api.database import db as _db
 from Models.tidal_station import TidalStation
 
-DIAMOND_BASE = "/api/tidal-diamond"
+DIAMOND_BASE = "/api/v1/tidal-diamond"
 
 
 def _simple_body(itinerary, **overrides):

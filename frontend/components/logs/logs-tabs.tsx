@@ -29,7 +29,7 @@ export function LogsTabs({ myLogs, endorsedLogs }: LogsTabsProps) {
         {endorsedLogs.length === 0 ? (
           <p className="text-muted-foreground text-sm">No endorsed logs yet.</p>
         ) : (
-          endorsedLogs.map((log) => <LogCard key={log.id} log={log} />)
+          endorsedLogs.map((log) => <LogCard key={log.id} log={log} variant="endorsed" />)
         )}
       </TabsContent>
     </Tabs>

@@ -11,7 +11,7 @@ from Services.day_service import DayService
 
 logger = logging.getLogger(__name__)
 
-DAY_ENDPOINT = "/api/day"
+DAY_ENDPOINT = "/api/v1/day"
 day_api = Blueprint('day', __name__, url_prefix=DAY_ENDPOINT)
 
 @day_api.route("/itinerary/<string:itinerary_id>", methods=['GET'])

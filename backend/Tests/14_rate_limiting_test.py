@@ -41,9 +41,9 @@ class TestLoginRateLimit:
         payload = {"mail": "nobody@example.com", "pwd": "x"}
 
         for _ in range(10):
-            client.post("/api/auth/login", json=payload)
+            client.post("/api/v1/auth/login", json=payload)
 
-        r = client.post("/api/auth/login", json=payload)
+        r = client.post("/api/v1/auth/login", json=payload)
         assert r.status_code == 429
         assert "Retry-After" in r.headers
 
@@ -52,7 +52,7 @@ class TestLoginRateLimit:
         payload = {"mail": "nobody@example.com", "pwd": "x"}
 
         for _ in range(10):
-            r = client.post("/api/auth/login", json=payload)
+            r = client.post("/api/v1/auth/login", json=payload)
             assert r.status_code != 429
 
 
@@ -63,7 +63,7 @@ class TestRegisterRateLimit:
         for i in range(5):
             s = uuid.uuid4().hex[:8]
             numeric = str(int(s, 16) % 100_000_000).zfill(8)
-            client.post("/api/auth/register", json={
+            client.post("/api/v1/auth/register", json={
                 "mail": f"rl_{s}@example.com",
                 "pwd": "Pass9$abc",
                 "phone": f"+390{numeric}",
@@ -73,7 +73,7 @@ class TestRegisterRateLimit:
 
         s = uuid.uuid4().hex[:8]
         numeric = str(int(s, 16) % 100_000_000).zfill(8)
-        r = client.post("/api/auth/register", json={
+        r = client.post("/api/v1/auth/register", json={
             "mail": f"rl_{s}@example.com",
             "pwd": "Pass9$abc",
             "phone": f"+390{numeric}",
@@ -89,9 +89,9 @@ class TestForgotPasswordRateLimit:
     def test_forgot_password_rate_limited_after_threshold(self, client):
         """6th forgot-password request within an hour returns 429."""
         for _ in range(5):
-            client.post("/api/auth/forgot-password", json={"mail": "nobody@example.com"})
+            client.post("/api/v1/auth/forgot-password", json={"mail": "nobody@example.com"})
 
-        r = client.post("/api/auth/forgot-password", json={"mail": "nobody@example.com"})
+        r = client.post("/api/v1/auth/forgot-password", json={"mail": "nobody@example.com"})
         assert r.status_code == 429
         assert "Retry-After" in r.headers
 
@@ -101,9 +101,9 @@ class TestResendVerificationRateLimit:
     def test_resend_rate_limited_per_email(self, client):
         """4th resend for the same email address within an hour returns 429."""
         for _ in range(3):
-            client.post("/api/auth/resend-verification", json={"mail": "rate@example.com"})
+            client.post("/api/v1/auth/resend-verification", json={"mail": "rate@example.com"})
 
-        r = client.post("/api/auth/resend-verification", json={"mail": "rate@example.com"})
+        r = client.post("/api/v1/auth/resend-verification", json={"mail": "rate@example.com"})
         assert r.status_code == 429
         assert "Retry-After" in r.headers
 
@@ -111,9 +111,9 @@ class TestResendVerificationRateLimit:
         """Resend limits are per-email: hitting the limit for one address
         does not affect a different address."""
         for _ in range(3):
-            client.post("/api/auth/resend-verification", json={"mail": "addr_a@example.com"})
+            client.post("/api/v1/auth/resend-verification", json={"mail": "addr_a@example.com"})
 
-        r = client.post("/api/auth/resend-verification", json={"mail": "addr_b@example.com"})
+        r = client.post("/api/v1/auth/resend-verification", json={"mail": "addr_b@example.com"})
         assert r.status_code != 429
 
 
@@ -122,9 +122,9 @@ class TestResendDeletionCancelRateLimit:
     def test_resend_deletion_cancel_rate_limited_per_email(self, client):
         """4th resend-deletion-cancel for the same email returns 429."""
         for _ in range(3):
-            client.post("/api/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
+            client.post("/api/v1/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
 
-        r = client.post("/api/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
+        r = client.post("/api/v1/auth/resend-deletion-cancel", json={"mail": "rate@example.com"})
         assert r.status_code == 429
         assert "Retry-After" in r.headers
 
@@ -132,9 +132,9 @@ class TestResendDeletionCancelRateLimit:
         """Limit is per-email: exhausting the limit for one address does not
         affect a different address."""
         for _ in range(3):
-            client.post("/api/auth/resend-deletion-cancel", json={"mail": "del_a@example.com"})
+            client.post("/api/v1/auth/resend-deletion-cancel", json={"mail": "del_a@example.com"})
 
-        r = client.post("/api/auth/resend-deletion-cancel", json={"mail": "del_b@example.com"})
+        r = client.post("/api/v1/auth/resend-deletion-cancel", json={"mail": "del_b@example.com"})
         assert r.status_code != 429
 
 
@@ -144,13 +144,13 @@ class TestReAuthRateLimit:
         """11th re-auth attempt within a minute returns 429."""
         for _ in range(10):
             client.post(
-                "/api/user/me/re-auth",
+                "/api/v1/user/me/re-auth",
                 json={"password": "wrong"},
                 headers=auth_headers,
             )
 
         r = client.post(
-            "/api/user/me/re-auth",
+            "/api/v1/user/me/re-auth",
             json={"password": "wrong"},
             headers=auth_headers,
         )
@@ -161,7 +161,7 @@ class TestReAuthRateLimit:
         """Requests up to the limit are not blocked."""
         for _ in range(10):
             r = client.post(
-                "/api/user/me/re-auth",
+                "/api/v1/user/me/re-auth",
                 json={"password": "wrong"},
                 headers=auth_headers,
             )

@@ -24,7 +24,7 @@ def _resend_key():
     return mail if mail else get_remote_address()
 
 
-@api.route("/api/auth/login", methods=["POST"])
+@api.route("/api/v1/auth/login", methods=["POST"])
 @limiter.limit("10 per minute")
 @limiter.limit("50 per hour")
 def login_user():
@@ -71,7 +71,7 @@ def login_user():
         raise e
 
 
-@api.route("/api/auth/register", methods=["POST"])
+@api.route("/api/v1/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
 def register_user():
     user_json = request.get_json()
@@ -87,7 +87,7 @@ def register_user():
     }), HTTPStatus.CREATED
 
 
-@api.route("/api/auth/activate-test", methods=["POST"])
+@api.route("/api/v1/auth/activate-test", methods=["POST"])
 def activate_test_user():
     """Bypass email verification for E2E tests. Only available in development/testing."""
     if not current_app.config.get("DEVELOPMENT") and not current_app.config.get("TESTING"):
@@ -108,7 +108,7 @@ def activate_test_user():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-@api.route("/api/auth/verify", methods=["GET"])
+@api.route("/api/v1/auth/verify", methods=["GET"])
 def verify_account():
     token = request.args.get("token")
     if not token:
@@ -123,7 +123,7 @@ def verify_account():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
 
-@api.route("/api/auth/resend-verification", methods=["POST"])
+@api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
 def resend_verification():
     data = request.get_json()
@@ -141,7 +141,7 @@ def resend_verification():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend verification")
 
 
-@api.route("/api/auth/resend-deletion-cancel", methods=["POST"])
+@api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
 def resend_deletion_cancel():
     data = request.get_json()
@@ -169,7 +169,7 @@ def resend_deletion_cancel():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend cancellation email")
 
 
-@api.route("/api/auth/forgot-password", methods=["POST"])
+@api.route("/api/v1/auth/forgot-password", methods=["POST"])
 @limiter.limit("5 per hour")
 def forgot_password():
     data = request.get_json()
@@ -180,7 +180,7 @@ def forgot_password():
     return jsonify({"status": "success", "message": "If that address is registered, a reset link has been sent"}), HTTPStatus.OK
 
 
-@api.route("/api/auth/reset-password", methods=["POST"])
+@api.route("/api/v1/auth/reset-password", methods=["POST"])
 def reset_password():
     data = request.get_json()
     if not data or not data.get("token") or not data.get("pwd"):
@@ -195,7 +195,7 @@ def reset_password():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Password reset failed")
 
 
-@api.route("/api/auth/refresh", methods=["POST"])
+@api.route("/api/v1/auth/refresh", methods=["POST"])
 def refresh_token():
     body = request.get_json()
     raw_refresh = body.get("refresh_token") if body else None
@@ -222,7 +222,7 @@ def refresh_token():
     return jsonify({"status": "success", "access_token": access_token}), HTTPStatus.OK
 
 
-@api.route("/api/auth/logout", methods=["POST"])
+@api.route("/api/v1/auth/logout", methods=["POST"])
 @JWTService.authenticate_restful
 def logout():
     try:

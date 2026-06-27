@@ -6,6 +6,14 @@ from Models.log import Log
 from Schemas.base_schema import BaseSchema
 
 
+class _ShallowEndorserSchema(BaseSchema):
+    """Minimal endorser identity — never leaks credentials, contact, or related collections."""
+    id = fields.UUID(dump_only=True)
+    username = fields.String(dump_only=True)
+    name = fields.String(dump_only=True)
+    avatar_url = fields.String(dump_only=True)
+
+
 class LogSchema(BaseSchema):
     hours = fields.Float(allow_none=True)
     avg_sea = fields.Integer(allow_none=True)
@@ -13,6 +21,19 @@ class LogSchema(BaseSchema):
     date = fields.Date(allow_none=True)
     notes = fields.String(allow_none=True)
     user_id = fields.UUID(dump_only=True)
+    # The trip this log documents — loadable (optional) and the endorsement key.
+    trip_id = fields.UUID(allow_none=True, load_default=None)
+    # Derived projections — never stored. endorsers is shallow on purpose (no rank/cert fields):
+    # endorsement is flat factual attestation, not a rank broadcast.
+    endorsement_count = fields.Method("get_endorsement_count", dump_only=True)
+    endorsers = fields.List(
+        fields.Nested(_ShallowEndorserSchema),
+        dump_only=True,
+        attribute="user_endorsed_logs",
+    )
+
+    def get_endorsement_count(self, obj):
+        return len(obj.user_endorsed_logs)
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):

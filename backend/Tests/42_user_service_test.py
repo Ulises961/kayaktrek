@@ -4,6 +4,7 @@ tests do not reach. Uses a fresh-user factory so the session-scoped users
 (user_1 / user_2) are never mutated.
 """
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy.exc import NoResultFound
@@ -13,6 +14,15 @@ from Models.user import User
 from Services.user_service import UserService
 
 _FAKE_UUID = "00000000-0000-7000-8000-0000000000cc"
+
+
+def _set_attrs(user_id: str, **attrs) -> User:
+    """Set attributes directly on a user row and commit (test helper)."""
+    user = db.session.query(User).filter_by(id=uuid.UUID(user_id)).first()
+    for key, value in attrs.items():
+        setattr(user, key, value)
+    db.session.commit()
+    return user
 
 
 @pytest.fixture(scope="function")
@@ -27,7 +37,7 @@ def make_user(app, client):
         mail = f"svc.{suffix}@example.com"
         username = f"svc_{suffix}"
         phone = f"+39{counter['n']:010d}"
-        resp = client.post("/api/auth/register", json={
+        resp = client.post("/api/v1/auth/register", json={
             "mail": mail, "pwd": pwd, "phone": phone,
             "name": "Svc", "username": username,
         })
@@ -65,6 +75,41 @@ def test_update_user_duplicate_username_raises(make_user):
     with pytest.raises(Exception):  # IntegrityError (re-wrapped) on the unique constraint
         UserService.update_user(a["id"], {"username": b["username"]})
     db.session.rollback()
+
+
+# ── get_public_profile — visibility choke-point (single 404, no oracle) ──────────
+
+def test_get_public_profile_returns_public_user(make_user):
+    u = make_user()
+    _set_attrs(u["id"], profile_is_public=True)
+    result = UserService.get_public_profile(u["username"])
+    assert str(result.id) == u["id"]
+
+
+def test_get_public_profile_private_raises(make_user):
+    u = make_user()  # profile_is_public defaults to False
+    with pytest.raises(NoResultFound):
+        UserService.get_public_profile(u["username"])
+
+
+def test_get_public_profile_missing_raises(client, auth_headers):
+    with pytest.raises(NoResultFound):
+        UserService.get_public_profile("no_such_paddler_at_all")
+
+
+def test_get_public_profile_inactive_raises(make_user):
+    u = make_user()
+    _set_attrs(u["id"], profile_is_public=True, active=False)
+    with pytest.raises(NoResultFound):
+        UserService.get_public_profile(u["username"])
+
+
+def test_get_public_profile_deletion_pending_raises(make_user):
+    u = make_user()
+    _set_attrs(u["id"], profile_is_public=True,
+               deletion_requested_at=datetime.now(timezone.utc))
+    with pytest.raises(NoResultFound):
+        UserService.get_public_profile(u["username"])
 
 
 # ── keypair flow ──────────────────────────────────────────────────────────────

@@ -10,16 +10,25 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-# There is intentionally no `get` method here. The URL returned by `upload()`
-# is a direct MinIO link; the frontend uses it in <img src> without any backend
-# proxy. The backend only owns the write path (upload + delete) and presigned
-# URL generation for private objects.
+# For user uploads there is intentionally no `get` method: the URL returned by
+# `upload()` is a direct MinIO link the frontend uses in <img src> without any
+# backend proxy. The backend only owns the write path (upload + delete) and
+# presigned URL generation for private objects.
+#
+# GDPR exports are the one exception (see the `*_export` methods): they are
+# server-generated, private (never in the public-read policy), and streamed back
+# through the backend so the one-time download token can be enforced — hence a
+# read path (`download_export`) exists for them.
 
 _ENDPOINT = os.environ.get("STORAGE_ENDPOINT", "http://localhost:9000")
 _PUBLIC_URL = os.environ.get("STORAGE_PUBLIC_URL", "http://localhost:9000")
 _ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY", "kayak")
 _SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY", "")
 _BUCKET = os.environ.get("STORAGE_BUCKET", "kayak")
+
+# Prefix for GDPR data-export blobs. Deliberately excluded from _PUBLIC_READ_POLICY
+# (private) — exports are streamed through the backend behind a one-time token.
+_EXPORTS_PREFIX = "exports/"
 
 MIN_SIZE = 512
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -172,3 +181,43 @@ class StorageService:
             Params={"Bucket": _BUCKET, "Key": key},
             ExpiresIn=expires_in,
         )
+
+    # -- GDPR data exports ----------------------------------------------------
+    # Server-generated blobs shared across containers/replicas via object storage
+    # (local disk fails the moment the worker and web run in separate containers).
+
+    @staticmethod
+    def upload_export(object_key: str, data: bytes) -> None:
+        """Store a GDPR export blob privately. No MIME/size validation — the
+        payload is server-generated JSON, not a user upload."""
+        client = _client()
+        _ensure_bucket(client)
+        client.put_object(
+            Bucket=_BUCKET,
+            Key=f"{_EXPORTS_PREFIX}{object_key}",
+            Body=data,
+            ContentType="application/json",
+        )
+        logger.info("Uploaded export %s (%d bytes)", object_key, len(data))
+
+    @staticmethod
+    def download_export(object_key: str) -> bytes | None:
+        """Return an export blob's bytes, or None if it does not exist."""
+        client = _client()
+        try:
+            obj = client.get_object(Bucket=_BUCKET, Key=f"{_EXPORTS_PREFIX}{object_key}")
+            return obj["Body"].read()
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+                return None
+            raise
+
+    @staticmethod
+    def delete_export(object_key: str) -> None:
+        """Delete an export blob. Silently succeeds if the key does not exist."""
+        client = _client()
+        try:
+            client.delete_object(Bucket=_BUCKET, Key=f"{_EXPORTS_PREFIX}{object_key}")
+            logger.info("Deleted export %s", object_key)
+        except ClientError as e:
+            logger.warning("Could not delete export %s: %s", object_key, e)

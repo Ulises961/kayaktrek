@@ -6,7 +6,7 @@ import pytest
 
 from Resources.point_resource import POINT_ENDPOINT
 
-SEA_BASE = "/api/day"
+SEA_BASE = "/api/v1/day"
 
 
 def _day(itinerary, day_number):

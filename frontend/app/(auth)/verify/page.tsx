@@ -1,4 +1,4 @@
-import { API_URL } from "@/lib/api/config"
+import { API_URL, API_PREFIX } from "@/lib/api/config"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
@@ -22,9 +22,12 @@ export default async function VerifyPage({
   let errorMessage = "Invalid or expired verification link."
 
   try {
-    const res = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}`, {
-      cache: "no-store",
-    })
+    const res = await fetch(
+      `${API_URL}${API_PREFIX}/auth/verify?token=${encodeURIComponent(token)}`,
+      {
+        cache: "no-store",
+      },
+    )
     if (res.ok) {
       success = true
     } else {

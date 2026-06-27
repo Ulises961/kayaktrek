@@ -13,7 +13,7 @@ from Services.Middleware.privileges_middleware import require_owner
 
 logger = logging.getLogger(__name__)
 
-SHUTTLE_ENDPOINT = "/api/shuttle"
+SHUTTLE_ENDPOINT = "/api/v1/shuttle"
 shuttle_api = Blueprint("shuttle", __name__, url_prefix=SHUTTLE_ENDPOINT)
 
 

@@ -10,7 +10,7 @@ from Services.logistics_service import LogisticsService
 
 logger = logging.getLogger(__name__)
 
-FLOAT_PLAN_ENDPOINT = "/api/float-plan"
+FLOAT_PLAN_ENDPOINT = "/api/v1/float-plan"
 float_plan_api = Blueprint("float_plan", __name__, url_prefix=FLOAT_PLAN_ENDPOINT)
 
 
