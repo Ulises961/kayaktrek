@@ -244,7 +244,11 @@ function scaleBarHtml(px: number, meters: number): string {
 function ScaleBar() {
   const map = useMap()
   useEffect(() => {
-    const control = new L.Control({ position: "bottomright" })
+    // On desktop the cartouche sits bottom-left, so bottom-right is clear. On
+    // mobile the cartouche spans the bottom — move the bar up to the top-right
+    // (empty water under the header) so it is never occluded.
+    const mq = window.matchMedia("(min-width: 640px)")
+    let control: L.Control | null = null
     let el: HTMLElement | null = null
     const render = () => {
       if (!el) return
@@ -252,17 +256,29 @@ function ScaleBar() {
       const meters = niceScaleMeters(SCALE_TARGET_PX * mpp)
       el.innerHTML = scaleBarHtml(meters / mpp, meters)
     }
-    control.onAdd = () => {
-      el = L.DomUtil.create("div")
-      el.style.margin = "0 42px 40px 0"
-      render()
-      return el
+    const mount = () => {
+      const desktop = mq.matches
+      control = new L.Control({ position: desktop ? "bottomright" : "topright" })
+      control.onAdd = () => {
+        el = L.DomUtil.create("div")
+        el.style.margin = desktop ? "0 42px 40px 0" : "60px 16px 0 0"
+        render()
+        return el
+      }
+      control.addTo(map)
     }
-    control.addTo(map)
+    const remount = () => {
+      control?.remove()
+      el = null
+      mount()
+    }
+    mount()
+    mq.addEventListener("change", remount)
     map.on("zoomend moveend", render)
     return () => {
+      mq.removeEventListener("change", remount)
       map.off("zoomend moveend", render)
-      control.remove()
+      control?.remove()
     }
   }, [map])
   return null

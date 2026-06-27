@@ -58,7 +58,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         <p className="chart-invite mt-4">
           A growing chart of paddled waters — add the one you know best.
         </p>
-        <div className="mt-5 flex items-center gap-4">
+        <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Button asChild className={chartCta}>
             <Link href="/register">Start planning</Link>
           </Button>
