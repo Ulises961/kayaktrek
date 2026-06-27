@@ -119,7 +119,7 @@ function fmtDeg(value: number, pos: string, neg: string): string {
 function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<span style="font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:#1a3554;opacity:0.5;text-shadow:0 1px 2px rgba(247,244,236,0.9);">${text}</span>`,
+    html: `<span style="font-family:var(--font-mono),ui-monospace,monospace;font-size:11px;font-weight:${weight};letter-spacing:0.04em;color:#1a3554;opacity:0.5;text-shadow:0 1px 2px rgba(247,244,236,0.9);">${text}</span>`,
     iconSize: [0, 0],
     iconAnchor: anchor,
   })
@@ -222,7 +222,7 @@ function scaleBarHtml(px: number, meters: number): string {
     const fill = i % 2 === 0 ? "#1a3554" : "#f7f4ec"
     return `<div style="width:${segPx}px;height:9px;background:${fill};border-right:1px solid #1a3554;"></div>`
   }).join("")
-  return `<div style="font-family:var(--font-geist-mono),ui-monospace,monospace;color:#1a3554;text-shadow:0 1px 2px rgba(247,244,236,0.9);">
+  return `<div style="font-family:var(--font-mono),ui-monospace,monospace;color:#1a3554;text-shadow:0 1px 2px rgba(247,244,236,0.9);">
     <div style="display:flex;width:${px}px;border:1px solid #1a3554;border-right:none;">${cells}</div>
     <div style="display:flex;justify-content:space-between;width:${px}px;font-size:11px;letter-spacing:0.04em;margin-top:4px;opacity:0.85;"><span>0</span><span>${fmtDistance(meters)}</span></div>
   </div>`
@@ -241,7 +241,7 @@ function ScaleBar() {
     }
     control.onAdd = () => {
       el = L.DomUtil.create("div")
-      el.style.margin = "0 34px 40px 0"
+      el.style.margin = "0 42px 40px 0"
       render()
       return el
     }
@@ -260,7 +260,7 @@ function ScaleBar() {
 function noteIcon(): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div style="white-space:nowrap;font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:#1a3554;opacity:0.7;text-shadow:0 1px 2px rgba(247,244,236,0.9);">surface current · illustrative</div>`,
+    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:#1a3554;opacity:0.7;text-shadow:0 1px 2px rgba(247,244,236,0.9);">surface current · illustrative</div>`,
     iconSize: [0, 0],
     iconAnchor: [-8, -6],
   })
