@@ -12,6 +12,8 @@ import { DataExportButton } from "@/components/profile/data-export-button"
 import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
 import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
 import { CertificationsSection } from "@/components/profile/certifications-section"
+import { StatsDashboard } from "@/components/stats/stats-dashboard"
+import { getMyStats } from "@/lib/logs/actions"
 import {
   MailIcon,
   PhoneIcon,
@@ -26,6 +28,7 @@ import {
   MapPinIcon,
   GlobeIcon,
   AwardIcon,
+  ActivityIcon,
 } from "lucide-react"
 
 export default async function ProfilePage() {
@@ -36,6 +39,8 @@ export default async function ProfilePage() {
   } catch {
     notFound()
   }
+
+  const stats = await getMyStats().catch(() => null)
 
   const hasVessel =
     user.vesselMake || user.vesselModel || user.vesselLengthCm || user.vesselColorPrimary
@@ -82,6 +87,21 @@ export default async function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      {/* Paddling stats */}
+      {stats && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ActivityIcon className="size-4" />
+              Paddling stats
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatsDashboard stats={stats} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Contact */}
       <Card>
