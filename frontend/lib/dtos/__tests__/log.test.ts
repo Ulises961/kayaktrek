@@ -90,4 +90,41 @@ describe("LogFieldsSchema", () => {
   it("rejects HTML tags in notes", () => {
     expect(LogFieldsSchema.safeParse({ notes: "<script>xss</script>" }).success).toBe(false)
   })
+
+  it("accepts an optional tripId", () => {
+    expect(
+      LogFieldsSchema.safeParse({ tripId: "01952f1a-0000-7000-8000-000000000099" }).success,
+    ).toBe(true)
+  })
+})
+
+describe("LogSchema endorsement projections", () => {
+  const endorser = {
+    id: "01952f1a-0000-7000-8000-000000000002",
+    username: "buddy",
+    name: "Sam",
+    avatarUrl: "https://cdn.example.com/avatars/sam.png",
+  }
+
+  it("parses endorsementCount and an endorsers list", () => {
+    const result = LogSchema.safeParse({
+      ...LOG_FIXTURE,
+      tripId: "01952f1a-0000-7000-8000-000000000099",
+      endorsementCount: 1,
+      endorsers: [endorser],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts an endorser with a null avatarUrl", () => {
+    const result = LogSchema.safeParse({
+      ...LOG_FIXTURE,
+      endorsers: [{ ...endorser, avatarUrl: null }],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts a standalone log with null tripId and no endorsers", () => {
+    expect(LogSchema.safeParse({ ...LOG_FIXTURE, tripId: null }).success).toBe(true)
+  })
 })

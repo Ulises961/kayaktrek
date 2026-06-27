@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { createLog, updateLog, deleteLog } from "../actions"
+import { createLog, updateLog, deleteLog, endorseLog, unendorseLog } from "../actions"
 
 vi.mock("@/lib/api/client", () => ({
+  apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPatch: vi.fn(),
   apiDelete: vi.fn(),
@@ -64,5 +65,49 @@ describe("deleteLog", () => {
     DELETE.mockRejectedValue(new Error("Forbidden"))
     const result = await deleteLog("log-1")
     expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+})
+
+describe("endorseLog", () => {
+  it("posts to the endorse endpoint and revalidates", async () => {
+    POST.mockResolvedValue({ message: "Log endorsed" })
+    const result = await endorseLog("log-1")
+    expect(POST).toHaveBeenCalledWith("/api/log/log-1/endorse", {})
+    expect(revalidatePath).toHaveBeenCalledWith("/logs")
+    expect(result).toEqual({ success: true })
+  })
+
+  it("maps 403 to the shared-trip message", async () => {
+    POST.mockRejectedValue(new Error("POST ... failed: 403"))
+    const result = await endorseLog("log-1")
+    expect(result).toEqual({
+      success: false,
+      error: "You can only endorse logs from a trip you shared.",
+    })
+  })
+
+  it("maps 422 to the non-endorsable message", async () => {
+    POST.mockRejectedValue(new Error("POST ... failed: 422"))
+    const result = await endorseLog("log-1")
+    expect(result).toEqual({
+      success: false,
+      error: "This log isn't linked to a trip, so it can't be endorsed.",
+    })
+  })
+})
+
+describe("unendorseLog", () => {
+  it("deletes the endorsement and revalidates", async () => {
+    DELETE.mockResolvedValue(undefined)
+    const result = await unendorseLog("log-1")
+    expect(DELETE).toHaveBeenCalledWith("/api/log/log-1/endorse")
+    expect(revalidatePath).toHaveBeenCalledWith("/logs")
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns a generic error on failure", async () => {
+    DELETE.mockRejectedValue(new Error("boom"))
+    const result = await unendorseLog("log-1")
+    expect(result).toEqual({ success: false, error: "Failed to withdraw endorsement." })
   })
 })

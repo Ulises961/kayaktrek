@@ -10,6 +10,7 @@ from Models.user_endorses_log import user_endorses_log
 
 if TYPE_CHECKING:
     from Models.user import User
+    from Models.trip import Trip
 
 
 class Log(BaseModel):
@@ -21,8 +22,16 @@ class Log(BaseModel):
     user_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey('users.id'), nullable=True, index=True
     )
+    # The trip this log documents — the endorsement key (M7a). Nullable: a manually-created
+    # standalone log has no trip and is non-endorsable. ondelete=SET NULL so deleting a trip
+    # detaches a member's personal logbook entry rather than deleting it (and silently makes
+    # it non-endorsable, which is correct).
+    trip_id: Mapped[Optional[_UUID]] = mapped_column(
+        UUID, ForeignKey('trip.id', ondelete='SET NULL'), nullable=True, index=True
+    )
 
     user_logs: Mapped[List["User"]] = relationship(back_populates='logs')
+    trip: Mapped[Optional["Trip"]] = relationship()
     user_endorsed_logs: Mapped[List["User"]] = relationship(
         secondary=user_endorses_log, back_populates='endorsed_logs'
     )

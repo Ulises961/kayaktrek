@@ -168,7 +168,7 @@ def test_access_token_rejected_at_refresh_endpoint(client, app, user_1):
     verify_token is called with token_type='refresh' — access token fails the check.
     """
     token = _forge(app, {"user_id": str(user_1.id), "email": user_1.mail})
-    r = client.post("/api/auth/refresh", json={"refresh_token": token})
+    r = client.post("/api/v1/auth/refresh", json={"refresh_token": token})
     assert r.status_code == 401, f"access token accepted at refresh endpoint → {r.status_code}"
 
 
@@ -220,7 +220,7 @@ def pw_revocation_user(app, client):
         "name": "Revoke",
         "username": "revoke_tmp",
     }
-    client.post("/api/auth/register", json=data)
+    client.post("/api/v1/auth/register", json=data)
     with app.app_context():
         user = User.query.filter_by(mail="revoke.tmp@example.com").first()
         user.active = True
@@ -267,7 +267,7 @@ def test_token_invalidated_after_password_change(client, app, pw_revocation_user
 
     # Change the password using the pre-change token
     r = client.patch(
-        "/api/user/me/password",
+        "/api/v1/user/me/password",
         json={"currentPwd": pwd, "newPwd": new_pwd},
         headers=_bearer(token_before),
     )

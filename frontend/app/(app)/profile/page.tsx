@@ -10,6 +10,10 @@ import { Separator } from "@/components/ui/separator"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
+import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
+import { CertificationsSection } from "@/components/profile/certifications-section"
+import { StatsDashboard } from "@/components/stats/stats-dashboard"
+import { getMyStats } from "@/lib/logs/actions"
 import {
   MailIcon,
   PhoneIcon,
@@ -21,6 +25,10 @@ import {
   PaletteIcon,
   UserIcon,
   LockIcon,
+  MapPinIcon,
+  GlobeIcon,
+  AwardIcon,
+  ActivityIcon,
 } from "lucide-react"
 
 export default async function ProfilePage() {
@@ -31,6 +39,8 @@ export default async function ProfilePage() {
   } catch {
     notFound()
   }
+
+  const stats = await getMyStats().catch(() => null)
 
   const hasVessel =
     user.vesselMake || user.vesselModel || user.vesselLengthCm || user.vesselColorPrimary
@@ -54,6 +64,13 @@ export default async function ProfilePage() {
             {[user.name, user.surname].filter(Boolean).join(" ")}
           </h1>
           <p className="text-muted-foreground text-sm">@{user.username}</p>
+          {user.homeLocation && (
+            <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
+              <MapPinIcon className="size-3.5 shrink-0" />
+              {user.homeLocation}
+            </p>
+          )}
+          {user.bio && <p className="mt-2 text-sm whitespace-pre-line">{user.bio}</p>}
         </div>
         <div className="flex shrink-0 gap-2">
           <Button asChild variant="outline" size="sm">
@@ -70,6 +87,21 @@ export default async function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      {/* Paddling stats */}
+      {stats && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ActivityIcon className="size-4" />
+              Paddling stats
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatsDashboard stats={stats} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Contact */}
       <Card>
@@ -210,6 +242,32 @@ export default async function ProfilePage() {
             hasStoredNotes={!!user.medicalNotesConsentAt}
             resetAt={user.medicalNotesResetAt}
           />
+        </CardContent>
+      </Card>
+
+      {/* Certifications */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AwardIcon className="size-4" />
+            Certifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CertificationsSection initialCerts={user.certifications ?? []} />
+        </CardContent>
+      </Card>
+
+      {/* Public profile */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <GlobeIcon className="size-4" />
+            Public profile
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PublicProfileToggle username={user.username} initialIsPublic={!!user.profileIsPublic} />
         </CardContent>
       </Card>
 

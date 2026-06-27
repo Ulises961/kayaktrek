@@ -184,6 +184,38 @@ Expired tokens are not automatically nulled — they simply return 404. A Celery
 
 ---
 
+## Enumeration & oracle hardening (M7a §4)
+
+The 2026-06-11 security review flagged a cluster of LOW-severity enumeration/oracle items to revisit
+once a discoverable public surface (the public profile, M7a) ships. Their status after M7a §4:
+
+- **Login timing oracle — closed (pre-M7a).** `authenticate_user` runs a dummy bcrypt
+  (`_DUMMY_HASH`) when the account is absent, so present vs. absent accounts take the same time.
+  Extended in M7a to also dummy-hash is unnecessary because the password is now always verified
+  against a real-or-dummy hash on every path.
+- **`deletion_pending` disclosure — closed (M7a §4).** A deletion-pending account is also
+  `active = False`. Previously `authenticate_user` raised the distinct `deletion_pending`
+  `PermissionError` *before* verifying the password, letting an unauthenticated attacker probe which
+  addresses are mid-deletion. Fixed by verifying the password **first**; the actionable
+  `deletion_pending` 403 is only returned to a caller who proves the password (so a legitimate owner
+  can still cancel), while any wrong-password probe gets the generic 401.
+- **Registration "email taken" disclosure — closed (pre-M7a).** `register_user` returns the same
+  generic "check your inbox" response whether or not the address exists; an existing address instead
+  receives an `account_already_registered` email.
+- **GPX XXE/billion-laughs — closed (pre-M7a).** `import_gpx` pre-validates with
+  `defusedxml.ElementTree.fromstring` before handing the document to `gpxpy`, plus a 5 MB size cap.
+- **403-vs-404 authorization oracle — consciously declined (M7a §4).** `require_owner` keeps
+  returning **403** ("access denied") for a cross-tenant resource that exists, rather than masking it
+  as 404. Rationale: every resource ID is a UUIDv7 (122 bits, non-enumerable) behind full auth
+  gating, so an attacker can only reach this branch with an ID they were already given (a share link,
+  a former membership, a leaked URL) — in which case the 403 confirms nothing they don't already
+  know. For genuinely shared resources (a removed crew member re-hitting a trip), 403 is also the
+  more correct and useful response than a misleading 404. The change would have been a broad
+  API-contract churn (~6–8 test files) for negligible real secrecy. Revisit only if an enumerable
+  surface (e.g. sequential IDs or a public listing of private resource IDs) is ever introduced.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -192,3 +224,4 @@ Expired tokens are not automatically nulled — they simply return 404. A Celery
 | Float plan sharing — frozen snapshot | ADR-022 | 2026-05-16 | Supersedes ADR-018 §"Float plan delivery"; medical notes excluded from snapshot |
 | Medical notes ECIES encryption | ADR-023 | 2026-05-16 | Amends ADR-018 §"Medical notes — copy-on-join, consent-to-share"; plaintext column dropped |
 | Password-reset medical-notes data loss — notify + re-entry prompt | — | 2026-06-16 | Reset clears unreadable ciphertext; `medical_notes_reset_at` flag + `medical_notes_cleared` email + in-app prompt; rejected re-entry during the reset flow (would hold plaintext unauthenticated). Closes 2026-06-11 security review Step 4. |
+| Enumeration/oracle hardening (M7a §4) | — | 2026-06-25 | Closed login-timing, `deletion_pending`-before-password, registration, and GPX-XXE oracles; **consciously declined** the 403→404 `require_owner` flip (non-enumerable UUIDv7 + auth gating make the oracle non-exploitable; 403 is more correct for shared resources). Closes the 2026-06-11 review's deferred LOW items. |

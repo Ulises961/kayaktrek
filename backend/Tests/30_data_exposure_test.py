@@ -113,9 +113,9 @@ def test_duplicate_registration_no_sql_leak(client):
         "name": "SqlLeak",
         "username": "sql_leak_test",
     }
-    client.post("/api/auth/register", json=payload)
+    client.post("/api/v1/auth/register", json=payload)
 
-    r = client.post("/api/auth/register", json=payload)
+    r = client.post("/api/v1/auth/register", json=payload)
     body = r.data.decode()
 
     assert r.status_code == 201, f"non-disclosure must return 201, got {r.status_code}"
@@ -139,10 +139,10 @@ def test_duplicate_username_no_sql_leak(client):
         "name": "SqlA",
         "username": "sql_dup_user",
     }
-    client.post("/api/auth/register", json=base)
+    client.post("/api/v1/auth/register", json=base)
 
     payload2 = {**base, "mail": "sqlleak.b@example.com", "phone": "+39099900097"}
-    r = client.post("/api/auth/register", json=payload2)
+    r = client.post("/api/v1/auth/register", json=payload2)
     body = r.data.decode()
 
     assert r.status_code == 201, f"non-disclosure must return 201, got {r.status_code}"
@@ -162,7 +162,7 @@ def test_forgot_password_does_not_return_token(client):
     POST /api/auth/forgot-password must return a generic 200 without any token
     in the response body. The actual reset token is delivered by email only.
     """
-    r = client.post("/api/auth/forgot-password", json={"mail": "nobody@example.com"})
+    r = client.post("/api/v1/auth/forgot-password", json={"mail": "nobody@example.com"})
     assert r.status_code == 200
     body = json.loads(r.data)
     body_str = json.dumps(body)
@@ -179,7 +179,7 @@ def test_register_does_not_return_verification_token(client):
     import uuid
     s = uuid.uuid4().hex[:8]
     numeric = str(int(s, 16) % 100_000_000).zfill(8)
-    r = client.post("/api/auth/register", json={
+    r = client.post("/api/v1/auth/register", json={
         "mail": f"notoken_{s}@example.com",
         "pwd": "Password9$",
         "phone": f"+390{numeric}",

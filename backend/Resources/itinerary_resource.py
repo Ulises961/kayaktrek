@@ -13,7 +13,7 @@ from Services.itinerary_service import ItineraryService
 
 logger = logging.getLogger(__name__)
 
-ITINERARY_ENDPOINT = "/api/itinerary"
+ITINERARY_ENDPOINT = "/api/v1/itinerary"
 itinerary_api = Blueprint("itinerary", __name__, url_prefix=ITINERARY_ENDPOINT)
 
 

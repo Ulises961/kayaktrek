@@ -14,7 +14,7 @@ from Api.database import db
 
 logger = logging.getLogger(__name__)
 
-TRAVEL_DOCUMENT_ENDPOINT = "/api/travel-document"
+TRAVEL_DOCUMENT_ENDPOINT = "/api/v1/travel-document"
 travel_document_api = Blueprint("travel_document", __name__, url_prefix=TRAVEL_DOCUMENT_ENDPOINT)
 
 

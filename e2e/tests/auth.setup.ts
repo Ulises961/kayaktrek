@@ -9,7 +9,7 @@ import { BASE_URL, API_URL } from "../playwright.config"
 // spec asserts against the trip-detail fan-out. See ADR-030 in docs/adr/foundation.md.
 setup("warm up backend workers", async ({ request }) => {
   for (let i = 0; i < 6; i++) {
-    await request.get(`${API_URL}/api/item-categories`)
+    await request.get(`${API_URL}/api/v1/item-categories`)
   }
 })
 

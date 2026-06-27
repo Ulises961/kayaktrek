@@ -45,6 +45,14 @@ class User(BaseModel):
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Public profile (M7a) — opt-in, privacy-first. profile_is_public gates the entire
+    # public projection (stats + certifications); bio and home_location are free text.
+    bio: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    home_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    profile_is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     # Vessel defaults — pre-fill TripMember on invitation acceptance
     vessel_make: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     vessel_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

@@ -19,7 +19,7 @@ from Tasks.weather_fetch_task import fetch_weather
 
 logger = logging.getLogger(__name__)
 
-sea_api = Blueprint('sea', __name__, url_prefix='/api/day')
+sea_api = Blueprint('sea', __name__, url_prefix='/api/v1/day')
 
 _schema = SeaSchema()
 _weather_schema = WeatherSchema()

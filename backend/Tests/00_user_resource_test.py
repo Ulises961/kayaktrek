@@ -7,7 +7,7 @@ from Resources.user_resource import USER_ENDPOINT
 
 def test_user_missing_arguments(client):
     new_user_json = {"mail": "test2.user@gmail.com"}
-    response = client.post("/api/auth/register", json=new_user_json)
+    response = client.post("/api/v1/auth/register", json=new_user_json)
     assert response.status_code == 422
 
 

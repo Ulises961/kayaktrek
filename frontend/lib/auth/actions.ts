@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { API_URL } from "@/lib/api/config"
+import { API_URL, API_PREFIX } from "@/lib/api/config"
 import { z } from "zod"
 import {
   LoginSchema,
@@ -58,7 +58,7 @@ export async function login(
 
   let res: Response
   try {
-    res = await fetch(`${API_URL}/api/auth/login`, {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mail, pwd: password }),
@@ -114,7 +114,7 @@ export async function register(
 
   let res: Response
   try {
-    res = await fetch(`${API_URL}/api/auth/register`, {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -143,7 +143,7 @@ export async function forgotPassword(
   }
 
   try {
-    await fetch(`${API_URL}/api/auth/forgot-password`, {
+    await fetch(`${API_URL}${API_PREFIX}/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mail: parsed.data.mail }),
@@ -173,7 +173,7 @@ export async function resetPassword(
 
   let res: Response
   try {
-    res = await fetch(`${API_URL}/api/auth/reset-password`, {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: parsed.data.token, pwd: parsed.data.password }),
@@ -193,7 +193,7 @@ export async function cancelDeletion(token: string): Promise<AuthResult> {
   let res: Response
   try {
     res = await fetch(
-      `${API_URL}/api/user/me/deletion-request?token=${encodeURIComponent(token)}`,
+      `${API_URL}${API_PREFIX}/user/me/deletion-request?token=${encodeURIComponent(token)}`,
       {
         method: "DELETE",
       },
@@ -215,7 +215,7 @@ export async function cancelDeletion(token: string): Promise<AuthResult> {
 
 export async function resendDeletionCancel(mail: string): Promise<AuthResult> {
   try {
-    await fetch(`${API_URL}/api/auth/resend-deletion-cancel`, {
+    await fetch(`${API_URL}${API_PREFIX}/auth/resend-deletion-cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mail }),
@@ -241,7 +241,7 @@ export async function refreshSession(): Promise<boolean> {
 
   let res: Response
   try {
-    res = await fetch(`${API_URL}/api/auth/refresh`, {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

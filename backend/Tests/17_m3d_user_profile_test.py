@@ -27,7 +27,7 @@ def pw_user(app, client):
         "name": "PwChange",
         "username": "pwchange_tmp",
     }
-    client.post("/api/auth/register", json=data)
+    client.post("/api/v1/auth/register", json=data)
     with app.app_context():
         user = User.query.filter_by(mail="pwchange.tmp@example.com").first()
         user.active = True

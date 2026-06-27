@@ -28,7 +28,7 @@ _dump_schema = TidalStationSchema()
 _edit_schema = TidalDiamondEditSchema()
 
 
-@tidal_diamond_api.route('/api/tidal-diamond/create', methods=['POST'])
+@tidal_diamond_api.route('/api/v1/tidal-diamond/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_diamond():
@@ -51,7 +51,7 @@ def create_diamond():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@tidal_diamond_api.route('/api/tidal-diamond/<string:id>', methods=['GET'])
+@tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def get_diamond(id: str):
@@ -68,7 +68,7 @@ def get_diamond(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@tidal_diamond_api.route('/api/tidal-diamond/<string:id>', methods=['PATCH'])
+@tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def update_diamond(id: str):
@@ -90,7 +90,7 @@ def update_diamond(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@tidal_diamond_api.route('/api/tidal-diamond/<string:id>', methods=['DELETE'])
+@tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def delete_diamond(id: str):

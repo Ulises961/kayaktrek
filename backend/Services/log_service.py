@@ -3,7 +3,7 @@ Log Service - Business logic for log operations.
 """
 import logging
 import math
-from typing import List, cast
+from typing import Any, List, Optional, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from sqlalchemy.orm import selectinload
@@ -12,10 +12,28 @@ from Schemas.base_schema import camelcase
 
 from Models.log import Log
 from Models.user import User
+from Models.trip_member import TripMember
 from Schemas.log_schema import LogSchema
 from Api.database import db
 
 logger = logging.getLogger(__name__)
+
+
+def _as_float(value: Optional[Any]) -> float:
+    """Coerce a nullable Numeric column value to a float (None contributes 0.0).
+
+    The Log money/measurement columns are mapped as Numeric (Decimal at runtime); this
+    keeps the aggregation total-friendly and type-checkable in one place.
+    """
+    return float(value) if value is not None else 0.0
+
+
+class LogNotEndorsableError(Exception):
+    """A log that is structurally ineligible for endorsement (no trip link).
+
+    Distinct from PermissionError (403, the caller is not allowed): this is a 422 —
+    the log is the wrong shape to endorse, regardless of who is asking.
+    """
 
 
 class LogService:
@@ -100,7 +118,7 @@ class LogService:
         log = LogService.get_log_by_id(id)
         logger.info(f"Updating log {id}")
 
-        _MUTABLE_FIELDS = {"hours", "avg_sea", "distance", "date", "notes"}
+        _MUTABLE_FIELDS = {"hours", "avg_sea", "distance", "date", "notes", "trip_id"}
         for field in _MUTABLE_FIELDS:
             key = camelcase(field)
             if key in log_data:
@@ -149,29 +167,59 @@ class LogService:
     @staticmethod
     def endorse_log(id: str, user_id: str) -> None:
         """
-        Endorse a log entry.
+        Endorse a log entry under the same-trip mutual-attestation rule.
+
+        A user `E` may endorse log `L` (author `A`) iff `L.trip_id` is set AND both `A`
+        and `E` have held a TripMember row for that trip AND `E != A`. Endorsement is flat
+        factual attestation ("I shared this trip and corroborate it happened") — equal
+        regardless of the endorser's certifications or role.
 
         Args:
-            log_id: The ID of the log to endorse
+            id: The ID of the log to endorse
             user_id: The ID of the user endorsing the log
 
         Raises:
-            NoResultFound: If log doesn't exist
+            NoResultFound: If the log or endorsing user doesn't exist
+            LogNotEndorsableError: If the log has no trip link (422 — wrong shape)
+            PermissionError: If the caller is the author or did not share the trip (403)
         """
-        from Models.user import User
-
         log = LogService.get_log_by_id(id)
-        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
 
+        if log.trip_id is None:
+            raise LogNotEndorsableError(
+                "This log is not linked to a trip and cannot be endorsed"
+            )
+
+        endorser_id = UUID(user_id)
+        if log.user_id == endorser_id:
+            raise PermissionError("You cannot endorse your own log")
+
+        # Both author and endorser must have held a TripMember row for the log's trip.
+        # Two distinct member rows for {author, endorser} on that trip proves the shared trip.
+        shared_members = (
+            db.session.query(TripMember.user_id)
+            .filter(
+                TripMember.trip_id == log.trip_id,
+                TripMember.user_id.in_([log.user_id, endorser_id]),
+            )
+            .distinct()
+            .count()
+        )
+        if shared_members < 2:
+            raise PermissionError(
+                "You can only endorse a log from a trip you shared with its author"
+            )
+
+        user = db.session.query(User).filter_by(id=endorser_id).first()
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
         if user not in log.user_endorsed_logs:
             log.user_endorsed_logs.append(user)
             db.session.commit()
-            logger.info(f"User {user_id} endorsed log {id}")
+            logger.info("log_endorsed", extra={"log_id": id, "endorser_id": user_id})
         else:
-            logger.info(f"User {user_id} already endorsed log {id}")
+            logger.info("log_endorse_noop", extra={"log_id": id, "endorser_id": user_id})
 
     @staticmethod
     def unendorse_log(id: str, user_id: str) -> None:
@@ -215,3 +263,48 @@ class LogService:
             raise NoResultFound(f"User with id {user_id} not found in db")
         logger.info(f"Found {len(user.endorsed_logs)} logs for user {user_id}")
         return user.endorsed_logs
+
+    @staticmethod
+    def stats_for_user(user_id: str) -> dict:
+        """
+        Aggregate a paddler's logbook into summary stats. Pure read aggregation over the
+        user's Log rows — no new storage. Reused by both the private /stats endpoint and
+        the public profile projection.
+
+        Returns a camelCase dict ready to jsonify.
+        """
+        logs = (
+            db.session.query(Log)
+            .options(selectinload(Log.user_endorsed_logs))
+            .filter_by(user_id=UUID(user_id))
+            .all()
+        )
+
+        total_distance = sum(_as_float(log.distance) for log in logs)
+        total_hours = sum(_as_float(log.hours) for log in logs)
+        trip_ids = {log.trip_id for log in logs if log.trip_id is not None}
+        endorsements_received = sum(len(log.user_endorsed_logs) for log in logs)
+
+        conditions_distribution: dict = {}
+        activity_by_month: dict = {}
+        for log in logs:
+            if log.avg_sea is not None:
+                conditions_distribution[log.avg_sea] = conditions_distribution.get(log.avg_sea, 0) + 1
+            if log.date is not None:
+                month_key = log.date.strftime("%Y-%m")
+                bucket = activity_by_month.setdefault(
+                    month_key, {"month": month_key, "distance": 0.0, "hours": 0.0, "count": 0}
+                )
+                bucket["distance"] += _as_float(log.distance)
+                bucket["hours"] += _as_float(log.hours)
+                bucket["count"] += 1
+
+        return {
+            "totalDistance": total_distance,
+            "totalHours": total_hours,
+            "logCount": len(logs),
+            "tripCount": len(trip_ids),
+            "endorsementsReceived": endorsements_received,
+            "conditionsDistribution": conditions_distribution,
+            "activityByMonth": [activity_by_month[key] for key in sorted(activity_by_month)],
+        }

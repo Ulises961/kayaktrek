@@ -10,7 +10,7 @@ export async function apiCreateTrip(
   accessToken: string,
   overrides: Record<string, unknown> = {},
 ): Promise<{ id: string; [key: string]: unknown }> {
-  const res = await request.post(`${API_URL}/api/trip/create`, {
+  const res = await request.post(`${API_URL}/api/v1/trip/create`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: {
       inventory: {},
@@ -27,7 +27,7 @@ export async function apiDeleteTrip(
   accessToken: string,
   tripId: string,
 ): Promise<void> {
-  await request.delete(`${API_URL}/api/trip/${tripId}?for_everyone=true`, {
+  await request.delete(`${API_URL}/api/v1/trip/${tripId}?for_everyone=true`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
 }
@@ -38,7 +38,7 @@ export async function apiInviteByEmail(
   tripId: string,
   email: string,
 ): Promise<void> {
-  const res = await request.post(`${API_URL}/api/trip/${tripId}/invite`, {
+  const res = await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { email },
   })
@@ -50,7 +50,7 @@ export async function apiAcceptInvitation(
   accessToken: string,
   tripId: string,
 ): Promise<void> {
-  const res = await request.post(`${API_URL}/api/trip/${tripId}/invitation`, {
+  const res = await request.post(`${API_URL}/api/v1/trip/${tripId}/invitation`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { accepted: true },
   })
@@ -63,7 +63,7 @@ export async function apiTransitionState(
   tripId: string,
   state: string,
 ): Promise<void> {
-  const res = await request.post(`${API_URL}/api/trip/${tripId}/state`, {
+  const res = await request.post(`${API_URL}/api/v1/trip/${tripId}/state`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { state },
   })
@@ -76,7 +76,7 @@ export async function apiGetAccessToken(
   pwd: string,
 ): Promise<string> {
   if (_tokenCache.has(mail)) return _tokenCache.get(mail)!
-  const res = await request.post(`${API_URL}/api/auth/login`, {
+  const res = await request.post(`${API_URL}/api/v1/auth/login`, {
     data: { mail, pwd },
   })
   if (!res.ok()) throw new Error(`login failed for ${mail}: ${res.status()}`)

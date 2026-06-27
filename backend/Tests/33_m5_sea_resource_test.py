@@ -20,14 +20,14 @@ from Services.tidal_station_service import TidalStationService
 
 def test_get_sea_404_when_not_exists(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/sea", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/sea", headers=auth_headers)
     assert resp.status_code == 404
 
 
 def test_post_sea_creates_and_returns_rule_of_twelfths(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     body = {"highTide": "12:00", "lowTide": "06:00", "tidalRangeM": 4.0}
-    resp = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    resp = client.post(f"/api/v1/day/{day_id}/sea", json=body, headers=auth_headers)
     assert resp.status_code == 201
     data = resp.get_json()
     assert data["dayId"] == day_id
@@ -42,10 +42,10 @@ def test_post_sea_creates_and_returns_rule_of_twelfths(client, auth_headers, iti
 def test_post_sea_409_when_already_exists(client, auth_headers, itinerary):
     day_id = itinerary["days"][1]["id"]
     body = {"highTide": "06:00", "lowTide": "12:00", "tidalRangeM": 3.0}
-    resp1 = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    resp1 = client.post(f"/api/v1/day/{day_id}/sea", json=body, headers=auth_headers)
     assert resp1.status_code == 201
 
-    resp2 = client.post(f"/api/day/{day_id}/sea", json=body, headers=auth_headers)
+    resp2 = client.post(f"/api/v1/day/{day_id}/sea", json=body, headers=auth_headers)
     assert resp2.status_code == 409
 
     _cleanup_sea(day_id)
@@ -54,13 +54,13 @@ def test_post_sea_409_when_already_exists(client, auth_headers, itinerary):
 def test_patch_sea_updates_fields(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     client.post(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"highTide": "10:00", "lowTide": "04:00", "tidalRangeM": 2.0},
         headers=auth_headers,
     )
 
     resp = client.patch(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"tidalRangeM": 3.5, "moonPhase": "waxing gibbous"},
         headers=auth_headers,
     )
@@ -77,7 +77,7 @@ def test_patch_sea_upserts_when_not_exists(client, auth_headers, itinerary):
     # Sea is lazily materialised: the first PATCH for a day creates the record
     # rather than 404ing, since the frontend only ever PATCHes.
     day_id = itinerary["days"][0]["id"]
-    resp = client.patch(f"/api/day/{day_id}/sea", json={"tidalRangeM": 1.0}, headers=auth_headers)
+    resp = client.patch(f"/api/v1/day/{day_id}/sea", json={"tidalRangeM": 1.0}, headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json()["tidalRangeM"] == pytest.approx(1.0)
 
@@ -87,12 +87,12 @@ def test_patch_sea_upserts_when_not_exists(client, auth_headers, itinerary):
 def test_get_sea_returns_created_record(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     client.post(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"lowTide": "08:00", "highTide": "14:00", "tidalRangeM": 5.5},
         headers=auth_headers,
     )
 
-    resp = client.get(f"/api/day/{day_id}/sea", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/sea", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["tidalRangeM"] == pytest.approx(5.5)
@@ -104,7 +104,7 @@ def test_get_sea_returns_created_record(client, auth_headers, itinerary):
 
 def test_get_tidal_gates_returns_empty_list(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/tidal-gates", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/tidal-gates", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json() == []
 
@@ -113,7 +113,7 @@ def test_get_tidal_gates_returns_empty_list(client, auth_headers, itinerary):
 
 def test_get_weather_404_when_no_record(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/weather", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/weather", headers=auth_headers)
     assert resp.status_code == 404
 
 
@@ -136,7 +136,7 @@ def test_get_weather_returns_states(client, auth_headers, app, itinerary):
         _db.session.add(ws)
         _db.session.commit()
 
-    resp = client.get(f"/api/day/{day_id}/weather", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/weather", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["dayId"] == day_id
@@ -162,7 +162,7 @@ def test_weather_fetch_400_without_date(client, auth_headers, app, itinerary):
         day.date = None
         _db.session.commit()
     try:
-        resp = client.post(f"/api/day/{day_id}/weather/fetch", headers=auth_headers)
+        resp = client.post(f"/api/v1/day/{day_id}/weather/fetch", headers=auth_headers)
         assert resp.status_code == 400
     finally:
         with app.app_context():
@@ -177,7 +177,7 @@ def test_weather_fetch_202_with_date(client, auth_headers, itinerary):
     mock_result.id = "mock-celery-task-id"
     with patch("Resources.sea_resource.fetch_weather") as mock_task:
         mock_task.delay.return_value = mock_result
-        resp = client.post(f"/api/day/{day_id}/weather/fetch", headers=auth_headers)
+        resp = client.post(f"/api/v1/day/{day_id}/weather/fetch", headers=auth_headers)
     assert resp.status_code == 202
     assert resp.get_json()["taskId"] == "mock-celery-task-id"
 
@@ -203,7 +203,7 @@ def test_tidal_station_create_requires_admin(client, auth_headers_2, itinerary):
         "name": "Test Station",
         "location": {"type": "Point", "coordinates": [-4.15, 50.35]},
     }
-    resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers_2)
+    resp = client.post("/api/v1/tidal-station/create", json=body, headers=auth_headers_2)
     assert resp.status_code == 403
 
 
@@ -216,7 +216,7 @@ def test_tidal_station_create_and_delete(admin_user_1, client, auth_headers):
             {"hoursFromHw": 0, "springRateKnots": 2.1, "neapRateKnots": 1.0, "directionDegrees": 270},
         ],
     }
-    resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers)
+    resp = client.post("/api/v1/tidal-station/create", json=body, headers=auth_headers)
     assert resp.status_code == 201
     data = resp.get_json()
     station_id = data["id"]
@@ -225,7 +225,7 @@ def test_tidal_station_create_and_delete(admin_user_1, client, auth_headers):
     assert len(data["tidalStreamEntries"]) == 1
     assert data["location"]["type"] == "Point"
 
-    del_resp = client.delete(f"/api/tidal-station/{station_id}", headers=auth_headers)
+    del_resp = client.delete(f"/api/v1/tidal-station/{station_id}", headers=auth_headers)
     assert del_resp.status_code == 200
 
 
@@ -234,11 +234,11 @@ def test_tidal_station_patch(admin_user_1, client, auth_headers):
         "name": "Lizard Point",
         "location": {"type": "Point", "coordinates": [-5.20, 49.96]},
     }
-    create_resp = client.post("/api/tidal-station/create", json=body, headers=auth_headers)
+    create_resp = client.post("/api/v1/tidal-station/create", json=body, headers=auth_headers)
     station_id = create_resp.get_json()["id"]
 
     patch_resp = client.patch(
-        f"/api/tidal-station/{station_id}",
+        f"/api/v1/tidal-station/{station_id}",
         json={"name": "Lizard Point Updated", "meanSpringRangeM": 3.9},
         headers=auth_headers,
     )
@@ -247,7 +247,7 @@ def test_tidal_station_patch(admin_user_1, client, auth_headers):
     assert patched["name"] == "Lizard Point Updated"
     assert patched["meanSpringRangeM"] == pytest.approx(3.9)
 
-    client.delete(f"/api/tidal-station/{station_id}", headers=auth_headers)
+    client.delete(f"/api/v1/tidal-station/{station_id}", headers=auth_headers)
 
 
 def test_tidal_station_nearby(client, auth_headers, app):
@@ -258,7 +258,7 @@ def test_tidal_station_nearby(client, auth_headers, app):
         _db.session.commit()
         station_id = str(station.id)
     try:
-        resp = client.get("/api/tidal-station/nearby?lat=50.35&lng=-4.15&range=1")
+        resp = client.get("/api/v1/tidal-station/nearby?lat=50.35&lng=-4.15&range=1")
         assert resp.status_code == 200
         names = [s["name"] for s in resp.get_json()]
         assert "Nearby Station Test" in names
@@ -271,7 +271,7 @@ def test_tidal_station_nearby(client, auth_headers, app):
 
 
 def test_tidal_station_nearby_excludes_out_of_range(client):
-    resp = client.get("/api/tidal-station/nearby?lat=51.50&lng=-0.10&range=1")
+    resp = client.get("/api/v1/tidal-station/nearby?lat=51.50&lng=-0.10&range=1")
     assert resp.status_code == 200
     # No stations near London — just confirm the endpoint returns an empty list
     assert isinstance(resp.get_json(), list)
@@ -280,13 +280,13 @@ def test_tidal_station_nearby_excludes_out_of_range(client):
 def test_patch_sea_tidal_stream_fields(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     client.post(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"highTide": "10:00", "lowTide": "04:00", "tidalRangeM": 4.0},
         headers=auth_headers,
     )
 
     resp = client.patch(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={
             "referencePortName": "Milford Haven",
             "hwTimeOffsetMinutes": 35,
@@ -316,13 +316,13 @@ def test_patch_sea_tidal_stream_fields(client, auth_headers, itinerary):
 def test_patch_sea_explicit_tidal_source_not_overridden(client, auth_headers, itinerary):
     day_id = itinerary["days"][1]["id"]
     client.post(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"highTide": "09:00", "lowTide": "15:00"},
         headers=auth_headers,
     )
 
     resp = client.patch(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"hwTimeOffsetMinutes": 20, "tidalSource": "manual"},
         headers=auth_headers,
     )
@@ -336,7 +336,7 @@ def test_patch_sea_explicit_tidal_source_not_overridden(client, auth_headers, it
 
 def test_wind_vectors_returns_empty_grid_when_no_weather(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/wind-vectors?hour=12", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/wind-vectors?hour=12", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["grid"] == []
@@ -344,7 +344,7 @@ def test_wind_vectors_returns_empty_grid_when_no_weather(client, auth_headers, i
 
 def test_wave_vectors_returns_empty_grid_when_no_sea_states(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/wave-vectors?hour=12", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/wave-vectors?hour=12", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["grid"] == []
@@ -352,7 +352,7 @@ def test_wave_vectors_returns_empty_grid_when_no_sea_states(client, auth_headers
 
 def test_tidal_diamonds_empty_when_none_exist(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
-    resp = client.get(f"/api/day/{day_id}/tidal-diamonds?hour=12", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/tidal-diamonds?hour=12", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json() == []
 
@@ -363,7 +363,7 @@ def test_tidal_diamonds_returns_user_diamond_resolved_at_hour(
     day_id = itinerary["days"][0]["id"]
     # HW at 12:00 so the clock hour maps onto the diamond's hourly table.
     client.post(
-        f"/api/day/{day_id}/sea",
+        f"/api/v1/day/{day_id}/sea",
         json={"highTide": "12:00", "lowTide": "06:00", "tidalRangeM": 4.0},
         headers=auth_headers,
     )
@@ -378,7 +378,7 @@ def test_tidal_diamonds_returns_user_diamond_resolved_at_hour(
     })
 
     # hour 9 → 3 h before HW(12) → hours_from_hw = -3 → mid-flood peak.
-    resp = client.get(f"/api/day/{day_id}/tidal-diamonds?hour=9", headers=auth_headers)
+    resp = client.get(f"/api/v1/day/{day_id}/tidal-diamonds?hour=9", headers=auth_headers)
     assert resp.status_code == 200
     diamonds = resp.get_json()
     assert len(diamonds) == 1

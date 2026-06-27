@@ -6,13 +6,14 @@ from marshmallow import ValidationError
 from flask import Blueprint, jsonify, request, abort, g
 
 import hashlib
-import os
+from io import BytesIO
 
 from flask import current_app, send_file
 
-from Schemas.user_schema import UserSchema, UserUpdateSchema
+from Schemas.user_schema import UserSchema, UserUpdateSchema, PublicUserSchema
 from Services.user_service import UserService
-from Services.storage_service import StorageValidationError
+from Services.log_service import LogService
+from Services.storage_service import StorageService, StorageValidationError
 from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_self, require_admin
@@ -24,7 +25,7 @@ from Services.mail_service import send_template_email
 
 logger = logging.getLogger(__name__)
 
-USER_ENDPOINT = "/api/user"
+USER_ENDPOINT = "/api/v1/user"
 user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
 
 
@@ -70,6 +71,31 @@ def search_users():
         return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
 
     except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/<string:username>/public", methods=["GET"])
+@JWTService.authenticate_optional
+def get_public_profile(username: str):
+    """
+    Retrieve a paddler's public profile by username. Auth-optional (mirrors
+    GET /api/itinerary/explore): anonymous and authenticated callers both allowed.
+
+    Returns a privacy-safe projection (identity, bio, home location, opt-in
+    certifications, aggregate stats). Returns a single 404 for a missing, inactive,
+    deletion-pending, or non-public profile — no existence oracle.
+    """
+    try:
+        viewer_id = getattr(g, "current_user_id", None)
+        user = UserService.get_public_profile(username, viewer_id)
+        data = PublicUserSchema().dump(user)
+        data["stats"] = LogService.stats_for_user(str(user.id))
+        return jsonify(data), HTTPStatus.OK
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Profile not found")
+    except Exception as e:
+        logger.error(f"Error retrieving public profile for {username}: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
@@ -353,7 +379,7 @@ def download_data_export(token: str):
     Returns:
         200 with the JSON file as an attachment
         400 if the token is invalid / expired / already used
-        404 if the file is missing (already downloaded or task not yet complete)
+        404 if the object is missing (already downloaded or task not yet complete)
     """
     try:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -361,20 +387,20 @@ def download_data_export(token: str):
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
 
-    exports_dir = os.path.join(current_app.root_path, "static", "exports")
-    filepath = os.path.join(exports_dir, f"{token_hash}.json")
-
-    if not os.path.isfile(filepath):
+    object_key = f"{token_hash}.json"
+    data = StorageService.download_export(object_key)
+    if data is None:
         abort(HTTPStatus.NOT_FOUND, description="Export file not found or already downloaded")
 
-    response = send_file(filepath, as_attachment=True, download_name="kayak-planner-export.json")
+    # Single-use: remove the object now that we hold its bytes in memory.
+    StorageService.delete_export(object_key)
 
-    try:
-        os.remove(filepath)
-    except OSError as e:
-        logger.error("export_file_cleanup_failed", extra={"filepath": filepath, "error": str(e)})
-
-    return response
+    return send_file(
+        BytesIO(data),
+        mimetype="application/json",
+        as_attachment=True,
+        download_name="kayak-planner-export.json",
+    )
 
 
 @user_api.route("/me", methods=["DELETE"])

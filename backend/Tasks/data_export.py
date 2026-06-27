@@ -1,15 +1,15 @@
 """
 GDPR Art. 15 / 20 — data export task.
 
-Assembles a JSON snapshot of all personal data for a user, writes it to
-static/exports/<token_hash>.json, then emails a signed one-time download
-link (24 h TTL).  The download endpoint streams the file, marks the token
-used, and deletes the file.
+Assembles a JSON snapshot of all personal data for a user, uploads it to object
+storage under exports/<token_hash>.json, then emails a signed one-time download
+link (24 h TTL).  The download endpoint streams the object, marks the token
+used, and deletes the object. Object storage (not local disk) is required so the
+worker and web containers — and any future replicas — share the file.
 """
 import hashlib
 import json
 import logging
-import os
 from datetime import UTC, date, datetime
 from typing import cast
 from uuid import UUID
@@ -21,6 +21,7 @@ from Models.auth_token import AuthTokenType
 from Models.user import User
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
+from Services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,7 @@ def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
 
         payload = json.dumps(_build_export(user), indent=2, default=_json_default)
 
-        exports_dir = os.path.join(current_app.root_path, "static", "exports")
-        os.makedirs(exports_dir, exist_ok=True)
-        filepath = os.path.join(exports_dir, f"{token_hash}.json")
-        with open(filepath, "w") as fh:
-            fh.write(payload)
+        StorageService.upload_export(f"{token_hash}.json", payload.encode("utf-8"))
 
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         download_url = f"{frontend_url}/download-export/{raw_token}"

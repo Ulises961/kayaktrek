@@ -37,7 +37,7 @@ test.describe("Trip state transitions", () => {
   test("leader advances happening → past via UI", async ({ page, request }) => {
     // Move to happening via API first
     const res = await request.post(
-      `${API_URL}/api/trip/${tripId}/state`,
+      `${API_URL}/api/v1/trip/${tripId}/state`,
       {
         headers: { Authorization: `Bearer ${leaderToken}` },
         data: { state: "happening" },
@@ -56,11 +56,11 @@ test.describe("Trip state transitions", () => {
   test("crew cannot transition state", async ({ browser, request }) => {
     // Invite and have crew accept via API
     const crewToken = await apiGetAccessToken(request, "e2e.crew@example.com", "Crew$ecure1!")
-    await request.post(`${API_URL}/api/trip/${tripId}/invite`, {
+    await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
       data: { email: "e2e.crew@example.com" },
     })
-    await request.post(`${API_URL}/api/trip/${tripId}/invitation`, {
+    await request.post(`${API_URL}/api/v1/trip/${tripId}/invitation`, {
       headers: { Authorization: `Bearer ${crewToken}` },
       data: { accepted: true },
     })
