@@ -74,6 +74,34 @@ def search_users():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_api.route("/search/paddlers", methods=["GET"])
+@JWTService.authenticate_restful
+@limiter.limit("30 per minute", key_func=lambda: str(g.current_user_id))
+def search_paddlers():
+    """Buddy finder — search public paddlers by username / name / surname (M7b).
+
+    Query params: q (search term), page, per_page. Returns a paginated, block-filtered
+    list of public profiles, each annotated with the caller's relationship
+    (none | pending_outgoing | pending_incoming | buddy) and connection id.
+    """
+    try:
+        query = request.args.get("q", "")
+        page = request.args.get("page", 1, type=int)
+        per_page = min(request.args.get("per_page", 20, type=int), 100)
+        result = UserService.search_paddlers(
+            str(g.current_user_id), query, page=page, per_page=per_page
+        )
+        return jsonify({
+            "items": result["items"],
+            "total": result["total"],
+            "page": result["page"],
+            "pages": result["pages"],
+        }), HTTPStatus.OK
+    except Exception as e:
+        logger.error(f"Error searching paddlers: {e}")
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_api.route("/<string:username>/public", methods=["GET"])
 @JWTService.authenticate_optional
 def get_public_profile(username: str):
