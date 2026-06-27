@@ -10,6 +10,7 @@ import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { AnchorIcon, ShieldAlertIcon, UserIcon, CameraIcon, Trash2Icon } from "lucide-react"
 
@@ -36,6 +37,8 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
       surname: user.surname ?? "",
       phone: user.phone ?? "",
       username: user.username ?? "",
+      bio: user.bio ?? "",
+      homeLocation: user.homeLocation ?? "",
       vesselMake: user.vesselMake ?? "",
       vesselModel: user.vesselModel ?? "",
       vesselLengthCm: user.vesselLengthCm != null ? String(user.vesselLengthCm) : "",
@@ -156,6 +159,32 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
             <Label htmlFor="phone">Phone</Label>
             <Input id="phone" type="tel" disabled={isPending} {...register("phone")} />
             {errors.phone && <p className="text-destructive text-xs">{errors.phone.message}</p>}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="homeLocation">Home location</Label>
+            <Input
+              id="homeLocation"
+              placeholder="e.g. Pembrokeshire, Wales"
+              disabled={isPending}
+              {...register("homeLocation")}
+            />
+            <p className="text-muted-foreground text-xs">
+              Shown on your public profile if you make it public.
+            </p>
+            {errors.homeLocation && (
+              <p className="text-destructive text-xs">{errors.homeLocation.message}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea
+              id="bio"
+              rows={3}
+              placeholder="A short introduction — paddling style, home waters, what you're into."
+              disabled={isPending}
+              {...register("bio")}
+            />
+            {errors.bio && <p className="text-destructive text-xs">{errors.bio.message}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Email</Label>
