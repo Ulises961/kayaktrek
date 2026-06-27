@@ -30,6 +30,9 @@ type Props = {
   routes?: RouteData[]
   center?: [number, number]
   zoom?: number
+  // When false the map is a static poster (no drag/zoom) so page-scroll is never
+  // captured — used on mobile, where touch-drag would fight the scroll-dissipate.
+  interactive?: boolean
 }
 
 // Esri Ocean Basemap — soft bathymetric Mediterranean blue, water-forward.
@@ -362,7 +365,58 @@ function RouteMarkers({ route }: { route: RouteData }) {
   )
 }
 
-export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Props) {
+// Frame the chart ON the itinerary (zoomed in, capped at the overview max) rather
+// than a fixed far-out centre — so the parallax reveal lands on a well-scaled
+// passage and the route sits centred, not stranded high. Re-fits on resize/
+// breakpoint. Falls back to the fixed centre/zoom when there is no route yet.
+function FrameRoute({ routes }: { routes: RouteData[] }) {
+  const map = useMap()
+  useEffect(() => {
+    const pts = routes.flatMap((r) => r.positions) as [number, number][]
+    if (pts.length === 0) return
+    const bounds = L.latLngBounds(pts)
+    const fit = () => {
+      const compact = window.matchMedia("(max-width: 639px)").matches
+      map.fitBounds(bounds, {
+        paddingTopLeft: [compact ? 32 : 56, 88], // clear the header strip
+        paddingBottomRight: [compact ? 32 : 56, compact ? 120 : 72],
+        maxZoom: MAX_ZOOM,
+        animate: false,
+      })
+    }
+    fit()
+    window.addEventListener("resize", fit)
+    return () => window.removeEventListener("resize", fit)
+  }, [map, routes])
+  return null
+}
+
+// Toggle the pan/zoom handlers to match `interactive`. Desktop is a fully
+// interactive chart (drag + wheel-zoom within the locked range); the mobile
+// poster disables everything so a touch-swipe scrolls the page (dissipating the
+// cartouche) instead of being captured by the map.
+function Interactions({ interactive }: { interactive: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    const handlers = [
+      map.dragging,
+      map.touchZoom,
+      map.doubleClickZoom,
+      map.boxZoom,
+      map.keyboard,
+      map.scrollWheelZoom,
+    ]
+    handlers.forEach((h) => (interactive ? h.enable() : h.disable()))
+  }, [map, interactive])
+  return null
+}
+
+export function LandingMap({
+  routes = [],
+  center = [41.55, 3.75],
+  zoom = 8,
+  interactive = true,
+}: Props) {
   return (
     <MapContainer
       center={center}
@@ -372,7 +426,10 @@ export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Pr
       className="h-full w-full"
       zoomControl={false}
       attributionControl={false}
+      scrollWheelZoom={false}
     >
+      <Interactions interactive={interactive} />
+      <FrameRoute routes={routes} />
       <TileLayer url={ESRI_OCEAN} />
       <TileLayer url={SEAMARK} />
       <Graticule />
