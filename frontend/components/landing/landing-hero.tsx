@@ -34,7 +34,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
 
       {/* Cartouche — title block / signature */}
       <div className="chart-cartouche chart-anim-rise absolute bottom-7 left-1/2 z-[1001] w-[min(26rem,calc(100%-3rem))] -translate-x-1/2 p-6 sm:bottom-9 sm:left-9 sm:translate-x-0 sm:p-7">
-        <p className="chart-eyebrow">Mediterranean · sea-kayak planning</p>
+        <p className="chart-eyebrow">Sea-kayak expedition planning</p>
         <h1 className="chart-tagline mt-3 text-[2rem] sm:text-[2.35rem]">
           Plan the passage.
           <br />
@@ -42,7 +42,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         </h1>
         <div className="chart-rule mt-4" />
         <p className="chart-invite mt-4">
-          A young chart of the Mediterranean — add the cove you know best.
+          A growing chart of paddled waters — add the one you know best.
         </p>
         <div className="mt-5 flex items-center gap-4">
           <Link href="/register" className="chart-btn-primary px-4 py-2.5">

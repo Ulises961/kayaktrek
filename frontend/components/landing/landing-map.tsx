@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   MapContainer,
   TileLayer,
@@ -68,6 +68,38 @@ function multiplierForZoom(zoom: number): number {
 const MIN_ZOOM = 6
 const MAX_ZOOM = 10
 
+// True while a zoom/pan gesture is in flight, flipping back `settled` a beat after
+// it ends. Vector overlays computed for the old viewport get CSS-transformed during
+// the animation and read as "out of phase" until redrawn — callers hide themselves
+// while unsettled and redraw fresh on settle (same idea as VelocityLayer's fade).
+function useSettled(delay = 280): boolean {
+  const [settled, setSettled] = useState(true)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current)
+  }
+  useMapEvents({
+    movestart: () => {
+      clear()
+      setSettled(false)
+    },
+    zoomstart: () => {
+      clear()
+      setSettled(false)
+    },
+    moveend: () => {
+      clear()
+      timer.current = setTimeout(() => setSettled(true), delay)
+    },
+    zoomend: () => {
+      clear()
+      timer.current = setTimeout(() => setSettled(true), delay)
+    },
+  })
+  useEffect(() => clear, [])
+  return settled
+}
+
 // ── Graticule ────────────────────────────────────────────────────────────────
 // A real geographic lat/lon grid drawn across the whole chart (the old ticks were
 // CSS marginalia fixed to the frame border). Lines are meridians/parallels at a
@@ -94,11 +126,11 @@ function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.
 }
 
 function Graticule() {
-  const [, bump] = useState(0)
-  const map = useMapEvents({
-    moveend: () => bump((n) => n + 1),
-    zoomend: () => bump((n) => n + 1),
-  })
+  const map = useMap()
+  // Hide the grid during a gesture and redraw it (fresh bounds) once settled, so
+  // it never shows the transformed, out-of-phase lines while zooming/panning.
+  const settled = useSettled()
+  if (!settled) return null
 
   const b = map.getBounds()
   const step = niceStep(map.getZoom())
@@ -163,7 +195,7 @@ function Graticule() {
 // ground distance at the current center/zoom, so the graticule's degrees have a
 // metric reference. Built as a Leaflet control (correctly positioned, above map).
 const EARTH_CIRCUMFERENCE_M = 40075016.686
-const SCALE_TARGET_PX = 130
+const SCALE_TARGET_PX = 188
 
 function metersPerPixel(lat: number, zoom: number): number {
   return (EARTH_CIRCUMFERENCE_M * Math.cos((lat * Math.PI) / 180)) / 2 ** (zoom + 8)
@@ -188,11 +220,11 @@ function scaleBarHtml(px: number, meters: number): string {
   const segPx = px / segs
   const cells = Array.from({ length: segs }, (_, i) => {
     const fill = i % 2 === 0 ? "#1a3554" : "#f7f4ec"
-    return `<div style="width:${segPx}px;height:6px;background:${fill};border-right:1px solid #1a3554;"></div>`
+    return `<div style="width:${segPx}px;height:9px;background:${fill};border-right:1px solid #1a3554;"></div>`
   }).join("")
   return `<div style="font-family:var(--font-geist-mono),ui-monospace,monospace;color:#1a3554;text-shadow:0 1px 2px rgba(247,244,236,0.9);">
     <div style="display:flex;width:${px}px;border:1px solid #1a3554;border-right:none;">${cells}</div>
-    <div style="display:flex;justify-content:space-between;width:${px}px;font-size:9px;letter-spacing:0.04em;margin-top:3px;opacity:0.8;"><span>0</span><span>${fmtDistance(meters)}</span></div>
+    <div style="display:flex;justify-content:space-between;width:${px}px;font-size:11px;letter-spacing:0.04em;margin-top:4px;opacity:0.85;"><span>0</span><span>${fmtDistance(meters)}</span></div>
   </div>`
 }
 
@@ -209,7 +241,7 @@ function ScaleBar() {
     }
     control.onAdd = () => {
       el = L.DomUtil.create("div")
-      el.style.margin = "0 16px 18px 0"
+      el.style.margin = "0 34px 40px 0"
       render()
       return el
     }

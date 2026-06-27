@@ -410,6 +410,39 @@ two, and the type-icon legend dropped the interest star. The `Place` marker laye
 and toggleable from the Overlays control; places and tidal diamonds are dropped from one top-centre
 **"+ Add"** disclosure (`MapAddControl`), the create-action counterpart to Overlays.
 
+## Forecast cell: bounded velocity overlay (landing decorative, planner real)
+
+`leaflet-velocity` renders particles across a rectangular data bbox. Zoomed out or
+panned, that bbox reads as a dislocated animated square with hard edges — and on a
+public landing it implies a full-coverage forecast the app can't stand behind.
+Decision: render velocity as a **forecast cell** — the field clipped to a
+soft-rimmed **disc** whose contour ring shows the **actual coverage extent** (the
+diameter of the area the field represents). **Principle:** the cell communicates
+coverage and nothing else — it does not repeat values, units, time, a legend, or a
+distance scale that other components of the same view already provide.
+
+- **Landing** (M1 redesign; `lib/landing/ambient-current.ts` + `landing-map.tsx`,
+  preview at `/preview/landing`): the field is **synthesized, decorative only** — it
+  carries motion and palette, nothing more. It **must never** show a legend, scale,
+  or timestamp (that would imply a trustable forecast); the label reads
+  "illustrative". Flow is a **coherent** dominant-drift field (`flowVector`: one
+  drift direction + a sub-one-cycle meander), not high-frequency noise. Density is
+  zoom-independent by construction (masked disc) with a deliberate per-zoom taper.
+- **Planner (M5)** is the intended home for the same bounded-cell treatment over the
+  **real** OpenMeteo overlays. The cell shows **only its coverage extent** — it does
+  **not** repeat the forecast's values, units, time, or legend, which already live in
+  the forecast panel/cards of the same view. Lifting the cell into the shared
+  `VelocityLayer` is **pending design**: planner data is a full-area grid, not a
+  single point, so the coverage derivation differs.
+- **Shared `VelocityLayer` changes (landed, benefit both surfaces):** the canvas is
+  hidden instantly on zoom/pan start and faded back after a settle delay (the stale,
+  mis-projected frame never shows particles off-field); options apply in place via
+  `setOptions` (no rebuild → no ~750 ms restart blank), enabling a live
+  zoom-derived `particleMultiplier`; `VelocityGridLayer.data` now allows `null`
+  (masked) cells. The landing also draws a real geographic graticule (hidden during
+  gestures, redrawn on settle) and a segmented nautical scale bar, with zoom locked
+  to the Esri Ocean basemap's useful range.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
