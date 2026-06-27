@@ -15,6 +15,7 @@ from Models.user import User
 from Models.trip_member import TripMember
 from Schemas.log_schema import LogSchema
 from Api.database import db
+from Services.block_service import BlockService
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,13 @@ class LogService:
         endorser_id = UUID(user_id)
         if log.user_id == endorser_id:
             raise PermissionError("You cannot endorse your own log")
+
+        # Block beats the shared-trip rule: a block in either direction between the
+        # endorser and the author forbids endorsement, even of a trip they shared.
+        if BlockService.block_exists_between(endorser_id, cast(UUID, log.user_id)):
+            raise PermissionError(
+                "You can only endorse a log from a trip you shared with its author"
+            )
 
         # Both author and endorser must have held a TripMember row for the log's trip.
         # Two distinct member rows for {author, endorser} on that trip proves the shared trip.

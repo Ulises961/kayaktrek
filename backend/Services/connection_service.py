@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from Api.database import db
 from Models.connection import Connection, ConnectionStatusType
 from Models.user import User
+from Services.block_service import BlockService
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,11 @@ class ConnectionService:
         """
         requester_uuid = UUID(requester_id)
         target = ConnectionService._resolve_target(addressee_username, addressee_id)
+
+        # A block in either direction makes the target unreachable — neutral 404,
+        # indistinguishable from a missing/private account (no disclosure).
+        if BlockService.block_exists_between(requester_uuid, target.id):
+            raise NoResultFound("Paddler not found")
 
         if target.id == requester_uuid:
             raise PermissionError("You cannot connect with yourself")

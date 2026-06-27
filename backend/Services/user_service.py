@@ -18,6 +18,7 @@ from Services.crypto_service import encrypt, decrypt, generate_keypair
 from Services.storage_service import StorageService
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
+from Services.block_service import BlockService
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,10 @@ class UserService:
             or user.deletion_requested_at is not None
             or not user.profile_is_public
         ):
+            raise NoResultFound(f"Public profile for '{username}' is not available")
+
+        # A block in either direction hides the profile — same neutral 404, no oracle.
+        if viewer_id is not None and BlockService.block_exists_between(viewer_id, user.id):
             raise NoResultFound(f"Public profile for '{username}' is not available")
         return user
 
