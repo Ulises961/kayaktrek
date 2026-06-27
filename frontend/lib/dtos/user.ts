@@ -5,6 +5,7 @@ import { ItinerariesSchema } from "./itinerary"
 import { InventoriesSchema } from "./inventory"
 import { ItemsSchema } from "./item"
 import { LogsSchema } from "./log"
+import { CertificationsSchema } from "./certification"
 
 // Shallow user representation used when a user is embedded inside a Trip
 // (travellers, pendingTravellers). Excludes nested collections to avoid
@@ -37,6 +38,11 @@ export const UserSchema = z.object({
   items: ItemsSchema.nullish(),
   endorsedLogs: LogsSchema.nullish(),
   logs: LogsSchema.nullish(),
+  certifications: CertificationsSchema.nullish(),
+  // Public profile (M7a) — opt-in, privacy-first
+  bio: z.string().max(1000).nullish(),
+  homeLocation: z.string().max(255).nullish(),
+  profileIsPublic: z.boolean().nullish(),
   // Float plan defaults (M3d)
   vesselMake: z.string().nullish(),
   vesselModel: z.string().nullish(),
@@ -68,6 +74,16 @@ export const ProfileFormSchema = z.object({
     .min(3, "At least 3 characters")
     .max(50)
     .regex(/^[a-zA-Z0-9_-]+$/, "Letters, numbers, _ and - only"),
+  bio: z
+    .string()
+    .max(1000, "Max 1000 characters")
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
+  homeLocation: z
+    .string()
+    .max(255, "Max 255 characters")
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
   vesselMake: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselModel: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselLengthCm: z

@@ -71,9 +71,23 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
 }
 
 // Partial update — sends only the changed fields.
-export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
-  const res = await apiFetch(path, { method: "PATCH", body: JSON.stringify(body) })
-  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`)
+export async function apiPatch<T>(
+  path: string,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
+  const retry = !extraHeaders
+  const res = await apiFetch(
+    path,
+    { method: "PATCH", body: JSON.stringify(body), headers: extraHeaders },
+    retry,
+  )
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null)) as { message?: string } | null
+    throw new Error(
+      `PATCH ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
+    )
+  }
   return res.json() as Promise<T>
 }
 

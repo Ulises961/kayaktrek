@@ -22,6 +22,8 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
       surname: fields.surname || null,
       phone: fields.phone || null,
       username: fields.username,
+      bio: fields.bio || null,
+      homeLocation: fields.homeLocation || null,
       vesselMake: fields.vesselMake || null,
       vesselModel: fields.vesselModel || null,
       vesselLengthCm:
@@ -39,6 +41,22 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update profile." }
+  }
+}
+
+// Toggle the opt-in public profile. Separated from the main profile form so the
+// switch can flip instantly without round-tripping every other field.
+export async function setProfileVisibility(isPublic: boolean): Promise<ProfileActionResult> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+
+  try {
+    await apiPatch(`/api/user/${session.userId}`, { profileIsPublic: isPublic })
+    revalidatePath("/profile")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: "Failed to update profile visibility." }
   }
 }
 
