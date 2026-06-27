@@ -35,6 +35,7 @@ from Resources.sea_resource import sea_api
 from Resources.tidal_station_resource import tidal_station_api
 from Resources.tidal_diamond_resource import tidal_diamond_api
 from Resources.place_resource import place_api
+from Resources.connection_resource import connection_api
 from Resources.dev_resource import dev_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
@@ -88,6 +89,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(tidal_station_api)
     app.register_blueprint(tidal_diamond_api)
     app.register_blueprint(place_api)
+    app.register_blueprint(connection_api)
     app.register_blueprint(dev_api)
 
     db.init_app(app)
