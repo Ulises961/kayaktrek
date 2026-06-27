@@ -41,21 +41,24 @@ const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
 // lib/landing/ambient-wind.ts for why this must never read as a forecast.
 //
 // Streak length = (velocityScale × magnitude) × (frames the trail survives).
-// - velocityScale → distance a particle travels per frame; the main lever for
-//   long, flowing streaks vs. minimal dots. Doesn't accumulate, so it lengthens
-//   trails WITHOUT the "heatmap" smear.
+// - velocityScale → distance a particle travels per frame: governs BOTH on-screen
+//   motion speed AND streak length, decoupled from colour (which reads the real m/s
+//   magnitude). Kept deliberately low so the gentle breeze drifts slowly — fast
+//   particles would read as a gale even though the colour band says "calm".
 // - opacity → trail-fade (how much of the previous frame is kept). High + dense
 //   = smear; with the per-zoom multiplier holding the count down it can sit a bit
 //   higher for visible trails. particleAge keeps particles alive longer (steadier).
+// - min/maxVelocity → the wind-speed window the colour ramp spans. 0–10 m/s maps
+//   WIND_COLOR_SCALE's calm blue→teal band; the gentle field stays well inside it.
 const VELOCITY_BASE = {
   colorScale: WIND_COLOR_SCALE,
-  velocityScale: 0.07,
+  velocityScale: 0.008,
   particleAge: 90,
   lineWidth: 1.8,
   opacity: 0.8,
   frameRate: 20,
   minVelocity: 0,
-  maxVelocity: 0.8,
+  maxVelocity: 10,
 }
 
 // Particle density vs zoom. leaflet-velocity ties particleCount to the viewport

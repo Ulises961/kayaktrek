@@ -26,10 +26,14 @@ export const MED_BOUNDS: Bounds = { la1: 43.4, la2: 39.2, lo1: 0.4, lo2: 5.2 }
 // a single body gently bending. The old two-eddy field used high spatial
 // frequencies (several sign flips across the small disc) which is what made it
 // look like chaotic, unrelated particles.
+// Magnitudes are REAL wind speed in m/s so the colour ramp encodes strength
+// honestly (see WIND_COLOR_SCALE). ~2.5–6.5 m/s is a Beaufort 2–4 "gentle to
+// moderate breeze" — a believable calm Mediterranean summer afternoon, and the
+// reason the field stays in the blue→teal calm band, never the warm/strong end.
 const FLOW_ANGLE = 0.6 // radians from east (CCW), +v = north → a calm ENE drift
 const FLOW_MEANDER = 0.4 // radians of gentle large-scale deflection (±~23°)
-const FLOW_SPEED = 0.5 // base magnitude; low for a "calm summer drift"
-const FLOW_SPEED_VAR = 0.3 // ± fraction the speed varies across the field
+const FLOW_SPEED = 4.5 // base wind speed (m/s); a gentle breeze, not a gale
+const FLOW_SPEED_VAR = 0.45 // ± fraction the speed varies across the field
 
 // px, py ∈ [0,1] across the field. Returns [u (eastward), v (northward)], pre-fade.
 function flowVector(px: number, py: number): [number, number] {
@@ -226,15 +230,19 @@ export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): 
   return ambientWindCell([clat, clon], radiusKm)
 }
 
-// Token-derived ramp: calm azure/teal → warm amber highlight on the faster
-// filaments. Carries the Mediterranean palette over a neutral base.
+// Wind-strength ramp — the CALM SLICE of the canonical wind-map scale
+// (deep-blue → blue → cyan → teal). Colour encodes speed, mapped across
+// [minVelocity, maxVelocity] ≈ [0, 10 m/s] in landing-map's VELOCITY_BASE.
+// Deliberately NO warm colours: yellow/amber/red/violet mean strong wind on a
+// real wind map, and this is a gentle Beaufort 2–4 breeze. A real forecast
+// (M5) would use the full scale; the decorative landing only ever shows the
+// calm band, so it can never imply strength it doesn't depict.
 export const WIND_COLOR_SCALE = [
-  palette.ocean700, // deep ocean ink (slowest)
+  palette.ocean800, // ~0 m/s — near calm
   palette.ocean600,
   palette.ocean500,
   palette.ocean400,
-  palette.foam400, // foam teal
   palette.ocean300,
-  palette.sunset300,
-  palette.sunset400, // sunset amber (fastest filaments)
+  palette.foam300, // brisker, still gentle
+  palette.foam400, // ~10 m/s top of the depicted band — teal, never warm
 ]
