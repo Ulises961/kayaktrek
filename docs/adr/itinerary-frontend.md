@@ -421,9 +421,10 @@ diameter of the area the field represents). **Principle:** the cell communicates
 coverage and nothing else — it does not repeat values, units, time, a legend, or a
 distance scale that other components of the same view already provide.
 
-- **Landing** (M1 redesign; `lib/landing/ambient-current.ts` + `landing-map.tsx`,
+- **Landing** (M1 redesign; `lib/landing/ambient-wind.ts` + `landing-map.tsx`,
   preview at `/preview/landing`): the field is **synthesized, decorative only** — it
-  carries motion and palette, nothing more. It **must never** show a legend, scale,
+  represents **wind** (not current, so it drifts over land and sea alike; label reads
+  "surface wind · illustrative"), and carries motion and palette, nothing more. It **must never** show a legend, scale,
   or timestamp (that would imply a trustable forecast); the label reads
   "illustrative". Flow is a **coherent** dominant-drift field (`flowVector`: one
   drift direction + a sub-one-cycle meander), not high-frequency noise. Density is

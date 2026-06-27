@@ -13,6 +13,7 @@ import {
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
+import { ringIcon } from "@/components/map/ring-icon"
 import { cellForRoutes, WIND_COLOR_SCALE } from "@/lib/landing/ambient-wind"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { palette } from "@/lib/tokens"
@@ -313,6 +314,35 @@ function ForecastCellLayer({ routes }: { routes: RouteData[] }) {
   )
 }
 
+// Route markers reusing the planner's shared ringIcon, so the landing speaks the
+// same marker language as the builder. Overnight stops get a sequential number in
+// a warm amber ring (the passage's anchors); plain waypoints get a small ink ring.
+function RouteMarkers({ route }: { route: RouteData }) {
+  const points = route.points
+  if (!points || points.length === 0) return null
+  return (
+    <>
+      {points.map((p, i) => {
+        const isStop = p.type === "stop"
+        // Sequential overnight number = stops up to and including this point.
+        const stopNo = points.slice(0, i + 1).filter((q) => q.type === "stop").length
+        const icon = isStop
+          ? ringIcon(palette.sunset500, "stop", stopNo)
+          : ringIcon(INK, "position")
+        return (
+          <Marker
+            key={`${route.id}-${i}`}
+            position={[p.lat, p.lon]}
+            icon={icon}
+            interactive={false}
+            keyboard={false}
+          />
+        )
+      })}
+    </>
+  )
+}
+
 export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Props) {
   return (
     <MapContainer
@@ -332,15 +362,20 @@ export function LandingMap({ routes = [], center = [41.55, 3.75], zoom = 8 }: Pr
       {routes.map((route) =>
         route.positions.length === 0 ? null : (
           <Fragment key={route.id}>
-            {/* White halo under ocean ink — the engraved chart-line look. */}
+            {/* White halo under ocean ink — the engraved chart-line look.
+                Slightly bolder than the graticule so the passage reads clearly
+                against the bathymetric blue. */}
             <Polyline
               positions={route.positions}
-              pathOptions={{ color: PAPER, weight: 5.5, opacity: 0.85 }}
+              pathOptions={{ color: PAPER, weight: 6, opacity: 0.9 }}
             />
             <Polyline
               positions={route.positions}
-              pathOptions={{ color: DEEP, weight: 2.5, opacity: 0.95 }}
+              pathOptions={{ color: DEEP, weight: 3, opacity: 1 }}
             />
+            {/* Marked passage: overnight stops as numbered amber anchors,
+                waypoints as small ink rings — the shared planner ringIcon. */}
+            <RouteMarkers route={route} />
           </Fragment>
         ),
       )}

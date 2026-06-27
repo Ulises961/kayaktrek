@@ -1,9 +1,20 @@
 import type { PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
+import type { PointType } from "@/lib/dtos/point"
+
+// A typed waypoint along a public route — enough to drop the shared ringIcon
+// marker (stop vs position) without exposing private point notes.
+export type RoutePoint = {
+  lat: number
+  lon: number
+  type: PointType
+  name: string | null
+}
 
 export type RouteData = {
   id: string
   name: string
   positions: [number, number][]
+  points?: RoutePoint[]
   totalMiles: number | null
   dayCount: number
 }
@@ -37,10 +48,17 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
     .sort((a, b) => a.dayNumber - b.dayNumber)
 
   const positions: [number, number][] = []
+  const points: RoutePoint[] = []
   for (const day of numberedDays) {
     for (const p of walkPublicPoints(day.points)) {
       if (p.latitude != null && p.longitude != null) {
         positions.push([p.latitude, p.longitude])
+        points.push({
+          lat: p.latitude,
+          lon: p.longitude,
+          type: p.type === "stop" ? "stop" : "position",
+          name: p.name ?? null,
+        })
       }
     }
   }
@@ -49,6 +67,7 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
     id: itinerary.id ?? "",
     name: itinerary.name ?? "Untitled",
     positions,
+    points,
     totalMiles: itinerary.totalMiles ?? null,
     dayCount: numberedDays.length,
   }
