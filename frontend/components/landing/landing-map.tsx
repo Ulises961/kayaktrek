@@ -13,7 +13,7 @@ import {
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
-import { cellForRoutes, CURRENT_COLOR_SCALE } from "@/lib/landing/ambient-current"
+import { cellForRoutes, WIND_COLOR_SCALE } from "@/lib/landing/ambient-wind"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { palette } from "@/lib/tokens"
 
@@ -36,8 +36,8 @@ const ESRI_OCEAN =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
 const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
 
-// Ambient, decorative current — carries motion + palette. No legend: see
-// lib/landing/ambient-current.ts for why this must never read as a forecast.
+// Ambient, decorative wind — carries motion + palette. No legend: see
+// lib/landing/ambient-wind.ts for why this must never read as a forecast.
 //
 // Streak length = (velocityScale × magnitude) × (frames the trail survives).
 // - velocityScale → distance a particle travels per frame; the main lever for
@@ -47,7 +47,7 @@ const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
 //   = smear; with the per-zoom multiplier holding the count down it can sit a bit
 //   higher for visible trails. particleAge keeps particles alive longer (steadier).
 const VELOCITY_BASE = {
-  colorScale: CURRENT_COLOR_SCALE,
+  colorScale: WIND_COLOR_SCALE,
   velocityScale: 0.07,
   particleAge: 90,
   lineWidth: 1.8,
@@ -269,7 +269,7 @@ function ScaleBar() {
 function noteIcon(): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">surface current · illustrative</div>`,
+    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">surface wind · illustrative</div>`,
     iconSize: [0, 0],
     iconAnchor: [-8, -6],
   })

@@ -1,10 +1,11 @@
 /**
- * Ambient current field for the landing hero — SYNTHESIZED, decorative only.
+ * Ambient wind field for the landing hero — SYNTHESIZED, decorative only.
  *
  * This is not real forecast data. It exists to give the landing map gentle
  * motion and carry the palette via leaflet-velocity's colour ramp. It must
  * never be shown with a legend, scale, or timestamp (that would imply a
  * trustable forecast). Real velocity data lives in the M5 planner overlays.
+ * Being wind (not current) it is free to drift over land and sea alike.
  *
  * Output matches the leaflet-velocity GRIB-style shape: two layers (u, v),
  * each a row-major grid from la1/lo1 (top-left) to la2/lo2 (bottom-right).
@@ -18,7 +19,7 @@ type Bounds = { la1: number; la2: number; lo1: number; lo2: number }
 export const MED_BOUNDS: Bounds = { la1: 43.4, la2: 39.2, lo1: 0.4, lo2: 5.2 }
 
 // ── Flow field ───────────────────────────────────────────────────────────────
-// A COHERENT flow, not chaotic noise. Real wind/current belongs to a larger
+// A COHERENT flow, not chaotic noise. Real wind belongs to a larger
 // atmospheric pattern: mostly uniform in direction, at most gently steered by
 // topography. So this is a dominant drift direction plus ONE low-frequency
 // meander (well under a full cycle across the field) — the whole patch reads as
@@ -39,9 +40,9 @@ function flowVector(px: number, py: number): [number, number] {
 
 /**
  * A coherent, slow drift (see flowVector). Magnitudes stay low so particles
- * drift like a calm summer current, not a gale.
+ * drift like a calm summer breeze, not a gale.
  */
-export function ambientCurrent(bounds: Bounds = MED_BOUNDS, nx = 28, ny = 24): VelocityGridLayer[] {
+export function ambientWind(bounds: Bounds = MED_BOUNDS, nx = 28, ny = 24): VelocityGridLayer[] {
   const { la1, la2, lo1, lo2 } = bounds
   const dx = (lo2 - lo1) / (nx - 1)
   const dy = (la1 - la2) / (ny - 1)
@@ -79,9 +80,9 @@ export function ambientCurrent(bounds: Bounds = MED_BOUNDS, nx = 28, ny = 24): V
   }
 
   return [
-    { header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_current" }, data: u },
+    { header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_wind" }, data: u },
     {
-      header: { ...header, parameterNumber: 3, parameterNumberName: "northward_current" },
+      header: { ...header, parameterNumber: 3, parameterNumberName: "northward_wind" },
       data: v,
     },
   ]
@@ -110,12 +111,12 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 }
 
 /**
- * Synthesized current clipped to a disc centred on `center`. Cells outside the
+ * Synthesized wind clipped to a disc centred on `center`. Cells outside the
  * radius are `null` (no particles); cells in the outer ~30% fade to zero so the
  * boundary is soft. Grid is generated over the disc's bbox at full resolution,
  * so the patch stays dense regardless of how small the disc is on the page.
  */
-export function ambientCurrentCell(
+export function ambientWindCell(
   center: [number, number],
   radiusKm: number,
   nx = 26,
@@ -185,11 +186,11 @@ export function ambientCurrentCell(
     radiusKm,
     grid: [
       {
-        header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_current" },
+        header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_wind" },
         data: u,
       },
       {
-        header: { ...header, parameterNumber: 3, parameterNumberName: "northward_current" },
+        header: { ...header, parameterNumber: 3, parameterNumberName: "northward_wind" },
         data: v,
       },
     ],
@@ -204,7 +205,7 @@ export function ambientCurrentCell(
 export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): ForecastCell {
   if (positions.length === 0) {
     const c = MED_BOUNDS
-    return ambientCurrentCell([(c.la1 + c.la2) / 2, (c.lo1 + c.lo2) / 2], 70)
+    return ambientWindCell([(c.la1 + c.la2) / 2, (c.lo1 + c.lo2) / 2], 70)
   }
   let minLat = Infinity,
     maxLat = -Infinity,
@@ -222,12 +223,12 @@ export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): 
   const halfDiagKm =
     Math.hypot((maxLat - minLat) * KM_PER_DEG_LAT, (maxLon - minLon) * kmPerDegLon) / 2
   const radiusKm = Math.max(minRadiusKm, halfDiagKm * 1.55)
-  return ambientCurrentCell([clat, clon], radiusKm)
+  return ambientWindCell([clat, clon], radiusKm)
 }
 
 // Token-derived ramp: calm azure/teal → warm amber highlight on the faster
 // filaments. Carries the Mediterranean palette over a neutral base.
-export const CURRENT_COLOR_SCALE = [
+export const WIND_COLOR_SCALE = [
   palette.ocean700, // deep ocean ink (slowest)
   palette.ocean600,
   palette.ocean500,
