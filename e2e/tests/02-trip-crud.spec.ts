@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test"
 import { LEADER } from "../fixtures/auth"
 import { apiGetAccessToken, apiDeleteTrip } from "../fixtures/trips"
+import { mutateAndSettle } from "../fixtures/ui"
 
 // Uses leader storageState set by auth.setup.ts
 
@@ -42,7 +43,9 @@ test.describe("Trip CRUD", () => {
     await page.getByRole("button", { name: /edit trip/i }).click()
     const destInput = page.getByPlaceholder("Destination")
     await destInput.fill("Faroe Islands")
-    await page.getByRole("button", { name: /save/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /save/i }).click(), {
+      refresh: true,
+    })
 
     await expect(page.getByText("Faroe Islands")).toBeVisible()
   })

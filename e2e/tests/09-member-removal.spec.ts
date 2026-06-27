@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip, apiInviteByEmail, apiAcceptInvitation } from "../fixtures/trips"
+import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Member removal", () => {
   let tripId: string
@@ -29,7 +30,9 @@ test.describe("Member removal", () => {
     // Leader removes crew via UI
     await page.getByText(CREW.name).hover()
     await page.getByRole("button", { name: /remove/i }).click()
-    await page.getByRole("button", { name: /confirm/i }).click()
+    await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
+      refresh: true,
+    })
     await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible()
 
     // Crew: attempt to navigate to the trip — should get 403 or redirect

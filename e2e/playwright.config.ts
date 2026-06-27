@@ -11,8 +11,13 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
 
-  timeout: 60_000,
-  expect: { timeout: 5000 },
+  // The CI runner is effectively a single slow vCPU with workers:1, so the
+  // trip-detail re-render after a mutation (7-call fan-out + heavy client
+  // reconcile) genuinely takes well over 10s. Size the waits to the runner, not
+  // to a fast dev box. (Real fix is the aggregate GET /api/trip/:id/detail — see
+  // ADR-030 / plans/e2e-hardening.md.)
+  timeout: 120_000,
+  expect: { timeout: 30_000 },
 
   use: {
     baseURL: BASE_URL,

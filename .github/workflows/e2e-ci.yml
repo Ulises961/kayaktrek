@@ -1,20 +1,14 @@
 name: E2E Tests
 
+# E2E is a LOCAL-ONLY gate. The free GitHub runner is effectively ~1 vCPU with
+# wildly variable load (observed 5–13 min for the same suite), so post-mutation
+# render-race assertions go red on slow runs regardless of test correctness —
+# making it useless as a required remote check. Run it locally before milestone
+# commits via `e2e/run-constrained-ci.sh` (act executes this exact workflow).
+# `workflow_dispatch` keeps it manually triggerable but off the PR/push path.
+# (Decision 2026-06-25; see plans/e2e-hardening.md / ADR-030.)
 on:
-  push:
-    branches: [master]
-    paths:
-      - "frontend/**"
-      - "backend/**"
-      - "e2e/**"
-      - ".github/workflows/e2e-ci.yml"
-  pull_request:
-    branches: [master]
-    paths:
-      - "frontend/**"
-      - "backend/**"
-      - "e2e/**"
-      - ".github/workflows/e2e-ci.yml"
+  workflow_dispatch:
 
 # CI ports are offset from the dev stack (5000/3000) so act runs don't clash
 # with a live local environment.

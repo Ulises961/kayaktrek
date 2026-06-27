@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test"
 import { LEADER } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
 import { API_URL } from "../playwright.config"
+import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Profile vessel pre-fill on trip creation", () => {
   let tripId: string
@@ -66,7 +67,7 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     await crewPage.getByRole("button", { name: "Edit", exact: true }).click()
     await crewPage.getByLabel(/make/i).fill("Prijon")
     await crewPage.getByLabel(/model/i).fill("Barracuda")
-    await crewPage.getByRole("button", { name: /save/i }).click()
+    await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /save/i }).click())
 
     await expect(crewPage.getByText("Prijon")).toBeVisible()
     await crewContext.close()
