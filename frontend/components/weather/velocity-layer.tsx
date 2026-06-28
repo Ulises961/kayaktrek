@@ -65,6 +65,14 @@ export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
         }
         const show = () => {
           if (showTimer) clearTimeout(showTimer)
+          // Force leaflet-velocity to recompute the field at the NEW bounds now.
+          // On pan its options don't change, so without this it keeps the stale,
+          // mis-positioned frame (the canvas is repositioned on moveend but the
+          // recompute is deferred by its internal 750ms timer) — that is the
+          // off-shift on drag. Zoom already restarts via the options effect
+          // (zoom-derived particleMultiplier changes), which is why only drag
+          // showed it. setOptions → _clearAndRestart restarts immediately.
+          layer.setOptions?.({ ...optionsRef.current })
           showTimer = setTimeout(() => {
             canvas.style.transition = "opacity 220ms ease"
             canvas.style.opacity = "1"

@@ -287,12 +287,16 @@ function ScaleBar() {
   return null
 }
 
-// Small chart-marginalia note pinned to the cell's south rim. Honest by design:
-// "illustrative", no scale/time — a bounded label can't masquerade as forecast.
-function noteIcon(): L.DivIcon {
+// Small chart-marginalia note pinned to the cell's south rim. The one fact this
+// label carries is the cell's COVERAGE EXTENT (its diameter) — never a wind value,
+// unit, or time. "illustrative" keeps it honest; rounding to 5 km avoids implying
+// a precision the synthesized field does not have. A bounded extent label can't
+// masquerade as a forecast.
+function noteIcon(radiusKm: number): L.DivIcon {
+  const span = Math.round((radiusKm * 2) / 5) * 5 // diameter, 5 km steps
   return L.divIcon({
     className: "",
-    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">surface wind · illustrative</div>`,
+    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">≈ ${span} km coverage · illustrative</div>`,
     iconSize: [0, 0],
     iconAnchor: [-8, -6],
   })
@@ -331,7 +335,12 @@ function ForecastCellLayer({ routes }: { routes: RouteData[] }) {
           fill: false,
         }}
       />
-      <Marker position={southRim} icon={noteIcon()} interactive={false} keyboard={false} />
+      <Marker
+        position={southRim}
+        icon={noteIcon(cell.radiusKm)}
+        interactive={false}
+        keyboard={false}
+      />
     </>
   )
 }
