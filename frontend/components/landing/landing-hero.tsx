@@ -4,6 +4,14 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { LandingMapLoader } from "./landing-map-loader"
 import { CompassRose } from "./compass-rose"
+import {
+  Cartouche,
+  CartoucheEyebrow,
+  CartoucheTitle,
+  CartoucheRule,
+  CartoucheNote,
+  NeatLine,
+} from "./cartouche"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { RouteData } from "@/lib/itinerary/public-routes"
@@ -70,7 +78,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         </div>
 
         {/* Neat-line frame (graticule lines + labels are drawn on the map itself) */}
-        <div className="chart-neatline chart-anim-fade z-[1000]" />
+        <NeatLine className="chart-anim-fade z-[1000]" />
 
         {/* Header — chart publication strip */}
         <header className="chart-header absolute top-0 right-0 left-0 z-[1001] flex items-center justify-between px-5 py-3 sm:px-7">
@@ -100,24 +108,24 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
             (no-op on desktop, where p is pinned to 0). */}
         <div className="absolute bottom-7 left-1/2 z-[1001] w-[min(26rem,calc(100%-3rem))] -translate-x-1/2 sm:bottom-9 sm:left-9 sm:translate-x-0">
           <div className="chart-anim-rise">
-            <div
-              className="chart-cartouche p-6 sm:p-7"
+            <Cartouche
+              className="p-6 sm:p-7"
               style={{
                 opacity: 1 - p,
                 transform: `translateY(${(-p * 40).toFixed(1)}px)`,
                 pointerEvents: p > 0.6 ? "none" : undefined,
               }}
             >
-              <p className="chart-eyebrow">Sea-kayak expedition planning</p>
-              <h1 className="chart-tagline mt-3 text-[2rem] sm:text-[2.35rem]">
+              <CartoucheEyebrow>Sea-kayak expedition planning</CartoucheEyebrow>
+              <CartoucheTitle className="mt-3 text-[2rem] sm:text-[2.35rem]">
                 Plan the passage.
                 <br />
                 <em>Paddle it with your crew.</em>
-              </h1>
-              <div className="chart-rule mt-4" />
-              <p className="chart-invite mt-4">
+              </CartoucheTitle>
+              <CartoucheRule className="mt-4" />
+              <CartoucheNote className="mt-4">
                 A growing chart of paddled waters — add the one you know best.
-              </p>
+              </CartoucheNote>
               <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Button asChild className={chartCta}>
                   <Link href="/register">Start planning</Link>
@@ -126,7 +134,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
                   <Link href="/login">browse the chart →</Link>
                 </Button>
               </div>
-            </div>
+            </Cartouche>
           </div>
         </div>
       </div>

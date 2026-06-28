@@ -10,6 +10,15 @@ import { WavesIcon, UsersIcon, RadioIcon } from "lucide-react"
 import { TRIP_STATES, type Trip } from "@/lib/dtos/trip"
 import { TestEmailButton } from "@/components/profile/test-email-button"
 import { ItineraryLayoutWireframe } from "@/components/wireframes/itinerary-layout-wireframe"
+import { CompassRose } from "@/components/landing/compass-rose"
+import {
+  Cartouche,
+  CartoucheEyebrow,
+  CartoucheTitle,
+  CartoucheRule,
+  CartoucheNote,
+  NeatLine,
+} from "@/components/landing/cartouche"
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -436,6 +445,36 @@ export default function DesignPage() {
             <div className="flex flex-col gap-0.5">
               <Label>Distance today</Label>
               <span className="font-mono text-sm">18.4 km</span>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="8 — Nautical chart (landing)"
+        subtitle="The landing's chart language, promoted into the DS. Shown over a deep-sea panel as it appears on the map. Map overlays (graticule, scale bar, forecast cell) are Leaflet furniture in components/map/chart/."
+      >
+        <div className="flex flex-col gap-3">
+          <Label>Cartouche · neat-line · compass rose</Label>
+          {/* Deep-sea backdrop so the chart-paper ivory reads as it does on the map. */}
+          <div className="relative h-80 overflow-hidden rounded-md bg-[oklch(0.2_0.05_245)]">
+            <NeatLine />
+            <div className="absolute top-4 left-4">
+              <CompassRose size={40} />
+            </div>
+            <div className="absolute bottom-6 left-6 w-[min(24rem,calc(100%-3rem))]">
+              <Cartouche className="p-6">
+                <CartoucheEyebrow>Sea-kayak expedition planning</CartoucheEyebrow>
+                <CartoucheTitle className="mt-3 text-[2rem]">
+                  Plan the passage.
+                  <br />
+                  <em>Paddle it with your crew.</em>
+                </CartoucheTitle>
+                <CartoucheRule className="mt-4" />
+                <CartoucheNote className="mt-4">
+                  A growing chart of paddled waters — add the one you know best.
+                </CartoucheNote>
+              </Cartouche>
             </div>
           </div>
         </div>
