@@ -4,8 +4,10 @@ import { RelationshipSchema } from "./connection"
 
 // A single paddler-search result: the public profile projection plus the caller's
 // relationship annotation and (when one exists) the connection id, so the UI can
-// render the right action without a second fetch. Mirrors UserService.search_paddlers.
-export const PaddlerSearchResultSchema = PublicUserSchema.extend({
+// render the right action without a second fetch. Mirrors UserService.search_paddlers
+// — which dumps PublicUserSchema *without* the aggregate `stats` (those are attached
+// only on the full-profile path), so we drop stats here.
+export const PaddlerSearchResultSchema = PublicUserSchema.omit({ stats: true }).extend({
   id: z.uuidv7(),
   relationship: RelationshipSchema,
   connectionId: z.uuidv7().nullish(),

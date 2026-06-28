@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { PaddlerSearchResultSchema, PaddlerSearchPageSchema } from "../paddler-search"
 
-const STATS_FIXTURE = {
-  totalDistance: 0,
-  totalHours: 0,
-  logCount: 0,
-  tripCount: 0,
-  endorsementsReceived: 0,
-  conditionsDistribution: {},
-  activityByMonth: [],
-}
-
+// Mirrors the real search response shape — note: NO `stats` (search rows omit it).
 const RESULT_FIXTURE = {
   id: "01952f1a-0000-7000-8000-000000000003",
   username: "seapaddler",
@@ -20,13 +11,17 @@ const RESULT_FIXTURE = {
   bio: null,
   homeLocation: null,
   certifications: [],
-  stats: STATS_FIXTURE,
   relationship: "none",
   connectionId: null,
 }
 
 describe("PaddlerSearchResultSchema", () => {
   it("parses a result with no relationship", () => {
+    expect(PaddlerSearchResultSchema.safeParse(RESULT_FIXTURE).success).toBe(true)
+  })
+
+  it("parses a result that has no stats field (search omits stats)", () => {
+    expect("stats" in RESULT_FIXTURE).toBe(false)
     expect(PaddlerSearchResultSchema.safeParse(RESULT_FIXTURE).success).toBe(true)
   })
 

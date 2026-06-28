@@ -19,15 +19,6 @@ const RESULT: PaddlerSearchResult = {
   bio: null,
   homeLocation: null,
   certifications: [],
-  stats: {
-    totalDistance: 0,
-    totalHours: 0,
-    logCount: 0,
-    tripCount: 0,
-    endorsementsReceived: 0,
-    conditionsDistribution: {},
-    activityByMonth: [],
-  },
   relationship: "none",
   connectionId: null,
 }

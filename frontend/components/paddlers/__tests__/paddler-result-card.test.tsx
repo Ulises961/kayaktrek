@@ -25,15 +25,6 @@ const BASE: PaddlerSearchResult = {
   bio: null,
   homeLocation: null,
   certifications: [],
-  stats: {
-    totalDistance: 0,
-    totalHours: 0,
-    logCount: 0,
-    tripCount: 0,
-    endorsementsReceived: 0,
-    conditionsDistribution: {},
-    activityByMonth: [],
-  },
   relationship: "none",
   connectionId: null,
 }
@@ -47,6 +38,8 @@ describe("PaddlerResultCard", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /add buddy/i }))
     await waitFor(() => expect(requestConnection).toHaveBeenCalledWith({ username: "seapaddler" }))
+    // The action flips locally to Pending without needing a re-search.
+    expect(await screen.findByRole("button", { name: /pending/i })).toBeDefined()
   })
 
   it("renders a disabled Pending button for an outgoing request", () => {
@@ -80,10 +73,11 @@ describe("PaddlerResultCard", () => {
 
   it("blocks the paddler from the overflow menu", async () => {
     vi.mocked(blockPaddler).mockResolvedValue({ success: true })
-    render(<PaddlerResultCard paddler={BASE} />)
-
+    const { container } = render(<PaddlerResultCard paddler={BASE} />)
     await userEvent.click(screen.getByRole("button", { name: /more actions/i }))
     await userEvent.click(await screen.findByText(/block/i))
     await waitFor(() => expect(blockPaddler).toHaveBeenCalledWith({ username: "seapaddler" }))
+    // A successful block hides the card entirely.
+    await waitFor(() => expect(container.querySelector("div")).toBeNull())
   })
 })
