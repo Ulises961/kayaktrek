@@ -286,39 +286,6 @@
   }
 }
 
-/* Nautical chart grid — used by auth layout background */
-@keyframes chart-drift {
-  0% {
-    background-position:
-      0 0,
-      0 0,
-      0 0,
-      0 0;
-  }
-  100% {
-    background-position:
-      100px 100px,
-      100px 100px,
-      20px 20px,
-      20px 20px;
-  }
-}
-
-.chart-grid {
-  background-color: oklch(0.155 0.04 245); /* ocean-900 */
-  background-image:
-    linear-gradient(oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
-    linear-gradient(oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px);
-  background-size:
-    100px 100px,
-    100px 100px,
-    20px 20px,
-    20px 20px;
-  animation: chart-drift 120s linear infinite;
-}
-
 @layer base {
   html {
     font-size: 112.5%; /* 18px base — scales all rem values proportionally */
@@ -339,12 +306,8 @@
 
 @layer components {
   /* ── Auth surfaces ──────────────────────────────────────────────────────── */
-  .auth-card {
-    overflow: hidden;
-    border-radius: 2px;
-    background: white;
-    box-shadow: 0 8px 40px oklch(0.155 0.04 245 / 0.55);
-  }
+  /* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
+     These rules style the contents that sit inside it. */
   .auth-card-accent {
     height: 3px;
     background: linear-gradient(
