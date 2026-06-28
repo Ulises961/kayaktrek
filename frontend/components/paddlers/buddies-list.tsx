@@ -1,0 +1,154 @@
+"use client"
+
+import { useState, useTransition } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { CheckIcon, XIcon, UserMinusIcon } from "lucide-react"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { Button } from "@/components/ui/button"
+import { acceptConnection, removeConnection } from "@/lib/connections/actions"
+import type { Connection, ConnectionUser } from "@/lib/dtos/connection"
+
+interface BuddiesListProps {
+  connections: Connection[]
+  currentUserId: string
+}
+
+// Splits the caller's connections into incoming requests (caller is addressee),
+// outgoing requests (caller is requester) and accepted buddies. Each row offers the
+// action appropriate to that bucket.
+export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
+  const buddies = connections.filter((c) => c.status === "accepted")
+  const incoming = connections.filter(
+    (c) => c.status === "pending" && c.addressee.id === currentUserId,
+  )
+  const outgoing = connections.filter(
+    (c) => c.status === "pending" && c.requester.id === currentUserId,
+  )
+
+  if (connections.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No buddies yet. Find paddlers and send a buddy request.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {incoming.length > 0 && (
+        <Section title={`Buddy requests (${incoming.length})`}>
+          {incoming.map((c) => (
+            <ConnectionRow key={c.id} connectionId={c.id!} user={c.requester} variant="incoming" />
+          ))}
+        </Section>
+      )}
+      {outgoing.length > 0 && (
+        <Section title={`Sent requests (${outgoing.length})`}>
+          {outgoing.map((c) => (
+            <ConnectionRow key={c.id} connectionId={c.id!} user={c.addressee} variant="outgoing" />
+          ))}
+        </Section>
+      )}
+      <Section title={`Buddies (${buddies.length})`}>
+        {buddies.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No buddies yet.</p>
+        ) : (
+          buddies.map((c) => {
+            const other = c.requester.id === currentUserId ? c.addressee : c.requester
+            return <ConnectionRow key={c.id} connectionId={c.id!} user={other} variant="buddy" />
+          })
+        )}
+      </Section>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{title}</h2>
+      {children}
+    </div>
+  )
+}
+
+function ConnectionRow({
+  connectionId,
+  user,
+  variant,
+}: {
+  connectionId: string
+  user: ConnectionUser
+  variant: "incoming" | "outgoing" | "buddy"
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  const fullName = [user.name, user.surname].filter(Boolean).join(" ")
+
+  function run(action: () => Promise<{ success: boolean; error?: string }>) {
+    setError(null)
+    startTransition(async () => {
+      const result = await action()
+      if (!result.success) setError(result.error ?? "Something went wrong.")
+      else router.refresh()
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+      <Link href={`/paddlers/${user.username}`} className="shrink-0">
+        <UserAvatar name={user.name} surname={user.surname} imageUrl={user.avatarUrl} />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <Link href={`/paddlers/${user.username}`} className="truncate font-medium hover:underline">
+          {fullName}
+        </Link>
+        <p className="text-muted-foreground truncate text-xs">@{user.username}</p>
+        {error && <p className="text-destructive mt-0.5 text-xs">{error}</p>}
+      </div>
+
+      {variant === "incoming" && (
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            disabled={pending}
+            onClick={() => run(() => acceptConnection(connectionId))}
+          >
+            <CheckIcon className="size-4" /> Accept
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() => run(() => removeConnection(connectionId))}
+          >
+            <XIcon className="size-4" /> Decline
+          </Button>
+        </div>
+      )}
+      {variant === "outgoing" && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          onClick={() => run(() => removeConnection(connectionId))}
+        >
+          <XIcon className="size-4" /> Cancel
+        </Button>
+      )}
+      {variant === "buddy" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => run(() => removeConnection(connectionId))}
+        >
+          <UserMinusIcon className="size-4" /> Unfriend
+        </Button>
+      )}
+    </div>
+  )
+}

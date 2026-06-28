@@ -7,9 +7,10 @@ import type { Log } from "@/lib/dtos/log"
 interface LogsTabsProps {
   myLogs: Log[]
   endorsedLogs: Log[]
+  currentUserId?: string
 }
 
-export function LogsTabs({ myLogs, endorsedLogs }: LogsTabsProps) {
+export function LogsTabs({ myLogs, endorsedLogs, currentUserId }: LogsTabsProps) {
   return (
     <Tabs defaultValue="mine">
       <TabsList>
@@ -21,7 +22,7 @@ export function LogsTabs({ myLogs, endorsedLogs }: LogsTabsProps) {
         {myLogs.length === 0 ? (
           <p className="text-muted-foreground text-sm">No logs yet. Record your first session.</p>
         ) : (
-          myLogs.map((log) => <LogCard key={log.id} log={log} />)
+          myLogs.map((log) => <LogCard key={log.id} log={log} currentUserId={currentUserId} />)
         )}
       </TabsContent>
 

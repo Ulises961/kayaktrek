@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
+import { TripSchema } from "@/lib/dtos/trip"
+import type { TripMember } from "@/lib/dtos/trip-member"
 
 export type TripActionResult = { success: true } | { success: false; error: string }
 export type CreateTripResult = { success: true; tripId: string } | { success: false; error: string }
@@ -71,6 +73,18 @@ export async function deleteTrip(tripId: string): Promise<TripActionResult> {
   redirect("/trips")
 }
 
+// The trip's crew (travellers). Used by the "ask to endorse" picker to list the
+// candidates an author can ask to endorse a trip-linked log.
+export async function getTripCrew(tripId: string): Promise<TripMember[]> {
+  try {
+    const raw = await apiGet(`/api/trip/${tripId}`)
+    return TripSchema.parse(raw).travellers ?? []
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return []
+  }
+}
+
 export async function inviteUser(tripId: string, email: string): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invite`, { email })
@@ -79,6 +93,19 @@ export async function inviteUser(tripId: string, email: string): Promise<TripAct
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to send invitation." }
+  }
+}
+
+export async function inviteBuddy(tripId: string, userId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/invite`, { userId })
+    revalidatePath(`/trips/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : "Failed to send invitation."
+    if (msg.includes("403")) return { success: false, error: "You can't invite this paddler." }
+    return { success: false, error: msg }
   }
 }
 
