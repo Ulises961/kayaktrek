@@ -1,12 +1,15 @@
 """Itinerary Service — business logic for itinerary operations."""
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+import math
+from decimal import Decimal
+from typing import Dict, List, Optional, Set, Tuple, cast
 from uuid import UUID
 
 import bleach
 import defusedxml.ElementTree
 import gpxpy
 import gpxpy.gpx
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -15,9 +18,11 @@ from Models.day import Day
 from Models.itinerary import Itinerary
 from Models.point import Point, PointType
 from Models.trip import Trip
+from Models.user import User
 from Schemas.day_schema import DaySchema
 from Schemas.itinerary_shema import ItinerarySchema, ItineraryUpdateSchema
 from Services.Utils.rdp import rdp_simplify
+from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,248 @@ class ItineraryService:
     def get_public_itineraries() -> List[Itinerary]:
         """Return all public itineraries for the /explore listing."""
         return db.session.query(Itinerary).filter_by(is_public=True).all()
+
+    @staticmethod
+    def search_public_itineraries(
+        *,
+        page: int = 1,
+        per_page: int = 20,
+        min_lat: Optional[float] = None,
+        min_lng: Optional[float] = None,
+        max_lat: Optional[float] = None,
+        max_lng: Optional[float] = None,
+        seasons: Optional[List[str]] = None,
+        min_miles: Optional[float] = None,
+        max_miles: Optional[float] = None,
+        min_days: Optional[int] = None,
+        max_days: Optional[int] = None,
+        name: Optional[str] = None,
+        sort: str = "recent",
+    ) -> dict:
+        """Paginated, filterable public-route discovery for the /explore library.
+
+        All discovery facets are derived from data the itinerary already owns and
+        already exposes publicly (route points + day dates) — never from the private
+        Trip. Filters are correlated subqueries so the paginated base query stays one
+        row per itinerary. Returns {"items", "total", "page", "pages"}.
+        """
+        page = max(1, page)
+        per_page = max(1, min(per_page, 100))
+
+        # Numbered days only (day_number 0 is the staging day).
+        day_count_sq = (
+            select(func.count(Day.id))
+            .where(Day.itinerary_id == Itinerary.id, Day.day_number != 0)
+            .correlate(Itinerary)
+            .scalar_subquery()
+        )
+        # Representative latitude → hemisphere for the season mapping.
+        avg_lat_sq = (
+            select(func.avg(Point.latitude))
+            .select_from(Point)
+            .join(Day, Point.day_id == Day.id)
+            .where(
+                Day.itinerary_id == Itinerary.id,
+                Day.day_number != 0,
+                Point.latitude.isnot(None),
+            )
+            .correlate(Itinerary)
+            .scalar_subquery()
+        )
+
+        base = db.session.query(Itinerary).filter(Itinerary.is_public.is_(True))
+
+        if name and name.strip():
+            base = base.filter(Itinerary.name.ilike(f"%{name.strip()}%"))
+        if min_miles is not None:
+            base = base.filter(Itinerary.total_miles >= min_miles)
+        if max_miles is not None:
+            base = base.filter(Itinerary.total_miles <= max_miles)
+        if min_days is not None:
+            base = base.filter(day_count_sq >= min_days)
+        if max_days is not None:
+            base = base.filter(day_count_sq <= max_days)
+
+        # Viewport bbox (axis-aligned lat/lng box — all four bounds required):
+        # EXISTS a numbered-day point inside the box. Plain numeric comparison on
+        # latitude/longitude; the PostGIS geo column is only needed for radius queries.
+        if None not in (min_lat, min_lng, max_lat, max_lng):
+            bbox_exists = (
+                select(Point.id)
+                .select_from(Point)
+                .join(Day, Point.day_id == Day.id)
+                .where(
+                    Day.itinerary_id == Itinerary.id,
+                    Day.day_number != 0,
+                    Point.latitude.isnot(None),
+                    Point.longitude.isnot(None),
+                    Point.latitude >= min_lat,
+                    Point.latitude <= max_lat,
+                    Point.longitude >= min_lng,
+                    Point.longitude <= max_lng,
+                )
+                .correlate(Itinerary)
+                .exists()
+            )
+            base = base.filter(bbox_exists)
+
+        # Season (hemisphere-aware). A route matches if any dated numbered day falls in
+        # the requested season for its hemisphere. Routes with no dated days have an
+        # unknown season → treated as a wildcard (still shown) so undated planning
+        # templates are not hidden from discovery.
+        season_tokens = [
+            token
+            for token in (seasons or [])
+            if str(token).strip().lower() in VALID_SEASONS
+        ]
+        if season_tokens:
+            months_north = sorted(season_months(season_tokens, 1))
+            months_south = sorted(season_months(season_tokens, -1))
+            dated_days = select(Day.id).where(
+                Day.itinerary_id == Itinerary.id,
+                Day.day_number != 0,
+                Day.date.isnot(None),
+            ).correlate(Itinerary)
+            season_match = dated_days.where(
+                or_(
+                    and_(
+                        avg_lat_sq >= 0,
+                        func.extract("month", Day.date).in_(months_north),
+                    ),
+                    and_(
+                        avg_lat_sq < 0,
+                        func.extract("month", Day.date).in_(months_south),
+                    ),
+                )
+            ).exists()
+            has_any_dated_day = dated_days.exists()
+            base = base.filter(or_(season_match, ~has_any_dated_day))
+
+        total = base.count()
+
+        if sort == "distance":
+            base = base.order_by(Itinerary.total_miles.asc().nullslast())
+        elif sort == "duration":
+            base = base.order_by(day_count_sq.asc())
+        elif sort == "name":
+            base = base.order_by(Itinerary.name.asc())
+        else:  # recent — UUIDv7 ids are time-ordered
+            base = base.order_by(Itinerary.id.desc())
+
+        itineraries = (
+            base.options(selectinload(Itinerary.days).selectinload(Day.points))
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        items = ItineraryService._annotate_explore_items(itineraries)
+        pages = math.ceil(total / per_page) if total > 0 else 1
+        logger.info(
+            "public_itineraries_searched", extra={"total": total, "page": page}
+        )
+        return {"items": items, "total": total, "page": page, "pages": pages}
+
+    @staticmethod
+    def _annotate_explore_items(itineraries: List[Itinerary]) -> List[dict]:
+        """Derive each page row's facets + fork attribution (mirrors the two-phase
+        annotate step in UserService.search_paddlers)."""
+        items: List[dict] = []
+        source_ids: Set[UUID] = set()
+        for itinerary in itineraries:
+            numbered = [
+                day for day in (itinerary.days or []) if day.day_number != 0
+            ]
+            lats = [
+                float(point.latitude)
+                for day in numbered
+                for point in (day.points or [])
+                if point.latitude is not None
+            ]
+            lngs = [
+                float(point.longitude)
+                for day in numbered
+                for point in (day.points or [])
+                if point.longitude is not None
+            ]
+            centroid_lat = sum(lats) / len(lats) if lats else None
+            centroid_lng = sum(lngs) / len(lngs) if lngs else None
+            dated = sorted(day.date for day in numbered if day.date is not None)
+            season = (
+                season_of(dated[0].month, centroid_lat if centroid_lat is not None else 0)
+                if dated
+                else None
+            )
+            if itinerary.created_from_id is not None:
+                source_ids.add(itinerary.created_from_id)
+            items.append(
+                {
+                    "id": str(itinerary.id),
+                    "name": itinerary.name,
+                    "total_miles": (
+                        float(cast(Decimal, itinerary.total_miles))
+                        if itinerary.total_miles is not None
+                        else None
+                    ),
+                    "day_count": len(numbered),
+                    "season": season,
+                    "centroid_lat": centroid_lat,
+                    "centroid_lng": centroid_lng,
+                    "created_from_id": (
+                        str(itinerary.created_from_id)
+                        if itinerary.created_from_id is not None
+                        else None
+                    ),
+                    "_source_id": itinerary.created_from_id,
+                    "original_author": None,
+                }
+            )
+
+        authors = ItineraryService._authors_for_sources(source_ids)
+        for item in items:
+            source_id = item.pop("_source_id")
+            if source_id is not None:
+                item["original_author"] = authors.get(source_id)
+        return items
+
+    @staticmethod
+    def _authors_for_sources(source_ids: Set[UUID]) -> Dict[UUID, dict]:
+        """Batch-resolve fork-source itineraries to their author projection.
+
+        Returns {source_itinerary_id: {username, name, linkable}}. `linkable` mirrors
+        the author's profile_is_public so the frontend never deep-links a private
+        profile. Trip data is never touched.
+        """
+        if not source_ids:
+            return {}
+        rows = (
+            db.session.query(
+                Itinerary.id, User.username, User.name, User.profile_is_public
+            )
+            .join(User, Itinerary.user_id == User.id)
+            .filter(Itinerary.id.in_(source_ids))
+            .all()
+        )
+        return {
+            source_id: {
+                "username": username,
+                "name": name,
+                "linkable": bool(is_public),
+            }
+            for source_id, username, name, is_public in rows
+        }
+
+    @staticmethod
+    def resolve_original_author(itinerary: Itinerary) -> Optional[dict]:
+        """Author projection of the itinerary this one was forked from, or None.
+
+        Used by the public detail endpoint to render "Cloned from {author}".
+        """
+        if itinerary.created_from_id is None:
+            return None
+        return ItineraryService._authors_for_sources(
+            {itinerary.created_from_id}
+        ).get(itinerary.created_from_id)
 
     # ------------------------------------------------------------------ #
     # Write                                                                 #
