@@ -3,28 +3,14 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import MapLoader from "@/components/map/map-loader"
 import { getSession } from "@/lib/auth/session"
-import { apiGetPublic } from "@/lib/api/client"
-import { PublicItinerariesSchema, PublicItineraryDetailSchema } from "@/lib/dtos/itinerary"
-import { extractRouteData } from "@/lib/itinerary/public-routes"
+import { searchPublicItineraries, fetchPublicRouteData } from "@/lib/itinerary/actions"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 
 async function fetchLandingRoutes(): Promise<RouteData[]> {
   try {
-    const list = PublicItinerariesSchema.parse(
-      await apiGetPublic<unknown[]>("/api/itinerary/explore"),
-    )
-    const ids = list.map((i) => i.id).filter(Boolean) as string[]
-    const details = await Promise.all(
-      ids.slice(0, 20).map(async (id) => {
-        try {
-          const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
-          return PublicItineraryDetailSchema.parse(raw)
-        } catch {
-          return null
-        }
-      }),
-    )
-    return details.filter(Boolean).map((d) => extractRouteData(d!))
+    const page = await searchPublicItineraries({ perPage: 20 })
+    const routes = await Promise.all(page.items.map((item) => fetchPublicRouteData(item.id)))
+    return routes.filter((r): r is RouteData => r !== null)
   } catch {
     return []
   }

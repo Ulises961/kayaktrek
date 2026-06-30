@@ -17,10 +17,17 @@ import type { Day } from "@/lib/dtos/day"
 import {
   ItinerarySchema,
   ItinerariesSchema,
-  PublicItinerariesSchema,
+  PublicItineraryDetailSchema,
   ExplorePageSchema,
 } from "@/lib/dtos/itinerary"
-import type { Itinerary, PublicItinerary, ExplorePage, ExploreFilters } from "@/lib/dtos/itinerary"
+import type {
+  Itinerary,
+  PublicItineraryDetail,
+  ExplorePage,
+  ExploreFilters,
+} from "@/lib/dtos/itinerary"
+import { extractRouteData } from "./public-routes"
+import type { RouteData } from "./public-routes"
 import type { BoundaryApplyPayload } from "./boundaries"
 
 const EMPTY_EXPLORE_PAGE: ExplorePage = { items: [], total: 0, page: 1, pages: 1 }
@@ -234,22 +241,6 @@ export async function importGpx(formData: FormData): Promise<ItineraryActionResu
   }
 }
 
-export async function fetchPublicItineraries(): Promise<PublicItinerary[]> {
-  try {
-    const page = await searchPublicItineraries({ perPage: 100 })
-    return PublicItinerariesSchema.parse(
-      page.items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        isPublic: true,
-        totalMiles: item.totalMiles,
-      })),
-    )
-  } catch {
-    return []
-  }
-}
-
 function buildExploreParams(filters: ExploreFilters): URLSearchParams {
   const params = new URLSearchParams()
   if (filters.name?.trim()) params.set("name", filters.name.trim())
@@ -279,4 +270,22 @@ export async function searchPublicItineraries(filters: ExploreFilters = {}): Pro
   } catch {
     return EMPTY_EXPLORE_PAGE
   }
+}
+
+export async function fetchPublicItineraryDetail(
+  id: string,
+): Promise<PublicItineraryDetail | null> {
+  try {
+    const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
+    return PublicItineraryDetailSchema.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+// Lazily fetch a single public route's full geometry (the polyline the explore list
+// does not carry — list items only have a centroid).
+export async function fetchPublicRouteData(id: string): Promise<RouteData | null> {
+  const detail = await fetchPublicItineraryDetail(id)
+  return detail ? extractRouteData(detail) : null
 }
