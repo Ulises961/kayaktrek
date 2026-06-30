@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { SeaStateChip } from "./sea-state-chip"
 import { EndorseButton } from "./endorse-button"
+import { AskToEndorsePicker } from "./ask-to-endorse-picker"
 import { CalendarIcon, ClockIcon, PencilIcon, RouteIcon, BadgeCheckIcon } from "lucide-react"
 import type { Log } from "@/lib/dtos/log"
 
@@ -13,14 +14,17 @@ interface LogCardProps {
    * "endorsed" — a log the viewer has endorsed (foreign): withdraw affordance, no edit.
    */
   variant?: "owner" | "endorsed"
+  /** The viewer's id — enables the "ask to endorse" picker on owned trip-linked logs. */
+  currentUserId?: string
 }
 
 const MAX_AVATARS = 5
 
-export function LogCard({ log, variant = "owner" }: LogCardProps) {
+export function LogCard({ log, variant = "owner", currentUserId }: LogCardProps) {
   const { date, hours, distance, avgSea } = log
   const endorsers = log.endorsers ?? []
   const count = log.endorsementCount ?? endorsers.length
+  const canAskToEndorse = variant === "owner" && currentUserId && log.id && log.tripId
 
   return (
     <Card>
@@ -85,6 +89,17 @@ export function LogCard({ log, variant = "owner" }: LogCardProps) {
               </span>
             )}
             {endorsers.length > MAX_AVATARS && <span>+{endorsers.length - MAX_AVATARS}</span>}
+          </div>
+        )}
+
+        {canAskToEndorse && (
+          <div className="flex justify-end">
+            <AskToEndorsePicker
+              logId={log.id!}
+              tripId={log.tripId!}
+              authorId={currentUserId!}
+              endorserIds={endorsers.map((endorser) => endorser.id)}
+            />
           </div>
         )}
       </CardContent>

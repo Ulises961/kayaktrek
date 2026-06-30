@@ -1,5 +1,5 @@
 "use client"
-import { useCallback, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
 import { MapTopBar } from "./map-top-bar"
@@ -12,6 +12,7 @@ import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
+import { debounce } from "@/lib/utils/debounce"
 import { DayRail } from "./day-rail"
 import { FeatureDrawer } from "./feature-drawer"
 import { PointDetailSheet } from "./point-detail-sheet"
@@ -49,7 +50,15 @@ export function MapBuilder({
 
   const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
 
-  const speedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Persist the cruising speed only after the user stops dragging the slider.
+  const debouncedSaveSpeed = useMemo(
+    () =>
+      debounce((speedKnots: number) => {
+        updateItinerary(itinerary.id ?? "", { avgSpeedKnots: speedKnots })
+      }, 800),
+    [itinerary.id],
+  )
+  useEffect(() => debouncedSaveSpeed.cancel, [debouncedSaveSpeed])
 
   const day0 = itinerary.days?.find((d) => d.dayNumber === 0)
   const day0Id = day0?.id ?? null
@@ -125,12 +134,9 @@ export function MapBuilder({
   const handleAvgSpeedChange = useCallback(
     (v: number) => {
       setAvgSpeedKnots(v)
-      if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current)
-      speedDebounceRef.current = setTimeout(() => {
-        updateItinerary(itinerary.id ?? "", { avgSpeedKnots: v })
-      }, 800)
+      debouncedSaveSpeed(v)
     },
-    [itinerary.id],
+    [debouncedSaveSpeed],
   )
 
   const flyToPoint = useMemo(() => {

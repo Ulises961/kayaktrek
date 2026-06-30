@@ -24,6 +24,7 @@ from Schemas.trip_schema import TripSchema
 from Api.database import db
 from sqlalchemy.orm import selectinload
 from Services.user_service import UserService
+from Services.block_service import BlockService
 from Schemas.base_schema import camelcase
 
 logger = logging.getLogger(__name__)
@@ -283,12 +284,16 @@ class TripService:
         return [inv.trip for inv in invitations]
 
     @staticmethod
-    def invite_user(trip_id: str, invitee_id: str) -> Invitation:
+    def invite_user(trip_id: str, invitee_id: str, inviter_id: str | None = None) -> Invitation:
         """
         Create an invitation for invitee_id to join trip_id.
 
+        When `inviter_id` is provided (the authenticated leader), a block in either
+        direction between inviter and invitee forbids the invitation (M7b).
+
         Raises:
             NoResultFound: If the trip or invitee doesn't exist
+            PermissionError: If inviter and invitee have blocked each other
             ValueError: If invitee is already a member or has a pending invitation
         """
         # Query to check existence, if not found the called method raises an exception that bubbles up to the error handler
@@ -297,6 +302,9 @@ class TripService:
         invitee = db.session.query(User).filter_by(id=UUID(invitee_id)).first()
         if not invitee:
             raise NoResultFound(f"User {invitee_id} not found")
+
+        if inviter_id is not None and BlockService.block_exists_between(inviter_id, invitee_id):
+            raise PermissionError("You cannot invite this paddler")
 
         already_member = db.session.query(TripMember).filter_by(
             user_id=UUID(invitee_id), trip_id=UUID(trip_id)
@@ -323,18 +331,35 @@ class TripService:
         return invitation
 
     @staticmethod
-    def invite_user_by_email(trip_id: str, email: str) -> Invitation:
+    def invite_user_by_email(trip_id: str, email: str, inviter_id: str | None = None) -> Invitation:
         """
         Look up a user by exact email address and invite them to the trip.
 
         Raises:
             NoResultFound: If no active user has that email, or the trip doesn't exist
+            PermissionError: If inviter and invitee have blocked each other
             ValueError: If the user is already a member or has a pending invitation
         """
         invitee = db.session.query(User).filter_by(mail=email.strip().lower()).first()
         if not invitee:
             raise NoResultFound("No account found for that email address")
-        return TripService.invite_user(trip_id, str(invitee.id))
+        return TripService.invite_user(trip_id, str(invitee.id), inviter_id=inviter_id)
+
+    @staticmethod
+    def invite_user_by_username(trip_id: str, username: str, inviter_id: str | None = None) -> Invitation:
+        """
+        Look up a user by exact username (from the buddy finder / buddy list) and invite
+        them to the trip.
+
+        Raises:
+            NoResultFound: If no active user has that username, or the trip doesn't exist
+            PermissionError: If inviter and invitee have blocked each other
+            ValueError: If the user is already a member or has a pending invitation
+        """
+        invitee = db.session.query(User).filter_by(username=username).first()
+        if not invitee or not invitee.active:
+            raise NoResultFound("No account found for that username")
+        return TripService.invite_user(trip_id, str(invitee.id), inviter_id=inviter_id)
 
     @staticmethod
     def handle_invitation(trip_id: str, accepted: bool) -> None:

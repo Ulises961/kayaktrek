@@ -3,6 +3,7 @@ Log Service - Business logic for log operations.
 """
 import logging
 import math
+from datetime import datetime, timezone
 from typing import Any, List, Optional, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
@@ -13,8 +14,13 @@ from Schemas.base_schema import camelcase
 from Models.log import Log
 from Models.user import User
 from Models.trip_member import TripMember
+from Models.endorsement_request import (
+    EndorsementRequest,
+    EndorsementRequestStatusType,
+)
 from Schemas.log_schema import LogSchema
 from Api.database import db
+from Services.block_service import BlockService
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +200,13 @@ class LogService:
         if log.user_id == endorser_id:
             raise PermissionError("You cannot endorse your own log")
 
+        # Block beats the shared-trip rule: a block in either direction between the
+        # endorser and the author forbids endorsement, even of a trip they shared.
+        if BlockService.block_exists_between(endorser_id, cast(UUID, log.user_id)):
+            raise PermissionError(
+                "You can only endorse a log from a trip you shared with its author"
+            )
+
         # Both author and endorser must have held a TripMember row for the log's trip.
         # Two distinct member rows for {author, endorser} on that trip proves the shared trip.
         shared_members = (
@@ -214,10 +227,27 @@ class LogService:
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
+        # Resolve any pending endorsement request the author sent this endorser (M7b §2b).
+        pending_request = (
+            db.session.query(EndorsementRequest)
+            .filter_by(
+                log_id=log.id,
+                addressee_id=endorser_id,
+                status=EndorsementRequestStatusType.PENDING,
+            )
+            .first()
+        )
+        if pending_request is not None:
+            pending_request.status = EndorsementRequestStatusType.ACTIONED
+            pending_request.responded_at = datetime.now(timezone.utc)
+
         if user not in log.user_endorsed_logs:
             log.user_endorsed_logs.append(user)
             db.session.commit()
             logger.info("log_endorsed", extra={"log_id": id, "endorser_id": user_id})
+        elif pending_request is not None:
+            db.session.commit()
+            logger.info("log_endorse_request_resolved", extra={"log_id": id, "endorser_id": user_id})
         else:
             logger.info("log_endorse_noop", extra={"log_id": id, "endorser_id": user_id})
 

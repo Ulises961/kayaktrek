@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getPublicProfile } from "@/lib/public-profile/actions"
+import { getSession } from "@/lib/auth/session"
 import { isCertExpired } from "@/lib/certifications/expiry"
 import { UserAvatar } from "@/components/common/user-avatar"
+import { ProfileRelationshipControls } from "@/components/paddlers/profile-relationship-controls"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AwardIcon, MapPinIcon, ActivityIcon, AnchorIcon } from "lucide-react"
@@ -24,7 +26,7 @@ export async function generateMetadata({ params }: PublicProfilePageProps) {
 
 export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
   const { username } = await params
-  const profile = await getPublicProfile(username)
+  const [profile, session] = await Promise.all([getPublicProfile(username), getSession()])
   if (!profile) notFound()
 
   const fullName = [profile.name, profile.surname].filter(Boolean).join(" ")
@@ -60,6 +62,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
               </p>
             )}
           </div>
+          {session && <ProfileRelationshipControls username={profile.username} />}
         </div>
 
         {profile.bio && <p className="text-sm whitespace-pre-line">{profile.bio}</p>}

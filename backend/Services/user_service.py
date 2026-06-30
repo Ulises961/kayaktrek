@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -6,18 +7,24 @@ from cryptography.exceptions import InvalidTag
 from flask import g
 from flask_bcrypt import check_password_hash, generate_password_hash
 
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import NoResultFound, IntegrityError
+from sqlalchemy.orm import selectinload
 import uuid_extension
 import logging
 
 from Models.user import User
 from Models.trip_member import TripMember
+from Models.block import Block
+from Models.connection import Connection, ConnectionStatusType
 from Api.database import db
 from Schemas.base_schema import camelcase
+from Schemas.user_schema import PublicUserSchema
 from Services.crypto_service import encrypt, decrypt, generate_keypair
 from Services.storage_service import StorageService
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
+from Services.block_service import BlockService
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +123,114 @@ class UserService:
             or not user.profile_is_public
         ):
             raise NoResultFound(f"Public profile for '{username}' is not available")
+
+        # A block in either direction hides the profile — same neutral 404, no oracle.
+        if viewer_id is not None and BlockService.block_exists_between(viewer_id, user.id):
+            raise NoResultFound(f"Public profile for '{username}' is not available")
         return user
+
+    @staticmethod
+    def search_paddlers(
+        viewer_id: str, query: str, page: int = 1, per_page: int = 20
+    ) -> dict:
+        """Search public paddlers by username / name / surname for the buddy finder.
+
+        Only `profile_is_public` users are returned; the caller, anyone the caller
+        blocked, and anyone who blocked the caller are excluded. Each row is annotated
+        with the caller's relationship (none | pending_outgoing | pending_incoming |
+        buddy) and the connection id (when one exists) so the UI renders the right
+        action. An empty query returns an empty page rather than the whole directory.
+
+        Returns: {"items": [...], "total": N, "page": P, "pages": P}.
+        """
+        viewer_uuid = UUID(viewer_id)
+        term = (query or "").strip()
+        if not term:
+            return {"items": [], "total": 0, "page": page, "pages": 1}
+
+        pattern = f"%{term}%"
+        blocked = (
+            db.session.query(Block.id)
+            .filter(
+                or_(
+                    and_(Block.blocker_id == viewer_uuid, Block.blocked_id == User.id),
+                    and_(Block.blocker_id == User.id, Block.blocked_id == viewer_uuid),
+                )
+            )
+            .exists()
+        )
+        base = db.session.query(User).filter(
+            User.profile_is_public.is_(True),
+            User.active.is_(True),
+            User.deletion_requested_at.is_(None),
+            User.id != viewer_uuid,
+            or_(
+                User.username.ilike(pattern),
+                User.name.ilike(pattern),
+                User.surname.ilike(pattern),
+            ),
+            ~blocked,
+        )
+
+        total = base.count()
+        users = (
+            base.options(selectinload(User.certifications))
+            .order_by(User.username.asc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        relationship_by_user = UserService._relationships_for(viewer_uuid, users)
+        items = []
+        for user in users:
+            data = PublicUserSchema().dump(user)
+            data["id"] = str(user.id)
+            data["relationship"], data["connectionId"] = relationship_by_user[user.id]
+            items.append(data)
+
+        pages = math.ceil(total / per_page) if total > 0 else 1
+        logger.info(
+            "paddlers_searched",
+            extra={"viewer_id": viewer_id, "total": total, "page": page},
+        )
+        return {"items": items, "total": total, "page": page, "pages": pages}
+
+    @staticmethod
+    def _relationships_for(viewer_uuid: UUID, users: List[User]) -> dict:
+        """Map each user id to (relationship, connection_id) relative to the viewer."""
+        result: Dict[UUID, tuple] = {user.id: ("none", None) for user in users}
+        user_ids = list(result.keys())
+        if not user_ids:
+            return result
+
+        connections = (
+            db.session.query(Connection)
+            .filter(
+                or_(
+                    and_(
+                        Connection.requester_id == viewer_uuid,
+                        Connection.addressee_id.in_(user_ids),
+                    ),
+                    and_(
+                        Connection.addressee_id == viewer_uuid,
+                        Connection.requester_id.in_(user_ids),
+                    ),
+                )
+            )
+            .all()
+        )
+        for connection in connections:
+            is_outgoing = connection.requester_id == viewer_uuid
+            other_id = connection.addressee_id if is_outgoing else connection.requester_id
+            if connection.status is ConnectionStatusType.ACCEPTED:
+                relationship = "buddy"
+            elif is_outgoing:
+                relationship = "pending_outgoing"
+            else:
+                relationship = "pending_incoming"
+            result[other_id] = (relationship, str(connection.id))
+        return result
 
     @staticmethod
     def update_user(id: str, user_data: Dict[str, Any]) -> User:

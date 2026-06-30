@@ -1,18 +1,23 @@
 import Link from "next/link"
 import { apiGet } from "@/lib/api/client"
+import { getSession } from "@/lib/auth/session"
+import { listEndorsementRequests } from "@/lib/endorsement-requests/actions"
 import { LogPageSchema, LogsSchema } from "@/lib/dtos/log"
 import { LogsTabs } from "@/components/logs/logs-tabs"
+import { EndorsementInbox } from "@/components/logs/endorsement-inbox"
 import { Button } from "@/components/ui/button"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
-  const [pageData, endorsedData] = await Promise.all([
+  const [pageData, endorsedData, session, endorsementRequests] = await Promise.all([
     apiGet("/api/log/all?per_page=100")
       .then((r) => LogPageSchema.parse(r))
       .catch(() => ({ items: [], total: 0, page: 1, pages: 1 })),
     apiGet("/api/log/endorsed")
       .then((r) => LogsSchema.parse(r))
       .catch(() => []),
+    getSession(),
+    listEndorsementRequests("incoming"),
   ])
 
   const { items } = pageData
@@ -60,7 +65,9 @@ export default async function LogsPage() {
         </div>
       )}
 
-      <LogsTabs myLogs={items} endorsedLogs={endorsedData} />
+      <EndorsementInbox requests={endorsementRequests} />
+
+      <LogsTabs myLogs={items} endorsedLogs={endorsedData} currentUserId={session?.userId} />
     </div>
   )
 }

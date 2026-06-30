@@ -9,6 +9,8 @@ from Models.user_has_inventory import user_has_inventory
 from Models.user_has_items import user_has_items
 from Models.trip_member import TripMember
 from Models.user_endorses_log import user_endorses_log
+from Models.connection import Connection
+from Models.block import Block
 from datetime import datetime
 from sqlalchemy import String, Boolean, Integer, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -130,6 +132,24 @@ class User(BaseModel):
     )
     certifications: Mapped[List["UserCertification"]] = relationship(
         "UserCertification", back_populates="user", cascade="all, delete-orphan"
+    )
+    # Buddy connections — directed rows; query both columns for the symmetric view.
+    # DB-level ON DELETE CASCADE handles teardown; relationships are viewonly to keep
+    # all mutations in ConnectionService.
+    connections_sent: Mapped[List["Connection"]] = relationship(
+        "Connection",
+        foreign_keys=[Connection.requester_id],
+        viewonly=True,
+    )
+    connections_received: Mapped[List["Connection"]] = relationship(
+        "Connection",
+        foreign_keys=[Connection.addressee_id],
+        viewonly=True,
+    )
+    blocks_made: Mapped[List["Block"]] = relationship(
+        "Block",
+        foreign_keys=[Block.blocker_id],
+        viewonly=True,
     )
 
     def __repr__(self):
