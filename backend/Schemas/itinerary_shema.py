@@ -85,15 +85,50 @@ class ItineraryUpdateSchema(BaseSchema):
         return data
 
 
+class OriginalAuthorSchema(BaseSchema):
+    """Shallow projection of a fork-source itinerary's author (M7c attribution).
+
+    `linkable` mirrors the author's profile_is_public so the frontend only deep-links
+    to a public profile.
+    """
+    username = fields.String(dump_only=True)
+    name = fields.String(dump_only=True, allow_none=True)
+    linkable = fields.Boolean(dump_only=True)
+
+
+class ItineraryExploreItemSchema(BaseSchema):
+    """One row of the /explore discovery listing (unauthenticated).
+
+    Fed snake_case dicts from ItineraryService.search_public_itineraries — facets are
+    derived from the route's own points/dates; no Trip data is present.
+    """
+    name = fields.String(dump_only=True)
+    total_miles = fields.Float(dump_only=True, allow_none=True)
+    day_count = fields.Integer(dump_only=True)
+    season = fields.String(dump_only=True, allow_none=True)
+    centroid_lat = fields.Float(dump_only=True, allow_none=True)
+    centroid_lng = fields.Float(dump_only=True, allow_none=True)
+    created_from_id = fields.UUID(dump_only=True, allow_none=True)
+    original_author = fields.Nested(
+        OriginalAuthorSchema, dump_only=True, allow_none=True
+    )
+
+
 class ItineraryPublicSchema(BaseSchema):
     """Stripped schema for unauthenticated public itinerary access.
 
-    Excludes user_id, trip_id, notes, and private images.
+    Excludes user_id, trip_id, notes, and private images. `created_from_id` +
+    `original_author` surface fork attribution (M7c); the resource injects
+    `original_author` via ItineraryService.resolve_original_author before dumping.
     """
     name = fields.String(dump_only=True)
     is_public = fields.Boolean(dump_only=True)
     avg_speed_knots = fields.Float(dump_only=True)
     total_miles = fields.Float(dump_only=True)
+    created_from_id = fields.UUID(dump_only=True, allow_none=True)
+    original_author = fields.Nested(
+        OriginalAuthorSchema, dump_only=True, allow_none=True
+    )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
 
     @post_dump

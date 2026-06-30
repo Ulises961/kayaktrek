@@ -59,7 +59,7 @@ def public_itinerary(client, auth_headers):
 def test_get_explore_returns_200_list(client, public_itinerary):
     r = client.get(f"{ITINERARY_ENDPOINT}/explore")
     assert r.status_code == 200
-    ids = [i["id"] for i in r.json]
+    ids = [i["id"] for i in r.json["items"]]
     assert public_itinerary["itinerary_id"] in ids
 
 

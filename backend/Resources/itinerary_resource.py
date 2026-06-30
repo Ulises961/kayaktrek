@@ -1,12 +1,18 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, g, jsonify, request, abort, Response
+from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from Schemas.itinerary_shema import ItinerarySchema, ItineraryPublicSchema, ItineraryExploreSchema
+from Schemas.itinerary_shema import (
+    ItinerarySchema,
+    ItineraryPublicSchema,
+    ItineraryExploreItemSchema,
+)
 from Api.database import db
+from Api.limiter import limiter
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
 from Services.itinerary_service import ItineraryService
@@ -26,11 +32,35 @@ def get_all_itineraries():
 
 
 @itinerary_api.route("/explore", methods=["GET"])
+@limiter.limit("30 per minute", key_func=get_remote_address)
 def get_explore():
-    """GET /api/itinerary/explore — Unauthenticated. Return all public itineraries (lightweight)."""
-    itineraries = ItineraryService.get_public_itineraries()
-    schema = ItineraryExploreSchema()
-    return jsonify([schema.dump(i) for i in itineraries]), HTTPStatus.OK
+    """GET /api/itinerary/explore — Unauthenticated. Filterable, paginated public-route
+    discovery. Query params: page, per_page (capped 100); bbox minLat/minLng/maxLat/maxLng;
+    season (repeatable); minMiles/maxMiles; minDays/maxDays; name; sort
+    (recent|distance|duration|name). Returns {items, total, page, pages}."""
+    args = request.args
+    result = ItineraryService.search_public_itineraries(
+        page=args.get("page", 1, type=int),
+        per_page=args.get("per_page", 20, type=int),
+        min_lat=args.get("minLat", type=float),
+        min_lng=args.get("minLng", type=float),
+        max_lat=args.get("maxLat", type=float),
+        max_lng=args.get("maxLng", type=float),
+        seasons=args.getlist("season"),
+        min_miles=args.get("minMiles", type=float),
+        max_miles=args.get("maxMiles", type=float),
+        min_days=args.get("minDays", type=int),
+        max_days=args.get("maxDays", type=int),
+        name=args.get("name"),
+        sort=args.get("sort", "recent"),
+    )
+    schema = ItineraryExploreItemSchema()
+    return jsonify({
+        "items": [schema.dump(item) for item in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 @itinerary_api.route("/<string:id>/public", methods=["GET"])
@@ -38,7 +68,9 @@ def get_public_itinerary(id: str):
     """GET /api/itinerary/<id>/public — Unauthenticated. Returns 404 if not public."""
     try:
         itinerary = ItineraryService.get_public_itinerary(id)
-        return jsonify(ItineraryPublicSchema().dump(itinerary)), HTTPStatus.OK
+        payload = ItineraryPublicSchema().dump(itinerary)
+        payload["originalAuthor"] = ItineraryService.resolve_original_author(itinerary)
+        return jsonify(payload), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Itinerary not found or not public")
 
