@@ -1,14 +1,29 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, isRedirectError } from "@/lib/api/client"
+import {
+  apiGet,
+  apiGetPublic,
+  apiPost,
+  apiPatch,
+  apiDelete,
+  apiUpload,
+  isRedirectError,
+} from "@/lib/api/client"
 import { PointSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
-import { ItinerarySchema, ItinerariesSchema, PublicItinerariesSchema } from "@/lib/dtos/itinerary"
-import type { Itinerary, PublicItinerary } from "@/lib/dtos/itinerary"
+import {
+  ItinerarySchema,
+  ItinerariesSchema,
+  PublicItinerariesSchema,
+  ExplorePageSchema,
+} from "@/lib/dtos/itinerary"
+import type { Itinerary, PublicItinerary, ExplorePage, ExploreFilters } from "@/lib/dtos/itinerary"
 import type { BoundaryApplyPayload } from "./boundaries"
+
+const EMPTY_EXPLORE_PAGE: ExplorePage = { items: [], total: 0, page: 1, pages: 1 }
 
 export type ItineraryActionResult =
   | { success: true; itineraryId: string }
@@ -221,9 +236,47 @@ export async function importGpx(formData: FormData): Promise<ItineraryActionResu
 
 export async function fetchPublicItineraries(): Promise<PublicItinerary[]> {
   try {
-    const raw = await apiGet<unknown[]>("/api/itinerary/explore")
-    return PublicItinerariesSchema.parse(raw)
+    const page = await searchPublicItineraries({ perPage: 100 })
+    return PublicItinerariesSchema.parse(
+      page.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        isPublic: true,
+        totalMiles: item.totalMiles,
+      })),
+    )
   } catch {
     return []
+  }
+}
+
+function buildExploreParams(filters: ExploreFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.name?.trim()) params.set("name", filters.name.trim())
+  for (const season of filters.seasons ?? []) params.append("season", season)
+  if (filters.minMiles != null) params.set("minMiles", String(filters.minMiles))
+  if (filters.maxMiles != null) params.set("maxMiles", String(filters.maxMiles))
+  if (filters.minDays != null) params.set("minDays", String(filters.minDays))
+  if (filters.maxDays != null) params.set("maxDays", String(filters.maxDays))
+  // bbox is all-or-nothing — only sent when the full viewport box is known.
+  if (filters.bbox) {
+    params.set("minLat", String(filters.bbox.minLat))
+    params.set("minLng", String(filters.bbox.minLng))
+    params.set("maxLat", String(filters.bbox.maxLat))
+    params.set("maxLng", String(filters.bbox.maxLng))
+  }
+  if (filters.sort) params.set("sort", filters.sort)
+  if (filters.page != null) params.set("page", String(filters.page))
+  if (filters.perPage != null) params.set("per_page", String(filters.perPage))
+  return params
+}
+
+export async function searchPublicItineraries(filters: ExploreFilters = {}): Promise<ExplorePage> {
+  try {
+    const query = buildExploreParams(filters).toString()
+    const raw = await apiGetPublic<unknown>(`/api/itinerary/explore${query ? `?${query}` : ""}`)
+    return ExplorePageSchema.parse(raw)
+  } catch {
+    return EMPTY_EXPLORE_PAGE
   }
 }
