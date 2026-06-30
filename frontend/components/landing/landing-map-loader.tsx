@@ -11,9 +11,11 @@ const LandingMap = dynamic(() => import("./landing-map").then((m) => m.LandingMa
 export function LandingMapLoader({
   routes,
   interactive,
+  variant,
 }: {
   routes?: RouteData[]
   interactive?: boolean
+  variant?: "hero" | "banner"
 }) {
-  return <LandingMap routes={routes} interactive={interactive} />
+  return <LandingMap routes={routes} interactive={interactive} variant={variant} />
 }

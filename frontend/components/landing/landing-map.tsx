@@ -16,6 +16,12 @@ import {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { palette } from "@/lib/tokens"
 
+// "hero" is the full landing chart (all instruments). "banner" is the calmer
+// dashboard bridge — basemap + graticule + route only, no forecast cell or scale
+// bar, framed tight to fill a slim strip. The landing stays the bold hero; the
+// dashboard is a quiet continuation of the same chart.
+type Variant = "hero" | "banner"
+
 type Props = {
   routes?: RouteData[]
   center?: [number, number]
@@ -23,6 +29,7 @@ type Props = {
   // When false the map is a static poster (no drag/zoom) so page-scroll is never
   // captured — used on mobile, where touch-drag would fight the scroll-dissipate.
   interactive?: boolean
+  variant?: Variant
 }
 
 // Esri Ocean Basemap — soft bathymetric Mediterranean blue, water-forward.
@@ -70,7 +77,7 @@ function RouteMarkers({ route }: { route: RouteData }) {
 // than a fixed far-out centre — so the parallax reveal lands on a well-scaled
 // passage and the route sits centred, not stranded high. Re-fits on resize/
 // breakpoint. Falls back to the fixed centre/zoom when there is no route yet.
-function FrameRoute({ routes }: { routes: RouteData[] }) {
+function FrameRoute({ routes, variant }: { routes: RouteData[]; variant: Variant }) {
   const map = useMap()
   useEffect(() => {
     const pts = routes.flatMap((r) => r.positions) as [number, number][]
@@ -78,9 +85,13 @@ function FrameRoute({ routes }: { routes: RouteData[] }) {
     const bounds = L.latLngBounds(pts)
     const fit = () => {
       const compact = window.matchMedia("(max-width: 639px)").matches
+      // The banner is a short strip with no header to clear, so it frames tight.
+      const pad: L.PointTuple = variant === "banner" ? [24, 20] : [compact ? 32 : 56, 88]
+      const padBR: L.PointTuple =
+        variant === "banner" ? [24, 20] : [compact ? 32 : 56, compact ? 120 : 72]
       map.fitBounds(bounds, {
-        paddingTopLeft: [compact ? 32 : 56, 88], // clear the header strip
-        paddingBottomRight: [compact ? 32 : 56, compact ? 120 : 72],
+        paddingTopLeft: pad,
+        paddingBottomRight: padBR,
         maxZoom: MAX_ZOOM,
         animate: false,
       })
@@ -88,7 +99,7 @@ function FrameRoute({ routes }: { routes: RouteData[] }) {
     fit()
     window.addEventListener("resize", fit)
     return () => window.removeEventListener("resize", fit)
-  }, [map, routes])
+  }, [map, routes, variant])
   return null
 }
 
@@ -117,7 +128,9 @@ export function LandingMap({
   center = [41.55, 3.75],
   zoom = 8,
   interactive = true,
+  variant = "hero",
 }: Props) {
+  const isHero = variant === "hero"
   return (
     <MapContainer
       center={center}
@@ -130,12 +143,14 @@ export function LandingMap({
       scrollWheelZoom={false}
     >
       <Interactions interactive={interactive} />
-      <FrameRoute routes={routes} />
+      <FrameRoute routes={routes} variant={variant} />
       <TileLayer url={ESRI_OCEAN} />
       <TileLayer url={SEAMARK} />
       <Graticule />
-      <ScaleBar />
-      <ForecastCell routes={routes} />
+      {/* Forecast cell + scale bar are the loud instruments — hero only. The banner
+          stays a calm chart bridge, and the ambient wind never runs on the dashboard. */}
+      {isHero && <ScaleBar />}
+      {isHero && <ForecastCell routes={routes} />}
       {routes.map((route) =>
         route.positions.length === 0 ? null : (
           <Fragment key={route.id}>
