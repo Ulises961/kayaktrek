@@ -16,10 +16,10 @@ import {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { palette } from "@/lib/tokens"
 
-// "hero" is the full landing chart (all instruments). "banner" is the calmer
-// dashboard bridge — basemap + graticule + route only, no forecast cell or scale
-// bar, framed tight to fill a slim strip. The landing stays the bold hero; the
-// dashboard is a quiet continuation of the same chart.
+// "hero" is the full landing chart (all instruments) on the Esri Ocean basemap.
+// "banner" is the calmer in-app bridge — graticule + route only, no forecast cell or
+// scale bar, framed tight to a slim strip — on the OSM basemap the planner uses, so
+// its tiles are cacheable and shared with the builder the card links into.
 type Variant = "hero" | "banner"
 
 type Props = {
@@ -32,10 +32,24 @@ type Props = {
   variant?: Variant
 }
 
-// Esri Ocean Basemap — soft bathymetric Mediterranean blue, water-forward.
+// Esri Ocean Basemap — soft bathymetric Mediterranean blue, water-forward. Used by
+// the landing hero only: it is a proprietary tile product served client-direct with
+// attribution and NEVER cached/re-served (Esri terms), which is fine for a low-volume
+// marketing hero.
 const ESRI_OCEAN =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+// OSM base for the in-app "banner" variant — the same stack the planner uses, so the
+// tiles are cacheable (browser + the future MinIO proxy) and shared with the builder
+// the dashboard card links into. OSM sanctions caching; Esri does not.
+const OSM_BASE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
+
+// Attribution is required by every provider's terms; suppressing it is a ToS gap.
+const ESRI_ATTRIB =
+  "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, National Geographic, Garmin, HERE, and others"
+const OSM_ATTRIB =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+const SEAMARK_ATTRIB = '&copy; <a href="https://www.openseamap.org">OpenSeaMap</a> contributors'
 
 // Zoom is locked to Esri Ocean's useful range for this region: it thins to
 // "no data" past ~z11, and the landing is a calm discovery chart, not the
@@ -123,6 +137,17 @@ function Interactions({ interactive }: { interactive: boolean }) {
   return null
 }
 
+// Drop Leaflet's "Leaflet" prefix from the attribution control — the data credits
+// (OSM/Esri/OpenSeaMap) are the load-bearing part and the prefix link clutters the
+// chart aesthetic. The credits themselves stay visible, as the terms require.
+function AttributionPrefix() {
+  const map = useMap()
+  useEffect(() => {
+    map.attributionControl?.setPrefix(false)
+  }, [map])
+  return null
+}
+
 export function LandingMap({
   routes = [],
   center = [41.55, 3.75],
@@ -139,13 +164,16 @@ export function LandingMap({
       maxZoom={MAX_ZOOM}
       className="h-full w-full"
       zoomControl={false}
-      attributionControl={false}
       scrollWheelZoom={false}
     >
       <Interactions interactive={interactive} />
+      <AttributionPrefix />
       <FrameRoute routes={routes} variant={variant} />
-      <TileLayer url={ESRI_OCEAN} />
-      <TileLayer url={SEAMARK} />
+      <TileLayer
+        url={isHero ? ESRI_OCEAN : OSM_BASE}
+        attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIB}
+      />
+      <TileLayer url={SEAMARK} attribution={SEAMARK_ATTRIB} />
       <Graticule />
       {/* Forecast cell + scale bar are the loud instruments — hero only. The banner
           stays a calm chart bridge, and the ambient wind never runs on the dashboard. */}

@@ -4,6 +4,7 @@ import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TRIP_STATE_LABELS, TripPageSchema } from "@/lib/dtos/trip"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
+import { getMe } from "@/lib/user/me"
 import { StateBadge } from "@/components/common/state-badge"
 import { TripRouteThumbnail } from "@/components/dashboard/trip-route-thumbnail"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
 
 export default async function DashboardPage() {
   const session = await getSession()
+  const user = session ? await getMe() : null
   const trips = session ? await fetchTrips(session.userId) : []
 
   const happening = trips.filter((t) => t.state === "happening")
@@ -92,7 +94,7 @@ export default async function DashboardPage() {
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-semibold">
-          Welcome back{session?.email ? `, ${session.email.split("@")[0]}` : ""}
+          Welcome back{user?.username ? `, ${user.username}` : ""}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           {trips.length === 0
