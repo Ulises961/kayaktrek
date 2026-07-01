@@ -115,6 +115,10 @@
   --input: oklch(0.865 0.042 218);
   --ring: oklch(0.52 0.065 240);
 
+  /* Chart-paper ivory — scoped to the landing nautical-chart variant
+     (cartouche, neat-line, ticks, header). #f7f4ec in tokens.ts. */
+  --chart-paper: oklch(0.966 0.009 92);
+
   /* Sidebar — slightly deeper than background */
   --sidebar: oklch(0.965 0.006 90);
   --sidebar-foreground: oklch(0.155 0.04 245);
@@ -282,39 +286,6 @@
   }
 }
 
-/* Nautical chart grid — used by auth layout background */
-@keyframes chart-drift {
-  0% {
-    background-position:
-      0 0,
-      0 0,
-      0 0,
-      0 0;
-  }
-  100% {
-    background-position:
-      100px 100px,
-      100px 100px,
-      20px 20px,
-      20px 20px;
-  }
-}
-
-.chart-grid {
-  background-color: oklch(0.155 0.04 245); /* ocean-900 */
-  background-image:
-    linear-gradient(oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.18) 1px, transparent 1px),
-    linear-gradient(oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.43 0.165 243 / 0.07) 1px, transparent 1px);
-  background-size:
-    100px 100px,
-    100px 100px,
-    20px 20px,
-    20px 20px;
-  animation: chart-drift 120s linear infinite;
-}
-
 @layer base {
   html {
     font-size: 112.5%; /* 18px base — scales all rem values proportionally */
@@ -335,12 +306,8 @@
 
 @layer components {
   /* ── Auth surfaces ──────────────────────────────────────────────────────── */
-  .auth-card {
-    overflow: hidden;
-    border-radius: 2px;
-    background: white;
-    box-shadow: 0 8px 40px oklch(0.155 0.04 245 / 0.55);
-  }
+  /* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
+     These rules style the contents that sit inside it. */
   .auth-card-accent {
     height: 3px;
     background: linear-gradient(
@@ -478,5 +445,136 @@
   .fp-crew-card {
     page-break-inside: avoid;
     border-color: #ccc !important;
+  }
+}
+
+/* ===========================================================================
+ * Landing — "A Mediterranean planning chart"
+ * The viewport is a calm sea chart: Esri Ocean base + ambient current carry
+ * the mood; a neat-line frame and a title cartouche are the chrome. Palette
+ * and faces come from the maritime design system (tokens.ts / fonts).
+ * ======================================================================== */
+/* Plain (unlayered) rules so Lightning CSS always emits them and they win
+   over the base `* { border }` reset. */
+/* Header — slim chart publication strip. */
+.chart-header {
+  background: color-mix(in oklch, var(--chart-paper) 78%, transparent);
+  border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
+  backdrop-filter: blur(8px);
+}
+.chart-wordmark {
+  font-family: var(--font-display), serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: oklch(0.155 0.04 245);
+  line-height: 1;
+}
+
+/* Double neat-line — the classic chart border. */
+.chart-neatline {
+  position: absolute;
+  inset: 16px;
+  border: 1px solid oklch(0.155 0.04 245 / 0.32);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--chart-paper) 40%, transparent) inset;
+  pointer-events: none;
+}
+.chart-tick {
+  position: absolute;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  color: oklch(0.155 0.04 245 / 0.5);
+  background: color-mix(in oklch, var(--chart-paper) 55%, transparent);
+  padding: 0 0.25rem;
+}
+
+/* Cartouche — chart title block, the page's signature element. */
+.chart-cartouche {
+  background: color-mix(in oklch, var(--chart-paper) 90%, transparent);
+  border: 1px solid oklch(0.43 0.165 243 / 0.26);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.7) inset,
+    0 14px 44px oklch(0.155 0.04 245 / 0.26);
+  backdrop-filter: blur(7px);
+}
+.chart-eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: oklch(0.52 0.09 240);
+}
+.chart-tagline {
+  font-family: var(--font-display), serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.06;
+  color: oklch(0.155 0.04 245);
+}
+.chart-tagline em {
+  font-style: italic;
+  color: oklch(0.3 0.085 240);
+}
+.chart-invite {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: oklch(0.45 0.07 240);
+}
+.chart-rule {
+  height: 1px;
+  background: linear-gradient(to right, oklch(0.43 0.165 243 / 0.5), oklch(0.43 0.165 243 / 0.06));
+}
+
+/* Actions use the shadcn `Button` primitive (default + link variants) with the
+   chart-variant overrides applied in landing-hero.tsx — no bespoke classes. */
+
+/* Orchestrated load sequence — quiet, one-shot, reduced-motion safe. */
+@keyframes chart-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes chart-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes chart-needle-settle {
+  from {
+    transform: rotate(-34deg);
+  }
+  62% {
+    transform: rotate(7deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+.chart-anim-rise {
+  animation: chart-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chart-anim-fade {
+  animation: chart-fade 1.2s ease both;
+}
+.chart-needle {
+  transform-origin: 50% 50%;
+  animation: chart-needle-settle 1.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-anim-rise,
+  .chart-anim-fade,
+  .chart-needle {
+    animation: none;
   }
 }

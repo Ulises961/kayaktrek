@@ -1,6 +1,13 @@
 "use client"
 import clsx from "clsx"
-import { LifeBuoyIcon, MapPinIcon, NewspaperIcon, MailIcon, CompassIcon } from "lucide-react"
+import {
+  LayoutDashboardIcon,
+  LifeBuoyIcon,
+  MapPinIcon,
+  NewspaperIcon,
+  MailIcon,
+  CompassIcon,
+} from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { GlobeAmericasIcon } from "../icons/heroicons-globe-americas"
 import { UserGroupIcon } from "../icons/heroicons-user-group"
@@ -12,6 +19,7 @@ export function NavigationItems() {
   const { isMobile, setOpenMobile } = useSidebar()
 
   const menuItems = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
     { title: "Trips", url: "/trips", icon: GlobeAmericasIcon },
     { title: "Itineraries", url: "/itinerary", icon: MapPinIcon },
     { title: "Explore", url: "/explore", icon: CompassIcon },
