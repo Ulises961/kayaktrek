@@ -53,10 +53,15 @@ function multiplierForZoom(zoom: number): number {
 // planner data omits it). A bounded extent label can't masquerade as a forecast.
 function noteIcon(radiusKm: number, illustrative: boolean): L.DivIcon {
   const span = Math.round((radiusKm * 2) / 5) * 5 // diameter, 5 km steps
-  const suffix = illustrative ? " · illustrative" : ""
+  // Landing is decorative — it must never read as a forecast, so it keeps the
+  // "illustrative" wording. The planner shows real data, so it names the fact:
+  // this is the forecast's coverage extent.
+  const text = illustrative
+    ? `≈ ${span} km coverage · illustrative`
+    : `≈ ${span} km forecast coverage`
   return L.divIcon({
     className: "",
-    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">≈ ${span} km coverage${suffix}</div>`,
+    html: `<div style="white-space:nowrap;font-family:var(--font-mono),ui-monospace,monospace;font-size:10px;letter-spacing:0.04em;color:${INK};opacity:0.7;text-shadow:0 1px 2px ${PAPER_GLOW};">${text}</div>`,
     iconSize: [0, 0],
     iconAnchor: [-8, -6],
   })

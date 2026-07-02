@@ -49,7 +49,7 @@ export function ExploreClient({ routes, isAuthenticated }: Props) {
           routes.map((route) => (
             <div
               key={route.id}
-              className="border-border bg-card hover:bg-accent flex flex-col gap-2 rounded-lg border p-3 transition-colors"
+              className="border-border bg-card hover:bg-secondary flex flex-col gap-2 rounded-lg border p-3 transition-colors"
               onMouseEnter={() => setSelectedId(route.id)}
               onMouseLeave={() => setSelectedId(null)}
             >
