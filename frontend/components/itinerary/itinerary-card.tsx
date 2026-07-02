@@ -2,8 +2,8 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon } from "lucide-react"
-import { updateItinerary, createTripFromItinerary } from "@/lib/itinerary/actions"
+import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -13,6 +13,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 
 export type ItineraryCardProps = {
@@ -23,6 +34,7 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isCreatingTrip, startCreateTransition] = useTransition()
+  const [isDeleting, startDeleteTransition] = useTransition()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [tripName, setTripName] = useState("")
 
@@ -40,6 +52,13 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
     e.preventDefault()
     setTripName(itinerary.name ?? "")
     setShowCreateDialog(true)
+  }
+
+  function handleDelete() {
+    startDeleteTransition(async () => {
+      await deleteItinerary(itinerary.id ?? "")
+      router.refresh()
+    })
   }
 
   function handleCreateTrip() {
@@ -113,6 +132,39 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
                 <PlusIcon className="size-3" />
                 <span>Create trip</span>
               </button>
+              <span className="text-border select-none">·</span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    disabled={isDeleting}
+                    className="text-muted-foreground hover:text-destructive flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50"
+                  >
+                    <Trash2Icon className="size-3" />
+                    <span>Delete</span>
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete {itinerary.name || "this itinerary"}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes the route and all its days and points. This cannot be
+                      undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>

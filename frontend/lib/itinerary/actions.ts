@@ -140,6 +140,16 @@ export async function deletePoint(id: string): Promise<DeleteActionResult> {
   }
 }
 
+export async function deleteItinerary(id: string): Promise<DeleteActionResult> {
+  try {
+    await apiDelete(`/api/itinerary/${id}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to delete itinerary." }
+  }
+}
+
 export async function createDay(itineraryId: string, dayNumber: number): Promise<DayActionResult> {
   try {
     const raw = await apiPost<unknown>("/api/day/create", { itineraryId, dayNumber })
