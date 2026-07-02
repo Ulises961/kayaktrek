@@ -99,17 +99,25 @@ def test_update_validation_error_returns_400(client, auth_headers, itinerary):
 
 # ── POST /<id>/fork ───────────────────────────────────────────────────────────
 
-def test_fork_public_itinerary_returns_201_with_id(client, auth_headers, public_itinerary):
+def test_fork_public_itinerary_returns_201_with_id(client, auth_headers_2, public_itinerary):
+    # A different user than the author forks the public route.
     r = client.post(f"{ITINERARY_ENDPOINT}/{public_itinerary['itinerary_id']}/fork",
-                    headers=auth_headers)
+                    headers=auth_headers_2)
     assert r.status_code == 201
     fork_id = r.json.get("itineraryId")
     assert fork_id is not None
-    client.delete(f"{ITINERARY_ENDPOINT}/{fork_id}", headers=auth_headers)
+    client.delete(f"{ITINERARY_ENDPOINT}/{fork_id}", headers=auth_headers_2)
 
 
 def test_fork_private_itinerary_returns_403(client, auth_headers, itinerary):
     r = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/fork", headers=auth_headers)
+    assert r.status_code == 403
+
+
+def test_fork_own_itinerary_returns_403(client, auth_headers, public_itinerary):
+    # The author forking their own route is rejected — it would duplicate it.
+    r = client.post(f"{ITINERARY_ENDPOINT}/{public_itinerary['itinerary_id']}/fork",
+                    headers=auth_headers)
     assert r.status_code == 403
 
 

@@ -1,4 +1,5 @@
 import type { PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
+import { totalDistanceNm } from "@/lib/itinerary/distance"
 
 export type RouteData = {
   id: string
@@ -6,6 +7,13 @@ export type RouteData = {
   positions: [number, number][]
   totalMiles: number | null
   dayCount: number
+}
+
+// One numbered day's at-a-glance summary for the public route breakdown.
+export type DaySummary = {
+  dayNumber: number
+  date: string | null
+  distanceNm: number
 }
 
 // Walk the nextId linked list for PublicPoint (no nested `next` property).
@@ -52,4 +60,23 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
     totalMiles: itinerary.totalMiles ?? null,
     dayCount: numberedDays.length,
   }
+}
+
+// Per-day distances for the public detail breakdown, derived from the route's own
+// points (the same data extractRouteData draws) — so planners see how the mileage is
+// split across days before deciding to use the route.
+export function extractDaySummaries(itinerary: PublicItineraryDetail): DaySummary[] {
+  return [...itinerary.days]
+    .filter((d) => d.dayNumber > 0)
+    .sort((a, b) => a.dayNumber - b.dayNumber)
+    .map((day) => {
+      const ordered = walkPublicPoints(day.points)
+        .filter((p) => p.latitude != null && p.longitude != null)
+        .map((p) => ({ latitude: p.latitude as number, longitude: p.longitude as number }))
+      return {
+        dayNumber: day.dayNumber,
+        date: day.date ?? null,
+        distanceNm: totalDistanceNm(ordered),
+      }
+    })
 }

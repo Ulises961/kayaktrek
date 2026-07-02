@@ -402,6 +402,10 @@ class ItineraryService:
         source = ItineraryService.get_itinerary_by_id(source_id)
         if not source.is_public:
             raise PermissionError("Only public itineraries can be forked")
+        if source.user_id == UUID(user_id):
+            # The author already owns this route — cloning it would duplicate it in
+            # their itineraries list. They should open the original instead.
+            raise PermissionError("You already own this route")
 
         fork = Itinerary(
             name=source.name,

@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { forkItinerary } from "@/lib/itinerary/actions"
@@ -8,11 +9,21 @@ import { forkItinerary } from "@/lib/itinerary/actions"
 type Props = {
   itineraryId: string
   isAuthenticated: boolean
+  isOwner: boolean
 }
 
-export function RouteDetailActions({ itineraryId, isAuthenticated }: Props) {
+export function RouteDetailActions({ itineraryId, isAuthenticated, isOwner }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+
+  // The author already owns this route — open the original rather than clone a duplicate.
+  if (isOwner) {
+    return (
+      <Button asChild>
+        <Link href={`/itinerary/${itineraryId}`}>Open your route</Link>
+      </Button>
+    )
+  }
 
   function handleFork() {
     if (!isAuthenticated) {

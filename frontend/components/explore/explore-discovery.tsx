@@ -39,6 +39,7 @@ const SORTS: { value: ExploreSort; label: string }[] = [
 type Props = {
   initial: ExplorePage
   isAuthenticated: boolean
+  ownedIds: string[]
 }
 
 function toNumber(value: string): number | undefined {
@@ -47,9 +48,10 @@ function toNumber(value: string): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-export function ExploreDiscovery({ initial, isAuthenticated }: Props) {
+export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) {
   const router = useRouter()
   const [isForking, startFork] = useTransition()
+  const owned = new Set(ownedIds)
 
   // Filter inputs
   const [name, setName] = useState("")
@@ -313,15 +315,22 @@ export function ExploreDiscovery({ initial, isAuthenticated }: Props) {
                     )}
                   </p>
                 )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-full text-xs"
-                  disabled={isForking}
-                  onClick={() => handleFork(item.id)}
-                >
-                  Use this route
-                </Button>
+                {owned.has(item.id) ? (
+                  // The viewer authored this route — open the original, don't clone it.
+                  <Button asChild size="sm" variant="outline" className="h-7 w-full text-xs">
+                    <Link href={`/itinerary/${item.id}`}>Open your route</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 w-full text-xs"
+                    disabled={isForking}
+                    onClick={() => handleFork(item.id)}
+                  >
+                    Use this route
+                  </Button>
+                )}
               </div>
             ))
           )}

@@ -1,4 +1,4 @@
-import { searchPublicItineraries } from "@/lib/itinerary/actions"
+import { searchPublicItineraries, fetchItineraries } from "@/lib/itinerary/actions"
 import { getSession } from "@/lib/auth/session"
 import { ExploreDiscovery } from "@/components/explore/explore-discovery"
 
@@ -7,6 +7,12 @@ export default async function ExplorePage() {
     searchPublicItineraries({ perPage: 20 }),
     getSession(),
   ])
+
+  // The viewer's own routes get an "open" affordance instead of a duplicate-creating
+  // fork. fetchItineraries returns only routes they own, so their ids are safe to expose.
+  const ownedIds = session
+    ? (await fetchItineraries()).map((itinerary) => itinerary.id).filter((id): id is string => !!id)
+    : []
 
   return (
     <div className="flex flex-col xl:h-full">
@@ -19,7 +25,7 @@ export default async function ExplorePage() {
         </p>
       </div>
       <div className="flex-1 xl:min-h-0">
-        <ExploreDiscovery initial={initial} isAuthenticated={!!session} />
+        <ExploreDiscovery initial={initial} isAuthenticated={!!session} ownedIds={ownedIds} />
       </div>
     </div>
   )

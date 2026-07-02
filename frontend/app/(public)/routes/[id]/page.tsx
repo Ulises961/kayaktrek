@@ -3,8 +3,9 @@ import { notFound } from "next/navigation"
 import MapLoader from "@/components/map/map-loader"
 import { SeasonBadge } from "@/components/explore/season-badge"
 import { RouteDetailActions } from "@/components/explore/route-detail-actions"
-import { fetchPublicItineraryDetail } from "@/lib/itinerary/actions"
-import { extractRouteData } from "@/lib/itinerary/public-routes"
+import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
+import { fetchPublicItineraryDetail, fetchItineraries } from "@/lib/itinerary/actions"
+import { extractRouteData, extractDaySummaries } from "@/lib/itinerary/public-routes"
 import { getSession } from "@/lib/auth/session"
 import { seasonOfDetail } from "@/lib/itinerary/season"
 
@@ -13,7 +14,15 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
   const [detail, session] = await Promise.all([fetchPublicItineraryDetail(id), getSession()])
   if (!detail) notFound()
 
+  // The author already owns this route, so offer to open it rather than clone it into
+  // a duplicate. fetchItineraries returns only the viewer's own routes, so membership
+  // in that set is proof of ownership without leaking the owner from the public shape.
+  const isOwner = session
+    ? (await fetchItineraries()).some((itinerary) => itinerary.id === id)
+    : false
+
   const route = extractRouteData(detail)
+  const daySummaries = extractDaySummaries(detail)
   const season = seasonOfDetail(detail)
   const author = detail.originalAuthor
 
@@ -48,6 +57,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
               </span>
             )}
           </div>
+          <RouteDayBreakdown days={daySummaries} />
           {author && (
             <p className="text-sm text-slate-600">
               Cloned from{" "}
@@ -63,7 +73,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
               )}
             </p>
           )}
-          <RouteDetailActions itineraryId={id} isAuthenticated={!!session} />
+          <RouteDetailActions itineraryId={id} isAuthenticated={!!session} isOwner={isOwner} />
         </div>
       </div>
     </div>
