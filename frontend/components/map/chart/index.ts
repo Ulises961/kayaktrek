@@ -5,4 +5,4 @@ export { CHART_INK, CHART_DEEP, CHART_PAPER, CHART_PAPER_GLOW } from "./chart-th
 export { useSettled } from "./use-settled"
 export { Graticule } from "./graticule"
 export { ScaleBar } from "./scale-bar"
-export { ForecastCell } from "./forecast-cell"
+export { ForecastCell, ForecastCellShell, type ForecastCellLayer } from "./forecast-cell"
