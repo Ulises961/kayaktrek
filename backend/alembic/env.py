@@ -103,10 +103,17 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode (connects to the live database)."""
+    # Pin search_path to public only. The postgis/postgis Docker image auto-installs
+    # postgis_tiger_geocoder/postgis_topology and ALTERs the role's default search_path to
+    # include their schemas ("tiger", "topology") — SQLAlchemy's reflection with schema=None
+    # then walks the whole search_path, surfacing ~35 extension-owned tables as "removed"
+    # during autogenerate/check. Pinning search_path avoids relying on an ever-growing
+    # EXCLUDE_TABLES list of extension-internal table names.
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"options": "-csearch_path=public"},
     )
 
     with connectable.connect() as connection:
