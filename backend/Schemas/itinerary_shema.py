@@ -4,6 +4,7 @@ import bleach
 from Models.itinerary import Itinerary
 from Schemas.base_schema import BaseSchema
 from Schemas.day_schema import DaySchema, DayPublicSchema
+from Services.Utils.route_distance import compute_total_miles
 
 
 class ItinerarySchema(BaseSchema):
@@ -11,7 +12,9 @@ class ItinerarySchema(BaseSchema):
     name = fields.String(load_default=None, allow_none=True)
     is_public = fields.Boolean(load_default=False)
     avg_speed_knots = fields.Float(load_default=2.5)
-    total_miles = fields.Float(validate=lambda x: 0 <= x <= 50000, load_default=0)
+    # Derived on read (see Services.Utils.route_distance) — the stored column is never
+    # written to after creation, so it cannot be trusted as a live aggregate.
+    total_miles = fields.Method("get_total_miles", dump_only=True)
     expected_total_miles = fields.Float(
         allow_none=True, validate=lambda x: x is None or (0 <= x <= 50000)
     )
@@ -24,6 +27,9 @@ class ItinerarySchema(BaseSchema):
     )
     trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
+
+    def get_total_miles(self, obj: Itinerary) -> float:
+        return compute_total_miles(obj.days or [])
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
@@ -124,12 +130,15 @@ class ItineraryPublicSchema(BaseSchema):
     name = fields.String(dump_only=True)
     is_public = fields.Boolean(dump_only=True)
     avg_speed_knots = fields.Float(dump_only=True)
-    total_miles = fields.Float(dump_only=True)
+    total_miles = fields.Method("get_total_miles", dump_only=True)
     created_from_id = fields.UUID(dump_only=True, allow_none=True)
     original_author = fields.Nested(
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
+
+    def get_total_miles(self, obj: Itinerary) -> float:
+        return compute_total_miles(obj.days or [])
 
     @post_dump
     def exclude_day_zero(self, data, **kwargs):

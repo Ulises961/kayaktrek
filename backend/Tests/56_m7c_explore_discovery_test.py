@@ -15,6 +15,7 @@ from Models.day import Day
 from Models.itinerary import Itinerary
 from Models.point import Point
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Services.Utils.geo_utils import haversine_nm
 from Services.Utils.seasons import season_months, season_of
 
 EXPLORE = f"{ITINERARY_ENDPOINT}/explore"
@@ -23,6 +24,11 @@ EXPLORE = f"{ITINERARY_ENDPOINT}/explore"
 MED = (43.0, 8.0)
 # A point off Sydney (southern hemisphere).
 SYDNEY = (-33.8, 151.2)
+# Second endpoints for a short (~6 nm) and long (~54 nm) two-point route from MED —
+# total_miles is derived from real point geometry (see compute_total_miles), so
+# distance-facet tests need genuine coordinates, not a fabricated column value.
+MED_SHORT_END = (43.1, 8.0)
+MED_LONG_END = (43.9, 8.0)
 
 
 @pytest.fixture
@@ -40,18 +46,17 @@ def make_itinerary(app, user_1):
         *,
         owner=None,
         is_public=True,
-        total_miles=None,
         created_from_id=None,
     ):
         itinerary = Itinerary(
             name=name,
             is_public=is_public,
-            total_miles=total_miles,
             user_id=(owner or user_1).id,
             created_from_id=created_from_id,
         )
         db.session.add(itinerary)
         db.session.flush()
+        prev_point = None
         for day_number, day_date, coords in days_spec:
             day = Day(
                 day_number=day_number,
@@ -61,7 +66,14 @@ def make_itinerary(app, user_1):
             db.session.add(day)
             db.session.flush()
             for lat, lng in coords:
-                db.session.add(Point(latitude=lat, longitude=lng, day_id=day.id))
+                point = Point(latitude=lat, longitude=lng, day_id=day.id)
+                db.session.add(point)
+                db.session.flush()
+                # Chain points into one continuous route (real routes are a single
+                # linked list) so distance-facet tests get a genuine computed mileage.
+                if prev_point is not None:
+                    prev_point.next_id = point.id
+                prev_point = point
         db.session.commit()
         created.append(itinerary)
         return itinerary
@@ -166,8 +178,12 @@ def test_undated_route_appears_unfiltered_and_under_season_filter(client, make_i
 # ── distance / duration ───────────────────────────────────────────────────────
 
 def test_distance_range_inclusive(client, make_itinerary):
-    short = make_itinerary("Short", [(1, None, [MED])], total_miles=5)
-    long = make_itinerary("Long", [(1, None, [MED])], total_miles=50)
+    short_nm = haversine_nm(*MED, *MED_SHORT_END)
+    long_nm = haversine_nm(*MED, *MED_LONG_END)
+    assert 5 <= short_nm <= 10
+    assert long_nm > 10
+    short = make_itinerary("Short", [(1, None, [MED, MED_SHORT_END])])
+    long = make_itinerary("Long", [(1, None, [MED, MED_LONG_END])])
     r = client.get(f"{EXPLORE}?minMiles=5&maxMiles=10")
     ids = _ids(r)
     assert str(short.id) in ids
@@ -247,7 +263,7 @@ def test_private_itinerary_never_appears(client, make_itinerary):
 
 
 def test_explore_item_carries_no_trip_data(client, make_itinerary):
-    make_itinerary("Public", [(1, date(2024, 7, 1), [MED])], total_miles=12)
+    make_itinerary("Public", [(1, date(2024, 7, 1), [MED])])
     item = _items(client.get(EXPLORE))[0]
     assert "tripId" not in item
     assert "userId" not in item
@@ -260,8 +276,8 @@ def test_explore_item_carries_no_trip_data(client, make_itinerary):
 # ── sort ──────────────────────────────────────────────────────────────────────
 
 def test_sort_by_distance_ascending(client, make_itinerary):
-    far = make_itinerary("Far", [(1, None, [MED])], total_miles=40)
-    near = make_itinerary("Near", [(1, None, [MED])], total_miles=4)
+    far = make_itinerary("Far", [(1, None, [MED, MED_LONG_END])])
+    near = make_itinerary("Near", [(1, None, [MED, MED_SHORT_END])])
     r = client.get(f"{EXPLORE}?sort=distance")
     ids = _ids(r)
     assert ids.index(str(near.id)) < ids.index(str(far.id))

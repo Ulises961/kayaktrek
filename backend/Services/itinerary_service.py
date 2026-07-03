@@ -1,8 +1,7 @@
 """Itinerary Service — business logic for itinerary operations."""
 import logging
 import math
-from decimal import Decimal
-from typing import Dict, List, Optional, Set, Tuple, cast
+from typing import Dict, List, Optional, Set, Tuple
 from uuid import UUID
 
 import bleach
@@ -21,7 +20,9 @@ from Models.trip import Trip
 from Models.user import User
 from Schemas.day_schema import DaySchema
 from Schemas.itinerary_shema import ItinerarySchema, ItineraryUpdateSchema
+from Services.Utils.point_ordering import walk_linked_list
 from Services.Utils.rdp import rdp_simplify
+from Services.Utils.route_distance import compute_total_miles
 from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
 
 logger = logging.getLogger(__name__)
@@ -125,10 +126,6 @@ class ItineraryService:
 
         if name and name.strip():
             base = base.filter(Itinerary.name.ilike(f"%{name.strip()}%"))
-        if min_miles is not None:
-            base = base.filter(Itinerary.total_miles >= min_miles)
-        if max_miles is not None:
-            base = base.filter(Itinerary.total_miles <= max_miles)
         if min_days is not None:
             base = base.filter(day_count_sq >= min_days)
         if max_days is not None:
@@ -189,23 +186,45 @@ class ItineraryService:
             has_any_dated_day = dated_days.exists()
             base = base.filter(or_(season_match, ~has_any_dated_day))
 
-        total = base.count()
-
-        if sort == "distance":
-            base = base.order_by(Itinerary.total_miles.asc().nullslast())
-        elif sort == "duration":
-            base = base.order_by(day_count_sq.asc())
-        elif sort == "name":
-            base = base.order_by(Itinerary.name.asc())
-        else:  # recent — UUIDv7 ids are time-ordered
-            base = base.order_by(Itinerary.id.desc())
-
-        itineraries = (
-            base.options(selectinload(Itinerary.days).selectinload(Day.points))
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-            .all()
-        )
+        # total_miles is derived on read (see compute_total_miles) — there is no stored
+        # column to filter or sort by, so a miles filter or a distance sort requires
+        # loading every SQL-filtered candidate and scoring it in Python before paging.
+        if min_miles is not None or max_miles is not None or sort == "distance":
+            candidates = base.options(
+                selectinload(Itinerary.days).selectinload(Day.points)
+            ).all()
+            scored = [(it, ItineraryService.compute_total_miles(it)) for it in candidates]
+            if min_miles is not None:
+                scored = [(it, m) for it, m in scored if m >= min_miles]
+            if max_miles is not None:
+                scored = [(it, m) for it, m in scored if m <= max_miles]
+            if sort == "distance":
+                scored.sort(key=lambda pair: pair[1])
+            elif sort == "duration":
+                scored.sort(
+                    key=lambda pair: sum(1 for d in pair[0].days if d.day_number != 0)
+                )
+            elif sort == "name":
+                scored.sort(key=lambda pair: (pair[0].name or "").lower())
+            else:  # recent — UUIDv7 ids are time-ordered
+                scored.sort(key=lambda pair: str(pair[0].id), reverse=True)
+            total = len(scored)
+            start = (page - 1) * per_page
+            itineraries = [it for it, _ in scored[start: start + per_page]]
+        else:
+            total = base.count()
+            if sort == "duration":
+                base = base.order_by(day_count_sq.asc())
+            elif sort == "name":
+                base = base.order_by(Itinerary.name.asc())
+            else:  # recent — UUIDv7 ids are time-ordered
+                base = base.order_by(Itinerary.id.desc())
+            itineraries = (
+                base.options(selectinload(Itinerary.days).selectinload(Day.points))
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
 
         items = ItineraryService._annotate_explore_items(itineraries)
         pages = math.ceil(total / per_page) if total > 0 else 1
@@ -250,11 +269,7 @@ class ItineraryService:
                 {
                     "id": str(itinerary.id),
                     "name": itinerary.name,
-                    "total_miles": (
-                        float(cast(Decimal, itinerary.total_miles))
-                        if itinerary.total_miles is not None
-                        else None
-                    ),
+                    "total_miles": ItineraryService.compute_total_miles(itinerary),
                     "day_count": len(numbered),
                     "season": season,
                     "centroid_lat": centroid_lat,
@@ -724,18 +739,13 @@ class ItineraryService:
         UUID v7 IDs sort lexicographically by creation time, so sorting heads by
         str(id) gives a stable, deterministic order for orphaned chains.
         """
-        referenced: Set[str] = {str(p.next_id) for p in points if p.next_id}
-        heads = [p for p in points if str(p.id) not in referenced]
-        if not heads:
-            return []
-        heads.sort(key=lambda p: str(p.id))
-        point_map: Dict[str, Point] = {str(p.id): p for p in points}
-        order: List[str] = []
-        visited: Set[str] = set()
-        for head in heads:
-            current: Optional[Point] = head
-            while current and str(current.id) not in visited:
-                visited.add(str(current.id))
-                order.append(str(current.id))
-                current = point_map.get(str(current.next_id)) if current.next_id else None
-        return order
+        return walk_linked_list(points)
+
+    @staticmethod
+    def compute_total_miles(itinerary: Itinerary) -> float:
+        """Total paddle distance across the itinerary's numbered days, computed on read.
+
+        See `Services.Utils.route_distance` — `Itinerary.total_miles` is never
+        written to after creation and cannot be trusted as a stored aggregate.
+        """
+        return compute_total_miles(itinerary.days or [])
