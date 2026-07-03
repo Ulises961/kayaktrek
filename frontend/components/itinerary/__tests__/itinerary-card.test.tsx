@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockUpdateItinerary, mockRefresh, mockPush, mockCreateTripFromItinerary } = vi.hoisted(
-  () => ({
-    mockUpdateItinerary: vi.fn(),
-    mockRefresh: vi.fn(),
-    mockPush: vi.fn(),
-    mockCreateTripFromItinerary: vi.fn(),
-  }),
-)
+const {
+  mockUpdateItinerary,
+  mockRefresh,
+  mockPush,
+  mockCreateTripFromItinerary,
+  mockDeleteItinerary,
+} = vi.hoisted(() => ({
+  mockUpdateItinerary: vi.fn(),
+  mockRefresh: vi.fn(),
+  mockPush: vi.fn(),
+  mockCreateTripFromItinerary: vi.fn(),
+  mockDeleteItinerary: vi.fn(),
+}))
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mockRefresh, push: mockPush }),
@@ -18,6 +23,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/itinerary/actions", () => ({
   updateItinerary: mockUpdateItinerary,
   createTripFromItinerary: mockCreateTripFromItinerary,
+  deleteItinerary: mockDeleteItinerary,
 }))
 
 import { ItineraryCard } from "../itinerary-card"
@@ -167,5 +173,39 @@ describe("ItineraryCard — create trip", () => {
     await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
     const submitBtn = screen.getByRole("button", { name: /^create$/i }) as HTMLButtonElement
     expect(submitBtn.disabled).toBe(true)
+  })
+})
+
+describe("ItineraryCard — delete", () => {
+  const TRIP_ID = "01952f1a-0000-7000-8000-000000000099"
+
+  it("shows the Delete trigger for a standalone itinerary", () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument()
+  })
+
+  it("hides the Delete trigger for a trip-linked itinerary", () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: TRIP_ID }} />)
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument()
+  })
+
+  it("deletes and refreshes after confirming in the dialog", async () => {
+    mockDeleteItinerary.mockResolvedValue({ success: true })
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }))
+    // Confirm via the destructive action inside the alert dialog (the trigger also
+    // reads "Delete", so scope to the dialog).
+    const dialog = screen.getByRole("alertdialog")
+    await userEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }))
+    expect(mockDeleteItinerary).toHaveBeenCalledWith(BASE.id)
+    expect(mockRefresh).toHaveBeenCalled()
+  })
+
+  it("does not delete when the dialog is cancelled", async () => {
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }))
+    const dialog = screen.getByRole("alertdialog")
+    await userEvent.click(within(dialog).getByRole("button", { name: /cancel/i }))
+    expect(mockDeleteItinerary).not.toHaveBeenCalled()
   })
 })

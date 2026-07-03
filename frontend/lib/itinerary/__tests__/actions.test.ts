@@ -21,6 +21,7 @@ import {
   createPoint,
   updatePoint,
   deletePoint,
+  deleteItinerary,
   createDay,
   updateDay,
   assignPointsToDay,
@@ -181,6 +182,26 @@ describe("deletePoint", () => {
     mockApiDelete.mockRejectedValue(null)
     const result = await deletePoint(POINT_ID)
     expect(result).toEqual({ success: false, error: "Failed to delete point." })
+  })
+})
+
+describe("deleteItinerary", () => {
+  it("sends DELETE to /api/itinerary/:id", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    await deleteItinerary(ITINERARY_ID)
+    expect(mockApiDelete).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`)
+  })
+
+  it("returns success: true on success", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    const result = await deleteItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns success: false with error message on failure", async () => {
+    mockApiDelete.mockRejectedValue(new Error("Forbidden"))
+    const result = await deleteItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Forbidden" })
   })
 })
 

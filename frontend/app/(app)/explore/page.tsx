@@ -1,48 +1,31 @@
-import { apiGetPublic } from "@/lib/api/client"
-import { PublicItinerariesSchema, PublicItineraryDetailSchema } from "@/lib/dtos/itinerary"
-import { extractRouteData } from "@/lib/itinerary/public-routes"
+import { searchPublicItineraries, fetchItineraries } from "@/lib/itinerary/actions"
 import { getSession } from "@/lib/auth/session"
-import { ExploreClient } from "@/components/explore/explore-client"
-
-async function fetchRoutes() {
-  try {
-    const list = PublicItinerariesSchema.parse(
-      await apiGetPublic<unknown[]>("/api/itinerary/explore"),
-    )
-    const ids = list.map((i) => i.id).filter(Boolean) as string[]
-
-    const details = await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
-          return PublicItineraryDetailSchema.parse(raw)
-        } catch {
-          return null
-        }
-      }),
-    )
-
-    return details.filter(Boolean).map((d) => extractRouteData(d!))
-  } catch {
-    return []
-  }
-}
+import { ExploreDiscovery } from "@/components/explore/explore-discovery"
 
 export default async function ExplorePage() {
-  const [routes, session] = await Promise.all([fetchRoutes(), getSession()])
+  const [initial, session] = await Promise.all([
+    searchPublicItineraries({ perPage: 20 }),
+    getSession(),
+  ])
+
+  // The viewer's own routes get an "open" affordance instead of a duplicate-creating
+  // fork. fetchItineraries returns only routes they own, so their ids are safe to expose.
+  const ownedIds = session
+    ? (await fetchItineraries()).map((itinerary) => itinerary.id).filter((id): id is string => !!id)
+    : []
 
   return (
     <div className="flex flex-col xl:h-full">
       <div className="border-border flex shrink-0 items-center justify-between border-b px-4 py-3">
         <h1 className="text-lg font-semibold">Explore routes</h1>
         <p className="text-muted-foreground text-sm">
-          {routes.length === 0
+          {initial.total === 0
             ? "No public routes yet"
-            : `${routes.length} public ${routes.length === 1 ? "route" : "routes"}`}
+            : `${initial.total} public ${initial.total === 1 ? "route" : "routes"}`}
         </p>
       </div>
       <div className="flex-1 xl:min-h-0">
-        <ExploreClient routes={routes} isAuthenticated={!!session} />
+        <ExploreDiscovery initial={initial} isAuthenticated={!!session} ownedIds={ownedIds} />
       </div>
     </div>
   )
