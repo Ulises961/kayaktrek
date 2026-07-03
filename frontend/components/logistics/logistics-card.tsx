@@ -3,6 +3,7 @@
 import { AnchorIcon, CarIcon, PhoneIcon, ShieldAlertIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EditShoreContactDialog } from "./edit-logistics-dialog"
+import { fieldLabelClass } from "@/components/common/form-field"
 import type { Logistics } from "@/lib/dtos/logistics"
 
 interface LogisticsCardProps {
@@ -13,11 +14,7 @@ interface LogisticsCardProps {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase">
-      {children}
-    </span>
-  )
+  return <span className={fieldLabelClass}>{children}</span>
 }
 
 function FieldValue({ children, dim }: { children: React.ReactNode; dim?: boolean }) {
