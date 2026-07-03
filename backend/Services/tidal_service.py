@@ -3,6 +3,9 @@ import math
 from datetime import datetime, time, timedelta
 from typing import Optional
 
+import numpy as np
+from global_land_mask import globe
+
 from geoalchemy2 import Geography
 from geoalchemy2.functions import ST_DWithin
 from geoalchemy2.shape import to_shape
@@ -33,6 +36,12 @@ _STREAM_FRACTIONS = [0.0, 1 / 3, 2 / 3, 1.0, 2 / 3, 1 / 3]
 # Assumed paddling start (minutes from midnight) when no explicit start time exists
 _DEFAULT_START_MIN = 9 * 60  # 09:00
 
+# Resolution (per axis) of the uniform velocity grid. The field is a single
+# stamped value, so densifying it is information-neutral (every cell keeps the
+# same u/v) but is required for a smooth forecast-cell disc edge and a
+# reasonable land coastline when masking (M5b). Tuned to the landing cell.
+_VELOCITY_GRID_RESOLUTION = 24
+
 
 def _build_uniform_velocity_grid(
     lat_min: float,
@@ -42,16 +51,39 @@ def _build_uniform_velocity_grid(
     rate_ms: float,
     direction_deg: float,
     source: str,
+    mask_land: bool = False,
 ) -> dict:
-    """Build a 3x3 uniform leaflet-velocity grid from speed (m/s) + direction."""
+    """
+    Build a uniform leaflet-velocity grid from speed (m/s) + direction.
+
+    The grid stamps one (u, v) across an ``N×N`` grid (``N`` =
+    ``_VELOCITY_GRID_RESOLUTION``); it is not a spatial forecast. When
+    ``mask_land`` is set (marine fields only), cells whose centre falls on land
+    are nulled so no particles render over land — waves do not exist on land.
+    leaflet-velocity skips null cells.
+    """
     rad = math.radians(direction_deg)
     u = round(rate_ms * math.sin(rad), 5)
     v = round(rate_ms * math.cos(rad), 5)
 
-    nx, ny = 3, 3
+    nx = ny = _VELOCITY_GRID_RESOLUTION
     n = nx * ny
     dx = round((lon_max - lon_min) / (nx - 1), 4) if nx > 1 else 0.0
     dy = round((lat_max - lat_min) / (ny - 1), 4) if ny > 1 else 0.0
+
+    eastward: list[Optional[float]] = [u] * n
+    northward: list[Optional[float]] = [v] * n
+
+    if mask_land:
+        # Row-major from the NW corner (la1/north, lo1/west) — matches how
+        # leaflet-velocity maps a flat cell index back to lat/lon.
+        cell_lats = lat_max - np.arange(ny) * dy
+        cell_lons = lon_min + np.arange(nx) * dx
+        lat_grid, lon_grid = np.meshgrid(cell_lats, cell_lons, indexing="ij")
+        is_land = globe.is_land(lat_grid, lon_grid).ravel()
+        for index in np.flatnonzero(is_land):
+            eastward[index] = None
+            northward[index] = None
 
     header_base = {
         "parameterUnit": "m.s-1",
@@ -65,11 +97,11 @@ def _build_uniform_velocity_grid(
         "grid": [
             {
                 "header": {**header_base, "parameterCategory": 2, "parameterNumber": 2, "parameterNumberName": "eastward_component"},
-                "data": [u] * n,
+                "data": eastward,
             },
             {
                 "header": {**header_base, "parameterCategory": 2, "parameterNumber": 3, "parameterNumberName": "northward_component"},
-                "data": [v] * n,
+                "data": northward,
             },
         ],
     }
@@ -342,6 +374,7 @@ class TidalService:
             speed_ms,
             float(best.wave_direction),
             "marine",
+            mask_land=True,
         )
 
     @staticmethod

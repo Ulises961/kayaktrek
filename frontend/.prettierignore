@@ -1,0 +1,12 @@
+# Generated / tooling-owned files — Prettier must not reformat these.
+# pnpm owns the lockfile format; reformatting it churns on every install.
+pnpm-lock.yaml
+
+# Build output and generated types
+.next/
+out/
+coverage/
+next-env.d.ts
+
+# Dependencies
+node_modules/

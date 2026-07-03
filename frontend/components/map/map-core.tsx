@@ -10,6 +10,8 @@ import { getDayColor } from "@/lib/itinerary/colors"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
+import { Graticule, ScaleBar, ForecastCellShell, type ForecastCellLayer } from "./chart"
+import { discCell, maskGridToDisc } from "@/lib/landing/ambient-wind"
 import { LayersControl } from "./layers-control"
 import { TidalDiamondMarker } from "./tidal-diamond-marker"
 import { TidalDiamondForm } from "./tidal-diamond-form"
@@ -409,6 +411,49 @@ export default function MapCore({
     [days, selectedDayId],
   )
 
+  // Forecast cell — the selected day's route positions define a disc that clips
+  // the wind/swell fields to a round chart annotation (M5b). The backend stamps a
+  // single value across the day's bbox, so clipping the arbitrary corners is
+  // information-neutral. No route points → no disc; fall back to the raw fields.
+  const selectedDayPositions = useMemo<[number, number][]>(
+    () =>
+      points
+        .filter(
+          (point) =>
+            (point.dayId ?? null) === selectedDayId &&
+            point.latitude != null &&
+            point.longitude != null,
+        )
+        .map((point) => [point.latitude as number, point.longitude as number]),
+    [points, selectedDayId],
+  )
+  const forecastCell = useMemo(
+    () => (selectedDayPositions.length > 0 ? discCell(selectedDayPositions) : null),
+    [selectedDayPositions],
+  )
+  // Clip the fetched grids to the disc once (memoised so VelocityLayer keeps a
+  // stable `data` reference and does not rebuild every render).
+  const windCellGrid = useMemo(
+    () =>
+      forecastCell && windData
+        ? maskGridToDisc(windData.grid, forecastCell.center, forecastCell.radiusKm)
+        : null,
+    [forecastCell, windData],
+  )
+  const swellCellGrid = useMemo(
+    () =>
+      forecastCell && swellData
+        ? maskGridToDisc(swellData.grid, forecastCell.center, forecastCell.radiusKm)
+        : null,
+    [forecastCell, swellData],
+  )
+  const cellLayers = useMemo<ForecastCellLayer[]>(() => {
+    const layers: ForecastCellLayer[] = []
+    if (windCellGrid && windEnabled) layers.push({ grid: windCellGrid, options: WIND_OPTIONS })
+    if (swellCellGrid && swellEnabled) layers.push({ grid: swellCellGrid, options: SWELL_OPTIONS })
+    return layers
+  }, [windCellGrid, swellCellGrid, windEnabled, swellEnabled])
+
   useEffect(() => {
     if (!selectedDayId) return
     fetchWindVectors(selectedDayId, selectedHour).then((r) =>
@@ -691,6 +736,11 @@ export default function MapCore({
           url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
         />
 
+        {/* Nautical-chart furniture — a real lat/lon graticule and a scale bar,
+            reused from the landing chart (M5b). Always on: an operational chart. */}
+        <Graticule />
+        <ScaleBar />
+
         {!viewMode && !placing && !placingPlace && <MapEvents onMapClick={onMapClick} />}
         {placing && <DiamondPlacer onPlace={handlePlace} />}
         {placingPlace && <DiamondPlacer onPlace={handlePlaceDrop} />}
@@ -729,13 +779,24 @@ export default function MapCore({
           />
         ))}
 
+        {/* Large-scale atmospheric context — real spatial OpenMeteo grid, not
+            disc-clipped (clipping a genuine spatial field would drop real data). */}
         {selectedDayId && globalWindData && windEnabled && (
           <VelocityLayer data={globalWindData.grid} options={GLOBAL_WIND_OPTIONS} />
         )}
-        {selectedDayId && windData && windEnabled && (
+        {/* Day wind + swell as one round forecast cell: shared disc, one ring and
+            note. When the day has no route points, fall back to the raw fields. */}
+        {selectedDayId && forecastCell && cellLayers.length > 0 && (
+          <ForecastCellShell
+            layers={cellLayers}
+            center={forecastCell.center}
+            radiusKm={forecastCell.radiusKm}
+          />
+        )}
+        {selectedDayId && !forecastCell && windData && windEnabled && (
           <VelocityLayer data={windData.grid} options={WIND_OPTIONS} />
         )}
-        {selectedDayId && swellData && swellEnabled && (
+        {selectedDayId && !forecastCell && swellData && swellEnabled && (
           <VelocityLayer data={swellData.grid} options={SWELL_OPTIONS} />
         )}
         {hasDiamonds &&

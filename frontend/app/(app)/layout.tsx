@@ -3,18 +3,12 @@ import { AppSidebar } from "@/components/common/app-sidebar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { KeypairPromptBanner } from "@/components/common/keypair-prompt-banner"
 import { Separator } from "@/components/ui/separator"
-import { apiGet } from "@/lib/api/client"
-import { UserSchema } from "@/lib/dtos/user"
+import { getMe } from "@/lib/user/me"
 import React from "react"
 
 async function getHasKeypair(): Promise<boolean> {
-  try {
-    const raw = await apiGet("/api/user/me")
-    const user = UserSchema.parse(raw)
-    return user.hasKeypair ?? true
-  } catch {
-    return true
-  }
+  const user = await getMe()
+  return user?.hasKeypair ?? true
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

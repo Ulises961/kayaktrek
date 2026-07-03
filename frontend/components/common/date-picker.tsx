@@ -58,6 +58,8 @@ export function DatePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
+        {/* Open on the selected date's month, not today's, so editing an existing
+            date lands on the right month (and the picker is date-stable in tests). */}
         <Calendar
           mode="single"
           selected={selected}

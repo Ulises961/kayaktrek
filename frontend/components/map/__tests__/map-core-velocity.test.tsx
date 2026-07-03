@@ -19,6 +19,7 @@ vi.mock("react-leaflet", () => ({
     removeLayer: vi.fn(),
     getContainer: () => document.createElement("div"),
     invalidateSize: vi.fn(),
+    fitBounds: vi.fn(),
   })),
   useMapEvents: vi.fn(() => null),
 }))
@@ -32,6 +33,17 @@ vi.mock("../tidal-diamond-marker", () => ({
 vi.mock("@/components/weather/velocity-layer", () => ({
   VelocityLayer: ({ data }: { data: unknown[] }) => (
     <div data-testid="velocity-layer" data-layers={data.length} />
+  ),
+}))
+
+// Chart furniture touches Leaflet internals (L.Control, useMap bounds) that this
+// suite stubs out, so mock the module. The shell reports how many velocity fields
+// it wraps via data-layers.
+vi.mock("@/components/map/chart", () => ({
+  Graticule: () => <div data-testid="graticule" />,
+  ScaleBar: () => <div data-testid="scale-bar" />,
+  ForecastCellShell: ({ layers }: { layers: unknown[] }) => (
+    <div data-testid="forecast-cell" data-layers={layers.length} />
   ),
 }))
 
@@ -50,6 +62,16 @@ import {
   fetchGlobalWindVectors,
 } from "@/lib/weather/actions"
 import type { VelocityGridLayer } from "@/lib/types/ui"
+import type { Point } from "@/lib/dtos/point"
+
+// A single located route point on the selected day — enough to derive a forecast
+// cell disc (points=[] falls back to bare, unclipped velocity layers).
+const ROUTE_POINT = {
+  id: "p1",
+  dayId: "day-1",
+  latitude: 50.3,
+  longitude: -4.1,
+} as unknown as Point
 
 const WIND = fetchWindVectors as ReturnType<typeof vi.fn>
 const SWELL = fetchWaveVectors as ReturnType<typeof vi.fn>
@@ -231,5 +253,36 @@ describe("MapCore — velocity layer controls", () => {
     render(<MapCore {...BASE_PROPS} days={daysWithDate} selectedDayId="day-1" />)
 
     await waitFor(() => expect(screen.getByTestId("velocity-layer")).toBeInTheDocument())
+  })
+
+  it("wraps wind and swell in a single forecast cell for a routed day", async () => {
+    WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
+    SWELL.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
+
+    render(
+      <MapCore {...BASE_PROPS} points={[ROUTE_POINT]} selectedDayId="day-1" selectedHour={12} />,
+    )
+
+    const cell = await screen.findByTestId("forecast-cell")
+    // One cell (one disc + ring), wrapping both the wind and swell fields.
+    expect(cell).toHaveAttribute("data-layers", "2")
+  })
+
+  it("the forecast cell carries only the active layers", async () => {
+    WIND.mockResolvedValue({ success: true, data: { grid: [GRID_LAYER] } })
+    SWELL.mockResolvedValue({ success: false, error: "x" })
+
+    render(
+      <MapCore {...BASE_PROPS} points={[ROUTE_POINT]} selectedDayId="day-1" selectedHour={12} />,
+    )
+
+    const cell = await screen.findByTestId("forecast-cell")
+    expect(cell).toHaveAttribute("data-layers", "1")
+  })
+
+  it("renders the graticule and scale bar chart furniture", async () => {
+    render(<MapCore {...BASE_PROPS} selectedDayId="day-1" />)
+    expect(await screen.findByTestId("graticule")).toBeInTheDocument()
+    expect(screen.getByTestId("scale-bar")).toBeInTheDocument()
   })
 })

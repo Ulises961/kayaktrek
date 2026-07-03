@@ -41,7 +41,7 @@ export function TripCard({ trip, hero = false }: TripCardProps) {
       <Card
         className={cn(
           "cursor-pointer transition-colors",
-          hero ? "border-l-[4px]" : "hover:bg-accent/50 border-l-[3px]",
+          hero ? "border-l-[4px]" : "hover:bg-secondary/50 border-l-[3px]",
         )}
         style={{
           borderLeftColor: state ? STATE_ACCENT[state] : undefined,

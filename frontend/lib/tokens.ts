@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 // Palette — raw named colors (not semantic)
 // ---------------------------------------------------------------------------
-const palette = {
+export const palette = {
   // Ocean blues
   ocean950: "#060f1c",
   ocean900: "#0d1b2e",
@@ -37,6 +37,10 @@ const palette = {
   sunset400: "#f59e0b",
   sunset300: "#fcd34d",
   sunset100: "#fef3c7",
+
+  // Chart paper — warm ivory, scoped to the landing nautical-chart variant
+  // (cartouche, scale-bar, route halo). The only net-new color the variant adds.
+  chartPaper: "#f7f4ec",
 
   // Neutral slate
   slate950: "#020617",

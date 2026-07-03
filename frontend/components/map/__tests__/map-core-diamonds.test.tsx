@@ -79,6 +79,13 @@ vi.mock("../tidal-diamond-form", () => ({
 
 vi.mock("@/components/weather/velocity-layer", () => ({ VelocityLayer: () => <div /> }))
 
+// Chart furniture touches Leaflet internals this suite stubs out — mock it away.
+vi.mock("@/components/map/chart", () => ({
+  Graticule: () => null,
+  ScaleBar: () => null,
+  ForecastCellShell: () => null,
+}))
+
 vi.mock("@/lib/weather/actions", () => ({
   fetchWindVectors: vi.fn().mockResolvedValue({ success: false, error: "x" }),
   fetchWaveVectors: vi.fn().mockResolvedValue({ success: false, error: "x" }),
