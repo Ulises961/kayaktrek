@@ -105,6 +105,13 @@ class User(BaseModel):
     # logout, account deletion request). Checked on every authenticated request.
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
+    # Rotation counter for refresh tokens specifically — separate from token_version (the
+    # full-session kill switch for password change/logout/theft). Bumped on every successful
+    # /auth/refresh. A refresh token presented with a stale value indicates reuse (the token
+    # was already exchanged once, e.g. stolen and replayed), which additionally bumps
+    # token_version to revoke every outstanding session. See ADR-032 / M11 §2.
+    refresh_token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
     # Association object: full role-aware access
     trip_memberships: Mapped[List["TripMember"]] = relationship(
         "TripMember",

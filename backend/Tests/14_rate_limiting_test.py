@@ -138,6 +138,25 @@ class TestResendDeletionCancelRateLimit:
         assert r.status_code != 429
 
 
+class TestRefreshRateLimit:
+
+    def test_refresh_rate_limited_after_threshold(self, client):
+        """11th refresh attempt within a minute returns 429, even with an invalid token —
+        the limiter runs before the token is verified."""
+        for _ in range(10):
+            client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+
+        r = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+        assert r.status_code == 429
+        assert "Retry-After" in r.headers
+
+    def test_refresh_within_limit_not_blocked(self, client):
+        """Requests up to the limit are not blocked."""
+        for _ in range(10):
+            r = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+            assert r.status_code != 429
+
+
 class TestReAuthRateLimit:
 
     def test_re_auth_rate_limited_after_threshold(self, client, auth_headers):

@@ -45,7 +45,7 @@ def login_user():
 
         if user:
             access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
-            refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version)
+            refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, user.refresh_token_version)
 
             if access_token and refresh_token:
                 response_object = {
@@ -196,6 +196,7 @@ def reset_password():
 
 
 @api.route("/api/v1/auth/refresh", methods=["POST"])
+@limiter.limit("10 per minute")
 def refresh_token():
     body = request.get_json()
     raw_refresh = body.get("refresh_token") if body else None
@@ -217,9 +218,19 @@ def refresh_token():
     if payload.get("tv") != user.token_version:
         abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
 
-    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
+    try:
+        AuthService.advance_refresh_rotation(user, payload)
+    except ValueError as e:
+        abort(HTTPStatus.UNAUTHORIZED, description=str(e))
 
-    return jsonify({"status": "success", "access_token": access_token}), HTTPStatus.OK
+    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
+    refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, user.refresh_token_version)
+
+    return jsonify({
+        "status": "success",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/logout", methods=["POST"])

@@ -227,6 +227,37 @@ class AuthService:
         )
         return user
 
+    @staticmethod
+    def advance_refresh_rotation(user: User, payload: dict) -> None:
+        """
+        Validate a decoded refresh-token payload against the user's current rotation state
+        and, if valid, advance it (rotate-on-use). Caller mints the new access/refresh pair
+        from the user's post-call token_version/refresh_token_version.
+
+        A refresh token whose `rtv` claim does not match the user's current
+        refresh_token_version means it was already exchanged once — either the legitimate
+        client raced a retry, or the token was stolen and is being replayed. Either way this
+        is treated as a reuse/theft signal: token_version is bumped, revoking every
+        outstanding access and refresh token for the user, forcing a full re-login.
+
+        Raises:
+            ValueError: token invalidated by password change (stale iat), or reuse detected.
+        """
+        iat = payload.get("iat")
+        if iat and user.password_changed_at:
+            token_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+            if token_issued_at < user.password_changed_at:
+                raise ValueError("Token invalidated by password change — please log in again")
+
+        if payload.get("rtv") != user.refresh_token_version:
+            user.token_version += 1
+            db.session.commit()
+            logger.warning("refresh_token_reuse_detected", extra={"user_id": str(user.id)})
+            raise ValueError("Session invalidated — possible token reuse detected, please log in again")
+
+        user.refresh_token_version += 1
+        db.session.commit()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

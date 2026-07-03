@@ -37,7 +37,7 @@ class TestJWTService:
         """Test refresh token generation"""
         user_id = "test-uuid-456"
 
-        token = JWTService.generate_refresh_token(user_id, 0)
+        token = JWTService.generate_refresh_token(user_id, 0, 0)
 
         assert token is not None
         assert isinstance(token, str)
