@@ -324,7 +324,9 @@ def test_build_wave_velocity_grid_empty_when_height_or_direction_missing():
 
 def test_build_wave_velocity_grid_happy_path():
     states = [_wave_state(12, 2.0, 180.0)]
-    result = TidalService.build_wave_velocity_grid((50.0, 51.0, -5.0, -4.0), states, 12)
+    # Open Atlantic west of Brittany — every cell is sea, so data[0] (the NW corner)
+    # is never nulled by the land mask.
+    result = TidalService.build_wave_velocity_grid((47.0, 48.0, -10.0, -9.0), states, 12)
     assert result["source"] == "marine"
     assert len(result["grid"]) == 2
     # 2 m toward 180° (south) → northward component negative
@@ -335,6 +337,45 @@ def test_build_wave_velocity_grid_happy_path():
     assert east2["header"]["parameterNumber"] == 2
     assert north["header"]["parameterCategory"] == 2
     assert north["header"]["parameterNumber"] == 3
+
+
+# ── densification + land masking (M5b) ───────────────────────────────────────
+
+def test_velocity_grid_is_densified_beyond_3x3():
+    states = [_wind_state(12, 36.0, 270.0)]
+    result = TidalService.build_wind_velocity_grid((47.0, 48.0, -10.0, -9.0), states, 12)
+    header = result["grid"][0]["header"]
+    assert header["nx"] >= 20 and header["ny"] >= 20
+    assert header["nx"] == header["ny"]
+    # data length matches the declared grid dimensions
+    for component in result["grid"]:
+        assert len(component["data"]) == header["nx"] * header["ny"]
+
+
+def test_wave_grid_nulls_land_cells_but_keeps_sea():
+    states = [_wave_state(12, 2.0, 180.0)]
+    # bbox straddling the Essex/Suffolk coast (land, west) and the southern
+    # North Sea (sea, east) → the marine field must be nulled over land only.
+    result = TidalService.build_wave_velocity_grid((51.0, 52.5, 0.0, 2.0), states, 12)
+    for component in result["grid"]:
+        assert any(value is None for value in component["data"]), "some land cells should be nulled"
+        assert any(value is not None for value in component["data"]), "some sea cells should remain"
+
+
+def test_wave_grid_over_open_water_has_no_nulls():
+    states = [_wave_state(12, 2.0, 180.0)]
+    result = TidalService.build_wave_velocity_grid((47.0, 48.0, -10.0, -9.0), states, 12)
+    for component in result["grid"]:
+        assert all(value is not None for value in component["data"])
+
+
+def test_wind_grid_is_not_land_masked():
+    states = [_wind_state(12, 36.0, 270.0)]
+    # Same land/sea straddling bbox — wind over land is physically honest and
+    # must stay unmasked (no nulled cells).
+    result = TidalService.build_wind_velocity_grid((51.0, 52.5, 0.0, 2.0), states, 12)
+    for component in result["grid"]:
+        assert all(value is not None for value in component["data"])
 
 
 # ── tidal_gates_for_day — skip branches ──────────────────────────────────────

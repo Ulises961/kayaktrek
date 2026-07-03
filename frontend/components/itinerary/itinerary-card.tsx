@@ -56,7 +56,7 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
 
   return (
     <>
-      <div className="bg-card hover:bg-accent rounded-lg border transition-colors">
+      <div className="bg-card hover:bg-secondary rounded-lg border transition-colors">
         <Link href={`/itinerary/${itinerary.id}`} className="block p-4">
           <div className="flex items-start justify-between gap-2">
             <h2 className="truncate font-medium">{itinerary.name || "Unnamed itinerary"}</h2>

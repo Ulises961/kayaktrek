@@ -77,7 +77,7 @@ export function InviteBuddyPicker({
                   type="button"
                   disabled={pending}
                   onClick={() => invite(buddy.id!)}
-                  className="hover:bg-accent flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
+                  className="hover:bg-secondary flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-50"
                 >
                   <UserAvatar
                     name={buddy.name}

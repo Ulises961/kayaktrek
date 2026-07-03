@@ -115,10 +115,44 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 }
 
 /**
- * Synthesized wind clipped to a disc centred on `center`. Cells outside the
- * radius are `null` (no particles); cells in the outer ~30% fade to zero so the
- * boundary is soft. Grid is generated over the disc's bbox at full resolution,
- * so the patch stays dense regardless of how small the disc is on the page.
+ * Clip an existing velocity grid to a disc centred on `center`. Cells outside
+ * the radius are nulled (no particles); cells in the outer ~30% fade toward zero
+ * so the boundary is soft. Cells already `null` (e.g. the backend land mask) are
+ * left null. Shared by the decorative landing cell and the real M5b planner cell
+ * — the only difference is where the incoming grid comes from.
+ */
+export function maskGridToDisc(
+  grid: VelocityGridLayer[],
+  center: [number, number],
+  radiusKm: number,
+): VelocityGridLayer[] {
+  const [clat, clon] = center
+  const kmPerDegLon = KM_PER_DEG_LAT * Math.cos((clat * Math.PI) / 180)
+  return grid.map((layer) => {
+    const { la1, lo1, dx, dy, nx } = layer.header
+    const data = layer.data.map((value, index) => {
+      if (value === null) return null
+      const row = Math.floor(index / nx) // 0 = la1 (north)
+      const col = index % nx // 0 = lo1 (west)
+      const lat = la1 - row * dy
+      const lon = lo1 + col * dx
+      // Distance from disc centre, in km, then normalised to the radius.
+      const ekm = (lon - clon) * kmPerDegLon
+      const nkm = (lat - clat) * KM_PER_DEG_LAT
+      const t = Math.hypot(ekm, nkm) / radiusKm
+      if (t > 1) return null
+      // Soft rim: full strength to 70% radius, fading to 0 at the edge.
+      const fade = 1 - smoothstep(0.7, 1, t)
+      return Number((value * fade).toFixed(3))
+    })
+    return { header: layer.header, data }
+  })
+}
+
+/**
+ * Synthesized wind clipped to a disc centred on `center`. The flow is generated
+ * over the disc's bbox at full resolution (so the patch stays dense regardless
+ * of how small the disc is on the page) then clipped by `maskGridToDisc`.
  */
 export function ambientWindCell(
   center: [number, number],
@@ -141,33 +175,19 @@ export function ambientWindCell(
   const dx = (lo2 - lo1) / (nx - 1)
   const dy = (la1 - la2) / (ny - 1)
 
+  // Raw flow across the whole bbox; the disc clip + soft-rim fade + rounding are
+  // applied by maskGridToDisc so the landing and the planner share one clipper.
   const u: (number | null)[] = []
   const v: (number | null)[] = []
-
   for (let j = 0; j < ny; j++) {
     const lat = la1 - j * dy
     for (let i = 0; i < nx; i++) {
       const lon = lo1 + i * dx
       const px = (lon - lo1) / (lo2 - lo1)
       const py = (lat - la2) / (la1 - la2)
-
-      // Distance from cell centre, in km, then normalised to the radius.
-      const ekm = (lon - clon) * kmPerDegLon
-      const nkm = (lat - clat) * KM_PER_DEG_LAT
-      const t = Math.hypot(ekm, nkm) / radiusKm
-
-      if (t > 1) {
-        u.push(null)
-        v.push(null)
-        continue
-      }
-
-      // Soft rim: full strength to 70% radius, fading to 0 at the edge.
-      const fade = 1 - smoothstep(0.7, 1, t)
       const [fu, fv] = flowVector(px, py)
-
-      u.push(Number((fu * fade).toFixed(3)))
-      v.push(Number((fv * fade).toFixed(3)))
+      u.push(fu)
+      v.push(fv)
     }
   }
 
@@ -185,31 +205,27 @@ export function ambientWindCell(
     refTime: new Date().toISOString(),
   }
 
-  return {
-    center,
-    radiusKm,
-    grid: [
-      {
-        header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_wind" },
-        data: u,
-      },
-      {
-        header: { ...header, parameterNumber: 3, parameterNumberName: "northward_wind" },
-        data: v,
-      },
-    ],
-  }
+  const grid: VelocityGridLayer[] = [
+    { header: { ...header, parameterNumber: 2, parameterNumberName: "eastward_wind" }, data: u },
+    { header: { ...header, parameterNumber: 3, parameterNumberName: "northward_wind" }, data: v },
+  ]
+
+  return { center, radiusKm, grid: maskGridToDisc(grid, center, radiusKm) }
 }
 
 /**
- * Derive a forecast cell from one or more routes: centred on the combined
- * bounding-box centre, radius sized to comfortably contain the passage (with a
- * floor so a tiny/empty route still gets a sensible disc).
+ * Geometry of a forecast cell derived from one or more routes: centred on the
+ * combined bounding-box centre, radius sized to comfortably contain the passage
+ * (with a floor so a tiny/empty route still gets a sensible disc). No grid — use
+ * `maskGridToDisc` to clip a real grid, or `cellForRoutes` for the decorative one.
  */
-export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): ForecastCell {
+export function discCell(
+  positions: [number, number][],
+  minRadiusKm = 38,
+): { center: [number, number]; radiusKm: number } {
   if (positions.length === 0) {
     const c = MED_BOUNDS
-    return ambientWindCell([(c.la1 + c.la2) / 2, (c.lo1 + c.lo2) / 2], 70)
+    return { center: [(c.la1 + c.la2) / 2, (c.lo1 + c.lo2) / 2], radiusKm: 70 }
   }
   let minLat = Infinity,
     maxLat = -Infinity,
@@ -227,7 +243,16 @@ export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): 
   const halfDiagKm =
     Math.hypot((maxLat - minLat) * KM_PER_DEG_LAT, (maxLon - minLon) * kmPerDegLon) / 2
   const radiusKm = Math.max(minRadiusKm, halfDiagKm * 1.55)
-  return ambientWindCell([clat, clon], radiusKm)
+  return { center: [clat, clon], radiusKm }
+}
+
+/**
+ * Decorative forecast cell for the landing: derive the disc geometry from the
+ * routes, then synthesize the ambient flow clipped to it.
+ */
+export function cellForRoutes(positions: [number, number][], minRadiusKm = 38): ForecastCell {
+  const { center, radiusKm } = discCell(positions, minRadiusKm)
+  return ambientWindCell(center, radiusKm)
 }
 
 // Wind-strength ramp — the CALM SLICE of the canonical wind-map scale

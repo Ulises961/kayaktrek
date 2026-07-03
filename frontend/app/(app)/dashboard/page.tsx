@@ -36,7 +36,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
   return (
     <Link
       href={`/trips/${trip.id}`}
-      className="border-border bg-card hover:bg-accent block overflow-hidden rounded-xl border transition-colors"
+      className="border-border bg-card hover:bg-secondary block overflow-hidden rounded-xl border transition-colors"
     >
       {/* The trip's passage on the same sea chart as the landing — flush to the card
           edges, text below. No thumbnail when the trip has no plotted route yet. */}
