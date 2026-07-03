@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect } from "react"
+import L from "leaflet"
 import {
   MapContainer,
   TileLayer,
   Polyline,
   CircleMarker,
   Tooltip,
+  useMap,
   useMapEvents,
 } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
@@ -45,6 +48,35 @@ function BoundsWatcher({
   return null
 }
 
+// Navigates the map to whichever route is selected: an immediate fly to the item's
+// centroid so the user gets feedback right away, refined into a fly-to-bounds once
+// the route's polyline has finished loading (selectedRoute arrives after selectedId).
+function SelectionFlyTo({
+  selectedId,
+  selectedRoute,
+  items,
+}: {
+  selectedId: string | null
+  selectedRoute: RouteData | null
+  items: ExploreItem[]
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!selectedId) return
+    if (selectedRoute && selectedRoute.positions.length > 0) {
+      map.flyToBounds(L.latLngBounds(selectedRoute.positions), { padding: [48, 48], maxZoom: 12 })
+      return
+    }
+    const item = items.find((i) => i.id === selectedId)
+    if (item?.centroidLat != null && item?.centroidLng != null) {
+      map.flyTo([item.centroidLat, item.centroidLng], Math.max(map.getZoom(), 8))
+    }
+  }, [selectedId, selectedRoute, items, map])
+
+  return null
+}
+
 export default function ExploreDiscoveryMap({
   items,
   selectedId,
@@ -65,6 +97,7 @@ export default function ExploreDiscoveryMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <BoundsWatcher enabled={boundsEnabled} onChange={onBoundsChange} />
+      <SelectionFlyTo selectedId={selectedId} selectedRoute={selectedRoute} items={items} />
       {located.map((item) => {
         const isSelected = selectedId === item.id
         return (
