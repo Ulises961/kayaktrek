@@ -276,17 +276,22 @@ def test_explore_item_carries_no_trip_data(client, make_itinerary):
 # ── sort ──────────────────────────────────────────────────────────────────────
 
 def test_sort_by_distance_ascending(client, make_itinerary):
-    far = make_itinerary("Far", [(1, None, [MED, MED_LONG_END])])
-    near = make_itinerary("Near", [(1, None, [MED, MED_SHORT_END])])
-    r = client.get(f"{EXPLORE}?sort=distance")
+    # Scoped by a shared name prefix so this ordering check is immune to any other
+    # public itinerary in the worker's schema (e.g. the ownerless demo seed from
+    # Api.seed.seed_demo_itinerary, which persists for the whole test session and
+    # would otherwise contend for the unfiltered listing's page-1 slots).
+    far = make_itinerary("SortDist Far", [(1, None, [MED, MED_LONG_END])])
+    near = make_itinerary("SortDist Near", [(1, None, [MED, MED_SHORT_END])])
+    r = client.get(f"{EXPLORE}?sort=distance&name=SortDist")
     ids = _ids(r)
     assert ids.index(str(near.id)) < ids.index(str(far.id))
 
 
 def test_sort_by_name(client, make_itinerary):
-    zed = make_itinerary("Zed route", [(1, None, [MED])])
-    alpha = make_itinerary("Alpha route", [(1, None, [MED])])
-    r = client.get(f"{EXPLORE}?sort=name")
+    # Same isolation concern as test_sort_by_distance_ascending above.
+    zed = make_itinerary("SortName Zed route", [(1, None, [MED])])
+    alpha = make_itinerary("SortName Alpha route", [(1, None, [MED])])
+    r = client.get(f"{EXPLORE}?sort=name&name=SortName")
     ids = _ids(r)
     assert ids.index(str(alpha.id)) < ids.index(str(zed.id))
 
