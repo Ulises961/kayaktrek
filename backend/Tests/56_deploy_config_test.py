@@ -102,3 +102,31 @@ class TestSeedCliCommand:
             _db.session.query(Itinerary).filter(Itinerary.user_id.is_(None)).count()
         )
         assert demo_count_after_second == demo_count_after_first
+
+
+# ---------------------------------------------------------------------------
+# ProxyFix — off by default, opt-in via PROXY_TRUSTED_HOPS so rate limiting keys on
+# the real client IP behind a reverse proxy without trusting X-Forwarded-For blindly.
+# ---------------------------------------------------------------------------
+
+class TestProxyFixWiring:
+
+    def test_wsgi_app_is_unwrapped_when_proxy_trusted_hops_unset(self, monkeypatch):
+        monkeypatch.delenv("PROXY_TRUSTED_HOPS", raising=False)
+        from Api.app import createApp
+        app = createApp("testing")
+        assert type(app.wsgi_app).__name__ != "ProxyFix"
+
+    def test_wsgi_app_is_unwrapped_when_proxy_trusted_hops_is_zero(self, monkeypatch):
+        monkeypatch.setenv("PROXY_TRUSTED_HOPS", "0")
+        from Api.app import createApp
+        app = createApp("testing")
+        assert type(app.wsgi_app).__name__ != "ProxyFix"
+
+    def test_wsgi_app_is_wrapped_when_proxy_trusted_hops_is_set(self, monkeypatch):
+        monkeypatch.setenv("PROXY_TRUSTED_HOPS", "1")
+        from Api.app import createApp
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app = createApp("testing")
+        assert isinstance(app.wsgi_app, ProxyFix)
+        assert app.wsgi_app.x_for == 1

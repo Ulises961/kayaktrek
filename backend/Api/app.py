@@ -4,6 +4,7 @@ import uuid
 import click
 from flask import Flask, g, request
 from flask_migrate import Migrate
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from Api.cache import cache
 from Api.config import config
@@ -66,6 +67,17 @@ def createApp(config_mode: str, *, schema: str | None = None):
     )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
+
+    # Rate limiting (Api/limiter.py) keys on the peer address; behind a reverse proxy every
+    # request otherwise arrives from the proxy's IP, either throttling every client together
+    # or, if X-Forwarded-For were trusted blindly, becoming spoofable. Off by default (0 hops)
+    # so local/dev/direct-exposure setups are unaffected; a deploy behind N proxies sets
+    # PROXY_TRUSTED_HOPS=N deliberately (M11 §4).
+    trusted_hops = int(os.environ.get("PROXY_TRUSTED_HOPS", "0"))
+    if trusted_hops > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=trusted_hops, x_proto=trusted_hops, x_host=trusted_hops
+        )
 
     if schema:
         engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
