@@ -16,6 +16,8 @@ import {
 } from "@/lib/dtos/trip"
 import { updateTrip } from "@/lib/trips/actions"
 import { StateBadge } from "@/components/common/state-badge"
+import { fieldLabelClass } from "@/components/common/form-field"
+import { cn } from "@/lib/utils"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { DatePicker } from "@/components/common/date-picker"
@@ -43,11 +45,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
-      {children}
-    </span>
-  )
+  return <span className={cn(fieldLabelClass, "sm:text-[12px]")}>{children}</span>
 }
 
 function StateTimeline({ currentState }: { currentState: TripState }) {

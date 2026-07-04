@@ -21,7 +21,7 @@ Read the relevant document before working in an area. When a significant new dec
 | [foundation.md](foundation.md) | Infrastructure, data layer (PostgreSQL/PostGIS, UUID v7, Alembic, MinIO), async stack (RabbitMQ/Redis/Celery), Flask backend patterns, observability |
 | [trip-lifecycle.md](trip-lifecycle.md) | Trip state machine, pause/resume, collaboration model (leader vs crew), itinerary visibility and privacy, GDPR erasure |
 | [safety-privacy.md](safety-privacy.md) | Float plan (computed view, not stored), medical notes (copy-on-join, ECIES encryption), sharing (frozen snapshot, opaque token), email templates |
-| [itinerary-frontend.md](itinerary-frontend.md) | Map-first principle, Next.js App Router + server actions, trip detail page structure, itinerary builder evolution (M4 route-first / M4b unified sidebar + drag boundaries), tile caching architecture |
+| [itinerary-frontend.md](itinerary-frontend.md) | Map-first principle, Next.js App Router + server actions, trip detail page structure, itinerary builder evolution (M4 route-first / M4b unified sidebar + drag boundaries), tile caching architecture, shared form primitives + create/edit form-pair convention (ADR-032) |
 | [mobile-offline.md](mobile-offline.md) | Offline-first design, WatermelonDB sync protocol, conflict resolution, weather cache, mutation queue idempotency, MapLibre React Native, external GPS (BLE/NMEA + satellite feed) |
 | [features.md](features.md) | Weather & sea data (OpenMeteo, tidal model, rule of 12s, velocity overlays, UI language), expedition log auto-generation |
 
