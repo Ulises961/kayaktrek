@@ -4,11 +4,13 @@ services:
     image: rabbitmq:3-management
     container_name: kayak_rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"  # Management UI → http://localhost:15672  (guest/guest)
+      # M11 §4: was the only infra service bound to 0.0.0.0 — the management UI was a
+      # listening console on any network the host is attached to.
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"  # Management UI → http://localhost:15672
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}       
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -35,6 +37,20 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kayak_redis
+    # Was running on unconfigured image defaults: maxmemory 0 (unbounded growth) +
+    # maxmemory-policy noeviction (once a cap IS hit, Redis rejects writes outright,
+    # across rate limiter/cache/Celery results at once) + periodic RDB snapshotting
+    # (disk I/O the foundation ADR's pub/sub design explicitly wants to avoid). All three
+    # workloads sharing this instance are disposable — limiter counters reset harmlessly,
+    # cache entries just get refetched, Celery results are for short-lived checkable jobs —
+    # so graceful LRU eviction with persistence off is a strict improvement over the
+    # defaults, not a tradeoff. Site evaluation follow-up, 2026-07-04.
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
@@ -64,10 +80,16 @@ services:
   minio-init:
     image: minio/minio:latest
     container_name: kayak_minio_init
+    # Bucket + public-read policy provisioning lives here, not in the app at request time
+    # (M11 §4) — avatars/ and point-images/ are public-read (stable, cacheable URLs);
+    # documents/ and point-images-private/ stay private, served only via
+    # StorageService.presigned_url. Runtime credentials then only need object CRUD.
     entrypoint: >
       /bin/sh -c "
         mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-        mc mb --ignore-existing local/$$STORAGE_BUCKET
+        mc mb --ignore-existing local/$$STORAGE_BUCKET &&
+        mc anonymous set download local/$$STORAGE_BUCKET/avatars &&
+        mc anonymous set download local/$$STORAGE_BUCKET/point-images
       "
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kayak}
@@ -83,7 +105,11 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_migrate
-    command: alembic upgrade head
+    # Seeding moved here from app-factory time (M11 §4) — it used to run inside createApp(),
+    # which every gunicorn worker AND the migrate/Celery processes call, racing identical
+    # inserts at cold start. `flask seed` is idempotent and runs exactly once, after the
+    # schema is current.
+    command: sh -c "alembic upgrade head && flask seed"
     environment:
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
@@ -107,7 +133,7 @@ services:
     environment:
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
@@ -136,6 +162,14 @@ services:
     volumes:
       - ./backend:/app
       - /app/.venv
+    healthcheck:
+      # No curl in the runtime image (python:3.12-slim + only libpq-dev/gcc/libmagic1) —
+      # urllib is stdlib. GET /api/v1/health pings the DB (M11 §4).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   worker:
     build:
@@ -146,7 +180,7 @@ services:
     environment:
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}

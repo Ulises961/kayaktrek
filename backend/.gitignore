@@ -10,3 +10,4 @@ __pycache__
 Pipfile.lock
 *.egg*
 .coverage
+requirements-audit.txt

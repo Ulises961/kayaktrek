@@ -231,6 +231,44 @@ kept as an unversioned alias — frontend and backend tests moved to `/api/v1` i
 
 ---
 
+## Production hardening scoped as a dedicated milestone (M11)
+
+**Context.** The 2026-07-04 site evaluation (`docs/reviews/2026-07-04-site-evaluation.md`)
+found the core architecture sound but identified a consistent theme: the weakest surfaces are
+the *edges* — the unthrottled/unrotated refresh endpoint, the total absence of HTTP security
+headers, CI gates that don't actually gate (non-blocking lint, no production build, no
+migration run, no dependency audits), and deployment plumbing that lags the code (per-worker
+startup seeding, fail-open `DATABASE_URL`, no health endpoint, per-upload bucket-policy writes,
+proxy-blind rate limiting). Individually small; collectively they are the gap between "works in
+compose" and "deployable".
+
+**Decision (2026-07-04).** Crystallize the evaluation's remediation into a single milestone,
+**M11 — Production hardening** (`plans/M11.md`), to be tackled as soon as needed — at the latest
+before any staging/production deployment, and pullable forward section by section (the
+CI-honesty section is worth doing immediately). Scope decisions locked:
+
+- **Refresh tokens gain rotation + reuse detection** built on the existing `token_version`
+  mechanism (rotate on every use; a reused token revokes the family). No server-side token
+  store is introduced — revocation stays version-based, consistent with ADR-001's stateless JWT
+  design.
+- **Security headers live in Next.js** (`next.config.ts` `headers()`), not Flask — the browser
+  only ever talks to Next; Flask responses never reach it directly.
+- **CI must be honest**: blocking lint, `next build`, `alembic upgrade head` + autogenerate
+  drift check, Dependabot + audit steps. A green check must mean deployable.
+- **Startup work moves out of the app factory**: seeding becomes a CLI command run from the
+  migrate step; bucket + policy provisioning stays in `minio-init`, leaving the runtime
+  credential needing object CRUD only.
+- **OpenAPI contract is explicitly deferred** to an M9 (mobile) prerequisite — it earns its
+  cost only when a second consumer exists.
+
+**Consequences.** M11 joins observability (Logfire/OTel + Sentry), secrets management, backups,
+and TOU/legal on the pre-production checklist; after M11 those remaining checklist items are the
+only known deploy blockers. The refresh-rotation change is a breaking contract change for the
+frontend session layer (`refreshSession` must persist the newly returned refresh token) and
+lands as one coordinated PR.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -248,3 +286,4 @@ kept as an unversioned alias — frontend and backend tests moved to `/api/v1` i
 | Static type checking with mypy | ADR-029 | 2026-06-19 | Gradual, layer-by-layer; for correctness/tooling not perf; `TYPE_CHECKING` `Base` shim for `db.Model` |
 | E2E backend mirrors prod concurrency (gunicorn, not `flask run`) | ADR-030 | 2026-06-22 | Single-threaded dev server serialized the 7-call trip-detail fan-out → flaky post-mutation assertions; M6b's +2 calls tipped it over. Full revalidation breadth stays (member-removal cascades); fix is concurrency, not caching. Aggregate `/api/trip/:id/detail` tracked separately |
 | API versioning — URL-path `/api/v1` | ADR-031 | 2026-06-26 | Hard-cut all routes to `/api/v1` before mobile/PWA-offline clients ship (independently-deployed → need versioning); URL-path over header negotiation; frontend versions centrally in `apiFetch` (callers unchanged); v2 will be a parallel blueprint set, not an in-place rewrite |
+| Production hardening scoped as M11 | ADR-032 | 2026-07-04 | 2026-07-04 site evaluation remediation crystallized in `plans/M11.md`: refresh rotation + reuse detection on `token_version` (no server-side token store); security headers in Next.js not Flask; honest CI (blocking lint, `next build`, migration run + drift check, Dependabot/audits); seeding out of app factory; bucket provisioning to `minio-init`; ProxyFix at deploy; OpenAPI deferred to M9 prerequisite |
