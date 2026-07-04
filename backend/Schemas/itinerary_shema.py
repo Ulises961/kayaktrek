@@ -27,6 +27,9 @@ class ItinerarySchema(BaseSchema):
     )
     trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
+    # Unlisted story-share token (M7d) — only ever dumped back to the owner right
+    # after generate/regenerate; never present on the public/explore projections.
+    story_share_token = fields.String(dump_only=True, allow_none=True)
 
     def get_total_miles(self, obj: Itinerary) -> float:
         return compute_total_miles(obj.days or [])

@@ -1,6 +1,7 @@
 """Itinerary Service — business logic for itinerary operations."""
 import logging
 import math
+import secrets
 from typing import Dict, List, Optional, Set, Tuple
 from uuid import UUID
 
@@ -67,6 +68,31 @@ class ItineraryService:
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
         if not itinerary.is_public:
             raise NoResultFound(f"Itinerary {itinerary_id} not found")
+        return itinerary
+
+    @staticmethod
+    def generate_story_share(itinerary_id: str, user_id: str) -> Itinerary:
+        """Generate (or regenerate) the unlisted story-share token.
+
+        Any trip member with itinerary write access may share it (same access rule
+        as editing the route itself — see require_owner('itinerary')). Regenerating
+        immediately invalidates the previous link; there is no separate revoke.
+        """
+        itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
+        itinerary.story_share_token = secrets.token_urlsafe(32)
+        db.session.commit()
+        return itinerary
+
+    @staticmethod
+    def get_story_by_token(token: str) -> Itinerary:
+        """Return the itinerary for a valid story-share token.
+
+        Raises NoResultFound on an unknown token — no distinction from "never
+        shared" is surfaced, matching the float-plan token's no-oracle behavior.
+        """
+        itinerary = db.session.query(Itinerary).filter_by(story_share_token=token).first()
+        if not itinerary:
+            raise NoResultFound("Story not found")
         return itinerary
 
     @staticmethod
