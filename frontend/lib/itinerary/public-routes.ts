@@ -167,21 +167,13 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
   })
 }
 
-// Per-day distances for the public detail breakdown, derived from the route's own
-// points (the same data extractRouteData draws) — so planners see how the mileage is
-// split across days before deciding to use the route.
-export function extractDaySummaries(itinerary: PublicItineraryDetail): DaySummary[] {
-  return [...itinerary.days]
-    .filter((d) => d.dayNumber > 0)
-    .sort((a, b) => a.dayNumber - b.dayNumber)
-    .map((day) => {
-      const ordered = walkChain(day.points as PublicPoint[])
-        .filter((p) => p.latitude != null && p.longitude != null)
-        .map((p) => ({ latitude: p.latitude as number, longitude: p.longitude as number }))
-      return {
-        dayNumber: day.dayNumber,
-        date: day.date ?? null,
-        distanceNm: totalDistanceNm(ordered),
-      }
-    })
+// Per-day distances for the public detail breakdown. Derived straight from a route's
+// own day segments (§5's buildRouteData already walked each day once) rather than
+// re-walking the raw itinerary — see daySummariesFromRoute.
+export function daySummariesFromRoute(route: RouteData): DaySummary[] {
+  return route.days.map((d) => ({
+    dayNumber: d.dayNumber,
+    date: d.date,
+    distanceNm: d.distanceNm,
+  }))
 }

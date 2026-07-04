@@ -299,3 +299,15 @@ export async function fetchPublicRouteData(id: string): Promise<RouteData | null
   const detail = await fetchPublicItineraryDetail(id)
   return detail ? extractRouteData(detail) : null
 }
+
+// Unlisted trip-narrative share link (M7d) — same shape as fetchPublicItineraryDetail,
+// but keyed by the itinerary's story_share_token rather than its id, and reachable
+// whether or not the itinerary is also discoverable-public.
+export async function fetchStoryByToken(token: string): Promise<PublicItineraryDetail | null> {
+  try {
+    const raw = await apiGetPublic<unknown>(`/api/itinerary/story/public/${token}`)
+    return PublicItineraryDetailSchema.parse(raw)
+  } catch {
+    return null
+  }
+}
