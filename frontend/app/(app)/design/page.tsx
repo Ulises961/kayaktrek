@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation"
 import { StateVisual } from "@/components/illustrations/state-visual"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
@@ -160,6 +161,11 @@ const MOCK_TRIPS: Trip[] = [
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function DesignPage() {
+  // Component/token showcase — dev-only, never ship it in the production bundle.
+  if (process.env.NODE_ENV === "production") {
+    notFound()
+  }
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-14 px-6 py-8">
       {/* Header */}
