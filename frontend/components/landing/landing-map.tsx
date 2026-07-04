@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -91,11 +91,26 @@ function RouteMarkers({ route }: { route: RouteData }) {
 // than a fixed far-out centre — so the parallax reveal lands on a well-scaled
 // passage and the route sits centred, not stranded high. Re-fits on resize/
 // breakpoint. Falls back to the fixed centre/zoom when there is no route yet.
-function FrameRoute({ routes, variant }: { routes: RouteData[]; variant: Variant }) {
+// `onReady` fires once, the first time this effect runs — win or skip (no
+// routes). It's the explicit "the initial view is whatever it's going to be"
+// signal chart furniture like Graticule waits on, rather than each guessing it
+// from event timing (see Graticule's `ready` prop for why that races).
+function FrameRoute({
+  routes,
+  variant,
+  onReady,
+}: {
+  routes: RouteData[]
+  variant: Variant
+  onReady?: () => void
+}) {
   const map = useMap()
   useEffect(() => {
     const pts = routes.flatMap((r) => r.positions) as [number, number][]
-    if (pts.length === 0) return
+    if (pts.length === 0) {
+      onReady?.()
+      return
+    }
     const bounds = L.latLngBounds(pts)
     const fit = () => {
       const compact = window.matchMedia("(max-width: 639px)").matches
@@ -111,9 +126,10 @@ function FrameRoute({ routes, variant }: { routes: RouteData[]; variant: Variant
       })
     }
     fit()
+    onReady?.()
     window.addEventListener("resize", fit)
     return () => window.removeEventListener("resize", fit)
-  }, [map, routes, variant])
+  }, [map, routes, variant, onReady])
   return null
 }
 
@@ -156,6 +172,10 @@ export function LandingMap({
   variant = "hero",
 }: Props) {
   const isHero = variant === "hero"
+  // Gates Graticule until FrameRoute's initial fitBounds (or its no-routes skip)
+  // has actually applied — otherwise the grid draws once from the map's fixed
+  // construction-time center/zoom before catching up to the fitted extent.
+  const [chartReady, setChartReady] = useState(false)
   return (
     <MapContainer
       center={center}
@@ -168,13 +188,13 @@ export function LandingMap({
     >
       <Interactions interactive={interactive} />
       <AttributionPrefix />
-      <FrameRoute routes={routes} variant={variant} />
+      <FrameRoute routes={routes} variant={variant} onReady={() => setChartReady(true)} />
       <TileLayer
         url={isHero ? ESRI_OCEAN : OSM_BASE}
         attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIB}
       />
       <TileLayer url={SEAMARK} attribution={SEAMARK_ATTRIB} />
-      <Graticule />
+      <Graticule ready={chartReady} />
       {/* Forecast cell + scale bar are the loud instruments — hero only. The banner
           stays a calm chart bridge, and the ambient wind never runs on the dashboard. */}
       {isHero && <ScaleBar />}
