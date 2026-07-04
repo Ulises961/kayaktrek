@@ -9,7 +9,7 @@ from Models.image import Image
 from Models.point import Point
 from Models.point_has_image import PointHasImage
 from Schemas.image_schema import ImageSchema
-from Services.storage_service import StorageService
+from Services.storage_service import FileKind, StorageService
 from Api.database import db
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,10 @@ class ImageService:
             raise NoResultFound(f"Point {point_id} not found")
 
         object_key = str(uuid_extension.uuid7())
-        url = StorageService.upload(file_bytes, object_key, kind="image")
+        # New uploads are private by default (Image.is_public=False) — the object lands
+        # in the non-public-read prefix. Making it public later (ImageService.set_public)
+        # is the only way it moves to the public-read "image" prefix.
+        url = StorageService.upload(file_bytes, object_key, kind="image-private")
 
         try:
             image = ImageSchema().load({
@@ -93,7 +96,7 @@ class ImageService:
         except Exception:
             # DB failed after MinIO succeeded — best-effort rollback to avoid orphan
             try:
-                StorageService.delete(object_key, kind="image")
+                StorageService.delete(object_key, kind="image-private")
             except Exception as cleanup_err:
                 logger.error(
                     "Orphaned MinIO object '%s' after DB failure — manual cleanup required. Error: %s",
@@ -126,8 +129,11 @@ class ImageService:
         if image in point.images:
             point.images.remove(image)
 
-        # Capture the storage key before deleting the record
-        object_key = image.location.split("/point-images/")[-1] if image.location else None
+        # Capture the storage key/kind before deleting the record
+        image_kind: FileKind = "image" if image.is_public else "image-private"
+        object_key = (
+            StorageService.object_key_from_url(image.location, image_kind) if image.location else None
+        )
 
         # DB is committed first — if this fails, the record survives and the URL stays valid
         db.session.delete(image)
@@ -137,11 +143,45 @@ class ImageService:
         # orphaned object in storage (invisible to users) rather than a broken URL
         if object_key:
             try:
-                StorageService.delete(object_key, kind="image")
+                StorageService.delete(object_key, kind=image_kind)
             except Exception as e:
                 logger.error(
-                    "Orphaned MinIO object 'point-images/%s' after DB delete — manual cleanup required. Error: %s",
+                    "Orphaned MinIO object '%s' after DB delete — manual cleanup required. Error: %s",
                     object_key, e,
                 )
 
         logger.info("Image %s removed from point %s", image_id, point_id)
+
+    @staticmethod
+    def set_public(image_id: str, is_public: bool) -> Image:
+        """
+        Toggle an image's public/private visibility, moving the underlying storage
+        object between the public-read and private prefixes to match.
+
+        Args:
+            image_id: The ID of the image to update
+            is_public: The new visibility
+
+        Returns:
+            The updated Image object
+
+        Raises:
+            NoResultFound: If the image does not exist
+        """
+        image = ImageService.get_image_by_id(image_id)
+        if image.is_public == is_public:
+            return image
+
+        current_kind: FileKind = "image" if image.is_public else "image-private"
+        new_kind: FileKind = "image" if is_public else "image-private"
+
+        if image.location:
+            object_key = StorageService.object_key_from_url(image.location, current_kind)
+            image.location = StorageService.move(object_key, current_kind, new_kind)
+
+        image.is_public = is_public
+        db.session.commit()
+        db.session.refresh(image)
+
+        logger.info("image_visibility_changed", extra={"image_id": image.id, "is_public": is_public})
+        return image

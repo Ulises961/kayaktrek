@@ -182,6 +182,28 @@ class StorageService:
             ExpiresIn=expires_in,
         )
 
+    @staticmethod
+    def object_key_from_url(url: str, kind: FileKind) -> str:
+        """Recover the raw object key from a URL previously returned by upload()/move()."""
+        prefix = _KIND_PREFIXES[kind]
+        return url.split(f"/{prefix}")[-1]
+
+    @staticmethod
+    def move(object_key: str, from_kind: FileKind, to_kind: FileKind) -> str:
+        """Copy an object to a different kind's prefix and delete the original.
+
+        Returns the new URL (as upload() would have returned for to_kind).
+        """
+        from_key = f"{_KIND_PREFIXES[from_kind]}{object_key}"
+        to_key = f"{_KIND_PREFIXES[to_kind]}{object_key}"
+
+        client = _client()
+        client.copy_object(Bucket=_BUCKET, CopySource={"Bucket": _BUCKET, "Key": from_key}, Key=to_key)
+        client.delete_object(Bucket=_BUCKET, Key=from_key)
+
+        logger.info("Moved %s -> %s", from_key, to_key)
+        return f"{_PUBLIC_URL.rstrip('/')}/{_BUCKET}/{to_key}"
+
     # -- GDPR data exports ----------------------------------------------------
     # Server-generated blobs shared across containers/replicas via object storage
     # (local disk fails the moment the worker and web run in separate containers).
