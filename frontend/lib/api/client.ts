@@ -66,7 +66,12 @@ export async function apiPost<T>(
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const res = await apiFetch(path, { method: "PUT", body: JSON.stringify(body) })
-  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null)) as { message?: string } | null
+    throw new Error(
+      `PUT ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
+    )
+  }
   return res.json() as Promise<T>
 }
 
@@ -110,8 +115,10 @@ export async function apiGetPublic<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-// Multipart upload — omits Content-Type so the browser sets the boundary.
-export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+// Multipart upload — omits Content-Type so the browser sets the boundary. Kept separate
+// from apiFetch (rather than reusing it) for exactly that reason: apiFetch always sets
+// Content-Type: application/json, which a plain object spread can't unset for a FormData body.
+export async function apiUpload<T>(path: string, formData: FormData, retry = true): Promise<T> {
   const token = await getAccessToken()
   const res = await fetch(`${API_URL}${versionPath(path)}`, {
     method: "POST",
@@ -120,9 +127,9 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   })
-  if (res.status === 401) {
+  if (res.status === 401 && retry) {
     const refreshed = await refreshSession()
-    if (refreshed) return apiUpload(path, formData)
+    if (refreshed) return apiUpload(path, formData, false)
     redirect("/login")
   }
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
