@@ -106,10 +106,11 @@ def test_create_with_nonexistent_trip_raises(id):
 
 # ── fork_itinerary ────────────────────────────────────────────────────────────
 
-def test_fork_public_itinerary(public_itinerary_with_points, id):
-    """Fork creates a private deep copy with new UUIDs, correct name, and intact linked list."""
+def test_fork_public_itinerary(public_itinerary_with_points, id_2):
+    """Fork creates a private deep copy (owned by a different user than the author),
+    with new UUIDs, correct name, and intact linked list."""
     source_id = public_itinerary_with_points["itinerary_id"]
-    fork = ItineraryService.fork_itinerary(source_id, id)
+    fork = ItineraryService.fork_itinerary(source_id, id_2)
     try:
         forked_points = [p for day in fork.days for p in day.points]
         order = ItineraryService._walk_linked_list(forked_points)
@@ -117,7 +118,7 @@ def test_fork_public_itinerary(public_itinerary_with_points, id):
 
         assert fork.is_public is False
         assert fork.name == "Source Route"
-        assert str(fork.user_id) == id
+        assert str(fork.user_id) == id_2
         assert len(forked_points) == 2
         assert len(order) == 2
         assert "Camp Spot" in {p.name for p in forked_points}
@@ -132,6 +133,13 @@ def test_fork_private_itinerary_raises(itinerary_with_a_point, id):
     itin_id = itinerary_with_a_point["itinerary_id"]
     with pytest.raises(PermissionError, match="Only public itineraries can be forked"):
         ItineraryService.fork_itinerary(itin_id, id)
+
+
+def test_fork_own_itinerary_raises(public_itinerary_with_points, id):
+    """Authors cannot fork their own public route — it would duplicate it in their list."""
+    source_id = public_itinerary_with_points["itinerary_id"]
+    with pytest.raises(PermissionError, match="already own"):
+        ItineraryService.fork_itinerary(source_id, id)
 
 
 # ── apply_boundaries error branches ──────────────────────────────────────────
