@@ -29,11 +29,21 @@ def _get_worker_id(request) -> str:
     return 'master'
 
 
+#  Postgres's "IF NOT EXISTS" DDL is check-then-create, not atomic — concurrent xdist
+#  workers racing CREATE EXTENSION / CREATE SCHEMA at session start can still throw
+#  duplicate-object errors (or, worse, leave two workers silently sharing one schema).
+#  Every worker takes this session-level advisory lock before bootstrapping so the
+#  create-schema step is fully serialized; a stable arbitrary key shared by all workers.
+_SCHEMA_BOOTSTRAP_LOCK_KEY = 4_882_193_001
+
+
 @pytest.fixture(scope='session')
 def app(request):
     """Session-wide test Flask application, isolated to its own PostgreSQL schema."""
     worker_id = _get_worker_id(request)
-    schema = f"test_{worker_id}"
+    # PID-suffixed so a respawned/zombie xdist worker can never collide with a live one
+    # under the same worker id — each schema maps 1:1 to one real OS process.
+    schema = f"test_{worker_id}_{os.getpid()}"
 
     # Bootstrap using a plain connection (no custom search_path) so that:
     #   - the PostGIS extension lands in public (accessible to all schemas via search_path)
@@ -41,9 +51,14 @@ def app(request):
     db_url = os.getenv("TESTING_DATABASE_URL", os.getenv("DATABASE_URL"))
     bootstrap = create_engine(db_url, poolclass=_NullPool)
     with bootstrap.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis SCHEMA public"))
-        conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-        conn.commit()
+        conn.execute(text("SELECT pg_advisory_lock(:key)"), {"key": _SCHEMA_BOOTSTRAP_LOCK_KEY})
+        try:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis SCHEMA public"))
+            conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+            conn.commit()
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": _SCHEMA_BOOTSTRAP_LOCK_KEY})
+            conn.commit()
     bootstrap.dispose()
 
     app = createApp('testing', schema=schema)
