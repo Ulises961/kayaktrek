@@ -58,7 +58,9 @@ def createApp(config_mode: str, *, schema: str | None = None):
     Params:
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
     schema      -- optional PostgreSQL schema name; sets search_path so all tables land in that schema.
-                   Used by the test suite to isolate parallel workers.
+                   Used by the test suite to isolate parallel workers. "public" stays in
+                   search_path (PostGIS's types/functions live there); see Tests/conftest.py for
+                   why table *creation* still needs `checkfirst=False` despite that.
     """
 
     app = Flask(

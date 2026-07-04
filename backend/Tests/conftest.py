@@ -64,7 +64,18 @@ def app(request):
     app = createApp('testing', schema=schema)
     ctx = app.app_context()
     ctx.push()
-    _db.create_all()
+    # NOT _db.create_all() — Flask-SQLAlchemy's create_all() always checkfirst=True, and
+    # Postgres's has_table() (what checkfirst uses) checks *every* schema on search_path, not
+    # just the first. CI applies `alembic upgrade head` into "public" before the test step
+    # runs, so "public" always already holds a real, structurally-complete copy of every
+    # table; checkfirst=True finds those via "{schema},public" search_path and silently
+    # no-ops table creation for this worker, leaving its ORM traffic to fall through
+    # search_path onto that one shared "public" copy instead of its own isolated schema —
+    # confirmed by reproducing the exact cross-worker duplicate-key/deadlock signature seen
+    # in CI locally (pre-apply migrations to "public", then run pytest -n auto).
+    # checkfirst=False skips that check and unconditionally issues CREATE TABLE, which
+    # Postgres always resolves against the *first* schema on search_path (this worker's own).
+    _db.metadata.create_all(bind=_db.engine, checkfirst=False)
     seed_item_categories()
     seed_place_categories()
 
