@@ -37,6 +37,20 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kayak_redis
+    # Was running on unconfigured image defaults: maxmemory 0 (unbounded growth) +
+    # maxmemory-policy noeviction (once a cap IS hit, Redis rejects writes outright,
+    # across rate limiter/cache/Celery results at once) + periodic RDB snapshotting
+    # (disk I/O the foundation ADR's pub/sub design explicitly wants to avoid). All three
+    # workloads sharing this instance are disposable — limiter counters reset harmlessly,
+    # cache entries just get refetched, Celery results are for short-lived checkable jobs —
+    # so graceful LRU eviction with persistence off is a strict improvement over the
+    # defaults, not a tradeoff. Site evaluation follow-up, 2026-07-04.
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
