@@ -9,14 +9,22 @@ function detail(days: PublicItineraryDetail["days"]): PublicItineraryDetail {
 describe("seasonOfDetail", () => {
   it("returns null when no day has a date", () => {
     expect(
-      seasonOfDetail(detail([{ dayNumber: 1, points: [{ latitude: 40, longitude: 5 }] }])),
+      seasonOfDetail(
+        detail([{ dayNumber: 1, points: [{ latitude: 40, longitude: 5, images: [] }] }]),
+      ),
     ).toBeNull()
   })
 
   it("derives northern-hemisphere summer from a July date", () => {
     expect(
       seasonOfDetail(
-        detail([{ dayNumber: 1, date: "2024-07-15", points: [{ latitude: 43, longitude: 8 }] }]),
+        detail([
+          {
+            dayNumber: 1,
+            date: "2024-07-15",
+            points: [{ latitude: 43, longitude: 8, images: [] }],
+          },
+        ]),
       ),
     ).toBe("summer")
   })
@@ -25,7 +33,11 @@ describe("seasonOfDetail", () => {
     expect(
       seasonOfDetail(
         detail([
-          { dayNumber: 1, date: "2024-12-20", points: [{ latitude: -33.8, longitude: 151.2 }] },
+          {
+            dayNumber: 1,
+            date: "2024-12-20",
+            points: [{ latitude: -33.8, longitude: 151.2, images: [] }],
+          },
         ]),
       ),
     ).toBe("summer")
@@ -36,7 +48,11 @@ describe("seasonOfDetail", () => {
       seasonOfDetail(
         detail([
           { dayNumber: 0, date: "2024-01-01", points: [] },
-          { dayNumber: 1, date: "2024-07-10", points: [{ latitude: 43, longitude: 8 }] },
+          {
+            dayNumber: 1,
+            date: "2024-07-10",
+            points: [{ latitude: 43, longitude: 8, images: [] }],
+          },
         ]),
       ),
     ).toBe("summer")

@@ -50,6 +50,7 @@ function route(overrides: Partial<RouteData> = {}): RouteData {
       [37, 25],
       [37.2, 25.3],
     ],
+    days: [],
     totalMiles: 20,
     dayCount: 3,
     ...overrides,

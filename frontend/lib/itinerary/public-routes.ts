@@ -1,6 +1,7 @@
 import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
 import type { PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
+import { getDayColor } from "@/lib/itinerary/colors"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
@@ -9,13 +10,28 @@ export type RoutePoint = {
   lon: number
   type: PointType
   name: string | null
+  images: { url: string }[]
+}
+
+// One day's route segment, points already walked in order and coloured via the
+// builder's own day-colour palette — so the public map speaks the same visual
+// language as the authenticated itinerary builder.
+export type RouteDaySegment = {
+  dayNumber: number
+  date: string | null
+  color: string
+  points: RoutePoint[]
+  distanceNm: number
 }
 
 export type RouteData = {
   id: string
   name: string
+  // Flattened across all days — kept for consumers that only need overall extent
+  // (landing chart framing, forecast cell, thumbnails), not day colour.
   positions: [number, number][]
   points?: RoutePoint[]
+  days: RouteDaySegment[]
   totalMiles: number | null
   dayCount: number
 }
@@ -36,13 +52,14 @@ type ChainPoint = {
   longitude?: number | null
   type?: string | null
   name?: string | null
+  images?: { url?: string | null; location?: string | null }[] | null
 }
 
 type RouteSource = {
   id?: string | null
   name?: string | null
   totalMiles?: number | null
-  days: { dayNumber: number; points: ChainPoint[] }[]
+  days: { dayNumber: number; date?: string | null; points: ChainPoint[] }[]
 }
 
 // Walk the nextId linked list (no nested `next` property): start from heads (nodes
@@ -69,6 +86,19 @@ function walkChain<T extends ChainPoint>(points: T[]): T[] {
   return ordered
 }
 
+function toRoutePoint(p: ChainPoint & { latitude: number; longitude: number }): RoutePoint {
+  return {
+    lat: p.latitude,
+    lon: p.longitude,
+    type: p.type === "stop" ? "stop" : "position",
+    name: p.name ?? null,
+    images: (p.images ?? [])
+      .map((img) => img.url ?? img.location ?? null)
+      .filter((url): url is string => !!url)
+      .map((url) => ({ url })),
+  }
+}
+
 function buildRouteData(src: RouteSource): RouteData {
   const numberedDays = [...src.days]
     .filter((d) => d.dayNumber > 0)
@@ -76,18 +106,24 @@ function buildRouteData(src: RouteSource): RouteData {
 
   const positions: [number, number][] = []
   const points: RoutePoint[] = []
+  const days: RouteDaySegment[] = []
+
   for (const day of numberedDays) {
-    for (const p of walkChain(day.points)) {
-      if (p.latitude != null && p.longitude != null) {
-        positions.push([p.latitude, p.longitude])
-        points.push({
-          lat: p.latitude,
-          lon: p.longitude,
-          type: p.type === "stop" ? "stop" : "position",
-          name: p.name ?? null,
-        })
-      }
-    }
+    const ordered = walkChain(day.points).filter(
+      (p): p is typeof p & { latitude: number; longitude: number } =>
+        p.latitude != null && p.longitude != null,
+    )
+    const dayPoints = ordered.map(toRoutePoint)
+
+    for (const p of ordered) positions.push([p.latitude, p.longitude])
+    points.push(...dayPoints)
+    days.push({
+      dayNumber: day.dayNumber,
+      date: day.date ?? null,
+      color: getDayColor(day.dayNumber),
+      points: dayPoints,
+      distanceNm: totalDistanceNm(ordered),
+    })
   }
 
   return {
@@ -95,6 +131,7 @@ function buildRouteData(src: RouteSource): RouteData {
     name: src.name ?? "Untitled",
     positions,
     points,
+    days,
     totalMiles: src.totalMiles ?? null,
     dayCount: numberedDays.length,
   }
@@ -109,6 +146,7 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
     totalMiles: itinerary.totalMiles,
     days: itinerary.days.map((d) => ({
       dayNumber: d.dayNumber,
+      date: d.date ?? null,
       points: d.points as PublicPoint[],
     })),
   })
@@ -123,6 +161,7 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
     totalMiles: itinerary.totalMiles,
     days: (itinerary.days ?? []).map((d) => ({
       dayNumber: d.dayNumber,
+      date: d.date ?? null,
       points: (d.points ?? []) as ChainPoint[],
     })),
   })
