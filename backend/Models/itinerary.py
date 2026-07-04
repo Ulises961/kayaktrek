@@ -1,4 +1,5 @@
-from sqlalchemy import UUID, Boolean, Numeric, ForeignKey, String, Float
+from datetime import datetime
+from sqlalchemy import UUID, Boolean, DateTime, Numeric, ForeignKey, String, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
@@ -18,6 +19,14 @@ class Itinerary(BaseModel):
     user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     created_from_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey("itinerary.id", ondelete="SET NULL"), nullable=True
+    )
+    # Unlisted "share this trip's story" link (M7d) — independent of is_public/explore
+    # discoverability. Regenerating overwrites the old token, which is the only revoke
+    # path (mirrors Logistics.share_token). No automatic expiry: a story is a keepsake,
+    # not a time-boxed float plan.
+    story_share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
+    story_share_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     days: Mapped[List["Day"]] = relationship(
         lazy="select", cascade="all, delete,save-update"
