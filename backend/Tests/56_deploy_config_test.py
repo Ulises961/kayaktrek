@@ -130,3 +130,22 @@ class TestProxyFixWiring:
         app = createApp("testing")
         assert isinstance(app.wsgi_app, ProxyFix)
         assert app.wsgi_app.x_for == 1
+
+
+# ---------------------------------------------------------------------------
+# KeyError handler no longer echoes the missing key name to the client — it can fire
+# from internal config/env-var lookups, not just request payloads, and was inconsistent
+# with the sanitised ValueError handler.
+# ---------------------------------------------------------------------------
+
+def test_key_error_handler_does_not_leak_the_key_name(app):
+    # Registering a throwaway route would fail here: by the time the full suite runs, this
+    # session-scoped `app` has already served requests, and Flask locks route registration
+    # after the first request. Invoke the registered handler directly instead.
+    with app.test_request_context():
+        response, status = app.handle_user_exception(KeyError("SUPER_SECRET_INTERNAL_VAR_NAME"))
+
+    assert status == 400
+    body = response.get_json()
+    assert "SUPER_SECRET_INTERNAL_VAR_NAME" not in body["message"]
+    assert body["message"] == "A required field is missing from the request"

@@ -4,11 +4,17 @@ services:
     image: rabbitmq:3-management
     container_name: kayak_rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"  # Management UI → http://localhost:15672  (guest/guest)
+      # M11 §4: was the only infra service bound to 0.0.0.0 — the management UI was a
+      # listening console on any network the host is attached to. Still defaults to
+      # guest/guest (see RABBITMQ_PASSWORD below); tighten that separately once a real
+      # value is confirmed in the deploy's .env, since making it required (like
+      # POSTGRES_PASSWORD/MINIO_ROOT_PASSWORD) would fail a `docker compose up` that
+      # doesn't already set it.
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"  # Management UI → http://localhost:15672  (guest/guest)
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}       
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s

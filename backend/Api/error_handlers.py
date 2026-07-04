@@ -72,11 +72,13 @@ def register_error_handlers(app):
 
     @app.errorhandler(KeyError)
     def handle_key_error(error):
-        """Handle missing required fields."""
+        """Handle missing required fields. The key name is logged (useful for debugging)
+        but not echoed to the client — same posture as the ValueError handler, and this
+        one can fire from internal config/env-var lookups, not just request payloads."""
         logger.warning(f"Missing key: {str(error)}")
         return jsonify({
             "error": "Missing Field",
-            "message": f"Required field is missing: {str(error)}"
+            "message": "A required field is missing from the request"
         }), 400
 
     @app.errorhandler(RateLimitExceeded)
