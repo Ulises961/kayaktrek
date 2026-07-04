@@ -4,6 +4,7 @@ import bleach
 from Models.itinerary import Itinerary
 from Schemas.base_schema import BaseSchema
 from Schemas.day_schema import DaySchema, DayPublicSchema
+from Services.Utils.route_distance import compute_total_miles
 
 
 class ItinerarySchema(BaseSchema):
@@ -11,7 +12,9 @@ class ItinerarySchema(BaseSchema):
     name = fields.String(load_default=None, allow_none=True)
     is_public = fields.Boolean(load_default=False)
     avg_speed_knots = fields.Float(load_default=2.5)
-    total_miles = fields.Float(validate=lambda x: 0 <= x <= 50000, load_default=0)
+    # Derived on read (see Services.Utils.route_distance) — the stored column is never
+    # written to after creation, so it cannot be trusted as a live aggregate.
+    total_miles = fields.Method("get_total_miles", dump_only=True)
     expected_total_miles = fields.Float(
         allow_none=True, validate=lambda x: x is None or (0 <= x <= 50000)
     )
@@ -24,6 +27,9 @@ class ItinerarySchema(BaseSchema):
     )
     trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
+
+    def get_total_miles(self, obj: Itinerary) -> float:
+        return compute_total_miles(obj.days or [])
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
@@ -85,16 +91,54 @@ class ItineraryUpdateSchema(BaseSchema):
         return data
 
 
+class OriginalAuthorSchema(BaseSchema):
+    """Shallow projection of a fork-source itinerary's author (M7c attribution).
+
+    `linkable` mirrors the author's profile_is_public so the frontend only deep-links
+    to a public profile.
+    """
+    username = fields.String(dump_only=True)
+    name = fields.String(dump_only=True, allow_none=True)
+    linkable = fields.Boolean(dump_only=True)
+
+
+class ItineraryExploreItemSchema(BaseSchema):
+    """One row of the /explore discovery listing (unauthenticated).
+
+    Fed snake_case dicts from ItineraryService.search_public_itineraries — facets are
+    derived from the route's own points/dates; no Trip data is present.
+    """
+    name = fields.String(dump_only=True)
+    total_miles = fields.Float(dump_only=True, allow_none=True)
+    day_count = fields.Integer(dump_only=True)
+    season = fields.String(dump_only=True, allow_none=True)
+    centroid_lat = fields.Float(dump_only=True, allow_none=True)
+    centroid_lng = fields.Float(dump_only=True, allow_none=True)
+    created_from_id = fields.UUID(dump_only=True, allow_none=True)
+    original_author = fields.Nested(
+        OriginalAuthorSchema, dump_only=True, allow_none=True
+    )
+
+
 class ItineraryPublicSchema(BaseSchema):
     """Stripped schema for unauthenticated public itinerary access.
 
-    Excludes user_id, trip_id, notes, and private images.
+    Excludes user_id, trip_id, notes, and private images. `created_from_id` +
+    `original_author` surface fork attribution (M7c); the resource injects
+    `original_author` via ItineraryService.resolve_original_author before dumping.
     """
     name = fields.String(dump_only=True)
     is_public = fields.Boolean(dump_only=True)
     avg_speed_knots = fields.Float(dump_only=True)
-    total_miles = fields.Float(dump_only=True)
+    total_miles = fields.Method("get_total_miles", dump_only=True)
+    created_from_id = fields.UUID(dump_only=True, allow_none=True)
+    original_author = fields.Nested(
+        OriginalAuthorSchema, dump_only=True, allow_none=True
+    )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
+
+    def get_total_miles(self, obj: Itinerary) -> float:
+        return compute_total_miles(obj.days or [])
 
     @post_dump
     def exclude_day_zero(self, data, **kwargs):

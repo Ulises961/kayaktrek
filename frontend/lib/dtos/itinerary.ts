@@ -46,12 +46,68 @@ export const PublicDaySchema = z.object({
 })
 export type PublicDay = z.infer<typeof PublicDaySchema>
 
+// Fork attribution (M7c) — the author of the itinerary this one was forked from.
+// `linkable` mirrors the author's profile_is_public so the UI only deep-links public profiles.
+export const OriginalAuthorSchema = z.object({
+  username: z.string(),
+  name: z.string().nullish(),
+  linkable: z.boolean(),
+})
+export type OriginalAuthor = z.infer<typeof OriginalAuthorSchema>
+
 export const PublicItineraryDetailSchema = z.object({
   id: z.string().optional(),
   name: z.string().nullish(),
   isPublic: z.boolean().nullish(),
   totalMiles: z.number().nullish(),
   avgSpeedKnots: z.number().nullish(),
+  createdFromId: z.string().nullish(),
+  originalAuthor: OriginalAuthorSchema.nullish(),
   days: z.array(PublicDaySchema).default([]),
 })
 export type PublicItineraryDetail = z.infer<typeof PublicItineraryDetailSchema>
+
+// One row of the /explore discovery listing. Facets are derived server-side from the
+// route's own points/dates (no Trip data).
+export const ExploreItemSchema = z.object({
+  id: z.string(),
+  name: z.string().nullish(),
+  totalMiles: z.number().nullish(),
+  dayCount: z.number().default(0),
+  season: z.string().nullish(),
+  centroidLat: z.number().nullish(),
+  centroidLng: z.number().nullish(),
+  createdFromId: z.string().nullish(),
+  originalAuthor: OriginalAuthorSchema.nullish(),
+})
+export type ExploreItem = z.infer<typeof ExploreItemSchema>
+
+export const ExplorePageSchema = z.object({
+  items: z.array(ExploreItemSchema).default([]),
+  total: z.number().default(0),
+  page: z.number().default(1),
+  pages: z.number().default(1),
+})
+export type ExplorePage = z.infer<typeof ExplorePageSchema>
+
+export type ExploreBounds = {
+  minLat: number
+  minLng: number
+  maxLat: number
+  maxLng: number
+}
+
+export type ExploreSort = "recent" | "distance" | "duration" | "name"
+
+export type ExploreFilters = {
+  name?: string
+  seasons?: string[]
+  minMiles?: number
+  maxMiles?: number
+  minDays?: number
+  maxDays?: number
+  bbox?: ExploreBounds
+  sort?: ExploreSort
+  page?: number
+  perPage?: number
+}

@@ -1,14 +1,36 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, isRedirectError } from "@/lib/api/client"
+import {
+  apiGet,
+  apiGetPublic,
+  apiPost,
+  apiPatch,
+  apiDelete,
+  apiUpload,
+  isRedirectError,
+} from "@/lib/api/client"
 import { PointSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
-import { ItinerarySchema, ItinerariesSchema, PublicItinerariesSchema } from "@/lib/dtos/itinerary"
-import type { Itinerary, PublicItinerary } from "@/lib/dtos/itinerary"
+import {
+  ItinerarySchema,
+  ItinerariesSchema,
+  PublicItineraryDetailSchema,
+  ExplorePageSchema,
+} from "@/lib/dtos/itinerary"
+import type {
+  Itinerary,
+  PublicItineraryDetail,
+  ExplorePage,
+  ExploreFilters,
+} from "@/lib/dtos/itinerary"
+import { extractRouteData } from "./public-routes"
+import type { RouteData } from "./public-routes"
 import type { BoundaryApplyPayload } from "./boundaries"
+
+const EMPTY_EXPLORE_PAGE: ExplorePage = { items: [], total: 0, page: 1, pages: 1 }
 
 export type ItineraryActionResult =
   | { success: true; itineraryId: string }
@@ -118,6 +140,16 @@ export async function deletePoint(id: string): Promise<DeleteActionResult> {
   }
 }
 
+export async function deleteItinerary(id: string): Promise<DeleteActionResult> {
+  try {
+    await apiDelete(`/api/itinerary/${id}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to delete itinerary." }
+  }
+}
+
 export async function createDay(itineraryId: string, dayNumber: number): Promise<DayActionResult> {
   try {
     const raw = await apiPost<unknown>("/api/day/create", { itineraryId, dayNumber })
@@ -219,11 +251,51 @@ export async function importGpx(formData: FormData): Promise<ItineraryActionResu
   }
 }
 
-export async function fetchPublicItineraries(): Promise<PublicItinerary[]> {
-  try {
-    const raw = await apiGet<unknown[]>("/api/itinerary/explore")
-    return PublicItinerariesSchema.parse(raw)
-  } catch {
-    return []
+function buildExploreParams(filters: ExploreFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.name?.trim()) params.set("name", filters.name.trim())
+  for (const season of filters.seasons ?? []) params.append("season", season)
+  if (filters.minMiles != null) params.set("minMiles", String(filters.minMiles))
+  if (filters.maxMiles != null) params.set("maxMiles", String(filters.maxMiles))
+  if (filters.minDays != null) params.set("minDays", String(filters.minDays))
+  if (filters.maxDays != null) params.set("maxDays", String(filters.maxDays))
+  // bbox is all-or-nothing — only sent when the full viewport box is known.
+  if (filters.bbox) {
+    params.set("minLat", String(filters.bbox.minLat))
+    params.set("minLng", String(filters.bbox.minLng))
+    params.set("maxLat", String(filters.bbox.maxLat))
+    params.set("maxLng", String(filters.bbox.maxLng))
   }
+  if (filters.sort) params.set("sort", filters.sort)
+  if (filters.page != null) params.set("page", String(filters.page))
+  if (filters.perPage != null) params.set("per_page", String(filters.perPage))
+  return params
+}
+
+export async function searchPublicItineraries(filters: ExploreFilters = {}): Promise<ExplorePage> {
+  try {
+    const query = buildExploreParams(filters).toString()
+    const raw = await apiGetPublic<unknown>(`/api/itinerary/explore${query ? `?${query}` : ""}`)
+    return ExplorePageSchema.parse(raw)
+  } catch {
+    return EMPTY_EXPLORE_PAGE
+  }
+}
+
+export async function fetchPublicItineraryDetail(
+  id: string,
+): Promise<PublicItineraryDetail | null> {
+  try {
+    const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
+    return PublicItineraryDetailSchema.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+// Lazily fetch a single public route's full geometry (the polyline the explore list
+// does not carry — list items only have a centroid).
+export async function fetchPublicRouteData(id: string): Promise<RouteData | null> {
+  const detail = await fetchPublicItineraryDetail(id)
+  return detail ? extractRouteData(detail) : null
 }

@@ -1,6 +1,6 @@
-import type { PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
-import type { Itinerary } from "@/lib/dtos/itinerary"
+import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
 import type { PointType } from "@/lib/dtos/point"
+import { totalDistanceNm } from "@/lib/itinerary/distance"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
@@ -18,6 +18,13 @@ export type RouteData = {
   points?: RoutePoint[]
   totalMiles: number | null
   dayCount: number
+}
+
+// One numbered day's at-a-glance summary for the public route breakdown.
+export type DaySummary = {
+  dayNumber: number
+  date: string | null
+  distanceNm: number
 }
 
 // The minimal point shape both the public and authed DTOs satisfy — a linked-list
@@ -119,4 +126,23 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
       points: (d.points ?? []) as ChainPoint[],
     })),
   })
+}
+
+// Per-day distances for the public detail breakdown, derived from the route's own
+// points (the same data extractRouteData draws) — so planners see how the mileage is
+// split across days before deciding to use the route.
+export function extractDaySummaries(itinerary: PublicItineraryDetail): DaySummary[] {
+  return [...itinerary.days]
+    .filter((d) => d.dayNumber > 0)
+    .sort((a, b) => a.dayNumber - b.dayNumber)
+    .map((day) => {
+      const ordered = walkChain(day.points as PublicPoint[])
+        .filter((p) => p.latitude != null && p.longitude != null)
+        .map((p) => ({ latitude: p.latitude as number, longitude: p.longitude as number }))
+      return {
+        dayNumber: day.dayNumber,
+        date: day.date ?? null,
+        distanceNm: totalDistanceNm(ordered),
+      }
+    })
 }
