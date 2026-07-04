@@ -7,7 +7,7 @@ from uuid import UUID
 
 from flask import current_app
 from flask_bcrypt import check_password_hash, generate_password_hash
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
@@ -92,7 +92,21 @@ class AuthService:
         user = cast(User, UserSchema().load(user_json))
         user.active = False
         db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Two requests raced the existence check above with the same mail/username —
+            # the loser's INSERT hits the unique constraint. Treat it exactly like the
+            # pre-check "existing" branch: no error, no enumeration signal.
+            db.session.rollback()
+            existing = db.session.query(User).filter(
+                (User.username == username) | (User.mail == mail_addr)
+            ).first()
+            if existing:
+                if existing.mail == mail_addr:
+                    AuthService._send_already_registered_email(existing)
+                return existing
+            raise
 
         persisted_user: Optional[User] = db.session.query(User).filter_by(mail=mail_addr).first()
         if not persisted_user:

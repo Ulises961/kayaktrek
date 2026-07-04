@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from Models.user import User
+from Schemas.user_schema import UserSchema
 from Services.Middleware.auth_middleware import JWTService
 from Api.database import db
 
@@ -165,6 +166,52 @@ class TestAuthenticationEndpoints:
 
         response2 = client.post('/api/v1/auth/register', json=duplicate_data)
         assert response2.status_code == 201
+
+    def test_register_handles_concurrent_insert_race_gracefully(self, app, monkeypatch):
+        """Two requests can race register_user's existence pre-check and both reach the
+        INSERT — the loser must hit the same graceful non-disclosure branch as a normal
+        duplicate registration, not a raw IntegrityError 500/400. Forces the pre-check to
+        miss (simulating the loser's read happening before the winner's commit) so the
+        real unique constraint fires and exercises the except-branch end to end."""
+        from Services.auth_service import AuthService
+
+        unique_suffix = uuid.uuid4().hex[:8]
+        user_data = {
+            "username": f"racer_{unique_suffix}",
+            "mail": f"racer_{unique_suffix}@example.com",
+            "pwd": "Password123!",
+            "phone": f"+3891{random.randint(1000000, 9999999)}",
+            "name": "Racer",
+        }
+
+        with app.app_context():
+            winner = UserSchema().load(user_data)
+            winner.active = False
+            db.session.add(winner)
+            db.session.commit()
+
+            original_query = db.session.query
+            calls = {"n": 0}
+
+            def query_wrapper(model, *args, **kwargs):
+                if model is User:
+                    calls["n"] += 1
+                    if calls["n"] == 1:
+                        class _EmptyQuery:
+                            def filter(self, *a, **kw):
+                                return self
+
+                            def first(self):
+                                return None
+                        return _EmptyQuery()
+                return original_query(model, *args, **kwargs)
+
+            monkeypatch.setattr(db.session, "query", query_wrapper)
+
+            result = AuthService.register_user(user_data)
+
+            assert result.id == winner.id
+            assert User.query.filter_by(mail=user_data["mail"]).count() == 1
 
     def test_register_missing_fields(self, client):
         """Test registration with missing required fields"""
