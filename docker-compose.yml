@@ -83,7 +83,11 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_migrate
-    command: alembic upgrade head
+    # Seeding moved here from app-factory time (M11 §4) — it used to run inside createApp(),
+    # which every gunicorn worker AND the migrate/Celery processes call, racing identical
+    # inserts at cold start. `flask seed` is idempotent and runs exactly once, after the
+    # schema is current.
+    command: sh -c "alembic upgrade head && flask seed"
     environment:
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}

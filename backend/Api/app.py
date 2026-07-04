@@ -1,6 +1,7 @@
 import os
 import uuid
 
+import click
 from flask import Flask, g, request
 from flask_migrate import Migrate
 
@@ -100,11 +101,18 @@ def createApp(config_mode: str, *, schema: str | None = None):
     mail.init_app(app)
     limiter.init_app(app)
     cache.init_app(app)
-    with app.app_context():
-        if not app.config.get("TESTING"):
-            seed_item_categories()
-            seed_place_categories()
-            seed_demo_itinerary()
+
+    @app.cli.command("seed")
+    def seed_command():
+        """Seed static reference data (item/place categories) and the public demo
+        itinerary. Idempotent — safe to run on every deploy. Invoked from the `migrate`
+        compose step after `alembic upgrade head`, not at app-factory time: that ran on
+        every gunicorn worker (and the Celery/migrate processes too, since they also call
+        createApp()), racing identical inserts at cold start (M11 §4)."""
+        seed_item_categories()
+        seed_place_categories()
+        seed_demo_itinerary()
+        click.echo("Seed complete.")
 
     migrate = Migrate()
     migrate.init_app(app, db, directory='alembic')
