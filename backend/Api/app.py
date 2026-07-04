@@ -40,6 +40,7 @@ from Resources.connection_resource import connection_api
 from Resources.block_resource import block_api
 from Resources.endorsement_request_resource import endorsement_request_api
 from Resources.dev_resource import dev_api
+from Resources.health_resource import health_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
@@ -96,6 +97,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(block_api)
     app.register_blueprint(endorsement_request_api)
     app.register_blueprint(dev_api)
+    app.register_blueprint(health_api)
 
     db.init_app(app)
     mail.init_app(app)
