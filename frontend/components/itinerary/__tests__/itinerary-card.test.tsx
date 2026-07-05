@@ -24,6 +24,7 @@ vi.mock("@/lib/itinerary/actions", () => ({
   updateItinerary: mockUpdateItinerary,
   createTripFromItinerary: mockCreateTripFromItinerary,
   deleteItinerary: mockDeleteItinerary,
+  generateStoryShare: vi.fn(),
 }))
 
 import { ItineraryCard } from "../itinerary-card"
@@ -126,6 +127,13 @@ describe("ItineraryCard — GPX download", () => {
     render(<ItineraryCard itinerary={BASE} />)
     const link = screen.getByRole("link", { name: /gpx/i })
     expect(link.getAttribute("href")).toBe(`/itinerary/${BASE.id}/export`)
+  })
+})
+
+describe("ItineraryCard — story share", () => {
+  it("renders the Share story action", () => {
+    render(<ItineraryCard itinerary={BASE} />)
+    expect(screen.getByRole("button", { name: /share story/i })).toBeInTheDocument()
   })
 })
 

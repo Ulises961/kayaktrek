@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
+import { StoryShareButton } from "@/components/itinerary/story-share-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -122,6 +123,8 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
             <DownloadIcon className="size-3" />
             <span>GPX</span>
           </a>
+          <span className="text-border select-none">·</span>
+          <StoryShareButton itinerary={itinerary} />
           {!itinerary.tripId && (
             <>
               <span className="text-border select-none">·</span>

@@ -87,6 +87,23 @@ export async function updateItinerary(
   }
 }
 
+// Generate/regenerate the unlisted trip-narrative share link (M7d). Regenerating
+// invalidates the previous token — the backend rotates it unconditionally.
+export async function generateStoryShare(id: string): Promise<ItineraryUpdateResult> {
+  try {
+    const raw = await apiPost<unknown>(`/api/itinerary/${id}/story-share`, {})
+    const itinerary = ItinerarySchema.parse(raw)
+    revalidatePath("/itinerary")
+    return { success: true, itinerary }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to generate share link.",
+    }
+  }
+}
+
 export async function fetchItineraries(): Promise<Itinerary[]> {
   try {
     const raw = await apiGet<unknown[]>("/api/itinerary/all")

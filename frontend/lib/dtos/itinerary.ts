@@ -12,6 +12,9 @@ export const ItinerarySchema = z.object({
   days: DaysSchema.nullish(),
   tripId: z.uuidv7().nullish(),
   userId: z.uuidv7().nullish(),
+  // Unlisted trip-narrative share link (M7d) — only ever dumped back to the owner,
+  // right after generate/regenerate (POST /<id>/story-share).
+  storyShareToken: z.string().nullish(),
 })
 
 export type Itinerary = z.infer<typeof ItinerarySchema>

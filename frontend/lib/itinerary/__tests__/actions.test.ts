@@ -26,6 +26,7 @@ import {
   updateDay,
   assignPointsToDay,
   applyBoundaries,
+  generateStoryShare,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -371,5 +372,35 @@ describe("createTripFromItinerary", () => {
     mockApiPost.mockRejectedValue("oops")
     const result = await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
     expect(result).toEqual({ success: false, error: "Failed to create trip." })
+  })
+})
+
+describe("generateStoryShare", () => {
+  it("posts to the story-share endpoint and returns the updated itinerary", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID, storyShareToken: "tok-abc" })
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}/story-share`, {})
+    expect(result).toEqual({
+      success: true,
+      itinerary: { id: ITINERARY_ID, storyShareToken: "tok-abc" },
+    })
+  })
+
+  it("revalidates /itinerary", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID, storyShareToken: "tok-abc" })
+    await generateStoryShare(ITINERARY_ID)
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("nope"))
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to generate share link." })
   })
 })
