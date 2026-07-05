@@ -1,10 +1,13 @@
 "use client"
 
-import { Fragment } from "react"
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet"
+import { Fragment, useEffect } from "react"
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet"
+import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import type { RouteData, RouteDaySegment, RoutePoint } from "@/lib/itinerary/public-routes"
 import { ringIcon } from "@/components/map/ring-icon"
+
+const MAX_FIT_ZOOM = 14
 
 // Reserved for the M8 live-position feature (crew position broadcast while a trip
 // is `happening`) — unused until then, so this component doesn't need a rewrite
@@ -63,9 +66,23 @@ function DaySegmentMarkers({ routeId, segment }: { routeId: string; segment: Rou
   )
 }
 
+// Without this, the map sits at its fallback center/zoom regardless of where the
+// route actually is — the day-coloured polylines/markers above still render
+// correctly, just compressed into a handful of pixels at the wrong location.
+function FitToRoutes({ routes }: { routes: RouteData[] }) {
+  const map = useMap()
+  useEffect(() => {
+    const positions = routes.flatMap((route) => route.positions)
+    if (positions.length === 0) return
+    map.fitBounds(L.latLngBounds(positions), { padding: [48, 48], maxZoom: MAX_FIT_ZOOM })
+  }, [map, routes])
+  return null
+}
+
 export default function PublicMap({ routes = [] }: Props) {
   return (
     <MapContainer center={[43, 13]} zoom={5} className="h-full w-full" zoomControl={false}>
+      <FitToRoutes routes={routes} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

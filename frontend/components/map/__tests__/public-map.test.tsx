@@ -3,12 +3,15 @@ import { render } from "@testing-library/react"
 import React from "react"
 import type { RouteData, RouteDaySegment } from "@/lib/itinerary/public-routes"
 
-const { ringIcon } = vi.hoisted(() => ({
+const { ringIcon, fitBounds, latLngBounds } = vi.hoisted(() => ({
   ringIcon: vi.fn(() => ({ __mockIcon: true })),
+  fitBounds: vi.fn(),
+  latLngBounds: vi.fn((positions: [number, number][]) => ({ __mockBounds: positions })),
 }))
 
 vi.mock("leaflet/dist/leaflet.css", () => ({}))
 vi.mock("@/components/map/ring-icon", () => ({ ringIcon }))
+vi.mock("leaflet", () => ({ default: { latLngBounds } }))
 
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => (
@@ -18,6 +21,7 @@ vi.mock("react-leaflet", () => ({
   Polyline: vi.fn(({ children }: { children?: React.ReactNode }) => <>{children}</>),
   Marker: vi.fn(({ children }: { children?: React.ReactNode }) => <>{children}</>),
   Popup: ({ children }: { children: React.ReactNode }) => <div data-testid="popup">{children}</div>,
+  useMap: vi.fn(() => ({ fitBounds })),
 }))
 
 import { Polyline, Marker } from "react-leaflet"
@@ -118,5 +122,43 @@ describe("PublicMap day segments", () => {
     const popups = getAllByTestId("popup")
     expect(popups[0].querySelector("img")).not.toBeNull()
     expect(popups[0].querySelector("img")?.getAttribute("src")).toBe("https://example.com/a.jpg")
+  })
+})
+
+describe("PublicMap fit-to-route", () => {
+  it("fits the map to the route's positions on mount", () => {
+    render(<PublicMap routes={[route()]} />)
+    expect(latLngBounds).toHaveBeenCalledWith([
+      [41.9, 12.4],
+      [42.0, 12.5],
+    ])
+    expect(fitBounds).toHaveBeenCalledWith(
+      {
+        __mockBounds: [
+          [41.9, 12.4],
+          [42.0, 12.5],
+        ],
+      },
+      expect.objectContaining({ maxZoom: expect.any(Number) }),
+    )
+  })
+
+  it("fits across multiple routes' combined positions", () => {
+    const other = route({
+      id: "route-2",
+      positions: [[10, 20]],
+      days: [],
+    })
+    render(<PublicMap routes={[route(), other]} />)
+    expect(latLngBounds).toHaveBeenCalledWith([
+      [41.9, 12.4],
+      [42.0, 12.5],
+      [10, 20],
+    ])
+  })
+
+  it("does not fit when there are no positions", () => {
+    render(<PublicMap routes={[route({ positions: [], days: [] })]} />)
+    expect(fitBounds).not.toHaveBeenCalled()
   })
 })
