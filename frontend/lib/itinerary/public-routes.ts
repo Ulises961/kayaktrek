@@ -2,6 +2,7 @@ import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/i
 import type { PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { numberByOrder } from "@/lib/itinerary/linked-list"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
@@ -11,6 +12,12 @@ export type RoutePoint = {
   type: PointType
   name: string | null
   images: { url: string }[]
+  // The point's 1-based ordinal position across the *whole* route (e.g. 3 of 14),
+  // regardless of which day it falls in — computed once via the same
+  // `numberByOrder` the authenticated builder (map-core.tsx) uses on its own full
+  // point order, so numbering can't silently reset at a day boundary in one
+  // renderer but not the other. Null only when the source point had no id.
+  pointNumber: number | null
 }
 
 // One day's route segment, points already walked in order and coloured via the
@@ -86,7 +93,10 @@ function walkChain<T extends ChainPoint>(points: T[]): T[] {
   return ordered
 }
 
-function toRoutePoint(p: ChainPoint & { latitude: number; longitude: number }): RoutePoint {
+function toRoutePoint(
+  p: ChainPoint & { latitude: number; longitude: number },
+  pointNumber: number | null,
+): RoutePoint {
   return {
     lat: p.latitude,
     lon: p.longitude,
@@ -96,6 +106,7 @@ function toRoutePoint(p: ChainPoint & { latitude: number; longitude: number }): 
       .map((img) => img.url ?? img.location ?? null)
       .filter((url): url is string => !!url)
       .map((url) => ({ url })),
+    pointNumber,
   }
 }
 
@@ -104,16 +115,26 @@ function buildRouteData(src: RouteSource): RouteData {
     .filter((d) => d.dayNumber > 0)
     .sort((a, b) => a.dayNumber - b.dayNumber)
 
+  // Walk every day's chain up front, in day order, so points can be numbered by
+  // their absolute position across the whole route (numberByOrder) before being
+  // split back into per-day segments below — the split must not affect numbering.
+  const orderedByDay = numberedDays.map((day) =>
+    walkChain(day.points).filter(
+      (p): p is typeof p & { latitude: number; longitude: number } =>
+        p.latitude != null && p.longitude != null,
+    ),
+  )
+  const pointNumbers = numberByOrder(orderedByDay.flat())
+
   const positions: [number, number][] = []
   const points: RoutePoint[] = []
   const days: RouteDaySegment[] = []
 
-  for (const day of numberedDays) {
-    const ordered = walkChain(day.points).filter(
-      (p): p is typeof p & { latitude: number; longitude: number } =>
-        p.latitude != null && p.longitude != null,
+  numberedDays.forEach((day, i) => {
+    const ordered = orderedByDay[i]
+    const dayPoints = ordered.map((p) =>
+      toRoutePoint(p, p.id ? (pointNumbers.get(p.id) ?? null) : null),
     )
-    const dayPoints = ordered.map(toRoutePoint)
 
     for (const p of ordered) positions.push([p.latitude, p.longitude])
     points.push(...dayPoints)
@@ -124,7 +145,7 @@ function buildRouteData(src: RouteSource): RouteData {
       points: dayPoints,
       distanceNm: totalDistanceNm(ordered),
     })
-  }
+  })
 
   return {
     id: src.id ?? "",

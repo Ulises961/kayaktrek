@@ -129,6 +129,29 @@ describe("extractRouteData — day segments", () => {
   })
 })
 
+describe("extractRouteData — point numbering", () => {
+  it("numbers every point by its ordinal position across the whole route, not reset per day", () => {
+    // 4 points total across 2 days — expect 1..4 straight through, day 2 continuing from day 1.
+    const a = point("a", 44.0, 8.5, "b")
+    const b = { ...point("b", 44.1, 8.6), type: "stop" as const }
+    const c = point("c", 44.2, 8.7, "d")
+    const d = { ...point("d", 44.3, 8.8), type: "stop" as const }
+    const route = extractRouteData(
+      detail([
+        { dayNumber: 1, points: [a, b] },
+        { dayNumber: 2, points: [c, d] },
+      ]),
+    )
+    expect(route.days[0].points.map((p) => p.pointNumber)).toEqual([1, 2])
+    expect(route.days[1].points.map((p) => p.pointNumber)).toEqual([3, 4])
+  })
+
+  it("numbers waypoints (type: position) too, not just overnight stops", () => {
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [point("a", 44.0, 8.5)] }]))
+    expect(route.days[0].points[0].pointNumber).toBe(1)
+  })
+})
+
 describe("extractItineraryRoute — day segments", () => {
   function itinerary(days: NonNullable<Itinerary["days"]>): Itinerary {
     return { id: "it-1", name: "Route", totalMiles: 0, days }

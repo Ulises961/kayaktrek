@@ -7,6 +7,7 @@ import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
 import { routeLegs, legLabel } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { numberByOrder } from "@/lib/itinerary/linked-list"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
@@ -657,13 +658,7 @@ export default function MapCore({
 
   const boundaryPointIds = useMemo(() => new Set(boundaryMap.keys()), [boundaryMap])
 
-  const pointIndexById = useMemo(() => {
-    const m = new Map<string, number>()
-    points.forEach((p, i) => {
-      if (p.id) m.set(p.id, i + 1)
-    })
-    return m
-  }, [points])
+  const pointIndexById = useMemo(() => numberByOrder(points), [points])
 
   const validPoints = points.filter(
     (p): p is ValidPoint => p.latitude != null && p.longitude != null,

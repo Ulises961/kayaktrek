@@ -18,12 +18,14 @@ vi.mock("react-leaflet", () => ({
     <div data-testid="map-container">{children}</div>
   ),
   TileLayer: () => null,
-  Polyline: () => null,
   CircleMarker: () => null,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useMap: vi.fn(() => ({ flyTo, flyToBounds, getZoom: () => 5 })),
   useMapEvents: vi.fn(() => null),
 }))
+
+const { RouteDayLayers } = vi.hoisted(() => ({ RouteDayLayers: vi.fn(() => null) }))
+vi.mock("@/components/map/route-day-layers", () => ({ RouteDayLayers }))
 
 import ExploreDiscoveryMap from "../explore-discovery-map"
 
@@ -133,5 +135,52 @@ describe("ExploreDiscoveryMap selection navigation", () => {
     )
     expect(flyTo).not.toHaveBeenCalled()
     expect(flyToBounds).not.toHaveBeenCalled()
+  })
+})
+
+describe("ExploreDiscoveryMap selected-route preview", () => {
+  it("renders the selected route's day-coloured layers with photos off", () => {
+    render(
+      <ExploreDiscoveryMap
+        items={[item()]}
+        selectedId="route-1"
+        selectedRoute={route()}
+        boundsEnabled={false}
+        onSelect={vi.fn()}
+        onBoundsChange={vi.fn()}
+      />,
+    )
+    expect(RouteDayLayers).toHaveBeenCalledWith(
+      expect.objectContaining({ routes: [route()], showPhotos: false }),
+      undefined,
+    )
+  })
+
+  it("does not render route layers when nothing is selected", () => {
+    render(
+      <ExploreDiscoveryMap
+        items={[item()]}
+        selectedId={null}
+        selectedRoute={null}
+        boundsEnabled={false}
+        onSelect={vi.fn()}
+        onBoundsChange={vi.fn()}
+      />,
+    )
+    expect(RouteDayLayers).not.toHaveBeenCalled()
+  })
+
+  it("does not render route layers when the selected route has no positions", () => {
+    render(
+      <ExploreDiscoveryMap
+        items={[item()]}
+        selectedId="route-1"
+        selectedRoute={route({ positions: [] })}
+        boundsEnabled={false}
+        onSelect={vi.fn()}
+        onBoundsChange={vi.fn()}
+      />,
+    )
+    expect(RouteDayLayers).not.toHaveBeenCalled()
   })
 })

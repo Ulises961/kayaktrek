@@ -2,18 +2,11 @@
 
 import { useEffect } from "react"
 import L from "leaflet"
-import {
-  MapContainer,
-  TileLayer,
-  Polyline,
-  CircleMarker,
-  Tooltip,
-  useMap,
-  useMapEvents,
-} from "react-leaflet"
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import type { ExploreItem, ExploreBounds } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { RouteDayLayers } from "@/components/map/route-day-layers"
 
 type Props = {
   items: ExploreItem[]
@@ -118,10 +111,7 @@ export default function ExploreDiscoveryMap({
         )
       })}
       {selectedRoute && selectedRoute.positions.length > 0 && (
-        <Polyline
-          positions={selectedRoute.positions}
-          pathOptions={{ color: "#0ea5e9", weight: 4, opacity: 0.85 }}
-        />
+        <RouteDayLayers routes={[selectedRoute]} showPhotos={false} />
       )}
     </MapContainer>
   )

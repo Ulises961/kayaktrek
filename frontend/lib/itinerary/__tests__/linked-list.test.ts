@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { findHead, findTail, walkList } from "../linked-list"
+import { findHead, findTail, walkList, numberByOrder } from "../linked-list"
 import type { Point } from "@/lib/dtos/point"
 
 const P1 = "01952f1a-0000-7000-8000-000000000001"
@@ -111,5 +111,22 @@ describe("walkList", () => {
     ]
     const result = walkList(pts)
     expect(result.map((p) => p.id)).toEqual([PA, PB, PC, PD])
+  })
+})
+
+describe("numberByOrder", () => {
+  it("numbers every point by its 1-based position in the given order", () => {
+    const result = numberByOrder(POINTS)
+    expect(Object.fromEntries(result)).toEqual({ [P3]: 1, [P1]: 2, [P2]: 3 })
+  })
+
+  it("does not number a point with no id", () => {
+    const result = numberByOrder([{ type: "position" } as Point, p1])
+    expect(result.get(P1)).toBe(2)
+    expect(result.size).toBe(1)
+  })
+
+  it("returns an empty map for empty input", () => {
+    expect(numberByOrder([]).size).toBe(0)
   })
 })
