@@ -27,6 +27,7 @@ import {
   assignPointsToDay,
   applyBoundaries,
   generateStoryShare,
+  setImagePublic,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -37,6 +38,7 @@ const DAY_ID_2 = "01952f1a-0000-7000-8000-000000000005"
 const ITINERARY_ID_2 = "01952f1a-0000-7000-8000-000000000006"
 const START_PT = "01952f1a-0000-7000-8000-000000000007"
 const END_PT = "01952f1a-0000-7000-8000-000000000008"
+const IMAGE_ID = "01952f1a-0000-7000-8000-000000000009"
 
 const DAY_RESPONSE = { id: DAY_ID_2, dayNumber: 1, itineraryId: ITINERARY_ID_2 }
 
@@ -402,5 +404,39 @@ describe("generateStoryShare", () => {
     mockApiPost.mockRejectedValue("oops")
     const result = await generateStoryShare(ITINERARY_ID)
     expect(result).toEqual({ success: false, error: "Failed to generate share link." })
+  })
+})
+
+describe("setImagePublic", () => {
+  const IMAGE_RESPONSE = {
+    id: IMAGE_ID,
+    size: 1000,
+    name: "cove.jpg",
+    location: "https://example.com/cove.jpg",
+    isPublic: true,
+  }
+
+  it("patches the image visibility endpoint and returns the updated image", async () => {
+    mockApiPatch.mockResolvedValue(IMAGE_RESPONSE)
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, true)
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`, {
+      isPublic: true,
+    })
+    expect(result).toEqual({ success: true, image: IMAGE_RESPONSE })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiPatch.mockRejectedValue(new Error("nope"))
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, false)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPatch.mockRejectedValue("oops")
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, false)
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to update image visibility.",
+    })
   })
 })

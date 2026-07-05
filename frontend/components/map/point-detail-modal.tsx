@@ -1,9 +1,9 @@
 "use client"
 import { useState, useCallback } from "react"
-import { ChevronLeft, ChevronRight, ImageIcon, Anchor, CircleDot } from "lucide-react"
+import { ChevronLeft, ChevronRight, Eye, EyeOff, ImageIcon, Anchor, CircleDot } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { updatePoint } from "@/lib/itinerary/actions"
+import { updatePoint, setImagePublic } from "@/lib/itinerary/actions"
 import { cn } from "@/lib/utils"
 import type { Point } from "@/lib/dtos/point"
 
@@ -51,6 +51,16 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   const next = () => setImageIdx((i) => (i + 1) % images.length)
   const current = images[imageIdx]
 
+  const handleToggleVisibility = useCallback(async () => {
+    if (!current?.id) return
+    const result = await setImagePublic(point.id!, current.id, !current.isPublic)
+    if (!result.success) return
+    const updatedImages = (point.images ?? []).map((img) =>
+      img.id === current.id ? result.image : img,
+    )
+    dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
+  }, [current, point.id, point.images, dispatch])
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex h-[80vh] max-w-md flex-col gap-0 overflow-hidden p-0">
@@ -79,6 +89,17 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
               <span className="absolute right-2 bottom-2 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-sm">
                 {imageIdx + 1} / {images.length}
               </span>
+              {canEdit && (
+                <button
+                  type="button"
+                  aria-label={`Make photo ${current?.isPublic ? "private" : "public"}`}
+                  onClick={handleToggleVisibility}
+                  className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/90 backdrop-blur-sm transition-colors hover:bg-black/60"
+                >
+                  {current?.isPublic ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                  {current?.isPublic ? "Public" : "Private"}
+                </button>
+              )}
               {images.length > 1 && (
                 <>
                   <button

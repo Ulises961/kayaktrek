@@ -9,6 +9,7 @@ import type { Point } from "@/lib/dtos/point"
 
 vi.mock("@/lib/itinerary/actions", () => ({
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
+  setImagePublic: vi.fn(),
 }))
 
 import { PointDetailModal } from "../point-detail-modal"
@@ -23,8 +24,8 @@ const POINT: Point = {
   longitude: 13.512,
   dayId: "day-1",
   images: [
-    { id: "i1", location: "https://example.com/1.jpg", name: "one", size: 1000 },
-    { id: "i2", location: "https://example.com/2.jpg", name: "two", size: 2000 },
+    { id: "i1", location: "https://example.com/1.jpg", name: "one", size: 1000, isPublic: false },
+    { id: "i2", location: "https://example.com/2.jpg", name: "two", size: 2000, isPublic: true },
   ],
 }
 
@@ -113,5 +114,50 @@ describe("PointDetailModal", () => {
     renderModal(POINT, false)
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
     expect(screen.getByText("Only enter near slack water.")).toBeInTheDocument()
+  })
+
+  it("shows a visibility toggle labelled for the current photo's state when editable", () => {
+    renderModal(POINT, true)
+    expect(screen.getByRole("button", { name: /make photo public/i })).toBeInTheDocument()
+  })
+
+  it("does not show a visibility toggle when not editable", () => {
+    renderModal(POINT, false)
+    expect(
+      screen.queryByRole("button", { name: /make photo (public|private)/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("does not show a visibility toggle when there are no photos", () => {
+    renderModal({ ...POINT, images: [] }, true)
+    expect(
+      screen.queryByRole("button", { name: /make photo (public|private)/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("toggles the current photo's visibility and updates it via dispatch", async () => {
+    const updatedImage = { ...POINT.images![0], isPublic: true }
+    vi.mocked(actions.setImagePublic).mockResolvedValue({ success: true, image: updatedImage })
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /make photo public/i }))
+    expect(actions.setImagePublic).toHaveBeenCalledWith("p1", "i1", true)
+    expect(baseCtx.dispatch).toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { images: [updatedImage, POINT.images![1]] },
+    })
+  })
+
+  it("does not dispatch when the visibility toggle fails", async () => {
+    vi.mocked(actions.setImagePublic).mockResolvedValue({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /make photo public/i }))
+    expect(baseCtx.dispatch).not.toHaveBeenCalled()
+  })
+
+  it("advancing the carousel updates the toggle label to match the next photo", async () => {
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /next photo/i }))
+    expect(screen.getByRole("button", { name: /make photo private/i })).toBeInTheDocument()
   })
 })

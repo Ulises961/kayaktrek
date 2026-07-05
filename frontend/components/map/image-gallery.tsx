@@ -1,13 +1,14 @@
 "use client"
-import { ImageIcon } from "lucide-react"
+import { Eye, EyeOff, ImageIcon } from "lucide-react"
 import type { Point } from "@/lib/dtos/point"
 
 type ImageGalleryProps = {
   images: NonNullable<Point["images"]>
   onRemove: (imageId: string) => void
+  onToggleVisibility: (imageId: string, isPublic: boolean) => void
 }
 
-export function ImageGallery({ images, onRemove }: ImageGalleryProps) {
+export function ImageGallery({ images, onRemove, onToggleVisibility }: ImageGalleryProps) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {images.map((img) => (
@@ -23,13 +24,22 @@ export function ImageGallery({ images, onRemove }: ImageGalleryProps) {
               <ImageIcon size={16} className="text-muted-foreground" />
             </div>
           )}
-          <button
-            aria-label={`Remove image ${img.name ?? ""}`}
-            onClick={() => onRemove(img.id!)}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            ×
-          </button>
+          <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              aria-label={`Make ${img.name ?? "image"} ${img.isPublic ? "private" : "public"}`}
+              onClick={() => onToggleVisibility(img.id!, !img.isPublic)}
+              className="text-white/90 hover:text-white"
+            >
+              {img.isPublic ? <Eye size={12} /> : <EyeOff size={12} />}
+            </button>
+            <button
+              aria-label={`Remove image ${img.name ?? ""}`}
+              onClick={() => onRemove(img.id!)}
+              className="text-xs text-white/90 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
         </div>
       ))}
       <button

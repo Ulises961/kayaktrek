@@ -12,6 +12,8 @@ import {
 } from "@/lib/api/client"
 import { PointSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
+import { ImageSchema } from "@/lib/dtos/image"
+import type { Image } from "@/lib/dtos/image"
 import { DaySchema } from "@/lib/dtos/day"
 import type { Day } from "@/lib/dtos/day"
 import {
@@ -41,6 +43,8 @@ export type ItineraryUpdateResult =
   | { success: false; error: string }
 
 export type PointActionResult = { success: true; point: Point } | { success: false; error: string }
+
+export type ImageActionResult = { success: true; image: Image } | { success: false; error: string }
 
 export type DayActionResult = { success: true; day: Day } | { success: false; error: string }
 
@@ -144,6 +148,27 @@ export async function updatePoint(
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to update point." }
+  }
+}
+
+// Toggle an image's public/private visibility (M7d §8). The backend moves the
+// underlying storage object between prefixes and returns the image with its
+// (possibly changed) location — always use the returned image, not a guessed one.
+export async function setImagePublic(
+  pointId: string,
+  imageId: string,
+  isPublic: boolean,
+): Promise<ImageActionResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/point/${pointId}/images/${imageId}`, { isPublic })
+    const image = ImageSchema.parse(raw)
+    return { success: true, image }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update image visibility.",
+    }
   }
 }
 
