@@ -35,8 +35,8 @@ class ItinerarySchema(BaseSchema):
     # after generate/regenerate; never present on the public/explore projections.
     story_share_token = fields.String(dump_only=True, allow_none=True)
 
-    def get_total_miles(self, obj: Itinerary) -> float:
-        return compute_total_miles(obj.days or [])
+    def get_total_miles(self, itinerary: Itinerary) -> float:
+        return compute_total_miles(itinerary.days or [])
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
@@ -148,13 +148,13 @@ class ItineraryPublicSchema(BaseSchema):
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
     trip_state = fields.Method("get_trip_state", dump_only=True)
 
-    def get_total_miles(self, obj: Itinerary) -> float:
-        return compute_total_miles(obj.days or [])
+    def get_total_miles(self, itinerary: Itinerary) -> float:
+        return compute_total_miles(itinerary.days or [])
 
-    def get_trip_state(self, obj: Itinerary) -> Optional[str]:
-        if not obj.trip_id:
+    def get_trip_state(self, itinerary: Itinerary) -> Optional[str]:
+        if not itinerary.trip_id:
             return None
-        trip = db.session.get(Trip, obj.trip_id)
+        trip = db.session.get(Trip, itinerary.trip_id)
         return trip.state.value if trip else None
 
     @post_dump

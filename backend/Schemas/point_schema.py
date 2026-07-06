@@ -104,5 +104,5 @@ class PointPublicSchema(BaseSchema):
     # the full point.images list.
     images = fields.Method("get_public_images", dump_only=True)
 
-    def get_public_images(self, obj: Point) -> list:
-        return [{"url": image.location} for image in obj.images if image.is_public]
+    def get_public_images(self, point: Point) -> list:
+        return [{"url": image.location} for image in point.images if image.is_public]
