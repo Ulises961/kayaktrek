@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { apiGet } from "@/lib/api/client"
+import { apiGetAllPages } from "@/lib/api/paginate"
 import { getSession } from "@/lib/auth/session"
 import { listEndorsementRequests } from "@/lib/endorsement-requests/actions"
 import { LogPageSchema, LogsSchema } from "@/lib/dtos/log"
@@ -10,9 +11,7 @@ import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
   const [pageData, endorsedData, session, endorsementRequests] = await Promise.all([
-    apiGet("/api/log/all?per_page=100")
-      .then((r) => LogPageSchema.parse(r))
-      .catch(() => ({ items: [], total: 0, page: 1, pages: 1 })),
+    apiGetAllPages("/api/log/all", LogPageSchema).catch(() => ({ items: [], total: 0 })),
     apiGet("/api/log/endorsed")
       .then((r) => LogsSchema.parse(r))
       .catch(() => []),

@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session"
-import { apiGet } from "@/lib/api/client"
+import { apiGetAllPages } from "@/lib/api/paginate"
 import { TripPageSchema } from "@/lib/dtos/trip"
 import { TripCard } from "@/components/common/trip-card"
 import { PastTripsSection } from "@/components/trips/past-trips-section"
@@ -23,8 +23,10 @@ export default async function Page() {
   const session = await getSession()
   if (!session) redirect("/login")
 
-  const raw = await apiGet(`/api/trip/${session.userId}/all`)
-  const { items: trips, total } = TripPageSchema.parse(raw)
+  const { items: trips, total } = await apiGetAllPages(
+    `/api/trip/${session.userId}/all`,
+    TripPageSchema,
+  )
 
   const happeningTrips = trips.filter((t) => t.state === "happening")
   const planningTrips = trips.filter((t) => t.state === "building")
