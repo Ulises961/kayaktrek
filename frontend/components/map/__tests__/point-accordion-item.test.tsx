@@ -1,7 +1,13 @@
-import { describe, it, expect, vi } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { PointAccordionItem } from "../point-accordion-item"
 import type { Point } from "@/lib/dtos/point"
+
+vi.mock("@/lib/itinerary/actions", () => ({
+  setImagePublic: vi.fn(),
+}))
+
+import { setImagePublic } from "@/lib/itinerary/actions"
 
 const P_ID = "01952f1a-0000-7000-8000-000000000021"
 
@@ -12,6 +18,14 @@ const basePoint: Point = {
   longitude: 14.0,
 }
 
+const IMAGE = {
+  id: "i1",
+  location: "https://example.com/1.jpg",
+  name: "one",
+  size: 1000,
+  isPublic: false,
+}
+
 const defaultProps = {
   point: basePoint,
   index: 1,
@@ -20,6 +34,8 @@ const defaultProps = {
   onPointChange: vi.fn(),
   onDelete: vi.fn(),
 }
+
+beforeEach(() => vi.clearAllMocks())
 
 describe("PointAccordionItem", () => {
   it("renders collapsed row with index and type icon", () => {
@@ -91,5 +107,47 @@ describe("PointAccordionItem", () => {
     render(<PointAccordionItem {...defaultProps} isOpen onDelete={onDelete} />)
     fireEvent.click(screen.getByRole("button", { name: /delete point/i }))
     expect(onDelete).toHaveBeenCalledWith(P_ID)
+  })
+
+  it("shows the image gallery when the point has images", () => {
+    render(
+      <PointAccordionItem {...defaultProps} isOpen point={{ ...basePoint, images: [IMAGE] }} />,
+    )
+    expect(screen.getByRole("img")).toBeTruthy()
+  })
+
+  it("toggles image visibility and updates the point's images via onPointChange", async () => {
+    const onPointChange = vi.fn()
+    const updatedImage = { ...IMAGE, isPublic: true }
+    vi.mocked(setImagePublic).mockResolvedValue({ success: true, image: updatedImage })
+    render(
+      <PointAccordionItem
+        {...defaultProps}
+        isOpen
+        point={{ ...basePoint, images: [IMAGE] }}
+        onPointChange={onPointChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole("button", { name: /make one public/i }))
+    expect(setImagePublic).toHaveBeenCalledWith(P_ID, "i1", true)
+    await waitFor(() =>
+      expect(onPointChange).toHaveBeenCalledWith(P_ID, { images: [updatedImage] }),
+    )
+  })
+
+  it("does not call onPointChange when the visibility toggle fails", async () => {
+    const onPointChange = vi.fn()
+    vi.mocked(setImagePublic).mockResolvedValue({ success: false, error: "nope" })
+    render(
+      <PointAccordionItem
+        {...defaultProps}
+        isOpen
+        point={{ ...basePoint, images: [IMAGE] }}
+        onPointChange={onPointChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole("button", { name: /make one public/i }))
+    await waitFor(() => expect(setImagePublic).toHaveBeenCalled())
+    expect(onPointChange).not.toHaveBeenCalled()
   })
 })

@@ -6,7 +6,7 @@ from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from Schemas.itinerary_shema import (
+from Schemas.itinerary_schema import (
     ItinerarySchema,
     ItineraryPublicSchema,
     ItineraryExploreItemSchema,
@@ -73,6 +73,19 @@ def get_public_itinerary(id: str):
         return jsonify(payload), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Itinerary not found or not public")
+
+
+@itinerary_api.route("/story/public/<token>", methods=["GET"])
+@limiter.limit("30 per minute", key_func=get_remote_address)
+def get_story_by_token(token: str):
+    """GET /api/itinerary/story/public/<token> — Unauthenticated, unlisted story link."""
+    try:
+        itinerary = ItineraryService.get_story_by_token(token)
+        payload = ItineraryPublicSchema().dump(itinerary)
+        payload["originalAuthor"] = ItineraryService.resolve_original_author(itinerary)
+        return jsonify(payload), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Story not found")
 
 
 @itinerary_api.route("/<string:id>", methods=["GET"])
@@ -160,6 +173,19 @@ def delete_itinerary(id: str):
     except IntegrityError:
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete itinerary due to existing references")
+
+
+@itinerary_api.route("/<string:id>/story-share", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('itinerary')
+def generate_story_share(id: str):
+    """POST /api/itinerary/<id>/story-share — Generate/regenerate the unlisted
+    story-share link. Regenerating invalidates the previous link."""
+    try:
+        itinerary = ItineraryService.generate_story_share(id, g.current_user_id)
+        return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
 
 
 @itinerary_api.route("/<string:id>/fork", methods=["POST"])

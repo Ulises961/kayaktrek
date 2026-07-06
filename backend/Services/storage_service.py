@@ -68,10 +68,10 @@ _KIND_MAX_SIZE: dict[FileKind, int] = {
 }
 
 
-def _client():
+def _client(endpoint: str = _ENDPOINT):
     return boto3.client(
         "s3",
-        endpoint_url=_ENDPOINT,
+        endpoint_url=endpoint,
         aws_access_key_id=_ACCESS_KEY,
         aws_secret_access_key=_SECRET_KEY,
         config=Config(signature_version="s3v4"),
@@ -149,15 +149,45 @@ class StorageService:
 
     @staticmethod
     def presigned_url(object_key: str, kind: FileKind, expires_in: int = 3600) -> str:
-        """Generate a presigned GET URL (useful for private objects)."""
+        """Generate a presigned GET URL (useful for private objects).
+
+        Signed against STORAGE_PUBLIC_URL, not STORAGE_ENDPOINT (which
+        `upload`/`delete`/`move` use to reach MinIO over the internal docker
+        network, e.g. `http://minio:9000`). SigV4 query-signing covers the
+        Host, so the URL must be generated against the same host the browser
+        will actually request — otherwise the signature is valid for a host
+        the browser can never resolve, and every private image 404s/hangs.
+        """
         prefix = _KIND_PREFIXES[kind]
         key = f"{prefix}{object_key}"
-        client = _client()
+        client = _client(_PUBLIC_URL)
         return client.generate_presigned_url(
             "get_object",
             Params={"Bucket": _BUCKET, "Key": key},
             ExpiresIn=expires_in,
         )
+
+    @staticmethod
+    def object_key_from_url(url: str, kind: FileKind) -> str:
+        """Recover the raw object key from a URL previously returned by upload()/move()."""
+        prefix = _KIND_PREFIXES[kind]
+        return url.split(f"/{prefix}")[-1]
+
+    @staticmethod
+    def move(object_key: str, from_kind: FileKind, to_kind: FileKind) -> str:
+        """Copy an object to a different kind's prefix and delete the original.
+
+        Returns the new URL (as upload() would have returned for to_kind).
+        """
+        from_key = f"{_KIND_PREFIXES[from_kind]}{object_key}"
+        to_key = f"{_KIND_PREFIXES[to_kind]}{object_key}"
+
+        client = _client()
+        client.copy_object(Bucket=_BUCKET, CopySource={"Bucket": _BUCKET, "Key": from_key}, Key=to_key)
+        client.delete_object(Bucket=_BUCKET, Key=from_key)
+
+        logger.info("Moved %s -> %s", from_key, to_key)
+        return f"{_PUBLIC_URL.rstrip('/')}/{_BUCKET}/{to_key}"
 
     # -- GDPR data exports ----------------------------------------------------
     # Server-generated blobs shared across containers/replicas via object storage

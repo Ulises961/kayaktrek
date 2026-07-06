@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Trash2 } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { POINT_TYPE_META } from "@/lib/itinerary/point-icons"
+import { setImagePublic } from "@/lib/itinerary/actions"
 import { ImageGallery } from "./image-gallery"
 
 type PointAccordionItemProps = {
@@ -42,6 +43,15 @@ export function PointAccordionItem({
     const trimmed = notesVal.trim()
     if (trimmed === (point.notes ?? "")) return
     onPointChange(point.id!, { notes: trimmed || null })
+  }
+
+  const handleToggleImageVisibility = async (imageId: string, isPublic: boolean) => {
+    const result = await setImagePublic(point.id!, imageId, isPublic)
+    if (!result.success) return
+    const updatedImages = (point.images ?? []).map((img) =>
+      img.id === imageId ? result.image : img,
+    )
+    onPointChange(point.id!, { images: updatedImages })
   }
 
   return (
@@ -102,7 +112,11 @@ export function PointAccordionItem({
           />
 
           {(point.images?.length ?? 0) > 0 && (
-            <ImageGallery images={point.images!} onRemove={() => {}} />
+            <ImageGallery
+              images={point.images!}
+              onRemove={() => {}}
+              onToggleVisibility={handleToggleImageVisibility}
+            />
           )}
 
           <button

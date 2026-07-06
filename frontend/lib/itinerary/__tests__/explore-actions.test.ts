@@ -13,7 +13,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
-import { searchPublicItineraries, fetchPublicRouteData } from "../actions"
+import { searchPublicItineraries, fetchPublicRouteData, fetchStoryByToken } from "../actions"
 
 const ENVELOPE = { items: [], total: 0, page: 1, pages: 1 }
 
@@ -119,5 +119,32 @@ describe("fetchPublicRouteData", () => {
     const route = await fetchPublicRouteData("01952f1a-0000-7000-8000-000000000010")
     expect(route?.name).toBe("Loop")
     expect(route?.positions).toEqual([[37, 25]])
+  })
+})
+
+describe("fetchStoryByToken", () => {
+  beforeEach(() => mockApiGetPublic.mockReset())
+
+  it("hits the by-token story endpoint", async () => {
+    mockApiGetPublic.mockResolvedValue({ id: "it-1", name: "Story", days: [] })
+    await fetchStoryByToken("abc123")
+    expect(lastUrl()).toBe("/api/itinerary/story/public/abc123")
+  })
+
+  it("parses the detail, including tripState", async () => {
+    mockApiGetPublic.mockResolvedValue({
+      id: "it-1",
+      name: "Story",
+      tripState: "past",
+      days: [],
+    })
+    const detail = await fetchStoryByToken("abc123")
+    expect(detail?.name).toBe("Story")
+    expect(detail?.tripState).toBe("past")
+  })
+
+  it("returns null for an unknown or regenerated token", async () => {
+    mockApiGetPublic.mockImplementationOnce(() => Promise.reject(new Error("404")))
+    expect(await fetchStoryByToken("gone")).toBeNull()
   })
 })

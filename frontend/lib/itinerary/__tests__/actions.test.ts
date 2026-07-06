@@ -1,16 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockApiPost, mockApiPatch, mockApiDelete, mockRevalidatePath } = vi.hoisted(() => ({
-  mockApiPost: vi.fn(),
-  mockApiPatch: vi.fn(),
-  mockApiDelete: vi.fn(),
-  mockRevalidatePath: vi.fn(),
-}))
+const { mockApiPost, mockApiPatch, mockApiDelete, mockApiUpload, mockRevalidatePath } = vi.hoisted(
+  () => ({
+    mockApiPost: vi.fn(),
+    mockApiPatch: vi.fn(),
+    mockApiDelete: vi.fn(),
+    mockApiUpload: vi.fn(),
+    mockRevalidatePath: vi.fn(),
+  }),
+)
 
 vi.mock("@/lib/api/client", () => ({
   apiPost: mockApiPost,
   apiPatch: mockApiPatch,
   apiDelete: mockApiDelete,
+  apiUpload: mockApiUpload,
   isRedirectError: () => false,
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
@@ -26,6 +30,10 @@ import {
   updateDay,
   assignPointsToDay,
   applyBoundaries,
+  generateStoryShare,
+  setImagePublic,
+  uploadPointImage,
+  deletePointImage,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -36,6 +44,7 @@ const DAY_ID_2 = "01952f1a-0000-7000-8000-000000000005"
 const ITINERARY_ID_2 = "01952f1a-0000-7000-8000-000000000006"
 const START_PT = "01952f1a-0000-7000-8000-000000000007"
 const END_PT = "01952f1a-0000-7000-8000-000000000008"
+const IMAGE_ID = "01952f1a-0000-7000-8000-000000000009"
 
 const DAY_RESPONSE = { id: DAY_ID_2, dayNumber: 1, itineraryId: ITINERARY_ID_2 }
 
@@ -371,5 +380,120 @@ describe("createTripFromItinerary", () => {
     mockApiPost.mockRejectedValue("oops")
     const result = await createTripFromItinerary(ITINERARY_ID, "Galicia Coast")
     expect(result).toEqual({ success: false, error: "Failed to create trip." })
+  })
+})
+
+describe("generateStoryShare", () => {
+  it("posts to the story-share endpoint and returns the updated itinerary", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID, storyShareToken: "tok-abc" })
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}/story-share`, {})
+    expect(result).toEqual({
+      success: true,
+      itinerary: { id: ITINERARY_ID, storyShareToken: "tok-abc" },
+    })
+  })
+
+  it("revalidates /itinerary", async () => {
+    mockApiPost.mockResolvedValue({ id: ITINERARY_ID, storyShareToken: "tok-abc" })
+    await generateStoryShare(ITINERARY_ID)
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("nope"))
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await generateStoryShare(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to generate share link." })
+  })
+})
+
+describe("setImagePublic", () => {
+  const IMAGE_RESPONSE = {
+    id: IMAGE_ID,
+    size: 1000,
+    name: "cove.jpg",
+    location: "https://example.com/cove.jpg",
+    isPublic: true,
+  }
+
+  it("patches the image visibility endpoint and returns the updated image", async () => {
+    mockApiPatch.mockResolvedValue(IMAGE_RESPONSE)
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, true)
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`, {
+      isPublic: true,
+    })
+    expect(result).toEqual({ success: true, image: IMAGE_RESPONSE })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiPatch.mockRejectedValue(new Error("nope"))
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, false)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPatch.mockRejectedValue("oops")
+    const result = await setImagePublic(POINT_ID, IMAGE_ID, false)
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to update image visibility.",
+    })
+  })
+})
+
+describe("uploadPointImage", () => {
+  const IMAGE_RESPONSE = {
+    id: IMAGE_ID,
+    size: 1000,
+    name: "cove.jpg",
+    location: "https://example.com/cove.jpg",
+    isPublic: false,
+  }
+
+  it("uploads the form data to the point's images endpoint and returns the created image", async () => {
+    mockApiUpload.mockResolvedValue(IMAGE_RESPONSE)
+    const formData = new FormData()
+    const result = await uploadPointImage(POINT_ID, formData)
+    expect(mockApiUpload).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images`, formData)
+    expect(result).toEqual({ success: true, image: IMAGE_RESPONSE })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiUpload.mockRejectedValue(new Error("nope"))
+    const result = await uploadPointImage(POINT_ID, new FormData())
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiUpload.mockRejectedValue("oops")
+    const result = await uploadPointImage(POINT_ID, new FormData())
+    expect(result).toEqual({ success: false, error: "Failed to upload photo." })
+  })
+})
+
+describe("deletePointImage", () => {
+  it("deletes the image at the point's images sub-resource", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(mockApiDelete).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiDelete.mockRejectedValue(new Error("nope"))
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiDelete.mockRejectedValue("oops")
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(result).toEqual({ success: false, error: "Failed to delete photo." })
   })
 })

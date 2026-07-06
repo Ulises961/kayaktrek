@@ -1,7 +1,11 @@
+from typing import Optional
+
 from flask import g
 from marshmallow import fields, post_dump, post_load, pre_load, validates, ValidationError
 import bleach
+from Api.database import db
 from Models.itinerary import Itinerary
+from Models.trip import Trip
 from Schemas.base_schema import BaseSchema
 from Schemas.day_schema import DaySchema, DayPublicSchema
 from Services.Utils.route_distance import compute_total_miles
@@ -27,9 +31,12 @@ class ItinerarySchema(BaseSchema):
     )
     trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
+    # Unlisted story-share token (M7d) — only ever dumped back to the owner right
+    # after generate/regenerate; never present on the public/explore projections.
+    story_share_token = fields.String(dump_only=True, allow_none=True)
 
-    def get_total_miles(self, obj: Itinerary) -> float:
-        return compute_total_miles(obj.days or [])
+    def get_total_miles(self, itinerary: Itinerary) -> float:
+        return compute_total_miles(itinerary.days or [])
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
@@ -126,6 +133,9 @@ class ItineraryPublicSchema(BaseSchema):
     Excludes user_id, trip_id, notes, and private images. `created_from_id` +
     `original_author` surface fork attribution (M7c); the resource injects
     `original_author` via ItineraryService.resolve_original_author before dumping.
+    `trip_state` (M7d) exposes only the parent trip's lifecycle state — never any
+    other trip field — as the seam a future live-position feature (M8) attaches to
+    while `happening`.
     """
     name = fields.String(dump_only=True)
     is_public = fields.Boolean(dump_only=True)
@@ -136,9 +146,16 @@ class ItineraryPublicSchema(BaseSchema):
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
+    trip_state = fields.Method("get_trip_state", dump_only=True)
 
-    def get_total_miles(self, obj: Itinerary) -> float:
-        return compute_total_miles(obj.days or [])
+    def get_total_miles(self, itinerary: Itinerary) -> float:
+        return compute_total_miles(itinerary.days or [])
+
+    def get_trip_state(self, itinerary: Itinerary) -> Optional[str]:
+        if not itinerary.trip_id:
+            return None
+        trip = db.session.get(Trip, itinerary.trip_id)
+        return trip.state.value if trip else None
 
     @post_dump
     def exclude_day_zero(self, data, **kwargs):

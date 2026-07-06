@@ -1,7 +1,7 @@
 from marshmallow import fields, post_load, pre_load, validates, validates_schema, ValidationError
 from Models.trip import Trip, TripDifficultyType, TripStateType
 from Schemas.base_schema import BaseSchema, camelcase
-from Schemas.itinerary_shema import ItinerarySchema
+from Schemas.itinerary_schema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_member_schema import TripMemberSchema
 import bleach

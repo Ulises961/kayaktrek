@@ -31,12 +31,19 @@ function gratLabelIcon(text: string, anchor: [number, number], weight = 400): L.
   })
 }
 
-export function Graticule() {
+export function Graticule({ ready = true }: { ready?: boolean }) {
   const map = useMap()
   // Hide the grid during a gesture and redraw it (fresh bounds) once settled, so
   // it never shows the transformed, out-of-phase lines while zooming/panning.
   const settled = useSettled()
-  if (!settled) return null
+
+  // `ready` is an explicit signal from the caller (LandingMap, via FrameRoute's
+  // onReady) that any initial programmatic fitBounds() has already applied —
+  // not inferred from event timing. Without it, this component's very first
+  // render reads the map's construction-time center/zoom (before FrameRoute's
+  // own mount effect has had a chance to fit it to the routes), flashing that
+  // small default extent for a frame before catching up.
+  if (!ready || !settled) return null
 
   const b = map.getBounds()
   const step = niceStep(map.getZoom())

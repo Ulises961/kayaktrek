@@ -12,6 +12,9 @@ export const ItinerarySchema = z.object({
   days: DaysSchema.nullish(),
   tripId: z.uuidv7().nullish(),
   userId: z.uuidv7().nullish(),
+  // Unlisted trip-narrative share link (M7d) — only ever dumped back to the owner,
+  // right after generate/regenerate (POST /<id>/story-share).
+  storyShareToken: z.string().nullish(),
 })
 
 export type Itinerary = z.infer<typeof ItinerarySchema>
@@ -26,6 +29,12 @@ export const PublicItinerarySchema = z.object({
 export type PublicItinerary = z.infer<typeof PublicItinerarySchema>
 export const PublicItinerariesSchema = z.array(PublicItinerarySchema)
 
+// Photo-level opt-in (M7d) — only images the owner explicitly made public.
+export const PublicImageSchema = z.object({
+  url: z.string(),
+})
+export type PublicImage = z.infer<typeof PublicImageSchema>
+
 export const PublicPointSchema = z.object({
   id: z.string().optional(),
   latitude: z.number().nullish(),
@@ -34,6 +43,7 @@ export const PublicPointSchema = z.object({
   type: z.string().nullish(),
   dayId: z.string().nullish(),
   nextId: z.string().nullish(),
+  images: z.array(PublicImageSchema).default([]),
 })
 export type PublicPoint = z.infer<typeof PublicPointSchema>
 
@@ -64,6 +74,9 @@ export const PublicItineraryDetailSchema = z.object({
   createdFromId: z.string().nullish(),
   originalAuthor: OriginalAuthorSchema.nullish(),
   days: z.array(PublicDaySchema).default([]),
+  // Parent trip's lifecycle state (M7d) — read-only, reserved as the seam a future
+  // M8 live-position feature attaches to while `happening`.
+  tripState: z.string().nullish(),
 })
 export type PublicItineraryDetail = z.infer<typeof PublicItineraryDetailSchema>
 

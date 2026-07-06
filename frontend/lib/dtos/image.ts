@@ -5,6 +5,7 @@ export const ImageSchema = z.object({
   size: z.number(),
   name: z.string(),
   location: z.string(),
+  isPublic: z.boolean(),
 })
 
 export type Image = z.infer<typeof ImageSchema>

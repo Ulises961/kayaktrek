@@ -179,6 +179,43 @@ def upload_image(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@point_api.route("/<string:id>/images/<string:image_id>", methods=["PATCH"])
+@JWTService.authenticate_restful
+@require_owner("point")
+def update_image_visibility(id: str, image_id: str):
+    """
+    PATCH /api/point/<id>/images/<image_id> — toggle an image's public/private visibility.
+
+    Body: { "isPublic": bool }
+
+    Args:
+        id: Point ID the image is attached to
+        image_id: Image ID to update
+
+    Returns:
+        200 with the updated image object
+
+    Raises:
+        400: If isPublic is missing or not a boolean
+        404: If the image does not exist
+    """
+    body = request.get_json() or {}
+    is_public = body.get("isPublic")
+    if not isinstance(is_public, bool):
+        abort(HTTPStatus.BAD_REQUEST, description="isPublic must be a boolean")
+
+    try:
+        image = ImageService.set_public(image_id, is_public)
+        return jsonify(ImageSchema().dump(image)), HTTPStatus.OK
+
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        logger.error("Error updating visibility for image %s: %s", image_id, e)
+        db.session.rollback()
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("point")
