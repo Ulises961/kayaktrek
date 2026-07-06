@@ -564,7 +564,7 @@ class ItineraryService:
             boundary_day.start_point_id = UUID(start_pid)
             boundary_day.end_point_id = UUID(end_pid)
             if boundary.get("date"):
-                day.date = boundary["date"]
+                boundary_day.date = boundary["date"]
 
             new_boundary_ids.add(start_pid)
             new_boundary_ids.add(end_pid)

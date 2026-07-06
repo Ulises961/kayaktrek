@@ -204,6 +204,44 @@ def test_apply_boundaries_point_updates_applied(itinerary_with_a_point):
     assert point.type == PointType.STOP
 
 
+def test_apply_boundaries_dates_land_on_their_own_day(client, auth_headers, itinerary):
+    """Regression: each boundary's date must be written to that boundary's day.
+
+    A leaked loop variable (`day` from the day-indexing loop instead of
+    `boundary_day`) used to send every boundary date to one arbitrary day.
+    """
+    itin_id = itinerary["id"]
+    day0_id = next(d["id"] for d in itinerary["days"] if d["dayNumber"] == 0)
+    day1_id = next(d["id"] for d in itinerary["days"] if d["dayNumber"] == 1)
+    day2_id = next(d["id"] for d in itinerary["days"] if d["dayNumber"] == 2)
+
+    point_ids = []
+    for offset in range(4):
+        response = client.post(
+            f"{POINT_ENDPOINT}/create", headers=auth_headers,
+            json={"dayId": day0_id, "type": "position",
+                  "latitude": 44.0 + offset * 0.1, "longitude": 8.5},
+        )
+        assert response.status_code == 201
+        point_ids.append(response.json["id"])
+
+    ItineraryService.apply_boundaries(
+        itin_id,
+        boundaries=[
+            {"dayId": day1_id, "startPointId": point_ids[0],
+             "endPointId": point_ids[1], "date": "2026-08-10"},
+            {"dayId": day2_id, "startPointId": point_ids[2],
+             "endPointId": point_ids[3], "date": "2026-08-11"},
+        ],
+        point_updates=[],
+    )
+
+    day1 = db.session.query(Day).filter_by(id=UUID(day1_id)).one()
+    day2 = db.session.query(Day).filter_by(id=UUID(day2_id)).one()
+    assert day1.date.isoformat() == "2026-08-10"
+    assert day2.date.isoformat() == "2026-08-11"
+
+
 # ── export_gpx ────────────────────────────────────────────────────────────────
 
 def test_export_gpx_returns_valid_gpx_with_correct_point_count(public_itinerary_with_points):
