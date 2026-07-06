@@ -21,7 +21,10 @@ class TidalStation(BaseModel):
     __tablename__ = "tidal_station"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    location: Mapped[object] = mapped_column(Geometry("POINT", srid=4326, spatial_index=False), nullable=False)
+    # GIST index (`idx_tidal_station_location`) was created by a raw op.create_index in an old
+    # migration; spatial_index=True lets GeoAlchemy2 track it in metadata so Alembic autogenerate
+    # doesn't see it as drift (no DDL change — the index already exists).
+    location: Mapped[object] = mapped_column(Geometry("POINT", srid=4326, spatial_index=True), nullable=False)
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     mean_spring_range_m: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)

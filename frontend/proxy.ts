@@ -22,10 +22,28 @@ export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Cookie-gated routes. Anonymous-facing routes deliberately live outside this
-// matcher under the `app/(public)/` route group (landing, float-plan share,
-// export download, public paddler profiles) — keep that grouping in sync so it
-// stays obvious which routes are reachable without auth.
+// Cookie-gated routes — one entry per `app/(app)/*` segment (M11 §3: this list had drifted
+// to cover only 3 of the ~10 segments; server components still 401→redirect as a fallback,
+// but keep this in sync going forward). Anonymous-facing routes deliberately live outside
+// this matcher under the `app/(public)/` route group (landing, float-plan share, export
+// download, public paddler profiles) — keep that grouping in sync too.
+//
+// `/paddlers` is intentionally an EXACT match, not a `:path*` wildcard: `(app)/paddlers`
+// (the authed connections index) and `(public)/paddlers/[username]` (the public profile)
+// share the `/paddlers` URL prefix, and a wildcard here would gate the public profile pages
+// behind auth.
 export const config = {
-  matcher: ["/dashboard/:path*", "/trips/:path*", "/invitations/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/design/:path*",
+    "/explore/:path*",
+    "/gear/:path*",
+    "/invitations/:path*",
+    "/itinerary/:path*",
+    "/logs/:path*",
+    "/paddlers",
+    "/profile/:path*",
+    "/trips/:path*",
+    "/users/:path*",
+  ],
 }

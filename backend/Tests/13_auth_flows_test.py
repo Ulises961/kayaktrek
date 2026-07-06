@@ -409,3 +409,71 @@ class TestRevocableTokens:
 
         r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r.status_code == 403
+
+
+class TestRefreshTokenRotation:
+    """M11 §2 — rotate-on-use with reuse detection."""
+
+    def test_refresh_rotates_the_refresh_token(self, app, client):
+        """A successful refresh returns a NEW refresh token, distinct from the one presented."""
+        _, _, refresh_tok = _active_user_with_tokens(client)
+
+        r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 200
+        body = r.get_json()
+        assert "refresh_token" in body
+        assert body["refresh_token"] != refresh_tok
+
+    def test_reused_refresh_token_rejected(self, app, client):
+        """Presenting the same refresh token twice: the second use is rejected."""
+        _, _, refresh_tok = _active_user_with_tokens(client)
+
+        r1 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r1.status_code == 200
+
+        r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r2.status_code == 401
+
+    def test_refresh_token_reuse_revokes_entire_session(self, app, client):
+        """Reuse is treated as theft: it revokes every outstanding token for the user,
+        not just the reused one — the original access token must also stop working."""
+        user, access_tok, refresh_tok = _active_user_with_tokens(client)
+
+        r1 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r1.status_code == 200
+        rotated_refresh = r1.get_json()["refresh_token"]
+
+        # Reuse the original (already-rotated) refresh token — triggers revocation.
+        r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r2.status_code == 401
+
+        # The pre-reuse access token is now dead too (token_version bumped).
+        r3 = client.get("/api/v1/user/me", headers={"Authorization": f"Bearer {access_tok}"})
+        assert r3.status_code == 401
+
+        # So is the refresh token issued by the legitimate rotation just before the reuse.
+        r4 = client.post("/api/v1/auth/refresh", json={"refresh_token": rotated_refresh})
+        assert r4.status_code == 401
+
+    def test_refresh_chain_survives_multiple_legitimate_rotations(self, app, client):
+        """Repeated legitimate refresh → rotate → refresh cycles keep working."""
+        _, _, refresh_tok = _active_user_with_tokens(client)
+
+        for _ in range(3):
+            r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+            assert r.status_code == 200
+            refresh_tok = r.get_json()["refresh_token"]
+
+    def test_refresh_rejected_when_issued_before_password_change(self, app, client):
+        """Parity check: a refresh token's iat predating password_changed_at is rejected
+        even if token_version somehow still matched (defence-in-depth alongside the tv bump
+        password change already performs)."""
+        user, _, refresh_tok = _active_user_with_tokens(client)
+
+        # Simulate password_changed_at moving forward WITHOUT touching token_version, to
+        # exercise the iat check in isolation from the tv-based path.
+        user.password_changed_at = datetime.now(timezone.utc) + timedelta(seconds=5)
+        db.session.commit()
+
+        r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
+        assert r.status_code == 401

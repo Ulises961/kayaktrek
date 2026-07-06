@@ -444,6 +444,54 @@ distance scale that other components of the same view already provide.
   gestures, redrawn on settle) and a segmented nautical scale bar, with zoom locked
   to the Esri Ocean basemap's useful range.
 
+## Shared form primitives and the create/edit form-pair pattern (ADR-032)
+
+A cross-cutting review of the component layer (2026-07-03, full findings in
+`plans/component-abstraction-review.md`) found the app's compact forms had grown by
+copy-paste: seven local copies of the micro `FieldLabel`, five of the native-select
+class string, inline destructive-error paragraphs everywhere — and, worse, two
+dialog families (shuttle vehicles, travel documents) had forked their entire form
+body into separate add/edit components. The forks had already drifted: the add
+dialogs displayed validation errors their edit twins silently dropped, and toggle
+reset behavior differed between variants. Copy-paste duplication of form bodies is
+not a cosmetic problem; it is where correctness drift comes from.
+
+**Decision — two conventions, now load-bearing:**
+
+1. **Shared form primitives.** `components/common/form-field.tsx` is the single
+   source for compact-form furniture: `FieldLabel` (micro-label), `FieldError`
+   (inline validation message, renders nothing without one), `NativeSelect`
+   (styled native `<select>`), and the exported `fieldLabelClass` for display-only
+   `<span>` labels (read-only value cards, where a `<label>` element would be
+   semantically wrong). Form components must not re-declare these locally.
+   `components/common/accent-dialog.tsx` provides `AccentDialogContent`, the
+   accent-bar dialog shell (colored top bar + icon-tinted title); its `accent`
+   comes from the `palette` in `lib/tokens.ts`, never hardcoded hex at call sites —
+   keeping the token file the cross-platform source of truth it was designed to be.
+
+2. **One form per create/edit pair.** A create/edit dialog pair shares a single
+   form component. The form owns `useForm`, layout, and validation display, and
+   takes `values?` (prefill for edit), `isPending`, `error` (root error string),
+   `submitLabel`, and `onSubmit(fields)`. The dialogs are thin shells owning the
+   server action, pending/error state, and open/trigger state. `PlaceForm` (M4e)
+   was the existing precedent; `VehicleForm` and `DocumentForm` now follow it, and
+   `TidalDiamondForm` already matched. Where the create and edit variants genuinely
+   differ (the document attachment section: pending-file picker on create,
+   uploaded-file actions on edit), the difference enters through a slot prop
+   (`attachmentSlot`), not a fork.
+
+**Consciously rejected:** merging `PointDetailSheet` and `PointDetailModal`
+(similar names, different jobs — summary strip vs full editor; they change for
+different reasons), and any generic schema-driven form-builder abstraction —
+react-hook-form plus the shared primitives is the right altitude; each form keeps
+its own explicit layout.
+
+**Consequence:** the four vehicle/document dialogs went from ~500 duplicated lines
+to shared forms plus ~60-line shells, and the validation-message drift was fixed by
+construction. Follow-ups are opportunistic, not scheduled: remaining forms with
+inline error paragraphs (`new-trip-dialog`, profile forms, `tidal-entry-form`)
+migrate to `FieldError` when next touched.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -463,3 +511,4 @@ distance scale that other components of the same view already provide.
 | Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar | — | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists |
 | `Point.interest` removed from the route model; POIs become standalone map annotations | — | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position` |
 | M4e landed: `interest` gone from `PointType`; `Place` marker layer (day-independent, toggleable) + drop-a-pin; place/diamond add-actions unified in a top-centre `MapAddControl` "+ Add" disclosure | — | 2026-06-21 | Type selectors and icon legend now `stop`/`position` only; star icon removed; see `features.md` decision log for the `Place`/`PlaceCategory` entity |
+| Shared form primitives (`form-field.tsx`, `AccentDialogContent`) + one-form-per-create/edit-pair convention | ADR-032 | 2026-07-03 | Component abstraction review; `VehicleForm`/`DocumentForm` join the `PlaceForm` pattern; accent colors from `lib/tokens` palette; sheet/modal merge and generic form-builder rejected; findings in `plans/component-abstraction-review.md` |

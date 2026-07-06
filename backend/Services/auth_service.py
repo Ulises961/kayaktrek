@@ -7,7 +7,7 @@ from uuid import UUID
 
 from flask import current_app
 from flask_bcrypt import check_password_hash, generate_password_hash
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
@@ -92,7 +92,21 @@ class AuthService:
         user = cast(User, UserSchema().load(user_json))
         user.active = False
         db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Two requests raced the existence check above with the same mail/username —
+            # the loser's INSERT hits the unique constraint. Treat it exactly like the
+            # pre-check "existing" branch: no error, no enumeration signal.
+            db.session.rollback()
+            existing = db.session.query(User).filter(
+                (User.username == username) | (User.mail == mail_addr)
+            ).first()
+            if existing:
+                if existing.mail == mail_addr:
+                    AuthService._send_already_registered_email(existing)
+                return existing
+            raise
 
         persisted_user: Optional[User] = db.session.query(User).filter_by(mail=mail_addr).first()
         if not persisted_user:
@@ -226,6 +240,37 @@ class AuthService:
             extra={"user_id": str(user.id), "medical_notes_cleared": had_medical_notes},
         )
         return user
+
+    @staticmethod
+    def advance_refresh_rotation(user: User, payload: dict) -> None:
+        """
+        Validate a decoded refresh-token payload against the user's current rotation state
+        and, if valid, advance it (rotate-on-use). Caller mints the new access/refresh pair
+        from the user's post-call token_version/refresh_token_version.
+
+        A refresh token whose `rtv` claim does not match the user's current
+        refresh_token_version means it was already exchanged once — either the legitimate
+        client raced a retry, or the token was stolen and is being replayed. Either way this
+        is treated as a reuse/theft signal: token_version is bumped, revoking every
+        outstanding access and refresh token for the user, forcing a full re-login.
+
+        Raises:
+            ValueError: token invalidated by password change (stale iat), or reuse detected.
+        """
+        iat = payload.get("iat")
+        if iat and user.password_changed_at:
+            token_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+            if token_issued_at < user.password_changed_at:
+                raise ValueError("Token invalidated by password change — please log in again")
+
+        if payload.get("rtv") != user.refresh_token_version:
+            user.token_version += 1
+            db.session.commit()
+            logger.warning("refresh_token_reuse_detected", extra={"user_id": str(user.id)})
+            raise ValueError("Session invalidated — possible token reuse detected, please log in again")
+
+        user.refresh_token_version += 1
+        db.session.commit()
 
     # ------------------------------------------------------------------
     # Internal helpers

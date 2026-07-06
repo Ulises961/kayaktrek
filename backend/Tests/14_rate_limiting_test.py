@@ -34,6 +34,16 @@ def rate_limits_enabled(app):
     limiter._limiter = None
 
 
+class TestHealthRateLimitExemption:
+
+    def test_health_is_exempt_from_the_default_rate_limit(self, client):
+        """The 200/hour default_limits would otherwise start throttling a
+        compose/load-balancer healthcheck polling every few seconds (M11 §4)."""
+        for _ in range(205):
+            r = client.get("/api/v1/health")
+            assert r.status_code == 200
+
+
 class TestLoginRateLimit:
 
     def test_login_rate_limited_after_threshold(self, client):
@@ -136,6 +146,25 @@ class TestResendDeletionCancelRateLimit:
 
         r = client.post("/api/v1/auth/resend-deletion-cancel", json={"mail": "del_b@example.com"})
         assert r.status_code != 429
+
+
+class TestRefreshRateLimit:
+
+    def test_refresh_rate_limited_after_threshold(self, client):
+        """11th refresh attempt within a minute returns 429, even with an invalid token —
+        the limiter runs before the token is verified."""
+        for _ in range(10):
+            client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+
+        r = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+        assert r.status_code == 429
+        assert "Retry-After" in r.headers
+
+    def test_refresh_within_limit_not_blocked(self, client):
+        """Requests up to the limit are not blocked."""
+        for _ in range(10):
+            r = client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.token.here"})
+            assert r.status_code != 429
 
 
 class TestReAuthRateLimit:

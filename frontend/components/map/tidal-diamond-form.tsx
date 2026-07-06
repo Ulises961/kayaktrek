@@ -8,8 +8,8 @@ import {
 } from "@/lib/dtos/tidal-station"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { FieldLabel, FieldError } from "@/components/common/form-field"
 
 // Empty string ↔ null so a cleared numeric field round-trips as "no value"
 // rather than NaN, which the Zod schema would reject.
@@ -17,17 +17,6 @@ const asNumber = { setValueAs: (v: string) => (v === "" || v == null ? null : Nu
 
 function emptyEntries() {
   return DIAMOND_HOURS.map((h) => ({ hoursFromHw: h }))
-}
-
-function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
-  return (
-    <Label
-      htmlFor={htmlFor}
-      className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase"
-    >
-      {children}
-    </Label>
-  )
 }
 
 export type TidalDiamondFormProps = {
@@ -78,7 +67,7 @@ export function TidalDiamondForm({
           disabled={isPending}
           {...register("name")}
         />
-        {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
+        <FieldError message={errors.name?.message} />
       </div>
 
       <Tabs value={entryMode} onValueChange={(v) => setValue("entryMode", v as "simple" | "atlas")}>
@@ -103,9 +92,7 @@ export function TidalDiamondForm({
                 disabled={isPending}
                 {...register("maxSpringRateKnots", asNumber)}
               />
-              {errors.maxSpringRateKnots && (
-                <p className="text-destructive text-xs">{errors.maxSpringRateKnots.message}</p>
-              )}
+              <FieldError message={errors.maxSpringRateKnots?.message} />
             </div>
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="max-neap">Peak neap rate (kn)</FieldLabel>
@@ -129,9 +116,7 @@ export function TidalDiamondForm({
                 disabled={isPending}
                 {...register("floodDirectionDegrees", asNumber)}
               />
-              {errors.floodDirectionDegrees && (
-                <p className="text-destructive text-xs">{errors.floodDirectionDegrees.message}</p>
-              )}
+              <FieldError message={errors.floodDirectionDegrees?.message} />
             </div>
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="ebb-dir">Ebb direction (°)</FieldLabel>
@@ -143,9 +128,7 @@ export function TidalDiamondForm({
                 disabled={isPending}
                 {...register("ebbDirectionDegrees", asNumber)}
               />
-              {errors.ebbDirectionDegrees && (
-                <p className="text-destructive text-xs">{errors.ebbDirectionDegrees.message}</p>
-              )}
+              <FieldError message={errors.ebbDirectionDegrees?.message} />
             </div>
           </div>
         </TabsContent>
@@ -234,7 +217,7 @@ export function TidalDiamondForm({
           disabled={isPending}
           {...register("radiusM", asNumber)}
         />
-        {errors.radiusM && <p className="text-destructive text-xs">{errors.radiusM.message}</p>}
+        <FieldError message={errors.radiusM?.message} />
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}

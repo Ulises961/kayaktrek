@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from typing import Literal
@@ -26,8 +25,9 @@ _ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY", "kayak")
 _SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY", "")
 _BUCKET = os.environ.get("STORAGE_BUCKET", "kayak")
 
-# Prefix for GDPR data-export blobs. Deliberately excluded from _PUBLIC_READ_POLICY
-# (private) — exports are streamed through the backend behind a one-time token.
+# Prefix for GDPR data-export blobs. Deliberately excluded from the public-read policy
+# provisioned by minio-init (private) — exports are streamed through the backend behind
+# a one-time token.
 _EXPORTS_PREFIX = "exports/"
 
 MIN_SIZE = 512
@@ -82,33 +82,11 @@ def _client(endpoint: str = _ENDPOINT):
 # Only avatars and public point images are directly accessible.
 # documents/ and point-images-private/ are not covered — objects there
 # require a presigned URL (StorageService.presigned_url).
-_PUBLIC_READ_POLICY = json.dumps({
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {"AWS": ["*"]},
-            "Action": ["s3:GetObject"],
-            "Resource": [
-                f"arn:aws:s3:::{_BUCKET}/avatars/*",
-                f"arn:aws:s3:::{_BUCKET}/point-images/*",
-            ],
-        }
-    ],
-})
-
-
-def _ensure_bucket(client) -> None:
-    try:
-        client.head_bucket(Bucket=_BUCKET)
-    except ClientError as e:
-        if e.response["Error"]["Code"] in ("404", "NoSuchBucket"):
-            client.create_bucket(Bucket=_BUCKET)
-            logger.info("Created storage bucket '%s'", _BUCKET)
-        else:
-            raise
-    # Idempotent — ensures objects are publicly readable via direct URL.
-    client.put_bucket_policy(Bucket=_BUCKET, Policy=_PUBLIC_READ_POLICY)
+#
+# Bucket creation and this public-read policy are provisioned once by the `minio-init`
+# compose service (mc mb + mc anonymous set download), not by the app at request time
+# (M11 §4) — the runtime credential only needs object CRUD, not bucket-policy-write, and
+# a bucket-existence check no longer costs an extra round-trip on every upload.
 
 
 class StorageValidationError(ValueError):
@@ -146,7 +124,6 @@ class StorageService:
         key = f"{prefix}{object_key}"
 
         client = _client()
-        _ensure_bucket(client)
 
         client.put_object(
             Bucket=_BUCKET,
@@ -221,7 +198,6 @@ class StorageService:
         """Store a GDPR export blob privately. No MIME/size validation — the
         payload is server-generated JSON, not a user upload."""
         client = _client()
-        _ensure_bucket(client)
         client.put_object(
             Bucket=_BUCKET,
             Key=f"{_EXPORTS_PREFIX}{object_key}",

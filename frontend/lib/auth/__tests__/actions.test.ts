@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { login, register, logout, forgotPassword, resetPassword } from "../actions"
+import { login, register, logout, forgotPassword, resetPassword, refreshSession } from "../actions"
 
 const mockCookieStore = {
   set: vi.fn(),
@@ -140,6 +140,64 @@ describe("resetPassword", () => {
       formData({ token: "tok", password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD }),
     )
     expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+  })
+})
+
+describe("refreshSession", () => {
+  it("returns false without fetching when there is no refresh_token cookie", async () => {
+    mockCookieStore.get.mockReturnValue(undefined)
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await refreshSession()
+
+    expect(result).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("rotates the refresh token cookie alongside the access token on success", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "old-refresh" })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "new-access", refresh_token: "new-refresh" }),
+      }),
+    )
+
+    const result = await refreshSession()
+
+    expect(result).toBe(true)
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "access_token",
+      "new-access",
+      expect.any(Object),
+    )
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "refresh_token",
+      "new-refresh",
+      expect.any(Object),
+    )
+  })
+
+  it("returns false and sets no cookies when the backend rejects the refresh token", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "stale-refresh" })
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+
+    const result = await refreshSession()
+
+    expect(result).toBe(false)
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+
+  it("returns false when the server is unreachable", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "some-refresh" })
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+
+    const result = await refreshSession()
+
+    expect(result).toBe(false)
   })
 })
 

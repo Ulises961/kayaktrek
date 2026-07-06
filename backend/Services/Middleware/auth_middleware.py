@@ -29,11 +29,12 @@ class JWTService:
         return JWTService.generate_token(payload)
 
     @staticmethod
-    def generate_refresh_token(user_id: str, token_version: int) -> str:
+    def generate_refresh_token(user_id: str, token_version: int, refresh_token_version: int) -> str:
         payload = {
             'user_id': str(user_id),
             'token_type': 'refresh',
             'tv': token_version,
+            'rtv': refresh_token_version,
             'iat': datetime.now(timezone.utc),
             'exp': datetime.now(timezone.utc) + timedelta(days=30),
         }

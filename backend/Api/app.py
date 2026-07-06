@@ -1,8 +1,10 @@
 import os
 import uuid
 
+import click
 from flask import Flask, g, request
 from flask_migrate import Migrate
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from Api.cache import cache
 from Api.config import config
@@ -39,6 +41,7 @@ from Resources.connection_resource import connection_api
 from Resources.block_resource import block_api
 from Resources.endorsement_request_resource import endorsement_request_api
 from Resources.dev_resource import dev_api
+from Resources.health_resource import health_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
@@ -55,7 +58,9 @@ def createApp(config_mode: str, *, schema: str | None = None):
     Params:
     config_mode -- the mode in which the app is to be run: development | testing | staging | production
     schema      -- optional PostgreSQL schema name; sets search_path so all tables land in that schema.
-                   Used by the test suite to isolate parallel workers.
+                   Used by the test suite to isolate parallel workers. "public" stays in
+                   search_path (PostGIS's types/functions live there); see Tests/conftest.py for
+                   why table *creation* still needs `checkfirst=False` despite that.
     """
 
     app = Flask(
@@ -64,6 +69,17 @@ def createApp(config_mode: str, *, schema: str | None = None):
     )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
+
+    # Rate limiting (Api/limiter.py) keys on the peer address; behind a reverse proxy every
+    # request otherwise arrives from the proxy's IP, either throttling every client together
+    # or, if X-Forwarded-For were trusted blindly, becoming spoofable. Off by default (0 hops)
+    # so local/dev/direct-exposure setups are unaffected; a deploy behind N proxies sets
+    # PROXY_TRUSTED_HOPS=N deliberately (M11 §4).
+    trusted_hops = int(os.environ.get("PROXY_TRUSTED_HOPS", "0"))
+    if trusted_hops > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=trusted_hops, x_proto=trusted_hops, x_host=trusted_hops
+        )
 
     if schema:
         engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
@@ -95,16 +111,24 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(block_api)
     app.register_blueprint(endorsement_request_api)
     app.register_blueprint(dev_api)
+    app.register_blueprint(health_api)
 
     db.init_app(app)
     mail.init_app(app)
     limiter.init_app(app)
     cache.init_app(app)
-    with app.app_context():
-        if not app.config.get("TESTING"):
-            seed_item_categories()
-            seed_place_categories()
-            seed_demo_itinerary()
+
+    @app.cli.command("seed")
+    def seed_command():
+        """Seed static reference data (item/place categories) and the public demo
+        itinerary. Idempotent — safe to run on every deploy. Invoked from the `migrate`
+        compose step after `alembic upgrade head`, not at app-factory time: that ran on
+        every gunicorn worker (and the Celery/migrate processes too, since they also call
+        createApp()), racing identical inserts at cold start (M11 §4)."""
+        seed_item_categories()
+        seed_place_categories()
+        seed_demo_itinerary()
+        click.echo("Seed complete.")
 
     migrate = Migrate()
     migrate.init_app(app, db, directory='alembic')
