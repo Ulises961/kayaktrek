@@ -20,7 +20,7 @@ from Models.point import Point, PointType
 from Models.trip import Trip
 from Models.user import User
 from Schemas.day_schema import DaySchema
-from Schemas.itinerary_shema import ItinerarySchema, ItineraryUpdateSchema
+from Schemas.itinerary_schema import ItinerarySchema, ItineraryUpdateSchema
 from Services.Utils.point_ordering import walk_linked_list
 from Services.Utils.rdp import rdp_simplify
 from Services.Utils.route_distance import compute_total_miles

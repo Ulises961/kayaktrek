@@ -6,7 +6,7 @@ from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
-from Schemas.itinerary_shema import (
+from Schemas.itinerary_schema import (
     ItinerarySchema,
     ItineraryPublicSchema,
     ItineraryExploreItemSchema,
