@@ -1,16 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockApiPost, mockApiPatch, mockApiDelete, mockRevalidatePath } = vi.hoisted(() => ({
-  mockApiPost: vi.fn(),
-  mockApiPatch: vi.fn(),
-  mockApiDelete: vi.fn(),
-  mockRevalidatePath: vi.fn(),
-}))
+const { mockApiPost, mockApiPatch, mockApiDelete, mockApiUpload, mockRevalidatePath } = vi.hoisted(
+  () => ({
+    mockApiPost: vi.fn(),
+    mockApiPatch: vi.fn(),
+    mockApiDelete: vi.fn(),
+    mockApiUpload: vi.fn(),
+    mockRevalidatePath: vi.fn(),
+  }),
+)
 
 vi.mock("@/lib/api/client", () => ({
   apiPost: mockApiPost,
   apiPatch: mockApiPatch,
   apiDelete: mockApiDelete,
+  apiUpload: mockApiUpload,
   isRedirectError: () => false,
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
@@ -28,6 +32,8 @@ import {
   applyBoundaries,
   generateStoryShare,
   setImagePublic,
+  uploadPointImage,
+  deletePointImage,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -438,5 +444,56 @@ describe("setImagePublic", () => {
       success: false,
       error: "Failed to update image visibility.",
     })
+  })
+})
+
+describe("uploadPointImage", () => {
+  const IMAGE_RESPONSE = {
+    id: IMAGE_ID,
+    size: 1000,
+    name: "cove.jpg",
+    location: "https://example.com/cove.jpg",
+    isPublic: false,
+  }
+
+  it("uploads the form data to the point's images endpoint and returns the created image", async () => {
+    mockApiUpload.mockResolvedValue(IMAGE_RESPONSE)
+    const formData = new FormData()
+    const result = await uploadPointImage(POINT_ID, formData)
+    expect(mockApiUpload).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images`, formData)
+    expect(result).toEqual({ success: true, image: IMAGE_RESPONSE })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiUpload.mockRejectedValue(new Error("nope"))
+    const result = await uploadPointImage(POINT_ID, new FormData())
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiUpload.mockRejectedValue("oops")
+    const result = await uploadPointImage(POINT_ID, new FormData())
+    expect(result).toEqual({ success: false, error: "Failed to upload photo." })
+  })
+})
+
+describe("deletePointImage", () => {
+  it("deletes the image at the point's images sub-resource", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(mockApiDelete).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error on failure", async () => {
+    mockApiDelete.mockRejectedValue(new Error("nope"))
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(result).toEqual({ success: false, error: "nope" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiDelete.mockRejectedValue("oops")
+    const result = await deletePointImage(POINT_ID, IMAGE_ID)
+    expect(result).toEqual({ success: false, error: "Failed to delete photo." })
   })
 })

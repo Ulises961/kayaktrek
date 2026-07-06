@@ -68,10 +68,10 @@ _KIND_MAX_SIZE: dict[FileKind, int] = {
 }
 
 
-def _client():
+def _client(endpoint: str = _ENDPOINT):
     return boto3.client(
         "s3",
-        endpoint_url=_ENDPOINT,
+        endpoint_url=endpoint,
         aws_access_key_id=_ACCESS_KEY,
         aws_secret_access_key=_SECRET_KEY,
         config=Config(signature_version="s3v4"),
@@ -172,10 +172,18 @@ class StorageService:
 
     @staticmethod
     def presigned_url(object_key: str, kind: FileKind, expires_in: int = 3600) -> str:
-        """Generate a presigned GET URL (useful for private objects)."""
+        """Generate a presigned GET URL (useful for private objects).
+
+        Signed against STORAGE_PUBLIC_URL, not STORAGE_ENDPOINT (which
+        `upload`/`delete`/`move` use to reach MinIO over the internal docker
+        network, e.g. `http://minio:9000`). SigV4 query-signing covers the
+        Host, so the URL must be generated against the same host the browser
+        will actually request — otherwise the signature is valid for a host
+        the browser can never resolve, and every private image 404s/hangs.
+        """
         prefix = _KIND_PREFIXES[kind]
         key = f"{prefix}{object_key}"
-        client = _client()
+        client = _client(_PUBLIC_URL)
         return client.generate_presigned_url(
             "get_object",
             Params={"Bucket": _BUCKET, "Key": key},

@@ -10,6 +10,8 @@ import type { Point } from "@/lib/dtos/point"
 vi.mock("@/lib/itinerary/actions", () => ({
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
   setImagePublic: vi.fn(),
+  uploadPointImage: vi.fn(),
+  deletePointImage: vi.fn(),
 }))
 
 import { PointDetailModal } from "../point-detail-modal"
@@ -90,14 +92,22 @@ describe("PointDetailModal", () => {
     expect(screen.getByText("1 / 2")).toBeInTheDocument()
   })
 
+  it("renders a private photo to the owner via its returned location, not just once made public", () => {
+    // POINT.images[0] ("i1") is isPublic: false — the backend still returns a usable
+    // (presigned) location for it, and the carousel must not gate the <img> on isPublic.
+    renderModal(POINT)
+    const img = screen.getByAltText("one") as HTMLImageElement
+    expect(img.src).toBe(POINT.images![0].location)
+  })
+
   it("advances the carousel with the next button", async () => {
     renderModal(POINT)
     await userEvent.click(screen.getByRole("button", { name: /next photo/i }))
     expect(screen.getByText("2 / 2")).toBeInTheDocument()
   })
 
-  it("shows a 'No photos yet' empty state when there are no images", () => {
-    renderModal({ ...POINT, images: [] })
+  it("shows a 'No photos yet' empty state when there are no images and not editable", () => {
+    renderModal({ ...POINT, images: [] }, false)
     expect(screen.getByText(/no photos yet/i)).toBeInTheDocument()
   })
 
@@ -159,5 +169,73 @@ describe("PointDetailModal", () => {
     renderModal(POINT, true)
     await userEvent.click(screen.getByRole("button", { name: /next photo/i }))
     expect(screen.getByRole("button", { name: /make photo private/i })).toBeInTheDocument()
+  })
+
+  it("shows an 'Add a photo' invitation on the empty state when editable", () => {
+    renderModal({ ...POINT, images: [] }, true)
+    expect(screen.getByRole("button", { name: /add a photo/i })).toBeInTheDocument()
+  })
+
+  it("does not show 'Add a photo' on the empty state when not editable", () => {
+    renderModal({ ...POINT, images: [] }, false)
+    expect(screen.queryByRole("button", { name: /add a photo/i })).not.toBeInTheDocument()
+  })
+
+  it("shows an add-photo control alongside existing photos when editable", () => {
+    renderModal(POINT, true)
+    expect(screen.getByRole("button", { name: /add photo/i })).toBeInTheDocument()
+  })
+
+  it("uploads the selected file and appends it to the point via dispatch", async () => {
+    const newImage = {
+      id: "i3",
+      location: "https://example.com/3.jpg",
+      name: "three",
+      size: 500,
+      isPublic: false,
+    }
+    vi.mocked(actions.uploadPointImage).mockResolvedValue({ success: true, image: newImage })
+    renderModal(POINT, true)
+    const file = new File(["bytes"], "photo.jpg", { type: "image/jpeg" })
+    await userEvent.upload(screen.getByTestId("photo-file-input"), file)
+    expect(actions.uploadPointImage).toHaveBeenCalledWith("p1", expect.any(FormData))
+    expect(baseCtx.dispatch).toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { images: [...POINT.images!, newImage] },
+    })
+  })
+
+  it("does not dispatch when the upload fails", async () => {
+    vi.mocked(actions.uploadPointImage).mockResolvedValue({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    const file = new File(["bytes"], "photo.jpg", { type: "image/jpeg" })
+    await userEvent.upload(screen.getByTestId("photo-file-input"), file)
+    expect(baseCtx.dispatch).not.toHaveBeenCalled()
+  })
+
+  it("deletes the current photo and removes it from the point", async () => {
+    vi.mocked(actions.deletePointImage).mockResolvedValue({ success: true })
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /delete photo/i }))
+    expect(actions.deletePointImage).toHaveBeenCalledWith("p1", "i1")
+    expect(baseCtx.dispatch).toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { images: [POINT.images![1]] },
+    })
+  })
+
+  it("does not dispatch when photo deletion fails", async () => {
+    vi.mocked(actions.deletePointImage).mockResolvedValue({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /delete photo/i }))
+    expect(baseCtx.dispatch).not.toHaveBeenCalled()
+  })
+
+  it("does not show add/delete photo controls when not editable", () => {
+    renderModal(POINT, false)
+    expect(screen.queryByRole("button", { name: /add photo/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /delete photo/i })).not.toBeInTheDocument()
   })
 })

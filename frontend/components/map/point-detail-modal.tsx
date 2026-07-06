@@ -1,9 +1,25 @@
 "use client"
-import { useState, useCallback } from "react"
-import { ChevronLeft, ChevronRight, Eye, EyeOff, ImageIcon, Anchor, CircleDot } from "lucide-react"
+import { useState, useCallback, useRef } from "react"
+import type { ChangeEvent } from "react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  ImageIcon,
+  Anchor,
+  CircleDot,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { updatePoint, setImagePublic } from "@/lib/itinerary/actions"
+import {
+  updatePoint,
+  setImagePublic,
+  uploadPointImage,
+  deletePointImage,
+} from "@/lib/itinerary/actions"
 import { cn } from "@/lib/utils"
 import type { Point } from "@/lib/dtos/point"
 
@@ -61,6 +77,33 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
     dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
   }, [current, point.id, point.images, dispatch])
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ""
+      if (!file) return
+      const formData = new FormData()
+      formData.append("file", file)
+      const result = await uploadPointImage(point.id!, formData)
+      if (!result.success) return
+      const updatedImages = [...(point.images ?? []), result.image]
+      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
+      setImageIdx(updatedImages.length - 1)
+    },
+    [point.id, point.images, dispatch],
+  )
+
+  const handleDeletePhoto = useCallback(async () => {
+    if (!current?.id) return
+    const result = await deletePointImage(point.id!, current.id)
+    if (!result.success) return
+    const updatedImages = (point.images ?? []).filter((img) => img.id !== current.id)
+    dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
+    setImageIdx((i) => Math.min(i, Math.max(updatedImages.length - 1, 0)))
+  }, [current, point.id, point.images, dispatch])
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex h-[80vh] max-w-md flex-col gap-0 overflow-hidden p-0">
@@ -78,6 +121,14 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
           className="border-border/40 bg-muted/30 relative shrink-0 border-b"
           style={{ height: "42%" }}
         >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            data-testid="photo-file-input"
+            className="hidden"
+          />
           {images.length > 0 ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -98,6 +149,26 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
                 >
                   {current?.isPublic ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
                   {current?.isPublic ? "Public" : "Private"}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  aria-label="Add photo"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute top-2 right-2 rounded-full bg-black/40 p-1 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/60"
+                >
+                  <Plus className="size-3" />
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  aria-label="Delete photo"
+                  onClick={handleDeletePhoto}
+                  className="absolute bottom-2 left-2 rounded-full bg-black/40 p-1 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/60"
+                >
+                  <Trash2 className="size-3" />
                 </button>
               )}
               {images.length > 1 && (
@@ -135,6 +206,15 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
                 </>
               )}
             </>
+          ) : canEdit ? (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-muted-foreground/40 hover:text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-2 transition-colors"
+            >
+              <ImageIcon className="size-7" />
+              <p className="text-[10px]">Add a photo</p>
+            </button>
           ) : (
             <div className="text-muted-foreground/40 flex h-full flex-col items-center justify-center gap-2">
               <ImageIcon className="size-7" />

@@ -172,6 +172,33 @@ export async function setImagePublic(
   }
 }
 
+export async function uploadPointImage(
+  pointId: string,
+  formData: FormData,
+): Promise<ImageActionResult> {
+  try {
+    const raw = await apiUpload<unknown>(`/api/point/${pointId}/images`, formData)
+    const image = ImageSchema.parse(raw)
+    return { success: true, image }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to upload photo." }
+  }
+}
+
+export async function deletePointImage(
+  pointId: string,
+  imageId: string,
+): Promise<DeleteActionResult> {
+  try {
+    await apiDelete(`/api/point/${pointId}/images/${imageId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to delete photo." }
+  }
+}
+
 export async function deletePoint(id: string): Promise<DeleteActionResult> {
   try {
     await apiDelete(`/api/point/${id}`)
