@@ -31,7 +31,7 @@ describe("PublicRouteDetail", () => {
         route={route()}
         season="summer"
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.getByText("Aegean loop")).toBeInTheDocument()
@@ -45,7 +45,7 @@ describe("PublicRouteDetail", () => {
         route={route()}
         season="summer"
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.getByText("summer")).toBeInTheDocument()
@@ -57,7 +57,7 @@ describe("PublicRouteDetail", () => {
         route={route()}
         season={null}
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.getByText("Day 1")).toBeInTheDocument()
@@ -71,7 +71,7 @@ describe("PublicRouteDetail", () => {
         season={null}
         author={author}
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     const link = screen.getByRole("link", { name: "Jo" })
@@ -86,7 +86,7 @@ describe("PublicRouteDetail", () => {
         season={null}
         author={author}
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.queryByRole("link", { name: "Jo" })).not.toBeInTheDocument()
@@ -94,8 +94,8 @@ describe("PublicRouteDetail", () => {
   })
 
   it("renders the back link with the given href and label", () => {
-    render(<PublicRouteDetail route={route()} season={null} backHref="/" backLabel="← Home" />)
-    const link = screen.getByRole("link", { name: "← Home" })
+    render(<PublicRouteDetail route={route()} season={null} backHref="/" backLabel="Home" />)
+    const link = screen.getByRole("link", { name: "Home" })
     expect(link).toHaveAttribute("href", "/")
   })
 
@@ -105,7 +105,7 @@ describe("PublicRouteDetail", () => {
         route={route()}
         season={null}
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
         actions={<button>Fork this route</button>}
       />,
     )
@@ -119,7 +119,7 @@ describe("PublicRouteDetail", () => {
         season={null}
         tripState="past"
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.getByText("Past")).toBeInTheDocument()
@@ -130,7 +130,7 @@ describe("PublicRouteDetail", () => {
         season={null}
         tripState="building"
         backHref="/explore"
-        backLabel="← All routes"
+        backLabel="All routes"
       />,
     )
     expect(screen.queryByText("Building")).not.toBeInTheDocument()

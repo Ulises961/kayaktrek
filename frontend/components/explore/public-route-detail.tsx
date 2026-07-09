@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react"
 import Link from "next/link"
+import { BackLink } from "@/components/common/back-link"
 import { SeasonBadge } from "@/components/explore/season-badge"
 import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
 import { daySummariesFromRoute } from "@/lib/itinerary/public-routes"
@@ -40,16 +41,20 @@ export function PublicRouteDetail({
 
   return (
     <Fragment>
-      {/* Top bar */}
-      <div className="absolute top-0 right-0 left-0 z-[1001] flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-sm">
+      {/* Top bar — branding only; back navigation floats separately below/left so it
+          doesn't compete for attention with the logo on the opposite corner. */}
+      <div className="absolute top-0 right-0 left-0 z-[1001] border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-sm">
         <Link href="/" className="font-semibold tracking-tight text-slate-900">
           Kayak Expedition Planner
         </Link>
-        <Link href={backHref} className="text-sm text-slate-600 hover:underline">
-          {backLabel}
-        </Link>
       </div>
 
+      <BackLink
+        href={backHref}
+        label={backLabel}
+        variant="floating"
+        className="absolute top-20 left-6 z-[1001]"
+      />
       {/* Detail card */}
       <div className="absolute bottom-6 left-1/2 z-[1001] w-[min(92vw,28rem)] -translate-x-1/2">
         <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 p-5 shadow-lg backdrop-blur-sm">

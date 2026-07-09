@@ -1,13 +1,13 @@
 import { notFound, redirect } from "next/navigation"
-import Link from "next/link"
 import { format } from "date-fns"
-import { AnchorIcon, ArrowLeftIcon, LinkIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
+import { AnchorIcon, LinkIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
 import React from "react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { formatDayDate } from "@/lib/utils/date"
+import { BackLink } from "@/components/common/back-link"
 import { PrintButton } from "@/components/trips/print-button"
 import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
@@ -65,13 +65,7 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <Link
-            href={`/trips/${id}`}
-            className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs transition-colors print:hidden"
-          >
-            <ArrowLeftIcon className="size-3" />
-            Back to trip
-          </Link>
+          <BackLink href={`/trips/${id}`} label="Back to trip" size="xs" className="print:hidden" />
           <h1 className="text-2xl font-bold tracking-tight">Float Plan</h1>
           <p className="text-base font-medium">{trip.destination ?? "Unnamed expedition"}</p>
           <p className="text-muted-foreground text-sm">{dateLabel}</p>

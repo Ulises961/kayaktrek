@@ -30,7 +30,7 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
         author={detail.originalAuthor}
         tripState={detail.tripState}
         backHref="/"
-        backLabel="← Home"
+        backLabel="Home"
       />
     </div>
   )

@@ -32,8 +32,11 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
         season={season}
         author={detail.originalAuthor}
         tripState={detail.tripState}
-        backHref="/explore"
-        backLabel="← All routes"
+        // /explore is cookie-gated (proxy.ts); an anonymous visitor following that
+        // link would hit a login redirect instead of going back. Mirror the
+        // /story/[token] page's precedent and send them home instead.
+        backHref={session ? "/explore" : "/"}
+        backLabel={session ? "All routes" : "Home"}
         actions={
           <RouteDetailActions itineraryId={id} isAuthenticated={!!session} isOwner={isOwner} />
         }
