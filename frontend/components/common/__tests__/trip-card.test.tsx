@@ -73,9 +73,9 @@ describe("TripCard", () => {
     expect(screen.getByText("No dates set")).toBeDefined()
   })
 
-  it("renders the number of days derived from date range", () => {
+  it("renders the number of days derived from date range (inclusive — Jul 1-5 is 5 days)", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    expect(screen.getByText(/4 days/)).toBeDefined()
+    expect(screen.getByText(/5 days/)).toBeDefined()
   })
 
   it("omits day count when dates are absent", () => {

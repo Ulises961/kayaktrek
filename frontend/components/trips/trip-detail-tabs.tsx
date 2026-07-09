@@ -135,6 +135,8 @@ export function TripDetailTabs({
           itinerary={trip.itinerary}
           isLeader={isLeader}
           tripName={trip.destination ?? ""}
+          dateFrom={trip.dateFrom}
+          dateTo={trip.dateTo}
         />
       </TabsContent>
 

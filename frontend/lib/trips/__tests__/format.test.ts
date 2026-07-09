@@ -2,15 +2,14 @@ import { describe, it, expect } from "vitest"
 import { daysBetween, formatDateRange } from "../format"
 
 describe("daysBetween", () => {
-  it("counts calendar days between two ISO dates", () => {
-    // NOTE: exclusive count (Jul 1 -> Jul 5 reads "4 days", not the inclusive 5).
-    // This is the known bug tracked for M12 §A — preserved here as-is; §L only
-    // relocates the helper, it does not change behavior.
-    expect(daysBetween("2026-07-01", "2026-07-05")).toBe(4)
+  it("counts inclusive calendar days between two ISO dates", () => {
+    // Paddlers plan by inclusive days: Jul 1 -> Jul 5 is 5 paddling days / 4 nights
+    // (M12 §A / review 2.2 — was exclusive, read "4 days" for this exact range).
+    expect(daysBetween("2026-07-01", "2026-07-05")).toBe(5)
   })
 
-  it("returns 0 for the same date", () => {
-    expect(daysBetween("2026-07-01", "2026-07-01")).toBe(0)
+  it("returns 1 for the same date (a single-day trip)", () => {
+    expect(daysBetween("2026-07-01", "2026-07-01")).toBe(1)
   })
 })
 

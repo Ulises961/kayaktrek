@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/utils/date"
+import { daysBetween } from "@/lib/trips/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
@@ -18,6 +19,9 @@ export interface ItineraryTabProps {
   itinerary: Itinerary | null | undefined
   isLeader: boolean
   tripName?: string
+  /** Trip's own inclusive date span — the denominator for "X of Y days routed". */
+  dateFrom?: string | null
+  dateTo?: string | null
 }
 
 const COLLAPSE_LIMIT = 5
@@ -25,12 +29,24 @@ const DEFAULT_SPEED = 2.5
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
+// `day.startPointId` is boundary metadata written by applyBoundaries — it can go
+// stale relative to `day.points` (linked-list membership, ground truth) if a point's
+// day assignment changes without a re-slice. Prefer it as a fast path, but fall back
+// to the point nothing else in the day references as `nextId` (the actual chain head)
+// so a day with real points is never treated as having none (review 2.1).
+function chainHead(day: Day, pts: Point[]): Point | undefined {
+  const map = new Map(pts.map((p) => [p.id!, p]))
+  if (day.startPointId && map.has(day.startPointId)) return map.get(day.startPointId)
+  const referenced = new Set(pts.map((p) => p.nextId).filter((id): id is string => !!id))
+  return pts.find((p) => p.id && !referenced.has(p.id))
+}
+
 function walkDayPoints(day: Day): Point[] {
   const pts = day.points ?? []
-  if (!day.startPointId || pts.length === 0) return []
+  if (pts.length === 0) return []
   const map = new Map(pts.map((p) => [p.id!, p]))
   const ordered: Point[] = []
-  let cur = map.get(day.startPointId)
+  let cur = chainHead(day, pts)
   while (cur && ordered.length < 200) {
     ordered.push(cur)
     cur = cur.nextId ? map.get(cur.nextId) : undefined
@@ -49,7 +65,7 @@ interface DayStats {
 
 function getDayStats(day: Day, speedKnots: number): DayStats {
   const pts = day.points ?? []
-  if (!day.startPointId || pts.length === 0) {
+  if (pts.length === 0) {
     return { isRestDay: true, distanceNm: 0, startName: null, endName: null, hours: 0, minutes: 0 }
   }
   const ordered = walkDayPoints(day)
@@ -58,9 +74,8 @@ function getDayStats(day: Day, speedKnots: number): DayStats {
     .map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }))
   const distanceNm = totalDistanceNm(routePts)
   const { hours, minutes } = estimatedTime(distanceNm, speedKnots)
-  const map = new Map(pts.map((p) => [p.id!, p]))
-  const startName = map.get(day.startPointId!)?.name ?? null
-  const endName = day.endPointId ? (map.get(day.endPointId)?.name ?? null) : null
+  const startName = ordered[0]?.name ?? null
+  const endName = ordered.length > 1 ? (ordered[ordered.length - 1]?.name ?? null) : null
   return { isRestDay: false, distanceNm, startName, endName, hours, minutes }
 }
 
@@ -132,7 +147,14 @@ function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: ItineraryTabProps) {
+export function ItineraryTab({
+  tripId,
+  itinerary,
+  isLeader,
+  tripName,
+  dateFrom,
+  dateTo,
+}: ItineraryTabProps) {
   const [isPending, startTransition] = useTransition()
   const [showAll, setShowAll] = useState(false)
   const [name, setName] = useState(tripName ?? "")
@@ -210,11 +232,25 @@ export function ItineraryTab({ tripId, itinerary, isLeader, tripName }: Itinerar
   const visible = showAll ? days : days.slice(0, COLLAPSE_LIMIT)
   const hasMore = days.length > COLLAPSE_LIMIT
 
+  // The trip's inclusive calendar span is the "how many days is this trip" total
+  // (matches the trip header / trips list, review 2.2) — itinerary.days only holds
+  // the days a Day entity was ever created for, so a calendar date the paddler never
+  // opened the builder for (a skipped day, not even an explicit empty-slice rest day)
+  // is absent from that array entirely. Counting the denominator off the calendar
+  // span rather than `days.length` means those un-modeled gaps still count against
+  // the total instead of silently vanishing.
+  const routedDaysCount = days.filter((d) => (d.points ?? []).length > 0).length
+  const totalTripDays = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
+
   return (
     <div className="flex flex-col gap-5">
       {/* Stats tiles */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-        <StatTile value={days.length} label={days.length === 1 ? "day" : "days"} />
+        {totalTripDays != null ? (
+          <StatTile value={`${routedDaysCount} of ${totalTripDays}`} label="days routed" />
+        ) : (
+          <StatTile value={days.length} label={days.length === 1 ? "day" : "days"} />
+        )}
         {totalMiles > 0 && (
           <StatTile value={`${totalMiles.toFixed(1)} nm`} label="total distance" />
         )}
