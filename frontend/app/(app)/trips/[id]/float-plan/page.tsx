@@ -7,19 +7,11 @@ import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
+import { formatDayDate } from "@/lib/utils/date"
 import { PrintButton } from "@/components/trips/print-button"
 import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
 import { FloatPlanShareSection } from "@/components/trips/float-plan-share-section"
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return "—"
-  try {
-    return format(new Date(iso), "d MMM yyyy")
-  } catch {
-    return iso
-  }
-}
 
 function SectionHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -57,9 +49,9 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
   const dateRange = [trip.dateFrom, trip.dateTo].filter(Boolean)
   const dateLabel =
     dateRange.length === 2
-      ? `${formatDate(dateRange[0])} – ${formatDate(dateRange[1])}`
+      ? `${formatDayDate(dateRange[0])} – ${formatDayDate(dateRange[1])}`
       : dateRange.length === 1
-        ? formatDate(dateRange[0])
+        ? formatDayDate(dateRange[0])
         : "Dates not set"
 
   const sortedCrew = [...travellers].sort((a, b) => {

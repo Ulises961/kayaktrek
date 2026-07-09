@@ -1,10 +1,10 @@
 import Link from "next/link"
-import { format, parseISO } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StateBadge } from "@/components/common/state-badge"
 import { UsersIcon, CalendarIcon, ClockIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Trip, TripState } from "@/lib/dtos/trip"
+import { daysBetween, formatDateRange } from "@/lib/trips/format"
 
 interface TripCardProps {
   trip: Trip
@@ -15,20 +15,6 @@ const STATE_ACCENT: Record<TripState, string> = {
   building: "var(--state-planning-fg)",
   happening: "var(--state-happening-fg)",
   past: "var(--state-past-fg)",
-}
-
-function daysBetween(from: string, to: string): number {
-  const msPerDay = 1000 * 60 * 60 * 24
-  return Math.round((new Date(to).getTime() - new Date(from).getTime()) / msPerDay)
-}
-
-function formatDateRange(from: string, to: string): string {
-  const f = parseISO(from)
-  const t = parseISO(to)
-  const sameYear = f.getFullYear() === t.getFullYear()
-  return sameYear
-    ? `${format(f, "d MMM")} – ${format(t, "d MMM yyyy")}`
-    : `${format(f, "d MMM yyyy")} – ${format(t, "d MMM yyyy")}`
 }
 
 export function TripCard({ trip, hero = false }: TripCardProps) {

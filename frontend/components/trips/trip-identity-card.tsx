@@ -15,6 +15,7 @@ import {
   type TripState,
 } from "@/lib/dtos/trip"
 import { updateTrip } from "@/lib/trips/actions"
+import { daysBetween } from "@/lib/trips/format"
 import { StateBadge } from "@/components/common/state-badge"
 import { fieldLabelClass } from "@/components/common/form-field"
 import { cn } from "@/lib/utils"
@@ -98,12 +99,7 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
   const [isPending, startTransition] = useTransition()
 
   const travellers = trip.travellers ?? []
-  const days =
-    trip.dateFrom && trip.dateTo
-      ? Math.round(
-          (new Date(trip.dateTo).getTime() - new Date(trip.dateFrom).getTime()) / 86_400_000,
-        )
-      : null
+  const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
 
   const {
     register,

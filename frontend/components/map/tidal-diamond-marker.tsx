@@ -19,7 +19,9 @@ export function diamondColor(rateKnots: number | null): string {
   return "#dc2626"
 }
 
-function formatHour(h: number): string {
+// Not `lib/weather/hourly.ts`'s formatHour (which formats an "HH:MM:SS" time
+// string) — this formats an hour offset from high water, e.g. "+2" / "-1".
+function formatHourOffset(h: number): string {
   return h > 0 ? `+${h}` : `${h}`
 }
 
@@ -121,7 +123,7 @@ export function TidalDiamondMarker({
               <tbody>
                 {diamond.hourlyTable.map((row) => (
                   <tr key={row.hourFromHw}>
-                    <td>{formatHour(row.hourFromHw)}</td>
+                    <td>{formatHourOffset(row.hourFromHw)}</td>
                     <td>{row.rateKnots == null ? "—" : `${row.rateKnots.toFixed(1)} kn`}</td>
                     <td>
                       {row.directionDegrees == null ? "—" : `${Math.round(row.directionDegrees)}°`}

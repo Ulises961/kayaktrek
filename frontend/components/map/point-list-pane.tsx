@@ -13,7 +13,7 @@ import {
   applyBoundaries,
 } from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"

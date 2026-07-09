@@ -3,7 +3,7 @@ import { useRef } from "react"
 import { GripVerticalIcon, Trash2Icon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import { legLabel } from "@/lib/itinerary/distance"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
 
 export type BoundaryDividerProps = {

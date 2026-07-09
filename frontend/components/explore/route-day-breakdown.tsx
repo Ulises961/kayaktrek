@@ -1,4 +1,4 @@
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate } from "@/lib/utils/date"
 import type { DaySummary } from "@/lib/itinerary/public-routes"
 
 // Per-day mileage breakdown shown on the public route detail page so planners can see
