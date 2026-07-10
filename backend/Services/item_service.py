@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Fields a client is permitted to change on an existing item.
 # `status` promotes a suggested item to owned (the confirmation step before it
 # can be contributed to a trip requirement).
-_MUTABLE_FIELDS = {"name", "checked", "category_id", "status"}
+_MUTABLE_FIELDS = {"name", "checked", "category_id", "status", "default_pack"}
 
 
 class ItemService:
