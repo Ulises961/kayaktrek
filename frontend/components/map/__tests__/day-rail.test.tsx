@@ -7,6 +7,7 @@ import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context
 import type { MapState } from "@/lib/itinerary/map-reducer"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
+import { getDayColor } from "@/lib/itinerary/colors"
 
 vi.mock("@/lib/weather/actions", () => ({
   fetchDayWeather: vi.fn().mockResolvedValue({ success: false }),
@@ -146,6 +147,13 @@ describe("DayRail — entries", () => {
     expect(empty).toHaveAttribute("data-empty", "true")
     expect(empty).toBeDisabled()
     expect(screen.getByText("No points")).toBeInTheDocument()
+  })
+
+  it("shows a color swatch matching the day's route color", () => {
+    renderWithCtx(makeCtx())
+    const swatches = screen.getAllByTestId("day-color-swatch")
+    expect(swatches[0]).toHaveStyle({ backgroundColor: getDayColor(1) })
+    expect(swatches[1]).toHaveStyle({ backgroundColor: getDayColor(2) })
   })
 
   it("shows empty state message when there are no numbered days", () => {

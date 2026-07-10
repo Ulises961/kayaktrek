@@ -5,6 +5,7 @@ import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { fetchDayWeather } from "@/lib/weather/actions"
 import { representativeHour } from "@/lib/weather/hourly"
 import { formatDayDate } from "@/lib/utils/date"
+import { getDayColor } from "@/lib/itinerary/colors"
 import { BeaufortPill } from "@/components/weather/beaufort-pill"
 import type { Weather } from "@/lib/dtos/weather"
 import type { Day } from "@/lib/dtos/day"
@@ -59,7 +60,14 @@ function DayRailEntry({
           : "text-foreground enabled:hover:bg-muted/60",
       )}
     >
-      <span className="font-semibold">Day {day.dayNumber}</span>
+      <span className="flex items-center gap-1.5 font-semibold">
+        <span
+          data-testid="day-color-swatch"
+          className="h-4 w-1 shrink-0 rounded-sm"
+          style={{ backgroundColor: getDayColor(day.dayNumber) }}
+        />
+        Day {day.dayNumber}
+      </span>
       <span
         className={cn(
           "text-[10px]",

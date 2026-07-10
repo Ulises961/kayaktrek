@@ -25,7 +25,7 @@ export function NavigationItems() {
     { title: "Explore", url: "/explore", icon: CompassIcon },
     { title: "Invitations", url: "/invitations", icon: MailIcon },
     { title: "Gear", url: "/gear", icon: LifeBuoyIcon },
-    { title: "Buddies", url: "/paddlers", icon: UserGroupIcon },
+    { title: "Paddlers", url: "/paddlers", icon: UserGroupIcon },
     { title: "Logs", url: "/logs", icon: NewspaperIcon },
   ]
 
