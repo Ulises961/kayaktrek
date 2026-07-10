@@ -142,30 +142,65 @@ export function BoundaryDivider({
     scrollElRef.current = null
   }
 
-  // The day boundary handle mirrors the static Day 1 header: a full-width bar
-  // with "Day N · date · distance". Drag-to-reassign is confined to the grip so
+  const grip = (
+    <span
+      data-testid="boundary-grip"
+      className="-ml-1 shrink-0 cursor-ns-resize touch-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+    >
+      <GripVerticalIcon className="text-muted-foreground size-3.5" />
+    </span>
+  )
+
+  const deleteButton = onDelete && (
+    <button
+      type="button"
+      aria-label={`Delete day ${labelDayNumber}`}
+      onClick={onDelete}
+      className="text-muted-foreground hover:text-destructive ml-auto shrink-0 transition-colors"
+    >
+      <Trash2Icon className="size-3.5" />
+    </button>
+  )
+
+  // Non-interactive (view mode) has no grip, editable picker, or delete button —
+  // "Day N · date · distance" alone never overflows the pane, so it stays one line.
+  if (!interactive) {
+    return (
+      <div
+        ref={containerRef}
+        data-testid="boundary-label"
+        className="border-border bg-muted/30 flex items-center gap-1.5 border-y px-3 py-1 text-xs font-medium select-none"
+      >
+        <span>Day {labelDayNumber}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">{formatDayDate(labelDate)}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+      </div>
+    )
+  }
+
+  // Interactive (boundary-edit) mode packs a grip, inline date picker, and delete
+  // button on top of the label/distance — two lines so the delete button (line 1,
+  // short content) is never pushed past the pane's fixed width by the longer
+  // date/distance content (line 2). Drag-to-reassign is confined to the grip so
   // the inline date picker and delete button receive normal clicks.
   return (
     <div
       ref={containerRef}
-      data-testid={interactive ? "boundary-drag-handle" : "boundary-label"}
-      className="border-border bg-muted/30 flex items-center gap-1.5 border-y px-3 py-1 text-xs font-medium select-none"
+      data-testid="boundary-drag-handle"
+      className="border-border bg-muted/30 flex flex-col gap-0.5 border-y px-3 py-1 text-xs font-medium select-none"
     >
-      {interactive && (
-        <span
-          data-testid="boundary-grip"
-          className="-ml-1 shrink-0 cursor-ns-resize touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-        >
-          <GripVerticalIcon className="text-muted-foreground size-3.5" />
-        </span>
-      )}
-      <span>Day {labelDayNumber}</span>
-      <span className="text-muted-foreground">·</span>
-      {interactive ? (
+      <div data-testid="boundary-divider-line-1" className="flex items-center gap-1.5">
+        {grip}
+        <span>Day {labelDayNumber}</span>
+        {deleteButton}
+      </div>
+      <div data-testid="boundary-divider-line-2" className="flex items-center gap-1.5 pl-5">
         <DatePicker
           value={labelDate ?? ""}
           onChange={(v) => onDateChange?.(v || null)}
@@ -173,21 +208,9 @@ export function BoundaryDivider({
           size="sm"
           className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
         />
-      ) : (
-        <span className="text-muted-foreground">{formatDayDate(labelDate)}</span>
-      )}
-      <span className="text-muted-foreground">·</span>
-      <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
-      {interactive && onDelete && (
-        <button
-          type="button"
-          aria-label={`Delete day ${labelDayNumber}`}
-          onClick={onDelete}
-          className="text-muted-foreground hover:text-destructive ml-auto shrink-0 transition-colors"
-        >
-          <Trash2Icon className="size-3.5" />
-        </button>
-      )}
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+      </div>
     </div>
   )
 }

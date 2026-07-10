@@ -210,6 +210,44 @@ describe("BoundaryDivider — delete button (interactive mode)", () => {
   })
 })
 
+describe("BoundaryDivider — two-line layout (interactive mode)", () => {
+  it("keeps the grip, day label, and delete button together on the first line", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDelete={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const line1 = screen.getByTestId("boundary-divider-line-1")
+    expect(line1).toContainElement(screen.getByTestId("boundary-grip"))
+    expect(line1).toContainElement(screen.getByRole("button", { name: /delete day 2/i }))
+  })
+
+  it("puts the date picker and distance label on the second line", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDateChange={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const line2 = screen.getByTestId("boundary-divider-line-2")
+    expect(line2).toContainElement(screen.getByRole("button", { name: /2 Jun 2026/i }))
+    expect(line2).toContainElement(screen.getByText(/8\.4/))
+  })
+})
+
 describe("BoundaryDivider — non-interactive (view mode)", () => {
   it("does not render a drag handle", () => {
     render(
