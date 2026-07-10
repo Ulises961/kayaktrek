@@ -48,7 +48,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
     await mutateAndSettle(
       page,
       () => page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Drysuit" }),
-      { refresh: true },
+      { reload: true },
     )
 
     const row = page.locator("li").filter({ hasText: REQ })
@@ -72,7 +72,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
     await mutateAndSettle(
       page,
       () => page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Leader VHF" }),
-      { refresh: true },
+      { reload: true },
     )
 
     const row = page.locator("li").filter({ hasText: REQ })
@@ -97,11 +97,12 @@ test.describe("Trip inventory — requirements & authorship", () => {
     // Proposer (leader) removes it. Removal goes through a window.confirm().
     page.on("dialog", (d) => d.accept())
     await page.goto(`/trips/${tripId}?tab=items`)
-    // NB: POST-only (no `refresh: true`). The revalidated RSC in the action POST
-    // already reflects the removal. Awaiting the trailing router.refresh() refetch
-    // instead races the inventory GET, which re-seeds the removed *default*
-    // requirement ("VHF radio") — so it reappears and the assertion flaps.
-    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click())
+    // Since M6b, defaults seed at trip-creation/member-join only — a reload
+    // does NOT re-seed the removed requirement (the pre-M6b re-seed-on-read
+    // behaviour this test used to dodge is gone).
+    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click(), {
+      reload: true,
+    })
     await expect(page.locator("li").filter({ hasText: REQ })).toHaveCount(0)
   })
 
@@ -115,7 +116,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
     await expect(row.getByText("covered")).toBeVisible()
 
     await mutateAndSettle(page, () => row.getByRole("button", { name: /withdraw/i }).click(), {
-      refresh: true,
+      reload: true,
     })
     await expect(row.getByText("needed")).toBeVisible()
   })

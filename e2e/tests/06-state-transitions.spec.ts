@@ -28,7 +28,7 @@ test.describe("Trip state transitions", () => {
     await page.getByRole("button", { name: /begin expedition/i }).click()
     // Confirmation dialog
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
-      refresh: true,
+      reload: true,
     })
     // "Mark as past" appearing is the end-state signal: state is now "happening" AND RSC has re-rendered
     await expect(page.getByRole("button", { name: /mark as past/i })).toBeVisible()
@@ -48,7 +48,7 @@ test.describe("Trip state transitions", () => {
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("button", { name: /mark as past/i }).click()
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
-      refresh: true,
+      reload: true,
     })
     await expect(page.locator('[data-slot="state-badge"]').filter({ hasText: /past/i })).toBeVisible()
   })
