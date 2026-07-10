@@ -1,4 +1,6 @@
 from Resources.catalog_item_resource import CATALOG_ITEM_ENDPOINT
+from Resources.trip_resource import TRIP_ENDPOINT
+from Resources.inventory_resource import INVENTORY_ENDPOINT
 import json
 
 
@@ -119,3 +121,60 @@ def test_reset_to_default_rejects_when_nonempty(client, outsider_headers, catego
 
     second = client.post(f"{CATALOG_ITEM_ENDPOINT}/reset-to-default", headers=outsider_headers)
     assert second.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# trip_service.create_trip seeding swap (M10 §3)
+# ---------------------------------------------------------------------------
+
+def test_create_trip_seeds_requirements_from_leaders_catalog(client, outsider_headers, category_ids):
+    """A leader with a non-empty CatalogItem template seeds trip requirements
+    from it — not the hardcoded defaults — and stamps provenance."""
+    created = client.post(
+        f"{CATALOG_ITEM_ENDPOINT}/create",
+        json={"name": "Custom drogue", "categoryId": category_ids["gear"]},
+        headers=outsider_headers,
+    )
+    catalog_item = json.loads(created.data)
+
+    trip_response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=outsider_headers,
+    )
+    assert trip_response.status_code == 201
+    trip_data = json.loads(trip_response.data)
+    inventory_id = trip_data["inventory"]["id"]
+
+    inv = json.loads(client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=outsider_headers).data)
+    requirements = inv["requirements"]
+
+    assert len(requirements) == 1, "seeded only from the curated template, not the hardcoded defaults"
+    assert requirements[0]["name"] == "Custom drogue"
+    assert requirements[0]["category"] == "gear"
+    assert requirements[0]["catalogItemId"] == catalog_item["id"]
+
+    client.delete(f"{TRIP_ENDPOINT}/{trip_data['id']}", headers=outsider_headers)
+    client.delete(f"{CATALOG_ITEM_ENDPOINT}/{catalog_item['id']}", headers=outsider_headers)
+
+
+def test_create_trip_falls_back_to_defaults_without_catalog(client, outsider_headers):
+    """A leader with no CatalogItem rows still gets the hardcoded default set,
+    unchanged from pre-M10 behaviour."""
+    trip_response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=outsider_headers,
+    )
+    assert trip_response.status_code == 201
+    trip_data = json.loads(trip_response.data)
+    inventory_id = trip_data["inventory"]["id"]
+
+    inv = json.loads(client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=outsider_headers).data)
+    requirements = inv["requirements"]
+
+    assert len(requirements) >= 10, "expected the hardcoded default requirement set"
+    assert "Repair kit" in {r["name"] for r in requirements}
+    assert all(r["catalogItemId"] is None for r in requirements)
+
+    client.delete(f"{TRIP_ENDPOINT}/{trip_data['id']}", headers=outsider_headers)
