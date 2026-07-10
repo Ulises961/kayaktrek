@@ -62,8 +62,17 @@ export async function mutateAndSettle(
   // waitForResponse resolves on response HEADERS, but a server action STREAMS its
   // body — reloading at headers-time can interrupt the action mid-flight and race
   // a page render against the not-yet-committed mutation (observed: the buddy
-  // invite's reload rendering the pre-invite trip). Wait for the full body.
-  await actionResponse.finished()
+  // invite's reload rendering the pre-invite trip). So wait for the body — but
+  // bounded: when Next 16.2's router drops the apply of a streamed action response
+  // (see MutateOptions.reload), it abandons the stream unconsumed and finished()
+  // never resolves (observed: every reload-settled spec hanging to test timeout).
+  // The grace period only needs to cover headers→commit — the action function
+  // (and its backend mutation) has run to completion before any revalidated-tree
+  // bytes stream — not the full body.
+  await Promise.race([
+    actionResponse.finished().catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 5_000)),
+  ])
 
   if (options.reload) {
     await page.reload()
