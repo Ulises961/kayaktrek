@@ -69,10 +69,20 @@ export async function mutateAndSettle(
   // The grace period only needs to cover headers→commit — the action function
   // (and its backend mutation) has run to completion before any revalidated-tree
   // bytes stream — not the full body.
-  await Promise.race([
-    actionResponse.finished().catch(() => undefined),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ])
+  try {
+    await Promise.race([
+      // body() resolves only once the FULL body arrived — unlike finished(), it
+      // REJECTS when the router aborted the stream, letting us tell "action done"
+      // from "action still executing server-side after a dropped apply".
+      actionResponse.body(),
+      new Promise((resolve) => setTimeout(resolve, 5_000)),
+    ])
+  } catch {
+    // Aborted mid-stream: the server keeps executing the action after the client
+    // drops it — give the mutation the full grace window to commit before any
+    // reload reads the backend.
+    await page.waitForTimeout(5_000)
+  }
 
   if (options.reload) {
     await page.reload()
