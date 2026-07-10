@@ -22,6 +22,7 @@ from Models.sea import Sea
 from Models.weather import Weather
 from Models.inventory import Inventory
 from Models.item import Item
+from Models.catalog_item import CatalogItem
 from Models.point import Point
 from Models.log import Log
 from Models.image import Image
@@ -123,7 +124,7 @@ def require_owner(
 
     Args:
         resource_type: Type of resource ('trip', 'itinerary', 'day', 'sea', 'weather',
-                        'inventory', 'item', 'point', 'log', 'image')
+                        'inventory', 'item', 'catalog_item', 'point', 'log', 'image')
         id_param: Name of the parameter containing the resource ID (default: 'id')
         from_body: If True, extract id_param from request body instead of URL (default: False)
         parent_resource: Tuple of (parent_type, parent_id_param) to check parent ownership
@@ -248,6 +249,9 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
 
         elif resource_type == "item":
             return _check_item_ownership(g.current_user_id, resource_id)
+
+        elif resource_type == "catalog_item":
+            return _check_catalog_item_ownership(g.current_user_id, resource_id)
 
         elif resource_type == "point":
             return _check_point_ownership(g.current_user_id, resource_id)
@@ -435,6 +439,14 @@ def _check_item_ownership(user_id: str, item_id: str) -> Optional[bool]:
     if not item:
         return None
     return item.user_id == UUID(user_id) if item.user_id else False
+
+
+def _check_catalog_item_ownership(user_id: str, catalog_item_id: str) -> Optional[bool]:
+    """Check if the current user owns the catalog item template row."""
+    item = db.session.query(CatalogItem).filter_by(id=UUID(catalog_item_id)).first()
+    if not item:
+        return None
+    return item.owner_id == UUID(user_id)
 
 
 def _check_point_ownership(user_id: str, point_id: str) -> Optional[bool]:
