@@ -8,7 +8,6 @@ import { config } from "../proxy"
 const APP_SEGMENTS = [
   "dashboard",
   "design",
-  "explore",
   "gear",
   "invitations",
   "itinerary",
@@ -19,10 +18,16 @@ const APP_SEGMENTS = [
 ]
 
 describe("proxy matcher", () => {
-  it("gates every (app) segment except paddlers with a :path* wildcard", () => {
+  it("gates every (app) segment except paddlers and explore with a :path* wildcard", () => {
     for (const segment of APP_SEGMENTS) {
       expect(config.matcher).toContain(`/${segment}/:path*`)
     }
+  })
+
+  it("does NOT gate /explore — the M7c route library is anonymous-facing", () => {
+    // (app)/explore renders for anonymous visitors (fork CTA gated in-page via
+    // isAuthenticated). Gating it here broke anon discovery (2026-07-10 fix).
+    expect(config.matcher.some((m: string) => m.startsWith("/explore"))).toBe(false)
   })
 
   it("gates /paddlers as an EXACT match only — never a wildcard", () => {

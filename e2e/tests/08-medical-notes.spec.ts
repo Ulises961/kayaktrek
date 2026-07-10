@@ -45,8 +45,10 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     // Save
     await crewPage.getByRole("button", { name: /^save$/i }).click()
     await expect(crewPage.getByText("Saved.")).toBeVisible()
-    // Share with trip leader so they can decrypt
+    // Share with trip leader so they can decrypt. Wait for the confirmation —
+    // closing the context right after the click can kill the share POST mid-flight.
     await crewPage.getByRole("button", { name: /share with trip leader/i }).click()
+    await expect(crewPage.getByText("Shared with trip leader.")).toBeVisible()
     await crewContext.close()
 
     // Leader: navigate to the float plan page where the crew manifest lives

@@ -18,12 +18,16 @@ test.describe("Crew invitation flow", () => {
   })
 
   test("leader invites crew → crew accepts → crew appears on trip", async ({ page, browser }) => {
-    // Leader: navigate to trip and invite crew by email
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /crew/i }).click()
-    await page.getByRole("button", { name: /invite/i }).click()
+    // Leader: navigate to trip and invite crew by email. The invite form is
+    // always visible on the crew tab (M7b also added an "Invite a buddy"
+    // picker next to it, so match the submit button exactly).
+    await page.goto(`/trips/${tripId}?tab=crew`)
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
-    await page.getByRole("button", { name: /invite/i }).click()
+    await mutateAndSettle(
+      page,
+      () => page.getByRole("button", { name: "Invite", exact: true }).click(),
+      { reload: true },
+    )
     await expect(page.getByText(CREW.name)).toBeVisible()
 
     // Crew: open the trip in a separate context and accept the invitation
@@ -32,28 +36,39 @@ test.describe("Crew invitation flow", () => {
     })
     const crewPage = await crewContext.newPage()
     await crewPage.goto(`/invitations`)
-    await crewPage.getByRole("button", { name: /accept/i }).click()
+    // Scope to this trip's card — residue invitations from aborted runs may coexist
+    // on the persistent dev DB, and a bare /accept/i would be ambiguous.
+    await mutateAndSettle(crewPage, () =>
+      crewPage
+        .locator("[data-slot=card]", { hasText: "E2E Invitation Test" })
+        .getByRole("button", { name: /accept/i })
+        .click(),
+    )
     await crewContext.close()
 
     // Leader: refresh and verify crew is now a traveller (not pending)
     await page.reload()
-    await page.getByRole("tab", { name: /crew/i }).click()
     await expect(page.getByText(CREW.name)).toBeVisible()
   })
 
   test("leader can cancel a pending invitation", async ({ page }) => {
     // Invite via API, then cancel via UI
     const leaderPage = page
-    await leaderPage.goto(`/trips/${tripId}`)
-    await leaderPage.getByRole("tab", { name: /crew/i }).click()
-    await leaderPage.getByRole("button", { name: /invite/i }).click()
+    // Tab carried in the URL so the post-mutation reloads land back on Crew.
+    await leaderPage.goto(`/trips/${tripId}?tab=crew`)
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
-    await leaderPage.getByRole("button", { name: /invite/i }).click()
+    await mutateAndSettle(
+      leaderPage,
+      () => leaderPage.getByRole("button", { name: "Invite", exact: true }).click(),
+      { reload: true },
+    )
     await expect(leaderPage.getByText(CREW.name)).toBeVisible()
 
     // Cancel
-    await mutateAndSettle(leaderPage, () =>
-      leaderPage.getByRole("button", { name: /cancel invitation/i }).click(),
+    await mutateAndSettle(
+      leaderPage,
+      () => leaderPage.getByRole("button", { name: /cancel invitation/i }).click(),
+      { reload: true },
     )
     await expect(leaderPage.getByText(CREW.name)).not.toBeVisible()
   })

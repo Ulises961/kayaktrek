@@ -9,6 +9,12 @@ updates:
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    ignore:
+      # shadcn is a scaffolding CLI: CI never exercises its codegen, and v4
+      # changes generated component conventions (base-ui default). Upgrade
+      # deliberately next time components are scaffolded.
+      - dependency-name: "shadcn"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
