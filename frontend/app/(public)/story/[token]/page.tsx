@@ -20,8 +20,8 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
   const season = seasonOfDetail(detail)
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
-      <div className="absolute inset-0">
+    <div className="flex h-screen w-full overflow-hidden">
+      <div className="relative min-w-0 flex-1">
         <MapLoader routes={[route]} />
       </div>
       <PublicRouteDetail

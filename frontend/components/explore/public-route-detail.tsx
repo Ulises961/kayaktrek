@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { BackLink } from "@/components/common/back-link"
 import { SeasonBadge } from "@/components/explore/season-badge"
@@ -21,13 +21,16 @@ type Props = {
   actions?: ReactNode
 }
 
-// The card/top-bar layout shared by the discoverable route detail (`/routes/[id]`,
-// gated on Itinerary.is_public) and the unlisted story share (`/story/[token]`) — the
-// content a visitor sees is identical either way; only the fetch and the offered
-// actions (fork/open, discoverable-only) differ between the two pages.
+// The docked side-panel layout shared by the discoverable route detail
+// (`/routes/[id]`, gated on Itinerary.is_public) and the unlisted story share
+// (`/story/[token]`) — the content a visitor sees is identical either way; only the
+// fetch and the offered actions (fork/open, discoverable-only) differ between the
+// two pages.
 //
-// Renders only the top bar + floating card (both absolutely positioned) — the caller
-// owns the `relative h-screen w-full` wrapper and lays the map underneath as a sibling.
+// Renders as a flex sibling of the map, not an overlay on top of it — the caller
+// owns the `flex h-screen w-full` wrapper and lays the map in a `flex-1` column
+// beside this panel (M12 §B/2.6 — the card used to float over the route it was
+// meant to frame).
 export function PublicRouteDetail({
   route,
   season,
@@ -41,62 +44,56 @@ export function PublicRouteDetail({
   const daySummaries = daySummariesFromRoute(route)
 
   return (
-    <Fragment>
-      {/* Top bar — branding only; back navigation floats separately below/left so it
-          doesn't compete for attention with the logo on the opposite corner. */}
-      <div className="absolute top-0 right-0 left-0 z-[1001] border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-sm">
-        <Link href="/" className="font-semibold tracking-tight text-slate-900">
+    <div
+      data-testid="route-detail-panel"
+      className="border-border bg-background flex h-full w-full shrink-0 flex-col overflow-y-auto border-l sm:w-96"
+    >
+      <div className="border-border shrink-0 border-b px-5 py-4">
+        <Link href="/" className="text-foreground font-semibold tracking-tight">
           Kayak Expedition Planner
         </Link>
       </div>
 
-      <BackLink
-        href={backHref}
-        label={backLabel}
-        variant="floating"
-        className="absolute top-20 left-6 z-[1001]"
-      />
-      {/* Detail card */}
-      <div className="absolute bottom-6 left-1/2 z-[1001] w-[min(92vw,28rem)] -translate-x-1/2">
-        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 p-5 shadow-lg backdrop-blur-sm">
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-lg leading-tight font-semibold text-slate-900">{route.name}</h1>
-            <div className="flex items-center gap-1.5">
-              {isHistory && (
-                <span className="inline-flex items-center rounded-[3px] border border-current px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] text-slate-500 uppercase opacity-90">
-                  Past
-                </span>
-              )}
-              <SeasonBadge season={season} />
-            </div>
-          </div>
-          <div className="flex gap-4 text-sm text-slate-600">
-            {route.totalMiles != null && <span>{route.totalMiles.toFixed(1)} nm</span>}
-            {route.dayCount > 0 && (
-              <span>
-                {route.dayCount} {route.dayCount === 1 ? "day" : "days"}
+      <div className="flex flex-col gap-4 p-5">
+        <BackLink href={backHref} label={backLabel} />
+
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-lg leading-tight font-semibold">{route.name}</h1>
+          <div className="flex items-center gap-1.5">
+            {isHistory && (
+              <span className="text-muted-foreground inline-flex items-center rounded-[3px] border border-current px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase opacity-90">
+                Past
               </span>
             )}
+            <SeasonBadge season={season} />
           </div>
-          <RouteDayBreakdown days={daySummaries} />
-          {author && (
-            <p className="text-sm text-slate-600">
-              Cloned from{" "}
-              {author.linkable ? (
-                <Link
-                  href={`/paddlers/${author.username}`}
-                  className="font-medium text-slate-900 hover:underline"
-                >
-                  {author.name ?? author.username}
-                </Link>
-              ) : (
-                <span className="font-medium text-slate-900">{author.name ?? author.username}</span>
-              )}
-            </p>
-          )}
-          {actions}
         </div>
+        <div className="text-muted-foreground flex gap-4 text-sm">
+          {route.totalMiles != null && <span>{route.totalMiles.toFixed(1)} nm</span>}
+          {route.dayCount > 0 && (
+            <span>
+              {route.dayCount} {route.dayCount === 1 ? "day" : "days"}
+            </span>
+          )}
+        </div>
+        <RouteDayBreakdown days={daySummaries} />
+        {author && (
+          <p className="text-muted-foreground text-sm">
+            Cloned from{" "}
+            {author.linkable ? (
+              <Link
+                href={`/paddlers/${author.username}`}
+                className="text-foreground font-medium hover:underline"
+              >
+                {author.name ?? author.username}
+              </Link>
+            ) : (
+              <span className="text-foreground font-medium">{author.name ?? author.username}</span>
+            )}
+          </p>
+        )}
+        {actions}
       </div>
-    </Fragment>
+    </div>
   )
 }

@@ -100,6 +100,19 @@ describe("PublicRouteDetail", () => {
     expect(link).toHaveAttribute("href", "/")
   })
 
+  it("docks as a side panel, not an overlay positioned over the map", () => {
+    render(
+      <PublicRouteDetail
+        route={route()}
+        season={null}
+        backHref="/explore"
+        backLabel="All routes"
+      />,
+    )
+    const panel = screen.getByTestId("route-detail-panel")
+    expect(panel.className).not.toMatch(/absolute/)
+  })
+
   it("renders the actions slot", () => {
     render(
       <PublicRouteDetail
