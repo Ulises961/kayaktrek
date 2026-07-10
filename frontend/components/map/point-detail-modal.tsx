@@ -1,6 +1,6 @@
 "use client"
 import { useState, useCallback, useRef } from "react"
-import type { ChangeEvent } from "react"
+import type { ChangeEvent, KeyboardEvent } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -21,7 +21,14 @@ import {
   deletePointImage,
 } from "@/lib/itinerary/actions"
 import { cn } from "@/lib/utils"
-import { POINT_TYPE, type Point } from "@/lib/dtos/point"
+import { POINT_TYPE, type Point, type PointType } from "@/lib/dtos/point"
+import { useSaveStatus } from "@/hooks/use-save-status"
+import { SaveStatusLine } from "@/components/common/save-status-line"
+
+const TYPE_OPTIONS: { type: PointType; label: string; Icon: typeof Anchor }[] = [
+  { type: POINT_TYPE.STOP, label: "Stop", Icon: Anchor },
+  { type: POINT_TYPE.POSITION, label: "Position", Icon: CircleDot },
+]
 
 type PointDetailModalProps = {
   point: Point
@@ -52,16 +59,42 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
 
   const [imageIdx, setImageIdx] = useState(0)
   const [draftNotes, setDraftNotes] = useState(point.notes ?? "")
+  const { status: notesSaveStatus, run: runNotesSave } = useSaveStatus()
 
   const coords = coordLabel(point)
   const displayName = point.name || coords || "Waypoint"
 
-  const handleNotesBlur = useCallback(async () => {
+  const flushNotes = useCallback(async () => {
     const trimmed = draftNotes.trim()
     if (trimmed === (point.notes ?? "")) return
-    dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { notes: trimmed } })
-    await updatePoint(point.id!, { notes: trimmed })
-  }, [draftNotes, point.id, point.notes, dispatch])
+    await runNotesSave(async () => {
+      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { notes: trimmed } })
+      await updatePoint(point.id!, { notes: trimmed })
+    })
+  }, [draftNotes, point.id, point.notes, dispatch, runNotesSave])
+
+  const handleNotesKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault()
+        void flushNotes()
+      }
+    },
+    [flushNotes],
+  )
+
+  const handleClose = useCallback(async () => {
+    await flushNotes()
+    onClose()
+  }, [flushNotes, onClose])
+
+  const handleTypeChange = useCallback(
+    async (type: PointType) => {
+      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { type } })
+      await updatePoint(point.id!, { type })
+    },
+    [point.id, dispatch],
+  )
 
   const prev = () => setImageIdx((i) => (i - 1 + images.length) % images.length)
   const next = () => setImageIdx((i) => (i + 1) % images.length)
@@ -105,11 +138,32 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   }, [current, point.id, point.images, dispatch])
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && void handleClose()}>
       <DialogContent className="flex h-[80vh] max-w-md flex-col gap-0 overflow-hidden p-0">
         {/* Header */}
         <div className="border-border/60 shrink-0 border-b px-4 py-3">
-          <TypeBadge type={point.type ?? "position"} />
+          {canEdit ? (
+            <div className="flex gap-1">
+              {TYPE_OPTIONS.map(({ type, label, Icon }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleTypeChange(type)}
+                  className={cn(
+                    "flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-widest uppercase transition-colors",
+                    (point.type ?? POINT_TYPE.POSITION) === type
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted",
+                  )}
+                >
+                  <Icon className="size-3" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <TypeBadge type={point.type ?? "position"} />
+          )}
           <DialogTitle className="mt-0.5 text-sm leading-tight font-semibold">
             {displayName}
           </DialogTitle>
@@ -225,14 +279,18 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
 
         {/* Notes */}
         <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
-          <p className="text-muted-foreground mb-2 text-[9px] font-bold tracking-widest uppercase">
-            Notes
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-muted-foreground text-[9px] font-bold tracking-widest uppercase">
+              Notes
+            </p>
+            {canEdit && <SaveStatusLine status={notesSaveStatus} />}
+          </div>
           {canEdit ? (
             <textarea
               value={draftNotes}
               onChange={(e) => setDraftNotes(e.target.value)}
-              onBlur={handleNotesBlur}
+              onBlur={() => void flushNotes()}
+              onKeyDown={handleNotesKeyDown}
               placeholder="Landing notes, hazards, tidal timing, anything worth remembering…"
               className="border-border/40 bg-muted/20 placeholder:text-muted-foreground/40 focus:border-primary/50 min-h-0 flex-1 resize-none rounded-lg border px-3 py-2.5 text-[13px] leading-relaxed focus:outline-none"
             />

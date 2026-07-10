@@ -12,8 +12,12 @@ vi.mock("@/hooks/use-collapse-sidebar", () => ({
 
 vi.mock("next/dynamic", () => ({
   default: (_importFn: unknown, _opts?: unknown) =>
-    function MockMapCore() {
-      return <div data-testid="map-core" />
+    function MockMapCore(props: { onMarkerClick?: (pointId: string) => void }) {
+      return (
+        <div data-testid="map-core">
+          <button onClick={() => props.onMarkerClick?.("p1")}>simulate-marker-click</button>
+        </div>
+      )
     },
 }))
 
@@ -29,9 +33,19 @@ vi.mock("../feature-drawer", () => ({
   FeatureDrawer: () => <div data-testid="feature-drawer" />,
 }))
 
-vi.mock("../point-detail-sheet", () => ({
-  PointDetailSheet: () => null,
-}))
+vi.mock("../point-detail-sheet", async () => {
+  const { useMapBuilder } = await import("@/lib/itinerary/map-builder-context")
+  return {
+    PointDetailSheet: () => {
+      const { selectedPointId, selectedDayId } = useMapBuilder()
+      return (
+        <div data-testid="selected-info">
+          {selectedPointId ?? "none"}|{selectedDayId ?? "none"}
+        </div>
+      )
+    },
+  }
+})
 
 vi.mock("@/lib/itinerary/actions", () => ({
   createDay: vi.fn().mockResolvedValue({ success: false }),
@@ -156,5 +170,47 @@ describe("MapBuilder", () => {
       within(screen.getByTestId("stats-strip")).getByRole("button", { name: "km" }),
     )
     expect(setUnitPreference).toHaveBeenCalledWith(DISTANCE_UNIT.KM)
+  })
+
+  it("view mode: clicking a map marker selects the point and its day", async () => {
+    const withPoint: Itinerary = {
+      ...ITINERARY,
+      days: [
+        {
+          dayNumber: 1,
+          id: "day-1",
+          points: [{ id: "p1", type: "stop", latitude: 44, longitude: 14, dayId: "day-1" }],
+        },
+      ],
+    }
+    render(<MapBuilder itinerary={withPoint} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    expect(screen.getByTestId("selected-info")).toHaveTextContent("none|none")
+    await userEvent.click(screen.getByText("simulate-marker-click"))
+    expect(screen.getByTestId("selected-info")).toHaveTextContent("p1|day-1")
+  })
+
+  it("edit mode: clicking a map marker does not touch view-mode selection", async () => {
+    const withPoint: Itinerary = {
+      ...ITINERARY,
+      days: [
+        {
+          dayNumber: 1,
+          id: "day-1",
+          points: [{ id: "p1", type: "stop", latitude: 44, longitude: 14, dayId: "day-1" }],
+        },
+      ],
+    }
+    render(
+      <MapBuilder
+        itinerary={withPoint}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        isLeader={true}
+        tripState="building"
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
+    await userEvent.click(screen.getByText("simulate-marker-click"))
+    expect(screen.queryByTestId("selected-info")).not.toBeInTheDocument()
   })
 })

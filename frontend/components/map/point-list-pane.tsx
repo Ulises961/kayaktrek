@@ -15,6 +15,7 @@ import {
 import { initialMapState } from "@/lib/itinerary/map-reducer"
 import { formatDayDate } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
+import { useSaveStatus } from "@/hooks/use-save-status"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
@@ -153,18 +154,22 @@ export function PointListPane() {
     [draftSlices],
   )
 
+  const { status: nameSaveStatus, run: runNameSave } = useSaveStatus()
+
   const handleNameBlur = useCallback(
     async (pointId: string, name: string) => {
       if (draftSlices) return
       const trimmed = name.trim()
       const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
       if (trimmed === currentName) return
-      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
-      dispatch({ type: "SAVING_START" })
-      await updatePoint(pointId, { name: trimmed || null })
-      dispatch({ type: "SAVING_END" })
+      await runNameSave(async () => {
+        dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
+        dispatch({ type: "SAVING_START" })
+        await updatePoint(pointId, { name: trimmed || null })
+        dispatch({ type: "SAVING_END" })
+      })
     },
-    [draftSlices, dispatch, state.points],
+    [draftSlices, dispatch, state.points, runNameSave],
   )
 
   const handleDelete = useCallback(
@@ -490,6 +495,7 @@ export function PointListPane() {
                   onTypeChange={(type) => point.id && handleTypeChange(point.id, type)}
                   onNameChange={(name) => point.id && handleNameChange(point.id, name)}
                   onNameBlur={(name) => point.id && handleNameBlur(point.id, name)}
+                  saveStatus={isExpanded && !draftSlices ? nameSaveStatus : "idle"}
                   onDelete={point.id ? () => handleDelete(point.id!) : undefined}
                 />
               </div>

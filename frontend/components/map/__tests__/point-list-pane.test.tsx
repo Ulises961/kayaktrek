@@ -112,6 +112,24 @@ describe("PointListPane — drop mode (no draftSlices)", () => {
     expect(screen.getAllByTestId("point-row")).toHaveLength(3)
   })
 
+  it("shows a Saved status after blur-saving the expanded row's name", async () => {
+    const ctx = makeCtx({ activePointId: "p1" })
+    renderWithCtx(ctx)
+    const nameInput = screen.getByPlaceholderText("Point name")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.tab()
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+    expect(await screen.findByText(/saved/i)).toBeInTheDocument()
+  })
+
+  it("does not show a save status while in boundary-edit (draft) mode", () => {
+    const draft: DaySlice[] = [{ dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
+    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1" })
+    renderWithCtx(ctx)
+    expect(screen.queryByText(/saving|saved/i)).not.toBeInTheDocument()
+  })
+
   it("shows 'Edit boundaries' button when days exist", () => {
     const ctx = makeCtx({
       state: {

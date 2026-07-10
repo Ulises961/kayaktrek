@@ -81,7 +81,9 @@ beforeEach(() => vi.clearAllMocks())
 
 describe("PointDetailModal", () => {
   it("shows the point name, type and coordinates", () => {
-    renderModal(POINT)
+    // Non-editable: the type renders as the static badge. Editable mode replaces it
+    // with the interactive stop/position control, covered separately below.
+    renderModal(POINT, false)
     expect(screen.getByText("Vikten Sea Caves")).toBeInTheDocument()
     expect(screen.getByText("stop")).toBeInTheDocument()
     expect(screen.getByText(/68\.071°N · 13\.512°E/)).toBeInTheDocument()
@@ -124,6 +126,51 @@ describe("PointDetailModal", () => {
     renderModal(POINT, false)
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
     expect(screen.getByText("Only enter near slack water.")).toBeInTheDocument()
+  })
+
+  it("shows a Saving… then Saved status after the notes are blur-saved", async () => {
+    renderModal(POINT, true)
+    const textarea = screen.getByRole("textbox")
+    await userEvent.clear(textarea)
+    await userEvent.type(textarea, "New note")
+    await userEvent.tab()
+    expect(await screen.findByText(/saved/i)).toBeInTheDocument()
+  })
+
+  it("saves notes on Ctrl+Enter without needing blur first", async () => {
+    renderModal(POINT, true)
+    const textarea = screen.getByRole("textbox")
+    await userEvent.clear(textarea)
+    await userEvent.type(textarea, "New note")
+    await userEvent.keyboard("{Control>}{Enter}{/Control}")
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { notes: "New note" })
+  })
+
+  it("flushes unsaved notes when the modal is closed before blur", async () => {
+    const onClose = vi.fn()
+    renderModal(POINT, true, onClose)
+    const textarea = screen.getByRole("textbox")
+    await userEvent.clear(textarea)
+    await userEvent.type(textarea, "New note")
+    await userEvent.keyboard("{Escape}")
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { notes: "New note" })
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it("shows an interactive stop/position control when editable, calling updatePoint on change", async () => {
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /^position$/i }))
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { type: "position" })
+    expect(baseCtx.dispatch).toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { type: "position" },
+    })
+  })
+
+  it("does not show a point-type control when not editable", () => {
+    renderModal(POINT, false)
+    expect(screen.queryByRole("button", { name: /^position$/i })).not.toBeInTheDocument()
   })
 
   it("shows a visibility toggle labelled for the current photo's state when editable", () => {

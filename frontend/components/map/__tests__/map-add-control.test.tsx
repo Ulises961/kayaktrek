@@ -32,16 +32,38 @@ describe("MapAddControl", () => {
     expect(screen.getByTestId("add-diamond-button")).toBeInTheDocument()
   })
 
-  it("omits the diamond item when a day is not selected (canAddDiamond false)", () => {
-    render(<MapAddControl {...BASE} canAddDiamond={false} />)
-    expect(screen.getByTestId("add-place-button")).toBeInTheDocument()
-    expect(screen.queryByTestId("add-diamond-button")).not.toBeInTheDocument()
+  it("shows a one-line description under each item", () => {
+    render(<MapAddControl {...BASE} />)
+    expect(screen.getByText(/point of interest/i)).toBeInTheDocument()
+    expect(screen.getByText(/manual tide entry/i)).toBeInTheDocument()
   })
 
-  it("omits the place item when places cannot be managed", () => {
+  it("shows a click-the-map hint for route points in the disclosure", () => {
+    render(<MapAddControl {...BASE} />)
+    fireEvent.click(screen.getByTestId("add-button"))
+    expect(screen.getByText(/route points: click the map/i)).toBeInTheDocument()
+  })
+
+  it("disables the diamond item with a reason when a day is not selected, instead of hiding it", () => {
+    render(<MapAddControl {...BASE} canAddDiamond={false} />)
+    expect(screen.getByTestId("add-place-button")).toBeInTheDocument()
+    const diamondButton = screen.getByTestId("add-diamond-button")
+    expect(diamondButton).toBeInTheDocument()
+    expect(diamondButton).toBeDisabled()
+    expect(screen.getByText(/select a day first/i)).toBeInTheDocument()
+  })
+
+  it("clicking the disabled diamond item does not start placement", () => {
+    const onStartDiamond = vi.fn()
+    render(<MapAddControl {...BASE} canAddDiamond={false} onStartDiamond={onStartDiamond} />)
+    fireEvent.click(screen.getByTestId("add-diamond-button"))
+    expect(onStartDiamond).not.toHaveBeenCalled()
+  })
+
+  it("disables the place item (never hidden) when places cannot be managed", () => {
     render(<MapAddControl {...BASE} canAddPlace={false} />)
-    expect(screen.queryByTestId("add-place-button")).not.toBeInTheDocument()
-    expect(screen.getByTestId("add-diamond-button")).toBeInTheDocument()
+    expect(screen.getByTestId("add-place-button")).toBeDisabled()
+    expect(screen.getByTestId("add-diamond-button")).not.toBeDisabled()
   })
 
   it("starts place placement and closes the menu when Place is clicked", () => {

@@ -81,29 +81,40 @@ export function MapAddControl({
         )}
       >
         <div className="divide-border/20 flex flex-col divide-y">
-          {canAddPlace && (
-            <button
-              type="button"
-              data-testid="add-place-button"
-              onClick={pick(onStartPlace)}
-              className="hover:bg-muted/40 flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium transition-colors"
-            >
-              <MapPin className="size-3.5 shrink-0 text-[#0e7490]" aria-hidden />
-              Place
-            </button>
-          )}
-          {canAddDiamond && (
-            <button
-              type="button"
-              data-testid="add-diamond-button"
-              onClick={pick(onStartDiamond)}
-              className="hover:bg-muted/40 flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-medium transition-colors"
-            >
-              <Diamond className="size-3.5 shrink-0 text-[#f97316]" aria-hidden />
-              Tidal diamond
-            </button>
-          )}
+          <button
+            type="button"
+            data-testid="add-place-button"
+            disabled={!canAddPlace}
+            onClick={canAddPlace ? pick(onStartPlace) : undefined}
+            className="hover:enabled:bg-muted/40 flex w-full items-start gap-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <MapPin className="mt-0.5 size-3.5 shrink-0 text-[#0e7490]" aria-hidden />
+            <span className="flex flex-col">
+              <span className="text-[11px] font-medium">Place</span>
+              <span className="text-muted-foreground text-[10px]">
+                A point of interest anyone viewing this trip&apos;s map can see.
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            data-testid="add-diamond-button"
+            disabled={!canAddDiamond}
+            onClick={canAddDiamond ? pick(onStartDiamond) : undefined}
+            className="hover:enabled:bg-muted/40 flex w-full items-start gap-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Diamond className="mt-0.5 size-3.5 shrink-0 text-[#f97316]" aria-hidden />
+            <span className="flex flex-col">
+              <span className="text-[11px] font-medium">Tidal diamond</span>
+              <span className="text-muted-foreground text-[10px]">
+                {canAddDiamond ? "Manual tide entry for the selected day." : "Select a day first."}
+              </span>
+            </span>
+          </button>
         </div>
+        <p className="text-muted-foreground border-border/20 border-t px-3 py-2 text-[10px] italic">
+          Route points: click the map.
+        </p>
       </div>
     </div>
   )

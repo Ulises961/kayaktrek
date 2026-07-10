@@ -130,9 +130,18 @@ export function MapBuilder({
     /* intentional — MapCore handles live label updates locally */
   }, [])
 
-  const handleMarkerClick = useCallback((pointId: string) => {
-    setActivePointId((prev) => (prev === pointId ? null : pointId))
-  }, [])
+  const handleMarkerClick = useCallback(
+    (pointId: string) => {
+      if (viewMode) {
+        const point = state.points.find((p) => p.id === pointId)
+        setSelectedPointId(pointId)
+        setSelectedDayId(point?.dayId ?? null)
+        return
+      }
+      setActivePointId((prev) => (prev === pointId ? null : pointId))
+    },
+    [viewMode, state.points],
+  )
 
   const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
     setDistanceUnit(unit)
