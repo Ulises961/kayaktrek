@@ -71,6 +71,9 @@ test.describe("Paddler connections", () => {
       () => crewPage.getByRole("button", { name: /accept/i }).click(),
       { reload: true },
     )
+    // The /paddlers tabs are client state, so the settle reload lands back on
+    // "Find" — re-open Buddies before asserting.
+    await crewPage.getByRole("tab", { name: /buddies/i }).click()
     await expect(crewPage.getByRole("button", { name: /unfriend/i })).toBeVisible()
     await crewContext.close()
 

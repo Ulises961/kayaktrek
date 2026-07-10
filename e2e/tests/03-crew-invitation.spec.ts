@@ -33,7 +33,12 @@ test.describe("Crew invitation flow", () => {
     })
     const crewPage = await crewContext.newPage()
     await crewPage.goto(`/invitations`)
-    await crewPage.getByRole("button", { name: /accept/i }).click()
+    // Scope to this trip's card — residue invitations from aborted runs may coexist
+    // on the persistent dev DB, and a bare /accept/i would be ambiguous.
+    await crewPage
+      .locator("[data-slot=card]", { hasText: "E2E Invitation Test" })
+      .getByRole("button", { name: /accept/i })
+      .click()
     await crewContext.close()
 
     // Leader: refresh and verify crew is now a traveller (not pending)
