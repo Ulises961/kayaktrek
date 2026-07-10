@@ -50,7 +50,7 @@ export async function mutateAndSettle(
   trigger: () => Promise<void>,
   options: MutateOptions = {},
 ): Promise<void> {
-  await Promise.all([
+  const [actionResponse] = await Promise.all([
     page.waitForResponse(
       (res) =>
         res.request().method() === "POST" &&
@@ -59,6 +59,11 @@ export async function mutateAndSettle(
     ),
     trigger(),
   ])
+  // waitForResponse resolves on response HEADERS, but a server action STREAMS its
+  // body — reloading at headers-time can interrupt the action mid-flight and race
+  // a page render against the not-yet-committed mutation (observed: the buddy
+  // invite's reload rendering the pre-invite trip). Wait for the full body.
+  await actionResponse.finished()
 
   if (options.reload) {
     await page.reload()
