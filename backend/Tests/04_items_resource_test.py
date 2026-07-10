@@ -87,3 +87,41 @@ def test_promote_item_to_owned(client, auth_headers, inventory_with_items):
     )
     assert response.status_code == 200
     assert json.loads(response.data)['status'] == "owned"
+
+
+def test_create_item_defaults_default_pack_to_none(client, auth_headers, category_ids):
+    """A freshly custom-created item is unaffected by M10 — defaultPack is None."""
+    response = client.post(
+        f"{ITEM_ENDPOINT}/create",
+        json={"name": "custom paddle leash", "categoryId": category_ids["generic"]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data['defaultPack'] is None
+
+    client.delete(f"{ITEM_ENDPOINT}/{data['id']}", headers=auth_headers)
+
+
+def test_toggle_default_pack(client, auth_headers, inventory_with_items):
+    """PATCH defaultPack persists and can be toggled back off."""
+    item_id = inventory_with_items['items'][0]['id']
+
+    response = client.patch(
+        f"{ITEM_ENDPOINT}/{item_id}",
+        json={"defaultPack": True},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)['defaultPack'] is True
+
+    response = client.get(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+    assert json.loads(response.data)['defaultPack'] is True
+
+    response = client.patch(
+        f"{ITEM_ENDPOINT}/{item_id}",
+        json={"defaultPack": False},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)['defaultPack'] is False

@@ -24,6 +24,9 @@ class ItemSchema(BaseSchema):
     checked = fields.Boolean(allow_none=True)
     name = fields.String(allow_none=False, required=True, validate=lambda x: 1 <= len(x.strip()) <= 255)
     status = fields.Enum(ItemStatusType, by_value=True, allow_none=True, load_default=None)
+    # Trip-packing intent: auto-suggest this item onto future trips' private
+    # packing lists. Client-mutable via PATCH — see ItemService._MUTABLE_FIELDS.
+    default_pack = fields.Boolean(allow_none=True, load_default=None)
     # dump_only: stamped from auth context in @post_load, never accepted from client
     user_id = fields.UUID(dump_only=True)
 

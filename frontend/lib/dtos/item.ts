@@ -15,6 +15,9 @@ export const ItemSchema = z.object({
   checked: z.boolean().nullish(),
   status: ItemStatusSchema.nullish(),
   category: ItemCategorySchema.nullish(),
+  // Trip-packing intent: auto-suggest this item onto future trips' private
+  // packing lists. Null/false on custom items until the user opts in.
+  defaultPack: z.boolean().nullish(),
 })
 
 export type Item = z.infer<typeof ItemSchema>
