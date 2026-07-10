@@ -23,6 +23,11 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Sandboxes with a pre-provisioned Chromium (no network to download the
+    // pinned browser build) can point at it instead of `playwright install`.
+    ...(process.env.PW_CHROMIUM_PATH
+      ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } }
+      : {}),
   },
 
   projects: [

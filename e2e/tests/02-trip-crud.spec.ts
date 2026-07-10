@@ -44,7 +44,7 @@ test.describe("Trip CRUD", () => {
     const destInput = page.getByPlaceholder("Destination")
     await destInput.fill("Faroe Islands")
     await mutateAndSettle(page, () => page.getByRole("button", { name: /save/i }).click(), {
-      refresh: true,
+      reload: true,
     })
 
     await expect(page.getByText("Faroe Islands")).toBeVisible()

@@ -40,7 +40,7 @@ test.describe("Personal packing — private kit", () => {
     await mutateAndSettle(
       page,
       () => page.getByLabel("Add to your kit").selectOption({ label: "E2E Headtorch" }),
-      { refresh: true },
+      { reload: true },
     )
     await expect(page.getByRole("checkbox", { name: "E2E Headtorch" })).toBeVisible()
   })
@@ -57,7 +57,7 @@ test.describe("Personal packing — private kit", () => {
     // then synchronously verifies the checked state — throws under a slow
     // round-trip. Use `click()` (no post-state assertion) + settle on the POST;
     // persistence is then verified after reload.
-    await mutateAndSettle(page, () => box.click(), { refresh: true })
+    await mutateAndSettle(page, () => box.click(), { reload: true })
 
     await page.reload()
     await expect(page.getByRole("checkbox", { name: "E2E Spray Deck" })).toBeChecked()
@@ -72,7 +72,7 @@ test.describe("Personal packing — private kit", () => {
     await mutateAndSettle(
       page,
       () => page.getByRole("button", { name: "Remove E2E Bivvy from your kit" }).click(),
-      { refresh: true },
+      { reload: true },
     )
     await expect(page.getByRole("checkbox", { name: "E2E Bivvy" })).toHaveCount(0)
   })

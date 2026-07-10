@@ -60,14 +60,15 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     // Crew: override vessel in float plan tab
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    await crewPage.goto(`/trips/${tripId}`)
-    await crewPage.getByRole("tab", { name: /logistics/i }).click()
-    await crewPage.getByRole("tab", { name: /float plan/i }).click()
+    // Tab carried in the URL so the post-mutation reload lands back on Float plan.
+    await crewPage.goto(`/trips/${tripId}?tab=float-plan`)
 
     await crewPage.getByRole("button", { name: "Edit", exact: true }).click()
     await crewPage.getByLabel(/make/i).fill("Prijon")
     await crewPage.getByLabel(/model/i).fill("Barracuda")
-    await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /save/i }).click())
+    await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /save/i }).click(), {
+      reload: true,
+    })
 
     await expect(crewPage.getByText("Prijon")).toBeVisible()
     await crewContext.close()

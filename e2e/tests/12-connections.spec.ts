@@ -69,8 +69,11 @@ test.describe("Paddler connections", () => {
     await mutateAndSettle(
       crewPage,
       () => crewPage.getByRole("button", { name: /accept/i }).click(),
-      { refresh: true },
+      { reload: true },
     )
+    // The /paddlers tabs are client state, so the settle reload lands back on
+    // "Find" — re-open Buddies before asserting.
+    await crewPage.getByRole("tab", { name: /buddies/i }).click()
     await expect(crewPage.getByRole("button", { name: /unfriend/i })).toBeVisible()
     await crewContext.close()
 
@@ -125,13 +128,13 @@ test.describe("Paddler connections", () => {
     const trip = await apiCreateTrip(request, leaderToken, { destination: "E2E Invite Buddy" })
     const tripId = trip.id as string
 
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /crew/i }).click()
+    // Tab carried in the URL so the post-mutation reload lands back on Crew.
+    await page.goto(`/trips/${tripId}?tab=crew`)
     await page.getByRole("button", { name: /invite a buddy/i }).click()
     await mutateAndSettle(
       page,
       () => page.getByRole("button", { name: new RegExp(CREW.name, "i") }).click(),
-      { refresh: true },
+      { reload: true },
     )
 
     // Crew now shows under the trip's pending invitations.
@@ -162,7 +165,7 @@ test.describe("Paddler connections", () => {
     await mutateAndSettle(
       crewPage,
       () => crewPage.getByText(LEADER.name).click(),
-      { refresh: true },
+      { reload: true },
     )
     await crewContext.close()
 
@@ -173,7 +176,7 @@ test.describe("Paddler connections", () => {
     await mutateAndSettle(
       page,
       () => page.getByRole("button", { name: /^endorse$/i }).click(),
-      { refresh: true },
+      { reload: true },
     )
     await expect(page.getByText(/asked to endorse/i)).not.toBeVisible()
 

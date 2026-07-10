@@ -18,7 +18,11 @@ import { LoginPage } from "../pages/login.page"
 // distance / day-count / season facets to assert against.
 
 const ROUTE_NAME = `E2E Explore Route ${Date.now()}`
+// Stored trip metadata — no longer what /explore displays (kept to prove it is ignored).
 const TOTAL_MILES = 12.5
+// Since M4e the explore card derives distance from the route geometry (legs), not the
+// stored totalMiles: Launch→Waypoint→Camp is two ~3.6 nm hops at 48.4°N ⇒ 7.2 nm.
+const DERIVED_NM = "7.2"
 
 test.describe("Public route discovery", () => {
   let leaderToken: string
@@ -75,7 +79,7 @@ test.describe("Public route discovery", () => {
     // Derived facets surface on the card: distance and day count. (Season is a badge
     // here too, but /explore also renders season *filter chips* — assert the season on
     // the detail page below, where only the badge exists.)
-    await expect(page.getByText(`${TOTAL_MILES.toFixed(1)} nm`)).toBeVisible()
+    await expect(page.getByText(`${DERIVED_NM} nm`)).toBeVisible()
     await expect(page.getByText("2 days")).toBeVisible()
 
     // Open the public detail page.

@@ -24,14 +24,14 @@ test.describe("Member removal", () => {
   })
 
   test("leader removes crew member → crew loses access to the trip", async ({ page, browser }) => {
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /crew/i }).click()
+    // Tab carried in the URL so the post-mutation reload lands back on Crew.
+    await page.goto(`/trips/${tripId}?tab=crew`)
 
     // Leader removes crew via UI
     await page.getByText(CREW.name).hover()
     await page.getByRole("button", { name: /remove/i }).click()
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
-      refresh: true,
+      reload: true,
     })
     await expect(page.getByText(CREW.name, { exact: true })).not.toBeVisible()
 

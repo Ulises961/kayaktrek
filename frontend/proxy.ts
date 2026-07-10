@@ -32,11 +32,15 @@ export function proxy(request: NextRequest) {
 // (the authed connections index) and `(public)/paddlers/[username]` (the public profile)
 // share the `/paddlers` URL prefix, and a wildcard here would gate the public profile pages
 // behind auth.
+//
+// `/explore` is intentionally ABSENT: the M7c public route library is anonymous-facing by
+// design (fork/CTA gating happens in-page via `isAuthenticated`), even though it lives in
+// `(app)` for the sidebar shell. The M11 §3 matcher sweep briefly gated it and broke anon
+// discovery (caught by e2e 13-explore-discovery, fixed 2026-07-10).
 export const config = {
   matcher: [
     "/dashboard/:path*",
     "/design/:path*",
-    "/explore/:path*",
     "/gear/:path*",
     "/invitations/:path*",
     "/itinerary/:path*",
