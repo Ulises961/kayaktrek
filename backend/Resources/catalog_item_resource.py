@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
 from werkzeug.exceptions import HTTPException
+from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.catalog_item_schema import CatalogItemSchema
@@ -44,6 +45,8 @@ def create_catalog_item():
         item = CatalogItemService.create_item(item_data)
         return jsonify(CatalogItemSchema().dump(item)), HTTPStatus.CREATED
 
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except HTTPException:
         raise
     except IntegrityError:

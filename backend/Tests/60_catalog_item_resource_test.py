@@ -19,6 +19,15 @@ def test_create_catalog_item(client, auth_headers, category_ids):
     client.delete(f"{CATALOG_ITEM_ENDPOINT}/{data['id']}", headers=auth_headers)
 
 
+def test_create_catalog_item_rejects_empty_name(client, auth_headers):
+    response = client.post(
+        f"{CATALOG_ITEM_ENDPOINT}/create",
+        json={"name": "   "},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
 def test_get_all_catalog_items_scoped_to_owner(client, auth_headers, outsider_headers, category_ids):
     created = client.post(
         f"{CATALOG_ITEM_ENDPOINT}/create",
