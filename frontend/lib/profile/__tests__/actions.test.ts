@@ -27,7 +27,9 @@ import {
   getMedicalNotes,
   grantMedicalConsent,
   revokeMedicalConsent,
+  setUnitPreference,
 } from "../actions"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 const USER_ID = "01952f1a-0000-7000-8000-000000000001"
 const SESSION = { userId: USER_ID, email: "ada@example.com", isAdmin: false }
@@ -35,6 +37,7 @@ const SESSION = { userId: USER_ID, email: "ada@example.com", isAdmin: false }
 const PROFILE_FIELDS = {
   name: "Ada",
   username: "ada",
+  unitPreference: DISTANCE_UNIT.NM,
 }
 
 beforeEach(() => {
@@ -48,7 +51,7 @@ describe("updateProfile", () => {
     await updateProfile(PROFILE_FIELDS)
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/user/${USER_ID}`,
-      expect.objectContaining({ name: "Ada", username: "ada" }),
+      expect.objectContaining({ name: "Ada", username: "ada", unitPreference: DISTANCE_UNIT.NM }),
     )
   })
 
@@ -92,6 +95,41 @@ describe("updateProfile", () => {
   it("redirects to /login when there is no session", async () => {
     vi.mocked(getSession).mockResolvedValue(null)
     await updateProfile(PROFILE_FIELDS)
+    expect(redirect).toHaveBeenCalledWith("/login")
+  })
+})
+
+describe("setUnitPreference", () => {
+  it("patches unitPreference at /api/user/<id>", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setUnitPreference(DISTANCE_UNIT.KM)
+    expect(apiPatch).toHaveBeenCalledWith(`/api/user/${USER_ID}`, {
+      unitPreference: DISTANCE_UNIT.KM,
+    })
+  })
+
+  it("revalidates /profile on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setUnitPreference(DISTANCE_UNIT.KM)
+    expect(revalidatePath).toHaveBeenCalledWith("/profile")
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    expect(await setUnitPreference(DISTANCE_UNIT.KM)).toEqual({ success: true })
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPatch).mockRejectedValue(new Error("500"))
+    expect(await setUnitPreference(DISTANCE_UNIT.KM)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+
+  it("redirects to /login when there is no session", async () => {
+    vi.mocked(getSession).mockResolvedValue(null)
+    await setUnitPreference(DISTANCE_UNIT.KM)
     expect(redirect).toHaveBeenCalledWith("/login")
   })
 })

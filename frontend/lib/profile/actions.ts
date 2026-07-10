@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session"
 import { apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import type { ProfileFormValues } from "@/lib/dtos/user"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type ProfileActionResult = { success: true } | { success: false; error: string }
 export type AvatarActionResult =
@@ -24,6 +25,7 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
       username: fields.username,
       bio: fields.bio || null,
       homeLocation: fields.homeLocation || null,
+      unitPreference: fields.unitPreference,
       vesselMake: fields.vesselMake || null,
       vesselModel: fields.vesselModel || null,
       vesselLengthCm:
@@ -57,6 +59,23 @@ export async function setProfileVisibility(isPublic: boolean): Promise<ProfileAc
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: "Failed to update profile visibility." }
+  }
+}
+
+// Instant single-field toggle for the planner's unit switch — mirrors
+// setProfileVisibility so the map builder doesn't have to round-trip the whole
+// profile form just to flip nm/km.
+export async function setUnitPreference(unit: DistanceUnit): Promise<ProfileActionResult> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+
+  try {
+    await apiPatch(`/api/user/${session.userId}`, { unitPreference: unit })
+    revalidatePath("/profile")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: "Failed to update unit preference." }
   }
 }
 

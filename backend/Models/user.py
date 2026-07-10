@@ -1,4 +1,5 @@
 
+import enum
 from flask_bcrypt import generate_password_hash
 from Models.base_model import BaseModel
 from Models.inventory import Inventory
@@ -12,7 +13,7 @@ from Models.user_endorses_log import user_endorses_log
 from Models.connection import Connection
 from Models.block import Block
 from datetime import datetime
-from sqlalchemy import String, Boolean, Integer, Text, DateTime
+from sqlalchemy import String, Boolean, Integer, Text, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 
@@ -22,6 +23,11 @@ if TYPE_CHECKING:
     from Models.auth_token import AuthToken
     from Models.invitation import Invitation
     from Models.user_certification import UserCertification
+
+
+class UnitPreferenceType(enum.Enum):
+    NM = "nm"
+    KM = "km"
 
 
 class User(BaseModel):
@@ -53,6 +59,16 @@ class User(BaseModel):
     home_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     profile_is_public: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
+    )
+
+    # Distance-unit display preference (nm/km) — respected by the planner, Add-log
+    # form, and stats dashboard. Storage stays km-denominated everywhere; this only
+    # controls presentation. See plans/M12.md §C.
+    unit_preference: Mapped[UnitPreferenceType] = mapped_column(
+        Enum(UnitPreferenceType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=UnitPreferenceType.NM,
+        server_default="nm",
     )
 
     # Vessel defaults — pre-fill TripMember on invitation acceptance

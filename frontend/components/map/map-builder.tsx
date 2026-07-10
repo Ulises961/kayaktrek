@@ -12,6 +12,7 @@ import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
+import { setUnitPreference } from "@/lib/profile/actions"
 import { debounce } from "@/lib/utils/debounce"
 import { DayRail } from "./day-rail"
 import { FeatureDrawer } from "./feature-drawer"
@@ -27,6 +28,7 @@ type MapBuilderProps = {
   tripName: string
   tripState?: TripState | null
   isLeader?: boolean
+  initialDistanceUnit?: DistanceUnit
 }
 
 export function MapBuilder({
@@ -35,10 +37,11 @@ export function MapBuilder({
   tripName,
   tripState = null,
   isLeader = true,
+  initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
 
-  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(DISTANCE_UNIT.NM)
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)
@@ -131,6 +134,11 @@ export function MapBuilder({
     setActivePointId((prev) => (prev === pointId ? null : pointId))
   }, [])
 
+  const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
+    setDistanceUnit(unit)
+    setUnitPreference(unit)
+  }, [])
+
   const handleAvgSpeedChange = useCallback(
     (v: number) => {
       setAvgSpeedKnots(v)
@@ -162,7 +170,7 @@ export function MapBuilder({
       tripName,
       itineraryId: itinerary.id ?? "",
       distanceUnit,
-      setDistanceUnit,
+      setDistanceUnit: handleDistanceUnitChange,
       avgSpeedKnots,
       setAvgSpeedKnots,
       activePointId,
@@ -189,6 +197,7 @@ export function MapBuilder({
       tripName,
       itinerary.id,
       distanceUnit,
+      handleDistanceUnitChange,
       avgSpeedKnots,
       activePointId,
       day0Id,
@@ -210,7 +219,7 @@ export function MapBuilder({
           tripId={tripId}
           tripName={tripName}
           distanceUnit={distanceUnit}
-          onDistanceUnitChange={setDistanceUnit}
+          onDistanceUnitChange={handleDistanceUnitChange}
           totalDistance={totalDistance}
           dayCount={state.days.length}
           isSaving={isSaving}

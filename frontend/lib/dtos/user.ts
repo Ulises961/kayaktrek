@@ -6,6 +6,7 @@ import { InventoriesSchema } from "./inventory"
 import { ItemsSchema } from "./item"
 import { LogsSchema } from "./log"
 import { CertificationsSchema } from "./certification"
+import { DISTANCE_UNIT } from "../itinerary/distance"
 
 // Shallow user representation used when a user is embedded inside a Trip
 // (travellers, pendingTravellers). Excludes nested collections to avoid
@@ -43,6 +44,8 @@ export const UserSchema = z.object({
   bio: z.string().max(1000).nullish(),
   homeLocation: z.string().max(255).nullish(),
   profileIsPublic: z.boolean().nullish(),
+  // Distance-unit display preference (M12 §C) — presentation only, storage stays km.
+  unitPreference: z.enum([DISTANCE_UNIT.NM, DISTANCE_UNIT.KM]).default(DISTANCE_UNIT.NM),
   // Float plan defaults (M3d)
   vesselMake: z.string().nullish(),
   vesselModel: z.string().nullish(),
@@ -84,6 +87,7 @@ export const ProfileFormSchema = z.object({
     .max(255, "Max 255 characters")
     .refine(noHtmlTags.check, noHtmlTags.message)
     .optional(),
+  unitPreference: z.enum([DISTANCE_UNIT.NM, DISTANCE_UNIT.KM]),
   vesselMake: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselModel: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselLengthCm: z

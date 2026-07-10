@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { StatsDashboard } from "../stats-dashboard"
 import type { Stats } from "@/lib/dtos/public-profile"
+import { DISTANCE_UNIT, toNm } from "@/lib/itinerary/distance"
 
 const STATS: Stats = {
   totalDistance: 142.53,
@@ -47,5 +48,11 @@ describe("StatsDashboard", () => {
     render(<StatsDashboard stats={EMPTY} />)
     expect(screen.getByText(/no paddling logged yet/i)).toBeDefined()
     expect(screen.queryByText(/sea conditions/i)).toBeNull()
+  })
+
+  it("converts total distance to nm when unit is nm", () => {
+    render(<StatsDashboard stats={STATS} unit={DISTANCE_UNIT.NM} />)
+    const expected = `${Number(toNm(STATS.totalDistance).toFixed(1))} nm`
+    expect(screen.getByText(expected)).toBeDefined()
   })
 })

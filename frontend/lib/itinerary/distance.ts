@@ -44,6 +44,10 @@ export function toKm(nm: number): number {
   return nm * 1.852
 }
 
+export function toNm(km: number): number {
+  return km / 1.852
+}
+
 export function formatDistance(nm: number, unit: DistanceUnit): string {
   const value = unit === DISTANCE_UNIT.NM ? nm : toKm(nm)
   return value.toFixed(1)

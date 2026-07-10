@@ -4,6 +4,7 @@ import {
   totalDistanceNm,
   segmentMidpoint,
   toKm,
+  toNm,
   formatDistance,
   estimatedTime,
   formatTime,
@@ -67,6 +68,16 @@ describe("toKm", () => {
 
   it("converts 10 nm to 18.52 km", () => {
     expect(toKm(10)).toBeCloseTo(18.52)
+  })
+})
+
+describe("toNm", () => {
+  it("converts 1.852 km to 1 nm", () => {
+    expect(toNm(1.852)).toBeCloseTo(1)
+  })
+
+  it("is the inverse of toKm", () => {
+    expect(toNm(toKm(12.3))).toBeCloseTo(12.3)
   })
 })
 

@@ -2,7 +2,9 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getPublicProfile } from "@/lib/public-profile/actions"
 import { getSession } from "@/lib/auth/session"
+import { getMe } from "@/lib/user/me"
 import { isCertExpired } from "@/lib/certifications/expiry"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { ProfileRelationshipControls } from "@/components/paddlers/profile-relationship-controls"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
@@ -28,6 +30,11 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   const { username } = await params
   const [profile, session] = await Promise.all([getPublicProfile(username), getSession()])
   if (!profile) notFound()
+
+  // The viewer's own unit preference, not the profile owner's — an anonymous
+  // visitor (no session) sees the app-wide default.
+  const viewer = session ? await getMe() : null
+  const viewerUnit = viewer?.unitPreference ?? DISTANCE_UNIT.NM
 
   const fullName = [profile.name, profile.surname].filter(Boolean).join(" ")
 
@@ -76,7 +83,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <StatsDashboard stats={profile.stats} />
+            <StatsDashboard stats={profile.stats} unit={viewerUnit} />
           </CardContent>
         </Card>
 

@@ -37,6 +37,7 @@ class UserService:
         "emergency_contact_name", "emergency_contact_phone",
         "emergency_contact_relationship",
         "bio", "home_location", "profile_is_public",
+        "unit_preference",
     })
 
     @staticmethod

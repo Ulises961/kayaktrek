@@ -44,8 +44,14 @@ vi.mock("@/lib/itinerary/actions", () => ({
   updateItinerary: vi.fn().mockResolvedValue({ success: true }),
 }))
 
+vi.mock("@/lib/profile/actions", () => ({
+  setUnitPreference: vi.fn().mockResolvedValue({ success: true }),
+}))
+
 import { MapBuilder } from "../map-builder"
 import type { Itinerary } from "@/lib/dtos/itinerary"
+import { setUnitPreference } from "@/lib/profile/actions"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000030"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000020"
@@ -128,5 +134,27 @@ describe("MapBuilder", () => {
   it("shows 0 days for an empty itinerary", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
     expect(within(screen.getByTestId("stats-strip")).getByText("0 days")).toBeInTheDocument()
+  })
+
+  it("initializes the distance unit from initialDistanceUnit", () => {
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        initialDistanceUnit={DISTANCE_UNIT.KM}
+      />,
+    )
+    expect(
+      within(screen.getByTestId("stats-strip")).getByRole("button", { name: "km" }),
+    ).toHaveClass("bg-muted")
+  })
+
+  it("persists the unit preference when the toggle is clicked", async () => {
+    render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    await userEvent.click(
+      within(screen.getByTestId("stats-strip")).getByRole("button", { name: "km" }),
+    )
+    expect(setUnitPreference).toHaveBeenCalledWith(DISTANCE_UNIT.KM)
   })
 })

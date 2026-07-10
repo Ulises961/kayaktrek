@@ -1,9 +1,11 @@
 import { SeaStateChip } from "@/components/logs/sea-state-chip"
 import { RouteIcon, ClockIcon, NotebookIcon, MapIcon, BadgeCheckIcon } from "lucide-react"
 import type { Stats } from "@/lib/dtos/public-profile"
+import { DISTANCE_UNIT, toNm, type DistanceUnit } from "@/lib/itinerary/distance"
 
 interface StatsDashboardProps {
   stats: Stats
+  unit?: DistanceUnit
 }
 
 // Round to at most one decimal place, dropping a trailing ".0".
@@ -19,9 +21,15 @@ function monthLabel(month: string): string {
   return MONTH_LABEL.format(new Date(Date.UTC(year, m - 1, 1)))
 }
 
-export function StatsDashboard({ stats }: StatsDashboardProps) {
+export function StatsDashboard({ stats, unit = DISTANCE_UNIT.KM }: StatsDashboardProps) {
+  const toDisplay = (km: number) => (unit === DISTANCE_UNIT.NM ? toNm(km) : km)
+
   const headline = [
-    { label: "Distance", value: `${tidy(stats.totalDistance)} km`, icon: RouteIcon },
+    {
+      label: "Distance",
+      value: `${tidy(toDisplay(stats.totalDistance))} ${unit}`,
+      icon: RouteIcon,
+    },
     { label: "Hours", value: tidy(stats.totalHours), icon: ClockIcon },
     { label: "Logs", value: String(stats.logCount), icon: NotebookIcon },
     { label: "Trips", value: String(stats.tripCount), icon: MapIcon },
@@ -98,7 +106,7 @@ export function StatsDashboard({ stats }: StatsDashboardProps) {
                   <div
                     className="bg-primary/60 w-full rounded-t-sm"
                     style={{ height: `${Math.max(4, (m.distance / maxMonthDistance) * 100)}%` }}
-                    title={`${monthLabel(m.month)}: ${tidy(m.distance)} km, ${m.count} log(s)`}
+                    title={`${monthLabel(m.month)}: ${tidy(toDisplay(m.distance))} ${unit}, ${m.count} log(s)`}
                   />
                 </div>
                 <span className="text-muted-foreground text-[10px] whitespace-nowrap">

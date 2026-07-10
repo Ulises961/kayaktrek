@@ -98,7 +98,7 @@ export default async function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <StatsDashboard stats={stats} />
+            <StatsDashboard stats={stats} unit={user.unitPreference} />
           </CardContent>
         </Card>
       )}

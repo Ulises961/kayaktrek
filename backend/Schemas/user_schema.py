@@ -1,5 +1,5 @@
 from marshmallow import fields, post_load, validates, ValidationError, pre_load
-from Models.user import User
+from Models.user import User, UnitPreferenceType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
 from Schemas.user_certification_schema import UserCertificationSchema
@@ -43,6 +43,9 @@ class UserSchema(BaseSchema):
     bio = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 1000)
     home_location = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 255)
     profile_is_public = fields.Boolean()
+
+    # Distance-unit display preference — presentation only, storage stays km.
+    unit_preference = fields.Enum(UnitPreferenceType, by_value=True, load_default=UnitPreferenceType.NM)
 
     # Consent timestamp only — ciphertext fields are never exposed via API
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
@@ -159,6 +162,9 @@ class UserUpdateSchema(UserSchema):
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
+    # No load_default here — a PATCH omitting this field must leave it untouched,
+    # unlike UserSchema's create-time default.
+    unit_preference = fields.Enum(UnitPreferenceType, by_value=True)
 
     # Medical notes and consent fields are not mutable through this schema
     medical_notes_consent_at = fields.DateTime(dump_only=True)

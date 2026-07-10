@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
+import { getMe } from "@/lib/user/me"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
 import { TripSchema } from "@/lib/dtos/trip"
 import type { TripState } from "@/lib/dtos/trip"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { MapBuilder } from "@/components/map/map-builder"
 
 export default async function ItineraryBuilderPage({
@@ -24,6 +26,9 @@ export default async function ItineraryBuilderPage({
   let tripName = "Trip"
   let tripState: TripState | null = null
   let isLeader = true
+
+  const me = await getMe()
+  const initialDistanceUnit = me?.unitPreference ?? DISTANCE_UNIT.NM
 
   if (itinerary.tripId) {
     try {
@@ -50,6 +55,7 @@ export default async function ItineraryBuilderPage({
       tripName={tripName}
       tripState={tripState}
       isLeader={isLeader}
+      initialDistanceUnit={initialDistanceUnit}
     />
   )
 }
