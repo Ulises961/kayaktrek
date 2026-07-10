@@ -26,6 +26,7 @@ from Resources.inventory_resource import inventory_api
 from Resources.personal_packing_resource import personal_packing_api
 from Resources.item_resource import item_api
 from Resources.item_category_resource import item_category_api
+from Resources.catalog_item_resource import catalog_item_api
 from Resources.log_resource import log_api
 from Resources.authentication_resource import api as authApi
 from Resources.user_certification_resource import user_certification_api
@@ -93,6 +94,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(personal_packing_api)
     app.register_blueprint(item_api)
     app.register_blueprint(item_category_api)
+    app.register_blueprint(catalog_item_api)
     app.register_blueprint(itinerary_api)
     app.register_blueprint(log_api)
     app.register_blueprint(trip_api)

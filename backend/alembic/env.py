@@ -66,6 +66,7 @@ from Models.place import Place                         # noqa: F401
 from Models.connection import Connection               # noqa: F401
 from Models.block import Block                          # noqa: F401
 from Models.endorsement_request import EndorsementRequest  # noqa: F401
+from Models.catalog_item import CatalogItem             # noqa: F401
 
 with _app.app_context():
     target_metadata = db.metadata

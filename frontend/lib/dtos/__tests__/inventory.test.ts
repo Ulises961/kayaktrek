@@ -24,6 +24,7 @@ const ITEM_FIXTURE = {
   checked: false,
   status: "owned",
   category: CATEGORY_FIXTURE,
+  defaultPack: true,
 }
 
 const MEMBER_FIXTURE = {
@@ -78,6 +79,15 @@ describe("ItemSchema", () => {
     if (result.success) {
       expect(result.data.status).toBe("owned")
       expect(result.data.category?.slug).toBe("first_aid")
+      expect(result.data.defaultPack).toBe(true)
+    }
+  })
+
+  it("allows a missing/null defaultPack (custom item, not yet flagged)", () => {
+    const result = ItemSchema.safeParse({ ...ITEM_FIXTURE, defaultPack: null })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.defaultPack).toBeNull()
     }
   })
 

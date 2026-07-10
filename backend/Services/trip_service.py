@@ -16,6 +16,7 @@ from Models.invitation import Invitation
 from Models.inventory import Inventory
 from Models.trip_requirement import TripRequirement
 from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
+from Services.catalog_item_service import CatalogItemService
 from Models.user import User
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -148,13 +149,27 @@ class TripService:
             db.session.add(inventory)
         db.session.flush()  # obtain inventory.id before seeding requirements
         if membership:
-            for spec in DEFAULT_TRIP_REQUIREMENTS:
-                db.session.add(TripRequirement(
-                    inventory_id=inventory.id,
-                    name=spec["name"],
-                    category=spec["category"],
-                    proposed_by_member_id=membership.id,
-                ))
+            # Seed shared requirements from the leader's curated CatalogItem
+            # template when they have one; first-timers (empty template) fall
+            # back to the hardcoded default list, unchanged from pre-M10 behaviour.
+            catalog_items = CatalogItemService.get_items_by_owner(str(current_user.id))
+            if catalog_items:
+                for catalog_item in catalog_items:
+                    db.session.add(TripRequirement(
+                        inventory_id=inventory.id,
+                        name=catalog_item.name,
+                        category=catalog_item.category.slug if catalog_item.category else None,
+                        proposed_by_member_id=membership.id,
+                        catalog_item_id=catalog_item.id,
+                    ))
+            else:
+                for spec in DEFAULT_TRIP_REQUIREMENTS:
+                    db.session.add(TripRequirement(
+                        inventory_id=inventory.id,
+                        name=spec["name"],
+                        category=spec["category"],
+                        proposed_by_member_id=membership.id,
+                    ))
             # Seed the leader's private packing list from their default kit.
             seed_member_packing(membership)
         db.session.commit()
