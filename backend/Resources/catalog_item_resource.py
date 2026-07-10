@@ -112,6 +112,8 @@ def delete_catalog_item(id: str):
 
     except HTTPException:
         raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Catalog item with id {id} not found")
     except IntegrityError:
         logger.error("Integrity error deleting catalog item")
         db.session.rollback()

@@ -92,6 +92,23 @@ def test_delete_catalog_item_owned_by_another_user_forbidden(client, auth_header
     client.delete(f"{CATALOG_ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
 
 
+def test_update_nonexistent_catalog_item_404(client, auth_headers):
+    response = client.patch(
+        f"{CATALOG_ITEM_ENDPOINT}/00000000-0000-7000-8000-000000000000",
+        json={"name": "ghost"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_delete_nonexistent_catalog_item_404(client, auth_headers):
+    response = client.delete(
+        f"{CATALOG_ITEM_ENDPOINT}/00000000-0000-7000-8000-000000000000",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
 def test_delete_catalog_item(client, auth_headers, category_ids):
     created = client.post(
         f"{CATALOG_ITEM_ENDPOINT}/create",
