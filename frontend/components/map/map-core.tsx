@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { routeLegs, legLabel } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
 import { splitRingIcon } from "./ring-icon"
@@ -58,7 +58,7 @@ export type MapCoreProps = {
   // Points already sorted in route order by MapBuilder — no walkList needed here.
   points: Point[]
   days: Day[]
-  distanceUnit: "nm" | "km"
+  distanceUnit: DistanceUnit
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react"
 import { PublicRouteDetail } from "../public-route-detail"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { OriginalAuthor } from "@/lib/dtos/itinerary"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 
 function route(overrides: Partial<RouteData> = {}): RouteData {
   return {
@@ -117,7 +118,7 @@ describe("PublicRouteDetail", () => {
       <PublicRouteDetail
         route={route()}
         season={null}
-        tripState="past"
+        tripState={TRIP_STATE.PAST}
         backHref="/explore"
         backLabel="All routes"
       />,
@@ -128,7 +129,7 @@ describe("PublicRouteDetail", () => {
       <PublicRouteDetail
         route={route()}
         season={null}
-        tripState="building"
+        tripState={TRIP_STATE.BUILDING}
         backHref="/explore"
         backLabel="All routes"
       />,

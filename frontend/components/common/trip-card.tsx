@@ -50,11 +50,7 @@ export function TripCard({ trip, hero = false }: TripCardProps) {
         <CardContent className="space-y-0.5 px-3 pt-0 pb-3">
           <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
             <CalendarIcon className="size-3 shrink-0" />
-            {dateFrom && dateTo ? (
-              <span>{formatDateRange(dateFrom, dateTo)}</span>
-            ) : (
-              <span>No dates set</span>
-            )}
+            <span>{formatDateRange(dateFrom, dateTo)}</span>
           </div>
           <div className="text-muted-foreground flex items-center gap-2 text-[11px]">
             {days !== null && (

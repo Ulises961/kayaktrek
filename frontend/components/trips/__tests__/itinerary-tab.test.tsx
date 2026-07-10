@@ -19,6 +19,8 @@ import { ItineraryTab } from "../tabs/itinerary-tab"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
+import { formatDateRange } from "@/lib/trips/format"
+import { formatRouteRange } from "@/lib/itinerary/format"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITIN_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -206,7 +208,7 @@ describe("ItineraryTab — itinerary with days", () => {
 
   it("shows date range", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
-    expect(screen.getByText(/1 Jul 2026.*3 Jul 2026/)).toBeDefined()
+    expect(screen.getByText(formatDateRange("2026-07-01", "2026-07-03"))).toBeDefined()
   })
 
   it("renders a row for each day", () => {
@@ -217,7 +219,7 @@ describe("ItineraryTab — itinerary with days", () => {
 
   it("shows start and end names for days with points", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
-    expect(screen.getByText(/Ribadeo.*Foz/)).toBeDefined()
+    expect(screen.getByText(formatRouteRange("Ribadeo", "Foz"))).toBeDefined()
   })
 
   it("shows rest day label for days without points", () => {

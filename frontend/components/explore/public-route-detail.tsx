@@ -6,6 +6,7 @@ import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
 import { daySummariesFromRoute } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { OriginalAuthor } from "@/lib/dtos/itinerary"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 
 type Props = {
   route: RouteData
@@ -36,7 +37,7 @@ export function PublicRouteDetail({
   backLabel,
   actions,
 }: Props) {
-  const isHistory = tripState === "past" || tripState === "archived"
+  const isHistory = tripState === TRIP_STATE.PAST || tripState === TRIP_STATE.ARCHIVED
   const daySummaries = daySummariesFromRoute(route)
 
   return (

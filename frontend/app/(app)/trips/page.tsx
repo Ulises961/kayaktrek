@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth/session"
 import { apiGetAllPages } from "@/lib/api/paginate"
-import { TripPageSchema } from "@/lib/dtos/trip"
+import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
 import { TripCard } from "@/components/common/trip-card"
 import { PastTripsSection } from "@/components/trips/past-trips-section"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
@@ -28,10 +28,10 @@ export default async function Page() {
     TripPageSchema,
   )
 
-  const happeningTrips = trips.filter((t) => t.state === "happening")
-  const planningTrips = trips.filter((t) => t.state === "building")
+  const happeningTrips = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
+  const planningTrips = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
   const pastTrips = trips
-    .filter((t) => t.state === "past")
+    .filter((t) => t.state === TRIP_STATE.PAST)
     .sort((a, b) => {
       if (!a.dateTo && !b.dateTo) return 0
       if (!a.dateTo) return 1

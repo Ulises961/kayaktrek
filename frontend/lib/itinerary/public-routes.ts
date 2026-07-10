@@ -1,5 +1,5 @@
 import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
-import type { PointType } from "@/lib/dtos/point"
+import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
@@ -100,7 +100,7 @@ function toRoutePoint(
   return {
     lat: p.latitude,
     lon: p.longitude,
-    type: p.type === "stop" ? "stop" : "position",
+    type: p.type === POINT_TYPE.STOP ? POINT_TYPE.STOP : POINT_TYPE.POSITION,
     name: p.name ?? null,
     images: (p.images ?? [])
       .map((img) => img.url ?? img.location ?? null)

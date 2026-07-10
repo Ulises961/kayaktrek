@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { TripCard } from "../trip-card"
 import type { Trip } from "@/lib/dtos/trip"
+import { formatDateRange } from "@/lib/trips/format"
 
 const BASE_TRIP: Trip = {
   id: "01952f1a-0000-7000-8000-000000000010",
@@ -48,13 +49,12 @@ describe("TripCard", () => {
 
   it("renders the state badge", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    expect(screen.getByText("Building")).toBeDefined()
+    expect(screen.getByText("Planning")).toBeDefined()
   })
 
   it("renders the date range", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    // Dates are shown as "1 Jul – 5 Jul 2026" (unified d MMM yyyy format, same-year)
-    expect(screen.getByText("1 Jul – 5 Jul 2026")).toBeDefined()
+    expect(screen.getByText(formatDateRange("2026-07-01", "2026-07-05"))).toBeDefined()
   })
 
   it("renders the crew count", () => {
@@ -68,9 +68,9 @@ describe("TripCard", () => {
     expect(link.getAttribute("href")).toBe(`/trips/${BASE_TRIP.id}`)
   })
 
-  it("renders 'No dates set' when dates are absent", () => {
+  it("falls back to the shared 'Dates not set' label when dates are absent", () => {
     render(<TripCard trip={{ ...BASE_TRIP, dateFrom: undefined, dateTo: undefined }} />)
-    expect(screen.getByText("No dates set")).toBeDefined()
+    expect(screen.getByText(formatDateRange(undefined, undefined))).toBeDefined()
   })
 
   it("renders the number of days derived from date range (inclusive — Jul 1-5 is 5 days)", () => {

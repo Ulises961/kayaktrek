@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { AnchorIcon, CalendarIcon, PencilIcon, UsersIcon, XIcon } from "lucide-react"
 import {
   TRIP_DIFFICULTIES,
+  TRIP_STATE,
   TRIP_STATES,
   TRIP_STATE_LABELS,
   TripFieldsSchema,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/dtos/trip"
 import { updateTrip } from "@/lib/trips/actions"
 import { daysBetween } from "@/lib/trips/format"
+import { formatDayDate } from "@/lib/utils/date"
 import { StateBadge } from "@/components/common/state-badge"
 import { fieldLabelClass } from "@/components/common/form-field"
 import { cn } from "@/lib/utils"
@@ -235,13 +237,13 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
                   <span className="text-muted-foreground w-6 shrink-0 text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
                     From
                   </span>
-                  <span>{trip.dateFrom}</span>
+                  <span>{formatDayDate(trip.dateFrom)}</span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-muted-foreground w-6 shrink-0 text-[10px] font-semibold tracking-[0.08em] uppercase sm:text-[12px]">
                     To
                   </span>
-                  <span>{trip.dateTo}</span>
+                  <span>{formatDayDate(trip.dateTo)}</span>
                 </div>
               </div>
             ) : (
@@ -322,7 +324,7 @@ export function TripIdentityCard({ trip, isLeader }: TripIdentityCardProps) {
         {isLeader && (
           <>
             {/* Trip progression */}
-            {trip.state && trip.state !== "past" && (
+            {trip.state && trip.state !== TRIP_STATE.PAST && (
               <>
                 <Separator />
                 <div className="flex flex-col gap-2">

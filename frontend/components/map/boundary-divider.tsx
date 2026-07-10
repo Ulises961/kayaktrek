@@ -2,14 +2,14 @@
 import { useRef } from "react"
 import { GripVerticalIcon, Trash2Icon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
-import { legLabel } from "@/lib/itinerary/distance"
+import { legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
 
 export type BoundaryDividerProps = {
   boundary: DaySlice
   totalDistanceNm: number
-  distanceUnit: "nm" | "km"
+  distanceUnit: DistanceUnit
   avgSpeedKnots: number
   labelDayNumber: number
   labelDate: string | null

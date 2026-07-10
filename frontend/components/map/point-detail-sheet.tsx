@@ -2,13 +2,14 @@
 import { useState } from "react"
 import { X, Anchor, CircleDot } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import { cn } from "@/lib/utils"
 import { PointDetailModal } from "./point-detail-modal"
-import type { Point } from "@/lib/dtos/point"
+import { POINT_TYPE, type Point } from "@/lib/dtos/point"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 
 function TypeIcon({ type }: { type: string }) {
-  if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
+  if (type === POINT_TYPE.STOP) return <Anchor className="size-3.5 shrink-0" />
   return <CircleDot className="size-3.5 shrink-0" />
 }
 
@@ -22,7 +23,7 @@ function TypeIcon({ type }: { type: string }) {
 function legDistance(
   point: Point,
   state: ReturnType<typeof useMapBuilder>["state"],
-  unit: "nm" | "km",
+  unit: DistanceUnit,
   speedKnots: number,
 ): { legText: string; totalText: string } | null {
   if (!point.dayId) return null
@@ -62,7 +63,7 @@ export function PointDetailSheet() {
 
   if (!point) return null
 
-  const canEdit = isLeader && tripState !== "past"
+  const canEdit = isLeader && tripState !== TRIP_STATE.PAST
   const leg = legDistance(point, state, distanceUnit, avgSpeedKnots)
   const imageCount = point.images?.length ?? 0
   const displayName = point.name || `${point.type ?? "position"}`

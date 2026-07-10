@@ -7,7 +7,7 @@ import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
-import { totalDistanceNm } from "@/lib/itinerary/distance"
+import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
@@ -38,7 +38,7 @@ export function MapBuilder({
 }: MapBuilderProps) {
   useCollapseSidebar()
 
-  const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(DISTANCE_UNIT.NM)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
   const [activePointId, setActivePointId] = useState<string | null>(null)

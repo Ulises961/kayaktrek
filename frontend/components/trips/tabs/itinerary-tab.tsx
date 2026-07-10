@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
+import { formatRouteRange } from "@/lib/itinerary/format"
 import { formatDayDate } from "@/lib/utils/date"
-import { daysBetween } from "@/lib/trips/format"
+import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
-import type { Point } from "@/lib/dtos/point"
+import { POINT_TYPE, type Point } from "@/lib/dtos/point"
 
 export interface ItineraryTabProps {
   tripId: string
@@ -102,10 +103,7 @@ function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
 
 function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
   const stats = getDayStats(day, speedKnots)
-  const routeLabel =
-    stats.startName && stats.endName && stats.endName !== stats.startName
-      ? `${stats.startName} → ${stats.endName}`
-      : (stats.startName ?? "")
+  const routeLabel = formatRouteRange(stats.startName, stats.endName)
 
   return (
     <div className="border-border/50 hover:border-primary/50 border-l-2 py-2.5 pl-3 transition-colors">
@@ -221,7 +219,9 @@ export function ItineraryTab({
   // ── Full summary ──────────────────────────────────────────────────────────
   const speedKnots = itinerary.avgSpeedKnots ?? DEFAULT_SPEED
   const totalMiles = itinerary.totalMiles ?? 0
-  const stopCount = days.flatMap((d) => d.points ?? []).filter((p) => p.type === "stop").length
+  const stopCount = days
+    .flatMap((d) => d.points ?? [])
+    .filter((p) => p.type === POINT_TYPE.STOP).length
   const avgTime =
     days.length > 0 && totalMiles > 0 ? estimatedTime(totalMiles / days.length, speedKnots) : null
 
@@ -261,7 +261,7 @@ export function ItineraryTab({
       {/* Date span */}
       {firstDate && lastDate && (
         <p className="text-muted-foreground -mt-2 text-xs">
-          {formatDayDate(firstDate)} → {formatDayDate(lastDate)}
+          {formatDateRange(firstDate, lastDate)}
         </p>
       )}
 

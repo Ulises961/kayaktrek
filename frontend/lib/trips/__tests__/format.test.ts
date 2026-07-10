@@ -21,4 +21,16 @@ describe("formatDateRange", () => {
   it("includes the year on both dates when they span a year boundary", () => {
     expect(formatDateRange("2026-12-30", "2027-01-02")).toBe("30 Dec 2026 – 2 Jan 2027")
   })
+
+  it("falls back to 'Dates not set' when both dates are absent", () => {
+    expect(formatDateRange(null, undefined)).toBe("Dates not set")
+  })
+
+  it("formats just the one date present when only dateFrom is set", () => {
+    expect(formatDateRange("2026-07-01", null)).toBe("1 Jul 2026")
+  })
+
+  it("formats just the one date present when only dateTo is set", () => {
+    expect(formatDateRange(undefined, "2026-07-05")).toBe("5 Jul 2026")
+  })
 })

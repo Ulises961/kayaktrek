@@ -2,13 +2,14 @@
 import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { TripState } from "@/lib/dtos/trip"
+import { TRIP_STATE, type TripState } from "@/lib/dtos/trip"
+import { DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 
 type MapTopBarProps = {
   tripId: string | null
   tripName: string
-  distanceUnit: "nm" | "km"
-  onDistanceUnitChange: (unit: "nm" | "km") => void
+  distanceUnit: DistanceUnit
+  onDistanceUnitChange: (unit: DistanceUnit) => void
   totalDistance: number
   dayCount: number
   isSaving?: boolean
@@ -35,27 +36,33 @@ export function MapTopBar({
   isLeader = true,
   tripState = null,
 }: MapTopBarProps) {
-  const showEditRoute = viewMode && isLeader && tripState !== "past"
+  const showEditRoute = viewMode && isLeader && tripState !== TRIP_STATE.PAST
   const showDone = !viewMode
   const displayDistance =
-    distanceUnit === "nm" ? totalDistance.toFixed(1) : (totalDistance * 1.852).toFixed(1)
+    distanceUnit === DISTANCE_UNIT.NM
+      ? totalDistance.toFixed(1)
+      : (totalDistance * 1.852).toFixed(1)
 
   const unitToggle = (
     <span className="border-border flex overflow-hidden rounded border text-[10px]">
       <button
-        onClick={() => onDistanceUnitChange("nm")}
+        onClick={() => onDistanceUnitChange(DISTANCE_UNIT.NM)}
         className={cn(
           "px-1.5 py-0.5 transition-colors",
-          distanceUnit === "nm" ? "bg-muted text-foreground font-medium" : "hover:bg-muted",
+          distanceUnit === DISTANCE_UNIT.NM
+            ? "bg-muted text-foreground font-medium"
+            : "hover:bg-muted",
         )}
       >
         nm
       </button>
       <button
-        onClick={() => onDistanceUnitChange("km")}
+        onClick={() => onDistanceUnitChange(DISTANCE_UNIT.KM)}
         className={cn(
           "border-border border-l px-1.5 py-0.5 transition-colors",
-          distanceUnit === "km" ? "bg-muted text-foreground font-medium" : "hover:bg-muted",
+          distanceUnit === DISTANCE_UNIT.KM
+            ? "bg-muted text-foreground font-medium"
+            : "hover:bg-muted",
         )}
       >
         km

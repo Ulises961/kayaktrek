@@ -1,5 +1,5 @@
 import type { Day } from "@/lib/dtos/day"
-import type { PointType } from "@/lib/dtos/point"
+import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import type { MapState } from "./map-reducer"
 
 export type DaySlice = {
@@ -118,8 +118,8 @@ export function computeSlicesApplyPayload(
   for (const id of oldBoundaryIds) {
     if (!newBoundaryIds.has(id) && !seenIds.has(id)) {
       const point = points.find((p) => p.id === id)
-      if (point && point.type === "stop") {
-        pointUpdates.push({ id, type: "position" })
+      if (point && point.type === POINT_TYPE.STOP) {
+        pointUpdates.push({ id, type: POINT_TYPE.POSITION })
         seenIds.add(id)
       }
     }
@@ -128,8 +128,8 @@ export function computeSlicesApplyPayload(
   for (const id of newBoundaryIds) {
     if (!seenIds.has(id)) {
       const point = points.find((p) => p.id === id)
-      if (point && point.type !== "stop") {
-        pointUpdates.push({ id, type: "stop" })
+      if (point && point.type !== POINT_TYPE.STOP) {
+        pointUpdates.push({ id, type: POINT_TYPE.STOP })
         seenIds.add(id)
       }
     }

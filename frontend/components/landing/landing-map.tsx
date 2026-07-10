@@ -14,6 +14,7 @@ import {
   CHART_PAPER as PAPER,
 } from "@/components/map/chart"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { POINT_TYPE } from "@/lib/dtos/point"
 import { palette } from "@/lib/tokens"
 
 // "hero" is the full landing chart (all instruments) on the Esri Ocean basemap.
@@ -67,12 +68,12 @@ function RouteMarkers({ route }: { route: RouteData }) {
   return (
     <>
       {points.map((p, i) => {
-        const isStop = p.type === "stop"
+        const isStop = p.type === POINT_TYPE.STOP
         // Sequential overnight number = stops up to and including this point.
-        const stopNo = points.slice(0, i + 1).filter((q) => q.type === "stop").length
+        const stopNo = points.slice(0, i + 1).filter((q) => q.type === POINT_TYPE.STOP).length
         const icon = isStop
-          ? ringIcon(palette.sunset500, "stop", stopNo)
-          : ringIcon(INK, "position")
+          ? ringIcon(palette.sunset500, POINT_TYPE.STOP, stopNo)
+          : ringIcon(INK, POINT_TYPE.POSITION)
         return (
           <Marker
             key={`${route.id}-${i}`}

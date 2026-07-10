@@ -5,6 +5,11 @@ import { noHtmlTags } from "../validators"
 export const PointTypeSchema = z.enum(["stop", "position"])
 export type PointType = z.infer<typeof PointTypeSchema>
 
+export const POINT_TYPE = {
+  STOP: "stop",
+  POSITION: "position",
+} as const satisfies Record<string, PointType>
+
 // Point is self-referencing (next: Point), so the type and schema are defined
 // separately with z.lazy() to break the recursion.
 export type Point = {

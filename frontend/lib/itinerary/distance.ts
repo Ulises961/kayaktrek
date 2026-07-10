@@ -1,4 +1,12 @@
+import { POINT_TYPE } from "@/lib/dtos/point"
+
 const EARTH_RADIUS_NM = 3440.065
+
+export const DISTANCE_UNIT = {
+  NM: "nm",
+  KM: "km",
+} as const
+export type DistanceUnit = (typeof DISTANCE_UNIT)[keyof typeof DISTANCE_UNIT]
 
 export function haversineNm(
   a: { latitude: number; longitude: number },
@@ -36,8 +44,8 @@ export function toKm(nm: number): number {
   return nm * 1.852
 }
 
-export function formatDistance(nm: number, unit: "nm" | "km"): string {
-  const value = unit === "nm" ? nm : toKm(nm)
+export function formatDistance(nm: number, unit: DistanceUnit): string {
+  const value = unit === DISTANCE_UNIT.NM ? nm : toKm(nm)
   return value.toFixed(1)
 }
 
@@ -56,7 +64,7 @@ export function formatTime({ hours, minutes }: { hours: number; minutes: number 
   return `${hours}h ${minutes}min`
 }
 
-export function legLabel(distanceNm: number, speedKnots: number, unit: "nm" | "km"): string {
+export function legLabel(distanceNm: number, speedKnots: number, unit: DistanceUnit): string {
   const dist = formatDistance(distanceNm, unit)
   const time = formatTime(estimatedTime(distanceNm, speedKnots))
   return `${dist} ${unit} · ${time}`
@@ -97,7 +105,7 @@ export function routeLegs<T extends DayPoint>(dayPoints: T[]): RouteLeg<T>[] {
       running += d
       cumulative += d
     }
-    const isAnchor = i === 0 || i === placed.length - 1 || placed[i].type === "stop"
+    const isAnchor = i === 0 || i === placed.length - 1 || placed[i].type === POINT_TYPE.STOP
     legs.push({
       point: placed[i],
       isAnchor,

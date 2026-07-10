@@ -14,6 +14,7 @@ vi.mock("@/lib/api/client", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
 import { searchPublicItineraries, fetchPublicRouteData, fetchStoryByToken } from "../actions"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 
 const ENVELOPE = { items: [], total: 0, page: 1, pages: 1 }
 
@@ -135,12 +136,12 @@ describe("fetchStoryByToken", () => {
     mockApiGetPublic.mockResolvedValue({
       id: "it-1",
       name: "Story",
-      tripState: "past",
+      tripState: TRIP_STATE.PAST,
       days: [],
     })
     const detail = await fetchStoryByToken("abc123")
     expect(detail?.name).toBe("Story")
-    expect(detail?.tripState).toBe("past")
+    expect(detail?.tripState).toBe(TRIP_STATE.PAST)
   })
 
   it("returns null for an unknown or regenerated token", async () => {

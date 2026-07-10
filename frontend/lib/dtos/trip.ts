@@ -9,10 +9,20 @@ export const TRIP_STATES = ["building", "happening", "past"] as const
 export type TripState = (typeof TRIP_STATES)[number]
 
 export const TRIP_STATE_LABELS: Record<TripState, string> = {
-  building: "Building",
+  building: "Planning",
   happening: "Happening",
   past: "Past",
 }
+
+// Canonical values for equality checks — never hand-type the string literal at a
+// call site. Includes `archived`, the GDPR-erasure terminal state outside the
+// forward-only TRIP_STATES progression (never frontend-set, so not part of TripState).
+export const TRIP_STATE = {
+  BUILDING: "building",
+  HAPPENING: "happening",
+  PAST: "past",
+  ARCHIVED: "archived",
+} as const
 
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
 export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]

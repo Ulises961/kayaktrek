@@ -5,6 +5,7 @@ import type { Dispatch } from "react"
 import type { MapState, MapAction } from "./map-reducer"
 import type { DaySlice } from "./boundaries"
 import type { TripState } from "@/lib/dtos/trip"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type { DaySlice }
 
@@ -16,8 +17,8 @@ export type MapBuilderContextValue = {
   tripId: string | null
   tripName: string
   itineraryId: string
-  distanceUnit: "nm" | "km"
-  setDistanceUnit: (u: "nm" | "km") => void
+  distanceUnit: DistanceUnit
+  setDistanceUnit: (u: DistanceUnit) => void
   avgSpeedKnots: number
   setAvgSpeedKnots: (v: number) => void
   activePointId: string | null

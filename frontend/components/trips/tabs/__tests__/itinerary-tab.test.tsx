@@ -5,6 +5,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 import { ItineraryTab } from "../itinerary-tab"
 import type { Itinerary } from "@/lib/dtos/itinerary"
+import { formatRouteRange } from "@/lib/itinerary/format"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000d01"
 
@@ -57,7 +58,7 @@ describe("ItineraryTab", () => {
     )
 
     expect(screen.queryByText("Rest day")).toBeNull()
-    expect(screen.getByText("Start Cove → End Beach")).toBeTruthy()
+    expect(screen.getByText(formatRouteRange("Start Cove", "End Beach"))).toBeTruthy()
   })
 
   it("still labels a genuinely empty day as 'Rest day'", () => {

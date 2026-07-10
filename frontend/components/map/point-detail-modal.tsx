@@ -21,7 +21,7 @@ import {
   deletePointImage,
 } from "@/lib/itinerary/actions"
 import { cn } from "@/lib/utils"
-import type { Point } from "@/lib/dtos/point"
+import { POINT_TYPE, type Point } from "@/lib/dtos/point"
 
 type PointDetailModalProps = {
   point: Point
@@ -30,7 +30,7 @@ type PointDetailModalProps = {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const Icon = type === "stop" ? Anchor : CircleDot
+  const Icon = type === POINT_TYPE.STOP ? Anchor : CircleDot
   return (
     <span className="text-muted-foreground flex items-center gap-1.5 text-[9px] font-bold tracking-widest uppercase">
       <Icon className="size-3" />

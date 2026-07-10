@@ -3,6 +3,7 @@ import { FloatPlanSnapshotSchema, type SnapshotCrewMember } from "@/lib/dtos/flo
 import { API_URL, API_PREFIX } from "@/lib/api/config"
 import { formatDayDate } from "@/lib/utils/date"
 import { formatVesselLength } from "@/lib/user/format"
+import { formatDateRange } from "@/lib/trips/format"
 
 async function fetchSnapshot(token: string) {
   try {
@@ -121,13 +122,7 @@ export default async function PublicFloatPlanPage({
     )
   }
 
-  const dateRange = [snap.trip.dateFrom, snap.trip.dateTo].filter(Boolean)
-  const dateLabel =
-    dateRange.length === 2
-      ? `${formatDayDate(dateRange[0])} – ${formatDayDate(dateRange[1])}`
-      : dateRange.length === 1
-        ? formatDayDate(dateRange[0])
-        : "Dates not set"
+  const dateLabel = formatDateRange(snap.trip.dateFrom, snap.trip.dateTo)
 
   const sc = snap.shoreContact
   const hasShoreContact = sc && (sc.name || sc.phone || sc.email)

@@ -1,19 +1,19 @@
 "use client"
 
 import { useState } from "react"
+import { DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 
 const KM_PER_NM = 1.852
-type Unit = "km" | "nm"
 
-function convert(km: number, unit: Unit): string {
-  const value = unit === "km" ? km : km / KM_PER_NM
+function convert(km: number, unit: DistanceUnit): string {
+  const value = unit === DISTANCE_UNIT.KM ? km : km / KM_PER_NM
   return `${value.toFixed(1)} ${unit}`
 }
 
-function readStoredUnit(): Unit {
-  if (typeof window === "undefined") return "km"
+function readStoredUnit(): DistanceUnit {
+  if (typeof window === "undefined") return DISTANCE_UNIT.KM
   const stored = localStorage.getItem("distanceUnit")
-  return stored === "km" || stored === "nm" ? stored : "km"
+  return stored === DISTANCE_UNIT.KM || stored === DISTANCE_UNIT.NM ? stored : DISTANCE_UNIT.KM
 }
 
 interface MileageSummaryProps {
@@ -22,9 +22,9 @@ interface MileageSummaryProps {
 }
 
 export function MileageSummary({ planned, actual }: MileageSummaryProps) {
-  const [unit, setUnit] = useState<Unit>(readStoredUnit)
+  const [unit, setUnit] = useState<DistanceUnit>(readStoredUnit)
 
-  function toggleUnit(next: Unit) {
+  function toggleUnit(next: DistanceUnit) {
     setUnit(next)
     localStorage.setItem("distanceUnit", next)
   }
@@ -34,7 +34,7 @@ export function MileageSummary({ planned, actual }: MileageSummaryProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-1.5 self-end">
-        {(["km", "nm"] as Unit[]).map((u) => (
+        {([DISTANCE_UNIT.KM, DISTANCE_UNIT.NM] as DistanceUnit[]).map((u) => (
           <button
             key={u}
             onClick={() => toggleUnit(u)}

@@ -2,13 +2,14 @@ import Link from "next/link"
 import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
-import { TRIP_STATE_LABELS, TripPageSchema } from "@/lib/dtos/trip"
+import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
 import { getMe } from "@/lib/user/me"
 import { StateBadge } from "@/components/common/state-badge"
 import { TripRouteThumbnail } from "@/components/dashboard/trip-route-thumbnail"
 import { Button } from "@/components/ui/button"
 import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
+import { formatDateRange } from "@/lib/trips/format"
 import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 
@@ -50,8 +51,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
             {trip.dateFrom && (
               <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-sm">
                 <CalendarIcon className="size-3" />
-                {trip.dateFrom}
-                {trip.dateTo ? ` → ${trip.dateTo}` : ""}
+                {formatDateRange(trip.dateFrom, trip.dateTo)}
               </p>
             )}
           </div>
@@ -73,12 +73,10 @@ export default async function DashboardPage() {
   const user = session ? await getMe() : null
   const trips = session ? await fetchTrips(session.userId) : []
 
-  const happening = trips.filter((t) => t.state === "happening")
-  const upcoming = trips.filter(
-    (t) => t.state === "building" || t.state === TRIP_STATE_LABELS.building,
-  )
+  const happening = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
+  const upcoming = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
   const heroTrips = [...happening, ...upcoming].slice(0, 3)
-  const pastCount = trips.filter((t) => t.state === "past").length
+  const pastCount = trips.filter((t) => t.state === TRIP_STATE.PAST).length
 
   // Each shown trip's own route, drawn as the chart thumbnail in its card — the
   // landing's sea chart carried into the app, one passage per card. Best-effort and
