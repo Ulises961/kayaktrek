@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockConfirmItemOwned, mockDeleteItem, mockRefresh } = vi.hoisted(() => ({
-  mockConfirmItemOwned: vi.fn(),
-  mockDeleteItem: vi.fn(),
-  mockRefresh: vi.fn(),
-}))
+const { mockConfirmItemOwned, mockDeleteItem, mockToggleDefaultPack, mockRefresh } = vi.hoisted(
+  () => ({
+    mockConfirmItemOwned: vi.fn(),
+    mockDeleteItem: vi.fn(),
+    mockToggleDefaultPack: vi.fn(),
+    mockRefresh: vi.fn(),
+  }),
+)
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mockRefresh }),
@@ -15,6 +18,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/inventory/actions", () => ({
   confirmItemOwned: mockConfirmItemOwned,
   deleteItem: mockDeleteItem,
+  toggleDefaultPack: mockToggleDefaultPack,
 }))
 
 import { ItemRow } from "../item-row"
@@ -40,13 +44,23 @@ const SUGGESTED: Item = {
   category: CATEGORY,
 }
 
+const ALWAYS_PACKED: Item = {
+  id: "01952f1a-0000-7000-8000-000000000a03",
+  name: "PFD",
+  status: "owned",
+  category: CATEGORY,
+  defaultPack: true,
+}
+
 describe("ItemRow", () => {
   beforeEach(() => {
     mockConfirmItemOwned.mockReset()
     mockDeleteItem.mockReset()
+    mockToggleDefaultPack.mockReset()
     mockRefresh.mockReset()
     mockConfirmItemOwned.mockResolvedValue({ success: true })
     mockDeleteItem.mockResolvedValue({ success: true })
+    mockToggleDefaultPack.mockResolvedValue({ success: true })
   })
 
   it("renders the item name, category and owned status", () => {
@@ -94,5 +108,35 @@ describe("ItemRow", () => {
     await user.click(screen.getByRole("button", { name: /delete/i }))
 
     expect(mockDeleteItem).not.toHaveBeenCalled()
+  })
+
+  it("offers an opt-in toggle for an item not yet flagged default-pack", () => {
+    render(<ItemRow item={OWNED} />)
+    const toggle = screen.getByRole("button", { name: /always pack/i })
+    expect(toggle.getAttribute("aria-pressed")).toBe("false")
+  })
+
+  it("shows the toggle pressed for an item already flagged default-pack", () => {
+    render(<ItemRow item={ALWAYS_PACKED} />)
+    const toggle = screen.getByRole("button", { name: /always pack/i })
+    expect(toggle.getAttribute("aria-pressed")).toBe("true")
+  })
+
+  it("opts an item into default-pack", async () => {
+    const user = userEvent.setup()
+    render(<ItemRow item={OWNED} />)
+
+    await user.click(screen.getByRole("button", { name: /always pack/i }))
+
+    expect(mockToggleDefaultPack).toHaveBeenCalledWith(OWNED.id, true)
+  })
+
+  it("clears default-pack — don't suggest again on future trips", async () => {
+    const user = userEvent.setup()
+    render(<ItemRow item={ALWAYS_PACKED} />)
+
+    await user.click(screen.getByRole("button", { name: /always pack/i }))
+
+    expect(mockToggleDefaultPack).toHaveBeenCalledWith(ALWAYS_PACKED.id, false)
   })
 })

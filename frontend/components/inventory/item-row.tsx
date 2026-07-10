@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { CheckIcon, Trash2Icon } from "lucide-react"
+import { CheckIcon, StarIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/dtos/item"
-import { confirmItemOwned, deleteItem } from "@/lib/inventory/actions"
+import { confirmItemOwned, deleteItem, toggleDefaultPack } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
 
 interface ItemRowProps {
@@ -42,6 +42,15 @@ export function ItemRow({ item }: ItemRowProps) {
     })
   }
 
+  function handleToggleDefaultPack() {
+    setError(null)
+    startTransition(async () => {
+      const result = await toggleDefaultPack(item.id!, !item.defaultPack)
+      if (result.success) router.refresh()
+      else setError(result.error)
+    })
+  }
+
   return (
     <li className="flex flex-col gap-2 rounded-lg border p-3">
       <div className="flex items-center justify-between gap-3">
@@ -65,6 +74,25 @@ export function ItemRow({ item }: ItemRowProps) {
               <CheckIcon className="size-3.5" /> I own this
             </Button>
           )}
+          <Button
+            size="icon"
+            variant={item.defaultPack ? "default" : "outline"}
+            disabled={isPending}
+            onClick={handleToggleDefaultPack}
+            aria-pressed={!!item.defaultPack}
+            aria-label={
+              item.defaultPack
+                ? `Stop always packing ${item.name} on future trips`
+                : `Always pack ${item.name} on future trips`
+            }
+            title={
+              item.defaultPack
+                ? "Always packed — click to stop suggesting this on future trips"
+                : "Always pack this on future trips"
+            }
+          >
+            <StarIcon className={cn("size-3.5", item.defaultPack && "fill-current")} />
+          </Button>
           <Button
             size="icon"
             variant="ghost"

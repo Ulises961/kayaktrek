@@ -53,6 +53,23 @@ export async function toggleItem(itemId: string, checked: boolean): Promise<Inve
   }
 }
 
+// Toggles cross-trip packing intent: does this item auto-suggest onto future
+// trips' private packing lists? Checking a custom item opts it in; clearing a
+// catalog-seeded item means "don't suggest again".
+export async function toggleDefaultPack(
+  itemId: string,
+  defaultPack: boolean,
+): Promise<InventoryActionResult> {
+  try {
+    await apiPatch(`/api/item/${itemId}`, { defaultPack })
+    revalidatePath("/gear")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to update gear." }
+  }
+}
+
 export async function deleteItem(itemId: string): Promise<InventoryActionResult> {
   try {
     await apiDelete(`/api/item/${itemId}`)
