@@ -18,12 +18,13 @@ test.describe("Crew invitation flow", () => {
   })
 
   test("leader invites crew → crew accepts → crew appears on trip", async ({ page, browser }) => {
-    // Leader: navigate to trip and invite crew by email
+    // Leader: navigate to trip and invite crew by email. The invite form is
+    // always visible on the crew tab (M7b also added an "Invite a buddy"
+    // picker next to it, so match the submit button exactly).
     await page.goto(`/trips/${tripId}`)
     await page.getByRole("tab", { name: /crew/i }).click()
-    await page.getByRole("button", { name: /invite/i }).click()
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
-    await page.getByRole("button", { name: /invite/i }).click()
+    await page.getByRole("button", { name: "Invite", exact: true }).click()
     await expect(page.getByText(CREW.name)).toBeVisible()
 
     // Crew: open the trip in a separate context and accept the invitation
@@ -46,9 +47,8 @@ test.describe("Crew invitation flow", () => {
     const leaderPage = page
     await leaderPage.goto(`/trips/${tripId}`)
     await leaderPage.getByRole("tab", { name: /crew/i }).click()
-    await leaderPage.getByRole("button", { name: /invite/i }).click()
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
-    await leaderPage.getByRole("button", { name: /invite/i }).click()
+    await leaderPage.getByRole("button", { name: "Invite", exact: true }).click()
     await expect(leaderPage.getByText(CREW.name)).toBeVisible()
 
     // Cancel

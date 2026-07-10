@@ -15,7 +15,7 @@ export async function apiCreateItem(
   token: string,
   opts: { name: string; status?: "owned" | "suggested" },
 ): Promise<ItemResponse> {
-  const res = await request.post(`${API_URL}/api/item/create`, {
+  const res = await request.post(`${API_URL}/api/v1/item/create`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { name: opts.name, status: opts.status ?? "owned" },
   })
@@ -47,7 +47,7 @@ export async function apiGetInventory(
   token: string,
   tripId: string,
 ): Promise<TripInventory> {
-  const res = await request.get(`${API_URL}/api/trip/${tripId}`, {
+  const res = await request.get(`${API_URL}/api/v1/trip/${tripId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok()) throw new Error(`getTrip failed: ${res.status()} ${await res.text()}`)
@@ -79,7 +79,7 @@ export async function apiAddRequirement(
   inventoryId: string,
   opts: { name: string; category?: string },
 ): Promise<{ id: string; name: string }> {
-  const res = await request.post(`${API_URL}/api/inventory/${inventoryId}/requirements`, {
+  const res = await request.post(`${API_URL}/api/v1/inventory/${inventoryId}/requirements`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { name: opts.name, category: opts.category },
   })
@@ -95,7 +95,7 @@ export async function apiContribute(
   itemId: string,
 ): Promise<void> {
   const res = await request.post(
-    `${API_URL}/api/inventory/${inventoryId}/requirements/${reqId}/contribute`,
+    `${API_URL}/api/v1/inventory/${inventoryId}/requirements/${reqId}/contribute`,
     { headers: { Authorization: `Bearer ${token}` }, data: { itemId } },
   )
   if (!res.ok()) throw new Error(`contribute failed: ${res.status()} ${await res.text()}`)
@@ -107,7 +107,7 @@ export async function apiAddPacking(
   tripId: string,
   itemId: string,
 ): Promise<void> {
-  const res = await request.post(`${API_URL}/api/packing/create`, {
+  const res = await request.post(`${API_URL}/api/v1/packing/create`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { tripId, itemId },
   })
