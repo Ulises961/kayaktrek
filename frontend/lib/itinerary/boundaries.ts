@@ -86,6 +86,19 @@ export function removeDraftSlice(slices: DaySlice[], dayId: string): DaySlice[] 
     .map((s, idx) => ({ ...s, dayNumber: idx + 1 }))
 }
 
+// Walks backward from `index` (inclusive) to find the nearest slice with a
+// date set — used as a DatePicker's minDate so a day can never be dated
+// before the closest earlier day that actually has a date (skipping over any
+// undated days in between). Returns undefined when nothing earlier is dated
+// (e.g. day 1, or every earlier day is also undated).
+export function latestDatedSliceDate(slices: DaySlice[], index: number): string | undefined {
+  for (let i = index; i >= 0; i--) {
+    const date = slices[i]?.date
+    if (date) return date
+  }
+  return undefined
+}
+
 export function initDaySlices(days: Day[], pointOrder: string[]): DaySlice[] {
   const sorted = days
     .filter((d) => d.dayNumber > 0 && d.id)

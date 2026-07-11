@@ -8,6 +8,7 @@ import {
   isDraftDay,
   appendDraftSlice,
   removeDraftSlice,
+  latestDatedSliceDate,
 } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
@@ -503,6 +504,7 @@ export function PointListPane() {
                 avgSpeedKnots={avgSpeedKnots}
                 labelDayNumber={slice.dayNumber + 1}
                 labelDate={nextSlice?.date ?? null}
+                minDate={latestDatedSliceDate(activeSlices!, sliceIdx)}
                 interactive={isInteractive}
                 onDateChange={
                   isInteractive

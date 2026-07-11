@@ -502,6 +502,23 @@ describe("PointListPane — Day 1 header in boundary-edit mode", () => {
   })
 })
 
+// ─── boundary date minDate wiring ─────────────────────────────────────────────
+
+describe("PointListPane — boundary divider date minDate", () => {
+  it("constrains a day's date picker to the nearest earlier dated day", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-25" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft }))
+    // The divider between day 1 and day 2 edits day 2's date; day 1's date
+    // (2026-07-15) is the floor, so an earlier day within the same visible
+    // month (e.g. the 5th) must be disabled.
+    await userEvent.click(screen.getByRole("button", { name: /25 Jul 2026/i }))
+    expect(screen.getByText("5").closest("button")).toBeDisabled()
+  })
+})
+
 // ─── Edit days ────────────────────────────────────────────────────────────────
 
 describe("PointListPane — Edit days", () => {

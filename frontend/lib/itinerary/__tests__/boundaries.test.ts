@@ -6,6 +6,7 @@ import {
   isDraftDay,
   appendDraftSlice,
   removeDraftSlice,
+  latestDatedSliceDate,
   type DaySlice,
 } from "../boundaries"
 import type { Day } from "@/lib/dtos/day"
@@ -373,5 +374,39 @@ describe("removeDraftSlice", () => {
   it("is a no-op when the dayId is not found", () => {
     const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
     expect(removeDraftSlice(slices, "does-not-exist")).toEqual(slices)
+  })
+})
+
+// ─── latestDatedSliceDate ─────────────────────────────────────────────────────
+
+describe("latestDatedSliceDate", () => {
+  it("returns the date of the slice at index when it has one", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-03" },
+    ]
+    expect(latestDatedSliceDate(slices, 1)).toBe("2026-07-03")
+  })
+
+  it("walks backward to the nearest earlier dated slice when the one at index has none", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
+      { dayId: D3, dayNumber: 3, startIdx: 2, endIdx: 3, date: null },
+    ]
+    expect(latestDatedSliceDate(slices, 2)).toBe("2026-07-01")
+  })
+
+  it("returns undefined when no earlier slice (inclusive) has a date", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
+    ]
+    expect(latestDatedSliceDate(slices, 1)).toBeUndefined()
+  })
+
+  it("returns undefined for a negative index (day 1 has nothing before it)", () => {
+    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null }]
+    expect(latestDatedSliceDate(slices, -1)).toBeUndefined()
   })
 })

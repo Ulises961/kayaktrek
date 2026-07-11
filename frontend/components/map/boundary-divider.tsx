@@ -13,6 +13,8 @@ export type BoundaryDividerProps = {
   avgSpeedKnots: number
   labelDayNumber: number
   labelDate: string | null
+  /** ISO date of the nearest earlier dated day — this day can't be dated before it. */
+  minDate?: string
   interactive?: boolean
   onDateChange?: (date: string | null) => void
   onBoundaryMove?: (newEndPointIdx: number) => void
@@ -35,6 +37,7 @@ export function BoundaryDivider({
   avgSpeedKnots,
   labelDayNumber,
   labelDate,
+  minDate,
   interactive = true,
   onDateChange,
   onBoundaryMove,
@@ -207,6 +210,7 @@ export function BoundaryDivider({
             onChange={(v) => onDateChange?.(v || null)}
             placeholder="Add date"
             size="sm"
+            minDate={minDate}
             className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
           />
           {deleteButton && <div className="ml-auto">{deleteButton}</div>}

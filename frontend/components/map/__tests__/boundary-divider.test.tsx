@@ -124,6 +124,24 @@ describe("BoundaryDivider — date editing", () => {
     await userEvent.click(screen.getByText("15"))
     expect(onDateChange).toHaveBeenCalledWith("2026-06-15")
   })
+
+  it("disables calendar days before minDate (can't pick a date earlier than the previous day's)", async () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-20"
+        minDate="2026-06-15"
+        onDateChange={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /20 Jun 2026/i }))
+    expect(screen.getByText("10").closest("button")).toBeDisabled()
+  })
 })
 
 describe("BoundaryDivider — drag handle (interactive, default)", () => {

@@ -17,6 +17,8 @@ interface DatePickerProps {
   /** Override the trigger button styling (e.g. for compact inline use). */
   className?: string
   size?: React.ComponentProps<typeof Button>["size"]
+  /** ISO date (YYYY-MM-DD) — calendar days before this are disabled. */
+  minDate?: string
 }
 
 export function DatePicker({
@@ -27,10 +29,12 @@ export function DatePicker({
   id,
   className,
   size,
+  minDate,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   const selected = value && isValid(parseISO(value)) ? parseISO(value) : undefined
+  const minDateParsed = minDate && isValid(parseISO(minDate)) ? parseISO(minDate) : undefined
 
   function handleSelect(date: Date | undefined) {
     onChange?.(date ? format(date, "yyyy-MM-dd") : "")
@@ -65,6 +69,7 @@ export function DatePicker({
           selected={selected}
           defaultMonth={selected}
           onSelect={handleSelect}
+          disabled={minDateParsed ? { before: minDateParsed } : undefined}
           initialFocus
         />
       </PopoverContent>
