@@ -28,9 +28,7 @@ function addDaysIso(iso: string, days: number): string {
 // between. Purely a display/detection derivation: emits one entry per
 // undated calendar day so the day list can show a "Rest" placeholder, never
 // a real Day row (M12 §I — deliberately no promotion/insertion action).
-export function computeRestGaps(
-  days: { dayNumber: number; date: string | null | undefined }[],
-): RestGap[] {
+export function computeRestGaps(days: { dayNumber: number; date?: string | null }[]): RestGap[] {
   const dated = days
     .filter((d): d is { dayNumber: number; date: string } => !!d.date)
     .sort((a, b) => a.dayNumber - b.dayNumber)

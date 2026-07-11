@@ -207,6 +207,81 @@ describe("DayRail — §M shared boundary-stop derivation", () => {
   })
 })
 
+// ─── §I rest-gap visualization ───────────────────────────────────────────────
+
+describe("DayRail — §I rest-gap visualization", () => {
+  it("does not show a Rest entry when consecutive days have no calendar gap", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-02" })],
+        },
+      }),
+    )
+    expect(screen.queryByTestId("rest-gap-entry")).not.toBeInTheDocument()
+  })
+
+  it("shows a Rest entry between two dated days with a calendar gap", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-03" })],
+        },
+      }),
+    )
+    const gapEntries = screen.getAllByTestId("rest-gap-entry")
+    expect(gapEntries).toHaveLength(1)
+    expect(screen.getByText("Rest")).toBeInTheDocument()
+  })
+
+  it("combines a multi-day gap into a single entry", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-05" })],
+        },
+      }),
+    )
+    expect(screen.getAllByTestId("rest-gap-entry")).toHaveLength(1)
+  })
+
+  it("is not clickable and never creates a real day", async () => {
+    const setSelectedDayId = vi.fn()
+    renderWithCtx(
+      makeCtx({
+        setSelectedDayId,
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-03" })],
+        },
+      }),
+    )
+    const gapEntry = screen.getByTestId("rest-gap-entry")
+    expect(gapEntry.tagName).not.toBe("BUTTON")
+    await userEvent.click(gapEntry)
+    expect(setSelectedDayId).not.toHaveBeenCalled()
+  })
+})
+
 // ─── selection ────────────────────────────────────────────────────────────────
 
 describe("DayRail — selection", () => {

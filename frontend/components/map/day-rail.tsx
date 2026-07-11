@@ -1,12 +1,14 @@
 "use client"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { fetchDayWeather } from "@/lib/weather/actions"
 import { representativeHour } from "@/lib/weather/hourly"
 import { formatDayDate } from "@/lib/utils/date"
+import { formatDateRange } from "@/lib/trips/format"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
+import { computeRestGaps, type RestGap } from "@/lib/itinerary/format"
 import { BeaufortPill } from "@/components/weather/beaufort-pill"
 import type { Weather } from "@/lib/dtos/weather"
 import type { Day } from "@/lib/dtos/day"
@@ -104,6 +106,25 @@ function DayRailEntry({
   )
 }
 
+// A purely visual placeholder for a calendar-date gap between two dated real
+// days — never a real Day entity, never clickable. Same vocabulary as a
+// disabled/empty DayRailEntry, deliberately not a <button>.
+function RestGapEntry({ gaps }: { gaps: RestGap[] }) {
+  const first = gaps[0].date
+  const last = gaps[gaps.length - 1].date
+  const label = first === last ? formatDayDate(first) : formatDateRange(first, last)
+
+  return (
+    <div
+      data-testid="rest-gap-entry"
+      className="text-muted-foreground/70 flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs"
+    >
+      <span className="font-semibold italic">Rest</span>
+      <span className="text-[10px]">{label}</span>
+    </div>
+  )
+}
+
 export function DayRail() {
   const { state, tripName, selectedDayId, setSelectedDayId, conditionsVersion } = useMapBuilder()
 
@@ -122,6 +143,13 @@ export function DayRail() {
   const numberedDays = [...state.days]
     .filter((d) => d.dayNumber > 0)
     .sort((a, b) => a.dayNumber - b.dayNumber)
+
+  const gapsByAfterDayNumber = new Map<number, RestGap[]>()
+  for (const gap of computeRestGaps(numberedDays)) {
+    const list = gapsByAfterDayNumber.get(gap.afterDayNumber) ?? []
+    list.push(gap)
+    gapsByAfterDayNumber.set(gap.afterDayNumber, list)
+  }
 
   return (
     <div
@@ -142,16 +170,21 @@ export function DayRail() {
         <p className="text-muted-foreground px-2.5 py-4 text-center text-[10px]">No days planned</p>
       ) : (
         <div className="flex flex-col gap-0.5 p-1.5">
-          {numberedDays.map((day) => (
-            <DayRailEntry
-              key={day.id}
-              day={day}
-              isActive={selectedDayId === day.id}
-              pointCount={pointCountByDay.get(day.id!) ?? 0}
-              conditionsVersion={conditionsVersion}
-              onClick={() => setSelectedDayId(selectedDayId === day.id ? null : day.id!)}
-            />
-          ))}
+          {numberedDays.map((day) => {
+            const gaps = gapsByAfterDayNumber.get(day.dayNumber)
+            return (
+              <Fragment key={day.id}>
+                <DayRailEntry
+                  day={day}
+                  isActive={selectedDayId === day.id}
+                  pointCount={pointCountByDay.get(day.id!) ?? 0}
+                  conditionsVersion={conditionsVersion}
+                  onClick={() => setSelectedDayId(selectedDayId === day.id ? null : day.id!)}
+                />
+                {gaps && <RestGapEntry gaps={gaps} />}
+              </Fragment>
+            )
+          })}
         </div>
       )}
     </div>
