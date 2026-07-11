@@ -118,11 +118,49 @@ The trip itself is always private — crew lists, emergency contacts, logistics,
 
 ---
 
-## Rest days — inferred from calendar gaps
+## Rest days — inferred from calendar gaps, refined M12 §I (2026-07-11)
 
-Rest days are not tracked as a separate entity. The `Day.date` field is optional; a gap between consecutive day dates in the calendar is implicitly a planned rest period. This avoids a `RestDay` model, a multi-date span on `Day`, or any additional backend work for a concept that is adequately represented by absence.
+Rest days are not tracked as a separate entity — a two-part model. The original 2026-05-24
+decision only covered the first half; the second was added once M12 §I found that paddlers
+overwhelmingly don't reach for the first path:
+
+- **A `Day` entity exists but owns no route points** (an empty slice — its start and end
+  boundary resolve to the same point, or it has no points at all). This is a real, explicit
+  rest day; no schema change, already representable via the builder's slice model.
+- **No `Day` entity exists at all** for one or more calendar dates between two dated real
+  days — the actual common path: a paddler just moves a later day's date forward rather than
+  opening the builder for the days in between. This is **purely a display-layer inference**,
+  not a stored entity: `computeRestGaps` (`lib/itinerary/format.ts`) detects the gap from two
+  consecutive dated `Day` rows, and the day list (trip page's Itinerary tab, the builder's day
+  rail) renders a non-interactive "Rest" placeholder for each undated calendar day —
+  deliberately never a real `Day` row. The codebase has no day-insert-with-renumber capability
+  (day creation only ever appends at the end; deletion only ever renumbers downward), and
+  building one was explicitly out of scope for this pass — real, paddled days stay exactly as
+  they are in the chain. The placeholder's shape (`{ afterDayNumber, date }`) is deliberately
+  enough information for a future "promote this gap to a real rest day" action to attach to
+  without reworking the detection logic, if that capability is ever added.
 
 The `is_paused` flag (above) handles a different, runtime concept: the expedition is stopped and the next checkpoint window may be missed. A date gap in the itinerary signals deliberate planning; `is_paused` signals an active expedition that has halted. These must not be conflated in the checkpoint-alert logic (M8).
+
+---
+
+## Overnight-stop ownership — single-owner storage, shared display derivation (M12 §M, 2026-07-11)
+
+The point shared between two consecutive days (the overnight stop) is owned by exactly one
+`Day` in storage — `apply_boundaries` assigns it to whichever day's boundary is processed last
+in the request (day-number order), which in practice is the *later* day. Three frontend
+surfaces — the trip page's Itinerary tab, the builder's day rail, and the public/explore route
+renderer — each independently derived per-day stats by walking a day's own `points` array, and
+all three inherited the same bug: the *earlier*/ending day's own array is missing its own end
+boundary, silently understating its distance and dropping its end-stop label.
+
+**Decision: keep single-owner storage (no schema/contract change), fix the display layer with
+one shared derivation.** `walkDayRoutePoints` (`lib/itinerary/day-points.ts`) walks a day's
+`startPointId` → `nextId` → `endPointId` through a *global* point lookup spanning every day,
+rather than that day's own `points` — sidesteps storage ownership entirely, since it never asks
+which day owns a given row. All three surfaces now derive from it (falling back to a
+chain-head heuristic only for a day with no boundary metadata yet — an organic/fresh day). A
+day is inferred as a rest day when this walk resolves to 0 or 1 points.
 
 ---
 
@@ -165,5 +203,6 @@ Revoking medical consent nulls the field on both the `User` record and every `Tr
 | Itinerary visibility independent of trip privacy | ADR-012 | 2025-01-01 | `is_public` on `Itinerary`, not `Trip`; resolves M1 blocker (confirmed in ADR-026) |
 | GDPR erasure model | ADR-013 | 2025-03-01 | 30-day grace period; targeted hard-delete |
 | Trip collaboration model | ADR-019 | 2026-05-09 | Itinerary: leader-only decided for M4 |
-| Rest days and paused expedition state | ADR-025 | 2026-05-24 | Pause/resume on `Trip`; rest days inferred from date gaps |
+| Rest days and paused expedition state | ADR-025 | 2026-05-24 | Pause/resume on `Trip`; rest days inferred from date gaps. Refined 2026-07-11 (M12 §I): two-part model — empty-slice `Day` = real rest day; a calendar gap with no `Day` row at all = visual-only "Rest" placeholder (`computeRestGaps`), deliberately never promoted to a real entity |
 | Community map annotations are a second public shape, independent of `Itinerary` visibility | — | 2026-06-20 | Global POIs (`itinerary_id = null`, `visibility = public`) on the landing map, not gated by a route; public tier deferred to M7; see `features.md` (Map Annotations) |
+| Overnight-stop ownership: single-owner storage, shared display derivation | — | 2026-07-11 | M12 §M — `apply_boundaries` assigns the shared boundary point to one day only; `walkDayRoutePoints` (`lib/itinerary/day-points.ts`) is the one shared derivation every per-day distance/label/rest-check now uses, regardless of storage ownership |
