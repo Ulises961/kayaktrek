@@ -250,6 +250,18 @@ describe("ItineraryTab — itinerary with days", () => {
     await userEvent.click(screen.getByRole("button", { name: /show all/i }))
     expect(screen.getByText(/Day 6/)).toBeDefined()
   })
+
+  it("orders the day list by dayNumber, not by array/date order", () => {
+    // Day 2 (no date) arrives before Day 1 (dated) in itinerary.days — the
+    // rendered list must still show Day 1 first.
+    const itinerary: Itinerary = {
+      ...ITIN_WITH_DAYS,
+      days: [DAY_REST, DAY_WITH_POINTS],
+    }
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader />)
+    const dayLabels = screen.getAllByText(/^Day \d$/).map((el) => el.textContent)
+    expect(dayLabels).toEqual(["Day 1", "Day 2"])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -457,5 +469,39 @@ describe("ItineraryTab — §M shared boundary-stop derivation", () => {
       <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
     )
     expect(screen.getByText(formatRouteRange("Shared Anchorage", "End Beach"))).toBeTruthy()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// §I — rest-gap visualization
+// ---------------------------------------------------------------------------
+
+describe("ItineraryTab — §I rest-gap visualization", () => {
+  it("shows a Rest entry between two dated days with a calendar gap", () => {
+    const itinerary: Itinerary = {
+      id: "01952f1a-0000-7000-8000-000000000i05",
+      days: [
+        { dayNumber: 1, date: "2026-07-01", startPointId: null, points: [] },
+        { dayNumber: 2, date: "2026-07-03", startPointId: null, points: [] },
+      ],
+    }
+    render(
+      <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
+    )
+    expect(screen.getByTestId("rest-gap-entry")).toBeInTheDocument()
+  })
+
+  it("does not show a Rest entry when there is no calendar gap", () => {
+    const itinerary: Itinerary = {
+      id: "01952f1a-0000-7000-8000-000000000i06",
+      days: [
+        { dayNumber: 1, date: "2026-07-01", startPointId: null, points: [] },
+        { dayNumber: 2, date: "2026-07-02", startPointId: null, points: [] },
+      ],
+    }
+    render(
+      <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
+    )
+    expect(screen.queryByTestId("rest-gap-entry")).not.toBeInTheDocument()
   })
 })

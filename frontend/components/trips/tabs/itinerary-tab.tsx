@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { Fragment, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ChevronDownIcon, ChevronUpIcon, MapIcon } from "lucide-react"
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
-import { formatRouteRange } from "@/lib/itinerary/format"
+import { formatRouteRange, computeRestGaps, type RestGap } from "@/lib/itinerary/format"
 import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 import { formatDayDate } from "@/lib/utils/date"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
@@ -129,6 +129,30 @@ function DayRow({
   )
 }
 
+// A purely visual placeholder for a calendar-date gap between two dated real
+// days — never a real Day entity. Same "Rest day" vocabulary as an empty-slice
+// DayRow, but its own row since it has no dayNumber of its own.
+function RestGapRow({ gaps }: { gaps: RestGap[] }) {
+  const first = gaps[0].date
+  const last = gaps[gaps.length - 1].date
+  const label = first === last ? formatDayDate(first) : formatDateRange(first, last)
+
+  return (
+    <div
+      data-testid="rest-gap-entry"
+      className="border-border/30 py-2.5 pl-3 text-xs"
+      style={{ borderLeftWidth: 2 }}
+    >
+      <span className="text-muted-foreground/60 text-[10px] font-semibold tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      <div className="mt-0.5">
+        <span className="text-muted-foreground/70 text-xs italic">Rest</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ItineraryTab({
@@ -184,7 +208,9 @@ export function ItineraryTab({
   }
 
   // ── Draft (no numbered days) ───────────────────────────────────────────────
-  const days = (itinerary.days ?? []).filter((d) => d.dayNumber > 0)
+  const days = (itinerary.days ?? [])
+    .filter((d) => d.dayNumber > 0)
+    .sort((a, b) => a.dayNumber - b.dayNumber)
   if (days.length === 0) {
     return (
       <div className="flex flex-col gap-3">
@@ -228,6 +254,13 @@ export function ItineraryTab({
   const routedDaysCount = days.filter((d) => (d.points ?? []).length > 0).length
   const totalTripDays = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
 
+  const gapsByAfterDayNumber = new Map<number, RestGap[]>()
+  for (const gap of computeRestGaps(days)) {
+    const list = gapsByAfterDayNumber.get(gap.afterDayNumber) ?? []
+    list.push(gap)
+    gapsByAfterDayNumber.set(gap.afterDayNumber, list)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Stats tiles */}
@@ -253,9 +286,15 @@ export function ItineraryTab({
 
       {/* Day list */}
       <div className="flex flex-col gap-1.5">
-        {visible.map((day) => (
-          <DayRow key={day.id} day={day} speedKnots={speedKnots} pointsById={pointsById} />
-        ))}
+        {visible.map((day) => {
+          const gaps = gapsByAfterDayNumber.get(day.dayNumber)
+          return (
+            <Fragment key={day.id}>
+              <DayRow day={day} speedKnots={speedKnots} pointsById={pointsById} />
+              {gaps && <RestGapRow gaps={gaps} />}
+            </Fragment>
+          )
+        })}
       </div>
 
       {/* Show all / less toggle */}
