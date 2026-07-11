@@ -67,11 +67,16 @@ const baseCtx: MapBuilderContextValue = {
   bumpConditions: vi.fn(),
 }
 
-function renderModal(point: Point, canEdit = true, onClose = vi.fn()) {
+function renderModal(
+  point: Point,
+  canEdit = true,
+  onClose = vi.fn(),
+  ctxOverrides: Partial<MapBuilderContextValue> = {},
+) {
   return render(
     createElement(
       MapBuilderContext.Provider,
-      { value: baseCtx },
+      { value: { ...baseCtx, ...ctxOverrides } },
       createElement(PointDetailModal, { point, canEdit, onClose }),
     ),
   )
@@ -87,6 +92,11 @@ describe("PointDetailModal", () => {
     expect(screen.getByText("Vikten Sea Caves")).toBeInTheDocument()
     expect(screen.getByText("stop")).toBeInTheDocument()
     expect(screen.getByText(/68\.071°N · 13\.512°E/)).toBeInTheDocument()
+  })
+
+  it("does not repeat the coordinates as both title and subtitle when the point has no name", () => {
+    renderModal({ ...POINT, name: undefined }, false)
+    expect(screen.getAllByText(/68\.071°N · 13\.512°E/)).toHaveLength(1)
   })
 
   it("shows the image carousel position", () => {
@@ -115,7 +125,7 @@ describe("PointDetailModal", () => {
 
   it("renders an editable notes field when editable and persists on blur", async () => {
     renderModal(POINT, true)
-    const textarea = screen.getByRole("textbox")
+    const textarea = screen.getByPlaceholderText(/landing notes/i)
     await userEvent.clear(textarea)
     await userEvent.type(textarea, "New note")
     await userEvent.tab()
@@ -130,7 +140,7 @@ describe("PointDetailModal", () => {
 
   it("shows a Saving… then Saved status after the notes are blur-saved", async () => {
     renderModal(POINT, true)
-    const textarea = screen.getByRole("textbox")
+    const textarea = screen.getByPlaceholderText(/landing notes/i)
     await userEvent.clear(textarea)
     await userEvent.type(textarea, "New note")
     await userEvent.tab()
@@ -139,7 +149,7 @@ describe("PointDetailModal", () => {
 
   it("saves notes on Ctrl+Enter without needing blur first", async () => {
     renderModal(POINT, true)
-    const textarea = screen.getByRole("textbox")
+    const textarea = screen.getByPlaceholderText(/landing notes/i)
     await userEvent.clear(textarea)
     await userEvent.type(textarea, "New note")
     await userEvent.keyboard("{Control>}{Enter}{/Control}")
@@ -149,7 +159,7 @@ describe("PointDetailModal", () => {
   it("flushes unsaved notes when the modal is closed before blur", async () => {
     const onClose = vi.fn()
     renderModal(POINT, true, onClose)
-    const textarea = screen.getByRole("textbox")
+    const textarea = screen.getByPlaceholderText(/landing notes/i)
     await userEvent.clear(textarea)
     await userEvent.type(textarea, "New note")
     await userEvent.keyboard("{Escape}")
@@ -171,6 +181,96 @@ describe("PointDetailModal", () => {
   it("does not show a point-type control when not editable", () => {
     renderModal(POINT, false)
     expect(screen.queryByRole("button", { name: /^position$/i })).not.toBeInTheDocument()
+  })
+
+  it("disables the type control for a boundary point (day start/end must stay 'stop')", async () => {
+    renderModal(POINT, true, vi.fn(), {
+      state: {
+        ...baseCtx.state,
+        days: [{ id: "day-1", dayNumber: 1, itineraryId: "itin-1", startPointId: "p1" }],
+      },
+    })
+    const positionButton = screen.getByRole("button", { name: /^position$/i })
+    const stopButton = screen.getByRole("button", { name: /^stop$/i })
+    expect(positionButton).toBeDisabled()
+    expect(stopButton).toBeDisabled()
+    await userEvent.click(positionButton)
+    expect(actions.updatePoint).not.toHaveBeenCalled()
+  })
+
+  it("keeps the type control enabled for a non-boundary point", () => {
+    renderModal(POINT, true, vi.fn(), {
+      state: {
+        ...baseCtx.state,
+        days: [{ id: "day-1", dayNumber: 1, itineraryId: "itin-1", startPointId: "some-other-id" }],
+      },
+    })
+    expect(screen.getByRole("button", { name: /^position$/i })).not.toBeDisabled()
+  })
+
+  it("renders an editable name field (as the dialog title) when editable and persists on blur", async () => {
+    renderModal(POINT, true)
+    const nameInput = screen.getByDisplayValue("Vikten Sea Caves")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.tab()
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+    expect(baseCtx.dispatch).toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { name: "New name" },
+    })
+  })
+
+  it("saves the name on Ctrl+Enter without needing blur first", async () => {
+    renderModal(POINT, true)
+    const nameInput = screen.getByDisplayValue("Vikten Sea Caves")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.keyboard("{Control>}{Enter}{/Control}")
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+  })
+
+  it("flushes an unsaved name change when the modal is closed before blur", async () => {
+    const onClose = vi.fn()
+    renderModal(POINT, true, onClose)
+    const nameInput = screen.getByDisplayValue("Vikten Sea Caves")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.keyboard("{Escape}")
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it("renders the name as static (non-editable) text, not an input, when not editable", () => {
+    renderModal(POINT, false)
+    expect(screen.getByText("Vikten Sea Caves")).toBeInTheDocument()
+    expect(screen.queryByDisplayValue("Vikten Sea Caves")).not.toBeInTheDocument()
+  })
+
+  it("shows an explicit Save button next to the notes field when editable", () => {
+    renderModal(POINT, true)
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument()
+  })
+
+  it("does not show a Save button when not editable", () => {
+    renderModal(POINT, false)
+    expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument()
+  })
+
+  it("clicking Save flushes a pending notes change without needing blur", async () => {
+    renderModal(POINT, true)
+    const notesArea = screen.getByPlaceholderText(/landing notes/i)
+    await userEvent.clear(notesArea)
+    await userEvent.type(notesArea, "New note")
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { notes: "New note" })
+  })
+
+  it("Save is a no-op when there's nothing pending to save", async () => {
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
+    expect(actions.updatePoint).not.toHaveBeenCalled()
   })
 
   it("shows a visibility toggle labelled for the current photo's state when editable", () => {

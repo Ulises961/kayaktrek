@@ -72,7 +72,16 @@ export function PointDetailSheet() {
     <>
       <div
         data-testid="point-detail-sheet"
-        className="border-border bg-background animate-in slide-in-from-bottom absolute inset-x-0 bottom-0 z-[1002] rounded-t-xl border-t shadow-2xl duration-200"
+        role="button"
+        tabIndex={0}
+        onClick={() => setModalOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            setModalOpen(true)
+          }
+        }}
+        className="border-border bg-background/20 hover:bg-background animate-in slide-in-from-bottom absolute inset-x-0 bottom-0 z-[1002] rounded-t-xl border-t text-left shadow-2xl backdrop-blur-sm transition-colors duration-250"
       >
         {/* drag handle */}
         <div className="flex justify-center pt-2 pb-1">
@@ -93,14 +102,17 @@ export function PointDetailSheet() {
           <button
             type="button"
             aria-label="Close"
-            onClick={() => setSelectedPointId(null)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedPointId(null)
+            }}
             className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 transition-colors"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* tiles */}
+        {/* tiles — presentational; the whole sheet (this included) opens the modal. */}
         <div className="grid grid-cols-3 gap-2 px-4 pb-4">
           <div className="bg-muted/40 rounded-lg px-2.5 py-2">
             <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
@@ -116,12 +128,7 @@ export function PointDetailSheet() {
             )}
           </div>
 
-          <button
-            type="button"
-            data-testid="point-notes-tile"
-            onClick={() => setModalOpen(true)}
-            className="bg-muted/40 hover:bg-muted/70 rounded-lg px-2.5 py-2 text-left transition-colors"
-          >
+          <div data-testid="point-notes-tile" className="bg-muted/40 rounded-lg px-2.5 py-2">
             <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
               Notes
             </p>
@@ -133,14 +140,9 @@ export function PointDetailSheet() {
             >
               {point.notes ? point.notes : canEdit ? "Add…" : "—"}
             </p>
-          </button>
+          </div>
 
-          <button
-            type="button"
-            data-testid="point-images-tile"
-            onClick={() => setModalOpen(true)}
-            className="bg-muted/40 hover:bg-muted/70 rounded-lg px-2.5 py-2 text-left transition-colors"
-          >
+          <div data-testid="point-images-tile" className="bg-muted/40 rounded-lg px-2.5 py-2">
             <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
               Images
             </p>
@@ -152,7 +154,7 @@ export function PointDetailSheet() {
             >
               {imageCount}
             </p>
-          </button>
+          </div>
         </div>
       </div>
 

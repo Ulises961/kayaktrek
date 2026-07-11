@@ -54,15 +54,36 @@ function coordLabel(point: Point): string | null {
 }
 
 export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalProps) {
-  const { dispatch } = useMapBuilder()
+  const { dispatch, state } = useMapBuilder()
   const images = point.images ?? []
 
   const [imageIdx, setImageIdx] = useState(0)
+  const [draftName, setDraftName] = useState(point.name ?? "")
   const [draftNotes, setDraftNotes] = useState(point.notes ?? "")
+  const { run: runNameSave } = useSaveStatus()
   const { status: notesSaveStatus, run: runNotesSave } = useSaveStatus()
 
   const coords = coordLabel(point)
   const displayName = point.name || coords || "Waypoint"
+
+  // A day's start/end point is unconditionally a "stop" — the boundary IS the
+  // overnight stop, so its type can't be changed here (that's what §G's boundary
+  // editing owns instead).
+  const isBoundary = state.days.some(
+    (day) => day.startPointId === point.id || day.endPointId === point.id,
+  )
+
+  // Name is a quick edit — flush quietly (blur/Ctrl+Enter/close), no dedicated
+  // button. Notes is where people spend real typing time, so it also gets an
+  // explicit Save they can reach for without needing to know the flush triggers.
+  const flushName = useCallback(async () => {
+    const trimmed = draftName.trim()
+    if (trimmed === (point.name ?? "")) return
+    await runNameSave(async () => {
+      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { name: trimmed } })
+      await updatePoint(point.id!, { name: trimmed })
+    })
+  }, [draftName, point.id, point.name, dispatch, runNameSave])
 
   const flushNotes = useCallback(async () => {
     const trimmed = draftNotes.trim()
@@ -73,20 +94,20 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
     })
   }, [draftNotes, point.id, point.notes, dispatch, runNotesSave])
 
-  const handleNotesKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDownFlush = useCallback(
+    (flush: () => Promise<void>) => (e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault()
-        void flushNotes()
+        void flush()
       }
     },
-    [flushNotes],
+    [],
   )
 
   const handleClose = useCallback(async () => {
-    await flushNotes()
+    await Promise.all([flushName(), flushNotes()])
     onClose()
-  }, [flushNotes, onClose])
+  }, [flushName, flushNotes, onClose])
 
   const handleTypeChange = useCallback(
     async (type: PointType) => {
@@ -140,34 +161,56 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   return (
     <Dialog open onOpenChange={(open) => !open && void handleClose()}>
       <DialogContent className="flex h-[80vh] max-w-md flex-col gap-0 overflow-hidden p-0">
-        {/* Header */}
+        {/* Header — type indicator and title share one row; coords only appear once,
+            as a subtitle, and are omitted entirely when they're already the title
+            (unnamed point). */}
         <div className="border-border/60 shrink-0 border-b px-4 py-3">
-          {canEdit ? (
-            <div className="flex gap-1">
-              {TYPE_OPTIONS.map(({ type, label, Icon }) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => handleTypeChange(type)}
-                  className={cn(
-                    "flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-widest uppercase transition-colors",
-                    (point.type ?? POINT_TYPE.POSITION) === type
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border hover:bg-muted",
-                  )}
-                >
-                  <Icon className="size-3" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <TypeBadge type={point.type ?? "position"} />
+          <div className="flex items-center gap-2">
+            {canEdit ? (
+              <div className="border-border flex shrink-0 overflow-hidden rounded border">
+                {TYPE_OPTIONS.map(({ type, label, Icon }) => (
+                  <button
+                    key={type}
+                    type="button"
+                    aria-label={label}
+                    disabled={isBoundary}
+                    title={isBoundary ? "Boundary points are always stops" : undefined}
+                    onClick={() => !isBoundary && handleTypeChange(type)}
+                    className={cn(
+                      "flex items-center justify-center p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      (point.type ?? POINT_TYPE.POSITION) === type
+                        ? "bg-primary text-primary-foreground"
+                        : "enabled:hover:bg-muted",
+                    )}
+                  >
+                    <Icon className="size-3" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <TypeBadge type={point.type ?? "position"} />
+            )}
+            {canEdit ? (
+              <DialogTitle asChild>
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onBlur={() => void flushName()}
+                  onKeyDown={handleKeyDownFlush(flushName)}
+                  placeholder={coords ?? "Waypoint"}
+                  className="min-w-0 flex-1 truncate border-none bg-transparent p-0 text-sm leading-tight font-semibold focus:outline-none"
+                />
+              </DialogTitle>
+            ) : (
+              <DialogTitle className="min-w-0 flex-1 truncate text-sm leading-tight font-semibold">
+                {displayName}
+              </DialogTitle>
+            )}
+          </div>
+          {coords && coords !== displayName && (
+            <p className="text-muted-foreground mt-1 font-mono text-[10px]">{coords}</p>
           )}
-          <DialogTitle className="mt-0.5 text-sm leading-tight font-semibold">
-            {displayName}
-          </DialogTitle>
-          {coords && <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">{coords}</p>}
         </div>
 
         {/* Image carousel */}
@@ -286,14 +329,23 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
             {canEdit && <SaveStatusLine status={notesSaveStatus} />}
           </div>
           {canEdit ? (
-            <textarea
-              value={draftNotes}
-              onChange={(e) => setDraftNotes(e.target.value)}
-              onBlur={() => void flushNotes()}
-              onKeyDown={handleNotesKeyDown}
-              placeholder="Landing notes, hazards, tidal timing, anything worth remembering…"
-              className="border-border/40 bg-muted/20 placeholder:text-muted-foreground/40 focus:border-primary/50 min-h-0 flex-1 resize-none rounded-lg border px-3 py-2.5 text-[13px] leading-relaxed focus:outline-none"
-            />
+            <>
+              <textarea
+                value={draftNotes}
+                onChange={(e) => setDraftNotes(e.target.value)}
+                onBlur={() => void flushNotes()}
+                onKeyDown={handleKeyDownFlush(flushNotes)}
+                placeholder="Landing notes, hazards, tidal timing, anything worth remembering…"
+                className="border-border/40 bg-muted/20 placeholder:text-muted-foreground/40 focus:border-primary/50 min-h-0 flex-1 resize-none rounded-lg border px-3 py-2.5 text-[13px] leading-relaxed focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => void flushNotes()}
+                className="text-primary hover:text-primary/80 mt-2 self-end text-xs font-medium transition-colors"
+              >
+                Save
+              </button>
+            </>
           ) : point.notes ? (
             <p className="text-foreground flex-1 overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap">
               {point.notes}
