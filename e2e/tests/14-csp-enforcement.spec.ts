@@ -11,10 +11,22 @@ import { apiSeedPublicItinerary } from "../fixtures/itinerary"
 
 const CSP_VIOLATION_PATTERN = /content security policy|refused to/i
 
+// zod's `allowsEval` (node_modules/zod/src/v4/core/util.ts) probes `new Function("")` to
+// detect a JIT-eval-capable environment, wrapped in its own try/catch that falls back to a
+// slower non-eval code path — it already special-cases Cloudflare Workers for the same
+// reason. The CSP violation still reaches the console even though zod catches the resulting
+// exception, so this fires once per page load with no functional effect. script-src has no
+// 'unsafe-eval' in production by design (that's the directive an XSS injection would need);
+// this is the one known, harmless violation type to exclude from the check below.
+const KNOWN_BENIGN_EVAL_PROBE = /blocked a javascript eval|evaluate a string as javascript/i
+
 function collectCspViolations(page: Page): string[] {
   const violations: string[] = []
   page.on("console", (msg) => {
-    if (CSP_VIOLATION_PATTERN.test(msg.text())) violations.push(msg.text())
+    const text = msg.text()
+    if (CSP_VIOLATION_PATTERN.test(text) && !KNOWN_BENIGN_EVAL_PROBE.test(text)) {
+      violations.push(text)
+    }
   })
   page.on("pageerror", (err) => {
     violations.push(`pageerror: ${err.message}`)
