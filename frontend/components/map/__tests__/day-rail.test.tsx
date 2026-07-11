@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
@@ -169,6 +169,41 @@ describe("DayRail — entries", () => {
     )
     expect(screen.queryAllByTestId("day-rail-entry")).toHaveLength(0)
     expect(screen.getByText(/no days/i)).toBeInTheDocument()
+  })
+})
+
+// ─── §M shared boundary-stop derivation ──────────────────────────────────────
+
+describe("DayRail — §M shared boundary-stop derivation", () => {
+  it("does not treat a day as empty when its only point is the boundary stop shared with the next day", () => {
+    // Simulates single-owner storage: the shared stop belongs to day 2 in
+    // `state.points` (dayId: DAY2_ID), but it's day 1's own endPointId.
+    const shared = { ...pt("shared", DAY2_ID), nextId: "p3" }
+    const p1 = { ...pt("p1", DAY1_ID), nextId: "shared" }
+    const p3 = pt("p3", DAY2_ID)
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [p1, shared, p3],
+          pointOrder: ["p1", "shared", "p3"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [
+            day(DAY1_ID, 1, { startPointId: "p1", endPointId: "shared" }),
+            day(DAY2_ID, 2, { startPointId: "shared", endPointId: "p3" }),
+          ],
+        },
+      }),
+    )
+    const entries = screen.getAllByTestId("day-rail-entry")
+    expect(entries[0]).not.toHaveAttribute("data-empty")
+    // Day 1 owns just p1 plus the shared boundary stop — 2 points, not 1.
+    expect(
+      within(entries[0]).getByText(
+        (_, node) => node?.textContent?.replace(/\s+/g, " ").trim() === "2 pts",
+      ),
+    ).toBeInTheDocument()
   })
 })
 

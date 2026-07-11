@@ -6,6 +6,7 @@ import { fetchDayWeather } from "@/lib/weather/actions"
 import { representativeHour } from "@/lib/weather/hourly"
 import { formatDayDate } from "@/lib/utils/date"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 import { BeaufortPill } from "@/components/weather/beaufort-pill"
 import type { Weather } from "@/lib/dtos/weather"
 import type { Day } from "@/lib/dtos/day"
@@ -106,11 +107,16 @@ function DayRailEntry({
 export function DayRail() {
   const { state, tripName, selectedDayId, setSelectedDayId, conditionsVersion } = useMapBuilder()
 
+  // A day's own route may include a boundary stop shared with (and stored
+  // under) the adjacent day — walk by boundary id through the *global* point
+  // map instead of grouping by `dayId`, falling back to that grouping only
+  // for a day with no boundary metadata yet.
+  const pointsById = new Map(state.points.filter((p) => p.id).map((p) => [p.id!, p]))
   const pointCountByDay = new Map<string, number>()
-  for (const pt of state.points) {
-    if (pt.dayId) {
-      pointCountByDay.set(pt.dayId, (pointCountByDay.get(pt.dayId) ?? 0) + 1)
-    }
+  for (const day of state.days) {
+    if (!day.id) continue
+    const fallback = state.points.filter((p) => p.dayId === day.id)
+    pointCountByDay.set(day.id, walkDayRoutePoints(day, pointsById, fallback).length)
   }
 
   const numberedDays = [...state.days]
