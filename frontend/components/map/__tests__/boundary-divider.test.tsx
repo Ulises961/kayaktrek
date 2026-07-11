@@ -211,7 +211,7 @@ describe("BoundaryDivider — delete button (interactive mode)", () => {
 })
 
 describe("BoundaryDivider — two-line layout (interactive mode)", () => {
-  it("keeps the grip, day label, and delete button together on the first line", () => {
+  it("keeps the grip, day label, date, and delete button together on the first line", () => {
     render(
       <BoundaryDivider
         boundary={BOUNDARY}
@@ -220,16 +220,19 @@ describe("BoundaryDivider — two-line layout (interactive mode)", () => {
         avgSpeedKnots={2.5}
         labelDayNumber={2}
         labelDate="2026-06-02"
+        onDateChange={vi.fn()}
         onDelete={vi.fn()}
         onBoundaryMove={vi.fn()}
       />,
     )
     const line1 = screen.getByTestId("boundary-divider-line-1")
     expect(line1).toContainElement(screen.getByTestId("boundary-grip"))
+    expect(line1).toContainElement(screen.getByTestId("boundary-day-label"))
+    expect(line1).toContainElement(screen.getByRole("button", { name: /2 Jun 2026/i }))
     expect(line1).toContainElement(screen.getByRole("button", { name: /delete day 2/i }))
   })
 
-  it("puts the date picker and distance label on the second line", () => {
+  it("puts the distance/time metrics on the second line, flush left, not under the first line", () => {
     render(
       <BoundaryDivider
         boundary={BOUNDARY}
@@ -242,9 +245,9 @@ describe("BoundaryDivider — two-line layout (interactive mode)", () => {
         onBoundaryMove={vi.fn()}
       />,
     )
-    const line2 = screen.getByTestId("boundary-divider-line-2")
-    expect(line2).toContainElement(screen.getByRole("button", { name: /2 Jun 2026/i }))
-    expect(line2).toContainElement(screen.getByText(/8\.4/))
+    const line1 = screen.getByTestId("boundary-divider-line-1")
+    const metrics = screen.getByText(/8\.4/)
+    expect(line1).not.toContainElement(metrics)
   })
 })
 

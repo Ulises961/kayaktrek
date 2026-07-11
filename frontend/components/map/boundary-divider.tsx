@@ -160,7 +160,7 @@ export function BoundaryDivider({
       type="button"
       aria-label={`Delete day ${labelDayNumber}`}
       onClick={onDelete}
-      className="text-muted-foreground hover:text-destructive ml-auto shrink-0 transition-colors"
+      className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
     >
       <Trash2Icon className="size-3.5" />
     </button>
@@ -184,23 +184,22 @@ export function BoundaryDivider({
     )
   }
 
-  // Interactive (boundary-edit) mode packs a grip, inline date picker, and delete
-  // button on top of the label/distance — two lines so the delete button (line 1,
-  // short content) is never pushed past the pane's fixed width by the longer
-  // date/distance content (line 2). Drag-to-reassign is confined to the grip so
-  // the inline date picker and delete button receive normal clicks.
+  // Interactive (boundary-edit) mode: line 1 is grip · Day N · date · delete, all
+  // inline (each with its own job, no stacking); line 2 is just the distance/time
+  // metrics, flush left under the whole row — no attempt to align it under the
+  // date text, which only made the row read as unbalanced. Drag is confined to
+  // the grip so the date picker and delete button receive normal clicks.
   return (
     <div
       ref={containerRef}
       data-testid="boundary-drag-handle"
-      className="border-border bg-muted/30 flex flex-col gap-0.5 border-y px-3 py-1 text-xs font-medium select-none"
+      className="border-border bg-muted/30 flex flex-col gap-0.5 border-y px-3 py-1.5 text-xs font-medium select-none"
     >
-      <div data-testid="boundary-divider-line-1" className="flex items-center gap-1.5">
+      <div data-testid="boundary-divider-line-1" className="flex items-center gap-2">
         {grip}
-        <span>Day {labelDayNumber}</span>
-        {deleteButton}
-      </div>
-      <div data-testid="boundary-divider-line-2" className="flex items-center gap-1.5 pl-5">
+        <span data-testid="boundary-day-label" className="shrink-0">
+          Day {labelDayNumber}
+        </span>
         <DatePicker
           value={labelDate ?? ""}
           onChange={(v) => onDateChange?.(v || null)}
@@ -208,9 +207,9 @@ export function BoundaryDivider({
           size="sm"
           className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
         />
-        <span className="text-muted-foreground">·</span>
-        <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+        {deleteButton && <div className="ml-auto">{deleteButton}</div>}
       </div>
+      <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
     </div>
   )
 }
