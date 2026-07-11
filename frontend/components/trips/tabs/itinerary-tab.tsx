@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
 import { formatRouteRange } from "@/lib/itinerary/format"
+import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 import { formatDayDate } from "@/lib/utils/date"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
@@ -30,31 +31,6 @@ const DEFAULT_SPEED = 2.5
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 
-// `day.startPointId` is boundary metadata written by applyBoundaries — it can go
-// stale relative to `day.points` (linked-list membership, ground truth) if a point's
-// day assignment changes without a re-slice. Prefer it as a fast path, but fall back
-// to the point nothing else in the day references as `nextId` (the actual chain head)
-// so a day with real points is never treated as having none (review 2.1).
-function chainHead(day: Day, pts: Point[]): Point | undefined {
-  const map = new Map(pts.map((p) => [p.id!, p]))
-  if (day.startPointId && map.has(day.startPointId)) return map.get(day.startPointId)
-  const referenced = new Set(pts.map((p) => p.nextId).filter((id): id is string => !!id))
-  return pts.find((p) => p.id && !referenced.has(p.id))
-}
-
-function walkDayPoints(day: Day): Point[] {
-  const pts = day.points ?? []
-  if (pts.length === 0) return []
-  const map = new Map(pts.map((p) => [p.id!, p]))
-  const ordered: Point[] = []
-  let cur = chainHead(day, pts)
-  while (cur && ordered.length < 200) {
-    ordered.push(cur)
-    cur = cur.nextId ? map.get(cur.nextId) : undefined
-  }
-  return ordered
-}
-
 interface DayStats {
   isRestDay: boolean
   distanceNm: number
@@ -64,19 +40,21 @@ interface DayStats {
   minutes: number
 }
 
-function getDayStats(day: Day, speedKnots: number): DayStats {
-  const pts = day.points ?? []
-  if (pts.length === 0) {
+// `pointsById` must span every day's points, not just this one — single-owner
+// storage means the stop shared with the adjacent day may live in that day's
+// own `points` array instead of this one (see `walkDayRoutePoints`).
+function getDayStats(day: Day, speedKnots: number, pointsById: Map<string, Point>): DayStats {
+  const ordered = walkDayRoutePoints(day, pointsById, day.points ?? [])
+  if (ordered.length <= 1) {
     return { isRestDay: true, distanceNm: 0, startName: null, endName: null, hours: 0, minutes: 0 }
   }
-  const ordered = walkDayPoints(day)
   const routePts = ordered
     .filter((p) => p.latitude != null && p.longitude != null)
     .map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }))
   const distanceNm = totalDistanceNm(routePts)
   const { hours, minutes } = estimatedTime(distanceNm, speedKnots)
   const startName = ordered[0]?.name ?? null
-  const endName = ordered.length > 1 ? (ordered[ordered.length - 1]?.name ?? null) : null
+  const endName = ordered[ordered.length - 1]?.name ?? null
   return { isRestDay: false, distanceNm, startName, endName, hours, minutes }
 }
 
@@ -101,8 +79,16 @@ function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
   )
 }
 
-function DayRow({ day, speedKnots }: { day: Day; speedKnots: number }) {
-  const stats = getDayStats(day, speedKnots)
+function DayRow({
+  day,
+  speedKnots,
+  pointsById,
+}: {
+  day: Day
+  speedKnots: number
+  pointsById: Map<string, Point>
+}) {
+  const stats = getDayStats(day, speedKnots, pointsById)
   const routeLabel = formatRouteRange(stats.startName, stats.endName)
 
   return (
@@ -219,9 +205,9 @@ export function ItineraryTab({
   // ── Full summary ──────────────────────────────────────────────────────────
   const speedKnots = itinerary.avgSpeedKnots ?? DEFAULT_SPEED
   const totalMiles = itinerary.totalMiles ?? 0
-  const stopCount = days
-    .flatMap((d) => d.points ?? [])
-    .filter((p) => p.type === POINT_TYPE.STOP).length
+  const allPoints = days.flatMap((d) => d.points ?? [])
+  const pointsById = new Map(allPoints.filter((p) => p.id).map((p) => [p.id!, p]))
+  const stopCount = allPoints.filter((p) => p.type === POINT_TYPE.STOP).length
   const avgTime =
     days.length > 0 && totalMiles > 0 ? estimatedTime(totalMiles / days.length, speedKnots) : null
 
@@ -268,7 +254,7 @@ export function ItineraryTab({
       {/* Day list */}
       <div className="flex flex-col gap-1.5">
         {visible.map((day) => (
-          <DayRow key={day.id} day={day} speedKnots={speedKnots} />
+          <DayRow key={day.id} day={day} speedKnots={speedKnots} pointsById={pointsById} />
         ))}
       </div>
 
