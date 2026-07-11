@@ -87,4 +87,28 @@ describe("computeRestGaps", () => {
     expect(computeRestGaps([{ dayNumber: 1, date: "2026-07-01" }])).toEqual([])
     expect(computeRestGaps([])).toEqual([])
   })
+
+  it("skips an out-of-order date instead of anchoring the next comparison to it", () => {
+    // Day 2's date is a data-entry mistake — chronologically *before* day 1's.
+    // The gap after day 3 must still be computed against day 1 (the last
+    // dayNumber-ordered day with a chronologically valid date), not day 2.
+    const gaps = computeRestGaps([
+      { dayNumber: 1, date: "2026-07-01" },
+      { dayNumber: 2, date: "2026-06-28" },
+      { dayNumber: 3, date: "2026-07-05" },
+    ])
+    expect(gaps).toEqual([
+      { afterDayNumber: 1, date: "2026-07-02" },
+      { afterDayNumber: 1, date: "2026-07-03" },
+      { afterDayNumber: 1, date: "2026-07-04" },
+    ])
+  })
+
+  it("does not treat an out-of-order date as a valid anchor even when it's the most recent day", () => {
+    const gaps = computeRestGaps([
+      { dayNumber: 1, date: "2026-07-01" },
+      { dayNumber: 2, date: "2026-06-28" },
+    ])
+    expect(gaps).toEqual([])
+  })
 })

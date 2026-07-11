@@ -34,12 +34,22 @@ export function computeRestGaps(days: { dayNumber: number; date?: string | null 
     .sort((a, b) => a.dayNumber - b.dayNumber)
 
   const gaps: RestGap[] = []
-  for (let i = 0; i < dated.length - 1; i++) {
-    const cur = dated[i]
-    const next = dated[i + 1]
-    const gapLength = daysBetween(cur.date, next.date) - 2 // exclude both endpoints
-    for (let g = 1; g <= gapLength; g++) {
-      gaps.push({ afterDayNumber: cur.dayNumber, date: addDaysIso(cur.date, g) })
+  // The anchor is the last dayNumber-ordered day whose date is chronologically
+  // valid (at or after the previous anchor) — a day with an out-of-order date
+  // (a data-entry mistake: earlier than the day before it) is skipped when
+  // choosing what the *next* day compares against, instead of poisoning it.
+  let anchor: { dayNumber: number; date: string } | null = null
+  for (const day of dated) {
+    if (anchor) {
+      const gapLength = daysBetween(anchor.date, day.date) - 2 // exclude both endpoints
+      if (gapLength >= 1) {
+        for (let g = 1; g <= gapLength; g++) {
+          gaps.push({ afterDayNumber: anchor.dayNumber, date: addDaysIso(anchor.date, g) })
+        }
+      }
+    }
+    if (!anchor || day.date >= anchor.date) {
+      anchor = day
     }
   }
   return gaps
