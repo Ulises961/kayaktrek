@@ -1,0 +1,108 @@
+"use client"
+
+import Link from "next/link"
+import { AnchorIcon, PencilIcon, UsersIcon } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button"
+import { StateBadge } from "@/components/common/state-badge"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { AdvanceStateButton } from "@/components/trips/advance-state-button"
+import { daysBetween, formatDateRange } from "@/lib/trips/format"
+import { TRIP_STATE, TRIP_DIFFICULTY_LABELS, type Trip } from "@/lib/dtos/trip"
+
+const MAX_VISIBLE_AVATARS = 5
+
+interface TripIdentityHeaderProps {
+  trip: Trip
+  isLeader: boolean
+}
+
+export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) {
+  const travellers = trip.travellers ?? []
+  const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
+  const visibleTravellers = travellers.slice(0, MAX_VISIBLE_AVATARS)
+  const overflowCount = travellers.length - visibleTravellers.length
+
+  const canAdvanceState = isLeader && trip.state && trip.state !== TRIP_STATE.PAST
+  const hasDetails = !!trip.description || !!trip.difficulty || canAdvanceState || isLeader
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-xl font-semibold">{trip.destination ?? "Untitled trip"}</h1>
+          {trip.state && <StateBadge state={trip.state} />}
+        </div>
+        {isLeader && (
+          <Button variant="ghost" size="icon" aria-label="Edit trip" className="shrink-0" asChild>
+            <Link href={`/trips/${trip.id}/edit`}>
+              <PencilIcon className="size-4" />
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
+        <span>
+          {formatDateRange(trip.dateFrom, trip.dateTo)}
+          {days !== null && <span className="ml-1 text-xs">({days} days)</span>}
+        </span>
+        {travellers.length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <UsersIcon className="size-3.5" />
+            <span className="flex -space-x-1.5">
+              {visibleTravellers.map((m) => (
+                <UserAvatar
+                  key={m.id}
+                  name={m.user.name}
+                  surname={m.user.surname}
+                  imageUrl={m.user.avatarUrl}
+                  size="sm"
+                  className="ring-background ring-2"
+                />
+              ))}
+            </span>
+            {overflowCount > 0 && <span className="text-xs">+{overflowCount}</span>}
+          </span>
+        )}
+      </div>
+
+      {hasDetails && (
+        <Accordion type="single" collapsible>
+          <AccordionItem value="details" className="border-none">
+            <AccordionTrigger className="text-muted-foreground w-fit gap-1.5 py-1 text-xs hover:no-underline">
+              Details
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-3 pt-1 pb-2">
+              {trip.description && <p className="text-sm">{trip.description}</p>}
+              {trip.difficulty && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Difficulty: </span>
+                  {TRIP_DIFFICULTY_LABELS[trip.difficulty]}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                {canAdvanceState && trip.state && (
+                  <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
+                )}
+                {isLeader && (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/trips/${trip.id}/float-plan`}>
+                      <AnchorIcon className="size-3.5" />
+                      View float plan
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+    </div>
+  )
+}
