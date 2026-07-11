@@ -27,6 +27,13 @@ export const TRIP_STATE = {
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
 export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]
 
+export const TRIP_DIFFICULTY_LABELS: Record<TripDifficulty, string> = {
+  easy: "Easy",
+  moderate: "Moderate",
+  demanding: "Demanding",
+  expert: "Expert",
+}
+
 export const TripSchema = z.object({
   id: z.uuidv7().optional(),
   state: z.enum(TRIP_STATES).nullish(),

@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { updateTrip } from "@/lib/trips/actions"
-import { TripFieldsSchema, type Trip, type TripFields } from "@/lib/dtos/trip"
+import {
+  TRIP_DIFFICULTIES,
+  TRIP_DIFFICULTY_LABELS,
+  TripFieldsSchema,
+  type Trip,
+  type TripFields,
+} from "@/lib/dtos/trip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,6 +35,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
       description: trip.description ?? "",
       dateFrom: trip.dateFrom ?? "",
       dateTo: trip.dateTo ?? "",
+      difficulty: trip.difficulty ?? null,
     },
   })
 
@@ -39,6 +46,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
         description: data.description?.trim() || undefined,
         dateFrom: data.dateFrom || undefined,
         dateTo: data.dateTo || undefined,
+        difficulty: data.difficulty ?? null,
       })
       if (result.success) {
         router.push(`/trips/${trip.id}`)
@@ -92,6 +100,23 @@ export function EditTripForm({ trip }: { trip: Trip }) {
             )}
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="difficulty">Difficulty</Label>
+        <select
+          id="difficulty"
+          disabled={isPending}
+          className="border-input bg-background focus:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus:ring-1 focus:outline-none disabled:opacity-50"
+          {...register("difficulty")}
+        >
+          <option value="">Not set</option>
+          {TRIP_DIFFICULTIES.map((d) => (
+            <option key={d} value={d}>
+              {TRIP_DIFFICULTY_LABELS[d]}
+            </option>
+          ))}
+        </select>
       </div>
 
       {errors.root && <p className="text-destructive text-sm">{errors.root.message}</p>}
