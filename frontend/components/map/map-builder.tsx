@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
+import { useFullBleedContent } from "@/hooks/use-full-bleed-content"
 import { MapTopBar } from "./map-top-bar"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
@@ -40,6 +41,7 @@ export function MapBuilder({
   initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
+  useFullBleedContent()
 
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
@@ -223,7 +225,7 @@ export function MapBuilder({
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>
-      <div className="bg-background fixed inset-0 z-50">
+      <div className="bg-background absolute inset-0 z-50">
         <MapTopBar
           tripId={tripId}
           tripName={tripName}

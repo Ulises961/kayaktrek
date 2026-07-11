@@ -1,9 +1,9 @@
 "use client"
-import Link from "next/link"
-import { ArrowLeftIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TRIP_STATE, type TripState } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
+import { useBreadcrumbs } from "@/hooks/use-breadcrumbs"
+import type { Crumb } from "@/lib/types/ui"
 
 type MapTopBarProps = {
   tripId: string | null
@@ -36,12 +36,67 @@ export function MapTopBar({
   isLeader = true,
   tripState = null,
 }: MapTopBarProps) {
-  const showEditRoute = viewMode && isLeader && tripState !== TRIP_STATE.PAST
-  const showDone = !viewMode
+  const canEdit = isLeader && tripState !== TRIP_STATE.PAST
+  const editDisabled = viewMode && !canEdit
   const displayDistance =
     distanceUnit === DISTANCE_UNIT.NM
       ? totalDistance.toFixed(1)
       : (totalDistance * 1.852).toFixed(1)
+
+  const crumbs: Crumb[] = tripId
+    ? [
+        { label: "Trips", href: "/trips" },
+        { label: tripName, href: `/trips/${tripId}` },
+        { label: "Itinerary" },
+      ]
+    : [{ label: "Itineraries", href: "/itinerary" }, { label: "Itinerary" }]
+
+  useBreadcrumbs(crumbs)
+
+  const editTitle = editDisabled
+    ? tripState === TRIP_STATE.PAST
+      ? "This trip has passed"
+      : "Only the leader can edit the route"
+    : undefined
+
+  const modeControl = (
+    <div
+      role="group"
+      aria-label="View mode"
+      className="border-border flex shrink-0 overflow-hidden rounded border text-xs"
+    >
+      <button
+        type="button"
+        aria-pressed={viewMode}
+        onClick={() => {
+          if (!viewMode) onToggleViewMode()
+        }}
+        className={cn(
+          "px-2.5 py-1 font-medium transition-colors",
+          viewMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+        )}
+      >
+        View
+      </button>
+      <button
+        type="button"
+        aria-pressed={!viewMode}
+        disabled={editDisabled}
+        title={editTitle}
+        onClick={() => {
+          if (viewMode && canEdit) onToggleViewMode()
+        }}
+        className={cn(
+          "border-border border-l px-2.5 py-1 font-medium transition-colors",
+          !viewMode
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+        )}
+      >
+        Edit
+      </button>
+    </div>
+  )
 
   const unitToggle = (
     <span className="border-border flex overflow-hidden rounded border text-[10px]">
@@ -74,16 +129,6 @@ export function MapTopBar({
     <div className="bg-background/90 border-border absolute top-0 right-0 left-0 z-[1001] flex flex-col border-b backdrop-blur-sm">
       {/* ── Row 1: always visible ── */}
       <div className="flex h-12 items-center gap-3 px-3 md:px-4">
-        <Link
-          href={tripId ? `/trips/${tripId}` : "/itinerary"}
-          className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeftIcon className="size-4 shrink-0" />
-          <span className="max-w-[120px] truncate md:max-w-none">
-            {tripId ? tripName : "Itineraries"}
-          </span>
-        </Link>
-
         <div className="flex-1" />
 
         {/* Desktop stats strip — hidden on mobile */}
@@ -114,37 +159,7 @@ export function MapTopBar({
           </span>
         </div>
 
-        {/* Mode pill */}
-        <span
-          className={cn(
-            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-            viewMode
-              ? "border-border text-muted-foreground"
-              : "border-primary text-primary bg-primary/10",
-          )}
-        >
-          {viewMode ? "Viewing" : "Editing"}
-        </span>
-
-        {showEditRoute && (
-          <button
-            type="button"
-            onClick={onToggleViewMode}
-            className="text-primary shrink-0 text-xs font-medium hover:underline"
-          >
-            Edit route
-          </button>
-        )}
-
-        {showDone && (
-          <button
-            type="button"
-            onClick={onToggleViewMode}
-            className="text-primary shrink-0 text-xs font-medium hover:underline"
-          >
-            Done
-          </button>
-        )}
+        {modeControl}
 
         {/* Saving indicator — rendered once, visible on both viewports */}
         {isSaving && <span className="text-muted-foreground shrink-0 text-xs">Saving…</span>}

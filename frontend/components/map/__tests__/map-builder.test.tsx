@@ -2,12 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockUseCollapseSidebar } = vi.hoisted(() => ({
+const { mockUseCollapseSidebar, mockUseFullBleedContent, mockUseBreadcrumbs } = vi.hoisted(() => ({
   mockUseCollapseSidebar: vi.fn(),
+  mockUseFullBleedContent: vi.fn(),
+  mockUseBreadcrumbs: vi.fn(),
 }))
 
 vi.mock("@/hooks/use-collapse-sidebar", () => ({
   useCollapseSidebar: mockUseCollapseSidebar,
+}))
+
+vi.mock("@/hooks/use-full-bleed-content", () => ({
+  useFullBleedContent: mockUseFullBleedContent,
+}))
+
+vi.mock("@/hooks/use-breadcrumbs", () => ({
+  useBreadcrumbs: mockUseBreadcrumbs,
 }))
 
 vi.mock("next/dynamic", () => ({
@@ -86,9 +96,16 @@ describe("MapBuilder", () => {
     expect(mockUseCollapseSidebar).toHaveBeenCalled()
   })
 
-  it("renders the map top bar with the trip name", () => {
+  it("requests full-bleed content on mount", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
-    expect(screen.getByText("Cinque Terre")).toBeInTheDocument()
+    expect(mockUseFullBleedContent).toHaveBeenCalled()
+  })
+
+  it("renders the map top bar, pushing the trip name into the header breadcrumb", () => {
+    render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    expect(mockUseBreadcrumbs).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ label: "Cinque Terre" })]),
+    )
   })
 
   it("renders the map core", () => {
@@ -106,7 +123,7 @@ describe("MapBuilder", () => {
     expect(screen.queryByTestId("point-list-pane")).not.toBeInTheDocument()
   })
 
-  it("renders the point list pane in edit mode after clicking 'Edit route'", async () => {
+  it("renders the point list pane in edit mode after clicking 'Edit'", async () => {
     render(
       <MapBuilder
         itinerary={ITINERARY}
@@ -116,11 +133,11 @@ describe("MapBuilder", () => {
         tripState="building"
       />,
     )
-    await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
     expect(screen.getByTestId("point-list-pane")).toBeInTheDocument()
   })
 
-  it("returns to view mode and shows day strip after clicking 'Done'", async () => {
+  it("returns to view mode and shows day strip after clicking 'View'", async () => {
     render(
       <MapBuilder
         itinerary={ITINERARY}
@@ -130,8 +147,8 @@ describe("MapBuilder", () => {
         tripState="building"
       />,
     )
-    await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
-    await userEvent.click(screen.getByRole("button", { name: "Done" }))
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+    await userEvent.click(screen.getByRole("button", { name: "View" }))
     expect(screen.getByTestId("day-rail")).toBeInTheDocument()
     expect(screen.queryByTestId("point-list-pane")).not.toBeInTheDocument()
   })
@@ -209,7 +226,7 @@ describe("MapBuilder", () => {
         tripState="building"
       />,
     )
-    await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
     await userEvent.click(screen.getByText("simulate-marker-click"))
     expect(screen.queryByTestId("selected-info")).not.toBeInTheDocument()
   })

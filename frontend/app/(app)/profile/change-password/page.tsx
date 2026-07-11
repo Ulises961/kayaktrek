@@ -1,10 +1,10 @@
-import { PageBreadcrumb } from "@/components/common/page-breadcrumb"
+import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { ChangePasswordForm } from "@/components/profile/change-password-form"
 
 export default function ChangePasswordPage() {
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageBreadcrumb
+      <SetBreadcrumbs
         crumbs={[{ label: "Profile", href: "/profile" }, { label: "Change password" }]}
       />
       <div>

@@ -3,7 +3,7 @@ import Link from "next/link"
 import { apiGet } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { PageBreadcrumb } from "@/components/common/page-breadcrumb"
+import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -48,7 +48,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageBreadcrumb crumbs={[{ label: "Profile" }]} />
+      <SetBreadcrumbs crumbs={[{ label: "Profile" }]} />
 
       {/* Header */}
       <div className="flex items-start gap-5">
