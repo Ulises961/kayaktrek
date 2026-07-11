@@ -64,7 +64,9 @@ const AUTH_GATED_PREFIXES = [
 
 export function isAuthGatedPath(pathname: string): boolean {
   if (pathname === "/paddlers") return true
-  return AUTH_GATED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  return AUTH_GATED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
 }
 
 // Built per-request, never in next.config.ts: the nonce must be fresh every time, which a
@@ -92,7 +94,9 @@ export function buildCsp(nonce: string, isDev: boolean): string {
 // refresh_token): the refresh token goes in the JSON body, not an Authorization
 // header — the same mismatch that made lib/auth/actions.ts's refreshSession silently
 // fail on every call (fixed alongside this).
-async function tryRefresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
+async function tryRefresh(
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
     const res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
       method: "POST",
