@@ -19,8 +19,11 @@ class Log(BaseModel):
     distance: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     date: Mapped[Optional[_date]] = mapped_column(Date, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    # ondelete=CASCADE matches actual intended behaviour: Tasks/erasure.py explicitly
+    # deletes a user's logs before deleting the user row. Declaring it here means that
+    # stays true even if a future deletion path forgets to repeat that step by hand.
     user_id: Mapped[Optional[_UUID]] = mapped_column(
-        UUID, ForeignKey('users.id'), nullable=True, index=True
+        UUID, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True
     )
     # The trip this log documents — the endorsement key (M7a). Nullable: a manually-created
     # standalone log has no trip and is non-endorsable. ondelete=SET NULL so deleting a trip
