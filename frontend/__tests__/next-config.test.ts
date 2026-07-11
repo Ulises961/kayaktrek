@@ -28,22 +28,8 @@ describe("next.config headers", () => {
     expect(headers["Permissions-Policy"]).toContain("microphone=()")
   })
 
-  it("ships a report-only CSP that denies framing and restricts default-src to self", async () => {
-    const headers = await headerMap()
-    const csp = headers["Content-Security-Policy-Report-Only"]
-
-    expect(csp).toBeDefined()
-    expect(csp).toContain("default-src 'self'")
-    expect(csp).toContain("frame-ancestors 'none'")
-  })
-
-  it("allows https image sources for map tiles and object storage, plus local MinIO in dev", async () => {
-    const headers = await headerMap()
-    const csp = headers["Content-Security-Policy-Report-Only"]
-
-    expect(csp).toMatch(/img-src[^;]*https:/)
-    expect(csp).toMatch(/img-src[^;]*http:\/\/localhost:9000/)
-  })
+  // CSP itself moved to proxy.ts (needs a fresh per-request nonce, which this static
+  // config can't provide) — see __tests__/proxy.test.ts's buildCsp coverage.
 
   it("only sends Strict-Transport-Security in production", async () => {
     vi.stubEnv("NODE_ENV", "production")

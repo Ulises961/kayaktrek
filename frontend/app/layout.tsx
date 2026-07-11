@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { Geist_Mono, DM_Sans, Fraunces } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/providers/theme-provider"
@@ -26,7 +27,11 @@ export const metadata: Metadata = {
   description: "Plan, crew, and navigate your kayak expedition",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading headers() here opts the whole app into dynamic rendering, which the CSP nonce
+  // requires anyway (a nonce can't be baked into a statically generated page).
+  const nonce = (await headers()).get("x-nonce") ?? undefined
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable} antialiased`}>
@@ -35,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           {children}
         </ThemeProvider>

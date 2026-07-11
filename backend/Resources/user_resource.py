@@ -333,7 +333,7 @@ def upload_avatar():
     Upload or replace the avatar for the authenticated user.
 
     Expects a multipart/form-data request with a 'file' field.
-    Accepted MIME types: image/jpeg, image/png, image/webp, image/gif, image/avif, image/svg+xml.
+    Accepted MIME types: image/jpeg, image/png, image/webp, image/gif, image/avif.
     Size limits: minimum 512 B, maximum 5 MB.
 
     Returns:

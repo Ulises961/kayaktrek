@@ -71,10 +71,45 @@ describe("register", () => {
 })
 
 describe("logout", () => {
-  it("clears both cookies and redirects to /", async () => {
+  it("calls the backend logout endpoint with the access token before clearing cookies", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "the-access-token" })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal("fetch", fetchMock)
+
     await logout()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/logout"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "Bearer the-access-token" }),
+      }),
+    )
     expect(mockCookieStore.delete).toHaveBeenCalledWith("access_token")
     expect(mockCookieStore.delete).toHaveBeenCalledWith("refresh_token")
+    expect(redirect).toHaveBeenCalledWith("/")
+  })
+
+  it("still clears cookies and redirects even if the backend call fails", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "the-access-token" })
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+
+    await logout()
+
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("access_token")
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("refresh_token")
+    expect(redirect).toHaveBeenCalledWith("/")
+  })
+
+  it("skips the backend call and still clears cookies when there is no access token", async () => {
+    mockCookieStore.get.mockReturnValue(undefined)
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    await logout()
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("access_token")
     expect(redirect).toHaveBeenCalledWith("/")
   })
 })
@@ -153,6 +188,26 @@ describe("refreshSession", () => {
 
     expect(result).toBe(false)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("sends the refresh token in the JSON body, matching what the backend actually reads", async () => {
+    // Regression guard: the backend's /auth/refresh reads `refresh_token` from the
+    // request body (request.get_json()), not from an Authorization header. Sending it
+    // as a header only (with no body) makes the backend 400 on every refresh attempt,
+    // silently logging users out ~15 minutes after login regardless of a still-valid
+    // 30-day refresh token.
+    mockCookieStore.get.mockReturnValue({ value: "old-refresh" })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: "new-access", refresh_token: "new-refresh" }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await refreshSession()
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body)).toEqual({ refresh_token: "old-refresh" })
   })
 
   it("rotates the refresh token cookie alongside the access token on success", async () => {

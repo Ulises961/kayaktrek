@@ -7,6 +7,7 @@ from flask import Blueprint, abort, g, jsonify, request
 from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
+from Schemas.medical_notes_access_log_schema import MedicalNotesAccessLogSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
@@ -420,6 +421,21 @@ def read_member_medical_notes(id: str, member_id: str):
         abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Member not found in this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/me/medical-notes/access-log", methods=["GET"])
+@JWTService.authenticate_restful
+def get_medical_notes_access_log(id: str):
+    """Who has read the caller's own shared medical notes on this trip, and when.
+    Metadata only (no notes content), so — unlike the decrypt endpoints above — this
+    does not require an elevated token."""
+    try:
+        logs = TripMemberService.get_medical_notes_access_log(id)
+        return jsonify(MedicalNotesAccessLogSchema(many=True).dump(logs)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

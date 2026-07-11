@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
+import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
 import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
 import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
 import { CertificationsSection } from "@/components/profile/certifications-section"
@@ -270,6 +271,21 @@ export default async function ProfilePage() {
           <PublicProfileToggle username={user.username} initialIsPublic={!!user.profileIsPublic} />
         </CardContent>
       </Card>
+
+      {/* Security */}
+      <div className="flex flex-col gap-3">
+        <Separator />
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          Security
+        </p>
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-sm">
+            Signing out ends your session on every device at once — there is no separate per-device
+            session list to manage individually.
+          </p>
+          <SignOutEverywhereButton />
+        </div>
+      </div>
 
       {/* Privacy */}
       <div className="flex flex-col gap-3">
