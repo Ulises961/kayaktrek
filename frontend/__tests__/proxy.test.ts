@@ -79,9 +79,14 @@ describe("buildCsp", () => {
     expect(buildCsp("n", false)).not.toContain("'unsafe-eval'")
   })
 
-  it("nonces style-src in production but not dev", () => {
-    expect(buildCsp("n", false)).toContain("style-src 'self' 'nonce-n'")
+  it("keeps style-src on 'unsafe-inline' with no nonce, in both dev and prod", () => {
+    // Inline style="" attributes (React's style={{...}} prop, Leaflet's own marker
+    // positioning) have no nonce escape hatch — only <style>/<link> elements do. A nonce
+    // token in style-src also makes browsers ignore 'unsafe-inline' entirely, so this
+    // directive has to stay nonce-free to have any effect.
+    expect(buildCsp("n", false)).toContain("style-src 'self' 'unsafe-inline'")
     expect(buildCsp("n", true)).toContain("style-src 'self' 'unsafe-inline'")
+    expect(buildCsp("n", false)).not.toMatch(/style-src[^;]*nonce/)
   })
 })
 

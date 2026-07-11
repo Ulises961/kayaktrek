@@ -1,6 +1,8 @@
 import { test, expect, Page } from "@playwright/test"
 import { LoginPage } from "../pages/login.page"
 import { LEADER } from "../fixtures/auth"
+import { apiGetAccessToken, apiDeleteTrip } from "../fixtures/trips"
+import { apiSeedPublicItinerary } from "../fixtures/itinerary"
 
 // Regression guard for the 2026-07-11 finding: an enforcing CSP without a nonce blocked
 // Next's own hydration bootstrap scripts, breaking every page silently — forms fell back to
@@ -38,6 +40,41 @@ test.describe("CSP enforcement — authenticated pages", () => {
     // Report-Only would mean the header name below is absent — assert the enforcing
     // variant specifically, not just "some CSP header exists".
     expect(response?.headers()["content-security-policy-report-only"]).toBeUndefined()
+  })
+
+  test("the itinerary map builder hydrates cleanly under the enforcing CSP", async ({
+    page,
+    request,
+  }) => {
+    // Regression guard: a nonce-only style-src blocks every inline style="" attribute
+    // app-wide — React's style={{...}} prop (day-rail, point-row, layers-control,
+    // point-list-pane, map-add-control, point-detail-modal) and Leaflet's own
+    // marker-positioning code both set the style attribute directly, and neither has a
+    // nonce escape hatch. None of the pages above render an inline style attribute, so
+    // they don't catch this — the map builder is the one that does.
+    const leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
+    const seeded = await apiSeedPublicItinerary(request, leaderToken, {
+      name: `CSP style-src regression ${Date.now()}`,
+      totalMiles: 1,
+      days: [
+        {
+          dayNumber: 1,
+          date: "2026-07-15",
+          points: [
+            { latitude: 48.4, longitude: -123.35, name: "Launch", type: "stop" },
+            { latitude: 48.45, longitude: -123.3, name: "Camp", type: "stop" },
+          ],
+        },
+      ],
+    })
+
+    try {
+      const violations = collectCspViolations(page)
+      await page.goto(`/itinerary/${seeded.itineraryId}`, { waitUntil: "networkidle" })
+      expect(violations).toEqual([])
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
   })
 })
 

@@ -73,13 +73,20 @@ export function isAuthGatedPath(pathname: string): boolean {
 // static config-time header value cannot provide. `'strict-dynamic'` lets the nonced initial
 // script load Next's own runtime/chunk scripts; browsers without strict-dynamic support fall
 // back to trusting `'self'` + the nonce. Dev needs 'unsafe-eval' (Turbopack/React dev-mode
-// error-stack reconstruction uses eval) and keeps style-src on 'unsafe-inline' (styled-jsx/dev
-// tooling inject inline styles that aren't nonce-aware) — neither is needed in production.
+// error-stack reconstruction uses eval) — not needed in production.
+//
+// style-src is 'unsafe-inline' with no nonce token, in both dev and prod: React's
+// `style={{...}}` prop (used throughout the map builder — day-rail, point-row,
+// layers-control, etc.) and Leaflet's own marker positioning both set the inline `style`
+// attribute directly, and nonces only cover <style>/<link> elements, never style=""
+// attributes. A nonce token in this directive also makes browsers ignore 'unsafe-inline'
+// entirely (a CSP backwards-compat rule), so it has to stay nonce-free to have any effect.
+// script-src (the actual XSS vector) keeps its strict nonce + strict-dynamic policy.
 export function buildCsp(nonce: string, isDev: boolean): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
-    isDev ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: http://localhost:9000",
     "font-src 'self' data:",
     "connect-src 'self'",
