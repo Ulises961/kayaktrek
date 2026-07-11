@@ -2,7 +2,13 @@
 import { useState, useCallback, useMemo, useRef, Fragment } from "react"
 import { PlusIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
+import {
+  initDaySlices,
+  computeSlicesApplyPayload,
+  isDraftDay,
+  appendDraftSlice,
+  removeDraftSlice,
+} from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
 import {
@@ -208,49 +214,12 @@ export function PointListPane() {
     [draftSlices, setDraftSlices, state.pointOrder.length],
   )
 
-  const handleEditBoundaries = useCallback(() => {
-    const slices = initDaySlices(state.days, state.pointOrder)
-    setDraftSlices(slices)
+  const handleEditDays = useCallback(() => {
+    setDraftSlices(initDaySlices(state.days, state.pointOrder))
   }, [state.days, state.pointOrder, setDraftSlices])
 
-  const handleAddDay = useCallback(async () => {
-    if (!itineraryId) return
-    const nextDayNumber = state.days.length + 1
-    dispatch({ type: "SAVING_START" })
-    const result = await createDay(itineraryId, nextDayNumber)
-    dispatch({ type: "SAVING_END" })
-    if (!result.success) return
-    dispatch({ type: "DAY_ADD", day: result.day })
-
-    const M = state.pointOrder.length
-    let newSlices: DaySlice[]
-
-    if (!activeSlices || activeSlices.length === 0) {
-      newSlices = [
-        {
-          dayId: result.day.id!,
-          dayNumber: nextDayNumber,
-          startIdx: 0,
-          endIdx: M > 0 ? M - 1 : 0,
-          date: null,
-        },
-      ]
-    } else {
-      const lastSlice = activeSlices[activeSlices.length - 1]
-      const midIdx = Math.floor((lastSlice.startIdx + lastSlice.endIdx) / 2)
-      newSlices = [
-        ...activeSlices.slice(0, -1),
-        { ...lastSlice, endIdx: midIdx },
-        {
-          dayId: result.day.id!,
-          dayNumber: nextDayNumber,
-          startIdx: midIdx,
-          endIdx: lastSlice.endIdx,
-          date: null,
-        },
-      ]
-    }
-
+  const handleAddDay = useCallback(() => {
+    const newSlices = appendDraftSlice(draftSlices ?? [], state.pointOrder.length)
     setDraftSlices(newSlices)
 
     // Scroll the new boundary handle into view after React re-renders
@@ -260,13 +229,37 @@ export function PointListPane() {
       const target = listRef.current.querySelector<HTMLElement>(`[data-point-idx="${dividerIdx}"]`)
       target?.scrollIntoView({ behavior: "smooth", block: "nearest" })
     })
-  }, [itineraryId, activeSlices, state.days.length, state.pointOrder, dispatch, setDraftSlices])
+  }, [draftSlices, state.pointOrder.length, setDraftSlices])
 
-  const handleApply = useCallback(async () => {
+  const handleSaveDays = useCallback(async () => {
     if (!draftSlices || !day0Id) return
     const snapshot = state
 
-    const base = computeSlicesApplyPayload(draftSlices, state)
+    // Resolve any draft-only days into real Day rows, in order, before
+    // building the apply-boundaries payload — a day is only ever created
+    // once the save is actually going through, never speculatively while
+    // still editing (that's what let Discard leave orphaned days before).
+    const resolvedSlices: DaySlice[] = []
+    const createdDayIds: string[] = []
+    for (const slice of draftSlices) {
+      if (!isDraftDay(slice.dayId)) {
+        resolvedSlices.push(slice)
+        continue
+      }
+      dispatch({ type: "SAVING_START" })
+      const result = await createDay(itineraryId, slice.dayNumber)
+      dispatch({ type: "SAVING_END" })
+      if (!result.success) {
+        // Nothing to roll back beyond days created earlier in this same attempt.
+        await Promise.all(createdDayIds.map((id) => deleteDay(id)))
+        return
+      }
+      createdDayIds.push(result.day.id!)
+      dispatch({ type: "DAY_ADD", day: result.day })
+      resolvedSlices.push({ ...slice, dayId: result.day.id! })
+    }
+
+    const base = computeSlicesApplyPayload(resolvedSlices, state)
     const pointMap = new Map(base.points.map((p) => [p.id, p]))
     for (const [id, fields] of dirtyPoints.entries()) {
       const resolvedType = (fields.type ??
@@ -292,7 +285,7 @@ export function PointListPane() {
       ...(fields.name !== undefined ? { name: fields.name } : {}),
     }))
 
-    dispatch({ type: "BOUNDARIES_APPLY", slices: draftSlices, pointUpdates, day0Id })
+    dispatch({ type: "BOUNDARIES_APPLY", slices: resolvedSlices, pointUpdates, day0Id })
     setDirtyPoints(new Map())
     setDraftSlices(null)
     setActivePointId(null)
@@ -319,7 +312,7 @@ export function PointListPane() {
     itineraryId,
   ])
 
-  const handleCancel = useCallback(() => {
+  const handleDiscard = useCallback(() => {
     setDirtyPoints(new Map())
     setDraftSlices(null)
     setActivePointId(null)
@@ -335,6 +328,14 @@ export function PointListPane() {
 
   const handleDeleteDay = useCallback(
     async (dayId: string) => {
+      // A draft day was never created server-side — dropping it from the
+      // draft slices locally is the whole deletion, and doesn't need to
+      // exit the draft session the way removing a real day does.
+      if (isDraftDay(dayId)) {
+        if (!draftSlices) return
+        setDraftSlices(removeDraftSlice(draftSlices, dayId))
+        return
+      }
       if (!day0Id) return
       setDraftSlices(null)
       dispatch({ type: "DAY_REMOVE", id: dayId, day0Id })
@@ -342,7 +343,7 @@ export function PointListPane() {
       await deleteDay(dayId)
       dispatch({ type: "SAVING_END" })
     },
-    [day0Id, dispatch, setDraftSlices],
+    [draftSlices, day0Id, dispatch, setDraftSlices],
   )
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -391,48 +392,36 @@ export function PointListPane() {
           <>
             <button
               type="button"
-              className="text-primary hover:text-primary/80 flex-1 text-sm font-medium transition-colors"
-              onClick={handleApply}
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground text-sm transition-colors"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-          </>
-        ) : state.days.length === 0 ? (
-          <button
-            type="button"
-            aria-label="Add day"
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-            onClick={handleAddDay}
-          >
-            <PlusIcon className="size-3.5" />
-            <span>Add day</span>
-          </button>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
-              onClick={handleEditBoundaries}
-            >
-              Edit boundaries
-            </button>
-            <button
-              type="button"
               aria-label="Add day"
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+              className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 text-xs transition-colors"
               onClick={handleAddDay}
             >
               <PlusIcon className="size-3.5" />
               <span>Add day</span>
             </button>
+            <button
+              type="button"
+              className="text-primary hover:text-primary/80 flex-1 text-sm font-medium transition-colors"
+              onClick={handleSaveDays}
+            >
+              Save days
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground shrink-0 text-sm transition-colors"
+              onClick={handleDiscard}
+            >
+              Discard
+            </button>
           </>
+        ) : (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
+            onClick={handleEditDays}
+          >
+            Edit days
+          </button>
         )}
       </div>
 
