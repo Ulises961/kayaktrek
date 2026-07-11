@@ -152,6 +152,44 @@ describe("extractRouteData — point numbering", () => {
   })
 })
 
+describe("extractRouteData — §M shared boundary-stop derivation", () => {
+  it("includes a day's own end boundary even when the point row is stored under the next day", () => {
+    // Simulates single-owner storage: the shared stop "b" is only present in
+    // day 2's own `points` array, not day 1's — even though it's day 1's own
+    // endPointId. The global point map spans every day, so the walk still
+    // resolves it for day 1.
+    const a = point("a", 44.0, 8.5, "b")
+    const b = point("b", 44.2, 8.7, "c")
+    const c = point("c", 44.4, 8.9)
+    const route = extractRouteData(
+      detail([
+        { dayNumber: 1, points: [a], startPointId: "a", endPointId: "b" },
+        { dayNumber: 2, points: [b, c], startPointId: "b", endPointId: "c" },
+      ]),
+    )
+    // Without the fix, day 1 would only resolve "a" (its own point row).
+    expect(route.days[0].points).toHaveLength(2)
+    const expectedDay1Distance = haversineNm(
+      { latitude: 44.0, longitude: 8.5 },
+      { latitude: 44.2, longitude: 8.7 },
+    )
+    expect(route.days[0].distanceNm).toBeCloseTo(expectedDay1Distance, 5)
+  })
+
+  it("falls back to the existing multi-chain walk when a day has no boundary metadata", () => {
+    // No startPointId/endPointId at all — must still walk day.points directly,
+    // exactly as before (public routes with organic/fresh days).
+    const a = point("a", 44.0, 8.5, "b")
+    const b = point("b", 44.2, 8.7)
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [a, b] }]))
+    const expected = haversineNm(
+      { latitude: 44.0, longitude: 8.5 },
+      { latitude: 44.2, longitude: 8.7 },
+    )
+    expect(route.days[0].distanceNm).toBeCloseTo(expected, 5)
+  })
+})
+
 describe("extractItineraryRoute — day segments", () => {
   function itinerary(days: NonNullable<Itinerary["days"]>): Itinerary {
     return { id: "it-1", name: "Route", totalMiles: 0, days }
