@@ -7,6 +7,7 @@ from sqlalchemy.exc import NoResultFound
 import logging
 
 from Models.trip_member import TripMember, MemberRoleType
+from Models.medical_notes_access_log import MedicalNotesAccessLog
 from Models.user import User
 from Api.database import db
 from Schemas.base_schema import camelcase
@@ -204,7 +205,7 @@ class TripMemberService:
         if not leader or not leader.private_key_ciphertext:
             raise ValueError("Leader keypair not found — generate your keypair first")
 
-        return decrypt_as_recipient(
+        plaintext = decrypt_as_recipient(
             target_membership.medical_notes_leader_ciphertext,
             target_membership.medical_notes_leader_nonce,  # type: ignore
             target_membership.medical_notes_leader_ephemeral_key,  # type: ignore
@@ -212,4 +213,26 @@ class TripMemberService:
             leader.private_key_nonce,  # type: ignore
             leader.private_key_salt,  # type: ignore
             leader_password,
+        )
+
+        # Accountability record (ADR-023) — only reached on a successful decrypt, so a
+        # wrong-password attempt (InvalidTag raised above) is never logged as an access.
+        db.session.add(MedicalNotesAccessLog(
+            trip_member_id=target_membership.id,
+            leader_id=leader.id,
+        ))
+        db.session.commit()
+
+        return plaintext
+
+    @staticmethod
+    def get_medical_notes_access_log(trip_id: str) -> list[MedicalNotesAccessLog]:
+        """Return the access-log rows for the current user's own shared medical notes on
+        this trip — who read them and when — most recent first."""
+        membership = TripMemberService.get_my_membership(trip_id)
+        return (
+            db.session.query(MedicalNotesAccessLog)
+            .filter_by(trip_member_id=membership.id)
+            .order_by(MedicalNotesAccessLog.created.desc())
+            .all()
         )
