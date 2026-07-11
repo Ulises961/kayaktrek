@@ -46,7 +46,6 @@ export function MapBuilder({
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
-  const [activePointId, setActivePointId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
@@ -102,7 +101,7 @@ export function MapBuilder({
     const tempId = `tmp-${Date.now()}`
 
     // Collapse any expanded point row so the newly added point is the only focus.
-    setActivePointId(null)
+    setSelectedPointId(null)
 
     dispatch({
       type: "POINT_ADD",
@@ -140,7 +139,7 @@ export function MapBuilder({
         setSelectedDayId(point?.dayId ?? null)
         return
       }
-      setActivePointId((prev) => (prev === pointId ? null : pointId))
+      setSelectedPointId((prev) => (prev === pointId ? null : pointId))
     },
     [viewMode, state.points],
   )
@@ -184,8 +183,6 @@ export function MapBuilder({
       setDistanceUnit: handleDistanceUnitChange,
       avgSpeedKnots,
       setAvgSpeedKnots,
-      activePointId,
-      setActivePointId,
       day0Id,
       viewMode,
       setViewMode,
@@ -210,7 +207,6 @@ export function MapBuilder({
       distanceUnit,
       handleDistanceUnitChange,
       avgSpeedKnots,
-      activePointId,
       day0Id,
       viewMode,
       selectedDayId,

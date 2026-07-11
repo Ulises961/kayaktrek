@@ -77,8 +77,6 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDistanceUnit: vi.fn(),
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
-    activePointId: null,
-    setActivePointId: vi.fn(),
     day0Id: DAY0_ID,
     viewMode: false,
     setViewMode: vi.fn(),
@@ -113,7 +111,7 @@ describe("PointListPane — drop mode (no draftSlices)", () => {
   })
 
   it("shows a Saved status after blur-saving the expanded row's name", async () => {
-    const ctx = makeCtx({ activePointId: "p1" })
+    const ctx = makeCtx({ selectedPointId: "p1" })
     renderWithCtx(ctx)
     const nameInput = screen.getByPlaceholderText("Point name")
     await userEvent.clear(nameInput)
@@ -125,7 +123,7 @@ describe("PointListPane — drop mode (no draftSlices)", () => {
 
   it("does not show a save status while in boundary-edit (draft) mode", () => {
     const draft: DaySlice[] = [{ dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
-    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1" })
+    const ctx = makeCtx({ draftSlices: draft, selectedPointId: "p1" })
     renderWithCtx(ctx)
     expect(screen.queryByText(/saving|saved/i)).not.toBeInTheDocument()
   })
@@ -411,7 +409,7 @@ describe("PointListPane — type change in boundary-edit mode", () => {
 
   it("type buttons reflect dirty selection immediately without dispatching POINT_UPDATE", async () => {
     const dispatch = vi.fn()
-    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1", dispatch })
+    const ctx = makeCtx({ draftSlices: draft, selectedPointId: "p1", dispatch })
     renderWithCtx(ctx)
 
     await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
@@ -421,7 +419,7 @@ describe("PointListPane — type change in boundary-edit mode", () => {
   })
 
   it("dirty type is included in apply payload on Save days click", async () => {
-    const ctx = makeCtx({ draftSlices: draft, activePointId: "p1" })
+    const ctx = makeCtx({ draftSlices: draft, selectedPointId: "p1" })
     renderWithCtx(ctx)
 
     await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))

@@ -21,8 +21,6 @@ export type MapBuilderContextValue = {
   setDistanceUnit: (u: DistanceUnit) => void
   avgSpeedKnots: number
   setAvgSpeedKnots: (v: number) => void
-  activePointId: string | null
-  setActivePointId: (id: string | null) => void
   day0Id: string | null
   viewMode: boolean
   setViewMode: (v: boolean) => void

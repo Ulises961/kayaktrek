@@ -76,8 +76,8 @@ export function PointListPane() {
     avgSpeedKnots,
     itineraryId,
     day0Id,
-    activePointId,
-    setActivePointId,
+    selectedPointId,
+    setSelectedPointId,
   } = useMapBuilder()
 
   const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(
@@ -124,9 +124,9 @@ export function PointListPane() {
 
   const handleExpand = useCallback(
     (id: string) => {
-      setActivePointId(activePointId === id ? null : id)
+      setSelectedPointId(selectedPointId === id ? null : id)
     },
-    [activePointId, setActivePointId],
+    [selectedPointId, setSelectedPointId],
   )
 
   const handleTypeChange = useCallback(
@@ -180,13 +180,13 @@ export function PointListPane() {
 
   const handleDelete = useCallback(
     async (pointId: string) => {
-      setActivePointId(null)
+      setSelectedPointId(null)
       dispatch({ type: "POINT_REMOVE", id: pointId })
       dispatch({ type: "SAVING_START" })
       await deletePoint(pointId)
       dispatch({ type: "SAVING_END" })
     },
-    [dispatch, setActivePointId],
+    [dispatch, setSelectedPointId],
   )
 
   const handleBoundaryMove = useCallback(
@@ -288,7 +288,7 @@ export function PointListPane() {
     dispatch({ type: "BOUNDARIES_APPLY", slices: resolvedSlices, pointUpdates, day0Id })
     setDirtyPoints(new Map())
     setDraftSlices(null)
-    setActivePointId(null)
+    setSelectedPointId(null)
 
     dispatch({ type: "SAVING_START" })
     const result = await applyBoundaries(itineraryId, payload)
@@ -308,15 +308,15 @@ export function PointListPane() {
     dirtyPoints,
     dispatch,
     setDraftSlices,
-    setActivePointId,
+    setSelectedPointId,
     itineraryId,
   ])
 
   const handleDiscard = useCallback(() => {
     setDirtyPoints(new Map())
     setDraftSlices(null)
-    setActivePointId(null)
-  }, [setDraftSlices, setActivePointId])
+    setSelectedPointId(null)
+  }, [setDraftSlices, setSelectedPointId])
 
   const handleDateChange = useCallback(
     (dayId: string, date: string | null) => {
@@ -467,7 +467,7 @@ export function PointListPane() {
             const dayNum = dayNumberById.get(point.dayId ?? "") ?? 0
             const dayColor = getDayColor(dayNum)
             const isBoundary = !!point.id && boundaryIds.has(point.id)
-            const isExpanded = activePointId === id || state.pendingPointId === id
+            const isExpanded = selectedPointId === id || state.pendingPointId === id
 
             const dirtyFields = draftSlices ? dirtyPoints.get(id) : undefined
             const displayPoint = dirtyFields ? { ...point, ...dirtyFields } : point

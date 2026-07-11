@@ -78,8 +78,6 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDistanceUnit: vi.fn(),
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
-    activePointId: null,
-    setActivePointId: vi.fn(),
     day0Id: "day-0",
     viewMode: true,
     setViewMode: vi.fn(),
