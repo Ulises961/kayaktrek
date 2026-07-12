@@ -2,12 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { AnchorIcon, ClipboardListIcon, MapPinIcon, PackageIcon, UsersIcon } from "lucide-react"
+import { AnchorIcon, MapPinIcon, PackageIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface TripDetailNavProps {
   tripId: string
-  /** Only current trip members have their own float plan to edit. */
+  /** Only current trip members have their own vessel/emergency/medical info to edit. */
   showFloatPlan: boolean
 }
 
@@ -18,7 +18,13 @@ export function TripDetailNav({ tripId, showFloatPlan }: TripDetailNavProps) {
     { href: `/trips/${tripId}`, label: "Itinerary", icon: MapPinIcon },
     { href: `/trips/${tripId}/crew`, label: "Crew", icon: UsersIcon },
     ...(showFloatPlan
-      ? [{ href: `/trips/${tripId}/my-float-plan`, label: "Float plan", icon: ClipboardListIcon }]
+      ? [
+          {
+            href: `/trips/${tripId}/my-float-plan`,
+            label: "Emergency info",
+            icon: ShieldAlertIcon,
+          },
+        ]
       : []),
     { href: `/trips/${tripId}/logistics`, label: "Logistics", icon: AnchorIcon },
     { href: `/trips/${tripId}/items`, label: "Items", icon: PackageIcon },

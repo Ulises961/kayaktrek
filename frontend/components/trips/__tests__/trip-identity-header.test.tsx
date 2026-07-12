@@ -96,11 +96,24 @@ describe("TripIdentityHeader", () => {
     expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
   })
 
-  it("shows a View float plan link inside Details for the leader", async () => {
+  it("shows a Printable float plan link inside Details for the leader", async () => {
     render(<TripIdentityHeader trip={TRIP} isLeader={true} />)
     await userEvent.click(screen.getByRole("button", { name: /details/i }))
-    const link = screen.getByRole("link", { name: /view float plan/i })
+    const link = screen.getByRole("link", { name: /printable float plan/i })
     expect(link.getAttribute("href")).toBe(`/trips/${TRIP.id}/float-plan`)
+  })
+
+  it("shows the trip-state timeline inside Details for the leader on a non-past trip", async () => {
+    render(<TripIdentityHeader trip={TRIP} isLeader={true} />)
+    await userEvent.click(screen.getByRole("button", { name: /details/i }))
+    expect(screen.getByText("Happening")).toBeInTheDocument()
+    expect(screen.getByText("Past")).toBeInTheDocument()
+  })
+
+  it("does not show the trip-state timeline for crew", async () => {
+    render(<TripIdentityHeader trip={TRIP} isLeader={false} />)
+    await userEvent.click(screen.getByRole("button", { name: /details/i }))
+    expect(screen.queryByText("Happening")).not.toBeInTheDocument()
   })
 
   it("does not render a Details disclosure when there is nothing to show (crew, no description/difficulty)", () => {

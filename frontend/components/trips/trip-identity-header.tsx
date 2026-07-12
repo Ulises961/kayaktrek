@@ -1,5 +1,6 @@
 "use client"
 
+import { Fragment } from "react"
 import Link from "next/link"
 import { AnchorIcon, PencilIcon, UsersIcon } from "lucide-react"
 import {
@@ -9,13 +10,59 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
+import { fieldLabelClass } from "@/components/common/form-field"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
-import { TRIP_STATE, TRIP_DIFFICULTY_LABELS, type Trip } from "@/lib/dtos/trip"
+import {
+  TRIP_STATE,
+  TRIP_STATES,
+  TRIP_STATE_LABELS,
+  TRIP_DIFFICULTY_LABELS,
+  type Trip,
+  type TripState,
+} from "@/lib/dtos/trip"
 
 const MAX_VISIBLE_AVATARS = 5
+
+function StateTimeline({ currentState }: { currentState: TripState }) {
+  const currentIndex = TRIP_STATES.indexOf(currentState)
+  return (
+    <div className="flex items-start">
+      {TRIP_STATES.map((s, i) => (
+        <Fragment key={s}>
+          <div className="flex shrink-0 flex-col items-center gap-1.5">
+            <div
+              className={`size-3.5 rounded-full border-2 transition-colors ${
+                i === currentIndex
+                  ? "bg-primary border-primary"
+                  : i < currentIndex
+                    ? "bg-primary/30 border-primary/30"
+                    : "bg-background border-border"
+              }`}
+            />
+            <span
+              className={`text-[10px] leading-none capitalize ${
+                i === currentIndex ? "text-foreground font-semibold" : "text-muted-foreground"
+              }`}
+            >
+              {TRIP_STATE_LABELS[s]}
+            </span>
+          </div>
+          {i < TRIP_STATES.length - 1 && (
+            <div
+              className={`mt-[5px] h-0 min-w-4 flex-1 border-t border-dashed ${
+                i < currentIndex ? "border-primary/40" : "border-border"
+              }`}
+            />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  )
+}
 
 interface TripIdentityHeaderProps {
   trip: Trip
@@ -78,27 +125,44 @@ export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) 
             <AccordionTrigger className="text-muted-foreground w-fit gap-1.5 py-1 text-xs hover:no-underline">
               Details
             </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-3 pt-1 pb-2">
-              {trip.description && <p className="text-sm">{trip.description}</p>}
-              {trip.difficulty && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Difficulty: </span>
-                  {TRIP_DIFFICULTY_LABELS[trip.difficulty]}
-                </p>
+            <AccordionContent className="flex flex-col gap-4 pt-1 pb-2">
+              {(trip.description || trip.difficulty) && (
+                <div className="flex flex-col gap-2">
+                  {trip.description && <p className="text-sm">{trip.description}</p>}
+                  {trip.difficulty && (
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Difficulty: </span>
+                      {TRIP_DIFFICULTY_LABELS[trip.difficulty]}
+                    </p>
+                  )}
+                </div>
               )}
-              <div className="flex flex-wrap items-center gap-3">
-                {canAdvanceState && trip.state && (
-                  <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
-                )}
-                {isLeader && (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/trips/${trip.id}/float-plan`}>
-                      <AnchorIcon className="size-3.5" />
-                      View float plan
-                    </Link>
-                  </Button>
-                )}
-              </div>
+
+              {canAdvanceState && trip.state && (
+                <>
+                  {(trip.description || trip.difficulty) && <Separator />}
+                  <div className="flex flex-col gap-3">
+                    <span className={fieldLabelClass}>Trip progression</span>
+                    <StateTimeline currentState={trip.state} />
+                    <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
+                  </div>
+                </>
+              )}
+
+              {isLeader && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-2">
+                    <span className={fieldLabelClass}>Share &amp; print</span>
+                    <Button variant="outline" size="sm" className="w-fit" asChild>
+                      <Link href={`/trips/${trip.id}/float-plan`}>
+                        <AnchorIcon className="size-3.5" />
+                        Printable float plan
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
