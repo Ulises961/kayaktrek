@@ -39,7 +39,14 @@ pre-commit:
       root: "frontend"
       run: pnpm prettier --check {staged_files}
 
-pre-push:
+# Full test suite + full lint/typecheck. Deliberately NOT wired to `pre-push`: it held
+# the network connection open long enough (backend pytest -n auto + frontend
+# pnpm test:run alone run 100s+) to time out `git push` on a slow connection.
+# backend-ci.yml/frontend-ci.yml already re-run all of this remotely on every push and
+# PR to master, so a blocking local pre-push copy is redundant, not a missing gate —
+# same reasoning as E2E's local-only demotion (ADR-030). Run manually before pushing
+# with `lefthook run local-verify`.
+local-verify:
   parallel: true
   commands:
     backend-tests:
