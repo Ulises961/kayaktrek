@@ -229,6 +229,24 @@ export async function resendDeletionCancel(mail: string): Promise<AuthResult> {
 
 export async function logout() {
   const cookieStore = await cookies()
+  const accessToken = cookieStore.get("access_token")?.value
+
+  if (accessToken) {
+    // Bumps token_version server-side, revoking every outstanding session for this
+    // user — the backend has no per-device granularity (ADR-032: no server-side
+    // token store), so this is the only "sign out" the architecture can offer. Best
+    // effort: an unreachable server or already-expired token shouldn't block the
+    // user from clearing their local cookies and leaving.
+    try {
+      await fetch(`${API_URL}${API_PREFIX}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      // ignore — cookies are cleared below regardless
+    }
+  }
+
   cookieStore.delete("access_token")
   cookieStore.delete("refresh_token")
   redirect("/")
@@ -243,10 +261,8 @@ export async function refreshSession(): Promise<boolean> {
   try {
     res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${refreshToken}`,
-      },
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
     })
   } catch {
     return false

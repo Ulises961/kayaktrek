@@ -52,6 +52,16 @@ The original design wrote a plaintext copy of medical notes to `TripMember.medic
 
 The fix: **ECIES encryption** (X25519 key agreement + AES-GCM). No new dependency — the `cryptography` library already installed supports X25519 and HKDF.
 
+**Threat model boundary.** "End-to-end" here means the ciphertext at rest is meaningless without a
+password — it defeats DB-read-access threats (admin, backup leak, SQL injection). It is not a
+zero-knowledge design: keypair generation (registration) and every decrypt (`share_medical_notes`,
+leader read) require the plaintext password in a request to the backend, so a compromised or
+malicious *live* server can capture it and decrypt. A true zero-knowledge design would derive the
+encryption key client-side and never transmit the password to the server at all — out of scope
+here; the current design is the standard "encrypted at rest, password-wrapped key" pattern, not
+Signal/WhatsApp-style E2E. Worth being precise about this distinction anywhere this feature is
+described as "E2E encryption" (e.g. the root `CLAUDE.md` milestone table).
+
 ### Keypair model
 
 Each `User` gets an X25519 keypair generated at registration:

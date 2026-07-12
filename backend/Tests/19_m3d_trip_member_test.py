@@ -519,3 +519,87 @@ def test_read_member_medical_notes_requires_elevated_token(client, auth_headers,
         headers=auth_headers,
     )
     assert response.status_code == 403
+
+
+# =============================================================================
+# GET /api/trip/<id>/member/me/medical-notes/access-log  (accountability record)
+# =============================================================================
+
+def test_leader_read_writes_an_access_log_row_the_crew_member_can_see(
+    client, auth_headers, auth_headers_2, trip_with_user2_as_crew, id
+):
+    """A successful leader decrypt is recorded, and the crew member (whose notes they
+    are) can see who read them and when."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    crew_id = trip_with_user2_as_crew["crew_id"]
+
+    _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
+
+    h = _elevated_headers(client, auth_headers)
+    read_response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
+        json={"password": _USER_1_PWD},
+        headers=h,
+    )
+    assert read_response.status_code == 200
+
+    log_response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert log_response.status_code == 200
+    entries = json.loads(log_response.data)
+    assert len(entries) == 1
+    assert entries[0]["leader"]["id"] == str(id)
+    assert "created" in entries[0]
+
+    # Cleanup
+    h2 = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=h2)
+
+
+def test_access_log_empty_when_never_read(client, auth_headers_2, trip_with_user2_as_crew):
+    """No access-log rows exist before the leader has ever read the crew member's notes."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+
+    response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data) == []
+
+
+def test_access_log_not_written_on_failed_decrypt(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
+    """A wrong-password (failed) leader decrypt attempt is not recorded — only successful reads."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    crew_id = trip_with_user2_as_crew["crew_id"]
+
+    _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
+
+    h = _elevated_headers(client, auth_headers)
+    failed_response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
+        json={"password": "wrongPassword1$"},
+        headers=h,
+    )
+    assert failed_response.status_code == 401
+
+    log_response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert json.loads(log_response.data) == []
+
+    # Cleanup
+    h2 = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=h2)
+
+
+def test_access_log_not_visible_to_other_crew_members(client, auth_headers_2, trip_with_user2_as_crew):
+    """A crew member cannot read another member's access log — it's scoped to 'me' only,
+    there is no by-member-id variant of this endpoint."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    crew_id = trip_with_user2_as_crew["crew_id"]
+
+    response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert response.status_code == 404

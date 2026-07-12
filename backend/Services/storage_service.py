@@ -34,7 +34,11 @@ MIN_SIZE = 512
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
 
-ALLOWED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/svg+xml"}
+ALLOWED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
+# SVG deliberately excluded: it's an XML format that can embed <script>, and these
+# objects are linked to directly with no backend proxy — an inline-script SVG would
+# execute in the storage origin if opened directly. No feature here depends on
+# vector images, so raster-only closes off that surface for free.
 
 ALLOWED_DOCUMENT_MIMES = {
     "application/pdf",
