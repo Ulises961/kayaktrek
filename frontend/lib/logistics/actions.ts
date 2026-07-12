@@ -18,7 +18,7 @@ export async function upsertLogistics(
 ): Promise<LogisticsActionResult> {
   try {
     await apiPut(`/api/logistics/${tripId}`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     revalidatePath(`/trips/${tripId}/float-plan`)
     return { success: true }
   } catch (e) {

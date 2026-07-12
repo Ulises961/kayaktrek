@@ -41,7 +41,9 @@ export async function updateMyFloatPlan(
       emergencyContactPhone: fields.emergencyContactPhone || null,
       emergencyContactRelationship: fields.emergencyContactRelationship || null,
     })
-    revalidatePath(`/trips/${tripId}`)
+    // The own-editing segment plus the leader-facing printable plan (crew manifest).
+    revalidatePath(`/trips/${tripId}/my-float-plan`)
+    revalidatePath(`/trips/${tripId}/float-plan`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -157,7 +159,8 @@ export async function shareMedicalNotes(
       { password },
       { "X-Elevated-Token": elevatedToken },
     )
-    revalidatePath(`/trips/${tripId}`)
+    // hasTripMedicalNotes/sharedAt state is only rendered on the own segment.
+    revalidatePath(`/trips/${tripId}/my-float-plan`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

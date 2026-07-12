@@ -53,10 +53,11 @@ describe("upsertLogistics", () => {
     expect(apiPut).toHaveBeenCalledWith(`/api/logistics/${TRIP_ID}`, { shoreContactName: "Maria" })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment and the printable float plan on success", async () => {
     vi.mocked(apiPut).mockResolvedValue(LOGISTICS_FIXTURE)
     await upsertLogistics(TRIP_ID, {})
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan`)
   })
 
   it("returns success: true on success", async () => {

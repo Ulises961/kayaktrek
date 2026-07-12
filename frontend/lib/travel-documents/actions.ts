@@ -25,7 +25,7 @@ export async function createTravelDocument(
 ): Promise<TravelDocumentCreateResult> {
   try {
     const raw = await apiPost<unknown>(`/api/travel-document/${tripId}/create`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true, document: TravelDocumentSchema.parse(raw) }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -40,7 +40,7 @@ export async function updateTravelDocument(
 ): Promise<TravelDocumentActionResult> {
   try {
     await apiPatch(`/api/travel-document/${documentId}`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -54,7 +54,7 @@ export async function deleteTravelDocument(
 ): Promise<TravelDocumentActionResult> {
   try {
     await apiDelete(`/api/travel-document/${documentId}`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -69,7 +69,7 @@ export async function uploadTravelDocumentAttachment(
 ): Promise<TravelDocumentActionResult> {
   try {
     await apiUpload(`/api/travel-document/${documentId}/attachment`, formData)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -86,7 +86,7 @@ export async function deleteTravelDocumentAttachment(
 ): Promise<TravelDocumentActionResult> {
   try {
     await apiDelete(`/api/travel-document/${documentId}/attachment`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

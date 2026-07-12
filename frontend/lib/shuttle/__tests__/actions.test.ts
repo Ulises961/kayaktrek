@@ -66,10 +66,10 @@ describe("createShuttleVehicle", () => {
     })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(VEHICLE_FIXTURE)
     await createShuttleVehicle(TRIP_ID, {})
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: true on success", async () => {
@@ -94,10 +94,10 @@ describe("updateShuttleVehicle", () => {
     })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiPatch).mockResolvedValue(VEHICLE_FIXTURE)
     await updateShuttleVehicle(TRIP_ID, VEHICLE_ID, {})
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -114,10 +114,10 @@ describe("deleteShuttleVehicle", () => {
     expect(apiDelete).toHaveBeenCalledWith(`/api/shuttle/vehicle/${VEHICLE_ID}`)
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await deleteShuttleVehicle(TRIP_ID, VEHICLE_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -136,10 +136,10 @@ describe("addShuttlePassenger", () => {
     })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
     await addShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -158,10 +158,10 @@ describe("removeShuttlePassenger", () => {
     )
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await removeShuttlePassenger(TRIP_ID, VEHICLE_ID, MEMBER_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {

@@ -67,10 +67,10 @@ describe("createTravelDocument", () => {
     })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(DOC_FIXTURE)
     await createTravelDocument(TRIP_ID, { type: "accommodation", name: "Hotel" })
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: true with document on success", async () => {
@@ -98,10 +98,10 @@ describe("updateTravelDocument", () => {
     })
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiPatch).mockResolvedValue(DOC_FIXTURE)
     await updateTravelDocument(TRIP_ID, DOC_ID, {})
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -118,10 +118,10 @@ describe("deleteTravelDocument", () => {
     expect(apiDelete).toHaveBeenCalledWith(`/api/travel-document/${DOC_ID}`)
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await deleteTravelDocument(TRIP_ID, DOC_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -139,10 +139,10 @@ describe("uploadTravelDocumentAttachment", () => {
     expect(apiUpload).toHaveBeenCalledWith(`/api/travel-document/${DOC_ID}/attachment`, formData)
   })
 
-  it("revalidates the trip path on success", async () => {
+  it("revalidates the logistics segment on success", async () => {
     vi.mocked(apiUpload).mockResolvedValue(DOC_FIXTURE)
     await uploadTravelDocumentAttachment(TRIP_ID, DOC_ID, new FormData())
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {

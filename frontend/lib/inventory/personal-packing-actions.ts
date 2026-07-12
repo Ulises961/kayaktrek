@@ -10,7 +10,7 @@ export type PackingActionResult = { success: true } | { success: false; error: s
 export async function addPackingItem(tripId: string, itemId: string): Promise<PackingActionResult> {
   try {
     await apiPost("/api/packing/create", { tripId, itemId })
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -26,7 +26,7 @@ export async function togglePackingItem(
 ): Promise<PackingActionResult> {
   try {
     await apiPatch(`/api/packing/${entryId}`, { checked })
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -40,7 +40,7 @@ export async function removePackingItem(
 ): Promise<PackingActionResult> {
   try {
     await apiDelete(`/api/packing/${entryId}`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

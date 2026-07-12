@@ -30,7 +30,9 @@ export async function createTrip(fields: TripFields): Promise<CreateTripResult> 
 export async function updateTrip(tripId: string, fields: TripFields): Promise<TripActionResult> {
   try {
     await apiPatch(`/api/trip/${tripId}`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    // Destination/dates/difficulty are shown in the layout-owned header, not
+    // just the current segment — revalidate the layout so it isn't stale.
+    revalidatePath("/trips/[id]", "layout")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -41,7 +43,8 @@ export async function updateTrip(tripId: string, fields: TripFields): Promise<Tr
 export async function advanceState(tripId: string, targetState: string): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/state`, { state: targetState })
-    revalidatePath(`/trips/${tripId}`)
+    // The state badge/timeline live in the layout-owned header.
+    revalidatePath("/trips/[id]", "layout")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -55,7 +58,9 @@ export async function advanceState(tripId: string, targetState: string): Promise
 export async function removeMember(tripId: string, userId: string): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}/member/${userId}`)
-    revalidatePath(`/trips/${tripId}`)
+    // Travellers feed both the layout header's avatar cluster and the crew
+    // segment's member list.
+    revalidatePath("/trips/[id]", "layout")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -88,7 +93,8 @@ export async function getTripCrew(tripId: string): Promise<TripMember[]> {
 export async function inviteUser(tripId: string, email: string): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invite`, { email })
-    revalidatePath(`/trips/${tripId}`)
+    // Pending invitations are only rendered on the crew segment.
+    revalidatePath(`/trips/${tripId}/crew`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -99,7 +105,7 @@ export async function inviteUser(tripId: string, email: string): Promise<TripAct
 export async function inviteBuddy(tripId: string, userId: string): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invite`, { userId })
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/crew`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -115,7 +121,7 @@ export async function cancelInvitation(
 ): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}/invite/${inviteeId}`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/crew`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -132,7 +138,9 @@ export async function handleInvitation(
 ): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invitation`, { accepted })
-    revalidatePath(`/trips/${tripId}`)
+    // Called from /invitations, not the trip detail itself — but acceptance
+    // changes travellers, which the layout header shows on next visit.
+    revalidatePath("/trips/[id]", "layout")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

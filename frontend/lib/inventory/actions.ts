@@ -98,7 +98,7 @@ export async function addRequirement(
       name: input.name,
       category: input.category,
     })
-    if (tripId) revalidatePath(`/trips/${tripId}`)
+    if (tripId) revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -116,7 +116,7 @@ export async function removeRequirement(
 ): Promise<InventoryActionResult> {
   try {
     await apiDelete(`/api/inventory/${inventoryId}/requirements/${reqId}`)
-    if (tripId) revalidatePath(`/trips/${tripId}`)
+    if (tripId) revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -136,7 +136,7 @@ export async function contributeItem(
 ): Promise<InventoryActionResult> {
   try {
     await apiPost(`/api/inventory/${inventoryId}/requirements/${reqId}/contribute`, { itemId })
-    if (tripId) revalidatePath(`/trips/${tripId}`)
+    if (tripId) revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -154,7 +154,7 @@ export async function unclaimRequirement(
 ): Promise<InventoryActionResult> {
   try {
     await apiDelete(`/api/inventory/${inventoryId}/requirements/${reqId}/contribute`)
-    if (tripId) revalidatePath(`/trips/${tripId}`)
+    if (tripId) revalidatePath(`/trips/${tripId}/items`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
