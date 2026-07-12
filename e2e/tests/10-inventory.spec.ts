@@ -35,7 +35,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
   })
 
   test("leader sees the seeded default requirements", async ({ page }) => {
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     const row = page.locator("li").filter({ hasText: REQ })
     await expect(row).toBeVisible()
     await expect(row.getByText("needed")).toBeVisible()
@@ -43,7 +43,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
 
   test("leader contributes an owned item → requirement becomes covered", async ({ page, request }) => {
     await apiCreateItem(request, leaderToken, { name: "E2E Drysuit", status: "owned" })
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
 
     await mutateAndSettle(
       page,
@@ -68,7 +68,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
 
     // Leader contributes their own item through the UI; the row then shows both.
     await apiCreateItem(request, leaderToken, { name: "E2E Leader VHF", status: "owned" })
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     await mutateAndSettle(
       page,
       () => page.getByLabel(`Contribute to ${REQ}`).selectOption({ label: "E2E Leader VHF" }),
@@ -89,14 +89,14 @@ test.describe("Trip inventory — requirements & authorship", () => {
     // Non-proposer (crew) sees the requirement but has no Remove control.
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    await crewPage.goto(`/trips/${tripId}?tab=items`)
+    await crewPage.goto(`/trips/${tripId}/items`)
     await expect(crewPage.locator("li").filter({ hasText: REQ })).toBeVisible()
     await expect(crewPage.getByRole("button", { name: `Remove ${REQ}` })).toHaveCount(0)
     await crewContext.close()
 
     // Proposer (leader) removes it. Removal goes through a window.confirm().
     page.on("dialog", (d) => d.accept())
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     // Since M6b, defaults seed at trip-creation/member-join only — a reload
     // does NOT re-seed the removed requirement (the pre-M6b re-seed-on-read
     // behaviour this test used to dodge is gone).
@@ -111,7 +111,7 @@ test.describe("Trip inventory — requirements & authorship", () => {
     const reqId = findRequirementId(await apiGetInventory(request, leaderToken, tripId), REQ)
     await apiContribute(request, leaderToken, inventoryId, reqId, item.id)
 
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     const row = page.locator("li").filter({ hasText: REQ })
     await expect(row.getByText("covered")).toBeVisible()
 

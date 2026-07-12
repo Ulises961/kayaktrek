@@ -18,7 +18,7 @@ test.describe("Logistics — shore contact and float plan", () => {
   })
 
   test("leader sets shore contact on float plan page", async ({ page }) => {
-    // Shore contact lives on /trips/:id/float-plan, not the logistics tab
+    // Shore contact lives on the printable /trips/:id/float-plan page, not the logistics segment
     await page.goto(`/trips/${tripId}/float-plan`)
 
     await page.getByRole("button", { name: "Edit", exact: true }).click()
@@ -29,8 +29,8 @@ test.describe("Logistics — shore contact and float plan", () => {
   })
 
   test("leader saves float plan to confirm it", async ({ page }) => {
-    // Float plan confirm: leader saves their vessel/emergency info from the float plan tab
-    await page.goto(`/trips/${tripId}?tab=float-plan`)
+    // Float plan confirm: leader saves their vessel/emergency info from the emergency info segment
+    await page.goto(`/trips/${tripId}/my-float-plan`)
     await page.getByRole("button", { name: "Edit", exact: true }).click()
     await page.getByRole("button", { name: /save float plan/i }).click()
     // Amber banner disappears once the leader has saved their float plan info
@@ -60,8 +60,7 @@ test.describe("Logistics — travel documents", () => {
   })
 
   test("leader adds a travel document and it appears in logistics", async ({ page }) => {
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /logistics/i }).click()
+    await page.goto(`/trips/${tripId}/logistics`)
 
     // Expand the Travel documents accordion before interacting with its content
     await page.getByRole("button", { name: /travel documents/i }).click()
@@ -94,8 +93,7 @@ test.describe("Logistics — shuttle vehicle", () => {
   })
 
   test("leader adds a shuttle vehicle and assigns a crew member as driver", async ({ page }) => {
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /logistics/i }).click()
+    await page.goto(`/trips/${tripId}/logistics`)
 
     // Expand the Shuttle accordion before interacting with its content
     await page.getByRole("button", { name: /shuttle/i }).click()
@@ -107,13 +105,14 @@ test.describe("Logistics — shuttle vehicle", () => {
     await mutateAndSettle(page, () => page.getByRole("button", { name: /^add$/i }).click())
 
     await expect(page.getByText("Toyota Land Cruiser")).toBeVisible()
-    await expect(page.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name).first()).toBeVisible()
+    // .first(): the "Driver" label and the passenger-candidate picker (which
+    // still lists the driver as an eligible passenger) both show the name.
+    await expect(page.getByText(CREW.name).first()).toBeVisible()
   })
 
   test("crew member joins a shuttle vehicle as passenger", async ({ page, browser }) => {
     // Leader adds vehicle via UI
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /logistics/i }).click()
+    await page.goto(`/trips/${tripId}/logistics`)
     await page.getByRole("button", { name: /shuttle/i }).click()
     await page.getByRole("button", { name: /add vehicle/i }).click()
     await page.getByLabel(/vehicle description/i).fill("Toyota Land Cruiser")
@@ -123,16 +122,17 @@ test.describe("Logistics — shuttle vehicle", () => {
     // Crew member joins the vehicle
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    await crewPage.goto(`/trips/${tripId}`)
-    await crewPage.getByRole("tab", { name: /logistics/i }).click()
+    await crewPage.goto(`/trips/${tripId}/logistics`)
     await crewPage.getByRole("button", { name: /shuttle/i }).click()
     await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /join/i }).click())
-    await expect(crewPage.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name)).toBeVisible()
+    // Scoped to <main>.first(): crew's own sidebar profile link also matches
+    // their name, and the passenger-candidate picker still lists them too.
+    await expect(crewPage.locator("main").getByText(CREW.name).first()).toBeVisible()
     await crewContext.close()
 
     // Leader sees the passenger on their view
     await page.reload()
     await page.getByRole("button", { name: /shuttle/i }).click()
-    await expect(page.getByRole("tabpanel", { name: /logistics/i }).getByText(CREW.name)).toBeVisible()
+    await expect(page.locator("main").getByText(CREW.name).first()).toBeVisible()
   })
 })

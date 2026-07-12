@@ -24,8 +24,7 @@ test.describe("Member removal", () => {
   })
 
   test("leader removes crew member → crew loses access to the trip", async ({ page, browser }) => {
-    // Tab carried in the URL so the post-mutation reload lands back on Crew.
-    await page.goto(`/trips/${tripId}?tab=crew`)
+    await page.goto(`/trips/${tripId}/crew`)
 
     // Leader removes crew via UI
     await page.getByText(CREW.name).hover()

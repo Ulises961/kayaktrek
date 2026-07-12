@@ -28,14 +28,14 @@ test.describe("Personal packing — private kit", () => {
   })
 
   test("member sees their seeded private kit", async ({ page }) => {
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     await expect(page.getByText("My kit")).toBeVisible()
     await expect(page.getByRole("checkbox", { name: KIT_SEED })).toBeVisible()
   })
 
   test("member adds an owned item to their kit", async ({ page, request }) => {
     await apiCreateItem(request, leaderToken, { name: "E2E Headtorch", status: "owned" })
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
 
     await mutateAndSettle(
       page,
@@ -48,7 +48,7 @@ test.describe("Personal packing — private kit", () => {
   test("toggling packed persists across reload", async ({ page, request }) => {
     const item = await apiCreateItem(request, leaderToken, { name: "E2E Spray Deck", status: "owned" })
     await apiAddPacking(request, leaderToken, tripId, item.id)
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
 
     const box = page.getByRole("checkbox", { name: "E2E Spray Deck" })
     await expect(box).not.toBeChecked()
@@ -66,7 +66,7 @@ test.describe("Personal packing — private kit", () => {
   test("member removes an item from their kit", async ({ page, request }) => {
     const item = await apiCreateItem(request, leaderToken, { name: "E2E Bivvy", status: "owned" })
     await apiAddPacking(request, leaderToken, tripId, item.id)
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
 
     await expect(page.getByRole("checkbox", { name: "E2E Bivvy" })).toBeVisible()
     await mutateAndSettle(
@@ -86,7 +86,7 @@ test.describe("Personal packing — private kit", () => {
     await apiAddPacking(request, crewToken, tripId, crewItem.id)
 
     // The leader's kit shows their own seeded gear but never the crew member's item.
-    await page.goto(`/trips/${tripId}?tab=items`)
+    await page.goto(`/trips/${tripId}/items`)
     await expect(page.getByRole("checkbox", { name: KIT_SEED })).toBeVisible()
     await expect(page.getByRole("checkbox", { name: "E2E Crew Secret Kit" })).toHaveCount(0)
   })

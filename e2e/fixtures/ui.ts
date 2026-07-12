@@ -16,8 +16,10 @@ interface MutateOptions {
    * streamed-apply drop; the repro lives in the 2026-07-10 e2e-alignment
    * notes (docs/reviews/2026-07-10-e2e-alignment.md).
    *
-   * NOTE: a reload resets client-only state (open dialogs, tabs selected via
-   * click). Specs using this must carry the tab in the URL (`?tab=…`).
+   * NOTE: a reload resets client-only state (open dialogs, accordion sections
+   * expanded via click) — the trip-detail tabs are real route segments now
+   * (M12 §R), so a reload naturally lands back on whichever segment the spec
+   * navigated to; no URL bookkeeping needed for that specifically.
    *
    * Leave unset for revalidate-only flows asserted against the action
    * response itself (the refreshed RSC streams back *inside* the action POST

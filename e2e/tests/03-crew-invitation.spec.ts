@@ -21,7 +21,7 @@ test.describe("Crew invitation flow", () => {
     // Leader: navigate to trip and invite crew by email. The invite form is
     // always visible on the crew tab (M7b also added an "Invite a buddy"
     // picker next to it, so match the submit button exactly).
-    await page.goto(`/trips/${tripId}?tab=crew`)
+    await page.goto(`/trips/${tripId}/crew`)
     await page.getByPlaceholder(/email/i).fill(CREW.mail)
     await mutateAndSettle(
       page,
@@ -54,8 +54,7 @@ test.describe("Crew invitation flow", () => {
   test("leader can cancel a pending invitation", async ({ page }) => {
     // Invite via API, then cancel via UI
     const leaderPage = page
-    // Tab carried in the URL so the post-mutation reloads land back on Crew.
-    await leaderPage.goto(`/trips/${tripId}?tab=crew`)
+    await leaderPage.goto(`/trips/${tripId}/crew`)
     await leaderPage.getByPlaceholder(/email/i).fill(CREW.mail)
     await mutateAndSettle(
       leaderPage,

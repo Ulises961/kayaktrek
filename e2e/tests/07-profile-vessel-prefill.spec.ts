@@ -34,12 +34,10 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     await apiDeleteTrip(request, leaderToken, tripId)
   })
 
-  test("vessel set in profile is pre-filled in the float plan tab", async ({ page }) => {
-    await page.goto(`/trips/${tripId}`)
-    await page.getByRole("tab", { name: /logistics/i }).click()
-    await page.getByRole("tab", { name: /float plan/i }).click()
+  test("vessel set in profile is pre-filled in the emergency info segment", async ({ page }) => {
+    await page.goto(`/trips/${tripId}/my-float-plan`)
 
-    // Leader's vessel should appear in the float plan tab
+    // Leader's vessel should appear in the emergency info segment
     await expect(page.getByText("Seabird")).toBeVisible()
     await expect(page.getByText("Meridian")).toBeVisible()
   })
@@ -60,8 +58,7 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
     // Crew: override vessel in float plan tab
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    // Tab carried in the URL so the post-mutation reload lands back on Float plan.
-    await crewPage.goto(`/trips/${tripId}?tab=float-plan`)
+    await crewPage.goto(`/trips/${tripId}/my-float-plan`)
 
     await crewPage.getByRole("button", { name: "Edit", exact: true }).click()
     await crewPage.getByLabel(/make/i).fill("Prijon")

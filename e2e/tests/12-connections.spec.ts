@@ -128,8 +128,7 @@ test.describe("Paddler connections", () => {
     const trip = await apiCreateTrip(request, leaderToken, { destination: "E2E Invite Buddy" })
     const tripId = trip.id as string
 
-    // Tab carried in the URL so the post-mutation reload lands back on Crew.
-    await page.goto(`/trips/${tripId}?tab=crew`)
+    await page.goto(`/trips/${tripId}/crew`)
     await page.getByRole("button", { name: /invite a buddy/i }).click()
     await mutateAndSettle(
       page,
