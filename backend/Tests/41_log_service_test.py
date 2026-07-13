@@ -77,11 +77,11 @@ def test_endorse_log_shared_trip_happy_path_and_idempotent(endorsable_log, id_2)
 
     LogService.endorse_log(log_id, id_2)
     endorsed = LogService.get_endorsed_logs(id_2)
-    assert log_id in [str(l.id) for l in endorsed]
+    assert log_id in [str(l.id) for l in endorsed["items"]]
 
     LogService.endorse_log(log_id, id_2)
     endorsed = LogService.get_endorsed_logs(id_2)
-    assert [str(l.id) for l in endorsed].count(log_id) == 1
+    assert [str(l.id) for l in endorsed["items"]].count(log_id) == 1
 
     LogService.unendorse_log(log_id, id_2)
 
@@ -116,11 +116,11 @@ def test_unendorse_log_removes_and_is_idempotent(endorsable_log, id_2):
 
     LogService.endorse_log(log_id, id_2)
     LogService.unendorse_log(log_id, id_2)
-    assert log_id not in [str(l.id) for l in LogService.get_endorsed_logs(id_2)]
+    assert log_id not in [str(l.id) for l in LogService.get_endorsed_logs(id_2)["items"]]
 
     # Unendorsing when not endorsed is a no-op, not an error.
     LogService.unendorse_log(log_id, id_2)
-    assert log_id not in [str(l.id) for l in LogService.get_endorsed_logs(id_2)]
+    assert log_id not in [str(l.id) for l in LogService.get_endorsed_logs(id_2)["items"]]
 
 
 # ── get_endorsed_logs ─────────────────────────────────────────────────────────

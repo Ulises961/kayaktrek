@@ -26,7 +26,8 @@ def get_logs():
     try:
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = LogService.get_logs_by_user(g.current_user_id, page=page, per_page=per_page)
+        sort = request.args.get("sort", "newest")
+        result = LogService.get_logs_by_user(g.current_user_id, page=page, per_page=per_page, sort=sort)
         schema = LogSchema()
         return jsonify({
             "items": [schema.dump(log) for log in result["items"]],
@@ -44,12 +45,21 @@ def get_logs():
 @JWTService.authenticate_restful
 def get_endorsed_logs():
     """
-    LogResource GET method. Retrieves all the logs associated to a user
+    LogResource GET method. Retrieves a paginated, sorted page of logs endorsed
+    by the current user.
     """
-    try:        
-        
-        logs = LogService.get_endorsed_logs(g.current_user_id) 
-        return jsonify([LogSchema().dump(log) for log in logs]), HTTPStatus.OK
+    try:
+        page = request.args.get("page", 1, type=int)
+        per_page = min(request.args.get("per_page", 20, type=int), 100)
+        sort = request.args.get("sort", "newest")
+        result = LogService.get_endorsed_logs(g.current_user_id, page=page, per_page=per_page, sort=sort)
+        schema = LogSchema()
+        return jsonify({
+            "items": [schema.dump(log) for log in result["items"]],
+            "total": result["total"],
+            "page": result["page"],
+            "pages": result["pages"],
+        }), HTTPStatus.OK
     except Exception as e:
         logger.error(f"Error retrieving logs: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")
