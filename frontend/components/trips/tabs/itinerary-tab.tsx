@@ -71,7 +71,7 @@ function StatLabel({ children }: { children: React.ReactNode }) {
 function StatTile({ value, label }: { value: React.ReactNode; label: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-foreground truncate font-mono text-lg leading-none font-semibold tabular-nums">
+      <span className="text-foreground truncate font-mono text-sm leading-none font-medium tabular-nums">
         {value}
       </span>{" "}
       <StatLabel>{label}</StatLabel>
