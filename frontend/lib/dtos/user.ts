@@ -46,6 +46,9 @@ export const UserSchema = z.object({
   profileIsPublic: z.boolean().nullish(),
   // Distance-unit display preference (M12 §C) — presentation only, storage stays km.
   unitPreference: z.enum([DISTANCE_UNIT.NM, DISTANCE_UNIT.KM]).default(DISTANCE_UNIT.NM),
+  // Set while an email-change request awaits confirmation (M12 §J) — drives the
+  // "pending — check your inbox" state on Settings across reloads.
+  pendingMail: z.string().nullish(),
   // Float plan defaults (M3d)
   vesselMake: z.string().nullish(),
   vesselModel: z.string().nullish(),
@@ -87,7 +90,6 @@ export const ProfileFormSchema = z.object({
     .max(255, "Max 255 characters")
     .refine(noHtmlTags.check, noHtmlTags.message)
     .optional(),
-  unitPreference: z.enum([DISTANCE_UNIT.NM, DISTANCE_UNIT.KM]),
   vesselMake: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselModel: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
   vesselLengthCm: z

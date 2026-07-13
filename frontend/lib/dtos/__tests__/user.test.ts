@@ -67,6 +67,16 @@ describe("UserSchema", () => {
     const result = UserSchema.safeParse({ ...BASE_USER, unitPreference: "miles" })
     expect(result.success).toBe(false)
   })
+
+  it("accepts a pendingMail value", () => {
+    const result = UserSchema.safeParse({ ...BASE_USER, pendingMail: "new@example.com" })
+    expect(result.success).toBe(true)
+  })
+
+  it("allows a null or absent pendingMail", () => {
+    expect(UserSchema.safeParse({ ...BASE_USER, pendingMail: null }).success).toBe(true)
+    expect(UserSchema.safeParse(BASE_USER).success).toBe(true)
+  })
 })
 
 describe("TravellerSchema", () => {
@@ -95,15 +105,10 @@ describe("ProfileFormSchema", () => {
     surname: "Lovelace",
     phone: "+34600000001",
     username: "ada_lovelace",
-    unitPreference: DISTANCE_UNIT.NM,
   }
 
   it("accepts a valid minimal profile", () => {
     expect(ProfileFormSchema.safeParse(VALID).success).toBe(true)
-  })
-
-  it("rejects an invalid unitPreference", () => {
-    expect(ProfileFormSchema.safeParse({ ...VALID, unitPreference: "miles" }).success).toBe(false)
   })
 
   it("rejects an empty name", () => {

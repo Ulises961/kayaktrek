@@ -6,22 +6,13 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ProfileFormSchema, type ProfileFormValues, type User } from "@/lib/dtos/user"
 import { updateProfile, uploadAvatar, removeAvatar } from "@/lib/profile/actions"
-import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { NativeSelect } from "@/components/common/form-field"
-import {
-  AnchorIcon,
-  ShieldAlertIcon,
-  UserIcon,
-  CameraIcon,
-  Trash2Icon,
-  RulerIcon,
-} from "lucide-react"
+import { AnchorIcon, ShieldAlertIcon, UserIcon, CameraIcon, Trash2Icon } from "lucide-react"
 
 interface EditProfileFormProps {
   user: User
@@ -48,7 +39,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
       username: user.username ?? "",
       bio: user.bio ?? "",
       homeLocation: user.homeLocation ?? "",
-      unitPreference: user.unitPreference ?? DISTANCE_UNIT.NM,
       vesselMake: user.vesselMake ?? "",
       vesselModel: user.vesselModel ?? "",
       vesselLengthCm: user.vesselLengthCm != null ? String(user.vesselLengthCm) : "",
@@ -195,37 +185,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
               {...register("bio")}
             />
             {errors.bio && <p className="text-destructive text-xs">{errors.bio.message}</p>}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Email</Label>
-            <Input value={user.mail} disabled readOnly className="opacity-60" />
-            <p className="text-muted-foreground text-xs">
-              Email changes require a separate verification flow.
-            </p>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Preferences */}
-        <div className="flex flex-col gap-4">
-          <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-            <RulerIcon className="size-4" /> Preferences
-          </p>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="unitPreference">Distance unit</Label>
-            <NativeSelect
-              id="unitPreference"
-              disabled={isPending}
-              className="max-w-40"
-              {...register("unitPreference")}
-            >
-              <option value={DISTANCE_UNIT.NM}>Nautical miles (nm)</option>
-              <option value={DISTANCE_UNIT.KM}>Kilometres (km)</option>
-            </NativeSelect>
-            <p className="text-muted-foreground text-xs">
-              Used across the planner, logbook, and stats.
-            </p>
           </div>
         </div>
 

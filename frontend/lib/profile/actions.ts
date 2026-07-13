@@ -25,7 +25,6 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
       username: fields.username,
       bio: fields.bio || null,
       homeLocation: fields.homeLocation || null,
-      unitPreference: fields.unitPreference,
       vesselMake: fields.vesselMake || null,
       vesselModel: fields.vesselModel || null,
       vesselLengthCm:
@@ -64,7 +63,9 @@ export async function setProfileVisibility(isPublic: boolean): Promise<ProfileAc
 
 // Instant single-field toggle for the planner's unit switch — mirrors
 // setProfileVisibility so the map builder doesn't have to round-trip the whole
-// profile form just to flip nm/km.
+// profile form just to flip nm/km. Read on both /profile (stats dashboard
+// display) and /settings (the editing control, M12 §J) — revalidate both
+// precisely rather than a blanket path.
 export async function setUnitPreference(unit: DistanceUnit): Promise<ProfileActionResult> {
   const session = await getSession()
   if (!session) redirect("/login")
@@ -72,6 +73,7 @@ export async function setUnitPreference(unit: DistanceUnit): Promise<ProfileActi
   try {
     await apiPatch(`/api/user/${session.userId}`, { unitPreference: unit })
     revalidatePath("/profile")
+    revalidatePath("/settings")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -230,6 +232,25 @@ export async function generateKeypair(password: string): Promise<ProfileActionRe
     if (msg.includes("401")) return { success: false, error: "Password incorrect." }
     if (msg.includes("409")) return { success: true }
     return { success: false, error: "Failed to set up encryption keypair." }
+  }
+}
+
+export async function requestEmailChange(
+  elevatedToken: string,
+  newMail: string,
+): Promise<ProfileActionResult> {
+  try {
+    await apiPost("/api/user/me/email-change", { newMail }, { "X-Elevated-Token": elevatedToken })
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("403"))
+      return { success: false, error: "Session expired. Please lock and unlock again." }
+    if (msg.includes("400"))
+      return { success: false, error: "That address can't be used. Try a different one." }
+    return { success: false, error: "Failed to request email change." }
   }
 }
 

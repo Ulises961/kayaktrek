@@ -40,11 +40,11 @@ describe("ChangePasswordForm", () => {
     await waitFor(() => expect(changePassword).toHaveBeenCalledWith("OldPass1!", "NewPass1!"))
   })
 
-  it("redirects to /profile on success", async () => {
+  it("redirects to /settings on success", async () => {
     vi.mocked(changePassword).mockResolvedValue({ success: true })
     await fillAndSubmit("OldPass1!", "NewPass1!", "NewPass1!")
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/profile?changed=1"))
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/settings?changed=1"))
   })
 
   it("shows a field error when passwords do not match", async () => {

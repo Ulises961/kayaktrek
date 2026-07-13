@@ -18,6 +18,7 @@ const APP_SEGMENTS = [
   "itinerary",
   "logs",
   "profile",
+  "settings",
   "trips",
   "users",
 ]

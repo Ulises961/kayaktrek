@@ -28,6 +28,7 @@ import {
   grantMedicalConsent,
   revokeMedicalConsent,
   setUnitPreference,
+  requestEmailChange,
 } from "../actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
@@ -37,7 +38,6 @@ const SESSION = { userId: USER_ID, email: "ada@example.com", isAdmin: false }
 const PROFILE_FIELDS = {
   name: "Ada",
   username: "ada",
-  unitPreference: DISTANCE_UNIT.NM,
 }
 
 beforeEach(() => {
@@ -51,8 +51,15 @@ describe("updateProfile", () => {
     await updateProfile(PROFILE_FIELDS)
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/user/${USER_ID}`,
-      expect.objectContaining({ name: "Ada", username: "ada", unitPreference: DISTANCE_UNIT.NM }),
+      expect.objectContaining({ name: "Ada", username: "ada" }),
     )
+  })
+
+  it("does not send unitPreference — that field moved to setUnitPreference (M12 §J)", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await updateProfile(PROFILE_FIELDS)
+    const payload = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
+    expect(payload).not.toHaveProperty("unitPreference")
   })
 
   it("converts empty vesselLengthCm to null", async () => {
@@ -108,10 +115,11 @@ describe("setUnitPreference", () => {
     })
   })
 
-  it("revalidates /profile on success", async () => {
+  it("revalidates /profile and /settings on success — both display it", async () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await setUnitPreference(DISTANCE_UNIT.KM)
     expect(revalidatePath).toHaveBeenCalledWith("/profile")
+    expect(revalidatePath).toHaveBeenCalledWith("/settings")
   })
 
   it("returns success: true on success", async () => {
@@ -376,6 +384,53 @@ describe("revokeMedicalConsent", () => {
       new Error("DELETE /api/user/me/medical-consent failed: 403"),
     )
     expect(await revokeMedicalConsent(ELEVATED_TOKEN)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+})
+
+describe("requestEmailChange", () => {
+  const NEW_MAIL = "new@example.com"
+
+  it("POSTs to /api/user/me/email-change with newMail and elevated header", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)
+    expect(apiPost).toHaveBeenCalledWith(
+      "/api/user/me/email-change",
+      { newMail: NEW_MAIL },
+      { "X-Elevated-Token": ELEVATED_TOKEN },
+    )
+  })
+
+  it("revalidates /settings on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)
+    expect(revalidatePath).toHaveBeenCalledWith("/settings")
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    expect(await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)).toEqual({ success: true })
+  })
+
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/email-change failed: 403"))
+    expect(await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+
+  it("returns a user-friendly error on 400 (invalid address or same as current)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/email-change failed: 400"))
+    const result = await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+
+  it("returns a generic error on other failures", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
+    expect(await requestEmailChange(ELEVATED_TOKEN, NEW_MAIL)).toEqual({
       success: false,
       error: expect.any(String),
     })

@@ -30,7 +30,7 @@ export function ChangePasswordForm() {
       const result = await changePassword(currentPwd, newPwd)
       if (result.success) {
         reset()
-        router.push("/profile?changed=1")
+        router.push("/settings?changed=1")
       } else {
         if (result.error.toLowerCase().includes("current")) {
           setError("currentPwd", { message: result.error })
@@ -99,7 +99,7 @@ export function ChangePasswordForm() {
           type="button"
           variant="outline"
           disabled={isPending}
-          onClick={() => router.push("/profile")}
+          onClick={() => router.push("/settings")}
         >
           Cancel
         </Button>
