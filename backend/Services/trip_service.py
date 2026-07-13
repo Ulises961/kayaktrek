@@ -346,37 +346,6 @@ class TripService:
         return invitation
 
     @staticmethod
-    def invite_user_by_email(trip_id: str, email: str, inviter_id: str | None = None) -> Invitation:
-        """
-        Look up a user by exact email address and invite them to the trip.
-
-        Raises:
-            NoResultFound: If no active user has that email, or the trip doesn't exist
-            PermissionError: If inviter and invitee have blocked each other
-            ValueError: If the user is already a member or has a pending invitation
-        """
-        invitee = db.session.query(User).filter_by(mail=email.strip().lower()).first()
-        if not invitee:
-            raise NoResultFound("No account found for that email address")
-        return TripService.invite_user(trip_id, str(invitee.id), inviter_id=inviter_id)
-
-    @staticmethod
-    def invite_user_by_username(trip_id: str, username: str, inviter_id: str | None = None) -> Invitation:
-        """
-        Look up a user by exact username (from the buddy finder / buddy list) and invite
-        them to the trip.
-
-        Raises:
-            NoResultFound: If no active user has that username, or the trip doesn't exist
-            PermissionError: If inviter and invitee have blocked each other
-            ValueError: If the user is already a member or has a pending invitation
-        """
-        invitee = db.session.query(User).filter_by(username=username).first()
-        if not invitee or not invitee.active:
-            raise NoResultFound("No account found for that username")
-        return TripService.invite_user(trip_id, str(invitee.id), inviter_id=inviter_id)
-
-    @staticmethod
     def handle_invitation(trip_id: str, accepted: bool) -> None:
         """
         Accept or decline a trip invitation for the current user.

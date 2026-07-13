@@ -223,6 +223,19 @@ once a discoverable public surface (the public profile, M7a) ships. Their status
   more correct and useful response than a misleading 404. The change would have been a broad
   API-contract churn (~6–8 test files) for negligible real secrecy. Revisit only if an enumerable
   surface (e.g. sequential IDs or a public listing of private resource IDs) is ever introduced.
+- **Trip-invite email/username lookup oracle — closed (M12 §N).** `POST /api/trip/<id>/invite`
+  previously accepted `{"email": ...}` or `{"username": ...}` and distinguished "no account"
+  (404) from "already a member/invited" (409) from success (201) — a leader-facing oracle
+  letting any trip leader test arbitrary email addresses or usernames for account existence.
+  Closed by removing both lookup paths from the endpoint entirely (only `{"userId": ...}` is
+  now accepted, sourced from the buddy picker or paddler search — a value the leader can only
+  obtain from context they can already see, never a blind guess). Frontend `InviteForm` (email
+  entry) was removed in the same change — removing only the frontend form while leaving the
+  backend branch reachable would not have closed the oracle, only hidden the UI for exploiting
+  it. **Accepted cost:** a leader can no longer invite someone who isn't yet a buddy connection
+  by email; the buddy-picker-only flow means connect-then-invite for anyone not already a
+  buddy (consistent with M7b's connection-gated invite model). A "Can't find them? Find
+  paddlers →" link from the buddy picker covers the connect-first step.
 
 ---
 
@@ -266,3 +279,4 @@ structurally mirrored on the existing token/re-auth machinery rather than invent
 | Password-reset medical-notes data loss — notify + re-entry prompt | — | 2026-06-16 | Reset clears unreadable ciphertext; `medical_notes_reset_at` flag + `medical_notes_cleared` email + in-app prompt; rejected re-entry during the reset flow (would hold plaintext unauthenticated). Closes 2026-06-11 security review Step 4. |
 | Enumeration/oracle hardening (M7a §4) | — | 2026-06-25 | Closed login-timing, `deletion_pending`-before-password, registration, and GPX-XXE oracles; **consciously declined** the 403→404 `require_owner` flip (non-enumerable UUIDv7 + auth gating make the oracle non-exploitable; 403 is more correct for shared resources). Closes the 2026-06-11 review's deferred LOW items. |
 | Email-change flow (M12 §J) | — | 2026-07-13 | Request (elevated-token-gated) → verify (anonymous, token-only, mirrors `/auth/verify`) two-step; new `pending_mail` column on `User` (not an `AuthToken` payload field); enumeration-safe (silent no-op for a taken address); `token_version` bumped on verify, not request; old address gets a non-actionable notice email. |
+| Trip-invite email/username oracle (M12 §N) | — | 2026-07-13 | Removed the `email`/`username` invite-lookup branches from `POST /trip/<id>/invite` (frontend `InviteForm` removed in the same change) — buddy-picker `userId` invite is now the sole path; accepted cost is invite-a-non-buddy becomes connect-then-invite. |

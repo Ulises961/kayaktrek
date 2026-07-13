@@ -81,7 +81,7 @@ def authz_resources(client, auth_headers, auth_headers_2, user_1, user_2, catego
     day_id = trip["itinerary"]["days"][0]["id"]
 
     # user_2 joins as crew
-    inv_r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", json={"email": user_2.mail}, headers=auth_headers)
+    inv_r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", json={"userId": str(user_2.id)}, headers=auth_headers)
     assert inv_r.status_code == 201, inv_r.data
     accept_r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invitation", json={"accepted": True}, headers=auth_headers_2)
     assert accept_r.status_code == 200, accept_r.data

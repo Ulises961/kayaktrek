@@ -1,7 +1,8 @@
 """M7b §3 — paddler search (buddy finder) + invite-by-search/buddy integration.
 
 Search returns public, block-filtered, relationship-annotated rows. The trip-invite
-path gains username/userId resolution and a block guard on top of invite-by-email.
+path accepts only a userId (M12 §N removed the email/username lookup branches — a
+leader-facing enumeration oracle) plus a block guard.
 """
 import pytest
 
@@ -127,16 +128,6 @@ def _find(payload, username):
 
 # ── invite integration ───────────────────────────────────────────────────────
 
-def test_invite_by_username(client, auth_headers, user_2):
-    trip_id = _make_trip(client, auth_headers)
-    try:
-        resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers,
-                           json={"username": user_2.username})
-        assert resp.status_code == 201
-    finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
-
-
 def test_invite_by_user_id(client, auth_headers, id_2):
     trip_id = _make_trip(client, auth_headers)
     try:
@@ -147,12 +138,18 @@ def test_invite_by_user_id(client, auth_headers, id_2):
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
 
 
-def test_invite_by_email_still_works(client, auth_headers, user_2):
+def test_email_and_username_bodies_no_longer_accepted(client, auth_headers, user_2):
+    """M12 §N: the email/username invite-lookup branches were removed entirely — a
+    stale client sending either key now falls through to the generic missing-userId
+    400, the same response as an empty body."""
     trip_id = _make_trip(client, auth_headers)
     try:
         resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers,
                            json={"email": user_2.mail})
-        assert resp.status_code == 201
+        assert resp.status_code == 400
+        resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers,
+                           json={"username": user_2.username})
+        assert resp.status_code == 400
     finally:
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
 
@@ -162,7 +159,7 @@ def test_invite_blocked_returns_403(client, auth_headers, id_2, user_2):
     try:
         assert client.post(BLOCK_ENDPOINT, headers=auth_headers, json={"blockedId": id_2}).status_code == 201
         resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers,
-                           json={"username": user_2.username})
+                           json={"userId": id_2})
         assert resp.status_code == 403
     finally:
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)

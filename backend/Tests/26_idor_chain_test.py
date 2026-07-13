@@ -121,7 +121,7 @@ def idor_resources(client, auth_headers, auth_headers_2, user_1, user_2, categor
     trip_b_id, itin_b_id, day_b_id, inv_b_id = _make_trip(auth_headers)
 
     # user_2 joins trip_A only
-    r = client.post(f"{TRIP_ENDPOINT}/{trip_a_id}/invite", json={"email": user_2.mail}, headers=auth_headers)
+    r = client.post(f"{TRIP_ENDPOINT}/{trip_a_id}/invite", json={"userId": str(user_2.id)}, headers=auth_headers)
     assert r.status_code == 201, r.data
     r = client.post(f"{TRIP_ENDPOINT}/{trip_a_id}/invitation", json={"accepted": True}, headers=auth_headers_2)
     assert r.status_code == 200, r.data

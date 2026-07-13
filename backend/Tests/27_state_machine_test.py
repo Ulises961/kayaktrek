@@ -113,7 +113,7 @@ def test_crew_cannot_transition_state(client, auth_headers, auth_headers_2, user
     """
     trip_id, *_ = _make_trip(client, auth_headers)
     try:
-        r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", json={"email": user_2.mail}, headers=auth_headers)
+        r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", json={"userId": str(user_2.id)}, headers=auth_headers)
         assert r.status_code == 201, r.data
         r = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invitation", json={"accepted": True}, headers=auth_headers_2)
         assert r.status_code == 200, r.data

@@ -202,25 +202,19 @@ def invite_user(id: str):
     """
     POST /api/trip/<id>/invite — Leader invites a user to the trip.
 
-    Body: {"email": "<email>"} | {"username": "<name>"} | {"userId": "<uuid>"} —
-    by exact email, or resolved from the buddy finder / buddy list. A block in either
-    direction between leader and invitee forbids the invitation (403).
+    Body: {"userId": "<uuid>"} — sourced from the buddy picker or paddler search, never
+    a blind email/username guess (M12 §N closed that enumeration oracle). A block in
+    either direction between leader and invitee forbids the invitation (403).
     Returns 201, 404 if no account found, 409 if already invited or member.
     """
     try:
         body = request.get_json() or {}
-        email = body.get("email")
-        username = body.get("username")
         user_id = body.get("userId")
         inviter_id = str(g.current_user_id)
-        if email:
-            TripService.invite_user_by_email(id, email, inviter_id=inviter_id)
-        elif username:
-            TripService.invite_user_by_username(id, username, inviter_id=inviter_id)
-        elif user_id:
+        if user_id:
             TripService.invite_user(id, user_id, inviter_id=inviter_id)
         else:
-            abort(HTTPStatus.BAD_REQUEST, description="'email', 'username' or 'userId' is required")
+            abort(HTTPStatus.BAD_REQUEST, description="'userId' is required")
         return jsonify({"message": "Invitation sent"}), HTTPStatus.CREATED
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
