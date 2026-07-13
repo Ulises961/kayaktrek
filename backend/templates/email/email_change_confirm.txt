@@ -1,0 +1,12 @@
+Hi {{ name }},
+
+A request was made to change the email on your Kayak Planner account to this address.
+
+Confirm this change:
+{{ confirm_url }}
+
+This link expires in 1 hour. If you didn't request this, you can safely ignore this email —
+nothing changes on your account until the link above is clicked.
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

@@ -44,6 +44,9 @@ class User(BaseModel):
             setattr(self, key, value)
 
     mail: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    # Set while an email-change request is awaiting confirmation via the link sent to this
+    # address. Cleared on verify (swapped into `mail`) or superseded by a newer request.
+    pending_mail: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pwd: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)

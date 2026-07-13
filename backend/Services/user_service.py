@@ -1,4 +1,5 @@
 import math
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
+    # Same pattern UserSchema.validate_mail uses — kept in sync deliberately.
+    _MAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
     _MUTABLE_FIELDS = frozenset({
         "username", "name", "surname", "phone",
         "vessel_make", "vessel_model", "vessel_length_cm",
@@ -415,6 +419,43 @@ class UserService:
         """Return True if the given password matches the stored hash."""
         user = UserService.get_user_by_id(id)
         return check_password_hash(user.pwd, password)
+
+    @staticmethod
+    def request_email_change(id: str, new_mail: str) -> None:
+        """
+        Begin an email-change request: validates the new address, stores it as
+        `pending_mail`, invalidates any earlier unconsumed request, and emails a
+        confirmation link to the new address (never the current one).
+
+        Silently no-ops (no email, no error) when the address already belongs to
+        another account — mirrors AuthService.register_user's existing-user
+        handling to avoid an enumeration oracle.
+
+        Raises:
+            NoResultFound: If user does not exist
+            ValueError: If new_mail is malformed or matches the current address
+        """
+        user = UserService.get_user_by_id(id)
+        if len(new_mail) > 255 or not UserService._MAIL_PATTERN.match(new_mail):
+            raise ValueError("Invalid email format")
+        if new_mail == user.mail:
+            raise ValueError("New email must be different from the current address")
+
+        existing = db.session.query(User).filter_by(mail=new_mail).first()
+        if existing:
+            logger.info("email_change_requested_for_taken_address", extra={"user_id": id})
+            return
+
+        db.session.query(AuthToken).filter_by(
+            user_id=user.id,
+            type=AuthTokenType.EMAIL_CHANGE,
+            used=False,
+        ).update({"used": True})
+        user.pending_mail = new_mail
+        db.session.commit()
+
+        AuthService._send_email_change_confirm(user, new_mail)
+        logger.info("email_change_requested", extra={"user_id": id})
 
     @staticmethod
     def grant_medical_consent(id: str, plaintext: str, password: str) -> User:

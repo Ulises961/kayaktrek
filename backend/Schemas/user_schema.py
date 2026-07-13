@@ -52,6 +52,9 @@ class UserSchema(BaseSchema):
     # Set when a password reset wiped the notes — drives the re-entry prompt in the UI
     medical_notes_reset_at = fields.DateTime(allow_none=True, dump_only=True)
     deletion_requested_at = fields.DateTime(allow_none=True, dump_only=True)
+    # Set while an email-change request awaits confirmation — never mutable via PATCH,
+    # only through the dedicated request-email-change/verify-email-change flow.
+    pending_mail = fields.String(allow_none=True, dump_only=True)
 
     # Presence flag — clients use this to show the keypair-generation prompt
     has_keypair = fields.Method("get_has_keypair", dump_only=True)
@@ -169,6 +172,7 @@ class UserUpdateSchema(UserSchema):
     # Medical notes and consent fields are not mutable through this schema
     medical_notes_consent_at = fields.DateTime(dump_only=True)
     deletion_requested_at = fields.DateTime(dump_only=True)
+    pending_mail = fields.String(dump_only=True)
 
     @post_load
     def make_user(self, data, **kwargs):
