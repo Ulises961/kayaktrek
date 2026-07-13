@@ -1,32 +1,23 @@
 import Link from "next/link"
-import { apiGet } from "@/lib/api/client"
-import { apiGetAllPages } from "@/lib/api/paginate"
 import { getSession } from "@/lib/auth/session"
 import { listEndorsementRequests } from "@/lib/endorsement-requests/actions"
-import { LogPageSchema, LogsSchema } from "@/lib/dtos/log"
+import { listMyLogs, listEndorsedLogs, getMyStats } from "@/lib/logs/actions"
+import { averageSeaState } from "@/lib/logs/format"
 import { LogsTabs } from "@/components/logs/logs-tabs"
 import { EndorsementInbox } from "@/components/logs/endorsement-inbox"
 import { Button } from "@/components/ui/button"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
-  const [pageData, endorsedData, session, endorsementRequests] = await Promise.all([
-    apiGetAllPages("/api/log/all", LogPageSchema).catch(() => ({ items: [], total: 0 })),
-    apiGet("/api/log/endorsed")
-      .then((r) => LogsSchema.parse(r))
-      .catch(() => []),
+  const [mine, endorsed, stats, session, endorsementRequests] = await Promise.all([
+    listMyLogs(),
+    listEndorsedLogs(),
+    getMyStats(),
     getSession(),
     listEndorsementRequests("incoming"),
   ])
 
-  const { items } = pageData
-
-  const totalHours = items.reduce((sum, l) => sum + (l.hours ?? 0), 0)
-  const totalDistance = items.reduce((sum, l) => sum + (l.distance ?? 0), 0)
-  const seaItems = items.filter((l) => l.avgSea != null)
-  const avgSea = seaItems.length
-    ? seaItems.reduce((sum, l) => sum + l.avgSea!, 0) / seaItems.length
-    : null
+  const avgSea = averageSeaState(stats.conditionsDistribution)
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -37,20 +28,20 @@ export default async function LogsPage() {
         </Button>
       </div>
 
-      {items.length > 0 && (
+      {stats.logCount > 0 && (
         <div className="grid grid-cols-3 gap-4">
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <ClockIcon className="size-3.5" /> Hours
             </span>
-            <span className="text-xl font-semibold">{totalHours.toFixed(1)}</span>
+            <span className="text-xl font-semibold">{stats.totalHours.toFixed(1)}</span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <RouteIcon className="size-3.5" /> Distance
             </span>
             <span className="text-xl font-semibold">
-              {totalDistance > 0 ? `${totalDistance.toFixed(1)} km` : "—"}
+              {stats.totalDistance > 0 ? `${stats.totalDistance.toFixed(1)} km` : "—"}
             </span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
@@ -66,7 +57,7 @@ export default async function LogsPage() {
 
       <EndorsementInbox requests={endorsementRequests} />
 
-      <LogsTabs myLogs={items} endorsedLogs={endorsedData} currentUserId={session?.userId} />
+      <LogsTabs initialMine={mine} initialEndorsed={endorsed} currentUserId={session?.userId} />
     </div>
   )
 }

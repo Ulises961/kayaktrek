@@ -3,6 +3,7 @@ import { apiGetAllPages } from "@/lib/api/paginate"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
 import { TripCard } from "@/components/common/trip-card"
 import { PastTripsSection } from "@/components/trips/past-trips-section"
+import { PlanningTripsSection } from "@/components/trips/planning-trips-section"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
 import { StateVisual } from "@/components/illustrations/state-visual"
 import CurrentPageTitle from "@/components/common/current-page-title"
@@ -67,11 +68,7 @@ export default async function Page() {
           {planningTrips.length > 0 && (
             <section className="flex flex-col gap-2">
               <SectionHeader label="Planning" count={planningTrips.length} />
-              <div className="flex flex-col gap-3">
-                {planningTrips.map((trip) => (
-                  <TripCard key={trip.id} trip={trip} />
-                ))}
-              </div>
+              <PlanningTripsSection trips={planningTrips} />
             </section>
           )}
           {pastTrips.length > 0 && (

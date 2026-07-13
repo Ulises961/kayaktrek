@@ -3,11 +3,34 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
-import type { LogFields } from "@/lib/dtos/log"
+import { LOG_SORT, LogPageSchema, type LogFields, type LogPage, type LogSort } from "@/lib/dtos/log"
 import { StatsSchema } from "@/lib/dtos/public-profile"
 import type { Stats } from "@/lib/dtos/public-profile"
 
 export type LogActionResult = { success: true } | { success: false; error: string }
+
+const EMPTY_LOG_PAGE: LogPage = { items: [], total: 0, page: 1, pages: 1 }
+
+export async function listMyLogs(page = 1, sort: LogSort = LOG_SORT.NEWEST): Promise<LogPage> {
+  try {
+    const raw = await apiGet<unknown>(`/api/log/all?page=${page}&sort=${sort}`)
+    return LogPageSchema.parse(raw)
+  } catch {
+    return EMPTY_LOG_PAGE
+  }
+}
+
+export async function listEndorsedLogs(
+  page = 1,
+  sort: LogSort = LOG_SORT.NEWEST,
+): Promise<LogPage> {
+  try {
+    const raw = await apiGet<unknown>(`/api/log/endorsed?page=${page}&sort=${sort}`)
+    return LogPageSchema.parse(raw)
+  } catch {
+    return EMPTY_LOG_PAGE
+  }
+}
 
 // Aggregate stats for the authenticated paddler. Reuses the same shape the public
 // profile exposes (StatsSchema). Throws on failure — callers render via the page.

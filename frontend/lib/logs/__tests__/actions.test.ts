@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { createLog, updateLog, deleteLog, endorseLog, unendorseLog } from "../actions"
+import {
+  createLog,
+  updateLog,
+  deleteLog,
+  endorseLog,
+  unendorseLog,
+  listMyLogs,
+  listEndorsedLogs,
+} from "../actions"
 
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
@@ -12,13 +20,17 @@ vi.mock("@/lib/api/client", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }))
 
-import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { LOG_SORT } from "@/lib/dtos/log"
 
+const GET = apiGet as ReturnType<typeof vi.fn>
 const POST = apiPost as ReturnType<typeof vi.fn>
 const PATCH = apiPatch as ReturnType<typeof vi.fn>
 const DELETE = apiDelete as ReturnType<typeof vi.fn>
+
+const EMPTY_PAGE = { items: [], total: 0, page: 1, pages: 1 }
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -109,5 +121,45 @@ describe("unendorseLog", () => {
     DELETE.mockRejectedValue(new Error("boom"))
     const result = await unendorseLog("log-1")
     expect(result).toEqual({ success: false, error: "Failed to withdraw endorsement." })
+  })
+})
+
+describe("listMyLogs", () => {
+  it("fetches page 1 with the default sort", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listMyLogs()
+    expect(GET).toHaveBeenCalledWith(`/api/log/all?page=1&sort=${LOG_SORT.NEWEST}`)
+  })
+
+  it("fetches the requested page and sort", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listMyLogs(2, LOG_SORT.OLDEST)
+    expect(GET).toHaveBeenCalledWith(`/api/log/all?page=2&sort=${LOG_SORT.OLDEST}`)
+  })
+
+  it("returns an empty page on failure", async () => {
+    GET.mockRejectedValue(new Error("boom"))
+    const result = await listMyLogs()
+    expect(result).toEqual(EMPTY_PAGE)
+  })
+})
+
+describe("listEndorsedLogs", () => {
+  it("fetches page 1 with the default sort", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listEndorsedLogs()
+    expect(GET).toHaveBeenCalledWith(`/api/log/endorsed?page=1&sort=${LOG_SORT.NEWEST}`)
+  })
+
+  it("fetches the requested page and sort", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listEndorsedLogs(2, LOG_SORT.OLDEST)
+    expect(GET).toHaveBeenCalledWith(`/api/log/endorsed?page=2&sort=${LOG_SORT.OLDEST}`)
+  })
+
+  it("returns an empty page on failure", async () => {
+    GET.mockRejectedValue(new Error("boom"))
+    const result = await listEndorsedLogs()
+    expect(result).toEqual(EMPTY_PAGE)
   })
 })

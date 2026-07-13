@@ -26,6 +26,15 @@ export const LogSchema = z.object({
   endorsers: z.array(EndorserSchema).nullish(),
 })
 
+// Mirrors ExploreSort (lib/dtos/itinerary.ts) — one canonical date-sort convention
+// across the app's Load-more listing surfaces (M12 §K). Enum-backed per the
+// project convention (frontend/CLAUDE.md) — never compare against a raw literal.
+export const LOG_SORT = {
+  NEWEST: "newest",
+  OLDEST: "oldest",
+} as const
+export type LogSort = (typeof LOG_SORT)[keyof typeof LOG_SORT]
+
 export const LogPageSchema = z.object({
   items: z.array(LogSchema),
   total: z.number(),
