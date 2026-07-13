@@ -13,7 +13,6 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
 import {
-  inviteUser,
   cancelInvitation,
   handleInvitation,
   createTrip,
@@ -25,35 +24,8 @@ import {
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const USER_ID = "01952f1a-0000-7000-8000-000000000020"
-const USER_EMAIL = "paddler@example.com"
 
 beforeEach(() => vi.clearAllMocks())
-
-describe("inviteUser", () => {
-  it("posts to the correct path with email in the body", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite`, { email: USER_EMAIL })
-  })
-
-  it("revalidates the crew segment on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/crew`)
-  })
-
-  it("returns success: true on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    const result = await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(result).toEqual({ success: true })
-  })
-
-  it("returns success: false when the API throws", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
-    const result = await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(result).toEqual({ success: false, error: expect.any(String) })
-  })
-})
 
 describe("cancelInvitation", () => {
   it("sends DELETE to the correct path", async () => {

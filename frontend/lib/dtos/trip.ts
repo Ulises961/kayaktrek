@@ -79,12 +79,7 @@ export const TripFieldsSchema = z
     { message: "End date must be on or after the start date.", path: ["dateTo"] },
   )
 
-export const InviteUserSchema = z.object({
-  email: z.string().email("Enter a valid email address."),
-})
-
 export type Trip = z.infer<typeof TripSchema>
-export type InviteUserFields = z.infer<typeof InviteUserSchema>
 export type TripPage = z.infer<typeof TripPageSchema>
 export type TripFields = z.infer<typeof TripFieldsSchema>
 export const TripsSchema = z.array(TripSchema)

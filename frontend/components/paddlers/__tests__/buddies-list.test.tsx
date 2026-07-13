@@ -74,6 +74,13 @@ describe("BuddiesList", () => {
     expect(screen.getByText(/no buddies yet/i)).toBeDefined()
   })
 
+  it("shows a search-specific empty message when filtered to zero by a search term", () => {
+    render(<BuddiesList connections={[]} currentUserId={ME} searchTerm="zzz" />)
+    expect(screen.queryByText(/no buddies yet/i)).toBeNull()
+    expect(screen.getByText(/no buddies match/i)).toBeDefined()
+    expect(screen.getByText(/zzz/i)).toBeDefined()
+  })
+
   it("categorises incoming, outgoing and accepted connections", () => {
     render(<BuddiesList connections={CONNECTIONS} currentUserId={ME} />)
     expect(screen.getByText(/buddy requests \(1\)/i)).toBeDefined()

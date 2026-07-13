@@ -12,12 +12,16 @@ import type { Connection, ConnectionUser } from "@/lib/dtos/connection"
 interface BuddiesListProps {
   connections: Connection[]
   currentUserId: string
+  /** The active search term, if any — distinguishes "no buddies yet" from
+   * "no buddies match this search" when the caller has already filtered
+   * `connections` down to an empty array. */
+  searchTerm?: string
 }
 
 // Splits the caller's connections into incoming requests (caller is addressee),
 // outgoing requests (caller is requester) and accepted buddies. Each row offers the
 // action appropriate to that bucket.
-export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
+export function BuddiesList({ connections, currentUserId, searchTerm }: BuddiesListProps) {
   const buddies = connections.filter((c) => c.status === "accepted")
   const incoming = connections.filter(
     (c) => c.status === "pending" && c.addressee.id === currentUserId,
@@ -29,7 +33,9 @@ export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
   if (connections.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No buddies yet. Find paddlers and send a buddy request.
+        {searchTerm
+          ? `No buddies match "${searchTerm}".`
+          : "No buddies yet. Find paddlers and send a buddy request."}
       </p>
     )
   }

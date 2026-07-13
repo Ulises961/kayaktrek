@@ -90,18 +90,6 @@ export async function getTripCrew(tripId: string): Promise<TripMember[]> {
   }
 }
 
-export async function inviteUser(tripId: string, email: string): Promise<TripActionResult> {
-  try {
-    await apiPost(`/api/trip/${tripId}/invite`, { email })
-    // Pending invitations are only rendered on the crew segment.
-    revalidatePath(`/trips/${tripId}/crew`)
-    return { success: true }
-  } catch (e) {
-    if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to send invitation." }
-  }
-}
-
 export async function inviteBuddy(tripId: string, userId: string): Promise<TripActionResult> {
   try {
     await apiPost(`/api/trip/${tripId}/invite`, { userId })

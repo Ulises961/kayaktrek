@@ -8,11 +8,19 @@ export const metadata = {
   title: "Paddlers — Kayak Expedition Planner",
 }
 
-export default async function PaddlersPage() {
+export default async function PaddlersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>
+}) {
   const session = await getSession()
   if (!session) redirect("/login")
 
-  const [connections, blocks] = await Promise.all([listConnections(), listBlocks()])
+  const [{ q }, connections, blocks] = await Promise.all([
+    searchParams,
+    listConnections(),
+    listBlocks(),
+  ])
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -23,7 +31,12 @@ export default async function PaddlersPage() {
         </p>
       </div>
 
-      <PaddlersHub connections={connections} blocks={blocks} currentUserId={session.userId} />
+      <PaddlersHub
+        connections={connections}
+        blocks={blocks}
+        currentUserId={session.userId}
+        initialQuery={q ?? ""}
+      />
     </div>
   )
 }

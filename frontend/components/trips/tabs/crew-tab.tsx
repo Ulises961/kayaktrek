@@ -3,7 +3,6 @@
 import { UsersIcon } from "lucide-react"
 import { CrewList } from "@/components/common/crew-list"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { InviteForm } from "@/components/trips/invite-form"
 import { InviteBuddyPicker } from "@/components/trips/invite-buddy-picker"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
 import type { Trip } from "@/lib/dtos/trip"
@@ -49,7 +48,6 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
       {isLeader && (
         <div className="flex flex-col gap-3 py-5">
           <SectionLabel>Invite member</SectionLabel>
-          <InviteForm tripId={tripId} />
           {leaderId && (
             <InviteBuddyPicker
               tripId={tripId}
