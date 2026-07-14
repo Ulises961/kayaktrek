@@ -18,7 +18,8 @@ export const RegisterSchema = z.object({
     .min(1, "Name is required.")
     .max(100, "Name must be at most 100 characters.")
     .refine(noHtmlTags.check, noHtmlTags.message),
-  phone: z.string().regex(/^\+[1-9]\d{6,14}$/, "Use international format: +34600000000"),
+  // Optional since M12 §F — signup no longer asks for it; collected in Settings.
+  phone: z.string().optional(),
   password: z
     .string()
     .min(12, "Password must be at least 12 characters.")
@@ -28,6 +29,16 @@ export const RegisterSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number.")
     .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character."),
 })
+
+// The always-visible signup checklist mirrors RegisterSchema's password regexes
+// verbatim (M12 §F) — change them together or the live checklist lies.
+export const PASSWORD_RULES: { label: string; test: (value: string) => boolean }[] = [
+  { label: "At least 12 characters", test: (v) => v.length >= 12 },
+  { label: "A lowercase letter", test: (v) => /[a-z]/.test(v) },
+  { label: "An uppercase letter", test: (v) => /[A-Z]/.test(v) },
+  { label: "A number", test: (v) => /[0-9]/.test(v) },
+  { label: "A special character", test: (v) => /[^a-zA-Z0-9]/.test(v) },
+]
 
 export const ForgotPasswordSchema = z.object({
   mail: z.string().email("Enter a valid email address."),

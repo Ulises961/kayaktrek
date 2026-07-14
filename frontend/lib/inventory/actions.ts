@@ -29,15 +29,16 @@ export async function createItem(input: CreateItemInput): Promise<InventoryActio
   }
 }
 
-// Promotes a suggested item to owned — the ownership confirmation step.
-export async function confirmItemOwned(itemId: string): Promise<InventoryActionResult> {
+// Sets an item's suggested/owned state — both directions, since the gear
+// closet's owned control is a toggle (M12 §F), not a one-way confirmation.
+export async function setItemOwned(itemId: string, owned: boolean): Promise<InventoryActionResult> {
   try {
-    await apiPatch(`/api/item/${itemId}`, { status: "owned" })
+    await apiPatch(`/api/item/${itemId}`, { status: owned ? "owned" : "suggested" })
     revalidatePath("/gear")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return { success: false, error: e instanceof Error ? e.message : "Failed to confirm gear." }
+    return { success: false, error: e instanceof Error ? e.message : "Failed to update gear." }
   }
 }
 

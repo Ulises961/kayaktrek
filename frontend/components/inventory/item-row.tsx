@@ -2,20 +2,15 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { CheckIcon, StarIcon, Trash2Icon } from "lucide-react"
+import { StarIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/dtos/item"
-import { confirmItemOwned, deleteItem, toggleDefaultPack } from "@/lib/inventory/actions"
+import { setItemOwned, deleteItem, toggleDefaultPack } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 
 interface ItemRowProps {
   item: Item
-}
-
-function statusBadgeClass(status: Item["status"]) {
-  return status === "owned"
-    ? "bg-[var(--state-happening-bg)] text-[var(--state-happening-fg)]"
-    : "bg-[var(--state-planning-bg)] text-[var(--state-planning-fg)]"
 }
 
 export function ItemRow({ item }: ItemRowProps) {
@@ -23,10 +18,14 @@ export function ItemRow({ item }: ItemRowProps) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  function handleConfirmOwned() {
+  const owned = item.status === "owned"
+
+  // One control that both displays and sets owned state (M12 §F) — replaces the
+  // old SUGGESTED/OWNED badge chip + separate "I own this" button pair.
+  function handleOwnedChange(next: boolean) {
     setError(null)
     startTransition(async () => {
-      const result = await confirmItemOwned(item.id!)
+      const result = await setItemOwned(item.id!, next)
       if (result.success) router.refresh()
       else setError(result.error)
     })
@@ -52,28 +51,21 @@ export function ItemRow({ item }: ItemRowProps) {
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg border p-3">
+    <li className="flex flex-col gap-1 rounded-lg border px-2 py-1.5">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{item.name}</span>
-          {item.category && (
-            <span className="text-muted-foreground text-xs">{item.category.name}</span>
-          )}
-        </div>
+        <span className={cn("text-sm font-medium", !owned && "text-muted-foreground")}>
+          {item.name}
+        </span>
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase",
-              statusBadgeClass(item.status),
-            )}
-          >
-            {item.status ?? "suggested"}
-          </span>
-          {item.status !== "owned" && (
-            <Button size="sm" variant="outline" disabled={isPending} onClick={handleConfirmOwned}>
-              <CheckIcon className="size-3.5" /> I own this
-            </Button>
-          )}
+          <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-[11px]">
+            Owned
+            <Switch
+              checked={owned}
+              disabled={isPending}
+              onCheckedChange={handleOwnedChange}
+              aria-label={owned ? `Mark ${item.name} as not owned` : `Mark ${item.name} as owned`}
+            />
+          </label>
           <Button
             size="icon"
             variant={item.defaultPack ? "default" : "outline"}
@@ -90,6 +82,7 @@ export function ItemRow({ item }: ItemRowProps) {
                 ? "Always packed — click to stop suggesting this on future trips"
                 : "Always pack this on future trips"
             }
+            className="size-7"
           >
             <StarIcon className={cn("size-3.5", item.defaultPack && "fill-current")} />
           </Button>
@@ -99,7 +92,7 @@ export function ItemRow({ item }: ItemRowProps) {
             disabled={isPending}
             onClick={handleDelete}
             aria-label={`Delete ${item.name}`}
-            className="text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive size-7"
           >
             <Trash2Icon className="size-4" />
           </Button>

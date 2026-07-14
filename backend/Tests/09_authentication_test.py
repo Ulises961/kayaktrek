@@ -141,6 +141,34 @@ class TestAuthenticationEndpoints:
         assert user.username == new_user_data['username']
         assert user.id is not None
 
+    def test_register_without_phone(self, client):
+        """Phone is optional at signup (M12 §F) — collected later in Settings."""
+        new_user_data = {
+            "username": f"nophone_{uuid.uuid4().hex[:8]}",
+            "mail": f"nophone_{uuid.uuid4().hex[:8]}@example.com",
+            "pwd": "SecurePass123!",
+            "name": "No",
+            "surname": "Phone",
+        }
+
+        response = client.post('/api/v1/auth/register', json=new_user_data)
+
+        assert response.status_code == 201
+        user = User.query.filter_by(mail=new_user_data['mail']).first()
+        assert user is not None
+        assert user.phone is None
+
+    def test_register_two_users_without_phone(self, client):
+        """unique=True on phone must tolerate multiple NULLs (Postgres semantics)."""
+        for _ in range(2):
+            payload = {
+                "username": f"nophone_{uuid.uuid4().hex[:8]}",
+                "mail": f"nophone_{uuid.uuid4().hex[:8]}@example.com",
+                "pwd": "SecurePass123!",
+                "name": "No",
+            }
+            assert client.post('/api/v1/auth/register', json=payload).status_code == 201
+
     def test_register_duplicate_username(self, client):
         """Test registering with existing username fails"""
         # Create first user

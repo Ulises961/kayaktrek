@@ -35,7 +35,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
     defaultValues: {
       name: user.name ?? "",
       surname: user.surname ?? "",
-      phone: user.phone ?? "",
       username: user.username ?? "",
       bio: user.bio ?? "",
       homeLocation: user.homeLocation ?? "",
@@ -154,11 +153,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
             {errors.username && (
               <p className="text-destructive text-xs">{errors.username.message}</p>
             )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" type="tel" disabled={isPending} {...register("phone")} />
-            {errors.phone && <p className="text-destructive text-xs">{errors.phone.message}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="homeLocation">Home location</Label>

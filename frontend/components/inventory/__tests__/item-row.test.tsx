@@ -2,21 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockConfirmItemOwned, mockDeleteItem, mockToggleDefaultPack, mockRefresh } = vi.hoisted(
-  () => ({
-    mockConfirmItemOwned: vi.fn(),
-    mockDeleteItem: vi.fn(),
-    mockToggleDefaultPack: vi.fn(),
-    mockRefresh: vi.fn(),
-  }),
-)
+const { mockSetItemOwned, mockDeleteItem, mockToggleDefaultPack, mockRefresh } = vi.hoisted(() => ({
+  mockSetItemOwned: vi.fn(),
+  mockDeleteItem: vi.fn(),
+  mockToggleDefaultPack: vi.fn(),
+  mockRefresh: vi.fn(),
+}))
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mockRefresh }),
 }))
 
 vi.mock("@/lib/inventory/actions", () => ({
-  confirmItemOwned: mockConfirmItemOwned,
+  setItemOwned: mockSetItemOwned,
   deleteItem: mockDeleteItem,
   toggleDefaultPack: mockToggleDefaultPack,
 }))
@@ -54,40 +52,43 @@ const ALWAYS_PACKED: Item = {
 
 describe("ItemRow", () => {
   beforeEach(() => {
-    mockConfirmItemOwned.mockReset()
+    mockSetItemOwned.mockReset()
     mockDeleteItem.mockReset()
     mockToggleDefaultPack.mockReset()
     mockRefresh.mockReset()
-    mockConfirmItemOwned.mockResolvedValue({ success: true })
+    mockSetItemOwned.mockResolvedValue({ success: true })
     mockDeleteItem.mockResolvedValue({ success: true })
     mockToggleDefaultPack.mockResolvedValue({ success: true })
   })
 
-  it("renders the item name, category and owned status", () => {
+  it("renders the item name and a checked owned switch for an owned item", () => {
     render(<ItemRow item={OWNED} />)
     expect(screen.getByText("Bilge pump")).toBeTruthy()
-    expect(screen.getByText("First aid")).toBeTruthy()
-    expect(screen.getByText(/owned/i)).toBeTruthy()
+    const toggle = screen.getByRole("switch")
+    expect(toggle.getAttribute("aria-checked")).toBe("true")
   })
 
-  it("does not offer a confirm-ownership action for an already-owned item", () => {
-    render(<ItemRow item={OWNED} />)
-    expect(screen.queryByRole("button", { name: /own this/i })).toBeNull()
-  })
-
-  it("offers a confirm-ownership action for a suggested item", () => {
+  it("shows the owned switch unchecked for a suggested item", () => {
     render(<ItemRow item={SUGGESTED} />)
-    expect(screen.getByText(/suggested/i)).toBeTruthy()
-    expect(screen.getByRole("button", { name: /own this/i })).toBeTruthy()
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false")
   })
 
-  it("promotes a suggested item to owned", async () => {
+  it("promotes a suggested item to owned via the switch", async () => {
     const user = userEvent.setup()
     render(<ItemRow item={SUGGESTED} />)
 
-    await user.click(screen.getByRole("button", { name: /own this/i }))
+    await user.click(screen.getByRole("switch"))
 
-    expect(mockConfirmItemOwned).toHaveBeenCalledWith(SUGGESTED.id)
+    expect(mockSetItemOwned).toHaveBeenCalledWith(SUGGESTED.id, true)
+  })
+
+  it("demotes an owned item back to suggested via the switch", async () => {
+    const user = userEvent.setup()
+    render(<ItemRow item={OWNED} />)
+
+    await user.click(screen.getByRole("switch"))
+
+    expect(mockSetItemOwned).toHaveBeenCalledWith(OWNED.id, false)
   })
 
   it("deletes the item after confirmation", async () => {

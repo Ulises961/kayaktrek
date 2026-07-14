@@ -18,10 +18,11 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
   if (!session) redirect("/login")
 
   try {
+    // phone is deliberately absent — it's account data, edited in Settings via
+    // setPhone (M12 §F), and PATCHing it here would clear a stored number.
     await apiPatch(`/api/user/${session.userId}`, {
       name: fields.name,
       surname: fields.surname || null,
-      phone: fields.phone || null,
       username: fields.username,
       bio: fields.bio || null,
       homeLocation: fields.homeLocation || null,
@@ -78,6 +79,28 @@ export async function setUnitPreference(unit: DistanceUnit): Promise<ProfileActi
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: "Failed to update unit preference." }
+  }
+}
+
+// Single-field phone update for Settings (M12 §F — collected once, in an
+// account-details context, instead of at signup). Mirrors setUnitPreference;
+// an empty string clears the stored number.
+export async function setPhone(phone: string): Promise<ProfileActionResult> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+
+  try {
+    await apiPatch(`/api/user/${session.userId}`, { phone: phone.trim() || null })
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("400"))
+      return { success: false, error: "Enter a valid phone number (7–15 digits)." }
+    if (msg.includes("409"))
+      return { success: false, error: "That phone number is already in use." }
+    return { success: false, error: "Failed to update phone number." }
   }
 }
 

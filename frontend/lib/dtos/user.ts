@@ -74,7 +74,6 @@ export const UsersSchema = z.array(UserSchema)
 export const ProfileFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).refine(noHtmlTags.check, noHtmlTags.message),
   surname: z.string().max(100).refine(noHtmlTags.check, noHtmlTags.message).optional(),
-  phone: z.string().max(20).optional(),
   username: z
     .string()
     .min(3, "At least 3 characters")

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { LoginSchema, RegisterSchema } from "../schemas"
+import { LoginSchema, RegisterSchema, PASSWORD_RULES } from "../schemas"
 
 // A password that satisfies all RegisterSchema rules
 const STRONG_PASSWORD = "Expedition#24"
@@ -76,51 +76,31 @@ describe("RegisterSchema", () => {
   })
 
   describe("phone", () => {
-    it("rejects an empty phone", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "" })
-      expect(result.success).toBe(false)
+    it("is optional — signup no longer collects it (M12 §F)", () => {
+      const { phone: _phone, ...withoutPhone } = valid
+      expect(RegisterSchema.safeParse(withoutPhone).success).toBe(true)
     })
 
-    it("rejects a number without leading +", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "34600000000" })
-      expect(result.success).toBe(false)
-    })
-
-    it("rejects a number with spaces", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "+34 600 000 000" })
-      expect(result.success).toBe(false)
-    })
-
-    it("rejects a number with dashes", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "+34-600-000-000" })
-      expect(result.success).toBe(false)
-    })
-
-    it("rejects a number that is too short", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "+34123" })
-      expect(result.success).toBe(false)
-    })
-
-    it("rejects a number that is too long", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "+3" + "4".repeat(15) })
-      expect(result.success).toBe(false)
-    })
-
-    it("rejects a country code starting with 0", () => {
-      const result = RegisterSchema.safeParse({ ...valid, phone: "+0034600000000" })
-      expect(result.success).toBe(false)
-    })
-
-    it("accepts a valid Spanish number", () => {
+    it("still accepts a phone when one is provided", () => {
       expect(RegisterSchema.safeParse({ ...valid, phone: "+34600000000" }).success).toBe(true)
     })
+  })
 
-    it("accepts a valid US number", () => {
-      expect(RegisterSchema.safeParse({ ...valid, phone: "+12125551234" }).success).toBe(true)
+  describe("PASSWORD_RULES", () => {
+    it("mirrors the schema: a password passing every rule passes the schema", () => {
+      expect(PASSWORD_RULES.every((r) => r.test(STRONG_PASSWORD))).toBe(true)
+      expect(RegisterSchema.safeParse({ ...valid, password: STRONG_PASSWORD }).success).toBe(true)
     })
 
-    it("accepts a valid UK number", () => {
-      expect(RegisterSchema.safeParse({ ...valid, phone: "+447911123456" }).success).toBe(true)
+    it.each([
+      ["short", "Sh#1aB"],
+      ["no lowercase", "EXPEDITION#24"],
+      ["no uppercase", "expedition#24"],
+      ["no number", "Expedition#xx"],
+      ["no special character", "Expedition424"],
+    ])("mirrors the schema: %s fails at least one rule and fails the schema", (_label, pwd) => {
+      expect(PASSWORD_RULES.every((r) => r.test(pwd))).toBe(false)
+      expect(RegisterSchema.safeParse({ ...valid, password: pwd }).success).toBe(false)
     })
   })
 

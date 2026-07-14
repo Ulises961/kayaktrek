@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { UnitPreferenceSelect } from "@/components/settings/unit-preference-select"
 import { EmailChangeSection } from "@/components/settings/email-change-section"
+import { PhoneSection } from "@/components/settings/phone-section"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
@@ -47,6 +48,8 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           <EmailChangeSection currentMail={user.mail} pendingMail={user.pendingMail} />
+          <Separator />
+          <PhoneSection initialPhone={user.phone} />
           <Separator />
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm">Password</p>

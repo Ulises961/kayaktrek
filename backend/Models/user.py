@@ -48,7 +48,9 @@ class User(BaseModel):
     # address. Cleared on verify (swapped into `mail`) or superseded by a newer request.
     pending_mail: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pwd: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    # Optional since M12 §F — collected in Settings, not at signup (multiple NULLs
+    # coexist with unique=True under Postgres).
+    phone: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
     username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     surname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

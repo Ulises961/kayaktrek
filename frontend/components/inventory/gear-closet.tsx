@@ -7,6 +7,7 @@ import type { Item } from "@/lib/dtos/item"
 import type { ItemCategory } from "@/lib/dtos/item-category"
 import { createItem } from "@/lib/inventory/actions"
 import { ItemRow } from "@/components/inventory/item-row"
+import { SectionLabel } from "@/components/common/section-label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -17,6 +18,25 @@ interface GearClosetProps {
 
 const UNCATEGORISED = "__none__"
 
+type CategoryGroup = { slug: string; label: string; items: Item[] }
+
+// Buckets items by category slug in the given category order, with an explicit
+// trailing "Uncategorised" bucket — the grouped closet reads by category
+// section instead of one flat list (M12 §F density pass).
+function groupByCategory(items: Item[], categories: ItemCategory[]): CategoryGroup[] {
+  const groups: CategoryGroup[] = categories.map((c) => ({
+    slug: c.slug,
+    label: c.name,
+    items: items.filter((i) => i.category?.slug === c.slug),
+  }))
+  groups.push({
+    slug: UNCATEGORISED,
+    label: "Uncategorised",
+    items: items.filter((i) => !i.category?.slug),
+  })
+  return groups.filter((g) => g.items.length > 0)
+}
+
 export function GearCloset({ items, categories }: GearClosetProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -25,10 +45,11 @@ export function GearCloset({ items, categories }: GearClosetProps) {
   const [categoryId, setCategoryId] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
 
-  const visible = useMemo(() => {
-    if (filter === "all") return items
-    return items.filter((i) => (i.category?.slug ?? UNCATEGORISED) === filter)
-  }, [items, filter])
+  const groups = useMemo(() => {
+    const all = groupByCategory(items, categories)
+    if (filter === "all") return all
+    return all.filter((g) => g.slug === filter)
+  }, [items, categories, filter])
 
   function onAdd() {
     const trimmed = name.trim()
@@ -98,11 +119,18 @@ export function GearCloset({ items, categories }: GearClosetProps) {
             ))}
           </div>
 
-          <ul className="flex flex-col gap-2">
-            {visible.map((item) => (
-              <ItemRow key={item.id} item={item} />
+          <div className="flex flex-col gap-4">
+            {groups.map((group) => (
+              <section key={group.slug} className="flex flex-col gap-1.5">
+                <SectionLabel>{group.label}</SectionLabel>
+                <ul className="flex flex-col gap-1.5">
+                  {group.items.map((item) => (
+                    <ItemRow key={item.id} item={item} />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         </>
       )}
     </div>

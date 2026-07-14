@@ -14,7 +14,8 @@ class UserSchema(BaseSchema):
     """
     mail = fields.Email(required=True, validate=lambda x: len(x) <= 255)
     pwd = fields.String(required=True, load_only=True, validate=lambda x: len(x) >= 8)
-    phone = fields.String(required=True, validate=lambda x: len(x) <= 20)
+    # Optional since M12 §F — signup no longer asks for it; collected in Settings.
+    phone = fields.String(allow_none=True, load_default=None, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(required=True, validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
@@ -161,7 +162,8 @@ class UserUpdateSchema(UserSchema):
     """
     mail = fields.Email(dump_only=True)
     pwd = fields.String(load_only=True)
-    phone = fields.String(validate=lambda x: len(x) <= 20)
+    # allow_none so Settings can clear a stored number, not just change it
+    phone = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
