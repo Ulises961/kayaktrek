@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { apiGetAllPages } from "@/lib/api/paginate"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
-import { fetchTripRoute } from "@/lib/itinerary/actions"
+import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { TripCard } from "@/components/common/trip-card"
 import { PastTripsSection } from "@/components/trips/past-trips-section"
@@ -31,16 +31,16 @@ export default async function Page() {
     TripPageSchema,
   )
 
-  // Each trip's own route, drawn as the chart banner on its card (M12 §E) — the
-  // dashboard's Promise.all pattern applied to the full list. Best-effort: a trip
-  // without an itinerary (or a failed fetch) simply shows no map.
-  const routes = await Promise.all(
-    trips.map((t) => (t.itinerary?.id ? fetchTripRoute(t.itinerary.id) : Promise.resolve(null))),
-  )
+  // Each trip's own route, drawn as the chart banner on its card (M12 §E). No extra
+  // requests: the trips envelope already nests each itinerary's days+points
+  // (TripSchema dumps the full ItinerarySchema), so the route is a pure derivation
+  // from data in hand — never a per-trip N+1 fetch.
   const routesById: Record<string, RouteData | null> = {}
-  trips.forEach((t, i) => {
-    if (t.id) routesById[t.id] = routes[i]
-  })
+  for (const t of trips) {
+    if (!t.id || !t.itinerary) continue
+    const route = extractItineraryRoute(t.itinerary)
+    routesById[t.id] = route.positions.length > 0 ? route : null
+  }
 
   const happeningTrips = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
   const planningTrips = trips.filter((t) => t.state === TRIP_STATE.BUILDING)

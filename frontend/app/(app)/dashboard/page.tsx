@@ -7,7 +7,7 @@ import { getMe } from "@/lib/user/me"
 import { StateBadge } from "@/components/common/state-badge"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { Button } from "@/components/ui/button"
-import { fetchTripRoute } from "@/lib/itinerary/actions"
+import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
 import { formatDateRange } from "@/lib/trips/format"
 import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
@@ -66,13 +66,15 @@ export default async function DashboardPage() {
   const pastCount = trips.filter((t) => t.state === TRIP_STATE.PAST).length
 
   // Each shown trip's own route, drawn as the chart thumbnail in its card — the
-  // landing's sea chart carried into the app, one passage per card. Best-effort and
-  // parallel; a trip without an itinerary (or a failed fetch) simply shows no map.
-  const heroRoutes = await Promise.all(
-    heroTrips.map((t) =>
-      t.itinerary?.id ? fetchTripRoute(t.itinerary.id) : Promise.resolve(null),
-    ),
-  )
+  // landing's sea chart carried into the app, one passage per card. No extra
+  // requests: the trips envelope already nests each itinerary's days+points, so
+  // the route is derived from data in hand (M12 phase 9b follow-up — this was
+  // previously a redundant per-trip fetch).
+  const heroRoutes: (RouteData | null)[] = heroTrips.map((t) => {
+    if (!t.itinerary) return null
+    const route = extractItineraryRoute(t.itinerary)
+    return route.positions.length > 0 ? route : null
+  })
 
   return (
     <div className="flex max-w-2xl flex-col gap-8 p-6">
