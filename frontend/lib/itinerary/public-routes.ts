@@ -2,12 +2,16 @@ import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/i
 import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { buildBoundaryColorMap, type BoundaryColors } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
 import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
 export type RoutePoint = {
+  // Source point id — lets renderers look a point up in `boundaryColors`
+  // (day-continuity split rings). Null when the source point had no id.
+  id: string | null
   lat: number
   lon: number
   type: PointType
@@ -40,6 +44,11 @@ export type RouteData = {
   positions: [number, number][]
   points?: RoutePoint[]
   days: RouteDaySegment[]
+  // Point id → { left, right } day colours at shared overnight-stop
+  // boundaries, so public renderers can draw the builder's split-ring
+  // continuity marker. A plain Record (not a Map): RouteData crosses the
+  // "use server" boundary in fetchPublicRouteData.
+  boundaryColors: Record<string, BoundaryColors>
   totalMiles: number | null
   dayCount: number
 }
@@ -121,6 +130,7 @@ function toRoutePoint(
   pointNumber: number | null,
 ): RoutePoint {
   return {
+    id: p.id ?? null,
     lat: p.latitude,
     lon: p.longitude,
     type: p.type === POINT_TYPE.STOP ? POINT_TYPE.STOP : POINT_TYPE.POSITION,
@@ -197,6 +207,7 @@ function buildRouteData(src: RouteSource): RouteData {
     positions,
     points,
     days,
+    boundaryColors: buildBoundaryColorMap(numberedDays),
     totalMiles: src.totalMiles ?? null,
     dayCount: numberedDays.length,
   }

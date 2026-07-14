@@ -190,6 +190,32 @@ describe("extractRouteData — §M shared boundary-stop derivation", () => {
   })
 })
 
+describe("extractRouteData — boundary colours", () => {
+  it("keys a shared boundary stop with the adjacent days' colours and carries point ids", () => {
+    // Shared stop "b" is day 2's startPointId (and day 1's endPointId) — it must
+    // appear in boundaryColors with day 1 on the left and day 2 on the right.
+    const a = point("a", 44.0, 8.5, "b")
+    const b = point("b", 44.2, 8.7, "c")
+    const c = point("c", 44.4, 8.9)
+    const route = extractRouteData(
+      detail([
+        { dayNumber: 1, points: [a], startPointId: "a", endPointId: "b" },
+        { dayNumber: 2, points: [b, c], startPointId: "b", endPointId: "c" },
+      ]),
+    )
+    expect(route.boundaryColors).toEqual({
+      b: { left: getDayColor(1), right: getDayColor(2) },
+    })
+    expect(route.days[0].points.map((p) => p.id)).toEqual(["a", "b"])
+    expect(route.days[1].points.map((p) => p.id)).toEqual(["b", "c"])
+  })
+
+  it("returns an empty record when no day has boundary metadata", () => {
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [point("a", 44, 8.5)] }]))
+    expect(route.boundaryColors).toEqual({})
+  })
+})
+
 describe("extractItineraryRoute — day segments", () => {
   function itinerary(days: NonNullable<Itinerary["days"]>): Itinerary {
     return { id: "it-1", name: "Route", totalMiles: 0, days }

@@ -3,11 +3,12 @@ import { render } from "@testing-library/react"
 import React from "react"
 import type { RouteData, RouteDaySegment } from "@/lib/itinerary/public-routes"
 
-const { ringIcon } = vi.hoisted(() => ({
+const { ringIcon, splitRingIcon } = vi.hoisted(() => ({
   ringIcon: vi.fn(() => ({ __mockIcon: true })),
+  splitRingIcon: vi.fn(() => ({ __mockSplitIcon: true })),
 }))
 
-vi.mock("@/components/map/ring-icon", () => ({ ringIcon }))
+vi.mock("@/components/map/ring-icon", () => ({ ringIcon, splitRingIcon }))
 
 vi.mock("react-leaflet", () => ({
   Polyline: vi.fn(({ children }: { children?: React.ReactNode }) => <>{children}</>),
@@ -25,8 +26,8 @@ function daySegment(overrides: Partial<RouteDaySegment> = {}): RouteDaySegment {
     color: "#2272b6",
     distanceNm: 1.2,
     points: [
-      { lat: 41.9, lon: 12.4, type: "position", name: null, images: [], pointNumber: 1 },
-      { lat: 42.0, lon: 12.5, type: "stop", name: "Cove", images: [], pointNumber: 2 },
+      { id: "p1", lat: 41.9, lon: 12.4, type: "position", name: null, images: [], pointNumber: 1 },
+      { id: "p2", lat: 42.0, lon: 12.5, type: "stop", name: "Cove", images: [], pointNumber: 2 },
     ],
     ...overrides,
   }
@@ -41,6 +42,7 @@ function route(overrides: Partial<RouteData> = {}): RouteData {
       [42.0, 12.5],
     ],
     days: [daySegment()],
+    boundaryColors: {},
     totalMiles: 12,
     dayCount: 1,
     ...overrides,
@@ -73,6 +75,7 @@ describe("RouteDayLayers", () => {
               daySegment({
                 points: [
                   {
+                    id: null,
                     lat: 41.9,
                     lon: 12.4,
                     type: "position",
@@ -106,13 +109,29 @@ describe("RouteDayLayers", () => {
               daySegment({
                 dayNumber: 1,
                 points: [
-                  { lat: 41.9, lon: 12.4, type: "stop", name: null, images: [], pointNumber: 1 },
+                  {
+                    id: null,
+                    lat: 41.9,
+                    lon: 12.4,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 1,
+                  },
                 ],
               }),
               daySegment({
                 dayNumber: 2,
                 points: [
-                  { lat: 42.0, lon: 12.5, type: "stop", name: null, images: [], pointNumber: 2 },
+                  {
+                    id: null,
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
                 ],
               }),
             ],
@@ -133,6 +152,7 @@ describe("RouteDayLayers", () => {
               daySegment({
                 points: [
                   {
+                    id: null,
                     lat: 41.9,
                     lon: 12.4,
                     type: "stop",
@@ -162,6 +182,7 @@ describe("RouteDayLayers", () => {
               daySegment({
                 points: [
                   {
+                    id: null,
                     lat: 41.9,
                     lon: 12.4,
                     type: "stop",
@@ -191,6 +212,7 @@ describe("RouteDayLayers", () => {
               daySegment({
                 points: [
                   {
+                    id: null,
                     lat: 41.9,
                     lon: 12.4,
                     type: "position",
@@ -198,7 +220,15 @@ describe("RouteDayLayers", () => {
                     images: [{ url: "https://example.com/a.jpg" }],
                     pointNumber: 1,
                   },
-                  { lat: 42.0, lon: 12.5, type: "stop", name: null, images: [], pointNumber: 2 },
+                  {
+                    id: null,
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
                 ],
               }),
             ],
@@ -211,5 +241,144 @@ describe("RouteDayLayers", () => {
     const popups = getAllByTestId("popup")
     expect(popups).toHaveLength(1)
     expect(popups[0].textContent).toContain("Day 1")
+  })
+
+  it("renders a split-ring marker at a shared boundary stop, once, from the opening day", () => {
+    // The shared stop "b" closes day 1 and opens day 2 — it appears in both
+    // segments' walked points, but must render exactly one marker: the split
+    // ring (left = day 1's colour, right = day 2's).
+    render(
+      <RouteDayLayers
+        routes={[
+          route({
+            boundaryColors: { b: { left: "#2272b6", right: "#f59e0b" } },
+            days: [
+              daySegment({
+                dayNumber: 1,
+                color: "#2272b6",
+                points: [
+                  {
+                    id: "a",
+                    lat: 41.9,
+                    lon: 12.4,
+                    type: "position",
+                    name: null,
+                    images: [],
+                    pointNumber: 1,
+                  },
+                  {
+                    id: "b",
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
+                ],
+              }),
+              daySegment({
+                dayNumber: 2,
+                color: "#f59e0b",
+                points: [
+                  {
+                    id: "b",
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
+                  {
+                    id: "c",
+                    lat: 42.1,
+                    lon: 12.6,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 3,
+                  },
+                ],
+              }),
+            ],
+          }),
+        ]}
+      />,
+    )
+    expect(splitRingIcon).toHaveBeenCalledTimes(1)
+    expect(splitRingIcon).toHaveBeenCalledWith("#2272b6", "#f59e0b", 2)
+    // 3 distinct points → 3 markers total, not 4 (no duplicate at the boundary).
+    expect(vi.mocked(Marker).mock.calls).toHaveLength(3)
+    // Non-boundary points keep the plain ring in their own day's colour.
+    expect(ringIcon).toHaveBeenCalledWith("#2272b6", "position", 1)
+    expect(ringIcon).toHaveBeenCalledWith("#f59e0b", "stop", 3)
+  })
+
+  it("keeps each day's legs in that day's own colour across a shared boundary", () => {
+    // Leg colours mirror the builder's buildSegments: day 1's leg into the
+    // boundary stays day 1, and the leg leaving it (day 2's opening leg)
+    // takes day 2's colour via the boundary exception.
+    render(
+      <RouteDayLayers
+        routes={[
+          route({
+            boundaryColors: { b: { left: "#2272b6", right: "#f59e0b" } },
+            days: [
+              daySegment({
+                dayNumber: 1,
+                color: "#2272b6",
+                points: [
+                  {
+                    id: "a",
+                    lat: 41.9,
+                    lon: 12.4,
+                    type: "position",
+                    name: null,
+                    images: [],
+                    pointNumber: 1,
+                  },
+                  {
+                    id: "b",
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
+                ],
+              }),
+              daySegment({
+                dayNumber: 2,
+                color: "#f59e0b",
+                points: [
+                  {
+                    id: "b",
+                    lat: 42.0,
+                    lon: 12.5,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 2,
+                  },
+                  {
+                    id: "c",
+                    lat: 42.1,
+                    lon: 12.6,
+                    type: "stop",
+                    name: null,
+                    images: [],
+                    pointNumber: 3,
+                  },
+                ],
+              }),
+            ],
+          }),
+        ]}
+      />,
+    )
+    const colors = vi.mocked(Polyline).mock.calls.map((c) => c[0].pathOptions?.color)
+    expect(colors).toEqual(["#2272b6", "#f59e0b"])
   })
 })
