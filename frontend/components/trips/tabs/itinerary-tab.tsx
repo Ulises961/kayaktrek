@@ -100,7 +100,7 @@ function DayRow({
             Day {day.dayNumber}
           </span>
           {day.date && (
-            <span className="text-muted-foreground/60 truncate text-[10px]">
+            <span className="text-muted-foreground/85 truncate text-[10px]">
               · {formatDayDate(day.date)}
             </span>
           )}
@@ -116,7 +116,7 @@ function DayRow({
       {/* Route or rest label */}
       <div className="mt-0.5">
         {stats.isRestDay ? (
-          <span className="text-muted-foreground/70 text-xs italic">Rest day</span>
+          <span className="text-muted-foreground text-xs italic">Rest day</span>
         ) : routeLabel ? (
           <span className="text-foreground text-sm leading-snug">{routeLabel}</span>
         ) : day.date ? (
@@ -143,11 +143,11 @@ function RestGapRow({ gaps }: { gaps: RestGap[] }) {
       className="border-border/30 py-2.5 pl-3 text-xs"
       style={{ borderLeftWidth: 2 }}
     >
-      <span className="text-muted-foreground/60 text-[10px] font-semibold tracking-[0.06em] uppercase">
+      <span className="text-muted-foreground/85 text-[10px] font-semibold tracking-[0.06em] uppercase">
         {label}
       </span>
       <div className="mt-0.5">
-        <span className="text-muted-foreground/70 text-xs italic">Rest</span>
+        <span className="text-muted-foreground text-xs italic">Rest</span>
       </div>
     </div>
   )

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { CardTopRule } from "@/components/common/card-top-rule"
+import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { cn } from "@/lib/utils"
 import { useDebouncedValue } from "@/lib/utils/debounce"
 import {
@@ -46,6 +48,21 @@ function toNumber(value: string): number | undefined {
   if (value.trim() === "") return undefined
   const n = Number(value)
   return Number.isFinite(n) ? n : undefined
+}
+
+// The card banner only needs a polyline — the backend supplies simplified
+// previewPositions on every listing row precisely so this never has to fetch
+// the full RouteData per card (M12 §E).
+function previewRoute(item: ExploreItem): RouteData {
+  return {
+    id: item.id,
+    name: item.name ?? "Untitled",
+    positions: item.previewPositions,
+    days: [],
+    boundaryColors: {},
+    totalMiles: item.totalMiles ?? null,
+    dayCount: item.dayCount,
+  }
 }
 
 export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) {
@@ -276,61 +293,67 @@ export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) 
               <div
                 key={item.id}
                 className={cn(
-                  "border-border bg-card flex flex-col gap-2 rounded-lg border p-3 transition-colors",
+                  "border-border bg-card relative flex flex-col gap-2 overflow-hidden rounded-lg border transition-colors",
                   selectedId === item.id ? "ring-2 ring-sky-400" : "hover:bg-accent",
                 )}
                 onMouseEnter={() => select(item.id)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <Link
-                    href={`/routes/${item.id}`}
-                    className="text-sm leading-tight font-medium hover:underline"
-                  >
-                    {item.name ?? "Untitled"}
-                  </Link>
-                  <SeasonBadge season={item.season} />
-                </div>
-                <div className="text-muted-foreground flex gap-3 text-xs">
-                  {item.totalMiles != null && <span>{item.totalMiles.toFixed(1)} nm</span>}
-                  {item.dayCount > 0 && (
-                    <span>
-                      {item.dayCount} {item.dayCount === 1 ? "day" : "days"}
-                    </span>
-                  )}
-                </div>
-                {item.originalAuthor && (
-                  <p className="text-muted-foreground text-xs">
-                    Cloned from{" "}
-                    {item.originalAuthor.linkable ? (
-                      <Link
-                        href={`/paddlers/${item.originalAuthor.username}`}
-                        className="font-medium hover:underline"
-                      >
-                        {item.originalAuthor.name ?? item.originalAuthor.username}
-                      </Link>
-                    ) : (
-                      <span className="font-medium">
-                        {item.originalAuthor.name ?? item.originalAuthor.username}
+                <CardTopRule className="absolute inset-x-0 top-0 z-[1002]" />
+                {item.previewPositions.length > 1 && (
+                  <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
+                )}
+                <div className="flex flex-col gap-2 p-3 pt-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/routes/${item.id}`}
+                      className="text-sm leading-tight font-medium hover:underline"
+                    >
+                      {item.name ?? "Untitled"}
+                    </Link>
+                    <SeasonBadge season={item.season} />
+                  </div>
+                  <div className="text-muted-foreground flex gap-3 text-xs">
+                    {item.totalMiles != null && <span>{item.totalMiles.toFixed(1)} nm</span>}
+                    {item.dayCount > 0 && (
+                      <span>
+                        {item.dayCount} {item.dayCount === 1 ? "day" : "days"}
                       </span>
                     )}
-                  </p>
-                )}
-                {owned.has(item.id) ? (
-                  // The viewer authored this route — open the original, don't clone it.
-                  <Button asChild size="sm" variant="outline" className="h-7 w-full text-xs">
-                    <Link href={`/itinerary/${item.id}`}>Open your route</Link>
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 w-full text-xs"
-                    disabled={isForking}
-                    onClick={() => handleFork(item.id)}
-                  >
-                    Use this route
-                  </Button>
-                )}
+                  </div>
+                  {item.originalAuthor && (
+                    <p className="text-muted-foreground text-xs">
+                      Cloned from{" "}
+                      {item.originalAuthor.linkable ? (
+                        <Link
+                          href={`/paddlers/${item.originalAuthor.username}`}
+                          className="font-medium hover:underline"
+                        >
+                          {item.originalAuthor.name ?? item.originalAuthor.username}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">
+                          {item.originalAuthor.name ?? item.originalAuthor.username}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {owned.has(item.id) ? (
+                    // The viewer authored this route — open the original, don't clone it.
+                    <Button asChild size="sm" variant="outline" className="h-7 w-full text-xs">
+                      <Link href={`/itinerary/${item.id}`}>Open your route</Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-full text-xs"
+                      disabled={isForking}
+                      onClick={() => handleFork(item.id)}
+                    >
+                      Use this route
+                    </Button>
+                  )}
+                </div>
               </div>
             ))
           )}

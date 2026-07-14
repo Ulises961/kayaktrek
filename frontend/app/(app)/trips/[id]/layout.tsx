@@ -6,6 +6,7 @@ import { deriveMembership } from "@/lib/trips/membership"
 import { TripIdentityHeader } from "@/components/trips/trip-identity-header"
 import { TripDetailNav } from "@/components/trips/trip-detail-nav"
 import { Card, CardContent } from "@/components/ui/card"
+import { CardTopRule } from "@/components/common/card-top-rule"
 
 export default async function TripDetailLayout({
   children,
@@ -26,7 +27,8 @@ export default async function TripDetailLayout({
     <div className="flex max-w-2xl flex-col gap-4">
       <TripIdentityHeader trip={trip} isLeader={isLeader} />
       <TripDetailNav tripId={id} showFloatPlan={isMember} />
-      <Card>
+      <Card className="relative overflow-hidden">
+        <CardTopRule className="absolute inset-x-0 top-0" />
         <CardContent>{children}</CardContent>
       </Card>
     </div>

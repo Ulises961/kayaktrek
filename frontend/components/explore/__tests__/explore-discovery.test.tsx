@@ -28,6 +28,7 @@ function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
     season: "summer",
     centroidLat: 37,
     centroidLng: 25,
+    previewPositions: [],
     createdFromId: null,
     originalAuthor: null,
     ...overrides,

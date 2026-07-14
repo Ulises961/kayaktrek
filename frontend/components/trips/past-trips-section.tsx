@@ -3,14 +3,17 @@
 import { useState } from "react"
 import { TripCard } from "@/components/common/trip-card"
 import type { Trip } from "@/lib/dtos/trip"
+import type { RouteData } from "@/lib/itinerary/public-routes"
 
 const INITIAL_VISIBLE = 3
 
 interface PastTripsSectionProps {
   trips: Trip[]
+  /** Trip id → its plotted route, fetched server-side by the trips page (M12 §E). */
+  routesById?: Record<string, RouteData | null>
 }
 
-export function PastTripsSection({ trips }: PastTripsSectionProps) {
+export function PastTripsSection({ trips, routesById = {} }: PastTripsSectionProps) {
   const [showAll, setShowAll] = useState(false)
   const visible = showAll ? trips : trips.slice(0, INITIAL_VISIBLE)
   const hidden = trips.length - INITIAL_VISIBLE
@@ -18,7 +21,7 @@ export function PastTripsSection({ trips }: PastTripsSectionProps) {
   return (
     <div className="flex flex-col gap-3">
       {visible.map((trip) => (
-        <TripCard key={trip.id} trip={trip} />
+        <TripCard key={trip.id} trip={trip} route={routesById[trip.id ?? ""]} />
       ))}
       {!showAll && hidden > 0 && (
         <button

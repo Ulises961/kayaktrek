@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { TripCard } from "@/components/common/trip-card"
 import type { Trip } from "@/lib/dtos/trip"
+import type { RouteData } from "@/lib/itinerary/public-routes"
 
 // UI-only display order — no backend `sort` param for trips (see the M12 §K
 // light-touch decision: the full set is already fetched, so this never re-fetches).
@@ -15,12 +16,14 @@ type PlanningSort = (typeof PLANNING_SORT)[keyof typeof PLANNING_SORT]
 
 interface PlanningTripsSectionProps {
   trips: Trip[]
+  /** Trip id → its plotted route, fetched server-side by the trips page (M12 §E). */
+  routesById?: Record<string, RouteData | null>
 }
 
 // The full set is already in memory (the trips list fetches every page up front —
 // see lib/api/paginate.ts), so this is a pure client-side re-sort, not a new fetch.
 // Undated trips sort last regardless of direction.
-export function PlanningTripsSection({ trips }: PlanningTripsSectionProps) {
+export function PlanningTripsSection({ trips, routesById = {} }: PlanningTripsSectionProps) {
   const [sort, setSort] = useState<PlanningSort>(PLANNING_SORT.SOONEST)
 
   const sorted = [...trips].sort((a, b) => {
@@ -47,7 +50,7 @@ export function PlanningTripsSection({ trips }: PlanningTripsSectionProps) {
       </div>
       <div className="flex flex-col gap-3">
         {sorted.map((trip) => (
-          <TripCard key={trip.id} trip={trip} />
+          <TripCard key={trip.id} trip={trip} route={routesById[trip.id ?? ""]} />
         ))}
       </div>
     </div>

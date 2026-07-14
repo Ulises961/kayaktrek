@@ -3,12 +3,11 @@ import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
-import { ItinerarySchema } from "@/lib/dtos/itinerary"
 import { getMe } from "@/lib/user/me"
 import { StateBadge } from "@/components/common/state-badge"
-import { TripRouteThumbnail } from "@/components/dashboard/trip-route-thumbnail"
+import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { Button } from "@/components/ui/button"
-import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
+import { fetchTripRoute } from "@/lib/itinerary/actions"
 import { formatDateRange } from "@/lib/trips/format"
 import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
@@ -21,18 +20,6 @@ async function fetchTrips(userId: string): Promise<Trip[]> {
   return TripPageSchema.parse(raw).items
 }
 
-// A trip's own route, drawn as the chart thumbnail on its card. Best-effort: a
-// missing itinerary or a failed fetch returns null and the card simply shows no map.
-async function fetchTripRoute(itineraryId: string): Promise<RouteData | null> {
-  try {
-    const raw = await apiGet<unknown>(`/api/itinerary/${itineraryId}`)
-    const route = extractItineraryRoute(ItinerarySchema.parse(raw))
-    return route.positions.length > 0 ? route : null
-  } catch {
-    return null
-  }
-}
-
 function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
   return (
     <Link
@@ -41,7 +28,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
     >
       {/* The trip's passage on the same sea chart as the landing — flush to the card
           edges, text below. No thumbnail when the trip has no plotted route yet. */}
-      {route && <TripRouteThumbnail route={route} />}
+      {route && <RouteThumbnail route={route} />}
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div>

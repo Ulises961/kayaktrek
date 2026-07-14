@@ -57,9 +57,11 @@ describe("TripCard", () => {
     expect(screen.getByText(formatDateRange("2026-07-01", "2026-07-05"))).toBeDefined()
   })
 
-  it("renders the crew count", () => {
+  it("renders the crew count (mono numeral in its own span)", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    expect(screen.getByText("2 members")).toBeDefined()
+    expect(
+      screen.getByText((_, el) => el?.textContent?.replace(/\s+/g, " ").trim() === "2 members"),
+    ).toBeDefined()
   })
 
   it("links to /trips/:id", () => {
@@ -75,7 +77,9 @@ describe("TripCard", () => {
 
   it("renders the number of days derived from date range (inclusive — Jul 1-5 is 5 days)", () => {
     render(<TripCard trip={BASE_TRIP} />)
-    expect(screen.getByText(/5 days/)).toBeDefined()
+    expect(
+      screen.getByText((_, el) => el?.textContent?.replace(/\s+/g, " ").trim() === "5 days"),
+    ).toBeDefined()
   })
 
   it("omits day count when dates are absent", () => {

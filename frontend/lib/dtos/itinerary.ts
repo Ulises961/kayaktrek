@@ -90,6 +90,9 @@ export const ExploreItemSchema = z.object({
   season: z.string().nullish(),
   centroidLat: z.number().nullish(),
   centroidLng: z.number().nullish(),
+  // Simplified [lat, lng] pairs for the card thumbnail polyline — supplied by the
+  // backend so listing cards never N+1-fetch full route data to draw a preview.
+  previewPositions: z.array(z.tuple([z.number(), z.number()])).default([]),
   createdFromId: z.string().nullish(),
   originalAuthor: OriginalAuthorSchema.nullish(),
 })

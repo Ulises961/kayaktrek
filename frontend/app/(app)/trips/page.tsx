@@ -1,6 +1,8 @@
 import { getSession } from "@/lib/auth/session"
 import { apiGetAllPages } from "@/lib/api/paginate"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
+import { fetchTripRoute } from "@/lib/itinerary/actions"
+import type { RouteData } from "@/lib/itinerary/public-routes"
 import { TripCard } from "@/components/common/trip-card"
 import { PastTripsSection } from "@/components/trips/past-trips-section"
 import { PlanningTripsSection } from "@/components/trips/planning-trips-section"
@@ -28,6 +30,17 @@ export default async function Page() {
     `/api/trip/${session.userId}/all`,
     TripPageSchema,
   )
+
+  // Each trip's own route, drawn as the chart banner on its card (M12 §E) — the
+  // dashboard's Promise.all pattern applied to the full list. Best-effort: a trip
+  // without an itinerary (or a failed fetch) simply shows no map.
+  const routes = await Promise.all(
+    trips.map((t) => (t.itinerary?.id ? fetchTripRoute(t.itinerary.id) : Promise.resolve(null))),
+  )
+  const routesById: Record<string, RouteData | null> = {}
+  trips.forEach((t, i) => {
+    if (t.id) routesById[t.id] = routes[i]
+  })
 
   const happeningTrips = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
   const planningTrips = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
@@ -60,7 +73,7 @@ export default async function Page() {
               <SectionHeader label="Happening" count={happeningTrips.length} />
               <div className="flex flex-col gap-3">
                 {happeningTrips.map((trip) => (
-                  <TripCard key={trip.id} trip={trip} hero />
+                  <TripCard key={trip.id} trip={trip} hero route={routesById[trip.id ?? ""]} />
                 ))}
               </div>
             </section>
@@ -68,13 +81,13 @@ export default async function Page() {
           {planningTrips.length > 0 && (
             <section className="flex flex-col gap-2">
               <SectionHeader label="Planning" count={planningTrips.length} />
-              <PlanningTripsSection trips={planningTrips} />
+              <PlanningTripsSection trips={planningTrips} routesById={routesById} />
             </section>
           )}
           {pastTrips.length > 0 && (
             <section className="flex flex-col gap-2">
               <SectionHeader label="Past" count={pastTrips.length} />
-              <PastTripsSection trips={pastTrips} />
+              <PastTripsSection trips={pastTrips} routesById={routesById} />
             </section>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client"
 import clsx from "clsx"
 import {
+  KayakIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
   MapPinIcon,
@@ -9,7 +10,6 @@ import {
   CompassIcon,
 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { GlobeAmericasIcon } from "../icons/heroicons-globe-americas"
 import { UserGroupIcon } from "../icons/heroicons-user-group"
 import { SidebarMenuItem, SidebarMenuButton, useSidebar } from "../ui/sidebar"
 
@@ -20,7 +20,7 @@ export function NavigationItems() {
 
   const menuItems = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
-    { title: "Trips", url: "/trips", icon: GlobeAmericasIcon },
+    { title: "Trips", url: "/trips", icon: KayakIcon },
     { title: "Itineraries", url: "/itinerary", icon: MapPinIcon },
     { title: "Explore", url: "/explore", icon: CompassIcon },
     { title: "Invitations", url: "/invitations", icon: MailIcon },

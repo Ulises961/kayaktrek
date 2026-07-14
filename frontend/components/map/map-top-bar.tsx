@@ -1,5 +1,6 @@
 "use client"
 import { cn } from "@/lib/utils"
+import { CardTopRule } from "@/components/common/card-top-rule"
 import { TRIP_STATE, type TripState } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs"
@@ -126,7 +127,12 @@ export function MapTopBar({
   )
 
   return (
-    <div className="bg-background/90 border-border absolute top-0 right-0 left-0 z-[1001] flex flex-col border-b backdrop-blur-sm">
+    // Deliberately NOT the global nav header's bg-background + border-b — this is an
+    // in-page instrument panel sitting directly beneath that h-12 bar, and the two
+    // read as one double-height "mega header" without a distinct identity. The
+    // chart-paper tint plus the maritime top-rule as its bottom edge mark it as the
+    // planner's own tool strip (M12 §E).
+    <div className="bg-surface-2/95 absolute top-0 right-0 left-0 z-[1001] flex flex-col backdrop-blur-sm">
       {/* ── Row 1: always visible ── */}
       <div className="flex h-12 items-center gap-3 px-3 md:px-4">
         <div className="flex-1" />
@@ -188,6 +194,9 @@ export function MapTopBar({
           {dayCount} {dayCount === 1 ? "day" : "days"}
         </span>
       </div>
+
+      {/* Bottom edge: the chart motif instead of a plain border-b. */}
+      <CardTopRule />
     </div>
   )
 }

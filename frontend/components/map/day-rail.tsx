@@ -45,7 +45,10 @@ function DayRailEntry({
   const windState = representativeHour(weather?.weatherStates)
   const hasWind = windState != null && windState.windForce != null
 
-  const placeholderColor = isActive ? "text-primary-foreground/60" : "text-muted-foreground/70"
+  // Content-bearing placeholder words ("No points", "Add date") stay at full
+  // muted-foreground / ≥85% opacity — opacity-quieted variants are reserved for
+  // decorative elements (M12 §E contrast rule, frontend/CLAUDE.md).
+  const placeholderColor = isActive ? "text-primary-foreground/85" : "text-muted-foreground"
 
   return (
     <button
@@ -117,7 +120,7 @@ function RestGapEntry({ gaps }: { gaps: RestGap[] }) {
   return (
     <div
       data-testid="rest-gap-entry"
-      className="text-muted-foreground/70 flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs"
+      className="text-muted-foreground flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs"
     >
       <span className="font-semibold italic">Rest</span>
       <span className="text-[10px]">{label}</span>

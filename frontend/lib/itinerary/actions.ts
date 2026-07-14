@@ -28,7 +28,7 @@ import type {
   ExplorePage,
   ExploreFilters,
 } from "@/lib/dtos/itinerary"
-import { extractRouteData } from "./public-routes"
+import { extractRouteData, extractItineraryRoute } from "./public-routes"
 import type { RouteData } from "./public-routes"
 import type { BoundaryApplyPayload } from "./boundaries"
 
@@ -358,6 +358,20 @@ export async function fetchPublicItineraryDetail(
     const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
     return PublicItineraryDetailSchema.parse(raw)
   } catch {
+    return null
+  }
+}
+
+// A trip's own route, drawn as the chart thumbnail on its card (dashboard hero,
+// trips list). Best-effort: a missing itinerary or a failed fetch returns null and
+// the card simply shows no map.
+export async function fetchTripRoute(itineraryId: string): Promise<RouteData | null> {
+  try {
+    const raw = await apiGet<unknown>(`/api/itinerary/${itineraryId}`)
+    const route = extractItineraryRoute(ItinerarySchema.parse(raw))
+    return route.positions.length > 0 ? route : null
+  } catch (error) {
+    if (isRedirectError(error)) throw error
     return null
   }
 }

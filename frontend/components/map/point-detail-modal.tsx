@@ -351,7 +351,7 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
               {point.notes}
             </p>
           ) : (
-            <p className="text-muted-foreground/60 text-[13px] italic">No notes for this point.</p>
+            <p className="text-muted-foreground text-[13px] italic">No notes for this point.</p>
           )}
         </div>
       </DialogContent>
