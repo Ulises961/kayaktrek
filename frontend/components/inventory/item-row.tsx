@@ -8,6 +8,7 @@ import type { Item } from "@/lib/dtos/item"
 import { setItemOwned, deleteItem, toggleDefaultPack } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { ListRow } from "@/components/common/list-row"
 
 interface ItemRowProps {
   item: Item
@@ -51,7 +52,7 @@ export function ItemRow({ item }: ItemRowProps) {
   }
 
   return (
-    <li className="flex flex-col gap-1 rounded-lg border px-2 py-1.5">
+    <ListRow className="flex flex-col gap-1 px-2 py-1.5">
       <div className="flex items-center justify-between gap-3">
         <span className={cn("text-sm font-medium", !owned && "text-muted-foreground")}>
           {item.name}
@@ -99,6 +100,6 @@ export function ItemRow({ item }: ItemRowProps) {
         </div>
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}
-    </li>
+    </ListRow>
   )
 }

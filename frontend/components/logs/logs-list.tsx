@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
+import { ListRow } from "@/components/common/list-row"
 import { listMyLogs, listEndorsedLogs } from "@/lib/logs/actions"
 import { LogCard } from "./log-card"
 import { LOG_SORT, type Log, type LogPage, type LogSort } from "@/lib/dtos/log"
@@ -81,14 +82,20 @@ export function LogsList({ initial, kind, currentUserId }: LogsListProps) {
           {kind === "mine" ? "No logs yet. Record your first session." : "No endorsed logs yet."}
         </p>
       ) : (
-        items.map((log) => (
-          <LogCard
-            key={log.id}
-            log={log}
-            variant={kind === "endorsed" ? "endorsed" : "owner"}
-            currentUserId={currentUserId}
-          />
-        ))
+        // LogCard stays a full Card (it carries endorsers/actions) — only the
+        // inter-card separation adopts the shared hairline language (M12 §O)
+        // instead of whitespace-only gaps.
+        <div className="flex flex-col">
+          {items.map((log) => (
+            <ListRow as="div" key={log.id} className="py-2 first:pt-0">
+              <LogCard
+                log={log}
+                variant={kind === "endorsed" ? "endorsed" : "owner"}
+                currentUserId={currentUserId}
+              />
+            </ListRow>
+          ))}
+        </div>
       )}
 
       {page < pages && (

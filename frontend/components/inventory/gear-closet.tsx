@@ -123,7 +123,7 @@ export function GearCloset({ items, categories }: GearClosetProps) {
             {groups.map((group) => (
               <section key={group.slug} className="flex flex-col gap-1.5">
                 <SectionLabel>{group.label}</SectionLabel>
-                <ul className="flex flex-col gap-1.5">
+                <ul className="flex flex-col">
                   {group.items.map((item) => (
                     <ItemRow key={item.id} item={item} />
                   ))}

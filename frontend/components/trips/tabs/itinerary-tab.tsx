@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ChevronDownIcon, ChevronUpIcon, MapIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ListRow } from "@/components/common/list-row"
 import { createItinerary } from "@/lib/itinerary/actions"
 import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
 import { formatRouteRange, computeRestGaps, type RestGap } from "@/lib/itinerary/format"
@@ -92,7 +93,7 @@ function DayRow({
   const routeLabel = formatRouteRange(stats.startName, stats.endName)
 
   return (
-    <div className="border-border/50 hover:border-primary/50 border-l-2 py-2.5 pl-3 transition-colors">
+    <ListRow as="div" className="hover:bg-secondary/30 py-2.5 transition-colors">
       {/* Header row: day + date · metrics */}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-1.5">
@@ -125,7 +126,7 @@ function DayRow({
           </span>
         ) : null}
       </div>
-    </div>
+    </ListRow>
   )
 }
 
@@ -138,18 +139,14 @@ function RestGapRow({ gaps }: { gaps: RestGap[] }) {
   const label = first === last ? formatDayDate(first) : formatDateRange(first, last)
 
   return (
-    <div
-      data-testid="rest-gap-entry"
-      className="border-border/30 py-2.5 pl-3 text-xs"
-      style={{ borderLeftWidth: 2 }}
-    >
+    <ListRow as="div" data-testid="rest-gap-entry" className="py-2.5 text-xs">
       <span className="text-muted-foreground/85 text-[10px] font-semibold tracking-[0.06em] uppercase">
         {label}
       </span>
       <div className="mt-0.5">
         <span className="text-muted-foreground text-xs italic">Rest</span>
       </div>
-    </div>
+    </ListRow>
   )
 }
 
@@ -284,8 +281,9 @@ export function ItineraryTab({
         </p>
       )}
 
-      {/* Day list */}
-      <div className="flex flex-col gap-1.5">
+      {/* Day list — rows separated by the shared hairline (M12 §O), no gap:
+          the ListRow border is the rhythm. */}
+      <div className="flex flex-col">
         {visible.map((day) => {
           const gaps = gapsByAfterDayNumber.get(day.dayNumber)
           return (

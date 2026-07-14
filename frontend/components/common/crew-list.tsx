@@ -1,4 +1,5 @@
 import { UserAvatar } from "@/components/common/user-avatar"
+import { ListRow } from "@/components/common/list-row"
 import { RemoveMemberButton } from "@/components/trips/remove-member-button"
 import { cn } from "@/lib/utils"
 import type { TripMember } from "@/lib/dtos/trip-member"
@@ -24,14 +25,14 @@ export function CrewList({ members, tripId, isLeader, leaderId }: CrewListProps)
   if (members.length === 0) return null
 
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col">
       {members.map((member) => {
         const { user, role } = member
         const displayName = [user.name, user.surname].filter(Boolean).join(" ")
         const canRemove = isLeader && tripId && user.id && user.id !== leaderId
 
         return (
-          <li key={member.id} className="flex items-center gap-3">
+          <ListRow key={member.id} className="flex items-center gap-3 py-2">
             <UserAvatar name={user.name} surname={user.surname} size="md" />
             <span className="flex-1 text-sm font-medium">{displayName}</span>
             <span
@@ -42,7 +43,7 @@ export function CrewList({ members, tripId, isLeader, leaderId }: CrewListProps)
             {canRemove && (
               <RemoveMemberButton tripId={tripId} userId={user.id!} displayName={displayName} />
             )}
-          </li>
+          </ListRow>
         )
       })}
     </ul>
