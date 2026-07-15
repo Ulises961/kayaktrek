@@ -118,11 +118,31 @@ describe("RequirementsChecklist", () => {
     expect(screen.getAllByText(/covered/i).length).toBeGreaterThan(0)
   })
 
-  it("shows every contribution with its contributor", () => {
+  it("shows every contribution as a stacked contributor avatar plus item name", () => {
     renderChecklist()
-    // Other member's contribution on a requirement I didn't propose.
+    // Other member's contribution on a requirement I didn't propose: the item
+    // name stays visible text, the contributor rides the avatar's tooltip
+    // (M12 §P — LogCard's endorser-stack idiom).
     expect(screen.getByText(/Trauma kit/)).toBeTruthy()
-    expect(screen.getByText(/Ozzy/)).toBeTruthy()
+    expect(screen.getByTitle(/Ozzy — Trauma kit/)).toBeTruthy()
+  })
+
+  it("groups by trimmed, case-folded free-text category with a trailing Uncategorised bucket", () => {
+    renderChecklist({
+      requirements: [
+        { ...REQ_PROPOSED_BY_ME, category: "Safety" },
+        { ...REQ_PROPOSED_BY_OTHER, category: " safety " },
+        REQ_COVERED_BY_ME_FIXTURE, // null category — must not be silently dropped
+      ],
+    })
+    const labels = screen
+      .getAllByText(/^(safety|uncategorised)$/i)
+      .filter((el) => el.tagName === "P")
+    expect(labels.map((el) => el.textContent)).toEqual(["Safety", "Uncategorised"])
+    // The whitespace-cased duplicate landed in the first-seen-cased bucket.
+    expect(screen.getByText("First aid kit")).toBeTruthy()
+    // Requirement name + its contribution's item name both render.
+    expect(screen.getAllByText("Bilge pump").length).toBeGreaterThan(0)
   })
 
   it("shows Remove only on requirements the current user proposed", () => {

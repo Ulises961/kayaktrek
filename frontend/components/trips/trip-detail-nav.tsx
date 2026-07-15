@@ -33,7 +33,12 @@ export function TripDetailNav({ tripId, showFloatPlan }: TripDetailNavProps) {
   return (
     <nav className="border-border flex w-full gap-1 overflow-x-auto border-b">
       {items.map((item) => {
-        const isActive = pathname === item.href
+        // Exact match for the base segment (/trips/[id] would prefix-match every
+        // sibling); prefix match for the others so sub-segments like
+        // /items/kit keep their parent tab lit (M12 §P).
+        const isActive =
+          pathname === item.href ||
+          (item.href !== `/trips/${tripId}` && pathname.startsWith(`${item.href}/`))
         const Icon = item.icon
         return (
           <Link

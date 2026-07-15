@@ -11,7 +11,10 @@ import {
   removePackingItem,
   type PackingActionResult,
 } from "@/lib/inventory/personal-packing-actions"
+import { bucketByCategory, packProgress } from "@/lib/inventory/format"
 import { Button } from "@/components/ui/button"
+import { ListRow } from "@/components/common/list-row"
+import { SectionLabel } from "@/components/common/section-label"
 
 interface PersonalPackingProps {
   tripId: string
@@ -27,6 +30,7 @@ export function PersonalPacking({ tripId, packingItems, myItems }: PersonalPacki
 
   const packedItemIds = new Set(packingItems.map((p) => p.item?.id))
   const addable = myItems.filter((i) => i.status === "owned" && !packedItemIds.has(i.id))
+  const progress = packProgress(packingItems)
 
   function run(fn: () => Promise<PackingActionResult>) {
     setError(null)
@@ -44,40 +48,60 @@ export function PersonalPacking({ tripId, packingItems, myItems }: PersonalPacki
           Nothing in your kit yet — add your own gear below to track what you&rsquo;re carrying.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {packingItems.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-center justify-between gap-3 rounded-lg border p-3"
-            >
-              <label className="flex items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={entry.checked ?? false}
-                  disabled={isPending}
-                  aria-label={entry.item?.name ?? "packing item"}
-                  onChange={(e) =>
-                    run(() => togglePackingItem(entry.id!, e.target.checked, tripId))
-                  }
-                  className="size-4"
-                />
-                <span className={entry.checked ? "text-muted-foreground line-through" : ""}>
-                  {entry.item?.name}
-                </span>
-              </label>
-              <Button
-                size="icon"
-                variant="ghost"
-                disabled={isPending}
-                onClick={() => run(() => removePackingItem(entry.id!, tripId))}
-                aria-label={`Remove ${entry.item?.name} from your kit`}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <XIcon className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Pack progress — the itinerary StatTile's mono-tabular convention. */}
+          <p className="text-muted-foreground text-xs">
+            <span className="text-foreground font-mono text-sm font-medium tabular-nums">
+              {progress.packed} of {progress.total}
+            </span>{" "}
+            packed
+          </p>
+
+          {/* Grouped by the clean FK-backed Item.category — no free-text
+              bucketing problem on this side. Denser than requirements: single
+              owner, no avatars. */}
+          <div className="flex flex-col gap-4">
+            {bucketByCategory(packingItems, (entry) => entry.item?.category?.name).map((bucket) => (
+              <section key={bucket.key || "__uncategorised__"} className="flex flex-col gap-1">
+                <SectionLabel>{bucket.label}</SectionLabel>
+                <ul className="flex flex-col">
+                  {bucket.entries.map((entry) => (
+                    <ListRow
+                      key={entry.id}
+                      className="flex items-center justify-between gap-3 px-2 py-1.5"
+                    >
+                      <label className="flex items-center gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={entry.checked ?? false}
+                          disabled={isPending}
+                          aria-label={entry.item?.name ?? "packing item"}
+                          onChange={(e) =>
+                            run(() => togglePackingItem(entry.id!, e.target.checked, tripId))
+                          }
+                          className="size-4"
+                        />
+                        <span className={entry.checked ? "text-muted-foreground line-through" : ""}>
+                          {entry.item?.name}
+                        </span>
+                      </label>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isPending}
+                        onClick={() => run(() => removePackingItem(entry.id!, tripId))}
+                        aria-label={`Remove ${entry.item?.name} from your kit`}
+                        className="text-muted-foreground hover:text-destructive size-7"
+                      >
+                        <XIcon className="size-4" />
+                      </Button>
+                    </ListRow>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </>
       )}
 
       {addable.length > 0 && (

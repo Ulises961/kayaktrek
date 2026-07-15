@@ -15,6 +15,10 @@ import {
 } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ListRow } from "@/components/common/list-row"
+import { SectionLabel } from "@/components/common/section-label"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { bucketByCategory } from "@/lib/inventory/format"
 
 interface RequirementsChecklistProps {
   inventoryId: string
@@ -76,19 +80,28 @@ export function RequirementsChecklist({
           No requirements yet{canManage ? " — add the gear this trip needs below." : "."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {requirements.map((req) => (
-            <RequirementRow
-              key={req.id}
-              inventoryId={inventoryId}
-              tripId={tripId}
-              requirement={req}
-              ownedItems={ownedItems}
-              canManage={canManage}
-              currentUserId={currentUserId}
-            />
+        // Grouped by the free-text category (trimmed + case-folded — see
+        // lib/inventory/format's known rough edge vs the ItemCategory FK).
+        <div className="flex flex-col gap-4">
+          {bucketByCategory(requirements, (r) => r.category).map((bucket) => (
+            <section key={bucket.key || "__uncategorised__"} className="flex flex-col gap-1">
+              <SectionLabel>{bucket.label}</SectionLabel>
+              <ul className="flex flex-col">
+                {bucket.entries.map((req) => (
+                  <RequirementRow
+                    key={req.id}
+                    inventoryId={inventoryId}
+                    tripId={tripId}
+                    requirement={req}
+                    ownedItems={ownedItems}
+                    canManage={canManage}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       {canManage && (
@@ -174,9 +187,9 @@ function RequirementRow({
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg border p-3">
+    <ListRow className="flex flex-col gap-2 px-2 py-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-medium">{req.name}</span>
+        <span className="text-sm font-medium">{req.name}</span>
         <div className="flex items-center gap-2">
           <span
             className={cn(
@@ -207,14 +220,30 @@ function RequirementRow({
       </div>
 
       {contributions.length > 0 && (
-        <ul className="flex flex-col gap-0.5">
-          {contributions.map((c) => (
-            <li key={c.id} className="text-muted-foreground text-xs">
-              {c.item?.name}
-              {c.member?.user?.name && ` · ${c.member.user.name}`}
-            </li>
-          ))}
-        </ul>
+        // Contributors as a stacked avatar row (LogCard's endorser idiom) — the
+        // covered/needed badge stays the row's primary status element.
+        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+          <span className="flex -space-x-1.5">
+            {contributions.map((c) => (
+              <span
+                key={c.id}
+                title={[c.member?.user?.name, c.item?.name].filter(Boolean).join(" — ")}
+              >
+                <UserAvatar
+                  name={c.member?.user?.name ?? "?"}
+                  size="sm"
+                  className="ring-background !size-5 ring-2"
+                />
+              </span>
+            ))}
+          </span>
+          <span className="truncate">
+            {contributions
+              .map((c) => c.item?.name)
+              .filter(Boolean)
+              .join(", ")}
+          </span>
+        </div>
       )}
 
       {canManage &&
@@ -240,6 +269,6 @@ function RequirementRow({
           </p>
         ))}
       {error && <p className="text-destructive text-xs">{error}</p>}
-    </li>
+    </ListRow>
   )
 }
