@@ -8,6 +8,7 @@ import { login } from "@/lib/auth/actions"
 import { LoginSchema, type LoginInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
@@ -77,9 +78,8 @@ export function LoginForm() {
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             className="auth-input"
             {...register("password")}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -228,9 +228,8 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cert-reauth-password">Password</Label>
-              <Input
+              <PasswordInput
                 id="cert-reauth-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {

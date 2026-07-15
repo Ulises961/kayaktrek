@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { ChangePasswordSchema, type ChangePasswordValues } from "@/lib/dtos/user"
 import { changePassword } from "@/lib/profile/actions"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 
@@ -45,9 +45,8 @@ export function ChangePasswordForm() {
     <form onSubmit={onSubmit} className="flex max-w-sm flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="currentPwd">Current password</Label>
-        <Input
+        <PasswordInput
           id="currentPwd"
-          type="password"
           autoComplete="current-password"
           disabled={isPending}
           {...register("currentPwd")}
@@ -65,9 +64,8 @@ export function ChangePasswordForm() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="newPwd">New password</Label>
-        <Input
+        <PasswordInput
           id="newPwd"
-          type="password"
           autoComplete="new-password"
           disabled={isPending}
           {...register("newPwd")}
@@ -77,9 +75,8 @@ export function ChangePasswordForm() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="confirmPwd">Confirm new password</Label>
-        <Input
+        <PasswordInput
           id="confirmPwd"
-          type="password"
           autoComplete="new-password"
           disabled={isPending}
           {...register("confirmPwd")}

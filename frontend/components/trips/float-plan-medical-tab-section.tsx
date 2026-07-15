@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { reAuth, getMedicalNotes } from "@/lib/profile/actions"
@@ -181,9 +181,8 @@ export function FloatPlanMedicalTabSection({
         <div className="flex max-w-sm items-end gap-2">
           <div className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor="fp-medical-password">Password</Label>
-            <Input
+            <PasswordInput
               id="fp-medical-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {

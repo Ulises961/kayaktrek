@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { MedicalNotesViewer } from "@/components/trips/medical-notes-viewer"
 import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
@@ -248,9 +248,8 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
           <form noValidate onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="leader-password">Password</Label>
-              <Input
+              <PasswordInput
                 id="leader-password"
-                type="password"
                 autoComplete="current-password"
                 {...register("password")}
               />

@@ -48,7 +48,7 @@ async function openToEdit({
 
   const btnName = hasStoredTripNotes ? /edit/i : /add notes/i
   await userEvent.click(screen.getByRole("button", { name: btnName }))
-  await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+  await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
   await waitFor(() => expect(screen.getByRole("button", { name: /^save$/i })).toBeDefined())
 }
@@ -87,7 +87,7 @@ describe("FloatPlanMedicalTabSection — authenticating state", () => {
   it("shows password field and Continue after clicking Edit", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
-    expect(screen.getByLabelText(/password/i)).toBeDefined()
+    expect(screen.getByLabelText(/password/i, { selector: "input" })).toBeDefined()
     expect(screen.getByRole("button", { name: /continue/i })).toBeDefined()
   })
 
@@ -96,14 +96,14 @@ describe("FloatPlanMedicalTabSection — authenticating state", () => {
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByText(/cancel/i))
     expect(screen.getByRole("button", { name: /edit/i })).toBeDefined()
-    expect(screen.queryByLabelText(/password/i)).toBeNull()
+    expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
 
   it("shows error when reAuth fails", async () => {
     vi.mocked(reAuth).mockResolvedValue({ success: false, error: "Password incorrect." })
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), "wrong")
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), "wrong")
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
   })

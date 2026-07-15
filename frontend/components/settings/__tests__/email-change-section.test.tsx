@@ -21,7 +21,7 @@ async function openToEditing() {
   render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
   vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
   await userEvent.click(screen.getByRole("button", { name: /change email/i }))
-  await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+  await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
   await waitFor(() => expect(screen.getByLabelText(/new email/i)).toBeInTheDocument())
 }
@@ -35,7 +35,7 @@ describe("EmailChangeSection — idle state", () => {
 
   it("does not show a password field at rest", () => {
     render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
-    expect(screen.queryByLabelText(/password/i)).toBeNull()
+    expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
 })
 
@@ -51,7 +51,7 @@ describe("EmailChangeSection — authenticating state", () => {
   it("shows a password field and Continue button after clicking Change email", async () => {
     render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
     await userEvent.click(screen.getByRole("button", { name: /change email/i }))
-    expect(screen.getByLabelText(/password/i)).toBeDefined()
+    expect(screen.getByLabelText(/password/i, { selector: "input" })).toBeDefined()
     expect(screen.getByRole("button", { name: /continue/i })).toBeDefined()
   })
 
@@ -59,7 +59,7 @@ describe("EmailChangeSection — authenticating state", () => {
     vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
     render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
     await userEvent.click(screen.getByRole("button", { name: /change email/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(reAuth).toHaveBeenCalledWith(PASSWORD))
   })
@@ -68,7 +68,7 @@ describe("EmailChangeSection — authenticating state", () => {
     vi.mocked(reAuth).mockResolvedValue({ success: false, error: "Password incorrect." })
     render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
     await userEvent.click(screen.getByRole("button", { name: /change email/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), "wrong")
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), "wrong")
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
   })
@@ -78,7 +78,7 @@ describe("EmailChangeSection — authenticating state", () => {
     await userEvent.click(screen.getByRole("button", { name: /change email/i }))
     await userEvent.click(screen.getByText(/cancel/i))
     expect(screen.getByRole("button", { name: /change email/i })).toBeDefined()
-    expect(screen.queryByLabelText(/password/i)).toBeNull()
+    expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
 })
 

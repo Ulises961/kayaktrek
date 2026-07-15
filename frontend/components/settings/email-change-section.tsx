@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { reAuth, requestEmailChange } from "@/lib/profile/actions"
 
@@ -99,9 +100,8 @@ export function EmailChangeSection({ currentMail, pendingMail }: EmailChangeSect
         <div className="flex max-w-sm items-end gap-2">
           <div className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor="email-change-password">Password</Label>
-            <Input
+            <PasswordInput
               id="email-change-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {

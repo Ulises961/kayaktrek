@@ -7,6 +7,7 @@ import { register as registerAction } from "@/lib/auth/actions"
 import { RegisterSchema, PASSWORD_RULES, type RegisterInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import { CheckIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -112,9 +113,8 @@ export default function RegisterPage() {
           <label htmlFor="password" className="auth-label">
             Password
           </label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             className="auth-input"
             {...register("password")}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -139,9 +139,8 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
         <div className="flex max-w-sm items-end gap-2">
           <div className="flex flex-1 flex-col gap-1.5">
             <Label htmlFor="medical-unlock-password">Password</Label>
-            <Input
+            <PasswordInput
               id="medical-unlock-password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {
