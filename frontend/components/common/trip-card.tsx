@@ -31,7 +31,7 @@ export function TripCard({ trip, hero = false, route = null }: TripCardProps) {
     <Link href={`/trips/${id}`}>
       <Card
         className={cn(
-          "relative cursor-pointer gap-0 overflow-hidden py-0 transition-colors",
+          "relative isolate cursor-pointer gap-0 overflow-hidden py-0 transition-colors",
           hero ? "border-l-[4px]" : "hover:bg-secondary/50 border-l-[3px]",
         )}
         style={{

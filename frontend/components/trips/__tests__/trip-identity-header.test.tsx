@@ -6,6 +6,11 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }))
 
+vi.mock("@/lib/trips/actions", () => ({
+  updateTrip: vi.fn(),
+  deleteTrip: vi.fn(),
+}))
+
 import { TripIdentityHeader } from "../trip-identity-header"
 import type { Trip } from "@/lib/dtos/trip"
 
@@ -65,15 +70,28 @@ describe("TripIdentityHeader", () => {
     expect(screen.getByText("GH")).toBeInTheDocument()
   })
 
-  it("shows an Edit trip link for the leader, pointing at the edit page", () => {
+  it("opens the edit dialog for the leader on pencil click", async () => {
     render(<TripIdentityHeader trip={TRIP} isLeader={true} />)
-    const link = screen.getByRole("link", { name: /edit trip/i })
-    expect(link.getAttribute("href")).toBe(`/trips/${TRIP.id}/edit`)
+    await userEvent.click(screen.getByRole("button", { name: /edit trip/i }))
+    expect(screen.getByRole("dialog", { name: /edit trip/i })).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: /destination/i })).toHaveValue("Cinque Terre")
   })
 
-  it("does not show an Edit trip link for crew", () => {
+  it("does not show an edit affordance for crew", () => {
     render(<TripIdentityHeader trip={TRIP} isLeader={false} />)
-    expect(screen.queryByRole("link", { name: /edit trip/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /edit trip/i })).not.toBeInTheDocument()
+  })
+
+  it("shows a delete affordance for the leader that opens a confirm dialog", async () => {
+    render(<TripIdentityHeader trip={TRIP} isLeader={true} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete trip/i }))
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument()
+    expect(screen.getByText(/delete cinque terre\?/i)).toBeInTheDocument()
+  })
+
+  it("does not show a delete affordance for crew", () => {
+    render(<TripIdentityHeader trip={TRIP} isLeader={false} />)
+    expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument()
   })
 
   it("keeps description/difficulty collapsed behind a Details disclosure until clicked", async () => {

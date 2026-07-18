@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { PublicRouteDetail } from "../public-route-detail"
+import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { OriginalAuthor } from "@/lib/dtos/itinerary"
 import { TRIP_STATE } from "@/lib/dtos/trip"
@@ -39,6 +40,20 @@ describe("PublicRouteDetail", () => {
     expect(screen.getByText("Aegean loop")).toBeInTheDocument()
     expect(screen.getByText("42.5 nm")).toBeInTheDocument()
     expect(screen.getByText("3 days")).toBeInTheDocument()
+  })
+
+  it("converts total distance to km when unit is km", () => {
+    render(
+      <PublicRouteDetail
+        route={route()}
+        season="summer"
+        backHref="/explore"
+        backLabel="All routes"
+        unit={DISTANCE_UNIT.KM}
+      />,
+    )
+    expect(screen.getByText(`${formatDistance(42.5, DISTANCE_UNIT.KM)} km`)).toBeInTheDocument()
+    expect(screen.queryByText(/42\.5 nm/)).not.toBeInTheDocument()
   })
 
   it("renders the season badge when a season is given", () => {

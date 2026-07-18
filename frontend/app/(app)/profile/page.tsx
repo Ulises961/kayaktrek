@@ -3,7 +3,6 @@ import Link from "next/link"
 import { apiGet } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -43,8 +42,6 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <SetBreadcrumbs crumbs={[{ label: "Profile" }]} />
-
       {/* Header */}
       <div className="flex items-start gap-5">
         <UserAvatar
@@ -82,6 +79,8 @@ export default async function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      <Separator />
 
       {/* Who I am */}
       <div className="flex flex-col gap-4">

@@ -1,7 +1,6 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { updateTrip } from "@/lib/trips/actions"
@@ -18,8 +17,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/common/date-picker"
 
-export function EditTripForm({ trip }: { trip: Trip }) {
-  const router = useRouter()
+interface EditTripFormProps {
+  trip: Trip
+  onSuccess: () => void
+  onCancel: () => void
+}
+
+export function EditTripForm({ trip, onSuccess, onCancel }: EditTripFormProps) {
   const [isPending, startTransition] = useTransition()
 
   const {
@@ -49,7 +53,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
         difficulty: data.difficulty ?? null,
       })
       if (result.success) {
-        router.push(`/trips/${trip.id}`)
+        onSuccess()
       } else {
         setError("root", { message: result.error })
       }
@@ -57,7 +61,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="destination">Destination</Label>
         <Input
@@ -125,12 +129,7 @@ export function EditTripForm({ trip }: { trip: Trip }) {
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : "Save changes"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => router.push(`/trips/${trip.id}`)}
-        >
+        <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
           Cancel
         </Button>
       </div>

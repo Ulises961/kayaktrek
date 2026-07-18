@@ -1,31 +1,35 @@
-import Link from "next/link"
 import { getSession } from "@/lib/auth/session"
+import { getMe } from "@/lib/user/me"
 import { listEndorsementRequests } from "@/lib/endorsement-requests/actions"
 import { listMyLogs, listEndorsedLogs, getMyStats } from "@/lib/logs/actions"
-import { averageSeaState } from "@/lib/logs/format"
+import { modalSeaState } from "@/lib/logs/format"
+import { beaufortLabel } from "@/lib/weather/beaufort"
+import { DISTANCE_UNIT, toNm } from "@/lib/itinerary/distance"
 import { LogsTabs } from "@/components/logs/logs-tabs"
 import { EndorsementInbox } from "@/components/logs/endorsement-inbox"
-import { Button } from "@/components/ui/button"
+import { AddLogDialog } from "@/components/logs/add-log-dialog"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
 
 export default async function LogsPage() {
-  const [mine, endorsed, stats, session, endorsementRequests] = await Promise.all([
+  const [mine, endorsed, stats, session, endorsementRequests, me] = await Promise.all([
     listMyLogs(),
     listEndorsedLogs(),
     getMyStats(),
     getSession(),
     listEndorsementRequests("incoming"),
+    getMe(),
   ])
 
-  const avgSea = averageSeaState(stats.conditionsDistribution)
+  const typicalSea = modalSeaState(stats.conditionsDistribution)
+  const unit = me?.unitPreference ?? DISTANCE_UNIT.NM
+  const displayDistance =
+    unit === DISTANCE_UNIT.NM ? toNm(stats.totalDistance) : stats.totalDistance
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Paddling logs</h1>
-        <Button asChild size="sm">
-          <Link href="/logs/new">Add log</Link>
-        </Button>
+        <AddLogDialog unit={unit} />
       </div>
 
       {stats.logCount > 0 && (
@@ -41,23 +45,28 @@ export default async function LogsPage() {
               <RouteIcon className="size-3.5" /> Distance
             </span>
             <span className="text-xl font-semibold">
-              {stats.totalDistance > 0 ? `${stats.totalDistance.toFixed(1)} km` : "—"}
+              {stats.totalDistance > 0 ? `${displayDistance.toFixed(1)} ${unit}` : "—"}
             </span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-lg border p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
-              <WavesIcon className="size-3.5" /> Avg sea
+              <WavesIcon className="size-3.5" /> Typical sea
             </span>
             <span className="text-xl font-semibold">
-              {avgSea != null ? `B${avgSea.toFixed(1)}` : "—"}
+              {typicalSea != null ? `B${typicalSea} · ${beaufortLabel(typicalSea)}` : "—"}
             </span>
           </div>
         </div>
       )}
 
-      <EndorsementInbox requests={endorsementRequests} />
+      <EndorsementInbox requests={endorsementRequests} unit={unit} />
 
-      <LogsTabs initialMine={mine} initialEndorsed={endorsed} currentUserId={session?.userId} />
+      <LogsTabs
+        initialMine={mine}
+        initialEndorsed={endorsed}
+        currentUserId={session?.userId}
+        unit={unit}
+      />
     </div>
   )
 }

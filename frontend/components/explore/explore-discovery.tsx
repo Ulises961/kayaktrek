@@ -26,6 +26,7 @@ import type {
   ExploreSort,
 } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import { SeasonBadge } from "./season-badge"
 
 const ExploreDiscoveryMap = dynamic(() => import("./explore-discovery-map"), { ssr: false })
@@ -42,6 +43,7 @@ type Props = {
   initial: ExplorePage
   isAuthenticated: boolean
   ownedIds: string[]
+  unit?: DistanceUnit
 }
 
 function toNumber(value: string): number | undefined {
@@ -65,7 +67,12 @@ function previewRoute(item: ExploreItem): RouteData {
   }
 }
 
-export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) {
+export function ExploreDiscovery({
+  initial,
+  isAuthenticated,
+  ownedIds,
+  unit = DISTANCE_UNIT.NM,
+}: Props) {
   const router = useRouter()
   const [isForking, startFork] = useTransition()
   const owned = new Set(ownedIds)
@@ -293,7 +300,7 @@ export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) 
               <div
                 key={item.id}
                 className={cn(
-                  "border-border bg-card relative flex flex-col gap-2 overflow-hidden rounded-lg border transition-colors",
+                  "border-border bg-card relative isolate flex shrink-0 flex-col gap-2 overflow-hidden rounded-lg border transition-colors",
                   selectedId === item.id ? "ring-2 ring-sky-400" : "hover:bg-accent",
                 )}
                 onMouseEnter={() => select(item.id)}
@@ -313,7 +320,11 @@ export function ExploreDiscovery({ initial, isAuthenticated, ownedIds }: Props) 
                     <SeasonBadge season={item.season} />
                   </div>
                   <div className="text-muted-foreground flex gap-3 text-xs">
-                    {item.totalMiles != null && <span>{item.totalMiles.toFixed(1)} nm</span>}
+                    {item.totalMiles != null && (
+                      <span>
+                        {formatDistance(item.totalMiles, unit)} {unit}
+                      </span>
+                    )}
                     {item.dayCount > 0 && (
                       <span>
                         {item.dayCount} {item.dayCount === 1 ? "day" : "days"}

@@ -7,6 +7,7 @@ import { TripIdentityHeader } from "@/components/trips/trip-identity-header"
 import { TripDetailNav } from "@/components/trips/trip-detail-nav"
 import { Card, CardContent } from "@/components/ui/card"
 import { CardTopRule } from "@/components/common/card-top-rule"
+import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 
 export default async function TripDetailLayout({
   children,
@@ -25,6 +26,12 @@ export default async function TripDetailLayout({
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
+      <SetBreadcrumbs
+        crumbs={[
+          { label: "Trips", href: "/trips" },
+          { label: trip.destination ?? "Untitled trip" },
+        ]}
+      />
       <TripIdentityHeader trip={trip} isLeader={isLeader} />
       <TripDetailNav tripId={id} showFloatPlan={isMember} />
       <Card className="relative overflow-hidden">

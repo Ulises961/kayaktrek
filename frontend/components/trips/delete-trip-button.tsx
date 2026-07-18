@@ -1,6 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
+import { Trash2Icon } from "lucide-react"
 import { deleteTrip } from "@/lib/trips/actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -34,12 +35,13 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button
-          variant="destructive"
-          size="sm"
+          variant="ghost"
+          size="icon"
+          aria-label="Delete trip"
+          className="text-muted-foreground hover:text-destructive size-7 shrink-0"
           disabled={isPending}
-          className="w-full sm:w-auto sm:self-start"
         >
-          Delete trip
+          <Trash2Icon className="size-3.5" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

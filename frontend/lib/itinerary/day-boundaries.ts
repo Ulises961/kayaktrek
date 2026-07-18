@@ -11,11 +11,17 @@ export type BoundaryColors = { left: string; right: string }
 type BoundaryDayLike = {
   dayNumber: number
   startPointId?: string | null
+  endPointId?: string | null
 }
 
 // Point id → { left, right } day colours for split-ring boundary markers.
-// A boundary point is the startPointId of any numbered day after day 1:
-// simultaneously the end of Day N-1 and the start of Day N.
+// A boundary point is the startPointId of a numbered day after day 1 *that
+// actually matches Day N-1's own endPointId* — i.e. a genuine shared
+// overnight stop, not just "some day after the first." A day can legitimately
+// start at a point with no relation to the previous day's end (no overnight
+// stop shared, e.g. seed/imported data, or a day never boundary-linked at
+// all) — treating that as a split-ring boundary drew a marker with the wrong
+// colour on one half and no incoming leg from the "previous" day to match it.
 //
 // Plain rings (no split) for:
 //   • Day 1's start — no previous numbered day, left half would be grey
@@ -25,13 +31,15 @@ type BoundaryDayLike = {
 // Returned as a plain Record (not a Map) so it can cross a "use server"
 // serialization boundary unchanged.
 export function buildBoundaryColorMap(days: BoundaryDayLike[]): Record<string, BoundaryColors> {
+  const byDayNumber = new Map(days.map((day) => [day.dayNumber, day]))
   const map: Record<string, BoundaryColors> = {}
   for (const day of days) {
-    if (day.dayNumber > 1 && day.startPointId) {
-      map[day.startPointId] = {
-        left: getDayColor(day.dayNumber - 1),
-        right: getDayColor(day.dayNumber),
-      }
+    if (day.dayNumber <= 1 || !day.startPointId) continue
+    const previous = byDayNumber.get(day.dayNumber - 1)
+    if (!previous?.endPointId || previous.endPointId !== day.startPointId) continue
+    map[day.startPointId] = {
+      left: getDayColor(day.dayNumber - 1),
+      right: getDayColor(day.dayNumber),
     }
   }
   return map

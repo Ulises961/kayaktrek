@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment } from "react"
+import { Fragment, useState } from "react"
 import Link from "next/link"
 import { AnchorIcon, PencilIcon, UsersIcon } from "lucide-react"
 import {
@@ -15,6 +15,8 @@ import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { fieldLabelClass } from "@/components/common/form-field"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
+import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
+import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import {
   TRIP_STATE,
@@ -70,6 +72,7 @@ interface TripIdentityHeaderProps {
 }
 
 export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) {
+  const [editOpen, setEditOpen] = useState(false)
   const travellers = trip.travellers ?? []
   const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
   const visibleTravellers = travellers.slice(0, MAX_VISIBLE_AVATARS)
@@ -86,13 +89,22 @@ export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) 
           {trip.state && <StateBadge state={trip.state} />}
         </div>
         {isLeader && (
-          <Button variant="ghost" size="icon" aria-label="Edit trip" className="shrink-0" asChild>
-            <Link href={`/trips/${trip.id}/edit`}>
-              <PencilIcon className="size-4" />
-            </Link>
-          </Button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Edit trip"
+              className="size-7"
+              onClick={() => setEditOpen(true)}
+            >
+              <PencilIcon className="size-3.5" />
+            </Button>
+            <DeleteTripButton tripId={trip.id!} destination={trip.destination} />
+          </div>
         )}
       </div>
+
+      {isLeader && <EditTripDialog trip={trip} open={editOpen} onOpenChange={setEditOpen} />}
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
         <span>

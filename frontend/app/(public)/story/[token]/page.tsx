@@ -4,6 +4,8 @@ import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { fetchStoryByToken } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { seasonOfDetail } from "@/lib/itinerary/season"
+import { getMe } from "@/lib/user/me"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 // Unlisted trip-narrative share (M7d): reachable by anyone with the link, whether or
 // not the itinerary is also discoverable-public. Renders the same detail view as
@@ -13,7 +15,7 @@ import { seasonOfDetail } from "@/lib/itinerary/season"
 // rather than to /explore.
 export default async function StoryPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const detail = await fetchStoryByToken(token)
+  const [detail, me] = await Promise.all([fetchStoryByToken(token), getMe()])
   if (!detail) notFound()
 
   const route = extractRouteData(detail)
@@ -31,6 +33,7 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
         tripState={detail.tripState}
         backHref="/"
         backLabel="Home"
+        unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
       />
     </div>
   )

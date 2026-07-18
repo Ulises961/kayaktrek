@@ -7,6 +7,7 @@ import { daySummariesFromRoute } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { OriginalAuthor } from "@/lib/dtos/itinerary"
 import { TRIP_STATE } from "@/lib/dtos/trip"
+import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 
 type Props = {
   route: RouteData
@@ -19,6 +20,7 @@ type Props = {
   backHref: string
   backLabel: string
   actions?: ReactNode
+  unit?: DistanceUnit
 }
 
 // The docked side-panel layout shared by the discoverable route detail
@@ -39,6 +41,7 @@ export function PublicRouteDetail({
   backHref,
   backLabel,
   actions,
+  unit = DISTANCE_UNIT.NM,
 }: Props) {
   const isHistory = tripState === TRIP_STATE.PAST || tripState === TRIP_STATE.ARCHIVED
   const daySummaries = daySummariesFromRoute(route)
@@ -69,14 +72,18 @@ export function PublicRouteDetail({
           </div>
         </div>
         <div className="text-muted-foreground flex gap-4 text-sm">
-          {route.totalMiles != null && <span>{route.totalMiles.toFixed(1)} nm</span>}
+          {route.totalMiles != null && (
+            <span>
+              {formatDistance(route.totalMiles, unit)} {unit}
+            </span>
+          )}
           {route.dayCount > 0 && (
             <span>
               {route.dayCount} {route.dayCount === 1 ? "day" : "days"}
             </span>
           )}
         </div>
-        <RouteDayBreakdown days={daySummaries} />
+        <RouteDayBreakdown days={daySummaries} unit={unit} />
         {author && (
           <p className="text-muted-foreground text-sm">
             Cloned from{" "}

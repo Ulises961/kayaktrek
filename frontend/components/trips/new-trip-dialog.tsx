@@ -6,20 +6,15 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createTrip } from "@/lib/trips/actions"
 import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
+import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/common/date-picker"
-import { PlusIcon } from "lucide-react"
+import { KayakIcon, PlusIcon } from "lucide-react"
 
 export function NewTripDialog() {
   const router = useRouter()
@@ -69,10 +64,7 @@ export function NewTripDialog() {
           New trip
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New trip</DialogTitle>
-        </DialogHeader>
+      <AccentDialogContent accent={palette.ocean500} icon={KayakIcon} title="New trip">
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Input placeholder="Destination" disabled={isPending} {...register("destination")} />
@@ -134,7 +126,7 @@ export function NewTripDialog() {
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </AccentDialogContent>
     </Dialog>
   )
 }

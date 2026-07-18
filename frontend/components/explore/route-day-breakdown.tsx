@@ -1,9 +1,16 @@
 import { formatDayDate } from "@/lib/utils/date"
+import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import type { DaySummary } from "@/lib/itinerary/public-routes"
 
 // Per-day mileage breakdown shown on the public route detail page so planners can see
 // how the distance is split across days before choosing to use the route.
-export function RouteDayBreakdown({ days }: { days: DaySummary[] }) {
+export function RouteDayBreakdown({
+  days,
+  unit = DISTANCE_UNIT.NM,
+}: {
+  days: DaySummary[]
+  unit?: DistanceUnit
+}) {
   if (days.length === 0) return null
 
   return (
@@ -22,7 +29,7 @@ export function RouteDayBreakdown({ days }: { days: DaySummary[] }) {
               <span className="text-muted-foreground flex-1">{formatDayDate(day.date)}</span>
             )}
             <span className="text-muted-foreground tabular-nums">
-              {day.distanceNm.toFixed(1)} nm
+              {formatDistance(day.distanceNm, unit)} {unit}
             </span>
           </li>
         ))}

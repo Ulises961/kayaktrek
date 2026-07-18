@@ -6,6 +6,7 @@ import { ListRow } from "@/components/common/list-row"
 import { listMyLogs, listEndorsedLogs } from "@/lib/logs/actions"
 import { LogCard } from "./log-card"
 import { LOG_SORT, type Log, type LogPage, type LogSort } from "@/lib/dtos/log"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 const SORTS: { value: LogSort; label: string }[] = [
   { value: LOG_SORT.NEWEST, label: "Newest first" },
@@ -16,9 +17,10 @@ interface LogsListProps {
   initial: LogPage
   kind: "mine" | "endorsed"
   currentUserId?: string
+  unit?: DistanceUnit
 }
 
-export function LogsList({ initial, kind, currentUserId }: LogsListProps) {
+export function LogsList({ initial, kind, currentUserId, unit }: LogsListProps) {
   const [items, setItems] = useState<Log[]>(initial.items)
   const [page, setPage] = useState(initial.page)
   const [pages, setPages] = useState(initial.pages)
@@ -27,6 +29,17 @@ export function LogsList({ initial, kind, currentUserId }: LogsListProps) {
   const latestRequest = useRef(0)
 
   const fetchPage = kind === "mine" ? listMyLogs : listEndorsedLogs
+
+  // A mutation from a child (add/edit/delete) revalidates `/logs` server-side; Next
+  // then re-renders this already-mounted component with a fresh `initial` object.
+  // `items`/`page`/`pages` are local state seeded from `initial` (needed for sort
+  // refetch + load-more accumulation below), so they don't pick that up on their
+  // own — resync whenever `initial` itself changes.
+  useEffect(() => {
+    setItems(initial.items)
+    setPage(initial.page)
+    setPages(initial.pages)
+  }, [initial])
 
   // Refetch page 1 whenever sort changes. Skip the very first run — the server
   // already provided `initial`. A request id discards stale responses that
@@ -92,6 +105,7 @@ export function LogsList({ initial, kind, currentUserId }: LogsListProps) {
                 log={log}
                 variant={kind === "endorsed" ? "endorsed" : "owner"}
                 currentUserId={currentUserId}
+                unit={unit}
               />
             </ListRow>
           ))}

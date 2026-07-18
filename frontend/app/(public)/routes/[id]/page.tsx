@@ -5,11 +5,17 @@ import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { fetchPublicItineraryDetail, fetchItineraries } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { getSession } from "@/lib/auth/session"
+import { getMe } from "@/lib/user/me"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { seasonOfDetail } from "@/lib/itinerary/season"
 
 export default async function PublicRoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [detail, session] = await Promise.all([fetchPublicItineraryDetail(id), getSession()])
+  const [detail, session, me] = await Promise.all([
+    fetchPublicItineraryDetail(id),
+    getSession(),
+    getMe(),
+  ])
   if (!detail) notFound()
 
   // The author already owns this route, so offer to open it rather than clone it into
@@ -40,6 +46,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
         actions={
           <RouteDetailActions itineraryId={id} isAuthenticated={!!session} isOwner={isOwner} />
         }
+        unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
       />
     </div>
   )

@@ -10,12 +10,13 @@ vi.mock("@/lib/logs/actions", () => ({
 import { listMyLogs, listEndorsedLogs } from "@/lib/logs/actions"
 import { LogsList } from "../logs-list"
 import { LOG_SORT, type Log, type LogPage } from "@/lib/dtos/log"
+import { formatDayDate } from "@/lib/utils/date"
 
 const mockMyLogs = vi.mocked(listMyLogs)
 const mockEndorsedLogs = vi.mocked(listEndorsedLogs)
 
-// LogCard renders `date` verbatim (no notes field is displayed at all), so distinct
-// dates are what distinguish fixtures in the rendered DOM.
+// LogCard renders `date` through formatDayDate (no notes field is displayed at all),
+// so distinct dates are what distinguish fixtures in the rendered DOM.
 function log(overrides: Partial<Log> = {}): Log {
   return {
     id: "01952f1a-0000-7000-8000-000000000020",
@@ -40,7 +41,7 @@ beforeEach(() => {
 describe("LogsList", () => {
   it("renders the initial logs without re-querying", () => {
     render(<LogsList initial={page([log()])} kind="mine" />)
-    expect(screen.getByText("2026-07-01")).toBeInTheDocument()
+    expect(screen.getByText(formatDayDate("2026-07-01"))).toBeInTheDocument()
     expect(mockMyLogs).not.toHaveBeenCalled()
   })
 
@@ -59,8 +60,8 @@ describe("LogsList", () => {
     render(<LogsList initial={page([log()])} kind="mine" />)
     await userEvent.selectOptions(screen.getByLabelText(/sort my logs/i), LOG_SORT.OLDEST)
     await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.OLDEST))
-    await waitFor(() => expect(screen.getByText("2026-01-01")).toBeInTheDocument())
-    expect(screen.queryByText("2026-07-01")).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(formatDayDate("2026-01-01"))).toBeInTheDocument())
+    expect(screen.queryByText(formatDayDate("2026-07-01"))).not.toBeInTheDocument()
   })
 
   it("calls listEndorsedLogs when kind is endorsed", async () => {
@@ -74,13 +75,24 @@ describe("LogsList", () => {
     mockMyLogs.mockResolvedValue(page([log({ id: "next", date: "2026-08-01" })], { page: 2 }))
     render(<LogsList initial={page([log()], { pages: 2, total: 2 })} kind="mine" />)
     await userEvent.click(screen.getByRole("button", { name: /load more/i }))
-    await waitFor(() => expect(screen.getByText("2026-08-01")).toBeInTheDocument())
-    expect(screen.getByText("2026-07-01")).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(formatDayDate("2026-08-01"))).toBeInTheDocument())
+    expect(screen.getByText(formatDayDate("2026-07-01"))).toBeInTheDocument()
   })
 
   it("does not show Load more once all pages are loaded", () => {
     render(<LogsList initial={page([log()], { page: 1, pages: 1 })} kind="mine" />)
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument()
+  })
+
+  it("resyncs to a fresh initial prop after a server revalidation re-render (e.g. post-delete)", () => {
+    const { rerender } = render(<LogsList initial={page([log()])} kind="mine" />)
+    expect(screen.getByText(formatDayDate("2026-07-01"))).toBeInTheDocument()
+
+    // Simulates the RSC tree re-rendering with fresh server data after a mutation's
+    // revalidatePath — same component instance, new `initial` object identity.
+    rerender(<LogsList initial={page([log({ id: "kept", date: "2026-09-09" })])} kind="mine" />)
+    expect(screen.getByText(formatDayDate("2026-09-09"))).toBeInTheDocument()
+    expect(screen.queryByText(formatDayDate("2026-07-01"))).not.toBeInTheDocument()
   })
 
   it("discards a stale response that resolves after a later sort change", async () => {
@@ -93,12 +105,12 @@ describe("LogsList", () => {
     await userEvent.selectOptions(screen.getByLabelText(/sort my logs/i), LOG_SORT.OLDEST)
     mockMyLogs.mockResolvedValueOnce(page([log({ id: "second", date: "2026-02-02" })]))
     await userEvent.selectOptions(screen.getByLabelText(/sort my logs/i), LOG_SORT.NEWEST)
-    await waitFor(() => expect(screen.getByText("2026-02-02")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(formatDayDate("2026-02-02"))).toBeInTheDocument())
 
     // The first (stale) request resolves after the second — must not overwrite it.
     resolveFirst(page([log({ id: "stale", date: "2026-03-03" })]))
     await new Promise((r) => setTimeout(r, 0))
-    expect(screen.queryByText("2026-03-03")).not.toBeInTheDocument()
-    expect(screen.getByText("2026-02-02")).toBeInTheDocument()
+    expect(screen.queryByText(formatDayDate("2026-03-03"))).not.toBeInTheDocument()
+    expect(screen.getByText(formatDayDate("2026-02-02"))).toBeInTheDocument()
   })
 })

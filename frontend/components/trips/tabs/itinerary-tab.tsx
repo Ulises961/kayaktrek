@@ -8,14 +8,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ListRow } from "@/components/common/list-row"
 import { createItinerary } from "@/lib/itinerary/actions"
-import { totalDistanceNm, estimatedTime, formatTime } from "@/lib/itinerary/distance"
-import { formatRouteRange, computeRestGaps, type RestGap } from "@/lib/itinerary/format"
+import {
+  totalDistanceNm,
+  estimatedTime,
+  formatTime,
+  formatDistance,
+  DISTANCE_UNIT,
+  type DistanceUnit,
+} from "@/lib/itinerary/distance"
+import { computeRestGaps, type RestGap } from "@/lib/itinerary/format"
 import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 import { formatDayDate } from "@/lib/utils/date"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
-import { POINT_TYPE, type Point } from "@/lib/dtos/point"
+import type { Point } from "@/lib/dtos/point"
 
 export interface ItineraryTabProps {
   tripId: string
@@ -25,6 +32,7 @@ export interface ItineraryTabProps {
   /** Trip's own inclusive date span — the denominator for "X of Y days routed". */
   dateFrom?: string | null
   dateTo?: string | null
+  unit?: DistanceUnit
 }
 
 const COLLAPSE_LIMIT = 5
@@ -35,8 +43,6 @@ const DEFAULT_SPEED = 2.5
 interface DayStats {
   isRestDay: boolean
   distanceNm: number
-  startName: string | null
-  endName: string | null
   hours: number
   minutes: number
 }
@@ -47,16 +53,14 @@ interface DayStats {
 function getDayStats(day: Day, speedKnots: number, pointsById: Map<string, Point>): DayStats {
   const ordered = walkDayRoutePoints(day, pointsById, day.points ?? [])
   if (ordered.length <= 1) {
-    return { isRestDay: true, distanceNm: 0, startName: null, endName: null, hours: 0, minutes: 0 }
+    return { isRestDay: true, distanceNm: 0, hours: 0, minutes: 0 }
   }
   const routePts = ordered
     .filter((p) => p.latitude != null && p.longitude != null)
     .map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }))
   const distanceNm = totalDistanceNm(routePts)
   const { hours, minutes } = estimatedTime(distanceNm, speedKnots)
-  const startName = ordered[0]?.name ?? null
-  const endName = ordered[ordered.length - 1]?.name ?? null
-  return { isRestDay: false, distanceNm, startName, endName, hours, minutes }
+  return { isRestDay: false, distanceNm, hours, minutes }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -84,48 +88,40 @@ function DayRow({
   day,
   speedKnots,
   pointsById,
+  unit,
 }: {
   day: Day
   speedKnots: number
   pointsById: Map<string, Point>
+  unit: DistanceUnit
 }) {
   const stats = getDayStats(day, speedKnots, pointsById)
-  const routeLabel = formatRouteRange(stats.startName, stats.endName)
+  const hasStats = !stats.isRestDay && stats.distanceNm > 0
 
   return (
     <ListRow as="div" className="hover:bg-secondary/30 py-2.5 transition-colors">
-      {/* Header row: day + date · metrics */}
+      {/* Header row: date + day · metrics */}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <span className="text-muted-foreground shrink-0 text-[10px] font-semibold tracking-[0.06em] uppercase">
-            Day {day.dayNumber}
+          <span className="text-muted-foreground shrink-0 text-xs font-semibold tracking-[0.06em] uppercase">
+            {day.date ? formatDayDate(day.date) : `Day ${day.dayNumber}`}
           </span>
           {day.date && (
-            <span className="text-muted-foreground/85 truncate text-[10px]">
-              · {formatDayDate(day.date)}
-            </span>
+            <span className="text-muted-foreground/85 truncate text-xs">· Day {day.dayNumber}</span>
           )}
         </div>
-        {!stats.isRestDay && stats.distanceNm > 0 && (
-          <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-            {stats.distanceNm.toFixed(1)} nm ·{" "}
-            {formatTime({ hours: stats.hours, minutes: stats.minutes })}
-          </span>
-        )}
+        <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+          {hasStats
+            ? `${formatDistance(stats.distanceNm, unit)} ${unit} · ${formatTime({ hours: stats.hours, minutes: stats.minutes })}`
+            : "—"}
+        </span>
       </div>
 
-      {/* Route or rest label */}
-      <div className="mt-0.5">
-        {stats.isRestDay ? (
+      {stats.isRestDay && (
+        <div className="mt-0.5">
           <span className="text-muted-foreground text-xs italic">Rest day</span>
-        ) : routeLabel ? (
-          <span className="text-foreground text-sm leading-snug">{routeLabel}</span>
-        ) : day.date ? (
-          <span className="text-muted-foreground text-sm leading-snug">
-            {formatDayDate(day.date)}
-          </span>
-        ) : null}
-      </div>
+        </div>
+      )}
     </ListRow>
   )
 }
@@ -140,7 +136,7 @@ function RestGapRow({ gaps }: { gaps: RestGap[] }) {
 
   return (
     <ListRow as="div" data-testid="rest-gap-entry" className="py-2.5 text-xs">
-      <span className="text-muted-foreground/85 text-[10px] font-semibold tracking-[0.06em] uppercase">
+      <span className="text-muted-foreground text-xs font-semibold tracking-[0.06em] uppercase">
         {label}
       </span>
       <div className="mt-0.5">
@@ -159,6 +155,7 @@ export function ItineraryTab({
   tripName,
   dateFrom,
   dateTo,
+  unit = DISTANCE_UNIT.NM,
 }: ItineraryTabProps) {
   const [isPending, startTransition] = useTransition()
   const [showAll, setShowAll] = useState(false)
@@ -230,9 +227,6 @@ export function ItineraryTab({
   const totalMiles = itinerary.totalMiles ?? 0
   const allPoints = days.flatMap((d) => d.points ?? [])
   const pointsById = new Map(allPoints.filter((p) => p.id).map((p) => [p.id!, p]))
-  const stopCount = allPoints.filter((p) => p.type === POINT_TYPE.STOP).length
-  const avgTime =
-    days.length > 0 && totalMiles > 0 ? estimatedTime(totalMiles / days.length, speedKnots) : null
 
   const datesWithDate = days.filter((d) => d.date)
   const firstDate = datesWithDate[0]?.date
@@ -249,7 +243,23 @@ export function ItineraryTab({
   // span rather than `days.length` means those un-modeled gaps still count against
   // the total instead of silently vanishing.
   const routedDaysCount = days.filter((d) => (d.points ?? []).length > 0).length
-  const totalTripDays = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
+  // The trip's own dateFrom/dateTo can lag behind a Day dated past it (e.g. a day
+  // added after the trip's own date range was last edited) — the itinerary's actual
+  // first/last day dates (firstDate/lastDate, already shown in the span line below)
+  // are just as real. Take whichever span is wider so paddling+rest days always
+  // account for every day actually in the list, never undercounting against it.
+  const itineraryCalendarDays = firstDate && lastDate ? daysBetween(firstDate, lastDate) : null
+  const totalTripDays =
+    dateFrom && dateTo ? Math.max(daysBetween(dateFrom, dateTo), itineraryCalendarDays ?? 0) : null
+  // Reuses the same two numbers as the "X of Y" stat above — no separate derivation.
+  const restDaysCount = totalTripDays != null ? totalTripDays - routedDaysCount : null
+
+  // Divided by *routed* days, not the calendar span — "paddling time" should reflect
+  // the days actually paddled, not be diluted by rest days with zero distance.
+  const avgTime =
+    routedDaysCount > 0 && totalMiles > 0
+      ? estimatedTime(totalMiles / routedDaysCount, speedKnots)
+      : null
 
   const gapsByAfterDayNumber = new Map<number, RestGap[]>()
   for (const gap of computeRestGaps(days)) {
@@ -263,15 +273,20 @@ export function ItineraryTab({
       {/* Stats tiles */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4">
         {totalTripDays != null ? (
-          <StatTile value={`${routedDaysCount} of ${totalTripDays}`} label="days routed" />
+          <StatTile
+            value={routedDaysCount}
+            label={routedDaysCount === 1 ? "paddling day" : "paddling days"}
+          />
         ) : (
           <StatTile value={days.length} label={days.length === 1 ? "day" : "days"} />
         )}
         {totalMiles > 0 && (
-          <StatTile value={`${totalMiles.toFixed(1)} nm`} label="total distance" />
+          <StatTile value={`${formatDistance(totalMiles, unit)} ${unit}`} label="total distance" />
         )}
-        {avgTime && <StatTile value={`~${formatTime(avgTime)}`} label="avg / day" />}
-        {stopCount > 0 && <StatTile value={stopCount} label={stopCount === 1 ? "stop" : "stops"} />}
+        {restDaysCount != null && restDaysCount > 0 && (
+          <StatTile value={restDaysCount} label={restDaysCount === 1 ? "rest day" : "rest days"} />
+        )}
+        {avgTime && <StatTile value={`~${formatTime(avgTime)}`} label="avg paddling time / day" />}
       </div>
 
       {/* Date span */}
@@ -288,7 +303,7 @@ export function ItineraryTab({
           const gaps = gapsByAfterDayNumber.get(day.dayNumber)
           return (
             <Fragment key={day.id}>
-              <DayRow day={day} speedKnots={speedKnots} pointsById={pointsById} />
+              <DayRow day={day} speedKnots={speedKnots} pointsById={pointsById} unit={unit} />
               {gaps && <RestGapRow gaps={gaps} />}
             </Fragment>
           )

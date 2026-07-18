@@ -8,6 +8,7 @@ vi.mock("@/lib/logs/actions", () => ({
 }))
 
 import { LogsTabs } from "../logs-tabs"
+import { formatDayDate } from "@/lib/utils/date"
 import type { Log, LogPage } from "@/lib/dtos/log"
 
 const LOG_A: Log = {
@@ -30,14 +31,14 @@ describe("LogsTabs", () => {
   it("shows my logs tab by default", () => {
     render(<LogsTabs initialMine={page([LOG_A])} initialEndorsed={page([])} />)
     expect(screen.getByText(/my logs/i)).toBeTruthy()
-    expect(screen.getByText(/2026-07-01/)).toBeTruthy()
+    expect(screen.getByText(formatDayDate(LOG_A.date))).toBeTruthy()
   })
 
   it("shows endorsed logs on tab switch", async () => {
     const user = userEvent.setup()
     render(<LogsTabs initialMine={page([LOG_A])} initialEndorsed={page([LOG_B])} />)
     await user.click(screen.getByRole("tab", { name: /endorsed/i }))
-    await waitFor(() => expect(screen.getByText(/2026-07-02/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(formatDayDate(LOG_B.date))).toBeTruthy())
   })
 
   it("shows empty state on endorsed tab when none", async () => {

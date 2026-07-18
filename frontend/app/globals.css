@@ -88,7 +88,9 @@
   --radius: 0.625rem;
 
   /* Core */
-  --background: oklch(0.986 0.007 88); /* warm-neutral paper white — nudged toward --chart-paper's warmth (M12 §E) */
+  --background: oklch(
+    0.986 0.007 88
+  ); /* warm-neutral paper white — nudged toward --chart-paper's warmth (M12 §E) */
   --foreground: oklch(0.155 0.04 245); /* #0d1b2e ocean-900 */
 
   --card: oklch(1 0 0);
@@ -323,7 +325,7 @@
      planner, landing hero) — raw daylight tiles otherwise glare against the
      navy shell. One shared rule, not per-map component edits. */
   .dark .leaflet-tile-pane {
-    filter: brightness(0.85) saturate(0.9);
+    filter: brightness(0.65) contrast(1.15) saturate(0.85);
   }
 
   /* ── Auth surfaces ──────────────────────────────────────────────────────── */

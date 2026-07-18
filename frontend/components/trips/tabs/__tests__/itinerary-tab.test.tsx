@@ -20,7 +20,7 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
 import { formatDateRange } from "@/lib/trips/format"
-import { formatRouteRange } from "@/lib/itinerary/format"
+import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITIN_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -201,9 +201,25 @@ describe("ItineraryTab — itinerary with days", () => {
     expect(el).toBeDefined()
   })
 
-  it("shows total distance in stats strip", () => {
+  it("shows total distance in stats strip, nm by default", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
     expect(screen.getByText(/22\.4 nm/)).toBeDefined()
+  })
+
+  it("converts total distance to km when unit is km", () => {
+    render(
+      <ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader unit={DISTANCE_UNIT.KM} />,
+    )
+    expect(screen.getByText(`${formatDistance(22.4, DISTANCE_UNIT.KM)} km`)).toBeDefined()
+    expect(screen.queryByText(/22\.4 nm/)).toBeNull()
+  })
+
+  it("converts day-row distance to km when unit is km, not nm", () => {
+    render(
+      <ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader unit={DISTANCE_UNIT.KM} />,
+    )
+    expect(screen.getAllByText(/km ·/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/nm ·/)).toBeNull()
   })
 
   it("shows date range", () => {
@@ -217,9 +233,16 @@ describe("ItineraryTab — itinerary with days", () => {
     expect(screen.getByText(/Day 2/)).toBeDefined()
   })
 
-  it("shows start and end names for days with points", () => {
+  it("does not show point/route names — the day row is just day number, date, and stats", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
-    expect(screen.getByText(formatRouteRange("Ribadeo", "Foz"))).toBeDefined()
+    expect(screen.queryByText("Ribadeo")).toBeNull()
+    expect(screen.queryByText("Foz")).toBeNull()
+    expect(screen.queryByText(/Ribadeo.*Foz/)).toBeNull()
+  })
+
+  it("shows a dash for a rest day's stats instead of hiding the line", () => {
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
+    expect(screen.getByText("—")).toBeInTheDocument()
   })
 
   it("shows rest day label for days without points", () => {
@@ -259,8 +282,139 @@ describe("ItineraryTab — itinerary with days", () => {
       days: [DAY_REST, DAY_WITH_POINTS],
     }
     render(<ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader />)
-    const dayLabels = screen.getAllByText(/^Day \d$/).map((el) => el.textContent)
+    // Date now leads (item 11 follow-up), so "Day N" renders as "· Day N" — strip
+    // the separator to isolate the ordering assertion.
+    const dayLabels = screen
+      .getAllByText(/Day \d$/)
+      .map((el) => el.textContent?.replace(/^·\s*/, ""))
     expect(dayLabels).toEqual(["Day 1", "Day 2"])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Stats rework — rename/add/remove (item 11 follow-up)
+// ---------------------------------------------------------------------------
+
+describe("ItineraryTab — stats rework", () => {
+  it("labels the routed-days stat 'paddling days', not 'days routed'", () => {
+    render(
+      <ItineraryTab
+        tripId={TRIP_ID}
+        itinerary={ITIN_WITH_DAYS}
+        isLeader
+        dateFrom="2026-07-01"
+        dateTo="2026-07-03"
+      />,
+    )
+    // ITIN_WITH_DAYS has exactly 1 routed day (DAY_WITH_POINTS) -> singular.
+    expect(screen.getByText("paddling day")).toBeInTheDocument()
+    expect(screen.queryByText("days routed")).toBeNull()
+  })
+
+  it("shows a calculated rest-days stat: total calendar span minus routed days", () => {
+    render(
+      <ItineraryTab
+        tripId={TRIP_ID}
+        itinerary={ITIN_WITH_DAYS}
+        isLeader
+        dateFrom="2026-07-01"
+        dateTo="2026-07-03"
+      />,
+    )
+    // 3 calendar days (Jul 1-3 inclusive), 1 routed (DAY_WITH_POINTS) -> 2 rest days.
+    expect(screen.getByText("2")).toBeInTheDocument()
+    expect(screen.getByText("rest days")).toBeInTheDocument()
+  })
+
+  it("hides the rest-days stat when every calendar day is routed", () => {
+    const itinerary: Itinerary = { ...ITIN_WITH_DAYS, days: [DAY_WITH_POINTS] }
+    render(
+      <ItineraryTab
+        tripId={TRIP_ID}
+        itinerary={itinerary}
+        isLeader
+        dateFrom="2026-07-01"
+        dateTo="2026-07-01"
+      />,
+    )
+    expect(screen.queryByText(/rest day/i)).toBeNull()
+  })
+
+  it("labels the average-time stat 'avg paddling time / day', not 'avg / day'", () => {
+    render(
+      <ItineraryTab
+        tripId={TRIP_ID}
+        itinerary={ITIN_WITH_DAYS}
+        isLeader
+        dateFrom="2026-07-01"
+        dateTo="2026-07-03"
+      />,
+    )
+    expect(screen.getByText("avg paddling time / day")).toBeInTheDocument()
+    expect(screen.queryByText("avg / day")).toBeNull()
+  })
+
+  it("never shows a stops stat", () => {
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={ITIN_WITH_DAYS} isLeader />)
+    expect(screen.queryByText(/^stops?$/)).toBeNull()
+  })
+
+  it("widens the total-days span to cover a Day dated past the trip's own dateTo, so rest days aren't undercounted", () => {
+    // Regression: a paddler added Day 5 dated 7 Aug without the trip's own dateTo
+    // (still 3 Aug, e.g. never edited after the day was added) ever catching up.
+    // The visible date-span line already derives from the itinerary's real day
+    // dates (28 Jul - 7 Aug, 11 days) — the rest-days stat must agree with it,
+    // not silently use the narrower 7-day trip-level span (which would undercount
+    // rest days as 2 instead of the real 6).
+    const routedDay = (dayNumber: number, date: string, idSuffix: string): Day => ({
+      id: `01952f1a-0000-7000-8000-00000000d${idSuffix}`,
+      dayNumber,
+      date,
+      startPointId: null,
+      points: [
+        {
+          id: `01952f1a-0000-7000-8000-00000000a${idSuffix}`,
+          type: "stop",
+          latitude: 42.0,
+          longitude: 3.0,
+          nextId: `01952f1a-0000-7000-8000-00000000b${idSuffix}`,
+        },
+        {
+          id: `01952f1a-0000-7000-8000-00000000b${idSuffix}`,
+          type: "stop",
+          latitude: 42.1,
+          longitude: 3.1,
+          nextId: null,
+        },
+      ],
+    })
+
+    const itinerary: Itinerary = {
+      id: "01952f1a-0000-7000-8000-000000000i07",
+      totalMiles: 24.4,
+      days: [
+        routedDay(1, "2026-07-28", "1"),
+        routedDay(2, "2026-07-29", "2"),
+        routedDay(3, "2026-08-01", "3"),
+        routedDay(4, "2026-08-05", "4"),
+        routedDay(5, "2026-08-07", "5"),
+      ],
+    }
+
+    render(
+      <ItineraryTab
+        tripId={TRIP_ID}
+        itinerary={itinerary}
+        isLeader
+        dateFrom="2026-07-28"
+        dateTo="2026-08-03"
+      />,
+    )
+
+    expect(screen.getByText(formatDateRange("2026-07-28", "2026-08-07"))).toBeInTheDocument()
+    expect(screen.getByText("6")).toBeInTheDocument()
+    expect(screen.getByText("rest days")).toBeInTheDocument()
+    expect(screen.queryByText("2")).toBeNull()
   })
 })
 
@@ -317,7 +471,9 @@ describe("ItineraryTab — §A regressions", () => {
     )
 
     expect(screen.queryByText("Rest day")).toBeNull()
-    expect(screen.getByText(formatRouteRange("Start Cove", "End Beach"))).toBeTruthy()
+    // A real distance/time line rendering (not the "—" no-info fallback) confirms
+    // getDayStats correctly resolved this as a routed day, not a rest day.
+    expect(screen.getByText(/nm ·/)).toBeTruthy()
   })
 
   it("still labels a genuinely empty day as 'Rest day'", () => {
@@ -333,14 +489,15 @@ describe("ItineraryTab — §A regressions", () => {
     expect(screen.getByText("Rest day")).toBeTruthy()
   })
 
-  it("shows 'X of Y days routed' against the trip's inclusive calendar span, not the raw itinerary day count", () => {
+  it("counts paddling/rest days against the trip's inclusive calendar span, not the raw itinerary day count", () => {
     // Regression for review 2.2 (M12 §A): the itinerary tab's own day count ("2 days")
     // competed with the trip header/trips-list calendar count ("4/5 days") instead of
     // being a progress indicator against it. The trip here spans Jul 1 -> Jul 5
     // (5 inclusive calendar days) but only Day 1 (routed) and Day 3 (an explicit empty
     // rest day) exist as itinerary.days entries — Jul 2, 4, 5 have no Day entity at
     // all (the paddler never opened the builder for them). Those un-modeled gaps must
-    // still count against the total, not just the modeled empty-slice rest day.
+    // still count against the total (rest days = 5 - 1 = 4), not just the modeled
+    // empty-slice rest day.
     const itinerary: Itinerary = {
       id: "01952f1a-0000-7000-8000-000000000i03",
       days: [
@@ -383,8 +540,10 @@ describe("ItineraryTab — §A regressions", () => {
       />,
     )
 
-    expect(screen.getByText("1 of 5")).toBeTruthy()
-    expect(screen.getByText("days routed")).toBeTruthy()
+    expect(screen.getByText("1")).toBeTruthy()
+    expect(screen.getByText("paddling day")).toBeTruthy()
+    expect(screen.getByText("4")).toBeTruthy()
+    expect(screen.getByText("rest days")).toBeTruthy()
   })
 })
 
@@ -447,28 +606,15 @@ describe("ItineraryTab — §M shared boundary-stop derivation", () => {
     ],
   }
 
-  it("day 1's route label includes its own end boundary even though the point row belongs to day 2 in storage", () => {
-    render(
-      <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
-    )
-    expect(screen.getByText(formatRouteRange("Start Cove", "Shared Anchorage"))).toBeTruthy()
-  })
-
   it("day 1's distance includes the leg into the shared boundary stop, not just its own owned points", () => {
     render(
       <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
     )
-    // A distance line only renders when distanceNm > 0 (DayRow's own gate) — without
-    // the fix, day 1 resolves to a single owned point (zero distance) and renders no
-    // line at all, so only day 2's would show. Both days must show one here.
+    // A real distance/time line (not the "—" no-info fallback) renders only when
+    // distanceNm > 0 — without the fix, day 1 resolves to a single owned point (zero
+    // distance) and shows "—", so only day 2's would show a real line. Both days
+    // must show one here.
     expect(screen.getAllByText(/nm ·/)).toHaveLength(2)
-  })
-
-  it("day 2's route label starts from the shared boundary stop", () => {
-    render(
-      <ItineraryTab tripId={TRIP_ID} itinerary={itinerary} isLeader={false} tripName="Test trip" />,
-    )
-    expect(screen.getByText(formatRouteRange("Shared Anchorage", "End Beach"))).toBeTruthy()
   })
 })
 

@@ -186,6 +186,10 @@ export function LandingMap({
       className="h-full w-full"
       zoomControl={false}
       scrollWheelZoom={false}
+      // Banner thumbnails are always a link to a fully-attributed detail view
+      // (route/trip/story page) — repeating the credit line on every card in a
+      // list is noise, not attribution; the linked-through page carries it.
+      attributionControl={variant !== "banner"}
     >
       <Interactions interactive={interactive} />
       <AttributionPrefix />

@@ -92,7 +92,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
         {/* Avatar */}
         <div className="flex items-center gap-4">
           <UserAvatar name={user.name} surname={user.surname} imageUrl={avatarUrl} size="lg" />
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -108,7 +108,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
               onClick={() => fileInputRef.current?.click()}
             >
               <CameraIcon className="size-4" />
-              {isUploading ? "Uploading…" : "Upload photo"}
+              {isUploading ? "Uploading…" : avatarUrl ? "Replace photo" : "Upload photo"}
             </Button>
             {avatarUrl && (
               <Button

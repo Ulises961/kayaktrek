@@ -1,7 +1,6 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LogFieldsSchema, type LogFields, type Log } from "@/lib/dtos/log"
@@ -20,10 +19,11 @@ const setValueAsNumber = (value: string) => (value === "" ? undefined : Number(v
 interface LogFormProps {
   log?: Log
   unit?: DistanceUnit
+  onSuccess: () => void
+  onCancel: () => void
 }
 
-export function LogForm({ log, unit = DISTANCE_UNIT.KM }: LogFormProps) {
-  const router = useRouter()
+export function LogForm({ log, unit = DISTANCE_UNIT.KM, onSuccess, onCancel }: LogFormProps) {
   const [isPending, startTransition] = useTransition()
   const isEdit = !!log?.id
 
@@ -63,7 +63,7 @@ export function LogForm({ log, unit = DISTANCE_UNIT.KM }: LogFormProps) {
       const result = isEdit ? await updateLog(log.id!, fields) : await createLog(fields)
 
       if (result.success) {
-        router.push("/logs")
+        onSuccess()
       } else {
         setError("root", { message: result.error })
       }
@@ -71,7 +71,7 @@ export function LogForm({ log, unit = DISTANCE_UNIT.KM }: LogFormProps) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="date">Date</Label>
         <Controller
@@ -153,12 +153,7 @@ export function LogForm({ log, unit = DISTANCE_UNIT.KM }: LogFormProps) {
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : isEdit ? "Save changes" : "Add log"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => router.push("/logs")}
-        >
+        <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
           Cancel
         </Button>
       </div>

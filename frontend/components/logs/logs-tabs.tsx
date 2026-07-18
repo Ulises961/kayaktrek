@@ -3,14 +3,16 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LogsList } from "./logs-list"
 import type { LogPage } from "@/lib/dtos/log"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 interface LogsTabsProps {
   initialMine: LogPage
   initialEndorsed: LogPage
   currentUserId?: string
+  unit?: DistanceUnit
 }
 
-export function LogsTabs({ initialMine, initialEndorsed, currentUserId }: LogsTabsProps) {
+export function LogsTabs({ initialMine, initialEndorsed, currentUserId, unit }: LogsTabsProps) {
   return (
     <Tabs defaultValue="mine">
       <TabsList>
@@ -19,11 +21,16 @@ export function LogsTabs({ initialMine, initialEndorsed, currentUserId }: LogsTa
       </TabsList>
 
       <TabsContent value="mine" className="mt-4">
-        <LogsList initial={initialMine} kind="mine" currentUserId={currentUserId} />
+        <LogsList initial={initialMine} kind="mine" currentUserId={currentUserId} unit={unit} />
       </TabsContent>
 
       <TabsContent value="endorsed" className="mt-4">
-        <LogsList initial={initialEndorsed} kind="endorsed" currentUserId={currentUserId} />
+        <LogsList
+          initial={initialEndorsed}
+          kind="endorsed"
+          currentUserId={currentUserId}
+          unit={unit}
+        />
       </TabsContent>
     </Tabs>
   )

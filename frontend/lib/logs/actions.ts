@@ -1,7 +1,6 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { LOG_SORT, LogPageSchema, type LogFields, type LogPage, type LogSort } from "@/lib/dtos/log"
 import { StatsSchema } from "@/lib/dtos/public-profile"
@@ -42,6 +41,7 @@ export async function getMyStats(): Promise<Stats> {
 export async function createLog(fields: LogFields): Promise<LogActionResult> {
   try {
     await apiPost("/api/log/create", fields)
+    revalidatePath("/logs")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -63,11 +63,12 @@ export async function updateLog(logId: string, fields: LogFields): Promise<LogAc
 export async function deleteLog(logId: string): Promise<LogActionResult> {
   try {
     await apiDelete(`/api/log/${logId}`)
+    revalidatePath("/logs")
+    return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete log." }
   }
-  redirect("/logs")
 }
 
 // Endorse another paddler's trip-linked log under the same-trip rule. The backend

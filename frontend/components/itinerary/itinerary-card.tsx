@@ -25,13 +25,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 
 export type ItineraryCardProps = {
   itinerary: Itinerary
+  unit?: DistanceUnit
 }
 
-export function ItineraryCard({ itinerary }: ItineraryCardProps) {
+export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryCardProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isCreatingTrip, startCreateTransition] = useTransition()
@@ -93,7 +95,9 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
               </span>
             )}
             {itinerary.totalMiles != null && itinerary.totalMiles > 0 && (
-              <span>{itinerary.totalMiles.toFixed(1)} nm</span>
+              <span>
+                {formatDistance(itinerary.totalMiles, unit)} {unit}
+              </span>
             )}
           </div>
         </Link>

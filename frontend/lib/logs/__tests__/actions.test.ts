@@ -18,11 +18,9 @@ vi.mock("@/lib/api/client", () => ({
 }))
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }))
 
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { LOG_SORT } from "@/lib/dtos/log"
 
 const GET = apiGet as ReturnType<typeof vi.fn>
@@ -39,6 +37,7 @@ describe("createLog", () => {
     POST.mockResolvedValue({ id: "abc" })
     const result = await createLog({ date: "2026-07-01", hours: 5 })
     expect(POST).toHaveBeenCalledWith("/api/log/create", { date: "2026-07-01", hours: 5 })
+    expect(revalidatePath).toHaveBeenCalledWith("/logs")
     expect(result).toEqual({ success: true })
   })
 
@@ -66,11 +65,12 @@ describe("updateLog", () => {
 })
 
 describe("deleteLog", () => {
-  it("deletes /api/log/:id and redirects", async () => {
+  it("deletes /api/log/:id and revalidates the logs list", async () => {
     DELETE.mockResolvedValue({})
-    await deleteLog("log-1")
+    const result = await deleteLog("log-1")
     expect(DELETE).toHaveBeenCalledWith("/api/log/log-1")
-    expect(redirect).toHaveBeenCalledWith("/logs")
+    expect(revalidatePath).toHaveBeenCalledWith("/logs")
+    expect(result).toEqual({ success: true })
   })
 
   it("returns error on failure", async () => {

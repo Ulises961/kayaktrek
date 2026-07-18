@@ -15,6 +15,7 @@ vi.mock("@/components/explore/explore-discovery-map", () => ({
 
 import { searchPublicItineraries } from "@/lib/itinerary/actions"
 import { ExploreDiscovery } from "../explore-discovery"
+import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { ExploreItem, ExplorePage } from "@/lib/dtos/itinerary"
 
 const mockSearch = vi.mocked(searchPublicItineraries)
@@ -49,6 +50,24 @@ describe("ExploreDiscovery", () => {
     render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
     expect(screen.getByText("Aegean loop")).toBeInTheDocument()
     expect(mockSearch).not.toHaveBeenCalled()
+  })
+
+  it("shows route distance in nm by default", () => {
+    render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    expect(screen.getByText(`${formatDistance(20, DISTANCE_UNIT.NM)} nm`)).toBeInTheDocument()
+  })
+
+  it("converts route distance to km when unit is km", () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item()])}
+        isAuthenticated
+        ownedIds={[]}
+        unit={DISTANCE_UNIT.KM}
+      />,
+    )
+    expect(screen.getByText(`${formatDistance(20, DISTANCE_UNIT.KM)} km`)).toBeInTheDocument()
+    expect(screen.queryByText(/20\.0 nm/)).not.toBeInTheDocument()
   })
 
   it("re-queries with the name filter when the user types", async () => {
