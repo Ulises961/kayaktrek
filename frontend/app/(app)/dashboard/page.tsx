@@ -1,11 +1,14 @@
 import Link from "next/link"
-import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
+import { MapIcon, CompassIcon, PlusIcon, CalendarIcon, BellIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
 import { getMe } from "@/lib/user/me"
+import { getPendingRequestsSummary } from "@/lib/requests/actions"
+import { buildPendingRequestRows } from "@/lib/requests/pending"
 import { StateBadge } from "@/components/common/state-badge"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
+import { ListRow } from "@/components/common/list-row"
 import { Button } from "@/components/ui/button"
 import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
 import { formatDateRange } from "@/lib/trips/format"
@@ -55,10 +58,46 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
   )
 }
 
+// One "someone is waiting on you" row per pending-request type (trip
+// invitations, buddy requests, endorsement asks) — mirrors the sidebar's
+// SidebarRequestsMenu, sharing the same row derivation so the two surfaces
+// never disagree on labels or destinations. Shown alongside the trips section
+// (whether hero trips or the empty-trips placeholder), not gated behind it —
+// hidden entirely when nothing is pending.
+function PendingRequestsSection({
+  pendingRequests,
+}: {
+  pendingRequests: Awaited<ReturnType<typeof getPendingRequestsSummary>>
+}) {
+  const rows = buildPendingRequestRows(pendingRequests)
+  if (rows.length === 0) return null
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium tracking-wide uppercase">
+        <BellIcon className="size-3.5" />
+        Pending requests
+      </h2>
+      <ul className="border-border bg-card overflow-hidden rounded-xl border">
+        {rows.map((row) => (
+          <ListRow key={row.href} as="li">
+            <Link href={row.href} className="hover:bg-secondary block px-4 py-3 text-sm">
+              {row.label}
+            </Link>
+          </ListRow>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default async function DashboardPage() {
   const session = await getSession()
-  const user = session ? await getMe() : null
-  const trips = session ? await fetchTrips(session.userId) : []
+  const [user, trips, pendingRequests] = await Promise.all([
+    session ? getMe() : Promise.resolve(null),
+    session ? fetchTrips(session.userId) : Promise.resolve([]),
+    getPendingRequestsSummary(),
+  ])
 
   const happening = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
   const upcoming = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
@@ -89,6 +128,8 @@ export default async function DashboardPage() {
             : `${trips.length} ${trips.length === 1 ? "trip" : "trips"} total${pastCount > 0 ? `, ${pastCount} completed` : ""}.`}
         </p>
       </div>
+
+      <PendingRequestsSection pendingRequests={pendingRequests} />
 
       {/* Active / upcoming trips */}
       {heroTrips.length > 0 ? (

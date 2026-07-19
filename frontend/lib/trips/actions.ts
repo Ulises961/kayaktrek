@@ -6,6 +6,7 @@ import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api
 import { getSession } from "@/lib/auth/session"
 import {
   TripPageSchema,
+  type Trip,
   type TripDifficulty,
   type TripPage,
   type TripSort,
@@ -178,5 +179,19 @@ export async function handleInvitation(
       success: false,
       error: e instanceof Error ? e.message : "Failed to respond to invitation.",
     }
+  }
+}
+
+// The given user's outstanding crew invitations — trips they've been invited to
+// but haven't accepted/declined yet. Surfaced at /invitations and reused by the
+// sidebar/dashboard pending-requests summary (lib/requests/actions.ts).
+export async function listTripInvitations(userId: string): Promise<Trip[]> {
+  try {
+    const raw = await apiGet<unknown>(`/api/trip/${userId}/invitations`)
+    if (!Array.isArray(raw)) return []
+    return raw.map((row) => TripSchema.parse(row))
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return []
   }
 }

@@ -30,4 +30,13 @@ describe("NavigationItems", () => {
     expect(screen.getByText("Paddlers")).toBeInTheDocument()
     expect(screen.queryByText("Buddies")).not.toBeInTheDocument()
   })
+
+  it("no longer shows the old static Invitations link — requests moved to the header", () => {
+    render(
+      <SidebarProvider>
+        <NavigationItems />
+      </SidebarProvider>,
+    )
+    expect(screen.queryByText("Invitations")).not.toBeInTheDocument()
+  })
 })

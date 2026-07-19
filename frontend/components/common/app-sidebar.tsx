@@ -33,20 +33,15 @@ export async function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
+      {/* Header holds only the collapse toggle — p-2 (8px) + the button's own
+          h-8 (32px) + p-2 (8px) = 48px, matching the main content header's
+          h-12 exactly (M12 B13, header-height unification). The profile link
+          moved to the footer, grouped with the other account-scoped actions
+          (Settings, Sign out) it always belonged next to. */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarToggleButton />
         </SidebarMenu>
-        <SidebarSeparator />
-        {user && (
-          <SidebarProfileLink
-            name={user.name}
-            surname={user.surname ?? undefined}
-            mail={user.mail}
-            displayName={displayName}
-            avatarUrl={user.avatarUrl ?? null}
-          />
-        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -60,6 +55,18 @@ export async function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {user && (
+          <>
+            <SidebarProfileLink
+              name={user.name}
+              surname={user.surname ?? undefined}
+              mail={user.mail}
+              displayName={displayName}
+              avatarUrl={user.avatarUrl ?? null}
+            />
+            <SidebarSeparator />
+          </>
+        )}
         <SidebarMenu>
           <SidebarSettingsLink />
           <SidebarLogoutButton />

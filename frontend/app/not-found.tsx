@@ -13,10 +13,10 @@ export default function NotFound() {
         </p>
       </div>
       <Link
-        href="/trips"
+        href="/"
         className="text-foreground hover:text-muted-foreground text-sm font-medium underline underline-offset-4 transition-colors"
       >
-        Back to your trips
+        Back to home
       </Link>
     </div>
   )

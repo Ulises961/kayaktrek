@@ -1,22 +1,17 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
-import { apiGet } from "@/lib/api/client"
-import { TripSchema } from "@/lib/dtos/trip"
-import { z } from "zod"
+import { listTripInvitations } from "@/lib/trips/actions"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InvitationActions } from "@/components/trips/invitation-actions"
 import { NoTripsIllustration } from "@/components/illustrations/no-trips"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-const InvitationsSchema = z.array(TripSchema)
-
 export default async function InvitationsPage() {
   const session = await getSession()
   if (!session) redirect("/login")
 
-  const raw = await apiGet(`/api/trip/${session.userId}/invitations`)
-  const trips = InvitationsSchema.parse(raw)
+  const trips = await listTripInvitations(session.userId)
 
   return (
     <>

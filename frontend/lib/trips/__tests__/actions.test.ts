@@ -25,6 +25,7 @@ import {
   removeMember,
   deleteTrip,
   listTrips,
+  listTripInvitations,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
@@ -238,5 +239,26 @@ describe("listTrips", () => {
     vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
     const result = await listTrips({})
     expect(result).toEqual(EMPTY_PAGE)
+  })
+})
+
+describe("listTripInvitations", () => {
+  it("fetches the given user's outstanding crew invitations", async () => {
+    vi.mocked(apiGet).mockResolvedValue([{ id: TRIP_ID, destination: "Fjords" }])
+    const result = await listTripInvitations(USER_ID)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${USER_ID}/invitations`)
+    expect(result).toEqual([expect.objectContaining({ id: TRIP_ID, destination: "Fjords" })])
+  })
+
+  it("returns an empty array when the response isn't an array", async () => {
+    vi.mocked(apiGet).mockResolvedValue(null)
+    const result = await listTripInvitations(USER_ID)
+    expect(result).toEqual([])
+  })
+
+  it("returns an empty array on failure", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
+    const result = await listTripInvitations(USER_ID)
+    expect(result).toEqual([])
   })
 })

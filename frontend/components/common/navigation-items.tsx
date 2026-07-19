@@ -6,7 +6,6 @@ import {
   PocketKnifeIcon,
   SignpostBigIcon,
   NewspaperIcon,
-  MailIcon,
   CompassIcon,
 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
@@ -23,7 +22,6 @@ export function NavigationItems() {
     { title: "Trips", url: "/trips", icon: KayakIcon },
     { title: "Itineraries", url: "/itinerary", icon: SignpostBigIcon },
     { title: "Explore", url: "/explore", icon: CompassIcon },
-    { title: "Invitations", url: "/invitations", icon: MailIcon },
     { title: "Gear", url: "/gear", icon: PocketKnifeIcon },
     { title: "Paddlers", url: "/paddlers", icon: UserGroupIcon },
     { title: "Logs", url: "/logs", icon: NewspaperIcon },
