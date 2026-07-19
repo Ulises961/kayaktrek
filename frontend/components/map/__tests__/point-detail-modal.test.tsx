@@ -45,6 +45,8 @@ const baseCtx: MapBuilderContextValue = {
   setDraftSlices: vi.fn(),
   tripId: null,
   tripName: "Test Trip",
+  tripDateFrom: null,
+  tripDateTo: null,
   itineraryId: "itin-1",
   distanceUnit: "nm",
   setDistanceUnit: vi.fn(),

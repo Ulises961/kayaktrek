@@ -25,6 +25,7 @@ import { DatePicker } from "@/components/common/date-picker"
 import { useSaveStatus } from "@/hooks/use-save-status"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
+import { ExtendTripRangeFooter } from "./extend-trip-range-footer"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { PointType } from "@/lib/dtos/point"
 
@@ -65,6 +66,29 @@ function buildRenderList(pointOrder: string[], slices: DaySlice[] | null): Rende
   return items
 }
 
+// A day-date picker's popover footer offering to push the trip's own
+// dateFrom/dateTo out of the way when that's the bound actually blocking the
+// user (never for the previous-day ordering constraint — extending the trip
+// wouldn't help there). Either, both, or neither side may apply.
+function buildRangeFooter(
+  tripId: string | null,
+  showMin: boolean,
+  minBound: string | undefined,
+  showMax: boolean,
+  maxBound: string | undefined,
+) {
+  if (!tripId) return undefined
+  const min = showMin && minBound
+  const max = showMax && maxBound
+  if (!min && !max) return undefined
+  return (
+    <>
+      {min && <ExtendTripRangeFooter tripId={tripId} direction="min" currentBound={minBound!} />}
+      {max && <ExtendTripRangeFooter tripId={tripId} direction="max" currentBound={maxBound!} />}
+    </>
+  )
+}
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 export function PointListPane() {
@@ -79,6 +103,9 @@ export function PointListPane() {
     day0Id,
     selectedPointId,
     setSelectedPointId,
+    tripId,
+    tripDateFrom,
+    tripDateTo,
   } = useMapBuilder()
 
   const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(
@@ -446,6 +473,15 @@ export function PointListPane() {
                     onChange={(v) => handleDateChange(s0.dayId, v || null)}
                     placeholder="Add date"
                     size="sm"
+                    minDate={tripDateFrom ?? undefined}
+                    maxDate={tripDateTo ?? undefined}
+                    footer={buildRangeFooter(
+                      tripId,
+                      true,
+                      tripDateFrom ?? undefined,
+                      true,
+                      tripDateTo ?? undefined,
+                    )}
                     className="h-6 w-auto border-none bg-transparent px-1 text-xs shadow-none"
                   />
                 ) : (
@@ -495,6 +531,8 @@ export function PointListPane() {
           // kind === "divider"
           const { slice, sliceIdx } = item
           const nextSlice = activeSlices![sliceIdx + 1]
+          const priorDate = latestDatedSliceDate(activeSlices!, sliceIdx)
+          const effectiveMinDate = priorDate ?? tripDateFrom ?? undefined
           return (
             <Fragment key={`divider-${slice.dayId}`}>
               <BoundaryDivider
@@ -504,7 +542,15 @@ export function PointListPane() {
                 avgSpeedKnots={avgSpeedKnots}
                 labelDayNumber={slice.dayNumber + 1}
                 labelDate={nextSlice?.date ?? null}
-                minDate={latestDatedSliceDate(activeSlices!, sliceIdx)}
+                minDate={effectiveMinDate}
+                maxDate={tripDateTo ?? undefined}
+                footer={buildRangeFooter(
+                  tripId,
+                  !priorDate,
+                  effectiveMinDate,
+                  true,
+                  tripDateTo ?? undefined,
+                )}
                 interactive={isInteractive}
                 onDateChange={
                   isInteractive

@@ -23,6 +23,8 @@ const MOCK_CTX: MapBuilderContextValue = {
   setDraftSlices: () => {},
   tripId: null,
   tripName: "Test Trip",
+  tripDateFrom: null,
+  tripDateTo: null,
   itineraryId: ITIN_ID,
   distanceUnit: "nm",
   setDistanceUnit: () => {},

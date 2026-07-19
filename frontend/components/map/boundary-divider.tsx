@@ -1,5 +1,5 @@
 "use client"
-import { useRef } from "react"
+import { useRef, type ReactNode } from "react"
 import { GripVerticalIcon, Trash2Icon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import { legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
@@ -15,6 +15,10 @@ export type BoundaryDividerProps = {
   labelDate: string | null
   /** ISO date of the nearest earlier dated day — this day can't be dated before it. */
   minDate?: string
+  /** ISO date — this day can't be dated after it (the trip's own dateTo). */
+  maxDate?: string
+  /** Rendered below the date picker's calendar, inside its popover. */
+  footer?: ReactNode
   interactive?: boolean
   onDateChange?: (date: string | null) => void
   onBoundaryMove?: (newEndPointIdx: number) => void
@@ -38,6 +42,8 @@ export function BoundaryDivider({
   labelDayNumber,
   labelDate,
   minDate,
+  maxDate,
+  footer,
   interactive = true,
   onDateChange,
   onBoundaryMove,
@@ -211,6 +217,8 @@ export function BoundaryDivider({
             placeholder="Add date"
             size="sm"
             minDate={minDate}
+            maxDate={maxDate}
+            footer={footer}
             className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
           />
           {deleteButton && <div className="ml-auto">{deleteButton}</div>}

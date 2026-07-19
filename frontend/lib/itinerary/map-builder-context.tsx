@@ -16,6 +16,10 @@ export type MapBuilderContextValue = {
   setDraftSlices: (s: DaySlice[] | null) => void
   tripId: string | null
   tripName: string
+  /** ISO date (YYYY-MM-DD) — the trip's own declared start/end, used to bound
+   * day-date pickers so a Day can't silently drift outside the trip's range. */
+  tripDateFrom: string | null
+  tripDateTo: string | null
   itineraryId: string
   distanceUnit: DistanceUnit
   setDistanceUnit: (u: DistanceUnit) => void

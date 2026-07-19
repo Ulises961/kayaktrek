@@ -24,6 +24,8 @@ export default async function ItineraryBuilderPage({
   }
 
   let tripName = "Trip"
+  let tripDateFrom: string | null = null
+  let tripDateTo: string | null = null
   let tripState: TripState | null = null
   let isLeader = true
 
@@ -35,6 +37,8 @@ export default async function ItineraryBuilderPage({
       const tripRaw = await apiGet(`/api/trip/${itinerary.tripId}`)
       const trip = TripSchema.parse(tripRaw)
       tripName = trip.destination ?? "Trip"
+      tripDateFrom = trip.dateFrom ?? null
+      tripDateTo = trip.dateTo ?? null
       tripState = trip.state ?? null
 
       const session = await getSession()
@@ -53,6 +57,8 @@ export default async function ItineraryBuilderPage({
       itinerary={itinerary}
       tripId={itinerary.tripId ?? null}
       tripName={tripName}
+      tripDateFrom={tripDateFrom}
+      tripDateTo={tripDateTo}
       tripState={tripState}
       isLeader={isLeader}
       initialDistanceUnit={initialDistanceUnit}

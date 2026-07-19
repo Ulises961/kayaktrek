@@ -27,6 +27,8 @@ type MapBuilderProps = {
   itinerary: Itinerary
   tripId: string | null
   tripName: string
+  tripDateFrom?: string | null
+  tripDateTo?: string | null
   tripState?: TripState | null
   isLeader?: boolean
   initialDistanceUnit?: DistanceUnit
@@ -36,6 +38,8 @@ export function MapBuilder({
   itinerary,
   tripId,
   tripName,
+  tripDateFrom = null,
+  tripDateTo = null,
   tripState = null,
   isLeader = true,
   initialDistanceUnit = DISTANCE_UNIT.NM,
@@ -178,6 +182,8 @@ export function MapBuilder({
       setDraftSlices,
       tripId: tripId ?? null,
       tripName,
+      tripDateFrom,
+      tripDateTo,
       itineraryId: itinerary.id ?? "",
       distanceUnit,
       setDistanceUnit: handleDistanceUnitChange,
@@ -203,6 +209,8 @@ export function MapBuilder({
       draftSlices,
       tripId,
       tripName,
+      tripDateFrom,
+      tripDateTo,
       itinerary.id,
       distanceUnit,
       handleDistanceUnitChange,

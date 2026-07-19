@@ -42,6 +42,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDraftSlices: vi.fn(),
     tripId: null,
     tripName: "Test Trip",
+    tripDateFrom: null,
+    tripDateTo: null,
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
     setDistanceUnit: vi.fn(),

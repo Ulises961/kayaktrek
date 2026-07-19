@@ -31,6 +31,9 @@ vi.mock("@/lib/itinerary/boundaries", async (importOriginal) => {
   }
 })
 
+vi.mock("@/lib/trips/actions", () => ({ updateTrip: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+
 import { PointListPane } from "../point-list-pane"
 import * as boundaries from "@/lib/itinerary/boundaries"
 import * as actions from "@/lib/itinerary/actions"
@@ -72,6 +75,8 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDraftSlices: vi.fn(),
     tripId: null,
     tripName: "Test Trip",
+    tripDateFrom: null,
+    tripDateTo: null,
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
     setDistanceUnit: vi.fn(),
@@ -516,6 +521,79 @@ describe("PointListPane — boundary divider date minDate", () => {
     // month (e.g. the 5th) must be disabled.
     await userEvent.click(screen.getByRole("button", { name: /25 Jul 2026/i }))
     expect(screen.getByText("5").closest("button")).toBeDisabled()
+  })
+
+  it("falls back to the trip's own dateFrom when no earlier day is dated yet", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-25" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft, tripDateFrom: "2026-07-20" }))
+    await userEvent.click(screen.getByRole("button", { name: /25 Jul 2026/i }))
+    // Before the trip's own start (the 15th) is disabled; day 2 has no prior
+    // dated day to fall back on instead.
+    expect(screen.getByText("15").closest("button")).toBeDisabled()
+  })
+
+  it("bounds every day's date picker by the trip's own dateTo", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-20" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft, tripDateTo: "2026-07-22" }))
+    await userEvent.click(screen.getByRole("button", { name: /20 Jul 2026/i }))
+    expect(screen.getByText("23").closest("button")).toBeDisabled()
+  })
+
+  it("does not offer to extend the trip start when an earlier day is already dated", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-25" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft, tripId: "trip-1", tripDateFrom: "2026-07-01" }))
+    await userEvent.click(screen.getByRole("button", { name: /25 Jul 2026/i }))
+    expect(screen.queryByText(/need an earlier date/i)).not.toBeInTheDocument()
+  })
+
+  it("offers to extend the trip end date from the boundary divider's picker", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-20" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft, tripId: "trip-1", tripDateTo: "2026-07-22" }))
+    await userEvent.click(screen.getByRole("button", { name: /20 Jul 2026/i }))
+    expect(screen.getByText(/need a later date/i)).toBeInTheDocument()
+  })
+})
+
+describe("PointListPane — Day 1 date picker trip bounds", () => {
+  it("bounds Day 1's date picker by the trip's own dateFrom and dateTo", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+    ]
+    renderWithCtx(
+      makeCtx({ draftSlices: draft, tripDateFrom: "2026-07-10", tripDateTo: "2026-07-20" }),
+    )
+    await userEvent.click(screen.getByRole("button", { name: /15 Jul 2026/i }))
+    expect(screen.getByText("5").closest("button")).toBeDisabled()
+    expect(screen.getByText("25").closest("button")).toBeDisabled()
+  })
+
+  it("offers both extend directions on Day 1 when both trip bounds are set", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+    ]
+    renderWithCtx(
+      makeCtx({
+        draftSlices: draft,
+        tripId: "trip-1",
+        tripDateFrom: "2026-07-10",
+        tripDateTo: "2026-07-20",
+      }),
+    )
+    await userEvent.click(screen.getByRole("button", { name: /15 Jul 2026/i }))
+    expect(screen.getByText(/need an earlier date/i)).toBeInTheDocument()
+    expect(screen.getByText(/need a later date/i)).toBeInTheDocument()
   })
 })
 
