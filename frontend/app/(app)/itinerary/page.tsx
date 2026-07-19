@@ -6,6 +6,7 @@ import { ImportGpxButton } from "@/components/itinerary/import-gpx-button"
 import { ItineraryCard } from "@/components/itinerary/itinerary-card"
 import { getMe } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function ItineraryListPage() {
   let itineraries: Awaited<ReturnType<typeof ItinerariesSchema.parse>> = []
@@ -21,7 +22,7 @@ export default async function ItineraryListPage() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold sm:text-2xl">Itineraries</h1>
+        <PageHeading>Itineraries</PageHeading>
         <div className="flex items-center gap-2">
           <ImportGpxButton />
           <NewItineraryButton />

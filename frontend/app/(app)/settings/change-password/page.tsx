@@ -1,5 +1,6 @@
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { ChangePasswordForm } from "@/components/profile/change-password-form"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default function ChangePasswordPage() {
   return (
@@ -8,7 +9,7 @@ export default function ChangePasswordPage() {
         crumbs={[{ label: "Settings", href: "/settings" }, { label: "Change password" }]}
       />
       <div>
-        <h1 className="text-2xl font-semibold">Change password</h1>
+        <PageHeading>Change password</PageHeading>
         <p className="text-muted-foreground mt-1 text-sm">
           Your new password must be at least 8 characters and include a letter, a number, and a
           special character.

@@ -12,6 +12,7 @@ import { PhoneSection } from "@/components/settings/phone-section"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
+import { PageHeading } from "@/components/common/page-heading"
 import { LockIcon, RulerIcon, MailIcon, ShieldIcon, DownloadIcon } from "lucide-react"
 
 export default async function SettingsPage() {
@@ -28,7 +29,7 @@ export default async function SettingsPage() {
       <SetBreadcrumbs crumbs={[{ label: "Settings" }]} />
 
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <PageHeading>Settings</PageHeading>
         <p className="text-muted-foreground mt-1 text-sm">
           Account, security, and data — self-presentation lives on your{" "}
           <Link href="/profile" className="hover:text-foreground underline underline-offset-2">

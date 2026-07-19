@@ -6,6 +6,7 @@ import { modalSeaState } from "@/lib/logs/format"
 import { beaufortLabel } from "@/lib/weather/beaufort"
 import { DISTANCE_UNIT, toNm } from "@/lib/itinerary/distance"
 import { LogsTabs } from "@/components/logs/logs-tabs"
+import { PageHeading } from "@/components/common/page-heading"
 import { EndorsementInbox } from "@/components/logs/endorsement-inbox"
 import { AddLogDialog } from "@/components/logs/add-log-dialog"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react"
@@ -28,7 +29,7 @@ export default async function LogsPage() {
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Paddling logs</h1>
+        <PageHeading>Paddling logs</PageHeading>
         <AddLogDialog unit={unit} />
       </div>
 

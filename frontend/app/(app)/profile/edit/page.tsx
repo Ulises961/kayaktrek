@@ -3,6 +3,7 @@ import { apiGet } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { EditProfileForm } from "@/components/profile/edit-profile-form"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function EditProfilePage() {
   let user
@@ -16,7 +17,7 @@ export default async function EditProfilePage() {
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <SetBreadcrumbs crumbs={[{ label: "Profile", href: "/profile" }, { label: "Edit" }]} />
-      <h1 className="text-2xl font-semibold">Edit profile</h1>
+      <PageHeading>Edit profile</PageHeading>
       <EditProfileForm user={user} />
     </div>
   )

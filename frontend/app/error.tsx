@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { StateVisual } from "@/components/illustrations/state-visual"
+import { PageHeading } from "@/components/common/page-heading"
 
 interface ErrorPageProps {
   error: Error & { digest?: string }
@@ -14,7 +15,7 @@ export default function ErrorPage({ reset }: ErrorPageProps) {
       <StateVisual state="error" className="w-full max-w-sm" />
       <div className="flex flex-col gap-2 text-center">
         <p className="text-muted-foreground font-mono text-xs tracking-widest uppercase">500</p>
-        <h1 className="text-foreground text-2xl font-semibold">Lost bearing</h1>
+        <PageHeading className="text-foreground">Lost bearing</PageHeading>
         <p className="text-muted-foreground max-w-xs text-sm">
           Something broke on our end. Try again or head back to safety.
         </p>
@@ -28,10 +29,10 @@ export default function ErrorPage({ reset }: ErrorPageProps) {
         </button>
         <span className="text-muted-foreground text-sm">·</span>
         <Link
-          href="/trips"
+          href="/"
           className="text-foreground hover:text-muted-foreground text-sm font-medium underline underline-offset-4 transition-colors"
         >
-          Back to your trips
+          Back to home
         </Link>
       </div>
     </div>

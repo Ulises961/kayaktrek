@@ -9,6 +9,7 @@ import { buildPendingRequestRows } from "@/lib/requests/pending"
 import { StateBadge } from "@/components/common/state-badge"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { ListRow } from "@/components/common/list-row"
+import { PageHeading } from "@/components/common/page-heading"
 import { Button } from "@/components/ui/button"
 import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
 import { formatDateRange } from "@/lib/trips/format"
@@ -119,9 +120,7 @@ export default async function DashboardPage() {
     <div className="flex max-w-2xl flex-col gap-8 p-6">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-semibold">
-          Welcome back{user?.username ? `, ${user.username}` : ""}
-        </h1>
+        <PageHeading>Welcome back{user?.username ? `, ${user.username}` : ""}</PageHeading>
         <p className="text-muted-foreground mt-1 text-sm">
           {trips.length === 0
             ? "You have no trips yet. Start planning your first expedition."

@@ -4,7 +4,7 @@ import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
 import { TripsBoard } from "@/components/trips/trips-board"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
 import { StateVisual } from "@/components/illustrations/state-visual"
-import CurrentPageTitle from "@/components/common/current-page-title"
+import { PageHeading } from "@/components/common/page-heading"
 import { redirect } from "next/navigation"
 
 export default async function Page() {
@@ -25,7 +25,7 @@ export default async function Page() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between">
-        <CurrentPageTitle />
+        <PageHeading>Trips</PageHeading>
         <NewTripDialog />
       </div>
       {grandTotal === 0 ? (

@@ -4,6 +4,7 @@ import { API_URL, API_PREFIX } from "@/lib/api/config"
 import { formatDayDate } from "@/lib/utils/date"
 import { formatVesselLength } from "@/lib/user/format"
 import { formatDateRange } from "@/lib/trips/format"
+import { PageHeading } from "@/components/common/page-heading"
 
 async function fetchSnapshot(token: string) {
   try {
@@ -112,7 +113,7 @@ export default async function PublicFloatPlanPage({
       <div className="bg-background flex min-h-screen items-center justify-center p-6">
         <div className="flex max-w-sm flex-col items-center gap-4 text-center">
           <AlertTriangleIcon className="text-muted-foreground size-10" />
-          <h1 className="text-xl font-semibold">Float plan not found</h1>
+          <PageHeading>Float plan not found</PageHeading>
           <p className="text-muted-foreground text-sm leading-relaxed">
             This link has expired or is no longer valid. Contact the expedition leader for an
             updated link.

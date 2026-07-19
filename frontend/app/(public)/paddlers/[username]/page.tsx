@@ -10,6 +10,7 @@ import { ListRow } from "@/components/common/list-row"
 import { ProfileRelationshipControls } from "@/components/paddlers/profile-relationship-controls"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeading } from "@/components/common/page-heading"
 import { AwardIcon, MapPinIcon, ActivityIcon, AnchorIcon } from "lucide-react"
 
 interface PublicProfilePageProps {
@@ -61,7 +62,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
             className="!size-16"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-2xl font-semibold">{fullName}</h1>
+            <PageHeading className="truncate">{fullName}</PageHeading>
             <p className="text-muted-foreground text-sm">@{profile.username}</p>
             {profile.homeLocation && (
               <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">

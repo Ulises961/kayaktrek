@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/common/user-avatar"
 import { InvitationActions } from "@/components/trips/invitation-actions"
 import { NoTripsIllustration } from "@/components/illustrations/no-trips"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function InvitationsPage() {
   const session = await getSession()
@@ -15,7 +16,7 @@ export default async function InvitationsPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold">Invitations</h1>
+      <PageHeading className="mb-6">Invitations</PageHeading>
 
       {trips.length === 0 ? (
         <div className="mt-16 flex flex-col items-center gap-4 text-center">

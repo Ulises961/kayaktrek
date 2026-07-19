@@ -11,6 +11,7 @@ import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
 import { CertificationsSection } from "@/components/profile/certifications-section"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
 import { getMyStats } from "@/lib/logs/actions"
+import { PageHeading } from "@/components/common/page-heading"
 import {
   PhoneIcon,
   PencilIcon,
@@ -52,9 +53,9 @@ export default async function ProfilePage() {
           className="!size-16"
         />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold">
+          <PageHeading className="truncate">
             {[user.name, user.surname].filter(Boolean).join(" ")}
-          </h1>
+          </PageHeading>
           <p className="text-muted-foreground text-sm">@{user.username}</p>
           {user.homeLocation && (
             <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
