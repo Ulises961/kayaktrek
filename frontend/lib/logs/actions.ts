@@ -8,11 +8,33 @@ import type { Stats } from "@/lib/dtos/public-profile"
 
 export type LogActionResult = { success: true } | { success: false; error: string }
 
+export type LogListFilters = {
+  minSea?: number
+  maxSea?: number
+  minDistance?: number
+  maxDistance?: number
+}
+
 const EMPTY_LOG_PAGE: LogPage = { items: [], total: 0, page: 1, pages: 1 }
 
-export async function listMyLogs(page = 1, sort: LogSort = LOG_SORT.NEWEST): Promise<LogPage> {
+function logListParams(page: number, sort: LogSort, filters: LogListFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  params.set("page", String(page))
+  params.set("sort", sort)
+  if (filters.minSea != null) params.set("min_sea", String(filters.minSea))
+  if (filters.maxSea != null) params.set("max_sea", String(filters.maxSea))
+  if (filters.minDistance != null) params.set("min_distance", String(filters.minDistance))
+  if (filters.maxDistance != null) params.set("max_distance", String(filters.maxDistance))
+  return params
+}
+
+export async function listMyLogs(
+  page = 1,
+  sort: LogSort = LOG_SORT.NEWEST,
+  filters: LogListFilters = {},
+): Promise<LogPage> {
   try {
-    const raw = await apiGet<unknown>(`/api/log/all?page=${page}&sort=${sort}`)
+    const raw = await apiGet<unknown>(`/api/log/all?${logListParams(page, sort, filters)}`)
     return LogPageSchema.parse(raw)
   } catch {
     return EMPTY_LOG_PAGE
@@ -22,9 +44,10 @@ export async function listMyLogs(page = 1, sort: LogSort = LOG_SORT.NEWEST): Pro
 export async function listEndorsedLogs(
   page = 1,
   sort: LogSort = LOG_SORT.NEWEST,
+  filters: LogListFilters = {},
 ): Promise<LogPage> {
   try {
-    const raw = await apiGet<unknown>(`/api/log/endorsed?page=${page}&sort=${sort}`)
+    const raw = await apiGet<unknown>(`/api/log/endorsed?${logListParams(page, sort, filters)}`)
     return LogPageSchema.parse(raw)
   } catch {
     return EMPTY_LOG_PAGE

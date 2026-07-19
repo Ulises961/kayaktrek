@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Plus, MapPin, Diamond } from "lucide-react"
+import { Plus, MapPin, Diamond, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type MapAddControlProps = {
@@ -15,10 +15,12 @@ export type MapAddControlProps = {
   onCancel: () => void
 }
 
-// Top-centre "+ Add" disclosure, the create-action counterpart to the top-right
+// Top-centre "Annotate" disclosure, the create-action counterpart to the top-right
 // Overlays (LayersControl) toggle. Mirrors its open/close mechanic: the menu items
 // stay in the DOM (visibility-toggled) so each is addressable and gated on its own
 // availability. While placing, the menu is replaced by a click-the-map prompt.
+// Named "Annotate" (not "Add") since route points — the other thing you can add to
+// the map — are created by clicking the map directly, not through this control.
 export function MapAddControl({
   canAddPlace,
   canAddDiamond,
@@ -61,6 +63,7 @@ export function MapAddControl({
         type="button"
         onClick={() => setOpen((o) => !o)}
         data-testid="add-button"
+        aria-expanded={open}
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-all",
           open
@@ -69,7 +72,11 @@ export function MapAddControl({
         )}
       >
         <Plus className="size-3.5" aria-hidden />
-        Add
+        Annotate
+        <ChevronDown
+          className={cn("size-3 transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
       </button>
 
       <div
@@ -92,7 +99,7 @@ export function MapAddControl({
             <span className="flex flex-col">
               <span className="text-[11px] font-medium">Place</span>
               <span className="text-muted-foreground text-[10px]">
-                A point of interest anyone viewing this trip&apos;s map can see.
+                Add a point of interest anyone viewing this trip&apos;s map can see.
               </span>
             </span>
           </button>
@@ -107,7 +114,9 @@ export function MapAddControl({
             <span className="flex flex-col">
               <span className="text-[11px] font-medium">Tidal diamond</span>
               <span className="text-muted-foreground text-[10px]">
-                {canAddDiamond ? "Manual tide entry for the selected day." : "Select a day first."}
+                {canAddDiamond
+                  ? "Add a manual tide entry for the selected day."
+                  : "Select a day first."}
               </span>
             </span>
           </button>

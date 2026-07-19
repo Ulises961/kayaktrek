@@ -10,10 +10,18 @@ import { CHART_INK as INK, CHART_PAPER_GLOW as PAPER_GLOW } from "./chart-theme"
 // A real geographic lat/lon grid drawn across the whole chart (the old ticks were
 // CSS marginalia fixed to the frame border). Lines are meridians/parallels at a
 // per-zoom degree step; they pan and zoom with the map like a true chart graticule.
-function niceStep(zoom: number): number {
+// Roughly doubles the step as zoom drops a couple of levels, keeping on-screen
+// line density stable instead of the old fixed 1° floor packing in an
+// unreadable mesh once zoomed out past a regional view. Below z4 there's no
+// step that reads as a navigation aid rather than clutter at that scale, so
+// the grid stops rendering entirely (a chart graticule is a coastal/regional
+// tool, not a whole-ocean one) — see the `null` handling in `Graticule`.
+function niceStep(zoom: number): number | null {
   if (zoom >= 10) return 0.25
   if (zoom >= 8) return 0.5
-  return 1
+  if (zoom >= 6) return 1
+  if (zoom >= 4) return 2
+  return null
 }
 
 function fmtDeg(value: number, pos: string, neg: string): string {
@@ -45,12 +53,17 @@ export function Graticule({ ready = true }: { ready?: boolean }) {
   // small default extent for a frame before catching up.
   if (!ready || !settled) return null
 
-  const b = map.getBounds()
   const step = niceStep(map.getZoom())
+  if (step === null) return null
+
+  const b = map.getBounds()
   const south = b.getSouth()
   const north = b.getNorth()
   const west = b.getWest()
   const east = b.getEast()
+  // Lines run edge-to-edge, no inset — the grid should read as genuinely part
+  // of the map surface, receding naturally under whatever UI chrome sits on
+  // top of it (z-order), not visibly clipped back from the true bounds.
   const lineOpts = { color: INK, weight: 0.7, opacity: 0.42, interactive: false } as const
 
   const els: ReactNode[] = []

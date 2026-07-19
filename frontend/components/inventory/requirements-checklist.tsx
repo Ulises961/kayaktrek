@@ -19,6 +19,17 @@ import { ListRow } from "@/components/common/list-row"
 import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { bucketByCategory } from "@/lib/inventory/format"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface RequirementsChecklistProps {
   inventoryId: string
@@ -52,6 +63,19 @@ export function RequirementsChecklist({
   const [error, setError] = useState<string | null>(null)
 
   const ownedItems = myItems.filter((i) => i.status === "owned")
+
+  // Items I've already contributed to some other requirement in this trip drop
+  // out of the picker — one physical item can't cover two requirements at
+  // once, and the list must recompute as contributions change (§4 fix).
+  const contributedItemIds = new Set(
+    requirements.flatMap((r) =>
+      (r.contributions ?? [])
+        .filter((c) => c.member?.user?.id === currentUserId)
+        .map((c) => c.item?.id)
+        .filter((id): id is string => !!id),
+    ),
+  )
+  const availableItems = ownedItems.filter((i) => !i.id || !contributedItemIds.has(i.id))
 
   function handleAdd() {
     const trimmed = name.trim()
@@ -93,7 +117,7 @@ export function RequirementsChecklist({
                     inventoryId={inventoryId}
                     tripId={tripId}
                     requirement={req}
-                    ownedItems={ownedItems}
+                    ownedItems={availableItems}
                     canManage={canManage}
                     currentUserId={currentUserId}
                   />
@@ -182,7 +206,6 @@ function RequirementRow({
   }
 
   function handleRemove() {
-    if (!confirm(`Remove “${req.name}” from the inventory?`)) return
     run(() => removeRequirement(inventoryId, req.id!, tripId))
   }
 
@@ -205,16 +228,37 @@ function RequirementRow({
             </Button>
           )}
           {canManage && isProposer && (
-            <Button
-              size="icon"
-              variant="ghost"
-              disabled={isPending}
-              onClick={handleRemove}
-              aria-label={`Remove ${req.name}`}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <XIcon className="size-4" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={isPending}
+                  aria-label={`Remove ${req.name}`}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <XIcon className="size-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove {req.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove “{req.name}” from the inventory. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleRemove}
+                    disabled={isPending}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>

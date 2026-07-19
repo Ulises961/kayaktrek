@@ -1,57 +1,26 @@
 import { getSession } from "@/lib/auth/session"
-import { apiGetAllPages } from "@/lib/api/paginate"
-import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
-import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
-import type { RouteData } from "@/lib/itinerary/public-routes"
-import { TripCard } from "@/components/common/trip-card"
-import { PastTripsSection } from "@/components/trips/past-trips-section"
-import { PlanningTripsSection } from "@/components/trips/planning-trips-section"
+import { listTrips } from "@/lib/trips/actions"
+import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
+import { TripsBoard } from "@/components/trips/trips-board"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
 import { StateVisual } from "@/components/illustrations/state-visual"
 import CurrentPageTitle from "@/components/common/current-page-title"
 import { redirect } from "next/navigation"
 
-function SectionHeader({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-muted-foreground text-xs font-semibold tracking-[0.06em] uppercase">
-        {label}
-      </span>
-      <span className="text-muted-foreground/50 text-xs">{count}</span>
-    </div>
-  )
-}
-
 export default async function Page() {
   const session = await getSession()
   if (!session) redirect("/login")
 
-  const { items: trips, total } = await apiGetAllPages(
-    `/api/trip/${session.userId}/all`,
-    TripPageSchema,
-  )
-
-  // Each trip's own route, drawn as the chart banner on its card (M12 §E). No extra
-  // requests: the trips envelope already nests each itinerary's days+points
-  // (TripSchema dumps the full ItinerarySchema), so the route is a pure derivation
-  // from data in hand — never a per-trip N+1 fetch.
-  const routesById: Record<string, RouteData | null> = {}
-  for (const t of trips) {
-    if (!t.id || !t.itinerary) continue
-    const route = extractItineraryRoute(t.itinerary)
-    routesById[t.id] = route.positions.length > 0 ? route : null
-  }
-
-  const happeningTrips = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
-  const planningTrips = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
-  const pastTrips = trips
-    .filter((t) => t.state === TRIP_STATE.PAST)
-    .sort((a, b) => {
-      if (!a.dateTo && !b.dateTo) return 0
-      if (!a.dateTo) return 1
-      if (!b.dateTo) return -1
-      return b.dateTo.localeCompare(a.dateTo)
-    })
+  // One page-1 fetch per state bucket, in parallel — replaces the old
+  // apiGetAllPages call that eagerly fetched every page of every trip up
+  // front regardless of how many a user has. Each TripsSection below takes it
+  // from here with its own independent load-more (M12 §24 follow-up).
+  const [happening, planning, past] = await Promise.all([
+    listTrips({ state: TRIP_STATE.HAPPENING, sort: TRIP_SORT.LATEST_END }),
+    listTrips({ state: TRIP_STATE.BUILDING, sort: TRIP_SORT.SOONEST }),
+    listTrips({ state: TRIP_STATE.PAST, sort: TRIP_SORT.LATEST_END }),
+  ])
+  const grandTotal = happening.total + planning.total + past.total
 
   return (
     <>
@@ -59,7 +28,7 @@ export default async function Page() {
         <CurrentPageTitle />
         <NewTripDialog />
       </div>
-      {total === 0 ? (
+      {grandTotal === 0 ? (
         <div className="mt-16 flex flex-col items-center gap-6 text-center xl:mt-24">
           <StateVisual state="empty" className="3xl:w-[32rem] w-56 opacity-80 xl:w-80 2xl:w-96" />
           <p className="text-muted-foreground text-sm xl:text-base 2xl:text-lg">
@@ -67,29 +36,8 @@ export default async function Page() {
           </p>
         </div>
       ) : (
-        <div className="mt-4 flex flex-col gap-6">
-          {happeningTrips.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <SectionHeader label="Happening" count={happeningTrips.length} />
-              <div className="flex flex-col gap-3">
-                {happeningTrips.map((trip) => (
-                  <TripCard key={trip.id} trip={trip} hero route={routesById[trip.id ?? ""]} />
-                ))}
-              </div>
-            </section>
-          )}
-          {planningTrips.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <SectionHeader label="Planning" count={planningTrips.length} />
-              <PlanningTripsSection trips={planningTrips} routesById={routesById} />
-            </section>
-          )}
-          {pastTrips.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <SectionHeader label="Past" count={pastTrips.length} />
-              <PastTripsSection trips={pastTrips} routesById={routesById} />
-            </section>
-          )}
+        <div className="mt-4">
+          <TripsBoard initialHappening={happening} initialPlanning={planning} initialPast={past} />
         </div>
       )}
     </>

@@ -3,11 +3,53 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
-import { TripSchema } from "@/lib/dtos/trip"
+import { getSession } from "@/lib/auth/session"
+import {
+  TripPageSchema,
+  type TripDifficulty,
+  type TripPage,
+  type TripSort,
+  type TripState,
+  TripSchema,
+} from "@/lib/dtos/trip"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 export type TripActionResult = { success: true } | { success: false; error: string }
 export type CreateTripResult = { success: true; tripId: string } | { success: false; error: string }
+
+const EMPTY_TRIP_PAGE: TripPage = { items: [], total: 0, page: 1, pages: 1 }
+
+export type TripListFilters = {
+  state?: TripState
+  sort?: TripSort
+  difficulty?: TripDifficulty
+  minMiles?: number
+  maxMiles?: number
+  page?: number
+}
+
+// Backend user is always the authenticated caller (from the session, never a
+// client-supplied id) — the endpoint is path-scoped to a user id for
+// ownership, not something a caller picks.
+export async function listTrips(filters: TripListFilters): Promise<TripPage> {
+  const session = await getSession()
+  if (!session) return EMPTY_TRIP_PAGE
+
+  const params = new URLSearchParams()
+  params.set("page", String(filters.page ?? 1))
+  if (filters.state) params.set("state", filters.state)
+  if (filters.sort) params.set("sort", filters.sort)
+  if (filters.difficulty) params.set("difficulty", filters.difficulty)
+  if (filters.minMiles != null) params.set("min_miles", String(filters.minMiles))
+  if (filters.maxMiles != null) params.set("max_miles", String(filters.maxMiles))
+
+  try {
+    const raw = await apiGet<unknown>(`/api/trip/${session.userId}/all?${params}`)
+    return TripPageSchema.parse(raw)
+  } catch {
+    return EMPTY_TRIP_PAGE
+  }
+}
 
 interface TripFields {
   destination?: string

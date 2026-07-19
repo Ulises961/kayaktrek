@@ -199,9 +199,13 @@ export function LandingMap({
         attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIB}
       />
       <TileLayer url={SEAMARK} attribution={SEAMARK_ATTRIB} />
-      <Graticule ready={chartReady} />
-      {/* Forecast cell + scale bar are the loud instruments — hero only. The banner
-          stays a calm chart bridge, and the ambient wind never runs on the dashboard. */}
+      {/* Graticule + forecast cell + scale bar are the loud instruments — hero only.
+          A banner thumbnail is a small linked-through strip, same "noise, not
+          attribution" rationale as the credit line above: a grid overlay on a
+          ~7-8rem-tall card strip has no room to read coordinates, it's just
+          clutter. The banner stays a calm chart bridge, and the ambient wind
+          never runs on the dashboard. */}
+      {isHero && <Graticule ready={chartReady} />}
       {isHero && <ScaleBar />}
       {isHero && <ForecastCell routes={routes} />}
       {routes.map((route) =>

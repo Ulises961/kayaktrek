@@ -3,15 +3,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }))
 vi.mock("@/lib/api/client", () => ({
+  apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPatch: vi.fn(),
   apiDelete: vi.fn(),
   isRedirectError: vi.fn().mockReturnValue(false),
 }))
+vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { getSession } from "@/lib/auth/session"
+import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
 import {
   cancelInvitation,
   handleInvitation,
@@ -20,6 +24,7 @@ import {
   advanceState,
   removeMember,
   deleteTrip,
+  listTrips,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
@@ -191,5 +196,47 @@ describe("deleteTrip", () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
     const result = await deleteTrip(TRIP_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("listTrips", () => {
+  const SESSION = { userId: USER_ID, email: "paddler@example.com", isAdmin: false }
+  const EMPTY_PAGE = { items: [], total: 0, page: 1, pages: 1 }
+
+  it("returns an empty page and never calls the API when there is no session", async () => {
+    vi.mocked(getSession).mockResolvedValue(null)
+    const result = await listTrips({})
+    expect(result).toEqual(EMPTY_PAGE)
+    expect(apiGet).not.toHaveBeenCalled()
+  })
+
+  it("fetches page 1 against the session's own user id by default", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockResolvedValue(EMPTY_PAGE)
+    await listTrips({})
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${USER_ID}/all?page=1`)
+  })
+
+  it("includes state, sort, difficulty and the distance range when provided", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockResolvedValue(EMPTY_PAGE)
+    await listTrips({
+      state: TRIP_STATE.BUILDING,
+      sort: TRIP_SORT.SOONEST,
+      difficulty: "easy",
+      minMiles: 5,
+      maxMiles: 50,
+      page: 2,
+    })
+    expect(apiGet).toHaveBeenCalledWith(
+      `/api/trip/${USER_ID}/all?page=2&state=building&sort=soonest&difficulty=easy&min_miles=5&max_miles=50`,
+    )
+  })
+
+  it("returns an empty page on failure", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
+    const result = await listTrips({})
+    expect(result).toEqual(EMPTY_PAGE)
   })
 })

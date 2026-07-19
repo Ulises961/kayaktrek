@@ -106,7 +106,7 @@ export function PaddlersHub({
           ) : communityResults.length === 0 ? (
             <p className="text-muted-foreground text-sm">No paddlers found.</p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col">
               {communityResults.map((paddler) => (
                 <PaddlerResultCard key={paddler.id} paddler={paddler} />
               ))}

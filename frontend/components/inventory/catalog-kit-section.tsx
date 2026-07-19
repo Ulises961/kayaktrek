@@ -12,6 +12,18 @@ import {
 } from "@/lib/inventory/catalog-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ListRow } from "@/components/common/list-row"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface CatalogKitSectionProps {
   items: CatalogItem[]
@@ -42,7 +54,6 @@ export function CatalogKitSection({ items, categories }: CatalogKitSectionProps)
   }
 
   function handleRemove(item: CatalogItem) {
-    if (!confirm(`Remove “${item.name}” from your default trip kit?`)) return
     setError(null)
     startTransition(async () => {
       const result = await deleteCatalogItem(item.id!)
@@ -80,29 +91,48 @@ export function CatalogKitSection({ items, categories }: CatalogKitSectionProps)
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center justify-between gap-3 rounded-lg border p-3"
-            >
+            <ListRow key={item.id} className="flex items-center justify-between gap-3 py-2">
               <div className="flex flex-col gap-0.5">
                 <span className="font-medium">{item.name}</span>
                 {item.category && (
                   <span className="text-muted-foreground text-xs">{item.category.name}</span>
                 )}
               </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                disabled={isPending}
-                onClick={() => handleRemove(item)}
-                aria-label={`Remove ${item.name}`}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <XIcon className="size-4" />
-              </Button>
-            </li>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    disabled={isPending}
+                    aria-label={`Remove ${item.name}`}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove {item.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove “{item.name}” from your default trip kit. New trips you lead
+                      will no longer seed it automatically.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleRemove(item)}
+                      disabled={isPending}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </ListRow>
           ))}
         </ul>
       )}

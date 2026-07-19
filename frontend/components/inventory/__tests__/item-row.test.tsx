@@ -91,35 +91,35 @@ describe("ItemRow", () => {
     expect(mockSetItemOwned).toHaveBeenCalledWith(OWNED.id, false)
   })
 
-  it("deletes the item after confirmation", async () => {
+  it("deletes the item after confirming in the dialog", async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, "confirm").mockReturnValue(true)
     render(<ItemRow item={OWNED} />)
 
     await user.click(screen.getByRole("button", { name: /delete/i }))
+    await user.click(screen.getByRole("button", { name: /^delete$/i }))
 
     expect(mockDeleteItem).toHaveBeenCalledWith(OWNED.id)
   })
 
-  it("does not delete when confirmation is dismissed", async () => {
+  it("does not delete when the dialog is cancelled", async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, "confirm").mockReturnValue(false)
     render(<ItemRow item={OWNED} />)
 
     await user.click(screen.getByRole("button", { name: /delete/i }))
+    await user.click(screen.getByRole("button", { name: /cancel/i }))
 
     expect(mockDeleteItem).not.toHaveBeenCalled()
   })
 
   it("offers an opt-in toggle for an item not yet flagged default-pack", () => {
     render(<ItemRow item={OWNED} />)
-    const toggle = screen.getByRole("button", { name: /always pack/i })
+    const toggle = screen.getByRole("button", { name: /add.*trip checklist/i })
     expect(toggle.getAttribute("aria-pressed")).toBe("false")
   })
 
   it("shows the toggle pressed for an item already flagged default-pack", () => {
     render(<ItemRow item={ALWAYS_PACKED} />)
-    const toggle = screen.getByRole("button", { name: /always pack/i })
+    const toggle = screen.getByRole("button", { name: /trip checklist/i })
     expect(toggle.getAttribute("aria-pressed")).toBe("true")
   })
 
@@ -127,7 +127,7 @@ describe("ItemRow", () => {
     const user = userEvent.setup()
     render(<ItemRow item={OWNED} />)
 
-    await user.click(screen.getByRole("button", { name: /always pack/i }))
+    await user.click(screen.getByRole("button", { name: /add.*trip checklist/i }))
 
     expect(mockToggleDefaultPack).toHaveBeenCalledWith(OWNED.id, true)
   })
@@ -136,7 +136,7 @@ describe("ItemRow", () => {
     const user = userEvent.setup()
     render(<ItemRow item={ALWAYS_PACKED} />)
 
-    await user.click(screen.getByRole("button", { name: /always pack/i }))
+    await user.click(screen.getByRole("button", { name: /trip checklist/i }))
 
     expect(mockToggleDefaultPack).toHaveBeenCalledWith(ALWAYS_PACKED.id, false)
   })

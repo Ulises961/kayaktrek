@@ -2,13 +2,24 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { StarIcon, Trash2Icon } from "lucide-react"
+import { PackagePlusIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Item } from "@/lib/dtos/item"
 import { setItemOwned, deleteItem, toggleDefaultPack } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { ListRow } from "@/components/common/list-row"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface ItemRowProps {
   item: Item
@@ -33,7 +44,6 @@ export function ItemRow({ item }: ItemRowProps) {
   }
 
   function handleDelete() {
-    if (!confirm(`Delete “${item.name}” from your gear? This cannot be undone.`)) return
     setError(null)
     startTransition(async () => {
       const result = await deleteItem(item.id!)
@@ -75,28 +85,49 @@ export function ItemRow({ item }: ItemRowProps) {
             aria-pressed={!!item.defaultPack}
             aria-label={
               item.defaultPack
-                ? `Stop always packing ${item.name} on future trips`
-                : `Always pack ${item.name} on future trips`
+                ? `Remove ${item.name} from trip checklist`
+                : `Add ${item.name} to trip checklist`
             }
             title={
               item.defaultPack
-                ? "Always packed — click to stop suggesting this on future trips"
-                : "Always pack this on future trips"
+                ? "On trip checklist — click to remove from future trips"
+                : "Add to trip checklist"
             }
             className="size-7"
           >
-            <StarIcon className={cn("size-3.5", item.defaultPack && "fill-current")} />
+            <PackagePlusIcon className="size-3.5" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            disabled={isPending}
-            onClick={handleDelete}
-            aria-label={`Delete ${item.name}`}
-            className="text-muted-foreground hover:text-destructive size-7"
-          >
-            <Trash2Icon className="size-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={isPending}
+                aria-label={`Delete ${item.name}`}
+                className="text-muted-foreground hover:text-destructive size-7"
+              >
+                <Trash2Icon className="size-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {item.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete “{item.name}” from your gear. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}

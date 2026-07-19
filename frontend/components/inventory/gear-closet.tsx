@@ -109,14 +109,14 @@ export function GearCloset({ items, categories }: GearClosetProps) {
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
-            <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
-              All
-            </FilterChip>
             {categories.map((c) => (
               <FilterChip key={c.id} active={filter === c.slug} onClick={() => setFilter(c.slug)}>
                 {c.name}
               </FilterChip>
             ))}
+            <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+              All
+            </FilterChip>
           </div>
 
           <div className="flex flex-col gap-4">

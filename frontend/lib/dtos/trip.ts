@@ -24,6 +24,17 @@ export const TRIP_STATE = {
   ARCHIVED: "archived",
 } as const
 
+// Mirrors LOG_SORT (lib/dtos/log.ts) — the same load-more listing convention
+// (M12 §24 follow-up). "latest_end" is the Past section's fixed order (most
+// recently finished first); "soonest"/"latest" back the Planning section's
+// user-facing sort control.
+export const TRIP_SORT = {
+  SOONEST: "soonest",
+  LATEST: "latest",
+  LATEST_END: "latest_end",
+} as const
+export type TripSort = (typeof TRIP_SORT)[keyof typeof TRIP_SORT]
+
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
 export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]
 

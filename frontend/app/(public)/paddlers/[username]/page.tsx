@@ -6,6 +6,7 @@ import { getMe } from "@/lib/user/me"
 import { isCertExpired } from "@/lib/certifications/expiry"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { UserAvatar } from "@/components/common/user-avatar"
+import { ListRow } from "@/components/common/list-row"
 import { ProfileRelationshipControls } from "@/components/paddlers/profile-relationship-controls"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -97,13 +98,13 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {profile.certifications.map((cert, i) => {
                   const expired = isCertExpired(cert.validUntil)
                   return (
-                    <li
+                    <ListRow
                       key={`${cert.organization}-${cert.award}-${i}`}
-                      className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                      className="flex items-center gap-3 py-2 text-sm"
                     >
                       <AwardIcon className="text-muted-foreground size-4 shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -117,7 +118,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
                           Expired
                         </span>
                       )}
-                    </li>
+                    </ListRow>
                   )
                 })}
               </ul>

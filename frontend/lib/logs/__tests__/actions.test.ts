@@ -142,6 +142,14 @@ describe("listMyLogs", () => {
     const result = await listMyLogs()
     expect(result).toEqual(EMPTY_PAGE)
   })
+
+  it("includes the severity and distance range when filters are provided", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listMyLogs(1, LOG_SORT.NEWEST, { minSea: 2, maxSea: 6, minDistance: 5, maxDistance: 30 })
+    expect(GET).toHaveBeenCalledWith(
+      `/api/log/all?page=1&sort=${LOG_SORT.NEWEST}&min_sea=2&max_sea=6&min_distance=5&max_distance=30`,
+    )
+  })
 })
 
 describe("listEndorsedLogs", () => {
@@ -161,5 +169,13 @@ describe("listEndorsedLogs", () => {
     GET.mockRejectedValue(new Error("boom"))
     const result = await listEndorsedLogs()
     expect(result).toEqual(EMPTY_PAGE)
+  })
+
+  it("includes the severity and distance range when filters are provided", async () => {
+    GET.mockResolvedValue(EMPTY_PAGE)
+    await listEndorsedLogs(1, LOG_SORT.NEWEST, { minSea: 2, maxSea: 6 })
+    expect(GET).toHaveBeenCalledWith(
+      `/api/log/endorsed?page=1&sort=${LOG_SORT.NEWEST}&min_sea=2&max_sea=6`,
+    )
   })
 })

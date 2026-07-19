@@ -6,6 +6,7 @@ import { BadgeCheckIcon, XIcon } from "lucide-react"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { ListRow } from "@/components/common/list-row"
 import { endorseLog } from "@/lib/logs/actions"
 import { deleteEndorsementRequest } from "@/lib/endorsement-requests/actions"
 import { formatDayDate } from "@/lib/utils/date"
@@ -30,7 +31,7 @@ export function EndorsementInbox({ requests, unit = DISTANCE_UNIT.KM }: Endorsem
           <BadgeCheckIcon className="size-4" />
           Asked to endorse ({requests.length})
         </h2>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {requests.map((request) => (
             <InboxRow key={request.id} request={request} unit={unit} />
           ))}
@@ -67,7 +68,7 @@ function InboxRow({ request, unit }: { request: EndorsementRequest; unit: Distan
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-lg border px-3 py-2">
+    <ListRow className="flex items-center gap-3 py-2">
       <UserAvatar
         name={author.name}
         surname={author.surname}
@@ -95,6 +96,6 @@ function InboxRow({ request, unit }: { request: EndorsementRequest; unit: Distan
           <span className="sr-only">Decline</span>
         </Button>
       </div>
-    </li>
+    </ListRow>
   )
 }

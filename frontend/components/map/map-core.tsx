@@ -701,7 +701,10 @@ export default function MapCore({
         />
 
         {/* Nautical-chart furniture — a real lat/lon graticule and a scale bar,
-            reused from the landing chart (M5b). Always on: an operational chart. */}
+            reused from the landing chart (M5b). Always on: an operational chart.
+            The grid runs edge-to-edge, underneath the top control row (zoom
+            control, Overlays toggle, the "+ Add" disclosure) — it should read
+            as genuinely part of the map surface, not visibly inset from it. */}
         <Graticule />
         <ScaleBar />
 

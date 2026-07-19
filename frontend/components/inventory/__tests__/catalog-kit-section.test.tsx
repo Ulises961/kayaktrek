@@ -96,13 +96,23 @@ describe("CatalogKitSection", () => {
     expect(mockCreateCatalogItem).toHaveBeenCalledWith(expect.objectContaining({ name: "Drogue" }))
   })
 
-  it("removes a template item after confirmation", async () => {
+  it("removes a template item after confirming in the dialog", async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, "confirm").mockReturnValue(true)
     render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
 
     await user.click(screen.getByRole("button", { name: /remove spare paddle/i }))
+    await user.click(screen.getByRole("button", { name: /^remove$/i }))
 
     expect(mockDeleteCatalogItem).toHaveBeenCalledWith(CATALOG_ITEMS[0].id)
+  })
+
+  it("does not remove a template item when the dialog is cancelled", async () => {
+    const user = userEvent.setup()
+    render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
+
+    await user.click(screen.getByRole("button", { name: /remove spare paddle/i }))
+    await user.click(screen.getByRole("button", { name: /cancel/i }))
+
+    expect(mockDeleteCatalogItem).not.toHaveBeenCalled()
   })
 })

@@ -80,9 +80,25 @@ describe("ExploreDiscovery", () => {
 
   it("re-queries with the season filter when a chip is toggled", async () => {
     render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    await userEvent.click(screen.getByRole("button", { name: /filters/i }))
     await userEvent.click(screen.getByRole("button", { name: "winter" }))
     await waitFor(() =>
       expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: ["winter"] })),
+    )
+  })
+
+  it("shows the active-filter count and clears everything via Clear filters", async () => {
+    render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    await userEvent.click(screen.getByRole("button", { name: /filters/i }))
+    await userEvent.click(screen.getByRole("button", { name: "winter" }))
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: ["winter"] })),
+    )
+
+    mockSearch.mockClear()
+    await userEvent.click(screen.getByRole("button", { name: /clear filters/i }))
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: [] })),
     )
   })
 

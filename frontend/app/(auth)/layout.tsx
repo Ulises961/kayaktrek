@@ -14,10 +14,14 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12 sm:items-start sm:justify-end sm:p-9">
       <ChartBackdrop routes={routes} />
 
-      {/* Chart identity mark — top-left, matches the landing header. */}
+      {/* Chart identity mark — top-left, matches the landing header. Given its
+          own `chart-header` chip (the landing header's solid-paper-strip
+          treatment, scoped to just this mark) rather than floating bare on
+          the live chart backdrop — the graticule's grid lines and labels sit
+          right behind it here and hurt legibility without a solid backing. */}
       <Link
         href="/"
-        className="fixed top-6 left-6 z-10 flex items-center gap-2.5 opacity-90 transition-opacity hover:opacity-100"
+        className="chart-header fixed top-6 left-6 z-10 flex items-center gap-2.5 rounded-full px-3.5 py-2 opacity-90 transition-opacity hover:opacity-100"
       >
         <CompassRose size={24} />
         <span className="chart-wordmark text-sm">Kayak Expedition Planner</span>

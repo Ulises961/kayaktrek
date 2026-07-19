@@ -6,6 +6,7 @@ import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-
 import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
 import { StoryShareButton } from "@/components/itinerary/story-share-button"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -78,7 +79,7 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
 
   return (
     <>
-      <div className="bg-card hover:bg-secondary rounded-lg border transition-colors">
+      <Card className="hover:bg-secondary gap-0 overflow-hidden rounded-lg py-0 transition-colors">
         <Link href={`/itinerary/${itinerary.id}`} className="block p-4">
           <div className="flex items-start justify-between gap-2">
             <h2 className="truncate font-medium">{itinerary.name || "Unnamed itinerary"}</h2>
@@ -175,7 +176,7 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
             </>
           )}
         </div>
-      </div>
+      </Card>
 
       <Dialog
         open={showCreateDialog}

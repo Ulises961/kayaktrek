@@ -6,11 +6,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { RouteIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { CardTopRule } from "@/components/common/card-top-rule"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
+import { ListFilterPopover } from "@/components/common/list-filter-popover"
 import { cn } from "@/lib/utils"
 import { useDebouncedValue } from "@/lib/utils/debounce"
 import {
@@ -168,6 +170,24 @@ export function ExploreDiscovery({
     )
   }
 
+  const seasonsFilterActive = seasons.length > 0
+  const milesFilterActive = minMiles.trim() !== "" || maxMiles.trim() !== ""
+  const daysFilterActive = minDays.trim() !== "" || maxDays.trim() !== ""
+  const activeFilterCount =
+    (seasonsFilterActive ? 1 : 0) +
+    (milesFilterActive ? 1 : 0) +
+    (daysFilterActive ? 1 : 0) +
+    (boundsEnabled ? 1 : 0)
+
+  function clearFilters() {
+    setSeasons([])
+    setMinMiles("")
+    setMaxMiles("")
+    setMinDays("")
+    setMaxDays("")
+    setBoundsEnabled(false)
+  }
+
   function handleFork(id: string) {
     if (!isAuthenticated) {
       router.push("/login")
@@ -203,73 +223,75 @@ export function ExploreDiscovery({
             onChange={(e) => setName(e.target.value)}
             aria-label="Search routes by name"
           />
-          <div className="flex flex-wrap gap-1.5">
-            {SEASONS.map((season) => (
-              <button
-                key={season}
-                type="button"
-                onClick={() => toggleSeason(season)}
-                aria-pressed={seasons.includes(season)}
-                className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-xs capitalize transition-colors",
-                  seasons.includes(season)
-                    ? "border-sky-500 bg-sky-500 text-white"
-                    : "border-border text-muted-foreground hover:bg-accent",
-                )}
-              >
-                {season}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Min nm</span>
-              <Input
-                type="number"
-                value={minMiles}
-                onChange={(e) => setMinMiles(e.target.value)}
-                aria-label="Minimum distance"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Max nm</span>
-              <Input
-                type="number"
-                value={maxMiles}
-                onChange={(e) => setMaxMiles(e.target.value)}
-                aria-label="Maximum distance"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Min days</span>
-              <Input
-                type="number"
-                value={minDays}
-                onChange={(e) => setMinDays(e.target.value)}
-                aria-label="Minimum days"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Max days</span>
-              <Input
-                type="number"
-                value={maxDays}
-                onChange={(e) => setMaxDays(e.target.value)}
-                aria-label="Maximum days"
-              />
-            </label>
-          </div>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="bounds"
-                checked={boundsEnabled}
-                onCheckedChange={(v) => setBoundsEnabled(!!v)}
-              />
-              <Label htmlFor="bounds" className="text-xs">
-                Filter to map area
-              </Label>
-            </div>
+            <ListFilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <div className="flex flex-wrap gap-1.5">
+                {SEASONS.map((season) => (
+                  <button
+                    key={season}
+                    type="button"
+                    onClick={() => toggleSeason(season)}
+                    aria-pressed={seasons.includes(season)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-xs capitalize transition-colors",
+                      seasons.includes(season)
+                        ? "border-sky-500 bg-sky-500 text-white"
+                        : "border-border text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    {season}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Min nm</span>
+                  <Input
+                    type="number"
+                    value={minMiles}
+                    onChange={(e) => setMinMiles(e.target.value)}
+                    aria-label="Minimum distance"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Max nm</span>
+                  <Input
+                    type="number"
+                    value={maxMiles}
+                    onChange={(e) => setMaxMiles(e.target.value)}
+                    aria-label="Maximum distance"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Min days</span>
+                  <Input
+                    type="number"
+                    value={minDays}
+                    onChange={(e) => setMinDays(e.target.value)}
+                    aria-label="Minimum days"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Max days</span>
+                  <Input
+                    type="number"
+                    value={maxDays}
+                    onChange={(e) => setMaxDays(e.target.value)}
+                    aria-label="Maximum days"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="bounds"
+                  checked={boundsEnabled}
+                  onCheckedChange={(v) => setBoundsEnabled(!!v)}
+                />
+                <Label htmlFor="bounds" className="text-xs">
+                  Filter to map area
+                </Label>
+              </div>
+            </ListFilterPopover>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as ExploreSort)}
@@ -297,10 +319,10 @@ export function ExploreDiscovery({
             </div>
           ) : (
             items.map((item) => (
-              <div
+              <Card
                 key={item.id}
                 className={cn(
-                  "border-border bg-card relative isolate flex shrink-0 flex-col gap-2 overflow-hidden rounded-lg border transition-colors",
+                  "relative isolate shrink-0 gap-0 overflow-hidden rounded-lg py-0 transition-colors",
                   selectedId === item.id ? "ring-2 ring-sky-400" : "hover:bg-accent",
                 )}
                 onMouseEnter={() => select(item.id)}
@@ -365,7 +387,7 @@ export function ExploreDiscovery({
                     </Button>
                   )}
                 </div>
-              </div>
+              </Card>
             ))
           )}
           {page < pages && (

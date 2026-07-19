@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("@/lib/logs/actions", () => ({
@@ -32,6 +32,19 @@ function page(items: Log[], overrides: Partial<LogPage> = {}): LogPage {
   return { items, total: items.length, page: 1, pages: 1, ...overrides }
 }
 
+// Opens the ListFilterPopover so its children (sea-state slider, distance
+// inputs) are reachable, and drives the sea-state range slider by keyboard
+// (Radix Slider's own interaction model) rather than a raw input's onChange.
+async function openFilters() {
+  await userEvent.click(screen.getByRole("button", { name: /filters/i }))
+}
+
+function moveSeaThumb(thumbIndex: 0 | 1, key: "ArrowRight" | "ArrowLeft", times = 1) {
+  const thumb = screen.getAllByRole("slider")[thumbIndex] as HTMLElement
+  thumb.focus()
+  for (let i = 0; i < times; i++) fireEvent.keyDown(thumb, { key })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockMyLogs.mockResolvedValue(page([]))
@@ -59,7 +72,7 @@ describe("LogsList", () => {
     mockMyLogs.mockResolvedValue(page([log({ id: "new", date: "2026-01-01" })]))
     render(<LogsList initial={page([log()])} kind="mine" />)
     await userEvent.selectOptions(screen.getByLabelText(/sort my logs/i), LOG_SORT.OLDEST)
-    await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.OLDEST))
+    await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.OLDEST, {}))
     await waitFor(() => expect(screen.getByText(formatDayDate("2026-01-01"))).toBeInTheDocument())
     expect(screen.queryByText(formatDayDate("2026-07-01"))).not.toBeInTheDocument()
   })
@@ -68,7 +81,7 @@ describe("LogsList", () => {
     mockEndorsedLogs.mockResolvedValue(page([]))
     render(<LogsList initial={page([log()])} kind="endorsed" />)
     await userEvent.selectOptions(screen.getByLabelText(/sort endorsed logs/i), LOG_SORT.OLDEST)
-    await waitFor(() => expect(mockEndorsedLogs).toHaveBeenCalledWith(1, LOG_SORT.OLDEST))
+    await waitFor(() => expect(mockEndorsedLogs).toHaveBeenCalledWith(1, LOG_SORT.OLDEST, {}))
   })
 
   it("appends the next page on Load more, preserving prior items", async () => {
@@ -112,5 +125,59 @@ describe("LogsList", () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.queryByText(formatDayDate("2026-03-03"))).not.toBeInTheDocument()
     expect(screen.getByText(formatDayDate("2026-02-02"))).toBeInTheDocument()
+  })
+
+  it("refetches page 1 with the sea-state range when the slider changes", async () => {
+    mockMyLogs.mockResolvedValue(page([log({ id: "rough", date: "2026-04-04" })]))
+    render(<LogsList initial={page([log()])} kind="mine" />)
+
+    await openFilters()
+    moveSeaThumb(0, "ArrowRight", 4) // min thumb 0 -> 4
+    await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.NEWEST, { minSea: 4 }))
+    await waitFor(() => expect(screen.getByText(formatDayDate("2026-04-04"))).toBeInTheDocument())
+  })
+
+  it("passes the distance filters through to Load more", async () => {
+    render(<LogsList initial={page([log()], { pages: 2, total: 2 })} kind="mine" />)
+
+    await openFilters()
+    mockMyLogs.mockResolvedValue(page([log({ id: "far", date: "2026-05-05" })], { pages: 2 }))
+    await userEvent.type(screen.getByLabelText(/minimum distance/i), "10")
+    await waitFor(() =>
+      expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.NEWEST, { minDistance: 10 }),
+    )
+    // The mock-call assertion above only proves the fetch fired — the resulting
+    // setPages(2) state update (inside startTransition) can still be pending;
+    // wait for the button itself before clicking it.
+    const loadMoreButton = await screen.findByRole("button", { name: /load more/i })
+    mockMyLogs.mockClear()
+    mockMyLogs.mockResolvedValue(page([log({ id: "next", date: "2026-06-06" })], { page: 2 }))
+    await userEvent.click(loadMoreButton)
+    await waitFor(() =>
+      expect(mockMyLogs).toHaveBeenCalledWith(2, LOG_SORT.NEWEST, { minDistance: 10 }),
+    )
+  })
+
+  it("shows a filters-specific empty state once a filter excludes everything", async () => {
+    mockMyLogs.mockResolvedValue(page([]))
+    render(<LogsList initial={page([log()])} kind="mine" />)
+    await openFilters()
+    moveSeaThumb(1, "ArrowLeft", 11) // max thumb 12 -> 1
+    await waitFor(() =>
+      expect(screen.getByText(/no logs match these filters/i)).toBeInTheDocument(),
+    )
+  })
+
+  it("shows the active-filter count and clears everything via Clear filters", async () => {
+    mockMyLogs.mockResolvedValue(page([log()]))
+    render(<LogsList initial={page([log()])} kind="mine" />)
+    await openFilters()
+    moveSeaThumb(0, "ArrowRight", 4)
+    await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.NEWEST, { minSea: 4 }))
+
+    mockMyLogs.mockClear()
+    mockMyLogs.mockResolvedValue(page([log()]))
+    await userEvent.click(screen.getByRole("button", { name: /clear filters/i }))
+    await waitFor(() => expect(mockMyLogs).toHaveBeenCalledWith(1, LOG_SORT.NEWEST, {}))
   })
 })
