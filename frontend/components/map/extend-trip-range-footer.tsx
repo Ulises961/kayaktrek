@@ -3,8 +3,7 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { updateTrip } from "@/lib/trips/actions"
-import { addDaysIso } from "@/lib/itinerary/format"
-import { formatDayDate } from "@/lib/utils/date"
+import { addDaysIso, formatDayDate } from "@/lib/utils/date"
 
 interface ExtendTripRangeFooterProps {
   tripId: string

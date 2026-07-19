@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { addDaysIso } from "@/lib/utils/date"
 
 interface DatePickerProps {
   value?: string
@@ -44,6 +45,20 @@ export function DatePicker({
   const minDateParsed = minDate && isValid(parseISO(minDate)) ? parseISO(minDate) : undefined
   const maxDateParsed = maxDate && isValid(parseISO(maxDate)) ? parseISO(maxDate) : undefined
 
+  // The day right after minDate — e.g. the day after the previous day's date
+  // in a day-by-day itinerary — highlighted as a suggestion, never a
+  // restriction: every other on-or-after-minDate day stays fully pickable.
+  // Only offered while there's no value yet, and only when it actually falls
+  // on or before maxDate (otherwise it isn't selectable at all).
+  const suggestedDate =
+    !selected && minDate
+      ? (() => {
+          const next = addDaysIso(minDate, 1)
+          if (maxDate && next > maxDate) return undefined
+          return isValid(parseISO(next)) ? parseISO(next) : undefined
+        })()
+      : undefined
+
   function handleSelect(date: Date | undefined) {
     onChange?.(date ? format(date, "yyyy-MM-dd") : "")
     setOpen(false)
@@ -76,15 +91,17 @@ export function DatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         {/* Open on the selected date's month; if there's no value yet, anchor on
-            the nearest bound (minDate, else maxDate) instead of today's month —
-            otherwise the first actually-pickable date can be many months away
-            from where the calendar opens. */}
+            the suggested date (else minDate, else maxDate) instead of today's
+            month — otherwise the first actually-pickable date can be many
+            months away from where the calendar opens. */}
         <Calendar
           mode="single"
           selected={selected}
-          defaultMonth={selected ?? minDateParsed ?? maxDateParsed}
+          defaultMonth={selected ?? suggestedDate ?? minDateParsed ?? maxDateParsed}
           onSelect={handleSelect}
           disabled={disabledMatchers.length > 0 ? disabledMatchers : undefined}
+          modifiers={suggestedDate ? { suggested: suggestedDate } : undefined}
+          modifiersClassNames={{ suggested: "ring-primary/50" }}
           initialFocus
         />
         {footer}

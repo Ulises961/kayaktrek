@@ -95,6 +95,59 @@ describe("DatePicker — defaultMonth anchoring", () => {
   })
 })
 
+describe("DatePicker — suggested date", () => {
+  // modifiersClassNames is applied by react-day-picker to the day's <td>
+  // cell (not the <button> inside it) — see react-day-picker's Day
+  // component. aria-label ("Tuesday, July 1st, 2031"-style) disambiguates
+  // outside-days duplicating a visible day number across month boundaries.
+
+  it("highlights the day right after minDate as the suggested choice", async () => {
+    render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    const day16 = screen.getByRole("button", { name: /june 16th, 2031/i })
+    expect(day16.closest("td")).toHaveClass("ring-primary/50")
+  })
+
+  it("does not mark minDate itself, or other days, as suggested", async () => {
+    render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    const day15 = screen.getByRole("button", { name: /june 15th, 2031/i })
+    const day17 = screen.getByRole("button", { name: /june 17th, 2031/i })
+    expect(day15.closest("td")).not.toHaveClass("ring-primary/50")
+    expect(day17.closest("td")).not.toHaveClass("ring-primary/50")
+  })
+
+  it("still allows picking a date later than the suggested one", async () => {
+    const onChange = vi.fn()
+    render(<DatePicker onChange={onChange} minDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    await userEvent.click(screen.getByRole("button", { name: /june 20th, 2031/i }))
+    expect(onChange).toHaveBeenCalledWith("2031-06-20")
+  })
+
+  it("rolls the suggestion (and the calendar's default month) into the next month when minDate is the last day of a month", async () => {
+    render(<DatePicker onChange={vi.fn()} minDate="2031-06-30" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    expect(screen.getByText(/july 2031/i)).toBeInTheDocument()
+    const july1 = screen.getByRole("button", { name: /july 1st, 2031/i })
+    expect(july1.closest("td")).toHaveClass("ring-primary/50")
+  })
+
+  it("does not suggest a date beyond maxDate", async () => {
+    render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" maxDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    const day16 = screen.getByRole("button", { name: /june 16th, 2031/i })
+    expect(day16.closest("td")).not.toHaveClass("ring-primary/50")
+  })
+
+  it("does not suggest anything when a value is already set", async () => {
+    render(<DatePicker value="2031-06-20" onChange={vi.fn()} minDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /20 jun 2031/i }))
+    const day16 = screen.getByRole("button", { name: /june 16th, 2031/i })
+    expect(day16.closest("td")).not.toHaveClass("ring-primary/50")
+  })
+})
+
 describe("DatePicker — footer", () => {
   it("renders footer content inside the popover when provided", async () => {
     render(<DatePicker value="2026-06-20" onChange={vi.fn()} footer={<p>Need a later date?</p>} />)

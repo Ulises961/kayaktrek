@@ -1,4 +1,5 @@
 import { daysBetween } from "@/lib/trips/format"
+import { addDaysIso } from "@/lib/utils/date"
 
 // The one canonical place-to-place range label. Falls back to just the start name
 // when there's no distinct end name to show.
@@ -14,12 +15,6 @@ export type RestGap = {
   /** The gap sits right after this dayNumber, before the next dated day. */
   afterDayNumber: number
   date: string
-}
-
-export function addDaysIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 // A calendar-date gap between two consecutive *dated* real Days, with no Day
