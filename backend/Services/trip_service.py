@@ -5,16 +5,19 @@ Trip Service - Business logic for trip operations.
 import logging
 import math
 from datetime import date, timedelta
-from typing import List
+from typing import Any, List, Optional
 from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
-from Models.trip import Trip, TripStateType
+from Models.trip import Trip, TripStateType, TripDifficultyType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.inventory import Inventory
+from Models.itinerary import Itinerary
+from Models.day import Day
 from Models.trip_requirement import TripRequirement
+from Services.Utils.route_distance import compute_total_miles
 from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Services.catalog_item_service import CatalogItemService
 from Models.user import User
@@ -63,18 +66,44 @@ class TripService:
         return trip
 
     @staticmethod
-    def get_trips_by_user(user_id: str, page: int = 1, per_page: int = 20) -> dict:
+    def get_trips_by_user(
+        user_id: str,
+        page: int = 1,
+        per_page: int = 20,
+        state: Optional[str] = None,
+        difficulty: Optional[str] = None,
+        sort: Optional[str] = None,
+        min_miles: Optional[float] = None,
+        max_miles: Optional[float] = None,
+    ) -> dict:
         """
-        Retrieve a paginated page of trips for a user.
+        Retrieve a paginated, filterable page of trips for a user.
+
+        `state`/`difficulty` filter on the trip's own enum fields. `sort` selects
+        the ordering: "soonest"/"latest" order by date_from, "latest_end" orders
+        by date_to descending (most recently finished first — the Past listing's
+        fixed order); anything else falls back to newest-created first.
+
+        `min_miles`/`max_miles` filter on the itinerary's route distance. This is
+        never a stored, SQL-filterable column (`Itinerary.total_miles` is written
+        at creation and never kept in sync — see `compute_total_miles`'s
+        docstring), so a distance filter falls back to fetching every trip
+        matching the other filters, scoring each in Python, and paginating the
+        filtered/sorted list in memory. A user's own trip count is small enough
+        (tens, not thousands) for this to be cheap — the same constraint that
+        makes `ItineraryService.search_public_itineraries` do the same thing.
 
         Raises:
             NoResultFound: If the user does not exist
+            ValueError: If `state` or `difficulty` is not a recognised enum value
         Returns:
             {"items": [...], "total": N, "page": P, "pages": P}
         """
         user = db.session.query(User).filter_by(id=UUID(user_id)).first()
         if not user:
             raise NoResultFound(f"User with id {user_id} not found")
+
+        wants_distance_filter = min_miles is not None or max_miles is not None
 
         query = (
             db.session.query(Trip)
@@ -84,13 +113,48 @@ class TripService:
                 selectinload(Trip.trip_members).selectinload(TripMember.user),
                 selectinload(Trip.invitations).selectinload(Invitation.user),
                 selectinload(Trip.inventory),
-                selectinload(Trip.itinerary),
+                selectinload(Trip.itinerary).selectinload(Itinerary.days).selectinload(Day.points)
+                if wants_distance_filter
+                else selectinload(Trip.itinerary),
             )
         )
-        total = query.count()
-        items = query.order_by(Trip.created.desc(), Trip.id).offset((page - 1) * per_page).limit(per_page).all()
+        if state:
+            query = query.filter(Trip.state == TripStateType(state))
+        if difficulty:
+            query = query.filter(Trip.difficulty == TripDifficultyType(difficulty))
+
+        order: Any
+        if sort == "soonest":
+            order = Trip.date_from.asc().nullslast()
+        elif sort == "latest":
+            order = Trip.date_from.desc().nullslast()
+        elif sort == "latest_end":
+            order = Trip.date_to.desc().nullslast()
+        else:
+            order = Trip.created.desc()
+
+        if not wants_distance_filter:
+            total = query.count()
+            items = query.order_by(order, Trip.id).offset((page - 1) * per_page).limit(per_page).all()
+            pages = math.ceil(total / per_page) if total > 0 else 1
+            logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page})")
+            return {"items": items, "total": total, "page": page, "pages": pages}
+
+        candidates = query.order_by(order, Trip.id).all()
+        matched = []
+        for trip in candidates:
+            miles = compute_total_miles(trip.itinerary.days) if trip.itinerary else 0.0
+            if min_miles is not None and miles < min_miles:
+                continue
+            if max_miles is not None and miles > max_miles:
+                continue
+            matched.append(trip)
+
+        total = len(matched)
+        start = (page - 1) * per_page
+        items = matched[start:start + per_page]
         pages = math.ceil(total / per_page) if total > 0 else 1
-        logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page})")
+        logger.info(f"Returning {len(items)} of {total} trips for user {user_id} (page {page}, distance-filtered)")
         return {"items": items, "total": total, "page": page, "pages": pages}
 
     @staticmethod

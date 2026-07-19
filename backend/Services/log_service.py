@@ -67,14 +67,27 @@ class LogService:
         return log
 
     @staticmethod
-    def get_logs_by_user(user_id: str, page: int = 1, per_page: int = 20, sort: str = "newest") -> dict:
+    def get_logs_by_user(
+        user_id: str,
+        page: int = 1,
+        per_page: int = 20,
+        sort: str = "newest",
+        min_sea: Optional[int] = None,
+        max_sea: Optional[int] = None,
+        min_distance: Optional[float] = None,
+        max_distance: Optional[float] = None,
+    ) -> dict:
         """
-        Retrieve a paginated, sorted page of logs created by a user.
+        Retrieve a paginated, sorted, filterable page of logs created by a user.
+
+        `min_sea`/`max_sea` filter on the Beaufort `avg_sea` severity field;
+        `min_distance`/`max_distance` filter on `distance`.
 
         Returns:
             {"items": [...], "total": N, "page": P, "pages": P}
         """
         query = db.session.query(Log).filter_by(user_id=UUID(user_id))
+        query = LogService._apply_log_filters(query, min_sea, max_sea, min_distance, max_distance)
         total = query.count()
         order = Log.date.asc().nullslast() if sort == "oldest" else Log.date.desc().nullslast()
         items = (
@@ -86,6 +99,25 @@ class LogService:
         pages = math.ceil(total / per_page) if total > 0 else 1
         logger.info(f"Returning {len(items)} of {total} logs for user {user_id} (page {page})")
         return {"items": items, "total": total, "page": page, "pages": pages}
+
+    @staticmethod
+    def _apply_log_filters(
+        query,
+        min_sea: Optional[int],
+        max_sea: Optional[int],
+        min_distance: Optional[float],
+        max_distance: Optional[float],
+    ):
+        """Shared range-filter application for the /all and /endorsed log listings."""
+        if min_sea is not None:
+            query = query.filter(Log.avg_sea >= min_sea)
+        if max_sea is not None:
+            query = query.filter(Log.avg_sea <= max_sea)
+        if min_distance is not None:
+            query = query.filter(Log.distance >= min_distance)
+        if max_distance is not None:
+            query = query.filter(Log.distance <= max_distance)
+        return query
 
     @staticmethod
     def create_log(log_data: dict) -> Log:
@@ -285,9 +317,18 @@ class LogService:
             logger.info(f"User {user_id} hasn't endorsed log {id}")
     
     @staticmethod
-    def get_endorsed_logs(user_id: str, page: int = 1, per_page: int = 20, sort: str = "newest") -> dict:
+    def get_endorsed_logs(
+        user_id: str,
+        page: int = 1,
+        per_page: int = 20,
+        sort: str = "newest",
+        min_sea: Optional[int] = None,
+        max_sea: Optional[int] = None,
+        min_distance: Optional[float] = None,
+        max_distance: Optional[float] = None,
+    ) -> dict:
         """
-        Retrieve a paginated, sorted page of logs endorsed by a user.
+        Retrieve a paginated, sorted, filterable page of logs endorsed by a user.
 
         Returns:
             {"items": [...], "total": N, "page": P, "pages": P}
@@ -301,6 +342,7 @@ class LogService:
             .join(user_endorses_log, user_endorses_log.c.log_id == Log.id)
             .filter(user_endorses_log.c.endorsers == UUID(user_id))
         )
+        query = LogService._apply_log_filters(query, min_sea, max_sea, min_distance, max_distance)
         total = query.count()
         order = Log.date.asc().nullslast() if sort == "oldest" else Log.date.desc().nullslast()
         items = (

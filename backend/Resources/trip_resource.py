@@ -62,7 +62,11 @@ def get_trip(id: str):
 @JWTService.authenticate_restful
 def get_all_user_trips(user_id: str):
     """
-    TripResource GET method. Retrieves trip(s) by ID or all trips.
+    TripResource GET method. Retrieves a paginated, filterable page of a user's trips.
+
+    Query params: page, per_page (capped 100); state (building|happening|past);
+    difficulty (easy|moderate|demanding|expert); sort (soonest|latest|latest_end,
+    default newest-created); min_miles/max_miles (itinerary total distance).
 
     Returns:
         JSON response with trip data and 200 status code
@@ -73,7 +77,16 @@ def get_all_user_trips(user_id: str):
         logger.info(f"Retrieving all trips for user with id {user_id}")
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = TripService.get_trips_by_user(user_id, page=page, per_page=per_page)
+        result = TripService.get_trips_by_user(
+            user_id,
+            page=page,
+            per_page=per_page,
+            state=request.args.get("state"),
+            difficulty=request.args.get("difficulty"),
+            sort=request.args.get("sort"),
+            min_miles=request.args.get("min_miles", type=float),
+            max_miles=request.args.get("max_miles", type=float),
+        )
         schema = TripSchema()
         return jsonify({
             "items": [schema.dump(trip) for trip in result["items"]],
@@ -84,6 +97,8 @@ def get_all_user_trips(user_id: str):
 
     except HTTPException:
         raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
     except Exception as e:
