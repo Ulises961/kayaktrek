@@ -151,7 +151,7 @@ def authz_resources(client, auth_headers, auth_headers_2, user_1, user_2, catego
         "leader_id": str(user_1.id),
     }
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     try:
         client.delete(f"{INVENTORY_ENDPOINT}/{personal_inv_id}", headers=auth_headers)
     except Exception:
@@ -468,6 +468,7 @@ class TestCrewBlockedOnLeaderActions:
 
         self._403(client, "POST",   f"{TRIP_ENDPOINT}/{tid}/state",           crew)
         self._403(client, "POST",   f"{TRIP_ENDPOINT}/{tid}/invite",          crew)
+        self._403(client, "DELETE", f"{TRIP_ENDPOINT}/{tid}",                 crew)
         self._403(client, "DELETE", f"{TRIP_ENDPOINT}/{tid}/invite/{DUMMY_ID}", crew)
         self._403(client, "DELETE", f"{TRIP_ENDPOINT}/{tid}/member/{mid}",    crew)
 

@@ -52,8 +52,8 @@ def test_member_leave_cascades_entries_but_keeps_items(app, client, auth_headers
     )
 
     # Crew leaves the trip — their TripMember is deleted, cascading.
-    assert client.delete(
-        f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=false", headers=crew_headers
+    assert client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/leave", headers=crew_headers
     ).status_code == 200
 
     # The requirement the crew proposed is gone, and their contribution cascaded

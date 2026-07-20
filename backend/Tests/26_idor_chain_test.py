@@ -224,8 +224,8 @@ def idor_resources(client, auth_headers, auth_headers_2, user_1, user_2, categor
         "crew_member_id": crew_member_id,
     }
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_a_id}?for_everyone=true", headers=auth_headers)
-    client.delete(f"{TRIP_ENDPOINT}/{trip_b_id}?for_everyone=true", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_a_id}", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_b_id}", headers=auth_headers)
     try:
         client.delete(f"{INVENTORY_ENDPOINT}/{personal_inv_id}", headers=auth_headers)
     except Exception:

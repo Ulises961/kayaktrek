@@ -57,7 +57,7 @@ def solo_trip_log(client, auth_headers):
     yield data
     try:
         client.delete(f"{LOG_ENDPOINT}/{data['id']}", headers=auth_headers)
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     except Exception:
         pass
 

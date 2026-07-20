@@ -280,13 +280,29 @@ class TripService:
             raise
 
     @staticmethod
-    def delete_trip(trip_id: str, for_everyone: bool) -> None:
+    def delete_trip_for_everyone(trip_id: str) -> None:
         """
-        Delete a trip or remove the current user from it.
+        Delete the entire trip and all its associations for every member.
 
-        If for_everyone is True the whole trip is deleted.
-        If False, only the current user's membership is removed; if no
-        members remain afterwards the trip is also deleted.
+        Raises:
+            NoResultFound: If trip doesn't exist
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if not trip:
+            raise NoResultFound(f"Trip with id {trip_id} not found")
+
+        logger.info("trip_deleted_for_everyone", extra={"trip_id": trip_id})
+        db.session.delete(trip)
+        db.session.commit()
+
+    @staticmethod
+    def leave_trip(trip_id: str) -> None:
+        """
+        Remove the current user's own membership from a trip.
+
+        If the caller was the trip's leader and crew remain, the trip survives
+        with no leader — see TripLeadershipService.claim_leadership. If no
+        members remain afterwards, the trip itself is deleted.
 
         Raises:
             NoResultFound: If trip doesn't exist or user isn't a member
@@ -295,34 +311,25 @@ class TripService:
         if not trip:
             raise NoResultFound(f"Trip with id {trip_id} not found")
 
-        if for_everyone:
-            # Delete the entire trip and all associations (cascade should handle user_has_trip)
-            logger.info(f"Deleting trip {trip_id} for everyone")
+        user_id = g.current_user_id
+        membership = (
+            db.session.query(TripMember)
+            .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
+            .first()
+        )
+        if not membership:
+            raise NoResultFound(f"User {user_id} is not associated with trip {trip_id}")
+
+        db.session.delete(membership)
+        db.session.commit()
+        logger.info("trip_member_left", extra={"trip_id": trip_id, "user_id": user_id})
+
+        # Delete the trip if no users remain (business logic decision)
+        db.session.refresh(trip)
+        if not trip.travellers:
             db.session.delete(trip)
             db.session.commit()
-            logger.info(f"Trip {trip_id} deleted successfully")
-        else:
-            # Only remove the current user's association with the trip
-            user_id = g.current_user_id
-            membership = (
-                db.session.query(TripMember)
-                .filter_by(user_id=UUID(user_id), trip_id=UUID(trip_id))
-                .first()
-            )
-            if not membership:
-                raise NoResultFound(f"User {user_id} is not associated with trip {trip_id}")
-
-            db.session.delete(membership)
-            db.session.commit()
-            logger.info(f"Removed user {user_id} from trip {trip_id}")
-
-            # Delete the trip if no users remain (business logic decision)
-            # Refresh trip to get updated travellers count
-            db.session.refresh(trip)
-            if not trip.travellers:
-                db.session.delete(trip)
-                db.session.commit()
-                logger.info(f"Trip {trip_id} had no remaining users and was deleted")
+            logger.info("trip_deleted_no_members_remaining", extra={"trip_id": trip_id})
 
     @staticmethod
     def get_invitations_by_user(user_id: str, include_expired: bool = False) -> List[Trip]:

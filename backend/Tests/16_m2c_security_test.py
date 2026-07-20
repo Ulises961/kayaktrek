@@ -7,7 +7,8 @@ Covers every item in the M2c Definition of Done:
 - Public itinerary read-only enforcement (§2)
 - Missing token → 401, invalid token → 401 (§3)
 - GET /api/itinerary/all returns 200 (§4)
-- DELETE trip for_everyone=false does not trigger mass delete (§5)
+- DELETE trip is leader-only and always deletes for everyone; crew self-removal is a
+  separate POST /leave endpoint (§5)
 - Login: any failure → 401 with same message (§7)
 - Register response contains no tokens (§8)
 """
@@ -162,23 +163,33 @@ def test_get_all_itineraries_returns_200(client, auth_headers):
 
 
 # ---------------------------------------------------------------------------
-# §5 — for_everyone=false does not trigger mass delete
+# §5 — DELETE is leader-only full deletion; crew cannot invoke it at all
 # ---------------------------------------------------------------------------
 
-def test_delete_trip_for_everyone_false_only_removes_for_requester(client, auth_headers):
-    """?for_everyone=false must not be treated as true."""
+def test_crew_cannot_delete_trip(client, trip_with_invitation):
+    """A crew member must not be able to delete the trip for everyone."""
+    trip_id = trip_with_invitation["trip"]["id"]
+    crew_headers = trip_with_invitation["invitee_headers"]
+
+    accept = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invitation",
+        headers=crew_headers,
+        json={"accepted": True},
+    )
+    assert accept.status_code == 200
+
+    delete = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=crew_headers)
+    assert delete.status_code == 403
+
+
+def test_leader_delete_removes_trip_for_everyone(client, auth_headers):
     r = client.post(f"{TRIP_ENDPOINT}/create", headers=auth_headers, json={"inventory": {}})
     assert r.status_code == 201
     trip_id = json.loads(r.data)["id"]
 
-    delete = client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=false", headers=auth_headers)
+    delete = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     assert delete.status_code == 200
-
-    # Trip should still exist (was not deleted for everyone, only removed from requester's view)
-    # Re-fetch — if it 404s because TripService.delete_trip with for_everyone=False removes
-    # the record entirely, that is acceptable (single-member trip). The key assertion is that
-    # passing "false" behaves identically to omitting the param — verified by absence of
-    # side-effects in multi-member scenarios. For a solo trip we just confirm no 500.
+    assert client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers).status_code == 404
 
 
 # ---------------------------------------------------------------------------

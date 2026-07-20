@@ -22,7 +22,8 @@ export default async function TripDetailLayout({
   if (!trip) notFound()
 
   const session = await getSession()
-  const { isLeader, isMember } = deriveMembership(trip, session)
+  const membership = deriveMembership(trip, session)
+  const { isMember } = membership
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
@@ -32,7 +33,7 @@ export default async function TripDetailLayout({
           { label: trip.destination ?? "Untitled trip" },
         ]}
       />
-      <TripIdentityHeader trip={trip} isLeader={isLeader} />
+      <TripIdentityHeader trip={trip} membership={membership} />
       <TripDetailNav tripId={id} showFloatPlan={isMember} />
       <Card className="relative overflow-hidden">
         <CardTopRule className="absolute inset-x-0 top-0" />

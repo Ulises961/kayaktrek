@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from uuid import UUID as _UUID
-from sqlalchemy import UUID, ForeignKey, Enum, UniqueConstraint, String, Integer, Text, DateTime
+from sqlalchemy import UUID, ForeignKey, Enum, UniqueConstraint, Index, String, Integer, Text, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from Models.base_model import BaseModel
 from typing import Optional, TYPE_CHECKING
@@ -20,6 +20,13 @@ class TripMember(BaseModel):
     __tablename__ = "trip_member"
     __table_args__ = (
         UniqueConstraint('user_id', 'trip_id', name='uq_trip_member_user_trip'),
+        # At most one nominated successor per trip.
+        Index(
+            'uq_trip_member_one_nominee_per_trip',
+            'trip_id',
+            unique=True,
+            postgresql_where="nominated_successor",
+        ),
     )
 
     user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -28,6 +35,11 @@ class TripMember(BaseModel):
         Enum(MemberRoleType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
     )
+
+    # Leader-designated successor — plain pointer, not a second live leader (the
+    # medical-notes ECIES model assumes exactly one leader). Consulted by
+    # TripLeadershipService.claim_leadership when the trip has no leader.
+    nominated_successor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Vessel — snapshot at time of joining; editable independently of User profile defaults
     vessel_make: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

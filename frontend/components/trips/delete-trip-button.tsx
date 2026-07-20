@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { Trash2Icon } from "lucide-react"
-import { deleteTrip } from "@/lib/trips/actions"
+import { deleteTripForEveryone } from "@/lib/trips/actions"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -27,7 +27,7 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
 
   function handleConfirm() {
     startTransition(async () => {
-      await deleteTrip(tripId)
+      await deleteTripForEveryone(tripId)
     })
   }
 
