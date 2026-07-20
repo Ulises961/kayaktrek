@@ -523,6 +523,20 @@ describe("PointListPane — boundary divider date minDate", () => {
     expect(screen.getByText("5").closest("button")).toBeDisabled()
   })
 
+  it("does not allow a day to share the previous dated day's own date", async () => {
+    const draft: DaySlice[] = [
+      { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-15" },
+      { dayId: DAY2_ID, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-25" },
+    ]
+    renderWithCtx(makeCtx({ draftSlices: draft }))
+    // Day 1 is dated 2026-07-15; day 2's picker must disable the 15th
+    // itself too, not just dates before it, or two days could end up
+    // sharing the same date.
+    await userEvent.click(screen.getByRole("button", { name: /25 Jul 2026/i }))
+    expect(screen.getByText("15").closest("button")).toBeDisabled()
+    expect(screen.getByText("16").closest("button")).not.toBeDisabled()
+  })
+
   it("falls back to the trip's own dateFrom when no earlier day is dated yet", async () => {
     const draft: DaySlice[] = [
       { dayId: DAY1_ID, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },

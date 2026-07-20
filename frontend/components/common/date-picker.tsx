@@ -7,7 +7,6 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { addDaysIso } from "@/lib/utils/date"
 
 interface DatePickerProps {
   value?: string
@@ -45,18 +44,13 @@ export function DatePicker({
   const minDateParsed = minDate && isValid(parseISO(minDate)) ? parseISO(minDate) : undefined
   const maxDateParsed = maxDate && isValid(parseISO(maxDate)) ? parseISO(maxDate) : undefined
 
-  // The day right after minDate — e.g. the day after the previous day's date
-  // in a day-by-day itinerary — highlighted as a suggestion, never a
-  // restriction: every other on-or-after-minDate day stays fully pickable.
-  // Only offered while there's no value yet, and only when it actually falls
-  // on or before maxDate (otherwise it isn't selectable at all).
+  // minDate itself, highlighted as a suggestion, never a restriction: every
+  // other on-or-after-minDate day stays fully pickable. Only offered while
+  // there's no value yet, and only when it actually falls on or before
+  // maxDate (otherwise it isn't selectable at all).
   const suggestedDate =
-    !selected && minDate
-      ? (() => {
-          const next = addDaysIso(minDate, 1)
-          if (maxDate && next > maxDate) return undefined
-          return isValid(parseISO(next)) ? parseISO(next) : undefined
-        })()
+    !selected && minDate && (!maxDate || minDate <= maxDate) && isValid(parseISO(minDate))
+      ? parseISO(minDate)
       : undefined
 
   function handleSelect(date: Date | undefined) {

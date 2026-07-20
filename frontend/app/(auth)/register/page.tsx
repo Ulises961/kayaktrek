@@ -1,7 +1,7 @@
 "use client"
 
 import { useActionState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { register as registerAction } from "@/lib/auth/actions"
 import { RegisterSchema, PASSWORD_RULES, type RegisterInput } from "@/lib/auth/schemas"
@@ -44,14 +44,14 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(RegisterSchema),
     mode: "onBlur",
   })
 
-  const password = watch("password") ?? ""
+  const password = useWatch({ control, name: "password" }) ?? ""
 
   const onSubmit = handleSubmit((data) => {
     const fd = new FormData()
@@ -132,7 +132,7 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
         Already have an account?{" "}
         <Link href="/login" className="auth-link">
           Sign in

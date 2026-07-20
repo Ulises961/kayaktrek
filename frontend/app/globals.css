@@ -476,6 +476,15 @@
   border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
   backdrop-filter: blur(8px);
 }
+/* App shell variant — tints from the app's own --background token (which
+   already has a dark-mode value) instead of chart-paper, so the header
+   reads as part of the content area below it rather than matching the
+   sidebar's tone and looking like a separate strip (M12 §B22 follow-up). */
+.chart-header-app {
+  background: color-mix(in oklch, var(--background) 78%, transparent);
+  border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
+  backdrop-filter: blur(8px);
+}
 .chart-wordmark {
   font-family: var(--font-display), serif;
   font-weight: 500;

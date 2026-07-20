@@ -101,20 +101,20 @@ describe("DatePicker — suggested date", () => {
   // component. aria-label ("Tuesday, July 1st, 2031"-style) disambiguates
   // outside-days duplicating a visible day number across month boundaries.
 
-  it("highlights the day right after minDate as the suggested choice", async () => {
-    render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" />)
-    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
-    const day16 = screen.getByRole("button", { name: /june 16th, 2031/i })
-    expect(day16.closest("td")).toHaveClass("ring-primary/50")
-  })
-
-  it("does not mark minDate itself, or other days, as suggested", async () => {
+  it("highlights minDate itself as the suggested choice", async () => {
     render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" />)
     await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
     const day15 = screen.getByRole("button", { name: /june 15th, 2031/i })
-    const day17 = screen.getByRole("button", { name: /june 17th, 2031/i })
-    expect(day15.closest("td")).not.toHaveClass("ring-primary/50")
-    expect(day17.closest("td")).not.toHaveClass("ring-primary/50")
+    expect(day15.closest("td")).toHaveClass("ring-primary/50")
+  })
+
+  it("does not mark any other day as suggested", async () => {
+    render(<DatePicker onChange={vi.fn()} minDate="2031-06-15" />)
+    await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
+    const day14 = screen.getByRole("button", { name: /june 14th, 2031/i })
+    const day16 = screen.getByRole("button", { name: /june 16th, 2031/i })
+    expect(day14.closest("td")).not.toHaveClass("ring-primary/50")
+    expect(day16.closest("td")).not.toHaveClass("ring-primary/50")
   })
 
   it("still allows picking a date later than the suggested one", async () => {
@@ -125,12 +125,12 @@ describe("DatePicker — suggested date", () => {
     expect(onChange).toHaveBeenCalledWith("2031-06-20")
   })
 
-  it("rolls the suggestion (and the calendar's default month) into the next month when minDate is the last day of a month", async () => {
+  it("suggests minDate itself even when it falls on the last day of a month", async () => {
     render(<DatePicker onChange={vi.fn()} minDate="2031-06-30" />)
     await userEvent.click(screen.getByRole("button", { name: /pick a date/i }))
-    expect(screen.getByText(/july 2031/i)).toBeInTheDocument()
-    const july1 = screen.getByRole("button", { name: /july 1st, 2031/i })
-    expect(july1.closest("td")).toHaveClass("ring-primary/50")
+    expect(screen.getByText(/june 2031/i)).toBeInTheDocument()
+    const june30 = screen.getByRole("button", { name: /june 30th, 2031/i })
+    expect(june30.closest("td")).toHaveClass("ring-primary/50")
   })
 
   it("does not suggest a date beyond maxDate", async () => {

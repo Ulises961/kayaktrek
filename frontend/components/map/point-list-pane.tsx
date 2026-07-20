@@ -20,7 +20,7 @@ import {
   applyBoundaries,
 } from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
-import { formatDayDate } from "@/lib/utils/date"
+import { formatDayDate, addDaysIso } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
 import { useSaveStatus } from "@/hooks/use-save-status"
 import { PointRow } from "./point-row"
@@ -532,7 +532,11 @@ export function PointListPane() {
           const { slice, sliceIdx } = item
           const nextSlice = activeSlices![sliceIdx + 1]
           const priorDate = latestDatedSliceDate(activeSlices!, sliceIdx)
-          const effectiveMinDate = priorDate ?? tripDateFrom ?? undefined
+          // A later day can't share the prior dated day's own date, so the
+          // floor is the day after it, not the day itself.
+          const effectiveMinDate = priorDate
+            ? addDaysIso(priorDate, 1)
+            : (tripDateFrom ?? undefined)
           return (
             <Fragment key={`divider-${slice.dayId}`}>
               <BoundaryDivider

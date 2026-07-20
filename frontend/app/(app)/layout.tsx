@@ -30,10 +30,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <BreadcrumbProvider>
           <main className="flex min-h-screen w-full overflow-auto p-1 md:p-4">
             <div className="flex h-screen w-full flex-col">
-              {/* Nav bar — same chart-paper strip as the landing/auth headers
-                  (M12 header consistency pass). No dark-mode override by
-                  design, same as everywhere else `.chart-header` is used. */}
-              <header className="chart-header mb-6 flex h-12 shrink-0 flex-row items-center gap-2 px-4">
+              {/* Nav bar — same chart-header shape (blur, bottom rule) as the
+                  landing/auth headers, but tinted from the app's own
+                  --background token instead of chart-paper, so it unifies
+                  with the content area below it rather than the sidebar. */}
+              <header className="chart-header-app mb-6 flex h-12 shrink-0 flex-row items-center gap-2 px-4">
                 <SidebarTrigger className="md:hidden" />
                 <Separator orientation="vertical" className="h-4 md:hidden" />
                 <div className="flex flex-1 items-center">
