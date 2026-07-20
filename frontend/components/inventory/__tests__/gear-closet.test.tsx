@@ -13,6 +13,9 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/inventory/actions", () => ({
   createItem: mockCreateItem,
+  setItemOwned: vi.fn(),
+  deleteItem: vi.fn(),
+  toggleDefaultPack: vi.fn(),
 }))
 
 import { GearCloset } from "../gear-closet"
@@ -53,17 +56,31 @@ describe("GearCloset", () => {
     mockCreateItem.mockResolvedValue({ success: true })
   })
 
-  it("renders the user's items with names and category labels", () => {
+  it("groups items under uppercase category section labels", () => {
     render(<GearCloset items={ITEMS} categories={CATEGORIES} />)
     expect(screen.getByText("Bilge pump")).toBeTruthy()
     expect(screen.getByText("Tent")).toBeTruthy()
-    expect(screen.getAllByText("First aid").length).toBeGreaterThan(0)
+    // One section header per non-empty category (distinct from the filter chips,
+    // which are buttons).
+    const headers = screen.getAllByText(/first aid|camping/i).filter((el) => el.tagName === "P")
+    expect(headers).toHaveLength(2)
   })
 
-  it("shows the ownership status of each item", () => {
+  it("buckets an item without a category under Uncategorised", () => {
+    render(
+      <GearCloset
+        items={[{ id: "01952f1a-0000-7000-8000-000000000a09", name: "Mystery strap" }]}
+        categories={CATEGORIES}
+      />,
+    )
+    expect(screen.getByText("Uncategorised")).toBeTruthy()
+    expect(screen.getByText("Mystery strap")).toBeTruthy()
+  })
+
+  it("shows the ownership state of each item via its switch", () => {
     render(<GearCloset items={ITEMS} categories={CATEGORIES} />)
-    expect(screen.getByText(/owned/i)).toBeTruthy()
-    expect(screen.getByText(/suggested/i)).toBeTruthy()
+    const switches = screen.getAllByRole("switch")
+    expect(switches.map((s) => s.getAttribute("aria-checked"))).toEqual(["true", "false"])
   })
 
   it("renders an empty state with a call to action when there are no items", () => {

@@ -14,6 +14,7 @@ import {
   CHART_PAPER as PAPER,
 } from "@/components/map/chart"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { POINT_TYPE } from "@/lib/dtos/point"
 import { palette } from "@/lib/tokens"
 
 // "hero" is the full landing chart (all instruments) on the Esri Ocean basemap.
@@ -67,12 +68,12 @@ function RouteMarkers({ route }: { route: RouteData }) {
   return (
     <>
       {points.map((p, i) => {
-        const isStop = p.type === "stop"
+        const isStop = p.type === POINT_TYPE.STOP
         // Sequential overnight number = stops up to and including this point.
-        const stopNo = points.slice(0, i + 1).filter((q) => q.type === "stop").length
+        const stopNo = points.slice(0, i + 1).filter((q) => q.type === POINT_TYPE.STOP).length
         const icon = isStop
-          ? ringIcon(palette.sunset500, "stop", stopNo)
-          : ringIcon(INK, "position")
+          ? ringIcon(palette.sunset500, POINT_TYPE.STOP, stopNo)
+          : ringIcon(INK, POINT_TYPE.POSITION)
         return (
           <Marker
             key={`${route.id}-${i}`}
@@ -185,6 +186,10 @@ export function LandingMap({
       className="h-full w-full"
       zoomControl={false}
       scrollWheelZoom={false}
+      // Banner thumbnails are always a link to a fully-attributed detail view
+      // (route/trip/story page) — repeating the credit line on every card in a
+      // list is noise, not attribution; the linked-through page carries it.
+      attributionControl={variant !== "banner"}
     >
       <Interactions interactive={interactive} />
       <AttributionPrefix />
@@ -194,9 +199,13 @@ export function LandingMap({
         attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIB}
       />
       <TileLayer url={SEAMARK} attribution={SEAMARK_ATTRIB} />
-      <Graticule ready={chartReady} />
-      {/* Forecast cell + scale bar are the loud instruments — hero only. The banner
-          stays a calm chart bridge, and the ambient wind never runs on the dashboard. */}
+      {/* Graticule + forecast cell + scale bar are the loud instruments — hero only.
+          A banner thumbnail is a small linked-through strip, same "noise, not
+          attribution" rationale as the credit line above: a grid overlay on a
+          ~7-8rem-tall card strip has no room to read coordinates, it's just
+          clutter. The banner stays a calm chart bridge, and the ambient wind
+          never runs on the dashboard. */}
+      {isHero && <Graticule ready={chartReady} />}
       {isHero && <ScaleBar />}
       {isHero && <ForecastCell routes={routes} />}
       {routes.map((route) =>

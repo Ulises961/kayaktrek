@@ -1,14 +1,18 @@
 import Link from "next/link"
-import { MapIcon, CompassIcon, PlusIcon, CalendarIcon } from "lucide-react"
+import { MapIcon, CompassIcon, PlusIcon, CalendarIcon, BellIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
-import { TRIP_STATE_LABELS, TripPageSchema } from "@/lib/dtos/trip"
-import { ItinerarySchema } from "@/lib/dtos/itinerary"
+import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
 import { getMe } from "@/lib/user/me"
+import { getPendingRequestsSummary } from "@/lib/requests/actions"
+import { buildPendingRequestRows } from "@/lib/requests/pending"
 import { StateBadge } from "@/components/common/state-badge"
-import { TripRouteThumbnail } from "@/components/dashboard/trip-route-thumbnail"
+import { RouteThumbnail } from "@/components/common/route-thumbnail"
+import { ListRow } from "@/components/common/list-row"
+import { PageHeading } from "@/components/common/page-heading"
 import { Button } from "@/components/ui/button"
 import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
+import { formatDateRange } from "@/lib/trips/format"
 import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 
@@ -20,18 +24,6 @@ async function fetchTrips(userId: string): Promise<Trip[]> {
   return TripPageSchema.parse(raw).items
 }
 
-// A trip's own route, drawn as the chart thumbnail on its card. Best-effort: a
-// missing itinerary or a failed fetch returns null and the card simply shows no map.
-async function fetchTripRoute(itineraryId: string): Promise<RouteData | null> {
-  try {
-    const raw = await apiGet<unknown>(`/api/itinerary/${itineraryId}`)
-    const route = extractItineraryRoute(ItinerarySchema.parse(raw))
-    return route.positions.length > 0 ? route : null
-  } catch {
-    return null
-  }
-}
-
 function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
   return (
     <Link
@@ -40,7 +32,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
     >
       {/* The trip's passage on the same sea chart as the landing — flush to the card
           edges, text below. No thumbnail when the trip has no plotted route yet. */}
-      {route && <TripRouteThumbnail route={route} />}
+      {route && <RouteThumbnail route={route} />}
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -50,8 +42,7 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
             {trip.dateFrom && (
               <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-sm">
                 <CalendarIcon className="size-3" />
-                {trip.dateFrom}
-                {trip.dateTo ? ` → ${trip.dateTo}` : ""}
+                {formatDateRange(trip.dateFrom, trip.dateTo)}
               </p>
             )}
           </div>
@@ -68,40 +59,76 @@ function HeroTrip({ trip, route }: { trip: Trip; route: RouteData | null }) {
   )
 }
 
+// One "someone is waiting on you" row per pending-request type (trip
+// invitations, buddy requests, endorsement asks) — mirrors the sidebar's
+// SidebarRequestsMenu, sharing the same row derivation so the two surfaces
+// never disagree on labels or destinations. Shown alongside the trips section
+// (whether hero trips or the empty-trips placeholder), not gated behind it —
+// hidden entirely when nothing is pending.
+function PendingRequestsSection({
+  pendingRequests,
+}: {
+  pendingRequests: Awaited<ReturnType<typeof getPendingRequestsSummary>>
+}) {
+  const rows = buildPendingRequestRows(pendingRequests)
+  if (rows.length === 0) return null
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium tracking-wide uppercase">
+        <BellIcon className="size-3.5" />
+        Pending requests
+      </h2>
+      <ul className="border-border bg-card overflow-hidden rounded-xl border">
+        {rows.map((row) => (
+          <ListRow key={row.href} as="li">
+            <Link href={row.href} className="hover:bg-secondary block px-4 py-3 text-sm">
+              {row.label}
+            </Link>
+          </ListRow>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default async function DashboardPage() {
   const session = await getSession()
-  const user = session ? await getMe() : null
-  const trips = session ? await fetchTrips(session.userId) : []
+  const [user, trips, pendingRequests] = await Promise.all([
+    session ? getMe() : Promise.resolve(null),
+    session ? fetchTrips(session.userId) : Promise.resolve([]),
+    getPendingRequestsSummary(),
+  ])
 
-  const happening = trips.filter((t) => t.state === "happening")
-  const upcoming = trips.filter(
-    (t) => t.state === "building" || t.state === TRIP_STATE_LABELS.building,
-  )
+  const happening = trips.filter((t) => t.state === TRIP_STATE.HAPPENING)
+  const upcoming = trips.filter((t) => t.state === TRIP_STATE.BUILDING)
   const heroTrips = [...happening, ...upcoming].slice(0, 3)
-  const pastCount = trips.filter((t) => t.state === "past").length
+  const pastCount = trips.filter((t) => t.state === TRIP_STATE.PAST).length
 
   // Each shown trip's own route, drawn as the chart thumbnail in its card — the
-  // landing's sea chart carried into the app, one passage per card. Best-effort and
-  // parallel; a trip without an itinerary (or a failed fetch) simply shows no map.
-  const heroRoutes = await Promise.all(
-    heroTrips.map((t) =>
-      t.itinerary?.id ? fetchTripRoute(t.itinerary.id) : Promise.resolve(null),
-    ),
-  )
+  // landing's sea chart carried into the app, one passage per card. No extra
+  // requests: the trips envelope already nests each itinerary's days+points, so
+  // the route is derived from data in hand (M12 phase 9b follow-up — this was
+  // previously a redundant per-trip fetch).
+  const heroRoutes: (RouteData | null)[] = heroTrips.map((t) => {
+    if (!t.itinerary) return null
+    const route = extractItineraryRoute(t.itinerary)
+    return route.positions.length > 0 ? route : null
+  })
 
   return (
     <div className="flex max-w-2xl flex-col gap-8 p-6">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-semibold">
-          Welcome back{user?.username ? `, ${user.username}` : ""}
-        </h1>
+        <PageHeading>Welcome back{user?.username ? `, ${user.username}` : ""}</PageHeading>
         <p className="text-muted-foreground mt-1 text-sm">
           {trips.length === 0
             ? "You have no trips yet. Start planning your first expedition."
             : `${trips.length} ${trips.length === 1 ? "trip" : "trips"} total${pastCount > 0 ? `, ${pastCount} completed` : ""}.`}
         </p>
       </div>
+
+      <PendingRequestsSection pendingRequests={pendingRequests} />
 
       {/* Active / upcoming trips */}
       {heroTrips.length > 0 ? (

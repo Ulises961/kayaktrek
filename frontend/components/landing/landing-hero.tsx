@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { LandingMapLoader } from "./landing-map-loader"
-import { CompassRose } from "./compass-rose"
 import {
   Cartouche,
   CartoucheEyebrow,
@@ -12,6 +11,7 @@ import {
   CartoucheNote,
   NeatLine,
 } from "./cartouche"
+import { ChartHeaderBar } from "@/components/common/chart-header"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { RouteData } from "@/lib/itinerary/public-routes"
@@ -81,27 +81,24 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         <NeatLine className="chart-anim-fade z-[1000]" />
 
         {/* Header — chart publication strip */}
-        <header className="chart-header absolute top-0 right-0 left-0 z-[1001] flex items-center justify-between px-5 py-3 sm:px-7">
-          <Link href="/" className="flex items-center gap-2.5">
-            <CompassRose size={26} />
-            <span className="chart-wordmark text-[0.95rem] sm:text-base">
-              Kayak Expedition Planner
-            </span>
-          </Link>
-          <nav className="flex items-center gap-1 sm:gap-3">
-            <Button
-              asChild
-              variant="link"
-              size="sm"
-              className={cn(chartLink, "hidden sm:inline-flex")}
-            >
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button asChild size="sm" className={chartCta}>
-              <Link href="/register">Start planning</Link>
-            </Button>
-          </nav>
-        </header>
+        <ChartHeaderBar
+          className="absolute top-0 right-0 left-0 z-[1001]"
+          nav={
+            <>
+              <Button asChild size="sm" className={chartCta}>
+                <Link href="/register">Sign up</Link>
+              </Button>
+              <Button
+                asChild
+                variant="link"
+                size="sm"
+                className={cn(chartLink, "hidden sm:inline-flex")}
+              >
+                <Link href="/login">Log in</Link>
+              </Button>
+            </>
+          }
+        />
 
         {/* Cartouche — title block / signature. Outer holds the placement; the
             inner box fades + rises out of the way as the mobile page scrolls
@@ -126,14 +123,6 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
               <CartoucheNote className="mt-4">
                 A growing chart of paddled waters — add the one you know best.
               </CartoucheNote>
-              <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-                <Button asChild className={chartCta}>
-                  <Link href="/register">Start planning</Link>
-                </Button>
-                <Button asChild variant="link" className={chartLink}>
-                  <Link href="/login">browse the chart →</Link>
-                </Button>
-              </div>
             </Cartouche>
           </div>
         </div>

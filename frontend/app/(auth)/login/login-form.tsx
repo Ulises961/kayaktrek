@@ -8,6 +8,7 @@ import { login } from "@/lib/auth/actions"
 import { LoginSchema, type LoginInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
@@ -72,14 +73,13 @@ export function LoginForm() {
             </label>
             <Link
               href="/forgot-password"
-              className="text-[10px] tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]"
+              className="text-sm tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]"
             >
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             className="auth-input"
             {...register("password")}
@@ -111,7 +111,7 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
         No account?{" "}
         <Link href="/register" className="auth-link">
           Create one

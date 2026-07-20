@@ -6,6 +6,7 @@ import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-
 import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
 import { StoryShareButton } from "@/components/itinerary/story-share-button"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -25,13 +26,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 
 export type ItineraryCardProps = {
   itinerary: Itinerary
+  unit?: DistanceUnit
 }
 
-export function ItineraryCard({ itinerary }: ItineraryCardProps) {
+export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryCardProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isCreatingTrip, startCreateTransition] = useTransition()
@@ -76,7 +79,7 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
 
   return (
     <>
-      <div className="bg-card hover:bg-secondary rounded-lg border transition-colors">
+      <Card className="hover:bg-secondary gap-0 overflow-hidden rounded-lg py-0 transition-colors">
         <Link href={`/itinerary/${itinerary.id}`} className="block p-4">
           <div className="flex items-start justify-between gap-2">
             <h2 className="truncate font-medium">{itinerary.name || "Unnamed itinerary"}</h2>
@@ -93,7 +96,9 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
               </span>
             )}
             {itinerary.totalMiles != null && itinerary.totalMiles > 0 && (
-              <span>{itinerary.totalMiles.toFixed(1)} nm</span>
+              <span>
+                {formatDistance(itinerary.totalMiles, unit)} {unit}
+              </span>
             )}
           </div>
         </Link>
@@ -171,7 +176,7 @@ export function ItineraryCard({ itinerary }: ItineraryCardProps) {
             </>
           )}
         </div>
-      </div>
+      </Card>
 
       <Dialog
         open={showCreateDialog}

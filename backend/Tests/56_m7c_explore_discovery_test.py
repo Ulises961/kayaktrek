@@ -270,7 +270,42 @@ def test_explore_item_carries_no_trip_data(client, make_itinerary):
     assert set(item) <= {
         "id", "name", "totalMiles", "dayCount", "season",
         "centroidLat", "centroidLng", "createdFromId", "originalAuthor",
+        "previewPositions",
     }
+
+
+# ── preview geometry (M12 phase 9b) ──────────────────────────────────────────
+
+def test_explore_item_carries_preview_positions_in_route_order(client, make_itinerary):
+    # Two days walked in day order — the thumbnail polyline must follow the
+    # route, not point-insertion or UUID order. The dogleg (non-collinear
+    # middle point) must survive simplification.
+    dogleg = (43.1, 8.4)
+    route = make_itinerary(
+        "Preview route",
+        [
+            (1, None, [MED, dogleg]),
+            (2, None, [MED_LONG_END]),
+        ],
+    )
+    item = next(i for i in _items(client.get(EXPLORE)) if i["id"] == str(route.id))
+    assert item["previewPositions"] == [
+        [MED[0], MED[1]],
+        [dogleg[0], dogleg[1]],
+        [MED_LONG_END[0], MED_LONG_END[1]],
+    ]
+
+
+def test_preview_positions_simplified_and_capped(client, make_itinerary):
+    # A dense straight line collapses to its two endpoints under RDP — the
+    # listing payload never carries every raw point.
+    dense = [(43.0 + n * 0.0001, 8.0) for n in range(200)]
+    route = make_itinerary("Dense route", [(1, None, dense)])
+    item = next(i for i in _items(client.get(EXPLORE)) if i["id"] == str(route.id))
+    positions = item["previewPositions"]
+    assert positions[0] == [43.0, 8.0]
+    assert positions[-1] == [pytest.approx(43.0199, abs=1e-6), 8.0]
+    assert len(positions) <= 60
 
 
 # ── sort ──────────────────────────────────────────────────────────────────────

@@ -2,7 +2,14 @@
 import { useState, useCallback, useMemo, useRef, Fragment } from "react"
 import { PlusIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
-import { initDaySlices, computeSlicesApplyPayload } from "@/lib/itinerary/boundaries"
+import {
+  initDaySlices,
+  computeSlicesApplyPayload,
+  isDraftDay,
+  appendDraftSlice,
+  removeDraftSlice,
+  latestDatedSliceDate,
+} from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
 import {
@@ -13,10 +20,12 @@ import {
   applyBoundaries,
 } from "@/lib/itinerary/actions"
 import { initialMapState } from "@/lib/itinerary/map-reducer"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate, addDaysIso } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
+import { useSaveStatus } from "@/hooks/use-save-status"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
+import { ExtendTripRangeFooter } from "./extend-trip-range-footer"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { PointType } from "@/lib/dtos/point"
 
@@ -57,6 +66,29 @@ function buildRenderList(pointOrder: string[], slices: DaySlice[] | null): Rende
   return items
 }
 
+// A day-date picker's popover footer offering to push the trip's own
+// dateFrom/dateTo out of the way when that's the bound actually blocking the
+// user (never for the previous-day ordering constraint — extending the trip
+// wouldn't help there). Either, both, or neither side may apply.
+function buildRangeFooter(
+  tripId: string | null,
+  showMin: boolean,
+  minBound: string | undefined,
+  showMax: boolean,
+  maxBound: string | undefined,
+) {
+  if (!tripId) return undefined
+  const min = showMin && minBound
+  const max = showMax && maxBound
+  if (!min && !max) return undefined
+  return (
+    <>
+      {min && <ExtendTripRangeFooter tripId={tripId} direction="min" currentBound={minBound!} />}
+      {max && <ExtendTripRangeFooter tripId={tripId} direction="max" currentBound={maxBound!} />}
+    </>
+  )
+}
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 export function PointListPane() {
@@ -69,8 +101,11 @@ export function PointListPane() {
     avgSpeedKnots,
     itineraryId,
     day0Id,
-    activePointId,
-    setActivePointId,
+    selectedPointId,
+    setSelectedPointId,
+    tripId,
+    tripDateFrom,
+    tripDateTo,
   } = useMapBuilder()
 
   const [dirtyPoints, setDirtyPoints] = useState<Map<string, { type?: PointType; name?: string }>>(
@@ -117,9 +152,9 @@ export function PointListPane() {
 
   const handleExpand = useCallback(
     (id: string) => {
-      setActivePointId(activePointId === id ? null : id)
+      setSelectedPointId(selectedPointId === id ? null : id)
     },
-    [activePointId, setActivePointId],
+    [selectedPointId, setSelectedPointId],
   )
 
   const handleTypeChange = useCallback(
@@ -153,29 +188,33 @@ export function PointListPane() {
     [draftSlices],
   )
 
+  const { status: nameSaveStatus, run: runNameSave } = useSaveStatus()
+
   const handleNameBlur = useCallback(
     async (pointId: string, name: string) => {
       if (draftSlices) return
       const trimmed = name.trim()
       const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
       if (trimmed === currentName) return
-      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
-      dispatch({ type: "SAVING_START" })
-      await updatePoint(pointId, { name: trimmed || null })
-      dispatch({ type: "SAVING_END" })
+      await runNameSave(async () => {
+        dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
+        dispatch({ type: "SAVING_START" })
+        await updatePoint(pointId, { name: trimmed || null })
+        dispatch({ type: "SAVING_END" })
+      })
     },
-    [draftSlices, dispatch, state.points],
+    [draftSlices, dispatch, state.points, runNameSave],
   )
 
   const handleDelete = useCallback(
     async (pointId: string) => {
-      setActivePointId(null)
+      setSelectedPointId(null)
       dispatch({ type: "POINT_REMOVE", id: pointId })
       dispatch({ type: "SAVING_START" })
       await deletePoint(pointId)
       dispatch({ type: "SAVING_END" })
     },
-    [dispatch, setActivePointId],
+    [dispatch, setSelectedPointId],
   )
 
   const handleBoundaryMove = useCallback(
@@ -203,49 +242,12 @@ export function PointListPane() {
     [draftSlices, setDraftSlices, state.pointOrder.length],
   )
 
-  const handleEditBoundaries = useCallback(() => {
-    const slices = initDaySlices(state.days, state.pointOrder)
-    setDraftSlices(slices)
+  const handleEditDays = useCallback(() => {
+    setDraftSlices(initDaySlices(state.days, state.pointOrder))
   }, [state.days, state.pointOrder, setDraftSlices])
 
-  const handleAddDay = useCallback(async () => {
-    if (!itineraryId) return
-    const nextDayNumber = state.days.length + 1
-    dispatch({ type: "SAVING_START" })
-    const result = await createDay(itineraryId, nextDayNumber)
-    dispatch({ type: "SAVING_END" })
-    if (!result.success) return
-    dispatch({ type: "DAY_ADD", day: result.day })
-
-    const M = state.pointOrder.length
-    let newSlices: DaySlice[]
-
-    if (!activeSlices || activeSlices.length === 0) {
-      newSlices = [
-        {
-          dayId: result.day.id!,
-          dayNumber: nextDayNumber,
-          startIdx: 0,
-          endIdx: M > 0 ? M - 1 : 0,
-          date: null,
-        },
-      ]
-    } else {
-      const lastSlice = activeSlices[activeSlices.length - 1]
-      const midIdx = Math.floor((lastSlice.startIdx + lastSlice.endIdx) / 2)
-      newSlices = [
-        ...activeSlices.slice(0, -1),
-        { ...lastSlice, endIdx: midIdx },
-        {
-          dayId: result.day.id!,
-          dayNumber: nextDayNumber,
-          startIdx: midIdx,
-          endIdx: lastSlice.endIdx,
-          date: null,
-        },
-      ]
-    }
-
+  const handleAddDay = useCallback(() => {
+    const newSlices = appendDraftSlice(draftSlices ?? [], state.pointOrder.length)
     setDraftSlices(newSlices)
 
     // Scroll the new boundary handle into view after React re-renders
@@ -255,13 +257,37 @@ export function PointListPane() {
       const target = listRef.current.querySelector<HTMLElement>(`[data-point-idx="${dividerIdx}"]`)
       target?.scrollIntoView({ behavior: "smooth", block: "nearest" })
     })
-  }, [itineraryId, activeSlices, state.days.length, state.pointOrder, dispatch, setDraftSlices])
+  }, [draftSlices, state.pointOrder.length, setDraftSlices])
 
-  const handleApply = useCallback(async () => {
+  const handleSaveDays = useCallback(async () => {
     if (!draftSlices || !day0Id) return
     const snapshot = state
 
-    const base = computeSlicesApplyPayload(draftSlices, state)
+    // Resolve any draft-only days into real Day rows, in order, before
+    // building the apply-boundaries payload — a day is only ever created
+    // once the save is actually going through, never speculatively while
+    // still editing (that's what let Discard leave orphaned days before).
+    const resolvedSlices: DaySlice[] = []
+    const createdDayIds: string[] = []
+    for (const slice of draftSlices) {
+      if (!isDraftDay(slice.dayId)) {
+        resolvedSlices.push(slice)
+        continue
+      }
+      dispatch({ type: "SAVING_START" })
+      const result = await createDay(itineraryId, slice.dayNumber)
+      dispatch({ type: "SAVING_END" })
+      if (!result.success) {
+        // Nothing to roll back beyond days created earlier in this same attempt.
+        await Promise.all(createdDayIds.map((id) => deleteDay(id)))
+        return
+      }
+      createdDayIds.push(result.day.id!)
+      dispatch({ type: "DAY_ADD", day: result.day })
+      resolvedSlices.push({ ...slice, dayId: result.day.id! })
+    }
+
+    const base = computeSlicesApplyPayload(resolvedSlices, state)
     const pointMap = new Map(base.points.map((p) => [p.id, p]))
     for (const [id, fields] of dirtyPoints.entries()) {
       const resolvedType = (fields.type ??
@@ -287,10 +313,10 @@ export function PointListPane() {
       ...(fields.name !== undefined ? { name: fields.name } : {}),
     }))
 
-    dispatch({ type: "BOUNDARIES_APPLY", slices: draftSlices, pointUpdates, day0Id })
+    dispatch({ type: "BOUNDARIES_APPLY", slices: resolvedSlices, pointUpdates, day0Id })
     setDirtyPoints(new Map())
     setDraftSlices(null)
-    setActivePointId(null)
+    setSelectedPointId(null)
 
     dispatch({ type: "SAVING_START" })
     const result = await applyBoundaries(itineraryId, payload)
@@ -310,15 +336,15 @@ export function PointListPane() {
     dirtyPoints,
     dispatch,
     setDraftSlices,
-    setActivePointId,
+    setSelectedPointId,
     itineraryId,
   ])
 
-  const handleCancel = useCallback(() => {
+  const handleDiscard = useCallback(() => {
     setDirtyPoints(new Map())
     setDraftSlices(null)
-    setActivePointId(null)
-  }, [setDraftSlices, setActivePointId])
+    setSelectedPointId(null)
+  }, [setDraftSlices, setSelectedPointId])
 
   const handleDateChange = useCallback(
     (dayId: string, date: string | null) => {
@@ -330,6 +356,14 @@ export function PointListPane() {
 
   const handleDeleteDay = useCallback(
     async (dayId: string) => {
+      // A draft day was never created server-side — dropping it from the
+      // draft slices locally is the whole deletion, and doesn't need to
+      // exit the draft session the way removing a real day does.
+      if (isDraftDay(dayId)) {
+        if (!draftSlices) return
+        setDraftSlices(removeDraftSlice(draftSlices, dayId))
+        return
+      }
       if (!day0Id) return
       setDraftSlices(null)
       dispatch({ type: "DAY_REMOVE", id: dayId, day0Id })
@@ -337,7 +371,7 @@ export function PointListPane() {
       await deleteDay(dayId)
       dispatch({ type: "SAVING_END" })
     },
-    [day0Id, dispatch, setDraftSlices],
+    [draftSlices, day0Id, dispatch, setDraftSlices],
   )
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -386,48 +420,36 @@ export function PointListPane() {
           <>
             <button
               type="button"
-              className="text-primary hover:text-primary/80 flex-1 text-sm font-medium transition-colors"
-              onClick={handleApply}
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground text-sm transition-colors"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-          </>
-        ) : state.days.length === 0 ? (
-          <button
-            type="button"
-            aria-label="Add day"
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-            onClick={handleAddDay}
-          >
-            <PlusIcon className="size-3.5" />
-            <span>Add day</span>
-          </button>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
-              onClick={handleEditBoundaries}
-            >
-              Edit boundaries
-            </button>
-            <button
-              type="button"
               aria-label="Add day"
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+              className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 text-xs transition-colors"
               onClick={handleAddDay}
             >
               <PlusIcon className="size-3.5" />
               <span>Add day</span>
             </button>
+            <button
+              type="button"
+              className="text-primary hover:text-primary/80 flex-1 text-sm font-medium transition-colors"
+              onClick={handleSaveDays}
+            >
+              Save days
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground shrink-0 text-sm transition-colors"
+              onClick={handleDiscard}
+            >
+              Discard
+            </button>
           </>
+        ) : (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground flex-1 text-left text-xs transition-colors"
+            onClick={handleEditDays}
+          >
+            Edit days
+          </button>
         )}
       </div>
 
@@ -451,6 +473,15 @@ export function PointListPane() {
                     onChange={(v) => handleDateChange(s0.dayId, v || null)}
                     placeholder="Add date"
                     size="sm"
+                    minDate={tripDateFrom ?? undefined}
+                    maxDate={tripDateTo ?? undefined}
+                    footer={buildRangeFooter(
+                      tripId,
+                      true,
+                      tripDateFrom ?? undefined,
+                      true,
+                      tripDateTo ?? undefined,
+                    )}
                     className="h-6 w-auto border-none bg-transparent px-1 text-xs shadow-none"
                   />
                 ) : (
@@ -473,7 +504,7 @@ export function PointListPane() {
             const dayNum = dayNumberById.get(point.dayId ?? "") ?? 0
             const dayColor = getDayColor(dayNum)
             const isBoundary = !!point.id && boundaryIds.has(point.id)
-            const isExpanded = activePointId === id || state.pendingPointId === id
+            const isExpanded = selectedPointId === id || state.pendingPointId === id
 
             const dirtyFields = draftSlices ? dirtyPoints.get(id) : undefined
             const displayPoint = dirtyFields ? { ...point, ...dirtyFields } : point
@@ -490,6 +521,7 @@ export function PointListPane() {
                   onTypeChange={(type) => point.id && handleTypeChange(point.id, type)}
                   onNameChange={(name) => point.id && handleNameChange(point.id, name)}
                   onNameBlur={(name) => point.id && handleNameBlur(point.id, name)}
+                  saveStatus={isExpanded && !draftSlices ? nameSaveStatus : "idle"}
                   onDelete={point.id ? () => handleDelete(point.id!) : undefined}
                 />
               </div>
@@ -499,6 +531,12 @@ export function PointListPane() {
           // kind === "divider"
           const { slice, sliceIdx } = item
           const nextSlice = activeSlices![sliceIdx + 1]
+          const priorDate = latestDatedSliceDate(activeSlices!, sliceIdx)
+          // A later day can't share the prior dated day's own date, so the
+          // floor is the day after it, not the day itself.
+          const effectiveMinDate = priorDate
+            ? addDaysIso(priorDate, 1)
+            : (tripDateFrom ?? undefined)
           return (
             <Fragment key={`divider-${slice.dayId}`}>
               <BoundaryDivider
@@ -508,6 +546,15 @@ export function PointListPane() {
                 avgSpeedKnots={avgSpeedKnots}
                 labelDayNumber={slice.dayNumber + 1}
                 labelDate={nextSlice?.date ?? null}
+                minDate={effectiveMinDate}
+                maxDate={tripDateTo ?? undefined}
+                footer={buildRangeFooter(
+                  tripId,
+                  !priorDate,
+                  effectiveMinDate,
+                  true,
+                  tripDateTo ?? undefined,
+                )}
                 interactive={isInteractive}
                 onDateChange={
                   isInteractive

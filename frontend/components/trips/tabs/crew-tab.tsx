@@ -2,8 +2,9 @@
 
 import { UsersIcon } from "lucide-react"
 import { CrewList } from "@/components/common/crew-list"
+import { ListRow } from "@/components/common/list-row"
+import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { InviteForm } from "@/components/trips/invite-form"
 import { InviteBuddyPicker } from "@/components/trips/invite-buddy-picker"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
 import type { Trip } from "@/lib/dtos/trip"
@@ -15,14 +16,6 @@ interface CrewTabProps {
   leaderId?: string
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
-      {children}
-    </p>
-  )
-}
-
 export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
   const travellers = trip.travellers ?? []
   const pendingTravellers = trip.pendingTravellers ?? []
@@ -30,7 +23,7 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
   return (
     <div className="divide-border divide-y">
       <div className="pb-5">
-        <SectionLabel>
+        <SectionLabel className="mb-3">
           <UsersIcon className="-mt-px mr-1 inline size-3" />
           Crew ({travellers.length})
         </SectionLabel>
@@ -48,8 +41,7 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
 
       {isLeader && (
         <div className="flex flex-col gap-3 py-5">
-          <SectionLabel>Invite member</SectionLabel>
-          <InviteForm tripId={tripId} />
+          <SectionLabel className="mb-3">Invite member</SectionLabel>
           {leaderId && (
             <InviteBuddyPicker
               tripId={tripId}
@@ -65,22 +57,22 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
 
       {isLeader && (
         <div className="pt-5">
-          <SectionLabel>
+          <SectionLabel className="mb-3">
             Pending invitations
             {pendingTravellers.length > 0 && ` (${pendingTravellers.length})`}
           </SectionLabel>
           {pendingTravellers.length === 0 ? (
             <p className="text-muted-foreground text-sm">No pending invitations.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {pendingTravellers.map((user) => (
-                <li key={user.id} className="flex items-center gap-3">
+                <ListRow key={user.id} className="flex items-center gap-3 py-2">
                   <UserAvatar name={user.name} surname={user.surname} size="md" />
                   <span className="flex-1 text-sm font-medium">
                     {[user.name, user.surname].filter(Boolean).join(" ")}
                   </span>
                   <CancelInvitationButton tripId={tripId} inviteeId={user.id!} />
-                </li>
+                </ListRow>
               ))}
             </ul>
           )}

@@ -3,6 +3,12 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MapTopBar } from "../map-top-bar"
 
+const { mockUseBreadcrumbs } = vi.hoisted(() => ({ mockUseBreadcrumbs: vi.fn() }))
+
+vi.mock("@/hooks/use-breadcrumbs", () => ({
+  useBreadcrumbs: mockUseBreadcrumbs,
+}))
+
 const BASE_PROPS = {
   tripId: "01952f1a-0000-7000-8000-000000000001",
   tripName: "Cinque Terre",
@@ -25,27 +31,27 @@ beforeEach(() => vi.clearAllMocks())
 // The compact mobile row renders the same values but is visually a secondary strip.
 const statsStrip = () => screen.getByTestId("stats-strip")
 
-describe("MapTopBar — navigation", () => {
-  it("renders a back link to the trip", () => {
+describe("MapTopBar — breadcrumb (pushed to the global header, not rendered locally)", () => {
+  it("pushes Trips / tripName / Itinerary when tripId is present", () => {
     render(<MapTopBar {...BASE_PROPS} />)
-    const link = screen.getByRole("link")
-    expect(link.getAttribute("href")).toBe("/trips/01952f1a-0000-7000-8000-000000000001")
+    expect(mockUseBreadcrumbs).toHaveBeenCalledWith([
+      { label: "Trips", href: "/trips" },
+      { label: "Cinque Terre", href: "/trips/01952f1a-0000-7000-8000-000000000001" },
+      { label: "Itinerary" },
+    ])
   })
 
-  it("displays the trip name in the back link", () => {
+  it("pushes Itineraries / Itinerary when tripId is null", () => {
+    render(<MapTopBar {...BASE_PROPS} tripId={null} />)
+    expect(mockUseBreadcrumbs).toHaveBeenCalledWith([
+      { label: "Itineraries", href: "/itinerary" },
+      { label: "Itinerary" },
+    ])
+  })
+
+  it("does not render breadcrumb text itself", () => {
     render(<MapTopBar {...BASE_PROPS} />)
-    expect(screen.getByText("Cinque Terre")).toBeInTheDocument()
-  })
-
-  it("links back to /itinerary when tripId is null", () => {
-    render(<MapTopBar {...BASE_PROPS} tripId={null} />)
-    const link = screen.getByRole("link")
-    expect(link.getAttribute("href")).toBe("/itinerary")
-  })
-
-  it("shows 'Itineraries' label when tripId is null", () => {
-    render(<MapTopBar {...BASE_PROPS} tripId={null} />)
-    expect(screen.getByText("Itineraries")).toBeInTheDocument()
+    expect(screen.queryByText("Trips")).not.toBeInTheDocument()
   })
 })
 
@@ -102,58 +108,48 @@ describe("MapTopBar — unit toggle", () => {
   })
 })
 
-describe("MapTopBar — mode pill and edit/done buttons", () => {
-  it("shows 'Viewing' pill in view mode", () => {
+describe("MapTopBar — View/Edit segmented control", () => {
+  it("marks View as the active segment in view mode", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} />)
-    expect(screen.getByText("Viewing")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("shows 'Editing' pill in edit mode", () => {
+  it("marks Edit as the active segment in edit mode", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={false} />)
-    expect(screen.getByText("Editing")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("shows 'Edit route' button for leader in view mode with building tripState", () => {
+  it("enables Edit for leader in view mode with building tripState", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={true} tripState="building" />)
-    expect(screen.getByRole("button", { name: "Edit route" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).not.toBeDisabled()
   })
 
-  it("shows 'Edit route' button for leader in view mode with happening tripState", () => {
+  it("enables Edit for leader in view mode with happening tripState", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={true} tripState="happening" />)
-    expect(screen.getByRole("button", { name: "Edit route" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).not.toBeDisabled()
   })
 
-  it("shows 'Edit route' button for leader in view mode with null tripState", () => {
+  it("enables Edit for leader in view mode with null tripState", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={true} tripState={null} />)
-    expect(screen.getByRole("button", { name: "Edit route" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).not.toBeDisabled()
   })
 
-  it("hides 'Edit route' button for crew", () => {
+  it("disables Edit for crew", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={false} tripState="building" />)
-    expect(screen.queryByRole("button", { name: "Edit route" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled()
   })
 
-  it("hides 'Edit route' button in past tripState", () => {
+  it("disables Edit in past tripState", () => {
     render(<MapTopBar {...BASE_PROPS} viewMode={true} isLeader={true} tripState="past" />)
-    expect(screen.queryByRole("button", { name: "Edit route" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled()
   })
 
-  it("hides 'Edit route' button when already in edit mode", () => {
-    render(<MapTopBar {...BASE_PROPS} viewMode={false} isLeader={true} tripState="building" />)
-    expect(screen.queryByRole("button", { name: "Edit route" })).not.toBeInTheDocument()
+  it("keeps Edit enabled while already in edit mode, regardless of leader/tripState", () => {
+    render(<MapTopBar {...BASE_PROPS} viewMode={false} isLeader={false} tripState="past" />)
+    expect(screen.getByRole("button", { name: "Edit" })).not.toBeDisabled()
   })
 
-  it("shows 'Done' button in edit mode", () => {
-    render(<MapTopBar {...BASE_PROPS} viewMode={false} />)
-    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument()
-  })
-
-  it("hides 'Done' button in view mode", () => {
-    render(<MapTopBar {...BASE_PROPS} viewMode={true} />)
-    expect(screen.queryByRole("button", { name: "Done" })).not.toBeInTheDocument()
-  })
-
-  it("calls onToggleViewMode when 'Edit route' is clicked", async () => {
+  it("calls onToggleViewMode when Edit is clicked from view mode", async () => {
     const onToggleViewMode = vi.fn()
     render(
       <MapTopBar
@@ -164,14 +160,21 @@ describe("MapTopBar — mode pill and edit/done buttons", () => {
         onToggleViewMode={onToggleViewMode}
       />,
     )
-    await userEvent.click(screen.getByRole("button", { name: "Edit route" }))
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
     expect(onToggleViewMode).toHaveBeenCalledOnce()
   })
 
-  it("calls onToggleViewMode when 'Done' is clicked", async () => {
+  it("calls onToggleViewMode when View is clicked from edit mode", async () => {
     const onToggleViewMode = vi.fn()
     render(<MapTopBar {...BASE_PROPS} viewMode={false} onToggleViewMode={onToggleViewMode} />)
-    await userEvent.click(screen.getByRole("button", { name: "Done" }))
+    await userEvent.click(screen.getByRole("button", { name: "View" }))
     expect(onToggleViewMode).toHaveBeenCalledOnce()
+  })
+
+  it("does not call onToggleViewMode when clicking the already-active segment", async () => {
+    const onToggleViewMode = vi.fn()
+    render(<MapTopBar {...BASE_PROPS} viewMode={true} onToggleViewMode={onToggleViewMode} />)
+    await userEvent.click(screen.getByRole("button", { name: "View" }))
+    expect(onToggleViewMode).not.toHaveBeenCalled()
   })
 })

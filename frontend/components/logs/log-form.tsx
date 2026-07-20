@@ -1,25 +1,37 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LogFieldsSchema, type LogFields, type Log } from "@/lib/dtos/log"
 import { createLog, updateLog } from "@/lib/logs/actions"
+import { DISTANCE_UNIT, toKm, toNm, type DistanceUnit } from "@/lib/itinerary/distance"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/common/date-picker"
 
+// register()'s valueAsNumber turns an empty input into NaN, not undefined, which the
+// optional number schema rejects — parse blank as undefined instead.
+const setValueAsNumber = (value: string) => (value === "" ? undefined : Number(value))
+
 interface LogFormProps {
   log?: Log
+  unit?: DistanceUnit
+  onSuccess: () => void
+  onCancel: () => void
 }
 
-export function LogForm({ log }: LogFormProps) {
-  const router = useRouter()
+export function LogForm({ log, unit = DISTANCE_UNIT.KM, onSuccess, onCancel }: LogFormProps) {
   const [isPending, startTransition] = useTransition()
   const isEdit = !!log?.id
+
+  // Distance is stored in km; the field only ever displays/accepts the caller's
+  // preferred unit, converting at the read/write boundary.
+  const toDisplay = (km: number) => (unit === DISTANCE_UNIT.NM ? toNm(km) : km)
+  const toStorage = (displayValue: number) =>
+    unit === DISTANCE_UNIT.NM ? toKm(displayValue) : displayValue
 
   const {
     register,
@@ -33,7 +45,7 @@ export function LogForm({ log }: LogFormProps) {
       date: log?.date ?? "",
       hours: log?.hours ?? undefined,
       avgSea: log?.avgSea ?? undefined,
-      distance: log?.distance ?? undefined,
+      distance: log?.distance != null ? toDisplay(log.distance) : undefined,
       notes: log?.notes ?? "",
     },
   })
@@ -44,14 +56,14 @@ export function LogForm({ log }: LogFormProps) {
         date: data.date || undefined,
         hours: data.hours,
         avgSea: data.avgSea,
-        distance: data.distance,
+        distance: data.distance != null ? toStorage(data.distance) : undefined,
         notes: data.notes?.trim() || undefined,
       }
 
       const result = isEdit ? await updateLog(log.id!, fields) : await createLog(fields)
 
       if (result.success) {
-        router.push("/logs")
+        onSuccess()
       } else {
         setError("root", { message: result.error })
       }
@@ -59,7 +71,7 @@ export function LogForm({ log }: LogFormProps) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="date">Date</Label>
         <Controller
@@ -88,21 +100,21 @@ export function LogForm({ log }: LogFormProps) {
             max={24}
             placeholder="0–24"
             disabled={isPending}
-            {...register("hours", { valueAsNumber: true })}
+            {...register("hours", { setValueAs: setValueAsNumber })}
           />
           {errors.hours && <p className="text-destructive text-sm">{errors.hours.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="distance">Distance (km)</Label>
+          <Label htmlFor="distance">Distance ({unit})</Label>
           <Input
             id="distance"
             type="number"
             step="0.1"
             min={0}
-            placeholder="km"
+            placeholder={unit}
             disabled={isPending}
-            {...register("distance", { valueAsNumber: true })}
+            {...register("distance", { setValueAs: setValueAsNumber })}
           />
           {errors.distance && <p className="text-destructive text-sm">{errors.distance.message}</p>}
         </div>
@@ -118,7 +130,7 @@ export function LogForm({ log }: LogFormProps) {
           max={12}
           placeholder="0 = calm · 12 = hurricane"
           disabled={isPending}
-          {...register("avgSea", { valueAsNumber: true })}
+          {...register("avgSea", { setValueAs: setValueAsNumber })}
         />
         {errors.avgSea && <p className="text-destructive text-sm">{errors.avgSea.message}</p>}
       </div>
@@ -141,12 +153,7 @@ export function LogForm({ log }: LogFormProps) {
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : isEdit ? "Save changes" : "Add log"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => router.push("/logs")}
-        >
+        <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
           Cancel
         </Button>
       </div>

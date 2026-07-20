@@ -1,6 +1,16 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+
+vi.mock("@/lib/logs/actions", () => ({
+  createLog: vi.fn(),
+  updateLog: vi.fn(),
+  deleteLog: vi.fn(),
+}))
+
 import { LogCard } from "../log-card"
+import { formatDayDate } from "@/lib/utils/date"
+import { DISTANCE_UNIT, toNm } from "@/lib/itinerary/distance"
 import type { Log } from "@/lib/dtos/log"
 
 const FULL_LOG: Log = {
@@ -14,9 +24,10 @@ const FULL_LOG: Log = {
 }
 
 describe("LogCard", () => {
-  it("renders the date", () => {
+  it("renders the date formatted, not as a raw ISO string", () => {
     render(<LogCard log={FULL_LOG} />)
-    expect(screen.getByText(/2026-07-03/)).toBeTruthy()
+    expect(screen.getByText(formatDayDate(FULL_LOG.date))).toBeTruthy()
+    expect(screen.queryByText("2026-07-03")).not.toBeInTheDocument()
   })
 
   it("renders hours", () => {
@@ -27,6 +38,17 @@ describe("LogCard", () => {
   it("renders distance", () => {
     render(<LogCard log={FULL_LOG} />)
     expect(screen.getByText(/22.4/)).toBeTruthy()
+  })
+
+  it("shows distance in km by default, stored value unchanged", () => {
+    render(<LogCard log={FULL_LOG} />)
+    expect(screen.getByText("22.4 km")).toBeInTheDocument()
+  })
+
+  it("converts the stored km distance to nm when unit is nm", () => {
+    render(<LogCard log={FULL_LOG} unit={DISTANCE_UNIT.NM} />)
+    expect(screen.getByText(`${toNm(FULL_LOG.distance!).toFixed(1)} nm`)).toBeInTheDocument()
+    expect(screen.queryByText(/22\.4 km/)).not.toBeInTheDocument()
   })
 
   it("renders a sea state chip when avgSea is set", () => {
@@ -60,14 +82,22 @@ describe("LogCard", () => {
     expect(screen.getByText(/1 endorsement\b/i)).toBeTruthy()
   })
 
-  it("shows an edit link on the owner variant", () => {
+  it("shows an edit affordance on the owner variant that opens the edit dialog", async () => {
     render(<LogCard log={FULL_LOG} />)
-    expect(screen.getByRole("link", { name: /edit log/i })).toBeTruthy()
+    await userEvent.click(screen.getByRole("button", { name: /edit log/i }))
+    expect(screen.getByRole("dialog", { name: /edit log/i })).toBeInTheDocument()
   })
 
-  it("shows a withdraw affordance and no edit link on the endorsed variant", () => {
+  it("shows a delete affordance on the owner variant that opens a confirm dialog", async () => {
+    render(<LogCard log={FULL_LOG} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete log/i }))
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument()
+  })
+
+  it("shows a withdraw affordance and no edit/delete affordance on the endorsed variant", () => {
     render(<LogCard log={FULL_LOG} variant="endorsed" />)
     expect(screen.getByRole("button", { name: /endorsed/i })).toBeTruthy()
-    expect(screen.queryByRole("link", { name: /edit log/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /edit log/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /delete log/i })).toBeNull()
   })
 })

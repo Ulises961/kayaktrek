@@ -1,10 +1,14 @@
 "use client"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { fetchDayWeather } from "@/lib/weather/actions"
 import { representativeHour } from "@/lib/weather/hourly"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate } from "@/lib/utils/date"
+import { formatDateRange } from "@/lib/trips/format"
+import { getDayColor } from "@/lib/itinerary/colors"
+import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
+import { computeRestGaps, type RestGap } from "@/lib/itinerary/format"
 import { BeaufortPill } from "@/components/weather/beaufort-pill"
 import type { Weather } from "@/lib/dtos/weather"
 import type { Day } from "@/lib/dtos/day"
@@ -41,7 +45,10 @@ function DayRailEntry({
   const windState = representativeHour(weather?.weatherStates)
   const hasWind = windState != null && windState.windForce != null
 
-  const placeholderColor = isActive ? "text-primary-foreground/60" : "text-muted-foreground/70"
+  // Content-bearing placeholder words ("No points", "Add date") stay at full
+  // muted-foreground / ≥85% opacity — opacity-quieted variants are reserved for
+  // decorative elements (M12 §E contrast rule, frontend/CLAUDE.md).
+  const placeholderColor = isActive ? "text-primary-foreground/85" : "text-muted-foreground"
 
   return (
     <button
@@ -59,7 +66,14 @@ function DayRailEntry({
           : "text-foreground enabled:hover:bg-muted/60",
       )}
     >
-      <span className="font-semibold">Day {day.dayNumber}</span>
+      <span className="flex items-center gap-1.5 font-semibold">
+        <span
+          data-testid="day-color-swatch"
+          className="h-4 w-1 shrink-0 rounded-sm"
+          style={{ backgroundColor: getDayColor(day.dayNumber) }}
+        />
+        Day {day.dayNumber}
+      </span>
       <span
         className={cn(
           "text-[10px]",
@@ -95,19 +109,50 @@ function DayRailEntry({
   )
 }
 
+// A purely visual placeholder for a calendar-date gap between two dated real
+// days — never a real Day entity, never clickable. Same vocabulary as a
+// disabled/empty DayRailEntry, deliberately not a <button>.
+function RestGapEntry({ gaps }: { gaps: RestGap[] }) {
+  const first = gaps[0].date
+  const last = gaps[gaps.length - 1].date
+  const label = first === last ? formatDayDate(first) : formatDateRange(first, last)
+
+  return (
+    <div
+      data-testid="rest-gap-entry"
+      className="text-muted-foreground flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs"
+    >
+      <span className="font-semibold italic">Rest</span>
+      <span className="text-[10px]">{label}</span>
+    </div>
+  )
+}
+
 export function DayRail() {
   const { state, tripName, selectedDayId, setSelectedDayId, conditionsVersion } = useMapBuilder()
 
+  // A day's own route may include a boundary stop shared with (and stored
+  // under) the adjacent day — walk by boundary id through the *global* point
+  // map instead of grouping by `dayId`, falling back to that grouping only
+  // for a day with no boundary metadata yet.
+  const pointsById = new Map(state.points.filter((p) => p.id).map((p) => [p.id!, p]))
   const pointCountByDay = new Map<string, number>()
-  for (const pt of state.points) {
-    if (pt.dayId) {
-      pointCountByDay.set(pt.dayId, (pointCountByDay.get(pt.dayId) ?? 0) + 1)
-    }
+  for (const day of state.days) {
+    if (!day.id) continue
+    const fallback = state.points.filter((p) => p.dayId === day.id)
+    pointCountByDay.set(day.id, walkDayRoutePoints(day, pointsById, fallback).length)
   }
 
   const numberedDays = [...state.days]
     .filter((d) => d.dayNumber > 0)
     .sort((a, b) => a.dayNumber - b.dayNumber)
+
+  const gapsByAfterDayNumber = new Map<number, RestGap[]>()
+  for (const gap of computeRestGaps(numberedDays)) {
+    const list = gapsByAfterDayNumber.get(gap.afterDayNumber) ?? []
+    list.push(gap)
+    gapsByAfterDayNumber.set(gap.afterDayNumber, list)
+  }
 
   return (
     <div
@@ -128,16 +173,21 @@ export function DayRail() {
         <p className="text-muted-foreground px-2.5 py-4 text-center text-[10px]">No days planned</p>
       ) : (
         <div className="flex flex-col gap-0.5 p-1.5">
-          {numberedDays.map((day) => (
-            <DayRailEntry
-              key={day.id}
-              day={day}
-              isActive={selectedDayId === day.id}
-              pointCount={pointCountByDay.get(day.id!) ?? 0}
-              conditionsVersion={conditionsVersion}
-              onClick={() => setSelectedDayId(selectedDayId === day.id ? null : day.id!)}
-            />
-          ))}
+          {numberedDays.map((day) => {
+            const gaps = gapsByAfterDayNumber.get(day.dayNumber)
+            return (
+              <Fragment key={day.id}>
+                <DayRailEntry
+                  day={day}
+                  isActive={selectedDayId === day.id}
+                  pointCount={pointCountByDay.get(day.id!) ?? 0}
+                  conditionsVersion={conditionsVersion}
+                  onClick={() => setSelectedDayId(selectedDayId === day.id ? null : day.id!)}
+                />
+                {gaps && <RestGapEntry gaps={gaps} />}
+              </Fragment>
+            )
+          })}
         </div>
       )}
     </div>

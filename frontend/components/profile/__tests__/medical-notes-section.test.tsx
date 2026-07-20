@@ -32,7 +32,7 @@ async function openToEdit(hasStoredNotes = false) {
   await userEvent.click(
     screen.getByRole("button", { name: hasStoredNotes ? /edit/i : /add notes/i }),
   )
-  await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+  await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
   // Wait for the editing phase to fully settle: the Save button only renders with
   // the name "Save" once the decrypt transition's isPending clears (it reads
@@ -56,7 +56,7 @@ describe("MedicalNotesSection — idle state", () => {
 
   it("does not show a password field at rest", () => {
     render(<MedicalNotesSection hasStoredNotes={false} />)
-    expect(screen.queryByLabelText(/password/i)).toBeNull()
+    expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
 })
 
@@ -78,7 +78,7 @@ describe("MedicalNotesSection — reset prompt", () => {
     vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
     vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, notes: null })
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
@@ -92,7 +92,7 @@ describe("MedicalNotesSection — authenticating state", () => {
   it("shows a password field and Continue button after clicking Edit", async () => {
     render(<MedicalNotesSection hasStoredNotes={true} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
-    expect(screen.getByLabelText(/password/i)).toBeDefined()
+    expect(screen.getByLabelText(/password/i, { selector: "input" })).toBeDefined()
     expect(screen.getByRole("button", { name: /continue/i })).toBeDefined()
   })
 
@@ -101,7 +101,7 @@ describe("MedicalNotesSection — authenticating state", () => {
     vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, notes: null })
     render(<MedicalNotesSection hasStoredNotes={false} />)
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), PASSWORD)
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(reAuth).toHaveBeenCalledWith(PASSWORD))
     expect(getMedicalNotes).toHaveBeenCalledWith(ELEVATED_TOKEN, PASSWORD)
@@ -111,7 +111,7 @@ describe("MedicalNotesSection — authenticating state", () => {
     vi.mocked(reAuth).mockResolvedValue({ success: false, error: "Password incorrect." })
     render(<MedicalNotesSection hasStoredNotes={false} />)
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
-    await userEvent.type(screen.getByLabelText(/password/i), "wrong")
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), "wrong")
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
   })
@@ -121,7 +121,7 @@ describe("MedicalNotesSection — authenticating state", () => {
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
     await userEvent.click(screen.getByText(/cancel/i))
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
-    expect(screen.queryByLabelText(/password/i)).toBeNull()
+    expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
 })
 

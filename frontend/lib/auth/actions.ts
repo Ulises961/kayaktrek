@@ -98,7 +98,7 @@ export async function register(
     mail: formData.get("mail"),
     username: formData.get("username"),
     name: formData.get("name"),
-    phone: formData.get("phone"),
+    phone: formData.get("phone") ?? undefined,
     password: formData.get("password"),
   })
   if (!parsed.success) {
@@ -110,7 +110,8 @@ export async function register(
   }
 
   const { mail, username, name, phone, password } = parsed.data
-  const body = { mail, username, name, phone, pwd: password }
+  // phone is optional at signup (M12 §F) — JSON.stringify drops the undefined key.
+  const body = { mail, username, name, phone: phone || undefined, pwd: password }
 
   let res: Response
   try {

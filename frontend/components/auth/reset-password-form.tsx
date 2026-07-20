@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { resetPassword } from "@/lib/auth/actions"
 import { ResetPasswordInput, ResetPasswordSchema } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 
@@ -43,9 +43,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <label htmlFor="password" className="auth-label">
             New password
           </label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             className="auth-input"
             {...register("password")}
@@ -57,9 +56,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <label htmlFor="confirmPassword" className="auth-label">
             Confirm password
           </label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             className="auth-input"
             {...register("confirmPassword")}

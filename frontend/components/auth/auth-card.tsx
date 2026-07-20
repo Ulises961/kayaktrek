@@ -1,6 +1,7 @@
 import React from "react"
 import { cn } from "@/lib/utils"
 import { Cartouche } from "@/components/landing/cartouche"
+import { CardTopRule } from "@/components/common/card-top-rule"
 
 interface AuthCardProps {
   children: React.ReactNode
@@ -13,7 +14,7 @@ interface AuthCardProps {
 export function AuthCard({ children, className }: AuthCardProps) {
   return (
     <Cartouche className={cn("overflow-hidden", className)}>
-      <div className="auth-card-accent" aria-hidden />
+      <CardTopRule />
       <div className="flex flex-col gap-5 p-8">{children}</div>
     </Cartouche>
   )

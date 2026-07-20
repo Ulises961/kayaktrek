@@ -28,6 +28,7 @@ vi.mock("@/lib/itinerary/actions", () => ({
 }))
 
 import { ItineraryCard } from "../itinerary-card"
+import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 
 const BASE: Itinerary = {
@@ -77,9 +78,15 @@ describe("ItineraryCard — content", () => {
     expect(screen.getByText("1 day")).toBeInTheDocument()
   })
 
-  it("renders the total distance in nm", () => {
+  it("renders the total distance in nm by default", () => {
     render(<ItineraryCard itinerary={BASE} />)
     expect(screen.getByText("42.3 nm")).toBeInTheDocument()
+  })
+
+  it("converts the total distance to km when unit is km", () => {
+    render(<ItineraryCard itinerary={BASE} unit={DISTANCE_UNIT.KM} />)
+    expect(screen.getByText(`${formatDistance(42.3, DISTANCE_UNIT.KM)} km`)).toBeInTheDocument()
+    expect(screen.queryByText(/42\.3 nm/)).not.toBeInTheDocument()
   })
 
   it("links to the itinerary builder", () => {

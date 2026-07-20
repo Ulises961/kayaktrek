@@ -47,12 +47,13 @@ def test_get_all_logs(client, auth_headers, test_log):
 
 
 def test_get_endorsed_logs(client, auth_headers):
-    """Test retrieving endorsed logs"""
+    """Test retrieving endorsed logs — paginated envelope (M12 §K)"""
     response = client.get(f"{LOG_ENDPOINT}/endorsed", headers=auth_headers)
     assert response.status_code == 200
-    
+
     data = json.loads(response.data)
-    assert isinstance(data, list)
+    assert "items" in data
+    assert "total" in data
 
 
 def test_update_log(client, auth_headers, test_log):

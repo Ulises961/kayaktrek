@@ -123,6 +123,21 @@ def verify_account():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
 
+@api.route("/api/v1/auth/verify-email-change", methods=["GET"])
+def verify_email_change():
+    token = request.args.get("token")
+    if not token:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing token")
+    try:
+        user = AuthService.verify_email_change(token)
+        return jsonify({"status": "success", "message": "Email address updated", "mail": user.mail}), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(e)
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Email change verification failed")
+
+
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
 def resend_verification():

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const {
@@ -37,6 +37,7 @@ const REQ_MINE = "01952f1a-0000-7000-8000-000000000b01"
 const REQ_OTHERS = "01952f1a-0000-7000-8000-000000000b02"
 const REQ_COVERED_BY_ME = "01952f1a-0000-7000-8000-000000000b03"
 const ITEM_ID = "01952f1a-0000-7000-8000-000000000a01"
+const LIFE_JACKET_ID = "01952f1a-0000-7000-8000-000000000a03"
 
 const ME = "01952f1a-0000-7000-8000-000000000e01"
 const OTHER = "01952f1a-0000-7000-8000-000000000e02"
@@ -49,6 +50,13 @@ const SUGGESTED_ITEM: Item = {
   id: "01952f1a-0000-7000-8000-000000000a02",
   name: "Spare paddle",
   status: "suggested",
+}
+// Owned but not yet contributed to anything — the one item that should remain
+// offered in every open requirement's picker.
+const OWNED_ITEM_2: Item = {
+  id: LIFE_JACKET_ID,
+  name: "Life jacket",
+  status: "owned",
 }
 
 // Proposed by me, uncovered → I may remove it and contribute to it.
@@ -93,7 +101,7 @@ function renderChecklist(
       inventoryId={INVENTORY_ID}
       tripId={TRIP_ID}
       requirements={REQUIREMENTS}
-      myItems={[OWNED_ITEM, SUGGESTED_ITEM]}
+      myItems={[OWNED_ITEM, OWNED_ITEM_2, SUGGESTED_ITEM]}
       canManage={true}
       currentUserId={ME}
       {...overrides}
@@ -118,11 +126,31 @@ describe("RequirementsChecklist", () => {
     expect(screen.getAllByText(/covered/i).length).toBeGreaterThan(0)
   })
 
-  it("shows every contribution with its contributor", () => {
+  it("shows every contribution as a stacked contributor avatar plus item name", () => {
     renderChecklist()
-    // Other member's contribution on a requirement I didn't propose.
+    // Other member's contribution on a requirement I didn't propose: the item
+    // name stays visible text, the contributor rides the avatar's tooltip
+    // (M12 §P — LogCard's endorser-stack idiom).
     expect(screen.getByText(/Trauma kit/)).toBeTruthy()
-    expect(screen.getByText(/Ozzy/)).toBeTruthy()
+    expect(screen.getByTitle(/Ozzy — Trauma kit/)).toBeTruthy()
+  })
+
+  it("groups by trimmed, case-folded free-text category with a trailing Uncategorised bucket", () => {
+    renderChecklist({
+      requirements: [
+        { ...REQ_PROPOSED_BY_ME, category: "Safety" },
+        { ...REQ_PROPOSED_BY_OTHER, category: " safety " },
+        REQ_COVERED_BY_ME_FIXTURE, // null category — must not be silently dropped
+      ],
+    })
+    const labels = screen
+      .getAllByText(/^(safety|uncategorised)$/i)
+      .filter((el) => el.tagName === "P")
+    expect(labels.map((el) => el.textContent)).toEqual(["Safety", "Uncategorised"])
+    // The whitespace-cased duplicate landed in the first-seen-cased bucket.
+    expect(screen.getByText("First aid kit")).toBeTruthy()
+    // Requirement name + its contribution's item name both render.
+    expect(screen.getAllByText("Bilge pump").length).toBeGreaterThan(0)
   })
 
   it("shows Remove only on requirements the current user proposed", () => {
@@ -147,15 +175,15 @@ describe("RequirementsChecklist", () => {
 
   it("only offers owned items in the contribute picker", () => {
     renderChecklist()
-    expect(screen.getAllByRole("option", { name: "Bilge pump" }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole("option", { name: "Life jacket" }).length).toBeGreaterThan(0)
     expect(screen.queryByRole("option", { name: "Spare paddle" })).toBeNull()
   })
 
   it("contributes an owned item to a requirement", async () => {
     const user = userEvent.setup()
     renderChecklist()
-    await user.selectOptions(screen.getByLabelText(/contribute to tow line/i), ITEM_ID)
-    expect(mockContributeItem).toHaveBeenCalledWith(INVENTORY_ID, REQ_MINE, ITEM_ID, TRIP_ID)
+    await user.selectOptions(screen.getByLabelText(/contribute to tow line/i), LIFE_JACKET_ID)
+    expect(mockContributeItem).toHaveBeenCalledWith(INVENTORY_ID, REQ_MINE, LIFE_JACKET_ID, TRIP_ID)
   })
 
   it("withdraws the current user's own contribution", async () => {
@@ -165,12 +193,28 @@ describe("RequirementsChecklist", () => {
     expect(mockUnclaimRequirement).toHaveBeenCalledWith(INVENTORY_ID, REQ_COVERED_BY_ME, TRIP_ID)
   })
 
-  it("removes a proposed requirement after confirmation", async () => {
+  it("removes a proposed requirement after confirming in the dialog", async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, "confirm").mockReturnValue(true)
     renderChecklist()
     await user.click(screen.getByRole("button", { name: /remove tow line/i }))
+    await user.click(screen.getByRole("button", { name: /^remove$/i }))
     expect(mockRemoveRequirement).toHaveBeenCalledWith(INVENTORY_ID, REQ_MINE, TRIP_ID)
+  })
+
+  it("does not remove a requirement when the dialog is cancelled", async () => {
+    const user = userEvent.setup()
+    renderChecklist()
+    await user.click(screen.getByRole("button", { name: /remove tow line/i }))
+    await user.click(screen.getByRole("button", { name: /cancel/i }))
+    expect(mockRemoveRequirement).not.toHaveBeenCalled()
+  })
+
+  it("excludes an item the user already contributed to another requirement from the picker", () => {
+    // I've already contributed the bilge pump to REQ_COVERED_BY_ME — it should
+    // not also be offered as an option for the still-open Tow line requirement.
+    renderChecklist()
+    const picker = screen.getByLabelText(/contribute to tow line/i)
+    expect(within(picker).queryByRole("option", { name: "Bilge pump" })).toBeNull()
   })
 
   it("adds a requirement from the inline form", async () => {

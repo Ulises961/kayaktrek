@@ -19,7 +19,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function FieldValue({ children, dim }: { children: React.ReactNode; dim?: boolean }) {
   return (
-    <span className={dim ? "text-muted-foreground/60 text-sm italic" : "text-foreground text-sm"}>
+    <span className={dim ? "text-muted-foreground text-sm italic" : "text-foreground text-sm"}>
       {children}
     </span>
   )

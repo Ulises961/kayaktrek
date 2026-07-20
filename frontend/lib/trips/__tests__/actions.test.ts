@@ -3,17 +3,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }))
 vi.mock("@/lib/api/client", () => ({
+  apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPatch: vi.fn(),
   apiDelete: vi.fn(),
   isRedirectError: vi.fn().mockReturnValue(false),
 }))
+vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { getSession } from "@/lib/auth/session"
+import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
 import {
-  inviteUser,
   cancelInvitation,
   handleInvitation,
   createTrip,
@@ -21,39 +24,14 @@ import {
   advanceState,
   removeMember,
   deleteTrip,
+  listTrips,
+  listTripInvitations,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000010"
 const USER_ID = "01952f1a-0000-7000-8000-000000000020"
-const USER_EMAIL = "paddler@example.com"
 
 beforeEach(() => vi.clearAllMocks())
-
-describe("inviteUser", () => {
-  it("posts to the correct path with email in the body", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite`, { email: USER_EMAIL })
-  })
-
-  it("revalidates the trip detail path on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
-  })
-
-  it("returns success: true on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue(undefined)
-    const result = await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(result).toEqual({ success: true })
-  })
-
-  it("returns success: false when the API throws", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
-    const result = await inviteUser(TRIP_ID, USER_EMAIL)
-    expect(result).toEqual({ success: false, error: expect.any(String) })
-  })
-})
 
 describe("cancelInvitation", () => {
   it("sends DELETE to the correct path", async () => {
@@ -62,10 +40,10 @@ describe("cancelInvitation", () => {
     expect(apiDelete).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite/${USER_ID}`)
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the crew segment on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await cancelInvitation(TRIP_ID, USER_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/crew`)
   })
 
   it("returns success: false when the API throws", async () => {
@@ -88,10 +66,10 @@ describe("handleInvitation", () => {
     expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invitation`, { accepted: false })
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the trip layout (travellers shown in the header) on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
     await handleInvitation(TRIP_ID, true)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
   })
 
   it("returns success: false when the API throws", async () => {
@@ -143,10 +121,10 @@ describe("updateTrip", () => {
     expect(apiPatch).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}`, FIELDS)
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the trip layout (header shows destination/dates/difficulty) on success", async () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await updateTrip(TRIP_ID, FIELDS)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
   })
 
   it("returns success: true on success", async () => {
@@ -169,10 +147,10 @@ describe("advanceState", () => {
     expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/state`, { state: "planning" })
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the trip layout (header shows the state badge/timeline) on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
     await advanceState(TRIP_ID, "planning")
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
   })
 
   it("returns success: false when the API throws", async () => {
@@ -189,10 +167,10 @@ describe("removeMember", () => {
     expect(apiDelete).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/${USER_ID}`)
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the trip layout (header avatar cluster + crew segment) on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await removeMember(TRIP_ID, USER_ID)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
   })
 
   it("returns success: false when the API throws", async () => {
@@ -219,5 +197,68 @@ describe("deleteTrip", () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
     const result = await deleteTrip(TRIP_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("listTrips", () => {
+  const SESSION = { userId: USER_ID, email: "paddler@example.com", isAdmin: false }
+  const EMPTY_PAGE = { items: [], total: 0, page: 1, pages: 1 }
+
+  it("returns an empty page and never calls the API when there is no session", async () => {
+    vi.mocked(getSession).mockResolvedValue(null)
+    const result = await listTrips({})
+    expect(result).toEqual(EMPTY_PAGE)
+    expect(apiGet).not.toHaveBeenCalled()
+  })
+
+  it("fetches page 1 against the session's own user id by default", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockResolvedValue(EMPTY_PAGE)
+    await listTrips({})
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${USER_ID}/all?page=1`)
+  })
+
+  it("includes state, sort, difficulty and the distance range when provided", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockResolvedValue(EMPTY_PAGE)
+    await listTrips({
+      state: TRIP_STATE.BUILDING,
+      sort: TRIP_SORT.SOONEST,
+      difficulty: "easy",
+      minMiles: 5,
+      maxMiles: 50,
+      page: 2,
+    })
+    expect(apiGet).toHaveBeenCalledWith(
+      `/api/trip/${USER_ID}/all?page=2&state=building&sort=soonest&difficulty=easy&min_miles=5&max_miles=50`,
+    )
+  })
+
+  it("returns an empty page on failure", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
+    const result = await listTrips({})
+    expect(result).toEqual(EMPTY_PAGE)
+  })
+})
+
+describe("listTripInvitations", () => {
+  it("fetches the given user's outstanding crew invitations", async () => {
+    vi.mocked(apiGet).mockResolvedValue([{ id: TRIP_ID, destination: "Fjords" }])
+    const result = await listTripInvitations(USER_ID)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${USER_ID}/invitations`)
+    expect(result).toEqual([expect.objectContaining({ id: TRIP_ID, destination: "Fjords" })])
+  })
+
+  it("returns an empty array when the response isn't an array", async () => {
+    vi.mocked(apiGet).mockResolvedValue(null)
+    const result = await listTripInvitations(USER_ID)
+    expect(result).toEqual([])
+  })
+
+  it("returns an empty array on failure", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
+    const result = await listTripInvitations(USER_ID)
+    expect(result).toEqual([])
   })
 })

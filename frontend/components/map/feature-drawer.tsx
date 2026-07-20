@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { useDayConditions } from "@/lib/weather/use-day-conditions"
 import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { formatDayDate } from "@/lib/utils/date"
+import { TRIP_STATE } from "@/lib/dtos/trip"
+import { POINT_TYPE } from "@/lib/dtos/point"
 import { WeatherGrid } from "@/components/weather/weather-grid"
 import { SeaGrid } from "@/components/weather/sea-grid"
 import { TidalEntryForm } from "@/components/weather/tidal-entry-form"
@@ -31,7 +33,7 @@ const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
 ]
 
 function TypeIcon({ type }: { type: string }) {
-  if (type === "stop") return <Anchor className="size-3.5 shrink-0" />
+  if (type === POINT_TYPE.STOP) return <Anchor className="size-3.5 shrink-0" />
   return <CircleDot className="size-3.5 shrink-0" />
 }
 
@@ -58,7 +60,7 @@ export function FeatureDrawer() {
 
   const isOpen = selectedDayId !== null
   const day = selectedDayId ? state.days.find((d) => d.id === selectedDayId) : null
-  const canFetch = isLeader && tripState !== "past"
+  const canFetch = isLeader && tripState !== TRIP_STATE.PAST
 
   // Reset to the Route tab whenever a different day is selected (render-time adjust).
   const [prevDayId, setPrevDayId] = useState(selectedDayId)

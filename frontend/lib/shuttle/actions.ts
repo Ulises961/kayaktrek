@@ -21,7 +21,7 @@ export async function createShuttleVehicle(
 ): Promise<ShuttleActionResult> {
   try {
     await apiPost(`/api/shuttle/${tripId}/create`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -36,7 +36,7 @@ export async function updateShuttleVehicle(
 ): Promise<ShuttleActionResult> {
   try {
     await apiPatch(`/api/shuttle/vehicle/${vehicleId}`, fields)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -50,7 +50,7 @@ export async function deleteShuttleVehicle(
 ): Promise<ShuttleActionResult> {
   try {
     await apiDelete(`/api/shuttle/vehicle/${vehicleId}`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -65,7 +65,7 @@ export async function addShuttlePassenger(
 ): Promise<ShuttleActionResult> {
   try {
     await apiPost(`/api/shuttle/vehicle/${vehicleId}/passenger`, { tripMemberId })
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -80,7 +80,7 @@ export async function removeShuttlePassenger(
 ): Promise<ShuttleActionResult> {
   try {
     await apiDelete(`/api/shuttle/vehicle/${vehicleId}/passenger/${memberId}`)
-    revalidatePath(`/trips/${tripId}`)
+    revalidatePath(`/trips/${tripId}/logistics`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

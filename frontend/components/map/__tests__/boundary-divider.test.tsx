@@ -124,6 +124,24 @@ describe("BoundaryDivider — date editing", () => {
     await userEvent.click(screen.getByText("15"))
     expect(onDateChange).toHaveBeenCalledWith("2026-06-15")
   })
+
+  it("disables calendar days before minDate (can't pick a date earlier than the previous day's)", async () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-20"
+        minDate="2026-06-15"
+        onDateChange={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /20 Jun 2026/i }))
+    expect(screen.getByText("10").closest("button")).toBeDisabled()
+  })
 })
 
 describe("BoundaryDivider — drag handle (interactive, default)", () => {
@@ -207,6 +225,67 @@ describe("BoundaryDivider — delete button (interactive mode)", () => {
       />,
     )
     expect(screen.queryByRole("button", { name: /delete day/i })).not.toBeInTheDocument()
+  })
+})
+
+describe("BoundaryDivider — two-line layout (interactive mode)", () => {
+  it("keeps the day label, date, and delete button together on the first line", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDateChange={vi.fn()}
+        onDelete={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const line1 = screen.getByTestId("boundary-divider-line-1")
+    expect(line1).toContainElement(screen.getByTestId("boundary-day-label"))
+    expect(line1).toContainElement(screen.getByRole("button", { name: /2 Jun 2026/i }))
+    expect(line1).toContainElement(screen.getByRole("button", { name: /delete day 2/i }))
+  })
+
+  it("renders the grip in its own column, spanning the full row height rather than confined to the first line", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDateChange={vi.fn()}
+        onDelete={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const container = screen.getByTestId("boundary-drag-handle")
+    const line1 = screen.getByTestId("boundary-divider-line-1")
+    const grip = screen.getByTestId("boundary-grip")
+    expect(container).toContainElement(grip)
+    expect(line1).not.toContainElement(grip)
+  })
+
+  it("puts the distance/time metrics on the second line, flush left, not under the first line", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onDateChange={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const line1 = screen.getByTestId("boundary-divider-line-1")
+    const metrics = screen.getByText(/8\.4/)
+    expect(line1).not.toContainElement(metrics)
   })
 })
 

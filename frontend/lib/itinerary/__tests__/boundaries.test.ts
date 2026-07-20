@@ -3,6 +3,10 @@ import {
   initDaySlices,
   applySlicesToPreviewDays,
   computeSlicesApplyPayload,
+  isDraftDay,
+  appendDraftSlice,
+  removeDraftSlice,
+  latestDatedSliceDate,
   type DaySlice,
 } from "../boundaries"
 import type { Day } from "@/lib/dtos/day"
@@ -270,5 +274,139 @@ describe("computeSlicesApplyPayload", () => {
     const { boundaries } = computeSlicesApplyPayload(slices, state)
     expect(boundaries).toHaveLength(1)
     expect(boundaries[0].dayId).toBe(D1)
+  })
+})
+
+// ─── isDraftDay ───────────────────────────────────────────────────────────────
+
+describe("isDraftDay", () => {
+  it("is true for a synthetic draft-N id", () => {
+    expect(isDraftDay("draft-1")).toBe(true)
+  })
+
+  it("is false for a real UUID day id", () => {
+    expect(isDraftDay(D1)).toBe(false)
+  })
+})
+
+// ─── appendDraftSlice ─────────────────────────────────────────────────────────
+
+describe("appendDraftSlice", () => {
+  it("with zero slices: new slice covers the whole point range and gets draft-1", () => {
+    const result = appendDraftSlice([], 3)
+    expect(result).toEqual([{ dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 2, date: null }])
+  })
+
+  it("with zero slices and zero points: endIdx stays 0", () => {
+    const result = appendDraftSlice([], 0)
+    expect(result[0]).toMatchObject({ startIdx: 0, endIdx: 0 })
+  })
+
+  it("splits the last slice at its midpoint and appends the new one after it", () => {
+    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }]
+    const result = appendDraftSlice(slices, 4)
+    expect(result).toEqual([
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
+    ])
+  })
+
+  it("leaves earlier slices untouched", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
+    ]
+    const result = appendDraftSlice(slices, 4)
+    expect(result[0]).toEqual(slices[0])
+  })
+
+  it("numbers a second draft append draft-3 when appending onto an existing draft-2", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
+    ]
+    const result = appendDraftSlice(slices, 4)
+    expect(result[2]).toMatchObject({ dayId: "draft-3", dayNumber: 3 })
+  })
+})
+
+// ─── removeDraftSlice ─────────────────────────────────────────────────────────
+
+describe("removeDraftSlice", () => {
+  it("removing the only slice leaves an empty array", () => {
+    const slices: DaySlice[] = [
+      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
+    ]
+    expect(removeDraftSlice(slices, "draft-1")).toEqual([])
+  })
+
+  it("removing the last slice extends the previous slice's endIdx to absorb it", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
+    ]
+    const result = removeDraftSlice(slices, "draft-2")
+    expect(result).toEqual([{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }])
+  })
+
+  it("removing the first slice extends the next slice's startIdx down to 0", () => {
+    const slices: DaySlice[] = [
+      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
+    ]
+    const result = removeDraftSlice(slices, "draft-1")
+    expect(result).toEqual([{ dayId: D2, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }])
+  })
+
+  it("removing a middle slice merges it into the previous slice and renumbers the rest", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
+      { dayId: D3, dayNumber: 3, startIdx: 2, endIdx: 4, date: null },
+    ]
+    const result = removeDraftSlice(slices, "draft-2")
+    expect(result).toEqual([
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
+      { dayId: D3, dayNumber: 2, startIdx: 2, endIdx: 4, date: null },
+    ])
+  })
+
+  it("is a no-op when the dayId is not found", () => {
+    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
+    expect(removeDraftSlice(slices, "does-not-exist")).toEqual(slices)
+  })
+})
+
+// ─── latestDatedSliceDate ─────────────────────────────────────────────────────
+
+describe("latestDatedSliceDate", () => {
+  it("returns the date of the slice at index when it has one", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: "2026-07-03" },
+    ]
+    expect(latestDatedSliceDate(slices, 1)).toBe("2026-07-03")
+  })
+
+  it("walks backward to the nearest earlier dated slice when the one at index has none", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
+      { dayId: D3, dayNumber: 3, startIdx: 2, endIdx: 3, date: null },
+    ]
+    expect(latestDatedSliceDate(slices, 2)).toBe("2026-07-01")
+  })
+
+  it("returns undefined when no earlier slice (inclusive) has a date", () => {
+    const slices: DaySlice[] = [
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
+      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
+    ]
+    expect(latestDatedSliceDate(slices, 1)).toBeUndefined()
+  })
+
+  it("returns undefined for a negative index (day 1 has nothing before it)", () => {
+    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null }]
+    expect(latestDatedSliceDate(slices, -1)).toBeUndefined()
   })
 })

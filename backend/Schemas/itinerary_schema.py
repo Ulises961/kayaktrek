@@ -121,6 +121,12 @@ class ItineraryExploreItemSchema(BaseSchema):
     season = fields.String(dump_only=True, allow_none=True)
     centroid_lat = fields.Float(dump_only=True, allow_none=True)
     centroid_lng = fields.Float(dump_only=True, allow_none=True)
+    # Simplified [lat, lng] pairs for the card thumbnail polyline — deliberately
+    # not the full RouteData shape, so listing rows never trigger a per-card
+    # route-detail fetch just to draw a preview.
+    preview_positions = fields.List(
+        fields.List(fields.Float), dump_only=True, dump_default=list
+    )
     created_from_id = fields.UUID(dump_only=True, allow_none=True)
     original_author = fields.Nested(
         OriginalAuthorSchema, dump_only=True, allow_none=True

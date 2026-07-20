@@ -1,55 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { DISTANCE_UNIT, toNm, type DistanceUnit } from "@/lib/itinerary/distance"
 
-const KM_PER_NM = 1.852
-type Unit = "km" | "nm"
-
-function convert(km: number, unit: Unit): string {
-  const value = unit === "km" ? km : km / KM_PER_NM
+function convert(km: number, unit: DistanceUnit): string {
+  const value = unit === DISTANCE_UNIT.KM ? km : toNm(km)
   return `${value.toFixed(1)} ${unit}`
-}
-
-function readStoredUnit(): Unit {
-  if (typeof window === "undefined") return "km"
-  const stored = localStorage.getItem("distanceUnit")
-  return stored === "km" || stored === "nm" ? stored : "km"
 }
 
 interface MileageSummaryProps {
   planned: number | null | undefined
   actual: number | null | undefined
+  unit: DistanceUnit
 }
 
-export function MileageSummary({ planned, actual }: MileageSummaryProps) {
-  const [unit, setUnit] = useState<Unit>(readStoredUnit)
-
-  function toggleUnit(next: Unit) {
-    setUnit(next)
-    localStorage.setItem("distanceUnit", next)
-  }
-
+export function MileageSummary({ planned, actual, unit }: MileageSummaryProps) {
   const hasData = planned != null || actual != null
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-1.5 self-end">
-        {(["km", "nm"] as Unit[]).map((u) => (
-          <button
-            key={u}
-            onClick={() => toggleUnit(u)}
-            aria-label={u}
-            className={`rounded border px-2 py-0.5 text-xs transition-colors ${
-              unit === u
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-input hover:border-primary"
-            }`}
-          >
-            {u}
-          </button>
-        ))}
-      </div>
-
       {!hasData ? (
         <p className="text-muted-foreground text-sm">No distance recorded yet.</p>
       ) : (

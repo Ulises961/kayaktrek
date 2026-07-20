@@ -31,8 +31,8 @@ function daySegment(overrides: Partial<RouteDaySegment> = {}): RouteDaySegment {
     color: "#2272b6",
     distanceNm: 1.2,
     points: [
-      { lat: 41.9, lon: 12.4, type: "position", name: null, images: [], pointNumber: 1 },
-      { lat: 42.0, lon: 12.5, type: "stop", name: "Cove", images: [], pointNumber: 2 },
+      { id: "p1", lat: 41.9, lon: 12.4, type: "position", name: null, images: [], pointNumber: 1 },
+      { id: "p2", lat: 42.0, lon: 12.5, type: "stop", name: "Cove", images: [], pointNumber: 2 },
     ],
     ...overrides,
   }
@@ -47,6 +47,7 @@ function route(overrides: Partial<RouteData> = {}): RouteData {
       [42.0, 12.5],
     ],
     days: [daySegment()],
+    boundaryColors: {},
     totalMiles: 12,
     dayCount: 1,
     ...overrides,

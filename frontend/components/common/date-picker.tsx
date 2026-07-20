@@ -17,6 +17,13 @@ interface DatePickerProps {
   /** Override the trigger button styling (e.g. for compact inline use). */
   className?: string
   size?: React.ComponentProps<typeof Button>["size"]
+  /** ISO date (YYYY-MM-DD) — calendar days before this are disabled. */
+  minDate?: string
+  /** ISO date (YYYY-MM-DD) — calendar days after this are disabled. */
+  maxDate?: string
+  /** Optional content rendered below the calendar grid, inside the popover
+   * (e.g. a caller-specific "extend the allowed range" affordance). */
+  footer?: React.ReactNode
 }
 
 export function DatePicker({
@@ -27,15 +34,34 @@ export function DatePicker({
   id,
   className,
   size,
+  minDate,
+  maxDate,
+  footer,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   const selected = value && isValid(parseISO(value)) ? parseISO(value) : undefined
+  const minDateParsed = minDate && isValid(parseISO(minDate)) ? parseISO(minDate) : undefined
+  const maxDateParsed = maxDate && isValid(parseISO(maxDate)) ? parseISO(maxDate) : undefined
+
+  // minDate itself, highlighted as a suggestion, never a restriction: every
+  // other on-or-after-minDate day stays fully pickable. Only offered while
+  // there's no value yet, and only when it actually falls on or before
+  // maxDate (otherwise it isn't selectable at all).
+  const suggestedDate =
+    !selected && minDate && (!maxDate || minDate <= maxDate) && isValid(parseISO(minDate))
+      ? parseISO(minDate)
+      : undefined
 
   function handleSelect(date: Date | undefined) {
     onChange?.(date ? format(date, "yyyy-MM-dd") : "")
     setOpen(false)
   }
+
+  const disabledMatchers = [
+    ...(minDateParsed ? [{ before: minDateParsed }] : []),
+    ...(maxDateParsed ? [{ after: maxDateParsed }] : []),
+  ]
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -58,15 +84,21 @@ export function DatePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        {/* Open on the selected date's month, not today's, so editing an existing
-            date lands on the right month (and the picker is date-stable in tests). */}
+        {/* Open on the selected date's month; if there's no value yet, anchor on
+            the suggested date (else minDate, else maxDate) instead of today's
+            month — otherwise the first actually-pickable date can be many
+            months away from where the calendar opens. */}
         <Calendar
           mode="single"
           selected={selected}
-          defaultMonth={selected}
+          defaultMonth={selected ?? suggestedDate ?? minDateParsed ?? maxDateParsed}
           onSelect={handleSelect}
+          disabled={disabledMatchers.length > 0 ? disabledMatchers : undefined}
+          modifiers={suggestedDate ? { suggested: suggestedDate } : undefined}
+          modifiersClassNames={{ suggested: "ring-primary/50" }}
           initialFocus
         />
+        {footer}
       </PopoverContent>
     </Popover>
   )

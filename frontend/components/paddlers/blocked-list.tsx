@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
+import { ListRow } from "@/components/common/list-row"
 import { unblockPaddler } from "@/lib/blocks/actions"
 import type { Block } from "@/lib/dtos/block"
 
@@ -19,11 +20,11 @@ export function BlockedList({ blocks }: BlockedListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <ul className="flex flex-col">
       {blocks.map((block) => (
         <BlockRow key={block.id} block={block} />
       ))}
-    </div>
+    </ul>
   )
 }
 
@@ -45,7 +46,7 @@ function BlockRow({ block }: { block: Block }) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+    <ListRow className="flex items-center gap-3 py-2.5">
       <UserAvatar name={user.name} surname={user.surname} imageUrl={user.avatarUrl} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{fullName}</p>
@@ -55,6 +56,6 @@ function BlockRow({ block }: { block: Block }) {
       <Button size="sm" variant="outline" disabled={pending} onClick={unblock}>
         Unblock
       </Button>
-    </div>
+    </ListRow>
   )
 }

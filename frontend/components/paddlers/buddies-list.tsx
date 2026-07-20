@@ -6,18 +6,23 @@ import { useRouter } from "next/navigation"
 import { CheckIcon, XIcon, UserMinusIcon } from "lucide-react"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
+import { ListRow } from "@/components/common/list-row"
 import { acceptConnection, removeConnection } from "@/lib/connections/actions"
 import type { Connection, ConnectionUser } from "@/lib/dtos/connection"
 
 interface BuddiesListProps {
   connections: Connection[]
   currentUserId: string
+  /** The active search term, if any — distinguishes "no buddies yet" from
+   * "no buddies match this search" when the caller has already filtered
+   * `connections` down to an empty array. */
+  searchTerm?: string
 }
 
 // Splits the caller's connections into incoming requests (caller is addressee),
 // outgoing requests (caller is requester) and accepted buddies. Each row offers the
 // action appropriate to that bucket.
-export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
+export function BuddiesList({ connections, currentUserId, searchTerm }: BuddiesListProps) {
   const buddies = connections.filter((c) => c.status === "accepted")
   const incoming = connections.filter(
     (c) => c.status === "pending" && c.addressee.id === currentUserId,
@@ -29,7 +34,9 @@ export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
   if (connections.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No buddies yet. Find paddlers and send a buddy request.
+        {searchTerm
+          ? `No buddies match "${searchTerm}".`
+          : "No buddies yet. Find paddlers and send a buddy request."}
       </p>
     )
   }
@@ -38,26 +45,42 @@ export function BuddiesList({ connections, currentUserId }: BuddiesListProps) {
     <div className="flex flex-col gap-6">
       {incoming.length > 0 && (
         <Section title={`Buddy requests (${incoming.length})`}>
-          {incoming.map((c) => (
-            <ConnectionRow key={c.id} connectionId={c.id!} user={c.requester} variant="incoming" />
-          ))}
+          <ul className="flex flex-col">
+            {incoming.map((c) => (
+              <ConnectionRow
+                key={c.id}
+                connectionId={c.id!}
+                user={c.requester}
+                variant="incoming"
+              />
+            ))}
+          </ul>
         </Section>
       )}
       {outgoing.length > 0 && (
         <Section title={`Sent requests (${outgoing.length})`}>
-          {outgoing.map((c) => (
-            <ConnectionRow key={c.id} connectionId={c.id!} user={c.addressee} variant="outgoing" />
-          ))}
+          <ul className="flex flex-col">
+            {outgoing.map((c) => (
+              <ConnectionRow
+                key={c.id}
+                connectionId={c.id!}
+                user={c.addressee}
+                variant="outgoing"
+              />
+            ))}
+          </ul>
         </Section>
       )}
       <Section title={`Buddies (${buddies.length})`}>
         {buddies.length === 0 ? (
           <p className="text-muted-foreground text-sm">No buddies yet.</p>
         ) : (
-          buddies.map((c) => {
-            const other = c.requester.id === currentUserId ? c.addressee : c.requester
-            return <ConnectionRow key={c.id} connectionId={c.id!} user={other} variant="buddy" />
-          })
+          <ul className="flex flex-col">
+            {buddies.map((c) => {
+              const other = c.requester.id === currentUserId ? c.addressee : c.requester
+              return <ConnectionRow key={c.id} connectionId={c.id!} user={other} variant="buddy" />
+            })}
+          </ul>
         )}
       </Section>
     </div>
@@ -98,7 +121,7 @@ function ConnectionRow({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+    <ListRow className="flex items-center gap-3 py-2.5">
       <Link href={`/paddlers/${user.username}`} className="shrink-0">
         <UserAvatar name={user.name} surname={user.surname} imageUrl={user.avatarUrl} />
       </Link>
@@ -149,6 +172,6 @@ function ConnectionRow({
           <UserMinusIcon className="size-4" /> Unfriend
         </Button>
       )}
-    </div>
+    </ListRow>
   )
 }

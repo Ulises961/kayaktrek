@@ -4,6 +4,9 @@ import { MapPinIcon } from "lucide-react"
 import { NewItineraryButton } from "@/components/itinerary/new-itinerary-button"
 import { ImportGpxButton } from "@/components/itinerary/import-gpx-button"
 import { ItineraryCard } from "@/components/itinerary/itinerary-card"
+import { getMe } from "@/lib/user/me"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function ItineraryListPage() {
   let itineraries: Awaited<ReturnType<typeof ItinerariesSchema.parse>> = []
@@ -13,11 +16,13 @@ export default async function ItineraryListPage() {
   } catch {
     itineraries = []
   }
+  const me = await getMe()
+  const unit = me?.unitPreference ?? DISTANCE_UNIT.NM
 
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold sm:text-2xl">Itineraries</h1>
+        <PageHeading>Itineraries</PageHeading>
         <div className="flex items-center gap-2">
           <ImportGpxButton />
           <NewItineraryButton />
@@ -31,7 +36,7 @@ export default async function ItineraryListPage() {
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           {itineraries.map((itinerary) => (
-            <ItineraryCard key={itinerary.id} itinerary={itinerary} />
+            <ItineraryCard key={itinerary.id} itinerary={itinerary} unit={unit} />
           ))}
         </div>
       )}

@@ -78,4 +78,35 @@ describe("InviteBuddyPicker", () => {
     await userEvent.click(screen.getByRole("button", { name: /invite a buddy/i }))
     expect(await screen.findByText(/no buddies available/i)).toBeDefined()
   })
+
+  it("filters the buddy list as the user types", async () => {
+    vi.mocked(listConnections).mockResolvedValue(BUDDIES)
+    render(<InviteBuddyPicker tripId={TRIP_ID} currentUserId={ME} excludeUserIds={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /invite a buddy/i }))
+    await screen.findByText(/Bob/)
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "bob")
+    expect(screen.getByText(/Bob/)).toBeInTheDocument()
+    expect(screen.queryByText(/Alice/)).not.toBeInTheDocument()
+  })
+
+  it("shows a 'Find paddlers' link when the typed term matches no buddy", async () => {
+    vi.mocked(listConnections).mockResolvedValue(BUDDIES)
+    render(<InviteBuddyPicker tripId={TRIP_ID} currentUserId={ME} excludeUserIds={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /invite a buddy/i }))
+    await screen.findByText(/Bob/)
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "nobody-like-this")
+    const link = await screen.findByRole("link", { name: /find paddlers/i })
+    expect(link).toHaveAttribute("href", "/paddlers?q=nobody-like-this")
+  })
+
+  it("does not show the 'Find paddlers' link when the search is empty", async () => {
+    vi.mocked(listConnections).mockResolvedValue(BUDDIES)
+    render(<InviteBuddyPicker tripId={TRIP_ID} currentUserId={ME} excludeUserIds={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /invite a buddy/i }))
+    await screen.findByText(/Bob/)
+    expect(screen.queryByRole("link", { name: /find paddlers/i })).not.toBeInTheDocument()
+  })
 })

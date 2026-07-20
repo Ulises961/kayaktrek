@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
 import { UserIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,29 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { MedicalNotesViewer } from "@/components/trips/medical-notes-viewer"
 import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
 import type { TripMember } from "@/lib/dtos/trip-member"
-
-// ---------------------------------------------------------------------------
-// Local helpers (mirrored from float-plan/page.tsx for the client boundary)
-// ---------------------------------------------------------------------------
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return "—"
-  try {
-    return format(new Date(iso), "d MMM yyyy")
-  } catch {
-    return iso
-  }
-}
-
-function formatLength(cm: number | null | undefined) {
-  if (!cm) return null
-  return `${(cm / 100).toFixed(2)} m`
-}
+import { formatDayDate } from "@/lib/utils/date"
+import { formatVesselLength } from "@/lib/user/format"
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
@@ -61,7 +44,7 @@ function VesselBlock({ member }: { member: TripMember }) {
         label="Make / Model"
         value={[vesselMake, vesselModel].filter(Boolean).join(" ") || null}
       />
-      <FieldRow label="Length" value={formatLength(vesselLengthCm)} />
+      <FieldRow label="Length" value={formatVesselLength(vesselLengthCm)} />
       <FieldRow label="Colour" value={colors || null} />
     </div>
   )
@@ -148,7 +131,7 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
 
       {member.floatPlanConfirmedAt ? (
         <p className="text-muted-foreground text-[10px]">
-          Float plan confirmed {formatDate(member.floatPlanConfirmedAt)}
+          Float plan confirmed {formatDayDate(member.floatPlanConfirmedAt)}
         </p>
       ) : (
         <span className="self-start rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-amber-700 uppercase dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
@@ -265,9 +248,8 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
           <form noValidate onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="leader-password">Password</Label>
-              <Input
+              <PasswordInput
                 id="leader-password"
-                type="password"
                 autoComplete="current-password"
                 {...register("password")}
               />

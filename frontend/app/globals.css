@@ -88,7 +88,9 @@
   --radius: 0.625rem;
 
   /* Core */
-  --background: oklch(0.986 0.004 85); /* warm-neutral paper white */
+  --background: oklch(
+    0.986 0.007 88
+  ); /* warm-neutral paper white — nudged toward --chart-paper's warmth (M12 §E) */
   --foreground: oklch(0.155 0.04 245); /* #0d1b2e ocean-900 */
 
   --card: oklch(1 0 0);
@@ -305,10 +307,11 @@
 }
 
 @layer components {
-  /* ── Auth surfaces ──────────────────────────────────────────────────────── */
-  /* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
-     These rules style the contents that sit inside it. */
-  .auth-card-accent {
+  /* ── Chart motifs ───────────────────────────────────────────────────────── */
+  /* Thin maritime-gradient top rule — the chart signature carried from the auth
+     cartouche onto in-app cards. Render via <CardTopRule /> (components/common/
+     card-top-rule.tsx), not by hand. */
+  .chart-top-rule {
     height: 3px;
     background: linear-gradient(
       to right,
@@ -317,6 +320,17 @@
       oklch(0.62 0.13 184)
     );
   }
+
+  /* Dark mode dims every Leaflet tile pane app-wide (dashboard banner, explore,
+     planner, landing hero) — raw daylight tiles otherwise glare against the
+     navy shell. One shared rule, not per-map component edits. */
+  .dark .leaflet-tile-pane {
+    filter: brightness(0.65) contrast(1.15) saturate(0.85);
+  }
+
+  /* ── Auth surfaces ──────────────────────────────────────────────────────── */
+  /* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
+     These rules style the contents that sit inside it. */
   .auth-heading {
     font-family: var(--font-display), serif;
     font-size: 1.6rem;
@@ -459,6 +473,15 @@
 /* Header — slim chart publication strip. */
 .chart-header {
   background: color-mix(in oklch, var(--chart-paper) 78%, transparent);
+  border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
+  backdrop-filter: blur(8px);
+}
+/* App shell variant — tints from the app's own --background token (which
+   already has a dark-mode value) instead of chart-paper, so the header
+   reads as part of the content area below it rather than matching the
+   sidebar's tone and looking like a separate strip (M12 §B22 follow-up). */
+.chart-header-app {
+  background: color-mix(in oklch, var(--background) 78%, transparent);
   border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
   backdrop-filter: blur(8px);
 }

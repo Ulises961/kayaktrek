@@ -1,37 +1,36 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogCard } from "./log-card"
-import type { Log } from "@/lib/dtos/log"
+import { LogsList } from "./logs-list"
+import type { LogPage } from "@/lib/dtos/log"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 interface LogsTabsProps {
-  myLogs: Log[]
-  endorsedLogs: Log[]
+  initialMine: LogPage
+  initialEndorsed: LogPage
   currentUserId?: string
+  unit?: DistanceUnit
 }
 
-export function LogsTabs({ myLogs, endorsedLogs, currentUserId }: LogsTabsProps) {
+export function LogsTabs({ initialMine, initialEndorsed, currentUserId, unit }: LogsTabsProps) {
   return (
     <Tabs defaultValue="mine">
       <TabsList>
-        <TabsTrigger value="mine">My logs ({myLogs.length})</TabsTrigger>
-        <TabsTrigger value="endorsed">Endorsed ({endorsedLogs.length})</TabsTrigger>
+        <TabsTrigger value="mine">My logs ({initialMine.total})</TabsTrigger>
+        <TabsTrigger value="endorsed">Endorsed ({initialEndorsed.total})</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="mine" className="mt-4 flex flex-col gap-2">
-        {myLogs.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No logs yet. Record your first session.</p>
-        ) : (
-          myLogs.map((log) => <LogCard key={log.id} log={log} currentUserId={currentUserId} />)
-        )}
+      <TabsContent value="mine" className="mt-4">
+        <LogsList initial={initialMine} kind="mine" currentUserId={currentUserId} unit={unit} />
       </TabsContent>
 
-      <TabsContent value="endorsed" className="mt-4 flex flex-col gap-2">
-        {endorsedLogs.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No endorsed logs yet.</p>
-        ) : (
-          endorsedLogs.map((log) => <LogCard key={log.id} log={log} variant="endorsed" />)
-        )}
+      <TabsContent value="endorsed" className="mt-4">
+        <LogsList
+          initial={initialEndorsed}
+          kind="endorsed"
+          currentUserId={currentUserId}
+          unit={unit}
+        />
       </TabsContent>
     </Tabs>
   )

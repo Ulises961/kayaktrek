@@ -1,11 +1,15 @@
 import { searchPublicItineraries, fetchItineraries } from "@/lib/itinerary/actions"
 import { getSession } from "@/lib/auth/session"
+import { getMe } from "@/lib/user/me"
+import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { ExploreDiscovery } from "@/components/explore/explore-discovery"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function ExplorePage() {
-  const [initial, session] = await Promise.all([
+  const [initial, session, me] = await Promise.all([
     searchPublicItineraries({ perPage: 20 }),
     getSession(),
+    getMe(),
   ])
 
   // The viewer's own routes get an "open" affordance instead of a duplicate-creating
@@ -17,7 +21,7 @@ export default async function ExplorePage() {
   return (
     <div className="flex flex-col xl:h-full">
       <div className="border-border flex shrink-0 items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-semibold">Explore routes</h1>
+        <PageHeading>Explore routes</PageHeading>
         <p className="text-muted-foreground text-sm">
           {initial.total === 0
             ? "No public routes yet"
@@ -25,7 +29,12 @@ export default async function ExplorePage() {
         </p>
       </div>
       <div className="flex-1 xl:min-h-0">
-        <ExploreDiscovery initial={initial} isAuthenticated={!!session} ownedIds={ownedIds} />
+        <ExploreDiscovery
+          initial={initial}
+          isAuthenticated={!!session}
+          ownedIds={ownedIds}
+          unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
+        />
       </div>
     </div>
   )

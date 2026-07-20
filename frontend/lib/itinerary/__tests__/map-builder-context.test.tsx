@@ -23,13 +23,13 @@ const MOCK_CTX: MapBuilderContextValue = {
   setDraftSlices: () => {},
   tripId: null,
   tripName: "Test Trip",
+  tripDateFrom: null,
+  tripDateTo: null,
   itineraryId: ITIN_ID,
   distanceUnit: "nm",
   setDistanceUnit: () => {},
   avgSpeedKnots: 2.5,
   setAvgSpeedKnots: () => {},
-  activePointId: null,
-  setActivePointId: () => {},
   day0Id: null,
   viewMode: true,
   setViewMode: () => {},
@@ -71,12 +71,12 @@ describe("useMapBuilder", () => {
     expect(result.current.draftSlices).toBeNull()
   })
 
-  it("exposes activePointId and day0Id from context", () => {
+  it("exposes selectedPointId and day0Id from context", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(MapBuilderContext.Provider, { value: MOCK_CTX }, children)
 
     const { result } = renderHook(() => useMapBuilder(), { wrapper })
-    expect(result.current.activePointId).toBeNull()
+    expect(result.current.selectedPointId).toBeNull()
     expect(result.current.day0Id).toBeNull()
   })
 })

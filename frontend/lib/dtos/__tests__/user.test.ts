@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { UserSchema, TravellerSchema, ProfileFormSchema, ChangePasswordSchema } from "../user"
+import { DISTANCE_UNIT } from "../../itinerary/distance"
 
 const BASE_USER = {
   id: "01952f1a-0000-7000-8000-000000000001",
@@ -50,6 +51,31 @@ describe("UserSchema", () => {
   it("allows null and absent optional fields", () => {
     const result = UserSchema.safeParse({ ...BASE_USER, surname: null, avatarUrl: null })
     expect(result.success).toBe(true)
+  })
+
+  it("defaults unitPreference to nm when absent", () => {
+    const result = UserSchema.parse(BASE_USER)
+    expect(result.unitPreference).toBe(DISTANCE_UNIT.NM)
+  })
+
+  it("accepts an explicit unitPreference", () => {
+    const result = UserSchema.safeParse({ ...BASE_USER, unitPreference: DISTANCE_UNIT.KM })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an invalid unitPreference", () => {
+    const result = UserSchema.safeParse({ ...BASE_USER, unitPreference: "miles" })
+    expect(result.success).toBe(false)
+  })
+
+  it("accepts a pendingMail value", () => {
+    const result = UserSchema.safeParse({ ...BASE_USER, pendingMail: "new@example.com" })
+    expect(result.success).toBe(true)
+  })
+
+  it("allows a null or absent pendingMail", () => {
+    expect(UserSchema.safeParse({ ...BASE_USER, pendingMail: null }).success).toBe(true)
+    expect(UserSchema.safeParse(BASE_USER).success).toBe(true)
   })
 })
 

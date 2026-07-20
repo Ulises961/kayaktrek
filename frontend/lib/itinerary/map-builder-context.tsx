@@ -5,6 +5,7 @@ import type { Dispatch } from "react"
 import type { MapState, MapAction } from "./map-reducer"
 import type { DaySlice } from "./boundaries"
 import type { TripState } from "@/lib/dtos/trip"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type { DaySlice }
 
@@ -15,13 +16,15 @@ export type MapBuilderContextValue = {
   setDraftSlices: (s: DaySlice[] | null) => void
   tripId: string | null
   tripName: string
+  /** ISO date (YYYY-MM-DD) — the trip's own declared start/end, used to bound
+   * day-date pickers so a Day can't silently drift outside the trip's range. */
+  tripDateFrom: string | null
+  tripDateTo: string | null
   itineraryId: string
-  distanceUnit: "nm" | "km"
-  setDistanceUnit: (u: "nm" | "km") => void
+  distanceUnit: DistanceUnit
+  setDistanceUnit: (u: DistanceUnit) => void
   avgSpeedKnots: number
   setAvgSpeedKnots: (v: number) => void
-  activePointId: string | null
-  setActivePointId: (id: string | null) => void
   day0Id: string | null
   viewMode: boolean
   setViewMode: (v: boolean) => void

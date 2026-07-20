@@ -1,5 +1,5 @@
 from marshmallow import fields, post_load, validates, ValidationError, pre_load
-from Models.user import User
+from Models.user import User, UnitPreferenceType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
 from Schemas.user_certification_schema import UserCertificationSchema
@@ -14,7 +14,8 @@ class UserSchema(BaseSchema):
     """
     mail = fields.Email(required=True, validate=lambda x: len(x) <= 255)
     pwd = fields.String(required=True, load_only=True, validate=lambda x: len(x) >= 8)
-    phone = fields.String(required=True, validate=lambda x: len(x) <= 20)
+    # Optional since M12 §F — signup no longer asks for it; collected in Settings.
+    phone = fields.String(allow_none=True, load_default=None, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(required=True, validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
@@ -44,11 +45,17 @@ class UserSchema(BaseSchema):
     home_location = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 255)
     profile_is_public = fields.Boolean()
 
+    # Distance-unit display preference — presentation only, storage stays km.
+    unit_preference = fields.Enum(UnitPreferenceType, by_value=True, load_default=UnitPreferenceType.NM)
+
     # Consent timestamp only — ciphertext fields are never exposed via API
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
     # Set when a password reset wiped the notes — drives the re-entry prompt in the UI
     medical_notes_reset_at = fields.DateTime(allow_none=True, dump_only=True)
     deletion_requested_at = fields.DateTime(allow_none=True, dump_only=True)
+    # Set while an email-change request awaits confirmation — never mutable via PATCH,
+    # only through the dedicated request-email-change/verify-email-change flow.
+    pending_mail = fields.String(allow_none=True, dump_only=True)
 
     # Presence flag — clients use this to show the keypair-generation prompt
     has_keypair = fields.Method("get_has_keypair", dump_only=True)
@@ -155,14 +162,19 @@ class UserUpdateSchema(UserSchema):
     """
     mail = fields.Email(dump_only=True)
     pwd = fields.String(load_only=True)
-    phone = fields.String(validate=lambda x: len(x) <= 20)
+    # allow_none so Settings can clear a stored number, not just change it
+    phone = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(validate=lambda x: 1 <= len(x.strip()) <= 100)
     surname = fields.String(allow_none=True, validate=lambda x: x is None or len(x.strip()) <= 100)
+    # No load_default here — a PATCH omitting this field must leave it untouched,
+    # unlike UserSchema's create-time default.
+    unit_preference = fields.Enum(UnitPreferenceType, by_value=True)
 
     # Medical notes and consent fields are not mutable through this schema
     medical_notes_consent_at = fields.DateTime(dump_only=True)
     deletion_requested_at = fields.DateTime(dump_only=True)
+    pending_mail = fields.String(dump_only=True)
 
     @post_load
     def make_user(self, data, **kwargs):

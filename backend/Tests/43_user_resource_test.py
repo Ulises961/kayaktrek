@@ -39,6 +39,40 @@ def test_get_other_user_returns_403(client, auth_headers, id_2):
     assert resp.status_code == 403
 
 
+# ── unit_preference ───────────────────────────────────────────────────────────
+
+def test_unit_preference_defaults_to_nm(client, auth_headers, id):
+    me = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers).json
+    assert me["unitPreference"] == "nm"
+
+
+def test_update_unit_preference(client, auth_headers, id):
+    resp = client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers,
+                        json={"unitPreference": "km"})
+    assert resp.status_code == 200
+    me = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers).json
+    assert me["unitPreference"] == "km"
+    # Restore so the session-scoped user_1 carries no state into other tests.
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json={"unitPreference": "nm"})
+
+
+def test_update_unit_preference_invalid_value_returns_400(client, auth_headers, id):
+    resp = client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers,
+                        json={"unitPreference": "miles"})
+    assert resp.status_code == 400
+
+
+def test_unit_preference_not_leaked_by_unrelated_patch(client, auth_headers, id):
+    """A PATCH omitting unitPreference must not silently reset it (partial-update contract)."""
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json={"unitPreference": "km"})
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers, json={"bio": "just a bio update"})
+    me = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers).json
+    assert me["unitPreference"] == "km"
+    # Restore.
+    client.patch(f"{USER_ENDPOINT}/{id}", headers=auth_headers,
+                 json={"unitPreference": "nm", "bio": None})
+
+
 # ── PATCH public-profile fields + GET /api/user/<username>/public ────────────
 
 def test_update_public_profile_fields(client, auth_headers, id):
@@ -82,7 +116,7 @@ def test_public_profile_public_hides_private_fields(client, auth_headers_2, id_2
         assert "totalDistance" in data["stats"]
         for forbidden in ("mail", "phone", "vesselMake", "emergencyContactName",
                           "medicalNotesConsentAt", "admin", "deletionRequestedAt",
-                          "logs", "endorsedLogs", "hasKeypair"):
+                          "logs", "endorsedLogs", "hasKeypair", "unitPreference"):
             assert forbidden not in data
     finally:
         client.patch(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers_2,

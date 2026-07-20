@@ -1,9 +1,15 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/common/app-sidebar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
+import { RequestsMenu } from "@/components/common/requests-menu"
 import { KeypairPromptBanner } from "@/components/common/keypair-prompt-banner"
+import { ContentAreaProvider } from "@/components/common/content-area-context"
+import { ContentArea } from "@/components/common/content-area"
+import { BreadcrumbProvider } from "@/components/common/breadcrumb-context"
+import { HeaderBreadcrumb } from "@/components/common/header-breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { getMe } from "@/lib/user/me"
+import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import React from "react"
 
 async function getHasKeypair(): Promise<boolean> {
@@ -12,25 +18,37 @@ async function getHasKeypair(): Promise<boolean> {
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const hasKeypair = await getHasKeypair()
+  const [hasKeypair, pendingRequests] = await Promise.all([
+    getHasKeypair(),
+    getPendingRequestsSummary(),
+  ])
 
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main className="flex min-h-screen w-full overflow-auto p-1 md:p-4">
-        <div className="flex h-screen w-full flex-col">
-          {/* Nav bar */}
-          <header className="border-border mb-6 flex h-12 shrink-0 flex-row items-center gap-2 border-b px-4">
-            <SidebarTrigger className="md:hidden" />
-            <Separator orientation="vertical" className="h-4 md:hidden" />
-            {/* Breadcrumb — each page renders its own via slot pattern */}
-            <div id="breadcrumb-slot" className="flex flex-1 items-center" />
-            <ThemeToggle />
-          </header>
-          <KeypairPromptBanner hasKeypair={hasKeypair} />
-          <div className="flex-1 overflow-auto p-6">{children}</div>
-        </div>
-      </main>
+      <ContentAreaProvider>
+        <BreadcrumbProvider>
+          <main className="flex min-h-screen w-full overflow-auto p-1 md:p-4">
+            <div className="flex h-screen w-full flex-col">
+              {/* Nav bar — same chart-header shape (blur, bottom rule) as the
+                  landing/auth headers, but tinted from the app's own
+                  --background token instead of chart-paper, so it unifies
+                  with the content area below it rather than the sidebar. */}
+              <header className="chart-header-app mb-6 flex h-12 shrink-0 flex-row items-center gap-2 px-4">
+                <SidebarTrigger className="md:hidden" />
+                <Separator orientation="vertical" className="h-4 md:hidden" />
+                <div className="flex flex-1 items-center">
+                  <HeaderBreadcrumb />
+                </div>
+                <RequestsMenu pendingRequests={pendingRequests} />
+                <ThemeToggle />
+              </header>
+              <KeypairPromptBanner hasKeypair={hasKeypair} />
+              <ContentArea>{children}</ContentArea>
+            </div>
+          </main>
+        </BreadcrumbProvider>
+      </ContentAreaProvider>
     </SidebarProvider>
   )
 }

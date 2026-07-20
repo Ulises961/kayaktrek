@@ -13,6 +13,7 @@ import { AddDocumentDialog } from "./add-document-dialog"
 import { EditDocumentDialog } from "./edit-document-dialog"
 import { DeleteDocumentButton } from "./delete-document-button"
 import { getTravelDocumentAttachmentUrl } from "@/lib/travel-documents/actions"
+import { formatDayDate } from "@/lib/utils/date"
 import {
   TRAVEL_DOCUMENT_TYPES,
   type TravelDocument,
@@ -149,9 +150,13 @@ function DocumentRow({ doc, today, canEdit, onEdit, tripId }: DocumentRowProps) 
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {doc.date && <span className="text-muted-foreground text-xs">{doc.date}</span>}
+          {doc.date && (
+            <span className="text-muted-foreground text-xs">{formatDayDate(doc.date)}</span>
+          )}
           {doc.expiryDate && !doc.date && (
-            <span className="text-muted-foreground text-xs">until {doc.expiryDate}</span>
+            <span className="text-muted-foreground text-xs">
+              until {formatDayDate(doc.expiryDate)}
+            </span>
           )}
           {status && <StatusBadge status={status} expiryDate={doc.expiryDate} />}
           {doc.confirmationNumber && (

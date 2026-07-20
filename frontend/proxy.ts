@@ -58,6 +58,7 @@ const AUTH_GATED_PREFIXES = [
   "/itinerary",
   "/logs",
   "/profile",
+  "/settings",
   "/trips",
   "/users",
 ]

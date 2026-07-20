@@ -264,6 +264,28 @@ def re_auth():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_api.route("/me/email-change", methods=["POST"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+@limiter.limit("5 per minute", key_func=lambda: str(g.current_user_id))
+def request_email_change():
+    try:
+        raw = request.get_json()
+        if not isinstance(raw, dict) or not raw.get("newMail"):
+            abort(HTTPStatus.BAD_REQUEST, description="newMail is required")
+        UserService.request_email_change(str(g.current_user_id), raw["newMail"].strip())
+        return "", HTTPStatus.ACCEPTED
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_api.route("/me/medical-consent", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token

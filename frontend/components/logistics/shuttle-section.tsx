@@ -161,7 +161,7 @@ function VehicleCard({
           {driverName ? (
             <span className="text-sm">{driverName}</span>
           ) : (
-            <span className="text-muted-foreground/60 text-sm italic">No driver set</span>
+            <span className="text-muted-foreground text-sm italic">No driver set</span>
           )}
         </div>
 

@@ -11,6 +11,8 @@ vi.mock("@/lib/endorsement-requests/actions", () => ({ deleteEndorsementRequest:
 import { endorseLog } from "@/lib/logs/actions"
 import { deleteEndorsementRequest } from "@/lib/endorsement-requests/actions"
 import { EndorsementInbox } from "../endorsement-inbox"
+import { formatDayDate } from "@/lib/utils/date"
+import { DISTANCE_UNIT, toNm } from "@/lib/itinerary/distance"
 import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
 
 const LOG_ID = "01952f1a-0000-7000-8000-0000000000e1"
@@ -50,11 +52,18 @@ describe("EndorsementInbox", () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it("shows who asked and the paddle detail", () => {
+  it("shows who asked and the paddle detail, date formatted and distance in km by default", () => {
     render(<EndorsementInbox requests={[REQUEST]} />)
     expect(screen.getByText(/asked to endorse \(1\)/i)).toBeDefined()
     expect(screen.getByText("Alice Adams")).toBeDefined()
-    expect(screen.getByText(/2026-06-20 · 12 km · 4h/)).toBeDefined()
+    const expected = `${formatDayDate("2026-06-20")} · 12.0 km · 4h`
+    expect(screen.getByText(expected)).toBeDefined()
+  })
+
+  it("converts the distance to nm when unit is nm", () => {
+    render(<EndorsementInbox requests={[REQUEST]} unit={DISTANCE_UNIT.NM} />)
+    const expected = `${formatDayDate("2026-06-20")} · ${toNm(12).toFixed(1)} nm · 4h`
+    expect(screen.getByText(expected)).toBeDefined()
   })
 
   it("endorses via the log id (resolving the request server-side)", async () => {

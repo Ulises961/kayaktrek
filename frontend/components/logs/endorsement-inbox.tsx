@@ -6,18 +6,22 @@ import { BadgeCheckIcon, XIcon } from "lucide-react"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { ListRow } from "@/components/common/list-row"
 import { endorseLog } from "@/lib/logs/actions"
 import { deleteEndorsementRequest } from "@/lib/endorsement-requests/actions"
+import { formatDayDate } from "@/lib/utils/date"
+import { DISTANCE_UNIT, toNm, type DistanceUnit } from "@/lib/itinerary/distance"
 import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
 
 interface EndorsementInboxProps {
   requests: EndorsementRequest[]
+  unit?: DistanceUnit
 }
 
 // The "asked to endorse" prompt: trip-mates who asked the viewer to endorse a log.
 // Endorsing resolves the request server-side (the existing endorse endpoint);
 // declining deletes it.
-export function EndorsementInbox({ requests }: EndorsementInboxProps) {
+export function EndorsementInbox({ requests, unit = DISTANCE_UNIT.KM }: EndorsementInboxProps) {
   if (requests.length === 0) return null
 
   return (
@@ -27,9 +31,9 @@ export function EndorsementInbox({ requests }: EndorsementInboxProps) {
           <BadgeCheckIcon className="size-4" />
           Asked to endorse ({requests.length})
         </h2>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {requests.map((request) => (
-            <InboxRow key={request.id} request={request} />
+            <InboxRow key={request.id} request={request} unit={unit} />
           ))}
         </ul>
       </CardContent>
@@ -37,7 +41,7 @@ export function EndorsementInbox({ requests }: EndorsementInboxProps) {
   )
 }
 
-function InboxRow({ request }: { request: EndorsementRequest }) {
+function InboxRow({ request, unit }: { request: EndorsementRequest; unit: DistanceUnit }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -45,9 +49,10 @@ function InboxRow({ request }: { request: EndorsementRequest }) {
   const author = request.requester
   const authorName = [author.name, author.surname].filter(Boolean).join(" ")
   const { date, distance, hours } = request.log
+  const displayDistance = distance != null && unit === DISTANCE_UNIT.NM ? toNm(distance) : distance
   const detail = [
-    date,
-    distance != null ? `${distance} km` : null,
+    date ? formatDayDate(date) : null,
+    displayDistance != null ? `${displayDistance.toFixed(1)} ${unit}` : null,
     hours != null ? `${hours}h` : null,
   ]
     .filter(Boolean)
@@ -63,7 +68,7 @@ function InboxRow({ request }: { request: EndorsementRequest }) {
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-lg border px-3 py-2">
+    <ListRow className="flex items-center gap-3 py-2">
       <UserAvatar
         name={author.name}
         surname={author.surname}
@@ -91,6 +96,6 @@ function InboxRow({ request }: { request: EndorsementRequest }) {
           <span className="sr-only">Decline</span>
         </Button>
       </div>
-    </li>
+    </ListRow>
   )
 }

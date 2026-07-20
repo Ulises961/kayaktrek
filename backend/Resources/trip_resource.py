@@ -62,7 +62,11 @@ def get_trip(id: str):
 @JWTService.authenticate_restful
 def get_all_user_trips(user_id: str):
     """
-    TripResource GET method. Retrieves trip(s) by ID or all trips.
+    TripResource GET method. Retrieves a paginated, filterable page of a user's trips.
+
+    Query params: page, per_page (capped 100); state (building|happening|past);
+    difficulty (easy|moderate|demanding|expert); sort (soonest|latest|latest_end,
+    default newest-created); min_miles/max_miles (itinerary total distance).
 
     Returns:
         JSON response with trip data and 200 status code
@@ -73,7 +77,16 @@ def get_all_user_trips(user_id: str):
         logger.info(f"Retrieving all trips for user with id {user_id}")
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = TripService.get_trips_by_user(user_id, page=page, per_page=per_page)
+        result = TripService.get_trips_by_user(
+            user_id,
+            page=page,
+            per_page=per_page,
+            state=request.args.get("state"),
+            difficulty=request.args.get("difficulty"),
+            sort=request.args.get("sort"),
+            min_miles=request.args.get("min_miles", type=float),
+            max_miles=request.args.get("max_miles", type=float),
+        )
         schema = TripSchema()
         return jsonify({
             "items": [schema.dump(trip) for trip in result["items"]],
@@ -84,6 +97,8 @@ def get_all_user_trips(user_id: str):
 
     except HTTPException:
         raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
     except Exception as e:
@@ -202,25 +217,19 @@ def invite_user(id: str):
     """
     POST /api/trip/<id>/invite — Leader invites a user to the trip.
 
-    Body: {"email": "<email>"} | {"username": "<name>"} | {"userId": "<uuid>"} —
-    by exact email, or resolved from the buddy finder / buddy list. A block in either
-    direction between leader and invitee forbids the invitation (403).
+    Body: {"userId": "<uuid>"} — sourced from the buddy picker or paddler search, never
+    a blind email/username guess (M12 §N closed that enumeration oracle). A block in
+    either direction between leader and invitee forbids the invitation (403).
     Returns 201, 404 if no account found, 409 if already invited or member.
     """
     try:
         body = request.get_json() or {}
-        email = body.get("email")
-        username = body.get("username")
         user_id = body.get("userId")
         inviter_id = str(g.current_user_id)
-        if email:
-            TripService.invite_user_by_email(id, email, inviter_id=inviter_id)
-        elif username:
-            TripService.invite_user_by_username(id, username, inviter_id=inviter_id)
-        elif user_id:
+        if user_id:
             TripService.invite_user(id, user_id, inviter_id=inviter_id)
         else:
-            abort(HTTPStatus.BAD_REQUEST, description="'email', 'username' or 'userId' is required")
+            abort(HTTPStatus.BAD_REQUEST, description="'userId' is required")
         return jsonify({"message": "Invitation sent"}), HTTPStatus.CREATED
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))

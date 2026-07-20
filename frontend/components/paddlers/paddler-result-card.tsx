@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
+import { ListRow } from "@/components/common/list-row"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +65,7 @@ export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
   if (hidden) return null
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+    <ListRow as="div" className="flex items-center gap-3 py-2.5">
       <Link href={`/paddlers/${paddler.username}`} className="shrink-0">
         <UserAvatar name={paddler.name} surname={paddler.surname} imageUrl={paddler.avatarUrl} />
       </Link>
@@ -141,6 +142,6 @@ export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </ListRow>
   )
 }

@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { generateKeypair } from "@/lib/profile/actions"
 
@@ -79,9 +79,8 @@ export function KeypairPromptBanner({ hasKeypair }: KeypairPromptBannerProps) {
           <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="keypair-password">Password</Label>
-              <Input
+              <PasswordInput
                 id="keypair-password"
-                type="password"
                 autoComplete="current-password"
                 {...register("password")}
               />

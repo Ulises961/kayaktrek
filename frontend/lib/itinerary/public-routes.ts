@@ -1,12 +1,17 @@
 import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
-import type { PointType } from "@/lib/dtos/point"
+import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { buildBoundaryColorMap, type BoundaryColors } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
+import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
 export type RoutePoint = {
+  // Source point id — lets renderers look a point up in `boundaryColors`
+  // (day-continuity split rings). Null when the source point had no id.
+  id: string | null
   lat: number
   lon: number
   type: PointType
@@ -39,6 +44,11 @@ export type RouteData = {
   positions: [number, number][]
   points?: RoutePoint[]
   days: RouteDaySegment[]
+  // Point id → { left, right } day colours at shared overnight-stop
+  // boundaries, so public renderers can draw the builder's split-ring
+  // continuity marker. A plain Record (not a Map): RouteData crosses the
+  // "use server" boundary in fetchPublicRouteData.
+  boundaryColors: Record<string, BoundaryColors>
   totalMiles: number | null
   dayCount: number
 }
@@ -66,7 +76,13 @@ type RouteSource = {
   id?: string | null
   name?: string | null
   totalMiles?: number | null
-  days: { dayNumber: number; date?: string | null; points: ChainPoint[] }[]
+  days: {
+    dayNumber: number
+    date?: string | null
+    points: ChainPoint[]
+    startPointId?: string | null
+    endPointId?: string | null
+  }[]
 }
 
 // Walk the nextId linked list (no nested `next` property): start from heads (nodes
@@ -93,14 +109,31 @@ function walkChain<T extends ChainPoint>(points: T[]): T[] {
   return ordered
 }
 
+// A day's own end boundary may be shared with (and stored under) the next
+// day — single-owner storage. Prefer walking by boundary id through a
+// *global* point map (spanning every day) so that's still resolved; fall
+// back to `walkChain`'s more permissive multi-head walk over the day's own
+// points only when there's no boundary metadata yet (an organic/fresh day).
+function walkDaySegment<T extends ChainPoint & { id?: string | null }>(
+  day: { points: T[]; startPointId?: string | null; endPointId?: string | null },
+  pointsById: Map<string, T>,
+): T[] {
+  if (day.startPointId) {
+    const walked = walkDayRoutePoints(day, pointsById)
+    if (walked.length > 0) return walked
+  }
+  return walkChain(day.points)
+}
+
 function toRoutePoint(
   p: ChainPoint & { latitude: number; longitude: number },
   pointNumber: number | null,
 ): RoutePoint {
   return {
+    id: p.id ?? null,
     lat: p.latitude,
     lon: p.longitude,
-    type: p.type === "stop" ? "stop" : "position",
+    type: p.type === POINT_TYPE.STOP ? POINT_TYPE.STOP : POINT_TYPE.POSITION,
     name: p.name ?? null,
     images: (p.images ?? [])
       .map((img) => img.url ?? img.location ?? null)
@@ -115,16 +148,35 @@ function buildRouteData(src: RouteSource): RouteData {
     .filter((d) => d.dayNumber > 0)
     .sort((a, b) => a.dayNumber - b.dayNumber)
 
-  // Walk every day's chain up front, in day order, so points can be numbered by
-  // their absolute position across the whole route (numberByOrder) before being
-  // split back into per-day segments below — the split must not affect numbering.
+  const pointsById = new Map(
+    numberedDays
+      .flatMap((d) => d.points)
+      .filter((p) => p.id)
+      .map((p) => [p.id!, p]),
+  )
+
+  // Walk every day's chain up front, in day order. A day's own segment may
+  // repeat the boundary stop shared with the adjacent day (walkDaySegment
+  // resolves it via boundary id even when the point row is stored under that
+  // other day) — desired for day-level distance/labels below, but the
+  // flattened/numbered views must still treat it as a single point.
   const orderedByDay = numberedDays.map((day) =>
-    walkChain(day.points).filter(
+    walkDaySegment(day, pointsById).filter(
       (p): p is typeof p & { latitude: number; longitude: number } =>
         p.latitude != null && p.longitude != null,
     ),
   )
-  const pointNumbers = numberByOrder(orderedByDay.flat())
+
+  const dedupedFlat: (typeof orderedByDay)[number] = []
+  const seenIds = new Set<string>()
+  for (const dayPoints of orderedByDay) {
+    for (const p of dayPoints) {
+      if (p.id && seenIds.has(p.id)) continue
+      if (p.id) seenIds.add(p.id)
+      dedupedFlat.push(p)
+    }
+  }
+  const pointNumbers = numberByOrder(dedupedFlat)
 
   const positions: [number, number][] = []
   const points: RoutePoint[] = []
@@ -135,9 +187,6 @@ function buildRouteData(src: RouteSource): RouteData {
     const dayPoints = ordered.map((p) =>
       toRoutePoint(p, p.id ? (pointNumbers.get(p.id) ?? null) : null),
     )
-
-    for (const p of ordered) positions.push([p.latitude, p.longitude])
-    points.push(...dayPoints)
     days.push({
       dayNumber: day.dayNumber,
       date: day.date ?? null,
@@ -147,12 +196,18 @@ function buildRouteData(src: RouteSource): RouteData {
     })
   })
 
+  for (const p of dedupedFlat) {
+    positions.push([p.latitude, p.longitude])
+    points.push(toRoutePoint(p, p.id ? (pointNumbers.get(p.id) ?? null) : null))
+  }
+
   return {
     id: src.id ?? "",
     name: src.name ?? "Untitled",
     positions,
     points,
     days,
+    boundaryColors: buildBoundaryColorMap(numberedDays),
     totalMiles: src.totalMiles ?? null,
     dayCount: numberedDays.length,
   }
@@ -169,6 +224,8 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
       dayNumber: d.dayNumber,
       date: d.date ?? null,
       points: d.points as PublicPoint[],
+      startPointId: d.startPointId ?? null,
+      endPointId: d.endPointId ?? null,
     })),
   })
 }
@@ -184,6 +241,8 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
       dayNumber: d.dayNumber,
       date: d.date ?? null,
       points: (d.points ?? []) as ChainPoint[],
+      startPointId: d.startPointId ?? null,
+      endPointId: d.endPointId ?? null,
     })),
   })
 }

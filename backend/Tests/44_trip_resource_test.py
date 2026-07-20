@@ -47,18 +47,11 @@ def test_invite_missing_email_returns_400(client, auth_headers, trip_w_o_itinera
     assert resp.status_code == 400
 
 
-def test_invite_unknown_email_returns_404(client, auth_headers, trip_w_o_itinerary):
-    trip_id = trip_w_o_itinerary["id"]
-    resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers,
-                       json={"email": "nobody@nowhere.test"})
-    assert resp.status_code == 404
-
-
 def test_invite_already_invited_returns_409(client, trip_with_invitation):
     trip_id = trip_with_invitation["trip"]["id"]
     resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite",
                        headers=trip_with_invitation["leader_headers"],
-                       json={"email": trip_with_invitation["invitee_email"]})
+                       json={"userId": trip_with_invitation["invitee_id"]})
     assert resp.status_code == 409
 
 

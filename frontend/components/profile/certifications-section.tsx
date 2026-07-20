@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
+import { ListRow } from "@/components/common/list-row"
 import {
   Dialog,
   DialogContent,
@@ -130,14 +131,11 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
           profile if you choose to share it.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {certs.map((cert) => {
             const expired = isCertExpired(cert.validUntil)
             return (
-              <li
-                key={cert.id}
-                className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
-              >
+              <ListRow key={cert.id} className="flex items-center gap-3 py-2 text-sm">
                 <AwardIcon className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{cert.award}</p>
@@ -168,7 +166,7 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
                 >
                   <Trash2Icon className="size-4" />
                 </button>
-              </li>
+              </ListRow>
             )
           })}
         </ul>
@@ -228,9 +226,8 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cert-reauth-password">Password</Label>
-              <Input
+              <PasswordInput
                 id="cert-reauth-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {

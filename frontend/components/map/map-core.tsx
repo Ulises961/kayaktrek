@@ -5,8 +5,9 @@ import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { routeLegs, legLabel } from "@/lib/itinerary/distance"
+import { routeLegs, legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { buildBoundaryColorMap, resolveLegDayNumber } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
 import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
@@ -58,7 +59,7 @@ export type MapCoreProps = {
   // Points already sorted in route order by MapBuilder — no walkList needed here.
   points: Point[]
   days: Day[]
-  distanceUnit: "nm" | "km"
+  distanceUnit: DistanceUnit
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null
@@ -155,26 +156,11 @@ function buildSegments(
     const b = resolvePosition(ordered[i + 1], drag)
     const dayNumA = dayNumberById.get(ordered[i].dayId ?? undefined) ?? 0
     const dayNumB = dayNumberById.get(ordered[i + 1].dayId ?? undefined) ?? 0
-    // A leg takes the colour of the day both endpoints agree on:
-    //   • both unassigned → grey
-    //   • same day → that day's colour
-    //   • A is a split-ring boundary stop and B is the immediately following day
-    //     → B's colour (the matching right-half of the split ring)
-    //   • otherwise (cross-day discontinuity, no shared colour) → grey
-    let dayNum: number
-    if (dayNumA === 0 || dayNumB === 0) {
-      dayNum = 0
-    } else if (dayNumA === dayNumB) {
-      dayNum = dayNumA
-    } else if (
-      ordered[i].id != null &&
-      boundaryPointIds.has(ordered[i].id!) &&
-      dayNumB === dayNumA + 1
-    ) {
-      dayNum = dayNumB
-    } else {
-      dayNum = 0
-    }
+    const dayNum = resolveLegDayNumber(
+      dayNumA,
+      dayNumB,
+      ordered[i].id != null && boundaryPointIds.has(ordered[i].id!),
+    )
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
       positions: [
@@ -634,29 +620,12 @@ export default function MapCore({
 
   const dayNumberById = useMemo(() => new Map(days.map((d) => [d.id, d.dayNumber ?? 0])), [days])
 
-  // Build boundary map: point id → { left, right } colors for split-ring markers.
-  // A boundary point is startPointId of any numbered day (dayNumber > 0).
-  const boundaryMap = useMemo(() => {
-    // Split-ring icons appear only on true shared boundaries: points that are
-    // simultaneously the end of Day N and the start of Day N+1 (dayNumber > 1).
-    //
-    // Plain rings (no split) for:
-    //   • Day 1's start — no previous numbered day, left half would be grey
-    //   • The trip's final endpoint — it is endPointId of the last day only,
-    //     never anyone's startPointId, so it never enters this map
-    const map = new Map<string, { left: string; right: string }>()
-    for (const day of days) {
-      if (day.dayNumber > 1 && day.startPointId) {
-        map.set(day.startPointId, {
-          left: getDayColor(day.dayNumber - 1),
-          right: getDayColor(day.dayNumber),
-        })
-      }
-    }
-    return map
-  }, [days])
+  // Point id → { left, right } colors for split-ring markers at shared
+  // day boundaries — derivation shared with the public/explore renderers
+  // via lib/itinerary/day-boundaries.
+  const boundaryMap = useMemo(() => buildBoundaryColorMap(days), [days])
 
-  const boundaryPointIds = useMemo(() => new Set(boundaryMap.keys()), [boundaryMap])
+  const boundaryPointIds = useMemo(() => new Set(Object.keys(boundaryMap)), [boundaryMap])
 
   const pointIndexById = useMemo(() => numberByOrder(points), [points])
 
@@ -732,7 +701,10 @@ export default function MapCore({
         />
 
         {/* Nautical-chart furniture — a real lat/lon graticule and a scale bar,
-            reused from the landing chart (M5b). Always on: an operational chart. */}
+            reused from the landing chart (M5b). Always on: an operational chart.
+            The grid runs edge-to-edge, underneath the top control row (zoom
+            control, Overlays toggle, the "+ Add" disclosure) — it should read
+            as genuinely part of the map surface, not visibly inset from it. */}
         <Graticule />
         <ScaleBar />
 
@@ -765,7 +737,7 @@ export default function MapCore({
             point={point}
             index={point.id ? (pointIndexById.get(point.id) ?? 0) : 0}
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
-            boundaryColors={point.id ? (boundaryMap.get(point.id) ?? null) : null}
+            boundaryColors={point.id ? (boundaryMap[point.id] ?? null) : null}
             draggable={!viewMode}
             label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
             onMarkerDragMove={handleMarkerDragMove}

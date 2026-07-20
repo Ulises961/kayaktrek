@@ -96,6 +96,31 @@ describe("PersonalPacking", () => {
     expect(mockRemove).toHaveBeenCalledWith(ENTRY_ID, TRIP_ID)
   })
 
+  it("shows pack progress in the mono-numeral convention", () => {
+    renderKit({
+      packingItems: [
+        { id: ENTRY_ID, checked: true, item: PACKED_ITEM },
+        { id: "01952f1a-0000-7000-8000-000000000p02", checked: false, item: UNPACKED_OWNED },
+      ],
+    })
+    expect(screen.getByText("1 of 2")).toBeTruthy()
+    expect(screen.getByText(/packed$/)).toBeTruthy()
+  })
+
+  it("groups entries by the item's FK-backed category, uncategorised trailing", () => {
+    const CAMPING = { id: "01952f1a-0000-7000-8000-0000000000c2", slug: "camping", name: "Camping" }
+    renderKit({
+      packingItems: [
+        { id: ENTRY_ID, checked: false, item: { ...PACKED_ITEM, category: CAMPING } },
+        { id: "01952f1a-0000-7000-8000-000000000p02", checked: false, item: UNPACKED_OWNED },
+      ],
+    })
+    const labels = screen
+      .getAllByText(/^(camping|uncategorised)$/i)
+      .filter((el) => el.tagName === "P")
+    expect(labels.map((el) => el.textContent)).toEqual(["Camping", "Uncategorised"])
+  })
+
   it("shows an empty state when nothing is packed", () => {
     renderKit({ packingItems: [] })
     expect(screen.getByText(/nothing in your kit yet/i)).toBeTruthy()

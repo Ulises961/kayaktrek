@@ -3,6 +3,8 @@ import { useState } from "react"
 import { TrashIcon, AnchorIcon, CircleDotIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Point, PointType } from "@/lib/dtos/point"
+import type { SaveStatus } from "@/hooks/use-save-status"
+import { SaveStatusLine } from "@/components/common/save-status-line"
 
 export type PointRowProps = {
   point: Point
@@ -14,6 +16,7 @@ export type PointRowProps = {
   onTypeChange?: (type: PointType) => void
   onNameChange?: (name: string) => void
   onNameBlur?: (name: string) => void
+  saveStatus?: SaveStatus
   onDelete?: () => void
 }
 
@@ -36,6 +39,7 @@ export function PointRow({
   onTypeChange,
   onNameChange,
   onNameBlur,
+  saveStatus = "idle",
   onDelete,
 }: PointRowProps) {
   const [localName, setLocalName] = useState(point.name ?? "")
@@ -108,17 +112,20 @@ export function PointRow({
       )}
 
       {onNameChange && (
-        <input
-          type="text"
-          className="border-border bg-background w-full rounded border px-2 py-1 text-sm"
-          placeholder="Point name"
-          value={localName}
-          onChange={(e) => {
-            setLocalName(e.target.value)
-            onNameChange(e.target.value)
-          }}
-          onBlur={() => onNameBlur?.(localName)}
-        />
+        <div className="flex flex-col gap-1">
+          <input
+            type="text"
+            className="border-border bg-background w-full rounded border px-2 py-1 text-sm"
+            placeholder="Point name"
+            value={localName}
+            onChange={(e) => {
+              setLocalName(e.target.value)
+              onNameChange(e.target.value)
+            }}
+            onBlur={() => onNameBlur?.(localName)}
+          />
+          <SaveStatusLine status={saveStatus} />
+        </div>
       )}
 
       {onDelete && (

@@ -1,7 +1,10 @@
-import { format } from "date-fns"
 import { AlertTriangleIcon, AnchorIcon, ShipWheelIcon, UserIcon } from "lucide-react"
 import { FloatPlanSnapshotSchema, type SnapshotCrewMember } from "@/lib/dtos/float-plan-snapshot"
 import { API_URL, API_PREFIX } from "@/lib/api/config"
+import { formatDayDate } from "@/lib/utils/date"
+import { formatVesselLength } from "@/lib/user/format"
+import { formatDateRange } from "@/lib/trips/format"
+import { PageHeading } from "@/components/common/page-heading"
 
 async function fetchSnapshot(token: string) {
   try {
@@ -15,20 +18,6 @@ async function fetchSnapshot(token: string) {
   } catch {
     return null
   }
-}
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return "—"
-  try {
-    return format(new Date(iso), "d MMM yyyy")
-  } catch {
-    return iso
-  }
-}
-
-function formatLength(cm: number | null | undefined) {
-  if (cm == null) return null
-  return `${(cm / 100).toFixed(2)} m`
 }
 
 function DocRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -82,7 +71,7 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
           {hasVessel ? (
             <div className="flex flex-col gap-1.5">
               {vesselDesc && <DocRow label="Make / model" value={vesselDesc} />}
-              {v.lengthCm && <DocRow label="Length" value={formatLength(v.lengthCm)} />}
+              {v.lengthCm && <DocRow label="Length" value={formatVesselLength(v.lengthCm)} />}
               {v.colorPrimary && <DocRow label="Primary colour" value={v.colorPrimary} />}
               {v.colorSecondary && <DocRow label="Secondary colour" value={v.colorSecondary} />}
             </div>
@@ -124,7 +113,7 @@ export default async function PublicFloatPlanPage({
       <div className="bg-background flex min-h-screen items-center justify-center p-6">
         <div className="flex max-w-sm flex-col items-center gap-4 text-center">
           <AlertTriangleIcon className="text-muted-foreground size-10" />
-          <h1 className="text-xl font-semibold">Float plan not found</h1>
+          <PageHeading>Float plan not found</PageHeading>
           <p className="text-muted-foreground text-sm leading-relaxed">
             This link has expired or is no longer valid. Contact the expedition leader for an
             updated link.
@@ -134,13 +123,7 @@ export default async function PublicFloatPlanPage({
     )
   }
 
-  const dateRange = [snap.trip.dateFrom, snap.trip.dateTo].filter(Boolean)
-  const dateLabel =
-    dateRange.length === 2
-      ? `${formatDate(dateRange[0])} – ${formatDate(dateRange[1])}`
-      : dateRange.length === 1
-        ? formatDate(dateRange[0])
-        : "Dates not set"
+  const dateLabel = formatDateRange(snap.trip.dateFrom, snap.trip.dateTo)
 
   const sc = snap.shoreContact
   const hasShoreContact = sc && (sc.name || sc.phone || sc.email)
@@ -190,7 +173,7 @@ export default async function PublicFloatPlanPage({
               <span className="text-muted-foreground font-mono text-[10px] tracking-[0.08em] uppercase">
                 Issued
               </span>
-              <span className="text-sm font-semibold">{formatDate(snap.generatedAt)}</span>
+              <span className="text-sm font-semibold">{formatDayDate(snap.generatedAt)}</span>
             </div>
           </div>
         </div>

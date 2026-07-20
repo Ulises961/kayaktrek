@@ -22,6 +22,7 @@ _TOKEN_EXPIRY_HOURS = {
     AuthTokenType.RESET: 1,
     AuthTokenType.DATA_EXPORT: 24,
     AuthTokenType.DELETION_CANCEL: 24 * 30,  # 30-day grace window
+    AuthTokenType.EMAIL_CHANGE: 1,
 }
 
 # Pre-computed hash used to equalise login timing when the account does not exist.
@@ -242,6 +243,47 @@ class AuthService:
         return user
 
     @staticmethod
+    def verify_email_change(raw_token: str) -> User:
+        """
+        Complete an email-change request using a valid EMAIL_CHANGE token.
+
+        Swaps `mail` to the pending address, clears `pending_mail`, and bumps
+        `token_version` — email is the login identifier, so every outstanding
+        session on the old identity must end, exactly like a password reset.
+        Notifies the old address afterward.
+
+        Raises:
+            ValueError: If the token is invalid/expired/used, there is no pending
+                request left to consume, or the pending address was claimed by
+                someone else in the meantime.
+        """
+        token = AuthService._consume_token(raw_token, AuthTokenType.EMAIL_CHANGE)
+        user = db.session.query(User).filter_by(id=token.user_id).first()
+        if not user:
+            raise ValueError("User not found")
+        if not user.pending_mail:
+            raise ValueError("No pending email change for this account")
+
+        new_mail = user.pending_mail
+        conflict = db.session.query(User).filter(
+            User.mail == new_mail, User.id != user.id
+        ).first()
+        if conflict:
+            user.pending_mail = None
+            db.session.commit()
+            raise ValueError("This email address is no longer available")
+
+        old_mail = user.mail
+        user.mail = new_mail
+        user.pending_mail = None
+        user.token_version += 1
+        db.session.commit()
+
+        AuthService._send_email_changed_notice(user, old_mail)
+        logger.info("email_changed", extra={"user_id": str(user.id)})
+        return user
+
+    @staticmethod
     def advance_refresh_rotation(user: User, payload: dict) -> None:
         """
         Validate a decoded refresh-token payload against the user's current rotation state
@@ -345,6 +387,36 @@ class AuthService:
             "medical_notes_cleared",
             name=user.name,
             profile_url=f"{frontend_url}/profile",
+            support_email=support_email,
+        )
+
+    @staticmethod
+    def _send_email_change_confirm(user: User, new_mail: str) -> None:
+        raw_token = AuthService._create_token(user.id, AuthTokenType.EMAIL_CHANGE)
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        confirm_url = f"{frontend_url}/verify-email-change?token={raw_token}"
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+
+        send_template_email(
+            new_mail,
+            "Confirm your new Kayak Planner email address",
+            "email_change_confirm",
+            name=user.name,
+            confirm_url=confirm_url,
+            support_email=support_email,
+        )
+
+    @staticmethod
+    def _send_email_changed_notice(user: User, old_mail: str) -> None:
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
+        send_template_email(
+            old_mail,
+            "Your Kayak Planner email address was changed",
+            "email_change_notice",
+            name=user.name,
+            new_mail=user.mail,
+            forgot_url=f"{frontend_url}/forgot-password",
             support_email=support_email,
         )
 

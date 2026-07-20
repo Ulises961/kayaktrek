@@ -259,6 +259,38 @@ class ItineraryService:
         )
         return {"items": items, "total": total, "page": page, "pages": pages}
 
+    # Explore-card thumbnails draw a single polyline, so the preview geometry is
+    # deliberately coarse: RDP at ~110 m tolerance, then a hard cap so one very
+    # dense route can't bloat the listing payload.
+    _PREVIEW_EPSILON = 0.001  # degrees
+    _PREVIEW_MAX_POINTS = 60
+
+    @staticmethod
+    def _preview_positions(numbered_days: List[Day]) -> List[List[float]]:
+        """Ordered, simplified [lat, lng] pairs for a route's listing thumbnail.
+
+        Walks each day's own chain in day_number order (same per-day walk as
+        compute_total_miles — a single global walk is non-deterministic across
+        disconnected day chains), then simplifies. Listing rows never need the
+        full RouteData shape — this is thumbnail geometry only.
+        """
+        ordered: List[Point] = []
+        for day in sorted(numbered_days, key=lambda d: d.day_number):
+            day_points = day.points or []
+            point_map = {str(p.id): p for p in day_points}
+            ordered.extend(point_map[pid] for pid in walk_linked_list(day_points))
+        placed = [
+            (float(p.latitude), float(p.longitude))
+            for p in ordered
+            if p.latitude is not None and p.longitude is not None
+        ]
+        simplified = rdp_simplify(placed, ItineraryService._PREVIEW_EPSILON)
+        cap = ItineraryService._PREVIEW_MAX_POINTS
+        if len(simplified) > cap:
+            step = (len(simplified) - 1) / (cap - 1)
+            simplified = [simplified[round(i * step)] for i in range(cap)]
+        return [[lat, lng] for lat, lng in simplified]
+
     @staticmethod
     def _annotate_explore_items(itineraries: List[Itinerary]) -> List[dict]:
         """Derive each page row's facets + fork attribution (mirrors the two-phase
@@ -300,6 +332,7 @@ class ItineraryService:
                     "season": season,
                     "centroid_lat": centroid_lat,
                     "centroid_lng": centroid_lng,
+                    "preview_positions": ItineraryService._preview_positions(numbered),
                     "created_from_id": (
                         str(itinerary.created_from_id)
                         if itinerary.created_from_id is not None

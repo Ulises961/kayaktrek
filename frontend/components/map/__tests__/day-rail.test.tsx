@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
@@ -7,6 +7,7 @@ import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context
 import type { MapState } from "@/lib/itinerary/map-reducer"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
+import { getDayColor } from "@/lib/itinerary/colors"
 
 vi.mock("@/lib/weather/actions", () => ({
   fetchDayWeather: vi.fn().mockResolvedValue({ success: false }),
@@ -51,13 +52,13 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDraftSlices: vi.fn(),
     tripId: null,
     tripName: "Test Trip",
+    tripDateFrom: null,
+    tripDateTo: null,
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
     setDistanceUnit: vi.fn(),
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
-    activePointId: null,
-    setActivePointId: vi.fn(),
     day0Id: "day-0",
     viewMode: true,
     setViewMode: vi.fn(),
@@ -148,6 +149,13 @@ describe("DayRail — entries", () => {
     expect(screen.getByText("No points")).toBeInTheDocument()
   })
 
+  it("shows a color swatch matching the day's route color", () => {
+    renderWithCtx(makeCtx())
+    const swatches = screen.getAllByTestId("day-color-swatch")
+    expect(swatches[0]).toHaveStyle({ backgroundColor: getDayColor(1) })
+    expect(swatches[1]).toHaveStyle({ backgroundColor: getDayColor(2) })
+  })
+
   it("shows empty state message when there are no numbered days", () => {
     renderWithCtx(
       makeCtx({
@@ -163,6 +171,116 @@ describe("DayRail — entries", () => {
     )
     expect(screen.queryAllByTestId("day-rail-entry")).toHaveLength(0)
     expect(screen.getByText(/no days/i)).toBeInTheDocument()
+  })
+})
+
+// ─── §M shared boundary-stop derivation ──────────────────────────────────────
+
+describe("DayRail — §M shared boundary-stop derivation", () => {
+  it("does not treat a day as empty when its only point is the boundary stop shared with the next day", () => {
+    // Simulates single-owner storage: the shared stop belongs to day 2 in
+    // `state.points` (dayId: DAY2_ID), but it's day 1's own endPointId.
+    const shared = { ...pt("shared", DAY2_ID), nextId: "p3" }
+    const p1 = { ...pt("p1", DAY1_ID), nextId: "shared" }
+    const p3 = pt("p3", DAY2_ID)
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [p1, shared, p3],
+          pointOrder: ["p1", "shared", "p3"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [
+            day(DAY1_ID, 1, { startPointId: "p1", endPointId: "shared" }),
+            day(DAY2_ID, 2, { startPointId: "shared", endPointId: "p3" }),
+          ],
+        },
+      }),
+    )
+    const entries = screen.getAllByTestId("day-rail-entry")
+    expect(entries[0]).not.toHaveAttribute("data-empty")
+    // Day 1 owns just p1 plus the shared boundary stop — 2 points, not 1.
+    expect(
+      within(entries[0]).getByText(
+        (_, node) => node?.textContent?.replace(/\s+/g, " ").trim() === "2 pts",
+      ),
+    ).toBeInTheDocument()
+  })
+})
+
+// ─── §I rest-gap visualization ───────────────────────────────────────────────
+
+describe("DayRail — §I rest-gap visualization", () => {
+  it("does not show a Rest entry when consecutive days have no calendar gap", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-02" })],
+        },
+      }),
+    )
+    expect(screen.queryByTestId("rest-gap-entry")).not.toBeInTheDocument()
+  })
+
+  it("shows a Rest entry between two dated days with a calendar gap", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-03" })],
+        },
+      }),
+    )
+    const gapEntries = screen.getAllByTestId("rest-gap-entry")
+    expect(gapEntries).toHaveLength(1)
+    expect(screen.getByText("Rest")).toBeInTheDocument()
+  })
+
+  it("combines a multi-day gap into a single entry", () => {
+    renderWithCtx(
+      makeCtx({
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-05" })],
+        },
+      }),
+    )
+    expect(screen.getAllByTestId("rest-gap-entry")).toHaveLength(1)
+  })
+
+  it("is not clickable and never creates a real day", async () => {
+    const setSelectedDayId = vi.fn()
+    renderWithCtx(
+      makeCtx({
+        setSelectedDayId,
+        state: {
+          points: [pt("p1", DAY1_ID)],
+          pointOrder: ["p1"],
+          pendingPointId: null,
+          pendingPointName: null,
+          savingCount: 0,
+          days: [day(DAY1_ID, 1, { date: "2026-07-01" }), day(DAY2_ID, 2, { date: "2026-07-03" })],
+        },
+      }),
+    )
+    const gapEntry = screen.getByTestId("rest-gap-entry")
+    expect(gapEntry.tagName).not.toBe("BUTTON")
+    await userEvent.click(gapEntry)
+    expect(setSelectedDayId).not.toHaveBeenCalled()
   })
 })
 

@@ -15,6 +15,7 @@ vi.mock("@/components/explore/explore-discovery-map", () => ({
 
 import { searchPublicItineraries } from "@/lib/itinerary/actions"
 import { ExploreDiscovery } from "../explore-discovery"
+import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { ExploreItem, ExplorePage } from "@/lib/dtos/itinerary"
 
 const mockSearch = vi.mocked(searchPublicItineraries)
@@ -28,6 +29,7 @@ function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
     season: "summer",
     centroidLat: 37,
     centroidLng: 25,
+    previewPositions: [],
     createdFromId: null,
     originalAuthor: null,
     ...overrides,
@@ -50,6 +52,24 @@ describe("ExploreDiscovery", () => {
     expect(mockSearch).not.toHaveBeenCalled()
   })
 
+  it("shows route distance in nm by default", () => {
+    render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    expect(screen.getByText(`${formatDistance(20, DISTANCE_UNIT.NM)} nm`)).toBeInTheDocument()
+  })
+
+  it("converts route distance to km when unit is km", () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item()])}
+        isAuthenticated
+        ownedIds={[]}
+        unit={DISTANCE_UNIT.KM}
+      />,
+    )
+    expect(screen.getByText(`${formatDistance(20, DISTANCE_UNIT.KM)} km`)).toBeInTheDocument()
+    expect(screen.queryByText(/20\.0 nm/)).not.toBeInTheDocument()
+  })
+
   it("re-queries with the name filter when the user types", async () => {
     render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
     await userEvent.type(screen.getByLabelText("Search routes by name"), "hebrides")
@@ -60,9 +80,25 @@ describe("ExploreDiscovery", () => {
 
   it("re-queries with the season filter when a chip is toggled", async () => {
     render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    await userEvent.click(screen.getByRole("button", { name: /filters/i }))
     await userEvent.click(screen.getByRole("button", { name: "winter" }))
     await waitFor(() =>
       expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: ["winter"] })),
+    )
+  })
+
+  it("shows the active-filter count and clears everything via Clear filters", async () => {
+    render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+    await userEvent.click(screen.getByRole("button", { name: /filters/i }))
+    await userEvent.click(screen.getByRole("button", { name: "winter" }))
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: ["winter"] })),
+    )
+
+    mockSearch.mockClear()
+    await userEvent.click(screen.getByRole("button", { name: /clear filters/i }))
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ seasons: [] })),
     )
   })
 

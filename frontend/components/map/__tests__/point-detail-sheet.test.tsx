@@ -42,13 +42,13 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     setDraftSlices: vi.fn(),
     tripId: null,
     tripName: "Test Trip",
+    tripDateFrom: null,
+    tripDateTo: null,
     itineraryId: ITIN_ID,
     distanceUnit: "nm",
     setDistanceUnit: vi.fn(),
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
-    activePointId: null,
-    setActivePointId: vi.fn(),
     day0Id: "day-0",
     viewMode: true,
     setViewMode: vi.fn(),
@@ -125,16 +125,29 @@ describe("PointDetailSheet — content", () => {
 })
 
 describe("PointDetailSheet — detail modal", () => {
-  it("opens the detail modal with an editable notes field when the Notes tile is clicked", async () => {
+  it("opens the detail modal (editable) when clicking anywhere on the sheet", async () => {
     renderWithCtx(makeCtx())
-    await userEvent.click(screen.getByTestId("point-notes-tile"))
-    expect(screen.getByRole("textbox")).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId("point-detail-sheet"))
+    expect(screen.getByPlaceholderText(/landing notes/i)).toBeInTheDocument()
   })
 
-  it("opens the detail modal showing coordinates when the Images tile is clicked", async () => {
-    renderWithCtx(makeCtx())
-    await userEvent.click(screen.getByTestId("point-images-tile"))
+  it("opens a read-only detail modal when clicking the sheet while not editable", async () => {
+    renderWithCtx(makeCtx({ isLeader: false }))
+    await userEvent.click(screen.getByTestId("point-detail-sheet"))
+    expect(screen.queryByPlaceholderText(/landing notes/i)).not.toBeInTheDocument()
     expect(screen.getByText(/43\.123°N · 14\.568°E/)).toBeInTheDocument()
+  })
+
+  it("clicking a tile also opens the modal (tiles are part of the clickable sheet)", async () => {
+    renderWithCtx(makeCtx())
+    await userEvent.click(screen.getByTestId("point-notes-tile"))
+    expect(screen.getByPlaceholderText(/landing notes/i)).toBeInTheDocument()
+  })
+
+  it("the Notes and Images tiles are presentational, not their own buttons", () => {
+    renderWithCtx(makeCtx())
+    expect(screen.getByTestId("point-notes-tile").tagName).not.toBe("BUTTON")
+    expect(screen.getByTestId("point-images-tile").tagName).not.toBe("BUTTON")
   })
 })
 
@@ -144,5 +157,11 @@ describe("PointDetailSheet — close", () => {
     renderWithCtx(makeCtx({ setSelectedPointId }))
     await userEvent.click(screen.getByRole("button", { name: /close/i }))
     expect(setSelectedPointId).toHaveBeenCalledWith(null)
+  })
+
+  it("clicking the close button does not also open the detail modal", async () => {
+    renderWithCtx(makeCtx())
+    await userEvent.click(screen.getByRole("button", { name: /close/i }))
+    expect(screen.queryByPlaceholderText(/landing notes/i)).not.toBeInTheDocument()
   })
 })

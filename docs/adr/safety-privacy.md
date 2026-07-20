@@ -223,8 +223,51 @@ once a discoverable public surface (the public profile, M7a) ships. Their status
   more correct and useful response than a misleading 404. The change would have been a broad
   API-contract churn (~6–8 test files) for negligible real secrecy. Revisit only if an enumerable
   surface (e.g. sequential IDs or a public listing of private resource IDs) is ever introduced.
+- **Trip-invite email/username lookup oracle — closed (M12 §N).** `POST /api/trip/<id>/invite`
+  previously accepted `{"email": ...}` or `{"username": ...}` and distinguished "no account"
+  (404) from "already a member/invited" (409) from success (201) — a leader-facing oracle
+  letting any trip leader test arbitrary email addresses or usernames for account existence.
+  Closed by removing both lookup paths from the endpoint entirely (only `{"userId": ...}` is
+  now accepted, sourced from the buddy picker or paddler search — a value the leader can only
+  obtain from context they can already see, never a blind guess). Frontend `InviteForm` (email
+  entry) was removed in the same change — removing only the frontend form while leaving the
+  backend branch reachable would not have closed the oracle, only hidden the UI for exploiting
+  it. **Accepted cost:** a leader can no longer invite someone who isn't yet a buddy connection
+  by email; the buddy-picker-only flow means connect-then-invite for anyone not already a
+  buddy (consistent with M7b's connection-gated invite model). A "Can't find them? Find
+  paddlers →" link from the buddy picker covers the connect-first step.
 
 ---
+
+## Email-change flow (M12 §J)
+
+Email is the login identifier, so a change is treated with the same care as a password reset —
+structurally mirrored on the existing token/re-auth machinery rather than inventing a new pattern:
+
+- **Two-step: request (authenticated + elevated) → verify (anonymous, token-only).**
+  `POST /api/v1/user/me/email-change` requires both a normal session and a fresh elevated token
+  (`JWTService.require_elevated_token`, the same re-auth gate as medical notes/certifications) —
+  changing the account's identity needs a just-proven password, not just an active session.
+  `GET /api/v1/auth/verify-email-change?token=...` is anonymous, mirroring `/auth/verify`'s shape
+  exactly (single-token action, no other body field) — this endpoint is what completes the change
+  when the link is clicked, possibly from a different device/session than the one that requested it.
+- **`pending_mail` on `User`, not an `AuthToken` payload.** `AuthToken` stays a generic, minimal
+  single-use-token model shared by four other token types; state that must outlive one token
+  (the address awaiting confirmation) gets a dedicated column, matching the existing
+  `deletion_requested_at`/`medical_notes_reset_at` precedent. This also lets the frontend render a
+  durable "pending — check your inbox" state across reloads with no client-side state machine.
+- **Enumeration-safe.** Requesting a change to an address already taken by someone else is a
+  silent no-op (202, no email sent, no error) — mirrors `AuthService.register_user`'s existing-user
+  handling. Requesting the caller's own current address is a visible 400 (not an enumeration risk —
+  it concerns only the caller's own data).
+- **`token_version` bump on verify, not on request.** The identity swap only takes effect once the
+  new address is proven reachable (link clicked); bumping revocation at request time would log the
+  user out for a change they haven't confirmed yet. On verify, `token_version` increments exactly
+  like a password reset — every outstanding session on the old identity ends, forcing re-login.
+- **Old address gets a notice, not a link.** After the swap, the *old* mailbox receives an
+  informational "your email was changed" email (mirrors `medical_notes_cleared`'s "something
+  changed on your account" precedent) with no action of its own — the actionable path if it wasn't
+  the account owner is "reset your password," already covered by the existing forgot-password flow.
 
 ## Decision log
 
@@ -235,3 +278,5 @@ once a discoverable public surface (the public profile, M7a) ships. Their status
 | Medical notes ECIES encryption | ADR-023 | 2026-05-16 | Amends ADR-018 §"Medical notes — copy-on-join, consent-to-share"; plaintext column dropped |
 | Password-reset medical-notes data loss — notify + re-entry prompt | — | 2026-06-16 | Reset clears unreadable ciphertext; `medical_notes_reset_at` flag + `medical_notes_cleared` email + in-app prompt; rejected re-entry during the reset flow (would hold plaintext unauthenticated). Closes 2026-06-11 security review Step 4. |
 | Enumeration/oracle hardening (M7a §4) | — | 2026-06-25 | Closed login-timing, `deletion_pending`-before-password, registration, and GPX-XXE oracles; **consciously declined** the 403→404 `require_owner` flip (non-enumerable UUIDv7 + auth gating make the oracle non-exploitable; 403 is more correct for shared resources). Closes the 2026-06-11 review's deferred LOW items. |
+| Email-change flow (M12 §J) | — | 2026-07-13 | Request (elevated-token-gated) → verify (anonymous, token-only, mirrors `/auth/verify`) two-step; new `pending_mail` column on `User` (not an `AuthToken` payload field); enumeration-safe (silent no-op for a taken address); `token_version` bumped on verify, not request; old address gets a non-actionable notice email. |
+| Trip-invite email/username oracle (M12 §N) | — | 2026-07-13 | Removed the `email`/`username` invite-lookup branches from `POST /trip/<id>/invite` (frontend `InviteForm` removed in the same change) — buddy-picker `userId` invite is now the sole path; accepted cost is invite-a-non-buddy becomes connect-then-invite. |

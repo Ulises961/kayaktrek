@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { WavesIcon, UsersIcon, RadioIcon } from "lucide-react"
 import { TRIP_STATES, type Trip } from "@/lib/dtos/trip"
+import { formatRouteRange } from "@/lib/itinerary/format"
 import { TestEmailButton } from "@/components/profile/test-email-button"
 import { ItineraryLayoutWireframe } from "@/components/wireframes/itinerary-layout-wireframe"
 import { CompassRose } from "@/components/landing/compass-rose"
@@ -413,7 +414,7 @@ export default function DesignPage() {
       {/* ── 9. Itinerary layout wireframe ────────────────────────────────────── */}
       <Section
         title="9 — Itinerary layout wireframe"
-        subtitle="Day strip → Feature drawer → Bottom sheet. Click a day, switch tabs, then click a route point."
+        subtitle="Day strip, then feature drawer, then bottom sheet. Click a day, switch tabs, then click a route point."
       >
         <ItineraryLayoutWireframe />
       </Section>
@@ -432,7 +433,9 @@ export default function DesignPage() {
       {/* ── 7. Typography ────────────────────────────────────────────────────── */}
       <Section title="7 — Typography hierarchy">
         <div className="flex flex-col gap-3">
-          <h1 className="text-4xl font-bold tracking-[-0.01em]">Route: Henningsvær → Nusfjord</h1>
+          <h1 className="text-4xl font-bold tracking-[-0.01em]">
+            Route: {formatRouteRange("Henningsvær", "Nusfjord")}
+          </h1>
           <h2 className="text-2xl font-semibold tracking-[-0.01em]">Day 3 — Kabelvåg to Svolvær</h2>
           <p className="text-base">
             The route follows the outer coast, exposed to NW swell. Conditions moderate. Estimated

@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session"
 import { apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import type { ProfileFormValues } from "@/lib/dtos/user"
+import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type ProfileActionResult = { success: true } | { success: false; error: string }
 export type AvatarActionResult =
@@ -17,10 +18,11 @@ export async function updateProfile(fields: ProfileFormValues): Promise<ProfileA
   if (!session) redirect("/login")
 
   try {
+    // phone is deliberately absent — it's account data, edited in Settings via
+    // setPhone (M12 §F), and PATCHing it here would clear a stored number.
     await apiPatch(`/api/user/${session.userId}`, {
       name: fields.name,
       surname: fields.surname || null,
-      phone: fields.phone || null,
       username: fields.username,
       bio: fields.bio || null,
       homeLocation: fields.homeLocation || null,
@@ -57,6 +59,48 @@ export async function setProfileVisibility(isPublic: boolean): Promise<ProfileAc
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: "Failed to update profile visibility." }
+  }
+}
+
+// Instant single-field toggle for the planner's unit switch — mirrors
+// setProfileVisibility so the map builder doesn't have to round-trip the whole
+// profile form just to flip nm/km. Read on both /profile (stats dashboard
+// display) and /settings (the editing control, M12 §J) — revalidate both
+// precisely rather than a blanket path.
+export async function setUnitPreference(unit: DistanceUnit): Promise<ProfileActionResult> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+
+  try {
+    await apiPatch(`/api/user/${session.userId}`, { unitPreference: unit })
+    revalidatePath("/profile")
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: "Failed to update unit preference." }
+  }
+}
+
+// Single-field phone update for Settings (M12 §F — collected once, in an
+// account-details context, instead of at signup). Mirrors setUnitPreference;
+// an empty string clears the stored number.
+export async function setPhone(phone: string): Promise<ProfileActionResult> {
+  const session = await getSession()
+  if (!session) redirect("/login")
+
+  try {
+    await apiPatch(`/api/user/${session.userId}`, { phone: phone.trim() || null })
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("400"))
+      return { success: false, error: "Enter a valid phone number (7–15 digits)." }
+    if (msg.includes("409"))
+      return { success: false, error: "That phone number is already in use." }
+    return { success: false, error: "Failed to update phone number." }
   }
 }
 
@@ -211,6 +255,25 @@ export async function generateKeypair(password: string): Promise<ProfileActionRe
     if (msg.includes("401")) return { success: false, error: "Password incorrect." }
     if (msg.includes("409")) return { success: true }
     return { success: false, error: "Failed to set up encryption keypair." }
+  }
+}
+
+export async function requestEmailChange(
+  elevatedToken: string,
+  newMail: string,
+): Promise<ProfileActionResult> {
+  try {
+    await apiPost("/api/user/me/email-change", { newMail }, { "X-Elevated-Token": elevatedToken })
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("403"))
+      return { success: false, error: "Session expired. Please lock and unlock again." }
+    if (msg.includes("400"))
+      return { success: false, error: "That address can't be used. Try a different one." }
+    return { success: false, error: "Failed to request email change." }
   }
 }
 

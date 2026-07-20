@@ -2,16 +2,18 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
+import { useFullBleedContent } from "@/hooks/use-full-bleed-content"
 import { MapTopBar } from "./map-top-bar"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
-import { totalDistanceNm } from "@/lib/itinerary/distance"
+import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
+import { setUnitPreference } from "@/lib/profile/actions"
 import { debounce } from "@/lib/utils/debounce"
 import { DayRail } from "./day-rail"
 import { FeatureDrawer } from "./feature-drawer"
@@ -25,23 +27,29 @@ type MapBuilderProps = {
   itinerary: Itinerary
   tripId: string | null
   tripName: string
+  tripDateFrom?: string | null
+  tripDateTo?: string | null
   tripState?: TripState | null
   isLeader?: boolean
+  initialDistanceUnit?: DistanceUnit
 }
 
 export function MapBuilder({
   itinerary,
   tripId,
   tripName,
+  tripDateFrom = null,
+  tripDateTo = null,
   tripState = null,
   isLeader = true,
+  initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
+  useFullBleedContent()
 
-  const [distanceUnit, setDistanceUnit] = useState<"nm" | "km">("nm")
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
   const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
-  const [activePointId, setActivePointId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
@@ -97,7 +105,7 @@ export function MapBuilder({
     const tempId = `tmp-${Date.now()}`
 
     // Collapse any expanded point row so the newly added point is the only focus.
-    setActivePointId(null)
+    setSelectedPointId(null)
 
     dispatch({
       type: "POINT_ADD",
@@ -127,8 +135,22 @@ export function MapBuilder({
     /* intentional — MapCore handles live label updates locally */
   }, [])
 
-  const handleMarkerClick = useCallback((pointId: string) => {
-    setActivePointId((prev) => (prev === pointId ? null : pointId))
+  const handleMarkerClick = useCallback(
+    (pointId: string) => {
+      if (viewMode) {
+        const point = state.points.find((p) => p.id === pointId)
+        setSelectedPointId(pointId)
+        setSelectedDayId(point?.dayId ?? null)
+        return
+      }
+      setSelectedPointId((prev) => (prev === pointId ? null : pointId))
+    },
+    [viewMode, state.points],
+  )
+
+  const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
+    setDistanceUnit(unit)
+    setUnitPreference(unit)
   }, [])
 
   const handleAvgSpeedChange = useCallback(
@@ -160,13 +182,13 @@ export function MapBuilder({
       setDraftSlices,
       tripId: tripId ?? null,
       tripName,
+      tripDateFrom,
+      tripDateTo,
       itineraryId: itinerary.id ?? "",
       distanceUnit,
-      setDistanceUnit,
+      setDistanceUnit: handleDistanceUnitChange,
       avgSpeedKnots,
       setAvgSpeedKnots,
-      activePointId,
-      setActivePointId,
       day0Id,
       viewMode,
       setViewMode,
@@ -187,10 +209,12 @@ export function MapBuilder({
       draftSlices,
       tripId,
       tripName,
+      tripDateFrom,
+      tripDateTo,
       itinerary.id,
       distanceUnit,
+      handleDistanceUnitChange,
       avgSpeedKnots,
-      activePointId,
       day0Id,
       viewMode,
       selectedDayId,
@@ -205,12 +229,12 @@ export function MapBuilder({
 
   return (
     <MapBuilderContext.Provider value={ctxValue}>
-      <div className="bg-background fixed inset-0 z-50">
+      <div className="bg-background absolute inset-0 z-50">
         <MapTopBar
           tripId={tripId}
           tripName={tripName}
           distanceUnit={distanceUnit}
-          onDistanceUnitChange={setDistanceUnit}
+          onDistanceUnitChange={handleDistanceUnitChange}
           totalDistance={totalDistance}
           dayCount={state.days.length}
           isSaving={isSaving}

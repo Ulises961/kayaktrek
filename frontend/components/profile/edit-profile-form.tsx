@@ -35,7 +35,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
     defaultValues: {
       name: user.name ?? "",
       surname: user.surname ?? "",
-      phone: user.phone ?? "",
       username: user.username ?? "",
       bio: user.bio ?? "",
       homeLocation: user.homeLocation ?? "",
@@ -93,7 +92,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
         {/* Avatar */}
         <div className="flex items-center gap-4">
           <UserAvatar name={user.name} surname={user.surname} imageUrl={avatarUrl} size="lg" />
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -109,7 +108,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
               onClick={() => fileInputRef.current?.click()}
             >
               <CameraIcon className="size-4" />
-              {isUploading ? "Uploading…" : "Upload photo"}
+              {isUploading ? "Uploading…" : avatarUrl ? "Replace photo" : "Upload photo"}
             </Button>
             {avatarUrl && (
               <Button
@@ -156,11 +155,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" type="tel" disabled={isPending} {...register("phone")} />
-            {errors.phone && <p className="text-destructive text-xs">{errors.phone.message}</p>}
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label htmlFor="homeLocation">Home location</Label>
             <Input
               id="homeLocation"
@@ -185,13 +179,6 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
               {...register("bio")}
             />
             {errors.bio && <p className="text-destructive text-xs">{errors.bio.message}</p>}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Email</Label>
-            <Input value={user.mail} disabled readOnly className="opacity-60" />
-            <p className="text-muted-foreground text-xs">
-              Email changes require a separate verification flow.
-            </p>
           </div>
         </div>
 

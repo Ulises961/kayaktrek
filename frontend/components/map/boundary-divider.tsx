@@ -1,18 +1,24 @@
 "use client"
-import { useRef } from "react"
+import { useRef, type ReactNode } from "react"
 import { GripVerticalIcon, Trash2Icon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
-import { legLabel } from "@/lib/itinerary/distance"
-import { formatDayDate } from "@/lib/itinerary/format"
+import { legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
+import { formatDayDate } from "@/lib/utils/date"
 import { DatePicker } from "@/components/common/date-picker"
 
 export type BoundaryDividerProps = {
   boundary: DaySlice
   totalDistanceNm: number
-  distanceUnit: "nm" | "km"
+  distanceUnit: DistanceUnit
   avgSpeedKnots: number
   labelDayNumber: number
   labelDate: string | null
+  /** ISO date of the nearest earlier dated day — this day can't be dated before it. */
+  minDate?: string
+  /** ISO date — this day can't be dated after it (the trip's own dateTo). */
+  maxDate?: string
+  /** Rendered below the date picker's calendar, inside its popover. */
+  footer?: ReactNode
   interactive?: boolean
   onDateChange?: (date: string | null) => void
   onBoundaryMove?: (newEndPointIdx: number) => void
@@ -35,6 +41,9 @@ export function BoundaryDivider({
   avgSpeedKnots,
   labelDayNumber,
   labelDate,
+  minDate,
+  maxDate,
+  footer,
   interactive = true,
   onDateChange,
   onBoundaryMove,
@@ -142,52 +151,80 @@ export function BoundaryDivider({
     scrollElRef.current = null
   }
 
-  // The day boundary handle mirrors the static Day 1 header: a full-width bar
-  // with "Day N · date · distance". Drag-to-reassign is confined to the grip so
-  // the inline date picker and delete button receive normal clicks.
+  const grip = (
+    <span
+      data-testid="boundary-grip"
+      className="-ml-1 flex shrink-0 cursor-ns-resize touch-none items-center"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+    >
+      <GripVerticalIcon className="text-muted-foreground size-3.5" />
+    </span>
+  )
+
+  const deleteButton = onDelete && (
+    <button
+      type="button"
+      aria-label={`Delete day ${labelDayNumber}`}
+      onClick={onDelete}
+      className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+    >
+      <Trash2Icon className="size-3.5" />
+    </button>
+  )
+
+  // Non-interactive (view mode) has no grip, editable picker, or delete button —
+  // "Day N · date · distance" alone never overflows the pane, so it stays one line.
+  if (!interactive) {
+    return (
+      <div
+        ref={containerRef}
+        data-testid="boundary-label"
+        className="border-border bg-muted/30 flex items-center gap-1.5 border-y px-3 py-1 text-xs font-medium select-none"
+      >
+        <span>Day {labelDayNumber}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">{formatDayDate(labelDate)}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+      </div>
+    )
+  }
+
+  // Interactive (boundary-edit) mode: the grip is its own column, stretched to
+  // the full height of both lines below — a larger drag target than confining
+  // it to line 1 alone, without adding a third row. Line 1 is Day N · date ·
+  // delete; line 2 is just the distance/time metrics, flush left under the
+  // whole row. Drag is confined to the grip so the date picker and delete
+  // button receive normal clicks.
   return (
     <div
       ref={containerRef}
-      data-testid={interactive ? "boundary-drag-handle" : "boundary-label"}
-      className="border-border bg-muted/30 flex items-center gap-1.5 border-y px-3 py-1 text-xs font-medium select-none"
+      data-testid="boundary-drag-handle"
+      className="border-border bg-muted/30 flex items-stretch gap-2 border-y px-3 py-1.5 text-xs font-medium select-none"
     >
-      {interactive && (
-        <span
-          data-testid="boundary-grip"
-          className="-ml-1 shrink-0 cursor-ns-resize touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-        >
-          <GripVerticalIcon className="text-muted-foreground size-3.5" />
-        </span>
-      )}
-      <span>Day {labelDayNumber}</span>
-      <span className="text-muted-foreground">·</span>
-      {interactive ? (
-        <DatePicker
-          value={labelDate ?? ""}
-          onChange={(v) => onDateChange?.(v || null)}
-          placeholder="Add date"
-          size="sm"
-          className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
-        />
-      ) : (
-        <span className="text-muted-foreground">{formatDayDate(labelDate)}</span>
-      )}
-      <span className="text-muted-foreground">·</span>
-      <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
-      {interactive && onDelete && (
-        <button
-          type="button"
-          aria-label={`Delete day ${labelDayNumber}`}
-          onClick={onDelete}
-          className="text-muted-foreground hover:text-destructive ml-auto shrink-0 transition-colors"
-        >
-          <Trash2Icon className="size-3.5" />
-        </button>
-      )}
+      {grip}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div data-testid="boundary-divider-line-1" className="flex items-center gap-2">
+          <span data-testid="boundary-day-label" className="shrink-0">
+            Day {labelDayNumber}
+          </span>
+          <DatePicker
+            value={labelDate ?? ""}
+            onChange={(v) => onDateChange?.(v || null)}
+            placeholder="Add date"
+            size="sm"
+            minDate={minDate}
+            maxDate={maxDate}
+            footer={footer}
+            className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
+          />
+          {deleteButton && <div className="ml-auto">{deleteButton}</div>}
+        </div>
+        <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
+      </div>
     </div>
   )
 }

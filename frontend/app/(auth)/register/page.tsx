@@ -1,14 +1,41 @@
 "use client"
 
 import { useActionState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { register as registerAction } from "@/lib/auth/actions"
-import { RegisterSchema, type RegisterInput } from "@/lib/auth/schemas"
+import { RegisterSchema, PASSWORD_RULES, type RegisterInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/common/password-input"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
+import { CheckIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import Link from "next/link"
+
+// Always-visible password checklist — rules up front, ticking live as the user
+// types, instead of surprising them with a validation error on blur (M12 §F).
+function PasswordRules({ password }: { password: string }) {
+  return (
+    <ul className="flex flex-col gap-0.5" aria-label="Password requirements">
+      {PASSWORD_RULES.map((rule) => {
+        const met = rule.test(password)
+        return (
+          <li
+            key={rule.label}
+            className={cn(
+              "flex items-center gap-1.5 text-[11px]",
+              met ? "text-[oklch(0.52_0.1_165)]" : "text-[oklch(0.52_0.065_240)]",
+            )}
+          >
+            <CheckIcon className={cn("size-3 shrink-0", met ? "opacity-100" : "opacity-30")} />
+            {rule.label}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
 
 export default function RegisterPage() {
   const [serverState, formAction] = useActionState(registerAction, null)
@@ -17,18 +44,20 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(RegisterSchema),
     mode: "onBlur",
   })
 
+  const password = useWatch({ control, name: "password" }) ?? ""
+
   const onSubmit = handleSubmit((data) => {
     const fd = new FormData()
     fd.append("mail", data.mail)
     fd.append("username", data.username)
     fd.append("name", data.name)
-    fd.append("phone", data.phone)
     fd.append("password", data.password)
     startTransition(() => formAction(fd))
   })
@@ -81,30 +110,16 @@ export default function RegisterPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="phone" className="auth-label">
-            Phone
-          </label>
-          <Input
-            id="phone"
-            type="tel"
-            autoComplete="tel"
-            className="auth-input"
-            {...register("phone")}
-          />
-          {errors.phone && <p className="text-[11px] text-red-600">{errors.phone.message}</p>}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
           <label htmlFor="password" className="auth-label">
             Password
           </label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             className="auth-input"
             {...register("password")}
           />
+          <PasswordRules password={password} />
           {errors.password && <p className="text-[11px] text-red-600">{errors.password.message}</p>}
         </div>
 
@@ -117,7 +132,7 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
         Already have an account?{" "}
         <Link href="/login" className="auth-link">
           Sign in

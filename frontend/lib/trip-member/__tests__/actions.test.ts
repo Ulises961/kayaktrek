@@ -94,10 +94,11 @@ describe("updateMyFloatPlan", () => {
     )
   })
 
-  it("revalidates the trip detail path on success", async () => {
+  it("revalidates the my-float-plan segment and the printable float plan on success", async () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await updateMyFloatPlan(TRIP_ID, FLOAT_PLAN_FIELDS)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan`)
   })
 
   it("returns success: true on success", async () => {
@@ -207,10 +208,10 @@ describe("shareMedicalNotes", () => {
     )
   })
 
-  it("revalidates the trip page on success", async () => {
+  it("revalidates the my-float-plan segment on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
     await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
   })
 
   it("returns success: true on success", async () => {

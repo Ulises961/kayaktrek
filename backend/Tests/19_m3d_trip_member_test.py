@@ -382,7 +382,7 @@ def test_crew_profile_snapshot_copied_on_accept(client, auth_headers, auth_heade
     trip_id = json.loads(resp.data)["id"]
 
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite",
-                json={"email": user_2.mail}, headers=auth_headers)
+                json={"userId": str(user_2.id)}, headers=auth_headers)
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/invitation",
                 json={"accepted": True}, headers=auth_headers_2)
 

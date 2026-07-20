@@ -1,0 +1,11 @@
+Hi {{ name }},
+
+The email address on your Kayak Planner account was changed to {{ new_mail }}.
+
+No action is needed if this was you.
+
+If you didn't make this change, reset your password immediately to secure your account:
+{{ forgot_url }}
+
+---
+Kayak Planner · Need help? Contact support at {{ support_email }}

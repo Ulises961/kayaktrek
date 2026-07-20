@@ -21,12 +21,24 @@ log_api = Blueprint('log', __name__, url_prefix=LOG_ENDPOINT)
 @JWTService.authenticate_restful
 def get_logs():
     """
-    LogResource GET method. Retrieves all the logs associated to a user
+    LogResource GET method. Retrieves a paginated, sorted, filterable page of a
+    user's own logs. Query params: page, per_page (capped 100), sort
+    (newest|oldest); min_sea/max_sea (Beaufort severity), min_distance/max_distance.
     """
     try:
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = LogService.get_logs_by_user(g.current_user_id, page=page, per_page=per_page)
+        sort = request.args.get("sort", "newest")
+        result = LogService.get_logs_by_user(
+            g.current_user_id,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+            min_sea=request.args.get("min_sea", type=int),
+            max_sea=request.args.get("max_sea", type=int),
+            min_distance=request.args.get("min_distance", type=float),
+            max_distance=request.args.get("max_distance", type=float),
+        )
         schema = LogSchema()
         return jsonify({
             "items": [schema.dump(log) for log in result["items"]],
@@ -44,12 +56,30 @@ def get_logs():
 @JWTService.authenticate_restful
 def get_endorsed_logs():
     """
-    LogResource GET method. Retrieves all the logs associated to a user
+    LogResource GET method. Retrieves a paginated, sorted, filterable page of logs
+    endorsed by the current user. Same query params as GET /api/log/all.
     """
-    try:        
-        
-        logs = LogService.get_endorsed_logs(g.current_user_id) 
-        return jsonify([LogSchema().dump(log) for log in logs]), HTTPStatus.OK
+    try:
+        page = request.args.get("page", 1, type=int)
+        per_page = min(request.args.get("per_page", 20, type=int), 100)
+        sort = request.args.get("sort", "newest")
+        result = LogService.get_endorsed_logs(
+            g.current_user_id,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+            min_sea=request.args.get("min_sea", type=int),
+            max_sea=request.args.get("max_sea", type=int),
+            min_distance=request.args.get("min_distance", type=float),
+            max_distance=request.args.get("max_distance", type=float),
+        )
+        schema = LogSchema()
+        return jsonify({
+            "items": [schema.dump(log) for log in result["items"]],
+            "total": result["total"],
+            "page": result["page"],
+            "pages": result["pages"],
+        }), HTTPStatus.OK
     except Exception as e:
         logger.error(f"Error retrieving logs: {e}")
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")

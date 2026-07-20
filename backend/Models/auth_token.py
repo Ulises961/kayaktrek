@@ -13,6 +13,7 @@ class AuthTokenType(enum.Enum):
     RESET = "reset"
     DATA_EXPORT = "data_export"
     DELETION_CANCEL = "deletion_cancel"
+    EMAIL_CHANGE = "email_change"
 
 
 class AuthToken(BaseModel):
