@@ -359,7 +359,7 @@ def trip_with_invitation(client, auth_headers, user_2, auth_headers_2):
     }
 
     try:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     except Exception:
         pass
 
@@ -409,7 +409,7 @@ def trip_with_user2_as_crew(client, auth_headers, user_2, auth_headers_2):
     }
 
     try:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     except Exception:
         pass
 

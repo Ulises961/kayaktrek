@@ -135,7 +135,7 @@ def test_invite_by_user_id(client, auth_headers, id_2):
                            json={"userId": id_2})
         assert resp.status_code == 201
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_email_and_username_bodies_no_longer_accepted(client, auth_headers, user_2):
@@ -151,7 +151,7 @@ def test_email_and_username_bodies_no_longer_accepted(client, auth_headers, user
                            json={"username": user_2.username})
         assert resp.status_code == 400
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_invite_blocked_returns_403(client, auth_headers, id_2, user_2):
@@ -162,7 +162,7 @@ def test_invite_blocked_returns_403(client, auth_headers, id_2, user_2):
                            json={"userId": id_2})
         assert resp.status_code == 403
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_invite_missing_identifier_returns_400(client, auth_headers):
@@ -171,4 +171,4 @@ def test_invite_missing_identifier_returns_400(client, auth_headers):
         resp = client.post(f"{TRIP_ENDPOINT}/{trip_id}/invite", headers=auth_headers, json={})
         assert resp.status_code == 400
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)

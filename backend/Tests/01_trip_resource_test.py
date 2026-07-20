@@ -198,7 +198,7 @@ def test_non_member_cannot_patch_trip(client, auth_headers, outsider_headers):
 def test_delete_trip_for_everyone_removes_trip(client, auth_headers):
     data = _create_trip(client, auth_headers)
     trip_id = data["id"]
-    response = client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    response = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     assert response.status_code == 200
     assert client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers).status_code == 404
 
@@ -206,17 +206,17 @@ def test_delete_trip_for_everyone_removes_trip(client, auth_headers):
 def test_delete_trip_for_everyone_cascades_pending_invitations(client, trip_with_invitation):
     trip_id = trip_with_invitation["trip"]["id"]
 
-    response = client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=trip_with_invitation["leader_headers"])
+    response = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_invitation["leader_headers"])
     assert response.status_code == 200
 
     remaining = _db.session.query(Invitation).filter_by(trip_id=UUID(trip_id)).all()
     assert remaining == []
 
 
-def test_delete_trip_for_self_as_sole_member_removes_trip(client, auth_headers):
+def test_leave_trip_as_sole_member_removes_trip(client, auth_headers):
     data = _create_trip(client, auth_headers)
     trip_id = data["id"]
-    response = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+    response = client.post(f"{TRIP_ENDPOINT}/{trip_id}/leave", headers=auth_headers)
     assert response.status_code == 200
     assert client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers).status_code == 404
 

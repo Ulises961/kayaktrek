@@ -187,11 +187,55 @@ GDPR Article 17 (right to erasure) applies, but a user's data is entangled with 
 | Trips where user is crew only | TripMember row removed; trip unaffected |
 | Personal logs, endorsements, GDPR exports | Deleted |
 
+**Doc/code mismatch, flagged not fixed (found 2026-07-20):** the table above says the leader slot is *anonymised* on erasure, but `Tasks.erasure.run_erasure` actually hard-deletes the `User` row outright, which cascades the leader's `TripMember` row away entirely (no ghost "Deleted member" row survives). The archived trip is left with zero `TripMember` rows of any role. This predates the leadership-succession work below and wasn't introduced by it; the succession feature's "no leader" trigger happens to work correctly regardless of which behavior is true (a cascade-deleted row and an anonymised-but-still-`LEADER`-roled row would need different trigger logic — only the former matches today's actual code). Left as a discrepancy to resolve in a future pass, not fixed here.
+
 Revoking medical consent nulls the field on both the `User` record and every `TripMember` row (GDPR Art. 7(3)) — data cannot be retained after withdrawal.
 
 **Re-authentication gate**: deletion requests are confirmed via out-of-band email (the email account acts as a second factor for high-stakes operations), not in-app password re-entry.
 
 **Risk**: national maritime law or coastguard incident reporting requirements may mandate retaining trip records beyond 30 days. Gate the hard-delete on that retention window, not just the grace period. Consult legal before launch.
+
+---
+
+## Leadership succession — nomination and claiming (2026-07-20)
+
+A trip can end up with **zero `LEADER` `TripMember` rows** while remaining fully
+visible and partly usable by its remaining crew — every leader-gated action (advance
+state, invite, remove members, edit dates) becomes permanently stuck with no
+recourse. Two paths produce this today:
+
+1. **Leaving a trip.** `POST /trip/<id>/leave` (any member, self-removal) is
+   distinct from `DELETE /trip/<id>` (leader-only, full deletion for everyone —
+   previously the same endpoint conflated both behaviors behind a `for_everyone`
+   query param with no leader gate on the destructive path, a privilege-escalation
+   bug closed by this same change). If the leader leaves and crew remain, the trip
+   survives with no leader.
+2. **GDPR erasure**, per the doc/code mismatch noted above — the leader's
+   `TripMember` row is cascade-deleted, but the trip is also set `archived` in the
+   same pass, which the claim trigger below deliberately excludes.
+
+**Trigger**: a trip is claimable when it has no `LEADER` row and its state is not
+`archived` — the latter preserves the existing terminal-archival decision above
+rather than reopening it.
+
+**Mechanism**: the leader may nominate one crew member as successor at any time
+(`TripMember.nominated_successor`, a plain boolean pointer enforced unique per trip
+by a partial index — not a second live leader; the medical-notes ECIES model below
+assumes exactly one). Once the trip is leaderless: if a successor was nominated,
+only they may claim it; otherwise any crew member may (first-come-first-serve). The
+claim itself is a row-locked (`SELECT ... FOR UPDATE` on `Trip`) role flip from
+`crew` to `leader`, serializing concurrent claim attempts.
+
+**Medical notes on leadership change**: `TripMember.medical_notes_leader_ciphertext`
+is ECIES-encrypted to the *specific* leader's X25519 public key at share-time
+(see above) — unreadable by whoever claims leadership next. A successful claim
+clears it (plus `_nonce`, `_ephemeral_key`, `medical_notes_consent_at`) on **every**
+membership in the trip. No new reset-flag/email was added for this, unlike the
+password-reset precedent (`medical_notes_reset_at`): clearing `consent_at` alone
+already reverts the existing share/not-shared UI state, which is self-explanatory
+the next time a member opens the tab — there's no silent data loss to explain,
+since the member's own encrypted-at-rest copy (`medical_notes_ciphertext`) is
+untouched.
 
 ---
 
@@ -206,3 +250,4 @@ Revoking medical consent nulls the field on both the `User` record and every `Tr
 | Rest days and paused expedition state | ADR-025 | 2026-05-24 | Pause/resume on `Trip`; rest days inferred from date gaps. Refined 2026-07-11 (M12 §I): two-part model — empty-slice `Day` = real rest day; a calendar gap with no `Day` row at all = visual-only "Rest" placeholder (`computeRestGaps`), deliberately never promoted to a real entity |
 | Community map annotations are a second public shape, independent of `Itinerary` visibility | — | 2026-06-20 | Global POIs (`itinerary_id = null`, `visibility = public`) on the landing map, not gated by a route; public tier deferred to M7; see `features.md` (Map Annotations) |
 | Overnight-stop ownership: single-owner storage, shared display derivation | — | 2026-07-11 | M12 §M — `apply_boundaries` assigns the shared boundary point to one day only; `walkDayRoutePoints` (`lib/itinerary/day-points.ts`) is the one shared derivation every per-day distance/label/rest-check now uses, regardless of storage ownership |
+| Leadership succession: nominate-then-claim, trip-wide medical-notes-leader-copy wipe on claim | — | 2026-07-20 | A leaderless, non-archived trip (leader left, or nomination unfulfilled) is claimable by its nominated successor if one exists, else first-come-first-serve by any crew member; bundled a fix for `DELETE /trip/<id>`'s missing `@require_leader` (any crew member could previously pass `for_everyone=true`). Plan: `plans/trip-leadership-succession.md` |

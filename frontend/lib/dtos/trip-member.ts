@@ -2,6 +2,11 @@ import { z } from "zod"
 import { noHtmlTags } from "../validators"
 import { TravellerSchema } from "./user"
 
+export const MEMBER_ROLE = {
+  LEADER: "leader",
+  CREW: "crew",
+} as const
+
 export const TripMemberSchema = z.object({
   id: z.uuidv7().optional(),
   role: z.enum(["leader", "crew"]),
@@ -19,6 +24,8 @@ export const TripMemberSchema = z.object({
   hasTripMedicalNotes: z.boolean().optional(),
   hasLeaderMedicalNotes: z.boolean().optional(),
   floatPlanConfirmedAt: z.string().nullish(),
+  // Leadership succession (trip-leadership-succession)
+  nominatedSuccessor: z.boolean().optional(),
 })
 
 export type TripMember = z.infer<typeof TripMemberSchema>

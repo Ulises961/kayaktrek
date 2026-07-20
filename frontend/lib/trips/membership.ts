@@ -1,5 +1,5 @@
 import type { Trip } from "@/lib/dtos/trip"
-import type { TripMember } from "@/lib/dtos/trip-member"
+import { MEMBER_ROLE, type TripMember } from "@/lib/dtos/trip-member"
 import type { Session } from "@/lib/auth/session"
 
 export type Membership = {
@@ -15,7 +15,7 @@ export type Membership = {
 // trips/[id]/float-plan/page.tsx before the route-segment refactor (M12 §R).
 export function deriveMembership(trip: Trip, session: Session | null): Membership {
   const travellers = trip.travellers ?? []
-  const leader = travellers.find((m) => m.role === "leader")
+  const leader = travellers.find((m) => m.role === MEMBER_ROLE.LEADER)
   const isLeader = !!session && !!leader && leader.user.id === session.userId
   const currentMember = session ? travellers.find((m) => m.user.id === session.userId) : undefined
   const isMember = !!currentMember

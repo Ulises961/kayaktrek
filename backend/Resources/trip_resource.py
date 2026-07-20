@@ -12,6 +12,7 @@ from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
 from Services.trip_member_service import TripMemberService
+from Services.trip_leadership_service import TripLeadershipService
 from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
@@ -452,19 +453,92 @@ def get_medical_notes_access_log(id: str):
 @trip_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
+@require_leader()
 def delete(id: str):
     """
-    TripResource DELETE method. Deletes a trip by id.
+    TripResource DELETE method. Leader-only — deletes the trip for everyone.
 
     Returns:
         Success message and 200 status code
     """
     try:
-        delete_to_all_participants = request.args.get("for_everyone", "false").lower() == "true"
-        
-        logger.info(f"Deleting trip {id}")
-        TripService.delete_trip(id, delete_to_all_participants)
+        TripService.delete_trip_for_everyone(id)
         return {"message": "Deletion successful"}, HTTPStatus.OK
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/leave", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+def leave(id: str):
+    """
+    Remove the caller's own membership from the trip. Any member (leader or
+    crew) may call this. If the leader leaves and crew remain, the trip
+    survives with no leader (see POST /<id>/claim-leadership).
+
+    Returns:
+        Success message and 200 status code
+    """
+    try:
+        TripService.leave_trip(id)
+        return {"message": "Left trip"}, HTTPStatus.OK
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/member/<string:user_id>/nominate-successor", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def nominate_successor(id: str, user_id: str):
+    """Leader designates a crew member as the trip's successor."""
+    try:
+        member = TripLeadershipService.nominate_successor(id, user_id)
+        return jsonify(TripMemberSchema().dump(member)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/nominate-successor", methods=["DELETE"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def clear_successor_nomination(id: str):
+    """Leader clears whichever member is currently nominated (no-op if none)."""
+    try:
+        TripLeadershipService.clear_nomination(id)
+        return {"message": "Nomination cleared"}, HTTPStatus.OK
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/claim-leadership", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+def claim_leadership(id: str):
+    """
+    A crew member claims leadership of a trip that currently has none. If a
+    successor was nominated, only they may claim; otherwise first-come-first-serve.
+
+    Returns 409 if the trip already has a leader or is archived, 403 if a
+    different successor was nominated.
+    """
+    try:
+        member = TripLeadershipService.claim_leadership(id)
+        return jsonify(TripMemberSchema().dump(member)), HTTPStatus.OK
+    except PermissionError as e:
+        abort(HTTPStatus.FORBIDDEN, description=str(e))
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except Exception as e:

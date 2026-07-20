@@ -395,7 +395,7 @@ def test_crew_profile_snapshot_copied_on_accept(client, auth_headers, auth_heade
     assert membership["emergencyContactName"] == "Jane Crew"
     assert membership["emergencyContactPhone"] == "+441234567890"
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     client.patch(f"{USER_ENDPOINT}/{user_2.id}", json={
         "vesselMake": None, "vesselModel": None,
         "emergencyContactName": None, "emergencyContactPhone": None,
@@ -426,7 +426,7 @@ def test_leader_profile_snapshot_copied_on_create(client, auth_headers, id):
     assert membership["emergencyContactName"] == "Jane Leader"
     assert membership["emergencyContactPhone"] == "+441111111111"
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
     client.patch(f"{USER_ENDPOINT}/{id}", json={
         "vesselMake": None, "vesselModel": None,
         "emergencyContactName": None, "emergencyContactPhone": None,

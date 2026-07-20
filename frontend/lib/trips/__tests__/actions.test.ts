@@ -23,7 +23,11 @@ import {
   updateTrip,
   advanceState,
   removeMember,
-  deleteTrip,
+  deleteTripForEveryone,
+  leaveTrip,
+  nominateSuccessor,
+  clearNomination,
+  claimLeadership,
   listTrips,
   listTripInvitations,
 } from "../actions"
@@ -180,22 +184,105 @@ describe("removeMember", () => {
   })
 })
 
-describe("deleteTrip", () => {
+describe("deleteTripForEveryone", () => {
   it("sends DELETE to the correct path", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
-    await deleteTrip(TRIP_ID)
+    await deleteTripForEveryone(TRIP_ID)
     expect(apiDelete).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}`)
   })
 
   it("redirects to /trips on success", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
-    await deleteTrip(TRIP_ID)
+    await deleteTripForEveryone(TRIP_ID)
     expect(redirect).toHaveBeenCalledWith("/trips")
   })
 
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
-    const result = await deleteTrip(TRIP_ID)
+    const result = await deleteTripForEveryone(TRIP_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("leaveTrip", () => {
+  it("sends POST to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await leaveTrip(TRIP_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/leave`, {})
+  })
+
+  it("redirects to /trips on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await leaveTrip(TRIP_ID)
+    expect(redirect).toHaveBeenCalledWith("/trips")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("404"))
+    const result = await leaveTrip(TRIP_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("nominateSuccessor", () => {
+  it("sends POST to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await nominateSuccessor(TRIP_ID, USER_ID)
+    expect(apiPost).toHaveBeenCalledWith(
+      `/api/trip/${TRIP_ID}/member/${USER_ID}/nominate-successor`,
+      {},
+    )
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await nominateSuccessor(TRIP_ID, USER_ID)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("400"))
+    const result = await nominateSuccessor(TRIP_ID, USER_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("clearNomination", () => {
+  it("sends DELETE to the correct path", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await clearNomination(TRIP_ID)
+    expect(apiDelete).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/nominate-successor`)
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await clearNomination(TRIP_ID)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
+    const result = await clearNomination(TRIP_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("claimLeadership", () => {
+  it("sends POST to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await claimLeadership(TRIP_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/claim-leadership`, {})
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await claimLeadership(TRIP_ID)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    const result = await claimLeadership(TRIP_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })

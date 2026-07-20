@@ -99,7 +99,7 @@ def test_state_not_settable_via_patch(client, auth_headers):
             "state was mutated via PATCH — TripUpdateSchema must mark state as dump_only"
         )
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ def test_crew_cannot_transition_state(client, auth_headers, auth_headers_2, user
         r = _transition(client, trip_id, "happening", auth_headers_2)
         assert r.status_code == 403, f"crew triggered state transition → {r.status_code}"
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def test_invalid_transitions(client, auth_headers):
             r = _transition(client, trip_id, state, auth_headers)
             assert r.status_code == 400, f"[{label}] got {r.status_code}, want 400"
     finally:
-        client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+        client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ def past_trip(client, auth_headers, category_ids):
         "vehicle_id": vehicle_id,
     }
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}?for_everyone=true", headers=auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_logistics_blocked_on_past_trip(client, auth_headers, past_trip):

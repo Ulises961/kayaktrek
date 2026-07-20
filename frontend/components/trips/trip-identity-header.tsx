@@ -17,7 +17,11 @@ import { fieldLabelClass } from "@/components/common/form-field"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
+import { LeaveTripButton } from "@/components/trips/leave-trip-button"
+import { SuccessorPicker } from "@/components/trips/successor-picker"
+import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
+import type { Membership } from "@/lib/trips/membership"
 import {
   TRIP_STATE,
   TRIP_STATES,
@@ -68,10 +72,11 @@ function StateTimeline({ currentState }: { currentState: TripState }) {
 
 interface TripIdentityHeaderProps {
   trip: Trip
-  isLeader: boolean
+  membership: Membership
 }
 
-export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) {
+export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps) {
+  const { isLeader, isMember, currentMemberId } = membership
   const [editOpen, setEditOpen] = useState(false)
   const travellers = trip.travellers ?? []
   const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
@@ -79,10 +84,18 @@ export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) 
   const overflowCount = travellers.length - visibleTravellers.length
 
   const canAdvanceState = isLeader && trip.state && trip.state !== TRIP_STATE.PAST
-  const hasDetails = !!trip.description || !!trip.difficulty || canAdvanceState || isLeader
+  const hasDetails =
+    !!trip.description || !!trip.difficulty || canAdvanceState || isLeader || isMember
 
   return (
     <div className="flex flex-col gap-2">
+      <LeaderlessTripBanner
+        tripId={trip.id!}
+        tripState={trip.state}
+        travellers={travellers}
+        isMember={isMember}
+        currentMemberId={currentMemberId}
+      />
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="truncate text-xl font-semibold">{trip.destination ?? "Untitled trip"}</h1>
@@ -172,6 +185,30 @@ export function TripIdentityHeader({ trip, isLeader }: TripIdentityHeaderProps) 
                         Printable float plan
                       </Link>
                     </Button>
+                  </div>
+                </>
+              )}
+
+              {isLeader && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-2">
+                    <span className={fieldLabelClass}>Successor</span>
+                    <SuccessorPicker tripId={trip.id!} travellers={travellers} />
+                  </div>
+                </>
+              )}
+
+              {isMember && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-2">
+                    <span className={fieldLabelClass}>Leave</span>
+                    <LeaveTripButton
+                      tripId={trip.id!}
+                      isLeader={isLeader}
+                      soleMember={travellers.length <= 1}
+                    />
                   </div>
                 </>
               )}

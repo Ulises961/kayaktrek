@@ -111,7 +111,8 @@ export async function removeMember(tripId: string, userId: string): Promise<Trip
   }
 }
 
-export async function deleteTrip(tripId: string): Promise<TripActionResult> {
+// Leader-only — always deletes the trip and all its data for every member.
+export async function deleteTripForEveryone(tripId: string): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}`)
   } catch (e) {
@@ -119,6 +120,62 @@ export async function deleteTrip(tripId: string): Promise<TripActionResult> {
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete trip." }
   }
   redirect("/trips")
+}
+
+// Any member removes their own membership. If the leader leaves and crew
+// remain, the trip survives with no leader — see claimLeadership.
+export async function leaveTrip(tripId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/leave`, {})
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to leave trip." }
+  }
+  redirect("/trips")
+}
+
+export async function nominateSuccessor(tripId: string, userId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/member/${userId}/nominate-successor`, {})
+    // The successor picker and the leaderless-claim banner both read
+    // travellers off the layout-owned header data.
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to nominate successor.",
+    }
+  }
+}
+
+export async function clearNomination(tripId: string): Promise<TripActionResult> {
+  try {
+    await apiDelete(`/api/trip/${tripId}/nominate-successor`)
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to clear nomination.",
+    }
+  }
+}
+
+export async function claimLeadership(tripId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/claim-leadership`, {})
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to claim leadership.",
+    }
+  }
 }
 
 // The trip's crew (travellers). Used by the "ask to endorse" picker to list the
