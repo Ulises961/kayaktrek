@@ -96,7 +96,7 @@ export function DatePicker({
           disabled={disabledMatchers.length > 0 ? disabledMatchers : undefined}
           modifiers={suggestedDate ? { suggested: suggestedDate } : undefined}
           modifiersClassNames={{ suggested: "ring-primary/50" }}
-          initialFocus
+          autoFocus
         />
         {footer}
       </PopoverContent>
