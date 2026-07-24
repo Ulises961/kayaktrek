@@ -1,26 +1,93 @@
+import logging
+import os
+import sys
+
 import logfire
 from flask import Flask
 
 from Api.database import db
 
 
+def _resolve_service_name() -> str:
+    """Distinct service.name per backend process, so the four roles M8 introduced
+    (main app, SSE sidecar, Celery worker, Celery beat) are separable in the
+    Logfire UI while a request that triggers a task still correlates into one
+    trace (M13 §A.0.3).
+
+    SERVICE_ROLE (entrypoint.sh, M8 ADR-033) only distinguishes the SSE sidecar
+    from the main app via gunicorn's entrypoint dispatch — celery_worker.py is
+    invoked directly by `celery -A celery_worker worker|beat` and never sets it,
+    so fall back to a sys.argv check for those two.
+    """
+    role = os.environ.get("SERVICE_ROLE")
+    if role:
+        return f"kayak-backend-{role}"
+    if "beat" in sys.argv:
+        return "kayak-backend-beat"
+    if "worker" in sys.argv:
+        return "kayak-backend-worker"
+    return "kayak-backend"
+
+
+# M13 §A.0.4 cost guardrail: two route families are structurally high-volume
+# and low-diagnostic-value at 100% trace sampling.
+#   - The tile proxy (D10, 600/min per IP — a single map view bursts 30-60
+#     requests) and the health check (polled every 10s by every container's
+#     compose healthcheck).
+#   - The SSE stream routes: LiveStreamService.stream_events re-queries the
+#     Trip on every heartbeat tick (every 15s, per open connection, for the
+#     connection's entire lifetime) — auto-instrumented, that's one unbounded
+#     SQLAlchemy span per tick per viewer. Excluded from Flask's per-request
+#     span here; _sse_connection_span (below) replaces it with exactly one
+#     manual span per connection instead (A.2).
+# excluded_urls takes OTel's comma-separated regex-per-entry format.
+_EXCLUDED_URL_PATTERNS = ",".join([
+    r"/api/v1/tiles/.*",
+    r"/api/v1/health",
+    r"/api/v1/live/trip/[^/]+/stream",
+    r"/api/v1/live/story/[^/]+/stream",
+])
+
+
 def setup_logfire(app: Flask, config_mode: str) -> None:
     """Configure Logfire (Pydantic's managed OTel backend) and auto-instrument
-    Flask, SQLAlchemy, and Celery.
+    Flask, SQLAlchemy, Celery, and outbound `requests` calls (OpenMeteo, the
+    tile proxy's upstream fetch).
 
     Safe to call unconditionally in every environment: without LOGFIRE_TOKEN set
     (CI, tests, a dev machine that hasn't configured one), send_to_logfire=
     "if-token-present" makes this a no-op rather than prompting or erroring.
     console=False since spans would otherwise duplicate the JsonFormatter
-    stdout stream in an incompatible format.
+    stdout stream in an incompatible format. Note this only configures the
+    SDK — `docker-compose.yml` must also propagate LOGFIRE_TOKEN into each
+    container's environment, or a real token set locally never reaches it.
     """
     logfire.configure(
         send_to_logfire="if-token-present",
-        service_name="kayak-backend",
+        service_name=_resolve_service_name(),
         environment=config_mode,
         console=False,
     )
-    logfire.instrument_flask(app)
+    logfire.instrument_flask(app, excluded_urls=_EXCLUDED_URL_PATTERNS)
     with app.app_context():
         logfire.instrument_sqlalchemy(engine=db.engine)
     logfire.instrument_celery()
+    logfire.instrument_requests()
+    # instrument_* above only cover auto-instrumented spans (Flask/SQLAlchemy/Celery/requests) —
+    # none of them touch the stdlib `logging` module, so without this, every application
+    # `logger.info(...)` call (Resources/, Services/, Tasks/) never reaches Logfire at all, only
+    # stdout. LogfireLoggingHandler forwards them; it no-ops cleanly with no LOGFIRE_TOKEN set,
+    # same as the rest of this function. Added alongside setup_logging()'s handlers, not instead
+    # of them — stdout JSON logging is unaffected.
+    #
+    # Capped at INFO: uncapped, this also forwards every third-party DEBUG line (urllib3,
+    # botocore, redis, ...) to Logfire — expensive against the free-tier budget (A.0.5), and
+    # DEBUG-level lines from Logfire's own outbound export calls specifically trigger the
+    # handler's documented fallback (instrumentation is suppressed around Logfire's own network
+    # calls to avoid tracing itself, so the fallback — a plain, unformatted StreamHandler —
+    # fires instead), duplicating every one of those lines in stdout. Capping to INFO — already
+    # this project's convention for "meaningful application signal" vs. library-internal noise
+    # (backend/CLAUDE.md "Logging") — means those DEBUG lines never reach the handler at all.
+    logfire_handler = logfire.LogfireLoggingHandler()
+    logfire_handler.setLevel(logging.INFO)
+    logging.getLogger().addHandler(logfire_handler)

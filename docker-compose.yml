@@ -140,6 +140,11 @@ services:
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # setup_logfire() (Api/observability.py) reads this unconditionally on every
+      # createApp() call — unset here, it silently no-ops (send_to_logfire=
+      # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
+      # reaches any container without this line, even though the app "worked" either way.
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
@@ -190,6 +195,11 @@ services:
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # setup_logfire() (Api/observability.py) reads this unconditionally on every
+      # createApp() call — unset here, it silently no-ops (send_to_logfire=
+      # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
+      # reaches any container without this line, even though the app "worked" either way.
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
@@ -238,6 +248,11 @@ services:
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # setup_logfire() (Api/observability.py) reads this unconditionally on every
+      # createApp() call — unset here, it silently no-ops (send_to_logfire=
+      # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
+      # reaches any container without this line, even though the app "worked" either way.
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
@@ -274,6 +289,11 @@ services:
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # setup_logfire() (Api/observability.py) reads this unconditionally on every
+      # createApp() call — unset here, it silently no-ops (send_to_logfire=
+      # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
+      # reaches any container without this line, even though the app "worked" either way.
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}

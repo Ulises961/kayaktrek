@@ -1084,7 +1084,7 @@ dependencies = [
     { name = "gpxpy" },
     { name = "gunicorn" },
     { name = "kombu" },
-    { name = "logfire", extra = ["celery", "flask", "sqlalchemy"] },
+    { name = "logfire", extra = ["celery", "flask", "requests", "sqlalchemy"] },
     { name = "marshmallow" },
     { name = "marshmallow-sqlalchemy" },
     { name = "openmeteo-requests" },
@@ -1136,7 +1136,7 @@ requires-dist = [
     { name = "gpxpy" },
     { name = "gunicorn" },
     { name = "kombu" },
-    { name = "logfire", extras = ["celery", "flask", "sqlalchemy"], specifier = ">=4.38.0" },
+    { name = "logfire", extras = ["celery", "flask", "requests", "sqlalchemy"], specifier = ">=4.38.0" },
     { name = "marshmallow" },
     { name = "marshmallow-sqlalchemy" },
     { name = "openmeteo-requests" },
@@ -1279,6 +1279,9 @@ celery = [
 ]
 flask = [
     { name = "opentelemetry-instrumentation-flask" },
+]
+requests = [
+    { name = "opentelemetry-instrumentation-requests" },
 ]
 sqlalchemy = [
     { name = "opentelemetry-instrumentation-sqlalchemy" },
@@ -1650,6 +1653,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/4a/6d/cf9a9cf18603e3aaebba96633ec3c1ced463706f545d8672419b715c1e59/opentelemetry_instrumentation_flask-0.64b0.tar.gz", hash = "sha256:74d07edba426beae1214bd0aec69bd31a9d0d22c29747b497d5d94c516d1c860", size = 24150, upload-time = "2026-06-24T15:19:27.847Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/64/42c6ef303e2c6b773debc2621148532c6e5ac5050c8fb6347f125c884757/opentelemetry_instrumentation_flask-0.64b0-py3-none-any.whl", hash = "sha256:bad53249bb68ab62c993dc9a3cb6be13f6ec0934ff658fea426e4d800a1310a2", size = 15079, upload-time = "2026-06-24T15:18:39.423Z" },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-requests"
+version = "0.64b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "opentelemetry-util-http" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/97/d5fb7b3f329c24ff2f6478f1a0c0c516ba942d3df2acbb197d276af31816/opentelemetry_instrumentation_requests-0.64b0.tar.gz", hash = "sha256:8213a20b6578c41aa05cc5b48419aea75e1584924a4904dfcf36524597e7cc96", size = 18106, upload-time = "2026-06-24T15:19:39.522Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/b2/f0f32ec327bdd76d245d28975dfb446d62eea2d267c06b6cb6c1a9b7e7d4/opentelemetry_instrumentation_requests-0.64b0-py3-none-any.whl", hash = "sha256:dcad4324ad97d785a5a3b9500acf3af3965b4c1d1b95776fa5e275b173d9541c", size = 13385, upload-time = "2026-06-24T15:18:56.163Z" },
 ]
 
 [[package]]

@@ -53,6 +53,13 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     worker_enable_remote_control=False,
+    # Celery's default (True) wipes the root logger's handlers — including our JsonFormatter
+    # + RequestContextFilter from setup_logging() — the moment the worker bootstraps, replacing
+    # them with Celery's own plain-text formatter. Every app-level task logger (Tasks.*, a child
+    # of root, not of the separate "celery" namespace) silently lost JSON formatting and
+    # trace_id/request_id correlation as a result. _configure_celery_logger below only re-applies
+    # our handlers to the "celery" namespace itself; it never protected root.
+    worker_hijack_root_logger=False,
     beat_schedule={
         "daily-gdpr-erasure": {
             "task": "Tasks.erasure.run_erasure",

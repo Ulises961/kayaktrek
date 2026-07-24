@@ -14,15 +14,20 @@ def setup_logging(app) -> None:
         log_level = logging.WARNING
 
     formatter = JsonFormatter(datefmt="%Y-%m-%dT%H:%M:%S")
+    # Filters attached to a Logger only run for records that Logger itself originates —
+    # they're skipped for child loggers (Resources.*, Services.*, botocore.*, ...) walking up
+    # the hierarchy, which is every real application log call. Attach to each Handler instead,
+    # so it runs for every record that reaches it regardless of which logger emitted it.
+    context_filter = RequestContextFilter()
 
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     root_logger.handlers.clear()
-    root_logger.addFilter(RequestContextFilter())
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(context_filter)
     root_logger.addHandler(console_handler)
 
     log_dir = os.getenv("LOG_DIR")
@@ -36,6 +41,7 @@ def setup_logging(app) -> None:
         )
         file_handler.setLevel(log_level)
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(context_filter)
         root_logger.addHandler(file_handler)
 
     logging.getLogger("werkzeug").setLevel(

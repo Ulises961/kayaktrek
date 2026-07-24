@@ -201,16 +201,49 @@ A `RequestContextFilter` injects `g.request_id` (from `X-Request-ID` header or a
 
 This layer is vendor-agnostic: the same stdout stream feeds any aggregator. It stays in place regardless of what is added on top.
 
-### Logfire — distributed tracing (proposed)
+### Logfire — distributed tracing (accepted, implemented — M13)
 
-The observability gap is the absence of distributed tracing: no span tree, no request timing, no frontend→backend correlation, no automatic Celery task tracing.
+Before this, the observability gap was the absence of distributed tracing: no span tree, no request timing, no frontend→backend correlation, no automatic Celery task tracing.
 
-The planned addition is **Logfire** (by Pydantic), a managed observability backend built on OpenTelemetry. It provides automatic instrumentation for Flask, SQLAlchemy, Celery, and HTTPX with minimal configuration. No Collector, Tempo, or Loki to operate.
+**Logfire** (by Pydantic) is the managed observability backend, built on OpenTelemetry, closing that gap. It provides automatic instrumentation for Flask, SQLAlchemy, Celery, `requests`, and Next.js's `fetch` with minimal configuration. No Collector, Tempo, or Loki to operate.
 
-When Logfire is wired:
-- The `JsonFormatter` **stays** — it is the vendor-agnostic log layer
-- The `JsonFormatter` is extended to emit `trace_id` / `span_id` from the active OTel span so log lines and traces are correlatable in any aggregator
-- The manual `g.request_id` becomes redundant for cross-service correlation (OTel handles that); it can remain as a lightweight per-request identifier in logs until OTel is fully verified
+- The `JsonFormatter` **stays** — it is the vendor-agnostic log layer — and is extended
+  (`RequestContextFilter`, `Services/Utils/logging_utils.py`) to emit `trace_id`/`span_id` from the
+  active OTel span, so a stdout log line and a Logfire trace are pivotable. The manual
+  `g.request_id` remains as a lightweight per-request identifier until OTel context propagation is
+  verified fully redundant with it.
+- **Per-process service naming** (`Api/observability.py` `_resolve_service_name`): the four
+  backend roles M8 introduced (main app, SSE sidecar, Celery worker, Celery beat) get distinct
+  `service.name` values (`kayak-backend[-sse|-worker|-beat]`) — separable in the Logfire UI, while
+  a request that triggers a task still correlates into one trace via standard OTel context
+  propagation. Derived from `SERVICE_ROLE` (M8, `entrypoint.sh`) plus an argv check for the two
+  Celery entry points, which never set it.
+- **SSE cost guardrail**: the tile proxy, health check, and the two SSE stream routes are excluded
+  from Flask's per-request auto-tracing (`excluded_urls` on `instrument_flask`) — structurally
+  high-volume (health check polled every 10s; a single map view bursts 30-60 tile requests) or, for
+  the SSE routes, would otherwise emit one unbounded SQLAlchemy span per 15s heartbeat tick for a
+  connection's entire, potentially hours-long lifetime. `LiveStreamService.stream_events`
+  (M8 ADR-033's sidecar) instead wraps the whole connection in one manual `logfire.span` with
+  `tick_count`/`position_events` attributes — verified live: a `curl -N` connection produces one
+  connection-scoped span in the Logfire UI, not one per tick.
+- **Frontend** (`frontend/instrumentation.ts`): `@vercel/otel`'s `registerOTel`, gated on
+  `LOGFIRE_TOKEN` and `NEXT_RUNTIME=nodejs` (skips `proxy.ts`'s edge runtime), exports to a
+  Logfire-pointed `OTLPTraceExporter`. The write token embeds its own region
+  (`pylf_v<version>_<region>_...`) — resolved via the `logfire` package's `resolveBaseUrl` rather
+  than a hardcoded host, so it always lands on the same `logfire-{eu,us}.pydantic.dev` the
+  backend's Python SDK auto-detects for the same token, with no second region setting to drift out
+  of sync. `@vercel/otel`'s `fetch` auto-instrumentation propagates the standard W3C `traceparent`
+  header, so a request crossing server action → `apiFetch` → Flask → SQLAlchemy shows up as one
+  connected trace — verified live end-to-end. Browser-side RUM is explicitly out of scope; no
+  current need justifies the added client bundle weight.
+- **Budget guardrail**: the account is on Logfire's Personal (free) plan, which hard-stops
+  ingestion automatically at 10M records/month with email + in-app alerts as usage approaches the
+  cap — a platform default, not something this project configures. Revisit only on a Team+ upgrade
+  (paid tiers have no automatic stop; a self-service spend cap must be set explicitly instead).
+- Both `LOGFIRE_TOKEN` env vars stay unset in CI (`backend-ci.yml`, `frontend-ci.yml`); since
+  `setup_logfire()`/`instrumentation.ts`'s `register()` run unconditionally on every app boot, the
+  entire test suite and build already exercise the no-op path on every run — a dedicated no-op
+  test would be redundant with that.
 
 If Logfire pricing ever becomes untenable, re-point the OTel exporter to a self-hosted Collector. The stdout JSON logs continue independently without code changes.
 
@@ -347,7 +380,9 @@ lands as one coordinated PR.
 | RabbitMQ / Redis / Celery | ADR-007 | 2025-01-01 | Fixed Redis DB allocation |
 | Structured JSON logging | ADR-010 | 2025-10-01 | Extended by Logfire (ADR-009) when OTel lands |
 | Logfire for observability | ADR-009 | 2026-05-09 | Proposed — replaces manual OTel+Grafana plan |
-| Logfire base wiring | ADR-009 | 2026-07-24 | `LOGFIRE_TOKEN` env var; `Api/observability.py` `setup_logfire()` called from `createApp()` — `logfire.configure(send_to_logfire="if-token-present", console=False)` + `instrument_flask`/`instrument_sqlalchemy`/`instrument_celery`. No-ops cleanly without a token (CI/tests unaffected). `RequestContextFilter` now also injects `trace_id`/`span_id` from the active OTel span into `JsonFormatter` output. ProxyFix must wrap `app.wsgi_app` *after* `setup_logfire()` so it stays the outermost WSGI layer (resolves real client IP before OTel tags spans with it). Frontend browser SDK and Sentry are still open — deferred to when e2e data collection is finished |
+| Logfire base wiring | ADR-009 | 2026-07-24 | `LOGFIRE_TOKEN` env var; `Api/observability.py` `setup_logfire()` called from `createApp()` — `logfire.configure(send_to_logfire="if-token-present", console=False)` + `instrument_flask`/`instrument_sqlalchemy`/`instrument_celery`. No-ops cleanly without a token (CI/tests unaffected). `RequestContextFilter` now also injects `trace_id`/`span_id` from the active OTel span into `JsonFormatter` output. ProxyFix must wrap `app.wsgi_app` *after* `setup_logfire()` so it stays the outermost WSGI layer (resolves real client IP before OTel tags spans with it) |
+| Logfire M13 §A.2/§A.3 — SSE guardrail + frontend | ADR-009 | 2026-07-24 | Per-process `service.name` (`_resolve_service_name`); tile proxy/health/SSE routes excluded from Flask auto-tracing, replaced by one manual `logfire.span` per SSE connection (`LiveStreamService.stream_events`) instead of one per 15s tick — verified live via `curl -N`. `frontend/instrumentation.ts`: `@vercel/otel` + a Logfire OTLP exporter whose region is resolved from the write token itself (`logfire`'s `resolveBaseUrl`), gated on `LOGFIRE_TOKEN`/`NEXT_RUNTIME=nodejs`; verified one connected trace end-to-end (server action → `apiFetch` → Flask → SQLAlchemy). Budget guardrail: Personal (free) plan hard-stops ingestion at 10M records/month automatically — no dashboard config needed at this tier. Browser RUM and Sentry remain deferred |
+| Logfire M13 — four pre-existing/introduced bugs found + fixed while verifying trace_id correlation and FE↔BE trace linking | ADR-009/ADR-010 | 2026-07-24 | (1) `RequestContextFilter` was attached to the root **Logger** (`addFilter`), not its **Handlers** — Python only invokes a Logger's own filters for records it directly originates, so every child-logger call (`Resources.*`, `Services.*`, i.e. all real application logging) silently skipped it; `request_id`/`trace_id`/`span_id` had never reached a real log line. Fixed in `Api/logging_config.py`; regression-guarded in `Tests/70_logging_context_filter_test.py`. (2) `Api/celery_app.py` left Celery's `worker_hijack_root_logger` at its default `True`, so the worker/beat processes wiped `setup_logging()`'s handlers at bootstrap and replaced them with Celery's own plain-text formatter — every task log line lost JSON formatting and correlation fields. Fixed via `worker_hijack_root_logger=False`. (3) `frontend/instrumentation.ts` had no `instrumentationConfig` — `@vercel/otel`'s fetch instrumentation only propagates W3C trace context to Vercel's own deployment URLs by default, silently excluding this self-hosted backend; every `apiFetch` call created its own disconnected trace instead of continuing the frontend's. Invisible on page-load GETs, confirmed broken once a POST mutation was checked specifically via a direct Logfire Query API call. Fixed via `instrumentationConfig.fetch.propagateContextUrls: [API_URL, SSE_URL]`; regression-guarded in `frontend/__tests__/instrumentation.test.ts`. (4) None of `setup_logfire()`'s `instrument_*` calls touch stdlib `logging` — added `logfire.LogfireLoggingHandler()` so application logs reach Logfire itself, not just stdout; uncapped, this forwarded every third-party DEBUG line and duplicated Logfire's own outbound-call logs via the handler's fallback (suppressed-instrumentation StreamHeader), so capped it at `INFO`. Regression-guarded in `Tests/71_observability_test.py`. All four verified live: a triggered `Tasks.ping.ping` emits JSON `task_started`/`task_completed` with matching `trace_id`/`span_id`, and a direct Logfire Query API call confirmed `parent_span_id` linkage frontend→backend→SQL for both a GET and a POST/PATCH mutation |
 | Thin resources / service layer | ADR-014 | 2025-01-01 | — |
 | Self-hosted architecture | ADR-016 | 2026-05-09 | Logfire is the only managed exception |
 | Static type checking with mypy | ADR-029 | 2026-06-19 | Gradual, layer-by-layer; for correctness/tooling not perf; `TYPE_CHECKING` `Base` shim for `db.Model` |
