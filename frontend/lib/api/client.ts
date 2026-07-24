@@ -16,6 +16,34 @@ async function getAccessToken(): Promise<string | null> {
   return cookieStore.get("access_token")?.value ?? null
 }
 
+// The backend's error handler always shapes a failure body as
+// {error: <category>, message: <detail>} (Api/error_handlers.py) — `message` is
+// either a plain string or, for Marshmallow validation failures, a
+// {field: [errors]} object. This is the single place that turns a failed
+// Response into the Error every server action re-throws (typically via
+// `e instanceof Error ? e.message : "..."`), so it's also the single place
+// responsible for making sure `.message` is something a user can actually
+// read — never the raw "METHOD /path failed: <status>" wrapper, which is for
+// server-side logs, not toasts/UI text.
+async function errorMessage(method: string, path: string, res: Response): Promise<string> {
+  const technical = `${method} ${path} failed: ${res.status}`
+  let body: { message?: unknown } | null = null
+  try {
+    body = (await res.json()) as { message?: unknown } | null
+  } catch {
+    body = null
+  }
+  if (typeof body?.message === "string") return body.message
+  if (body?.message && typeof body.message === "object") {
+    const fieldErrors = Object.entries(body.message as Record<string, unknown>).map(
+      ([field, messages]) =>
+        `${field}: ${Array.isArray(messages) ? messages.join(", ") : String(messages)}`,
+    )
+    if (fieldErrors.length > 0) return fieldErrors.join("; ")
+  }
+  return technical
+}
+
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 
@@ -39,7 +67,7 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
 
 export async function apiGet<T>(path: string, extraHeaders?: Record<string, string>): Promise<T> {
   const res = await apiFetch(path, { headers: extraHeaders })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
   return res.json() as Promise<T>
 }
 
@@ -54,24 +82,14 @@ export async function apiPost<T>(
     { method: "POST", body: JSON.stringify(body), headers: extraHeaders },
     retry,
   )
-  if (!res.ok) {
-    const detail = (await res.json().catch(() => null)) as { message?: string } | null
-    throw new Error(
-      `POST ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
-    )
-  }
+  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
   const text = await res.text()
   return (text ? JSON.parse(text) : null) as T
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const res = await apiFetch(path, { method: "PUT", body: JSON.stringify(body) })
-  if (!res.ok) {
-    const detail = (await res.json().catch(() => null)) as { message?: string } | null
-    throw new Error(
-      `PUT ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
-    )
-  }
+  if (!res.ok) throw new Error(await errorMessage("PUT", path, res))
   return res.json() as Promise<T>
 }
 
@@ -87,12 +105,7 @@ export async function apiPatch<T>(
     { method: "PATCH", body: JSON.stringify(body), headers: extraHeaders },
     retry,
   )
-  if (!res.ok) {
-    const detail = (await res.json().catch(() => null)) as { message?: string } | null
-    throw new Error(
-      `PATCH ${path} failed: ${res.status}${detail?.message ? ` — ${detail.message}` : ""}`,
-    )
-  }
+  if (!res.ok) throw new Error(await errorMessage("PATCH", path, res))
   return res.json() as Promise<T>
 }
 
@@ -102,7 +115,7 @@ export async function apiDelete(
 ): Promise<void> {
   const retry = !extraHeaders
   const res = await apiFetch(path, { method: "DELETE", headers: extraHeaders }, retry)
-  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+  if (!res.ok) throw new Error(await errorMessage("DELETE", path, res))
 }
 
 // Unauthenticated GET — for public endpoints that must not redirect to /login on failure.
@@ -111,7 +124,7 @@ export async function apiGetPublic<T>(path: string): Promise<T> {
     headers: { "Content-Type": "application/json" },
     next: { revalidate: 300 },
   })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
   return res.json() as Promise<T>
 }
 
@@ -132,6 +145,6 @@ export async function apiUpload<T>(path: string, formData: FormData, retry = tru
     if (refreshed) return apiUpload(path, formData, false)
     redirect("/login")
   }
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
   return res.json() as Promise<T>
 }

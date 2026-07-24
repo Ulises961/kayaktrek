@@ -1,8 +1,12 @@
 "use client"
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
+import { useSearchParams } from "next/navigation"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
 import { useFullBleedContent } from "@/hooks/use-full-bleed-content"
+import { usePositionWatch } from "@/hooks/use-position-watch"
+import { useLivePositions } from "@/hooks/use-live-positions"
+import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
@@ -13,6 +17,7 @@ import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
+import { getStreamTicket } from "@/lib/live/actions"
 import { setUnitPreference } from "@/lib/profile/actions"
 import { debounce } from "@/lib/utils/debounce"
 import { DayRail } from "./day-rail"
@@ -31,6 +36,10 @@ type MapBuilderProps = {
   tripDateTo?: string | null
   tripState?: TripState | null
   isLeader?: boolean
+  // Any trip member may enter Navigate mode while the trip is happening — a
+  // separate axis from isLeader, which only gates the View/Edit route-editing
+  // toggle. Computed server-side (deriveMembership + tripState === "happening").
+  showNavigate?: boolean
   initialDistanceUnit?: DistanceUnit
 }
 
@@ -42,6 +51,7 @@ export function MapBuilder({
   tripDateTo = null,
   tripState = null,
   isLeader = true,
+  showNavigate = false,
   initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
@@ -55,8 +65,64 @@ export function MapBuilder({
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
   const [selectedHour, setSelectedHour] = useState(12)
   const [conditionsVersion, setConditionsVersion] = useState(0)
+  const [navigateMode, setNavigateMode] = useState(false)
+  const [streamUrl, setStreamUrl] = useState<string | null>(null)
 
   const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
+
+  // ── Navigate mode (M8) ──────────────────────────────────────────────────
+
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (showNavigate && searchParams.get("navigate") === "1") {
+      setNavigateMode(true)
+      setViewMode(true)
+    }
+    // Deliberately mount-only (honors the deep link once) — re-running on every
+    // searchParams change would fight a user who explicitly turns Navigate off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showNavigate])
+
+  const handleToggleNavigate = useCallback(() => {
+    setNavigateMode((prev) => {
+      const next = !prev
+      if (next) setViewMode(true)
+      return next
+    })
+  }, [])
+
+  const mintStreamUrl = useCallback(
+    () => (tripId ? getStreamTicket(tripId) : Promise.resolve(null)),
+    [tripId],
+  )
+
+  useEffect(() => {
+    if (!navigateMode || !tripId) {
+      setStreamUrl(null)
+      return
+    }
+    let cancelled = false
+    mintStreamUrl().then((url) => {
+      if (!cancelled) setStreamUrl(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [navigateMode, tripId, mintStreamUrl])
+
+  const positionWatch = usePositionWatch(tripId ?? "", navigateMode)
+  const liveStream = useLivePositions(navigateMode ? streamUrl : null, {
+    mintUrl: mintStreamUrl,
+  })
+
+  const navigateStatusLabel =
+    positionWatch.status === "denied"
+      ? "Location denied"
+      : positionWatch.status === "unsupported"
+        ? "Location unavailable"
+        : positionWatch.status === "sending"
+          ? `Sharing position · ${liveStream.positions.length} crew live`
+          : "Acquiring location…"
 
   // Persist the cruising speed only after the user stops dragging the slider.
   const debouncedSaveSpeed = useMemo(
@@ -169,7 +235,14 @@ export function MapBuilder({
   }, [selectedPointId, state.points])
 
   const handleToggleViewMode = useCallback(() => {
-    setViewMode((v) => !v)
+    setViewMode((v) => {
+      const next = !v
+      // Edit and Navigate are mutually exclusive — Navigate is a View-only sub-state
+      // (handleToggleNavigate already forces viewMode true on entry), so leaving View
+      // for Edit must also leave Navigate, or the two ended up simultaneously true.
+      if (!next) setNavigateMode(false)
+      return next
+    })
     setSelectedDayId(null)
     setSelectedPointId(null)
   }, [])
@@ -244,12 +317,23 @@ export function MapBuilder({
           onToggleViewMode={handleToggleViewMode}
           isLeader={isLeader}
           tripState={tripState}
+          showNavigate={showNavigate}
+          navigateMode={navigateMode}
+          onToggleNavigate={handleToggleNavigate}
         />
         {/* Panels are layout siblings of the map, not overlays — they push the map
             narrower instead of covering it, so no information is hidden. */}
         <div className="absolute top-[100px] right-0 bottom-0 left-0 flex md:top-12">
           {viewMode && <DayRail />}
           <div className="relative min-w-0 flex-1">
+            {navigateMode && (
+              <div className="absolute top-3 left-3 z-[1001] flex items-center gap-2">
+                <div className="bg-primary text-primary-foreground rounded-full px-3 py-1 text-xs font-semibold shadow">
+                  {navigateStatusLabel}
+                </div>
+                {isLeader && tripId && <CloseDayButton tripId={tripId} />}
+              </div>
+            )}
             <MapCore
               points={orderedPoints}
               days={allDaysForMap}
@@ -266,6 +350,7 @@ export function MapBuilder({
               onMarkerDragMove={handleMarkerDragMove}
               onMarkerClick={handleMarkerClick}
               avgSpeedKnots={avgSpeedKnots}
+              livePositions={navigateMode ? liveStream.positions : []}
             />
             {viewMode && <PointDetailSheet />}
           </div>

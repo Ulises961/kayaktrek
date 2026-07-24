@@ -6,18 +6,11 @@ import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RouteDayLayers } from "@/components/map/route-day-layers"
+import { OSM_TILE_URL, OSM_ATTRIBUTION } from "@/lib/map/tiles"
+import { LivePositionLayer } from "@/components/map/live-position-layer"
+import type { LivePosition } from "@/lib/dtos/live-position"
 
 const MAX_FIT_ZOOM = 14
-
-// Reserved for the M8 live-position feature (crew position broadcast while a trip
-// is `happening`) — unused until then, so this component doesn't need a rewrite
-// when that lands, only a new layer added alongside the static route.
-export type LivePosition = {
-  userId: string
-  lat: number
-  lon: number
-  label?: string
-}
 
 type Props = {
   routes?: RouteData[]
@@ -37,15 +30,13 @@ function FitToRoutes({ routes }: { routes: RouteData[] }) {
   return null
 }
 
-export default function PublicMap({ routes = [] }: Props) {
+export default function PublicMap({ routes = [], livePositions = [] }: Props) {
   return (
     <MapContainer center={[43, 13]} zoom={5} className="h-full w-full" zoomControl={false}>
       <FitToRoutes routes={routes} />
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
       <RouteDayLayers routes={routes} />
+      <LivePositionLayer positions={livePositions} />
     </MapContainer>
   )
 }

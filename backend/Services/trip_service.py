@@ -10,7 +10,7 @@ from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
-from Models.trip import Trip, TripStateType, TripDifficultyType
+from Models.trip import Trip, TripStateType, TripDifficultyType, TripOutcomeType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.inventory import Inventory
@@ -18,6 +18,8 @@ from Models.itinerary import Itinerary
 from Models.day import Day
 from Models.trip_requirement import TripRequirement
 from Services.Utils.route_distance import compute_total_miles
+from Services.Utils.point_ordering import walk_linked_list
+from Services.Utils.timezone_utils import resolve_timezone
 from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Services.catalog_item_service import CatalogItemService
 from Models.user import User
@@ -332,6 +334,93 @@ class TripService:
             logger.info("trip_deleted_no_members_remaining", extra={"trip_id": trip_id})
 
     @staticmethod
+    def pause_trip(trip_id: str) -> Trip:
+        """
+        Pause a happening trip (storm delay, injury wait, etc).
+
+        Raises:
+            NoResultFound: If trip doesn't exist
+            ValueError: If the trip isn't happening or is already paused
+        """
+        trip = TripService.get_trip_by_id(trip_id)
+        if trip.state != TripStateType.HAPPENING:
+            raise ValueError(f"Cannot pause a trip in state '{trip.state.value}'")
+        if trip.is_paused:
+            raise ValueError(f"Trip {trip_id} is already paused")
+
+        trip.is_paused = True
+        trip.paused_at = date.today()
+        db.session.commit()
+        db.session.refresh(trip)
+        logger.info("trip_paused", extra={"trip_id": trip_id})
+        return trip
+
+    @staticmethod
+    def resume_trip(trip_id: str, resume_date: Optional[date] = None) -> Trip:
+        """
+        Resume a paused trip, shifting every Day after the pause date forward by
+        the resulting gap and extending date_to to match. day_number — the
+        immutable logical sequence position — is never touched.
+
+        Args:
+            trip_id: The ID of the trip
+            resume_date: Calendar date the expedition resumes (defaults to today).
+                Must be on or after paused_at.
+
+        Raises:
+            NoResultFound: If trip doesn't exist
+            ValueError: If the trip isn't paused, or resume_date precedes paused_at
+        """
+        trip = TripService.get_trip_by_id(trip_id)
+        if trip.state != TripStateType.HAPPENING or not trip.is_paused or trip.paused_at is None:
+            raise ValueError(f"Trip {trip_id} is not paused")
+
+        resume = resume_date or date.today()
+        if resume < trip.paused_at:
+            raise ValueError("resume_date cannot precede the pause date")
+
+        gap_days = (resume - trip.paused_at).days
+        if gap_days > 0 and trip.itinerary:
+            gap = timedelta(days=gap_days)
+            for day in trip.itinerary.days:
+                if day.date is not None and day.date > trip.paused_at:
+                    day.date = day.date + gap
+            if trip.date_to is not None:
+                trip.date_to = trip.date_to + gap
+
+        trip.is_paused = False
+        trip.paused_at = None
+        db.session.commit()
+        db.session.refresh(trip)
+        logger.info("trip_resumed", extra={"trip_id": trip_id, "gap_days": gap_days})
+        return trip
+
+    @staticmethod
+    def abort_trip(trip_id: str) -> Trip:
+        """
+        End a paused expedition early — the only way to reach `past` without
+        resuming. Deliberately bypasses Trip.transition_state: that method's
+        happening→past branch infers outcome=COMPLETED when unset and only
+        enforces the generic forward-only state machine, whereas abort needs
+        the stricter "happening + paused" precondition and an unconditional
+        INTERRUPTED outcome.
+
+        Raises:
+            NoResultFound: If trip doesn't exist
+            ValueError: If the trip isn't happening and paused
+        """
+        trip = TripService.get_trip_by_id(trip_id)
+        if trip.state != TripStateType.HAPPENING or not trip.is_paused:
+            raise ValueError(f"Trip {trip_id} can only be aborted while happening and paused")
+
+        trip.state = TripStateType.PAST
+        trip.outcome = TripOutcomeType.INTERRUPTED
+        db.session.commit()
+        db.session.refresh(trip)
+        logger.info("trip_aborted", extra={"trip_id": trip_id})
+        return trip
+
+    @staticmethod
     def get_invitations_by_user(user_id: str, include_expired: bool = False) -> List[Trip]:
         """
          Retrieve all invitations to trips received by the user
@@ -521,6 +610,29 @@ class TripService:
         logger.info("member_removed", extra={"trip_id": trip_id, "user_id": user_id})
 
     @staticmethod
+    def _resolve_start_timezone(trip: Trip) -> Optional[str]:
+        """Resolve the IANA timezone of the itinerary's first located point (earliest
+        Day, linked-list order). Returns None if the itinerary has no located points —
+        trip_today() falls back to UTC in that case."""
+        if trip.itinerary is None:
+            return None
+        days = (
+            db.session.query(Day)
+            .filter(Day.itinerary_id == trip.itinerary.id)
+            .options(selectinload(Day.points))
+            .order_by(Day.day_number)
+            .all()
+        )
+        for day in days:
+            points = day.points or []
+            point_map = {str(point.id): point for point in points}
+            for point_id in walk_linked_list(points):
+                point = point_map[point_id]
+                if point.latitude is not None and point.longitude is not None:
+                    return resolve_timezone(float(point.latitude), float(point.longitude))
+        return None
+
+    @staticmethod
     def transition_trip_state(trip_id: str, new_state_value: str) -> Trip:
         """
         Advance a trip's state forward along the state machine.
@@ -542,6 +654,8 @@ class TripService:
             raise ValueError(f"Invalid state '{new_state_value}'. Valid values: {[s.value for s in TripStateType]}")
 
         trip = TripService.get_trip_by_id(trip_id)
+        if trip.state == TripStateType.BUILDING and new_state == TripStateType.HAPPENING and trip.timezone_name is None:
+            trip.timezone_name = TripService._resolve_start_timezone(trip)
         trip.transition_state(new_state)
         db.session.commit()
         db.session.refresh(trip)

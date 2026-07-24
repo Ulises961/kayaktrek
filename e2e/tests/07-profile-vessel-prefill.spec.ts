@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test"
 import { LEADER } from "../fixtures/auth"
-import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
+import {
+  apiGetAccessToken,
+  apiCreateTrip,
+  apiDeleteTrip,
+  apiInviteByEmail,
+  apiAcceptInvitation,
+} from "../fixtures/trips"
 import { API_URL } from "../playwright.config"
 import { mutateAndSettle } from "../fixtures/ui"
 
@@ -45,15 +51,10 @@ test.describe("Profile vessel pre-fill on trip creation", () => {
   test("crew member can override vessel per-trip without changing profile", async ({ page, browser, request }) => {
     const crewToken = await apiGetAccessToken(request, "e2e.crew@example.com", "Crew$ecure1!")
 
-    // Invite crew and have them accept via API
-    await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
-      headers: { Authorization: `Bearer ${leaderToken}` },
-      data: { email: "e2e.crew@example.com" },
-    })
-    await request.post(`${API_URL}/api/v1/trip/${tripId}/invitation`, {
-      headers: { Authorization: `Bearer ${crewToken}` },
-      data: { accepted: true },
-    })
+    // Invite crew and have them accept via API. The invite endpoint takes a
+    // userId, never a bare email (M12 §N closed that enumeration oracle).
+    await apiInviteByEmail(request, leaderToken, tripId, "e2e.crew@example.com")
+    await apiAcceptInvitation(request, crewToken, tripId)
 
     // Crew: override vessel in float plan tab
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })

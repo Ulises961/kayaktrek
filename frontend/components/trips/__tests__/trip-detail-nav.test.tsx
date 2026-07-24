@@ -56,4 +56,50 @@ describe("TripDetailNav", () => {
     expect(screen.getByRole("link", { name: /itinerary/i })).not.toHaveAttribute("aria-current")
     expect(screen.getByRole("link", { name: /crew/i })).toHaveAttribute("aria-current", "page")
   })
+
+  it("hides the Live link when liveHref is absent", () => {
+    mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
+    render(<TripDetailNav tripId={TRIP_ID} showFloatPlan={false} />)
+    expect(screen.queryByRole("link", { name: /live/i })).not.toBeInTheDocument()
+  })
+
+  it("shows the Live link pointing at the itinerary's navigate deep link", () => {
+    mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
+    render(
+      <TripDetailNav
+        tripId={TRIP_ID}
+        showFloatPlan={false}
+        liveHref="/itinerary/itin-1?navigate=1"
+      />,
+    )
+    expect(screen.getByRole("link", { name: /live/i }).getAttribute("href")).toBe(
+      "/itinerary/itin-1?navigate=1",
+    )
+  })
+
+  it("puts Live first in the list, ahead of Itinerary", () => {
+    mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
+    render(
+      <TripDetailNav
+        tripId={TRIP_ID}
+        showFloatPlan={false}
+        liveHref="/itinerary/itin-1?navigate=1"
+      />,
+    )
+    const links = screen.getAllByRole("link")
+    expect(links[0]).toHaveAccessibleName(/live/i)
+    expect(links[1]).toHaveAccessibleName(/itinerary/i)
+  })
+
+  it("never marks Live as the active tab (it's an outbound link, not a trip-detail segment)", () => {
+    mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
+    render(
+      <TripDetailNav
+        tripId={TRIP_ID}
+        showFloatPlan={false}
+        liveHref="/itinerary/itin-1?navigate=1"
+      />,
+    )
+    expect(screen.getByRole("link", { name: /live/i })).not.toHaveAttribute("aria-current")
+  })
 })

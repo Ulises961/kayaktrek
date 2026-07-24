@@ -27,7 +27,7 @@ interface ShoreContactFormProps {
 function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-sm">
+    <div className="flex gap-2 text-base">
       <span className="text-muted-foreground w-28 shrink-0">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
@@ -101,7 +101,7 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
               <FieldRow label="Email" value={shoreContactEmail} />
             </>
           ) : (
-            <p className="text-muted-foreground text-sm italic">No shore contact recorded.</p>
+            <p className="text-muted-foreground text-base italic">No shore contact recorded.</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleEdit} className="shrink-0 print:hidden">

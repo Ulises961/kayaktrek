@@ -10,7 +10,7 @@ export class LoginPage {
   async login(mail: string, pwd: string) {
     await this.page.goto("/login")
     await this.page.getByLabel("Email").fill(mail)
-    await this.page.getByLabel("Password").fill(pwd)
+    await this.page.getByLabel("Password", { exact: true }).fill(pwd)
     await this.page.getByRole("button", { name: "Sign in" }).click()
     await this.page.waitForURL("**/dashboard")
   }

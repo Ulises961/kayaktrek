@@ -8,11 +8,11 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/trips/actions", () => ({
   updateTrip: vi.fn(),
-  deleteTripForEveryone: vi.fn(),
-  leaveTrip: vi.fn(),
-  nominateSuccessor: vi.fn(),
-  clearNomination: vi.fn(),
-  claimLeadership: vi.fn(),
+  deleteTrip: vi.fn(),
+  advanceState: vi.fn(),
+  pauseTrip: vi.fn(),
+  resumeTrip: vi.fn(),
+  abortTrip: vi.fn(),
 }))
 
 import { TripIdentityHeader } from "../trip-identity-header"
@@ -120,67 +120,77 @@ describe("TripIdentityHeader", () => {
     expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument()
   })
 
-  it("keeps description/difficulty collapsed behind a Details disclosure until clicked", async () => {
+  it("shows description/difficulty expanded by default under the Details disclosure", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.getByText("A coastal paddle")).toBeInTheDocument()
     expect(screen.getByText("Moderate")).toBeInTheDocument()
   })
 
-  it("shows the advance-state action inside Details for the leader on a non-past trip", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+  it("collapses Details again when clicked", async () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     await userEvent.click(screen.getByRole("button", { name: /details/i }))
+    expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
+  })
+
+  it("shows the advance-state action inside Details for the leader on a non-past trip", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
     expect(screen.getByRole("button", { name: /begin expedition/i })).toBeInTheDocument()
   })
 
-  it("does not show the advance-state action for crew", async () => {
+  it("does not show the advance-state action for crew", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
   })
 
-  it("shows a Printable float plan link inside Details for the leader", async () => {
+  it("shows a Printable float plan link inside Details for the leader", () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     const link = screen.getByRole("link", { name: /printable float plan/i })
-    expect(link.getAttribute("href")).toBe(`/trips/${TRIP.id}/float-plan`)
+    expect(link.getAttribute("href")).toBe(`/trips/float-plan/${TRIP.id}`)
   })
 
-  it("shows the trip-state timeline inside Details for the leader on a non-past trip", async () => {
+  it("shows the trip-state timeline inside Details for the leader on a non-past trip", () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.getByText("Happening")).toBeInTheDocument()
     expect(screen.getByText("Past")).toBeInTheDocument()
   })
 
-  it("does not show the trip-state timeline for crew", async () => {
+  it("does not show the trip-state timeline for crew", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.queryByText("Happening")).not.toBeInTheDocument()
   })
 
-  it("does not render a Details disclosure for a non-member with nothing to show", () => {
+  it("shows pause controls inside Details for the leader on a happening trip", () => {
+    render(
+      <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={LEADER_MEMBERSHIP} />,
+    )
+    expect(screen.getByRole("button", { name: /pause expedition/i })).toBeInTheDocument()
+  })
+
+  it("does not show pause controls for crew", () => {
+    render(
+      <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={CREW_MEMBERSHIP} />,
+    )
+    expect(screen.queryByRole("button", { name: /pause expedition/i })).not.toBeInTheDocument()
+  })
+
+  it("does not render a Details disclosure when there is nothing to show (crew, no description/difficulty)", () => {
     const bare: Trip = { ...TRIP, description: null, difficulty: null }
     render(<TripIdentityHeader trip={bare} membership={NON_MEMBER} />)
     expect(screen.queryByRole("button", { name: /details/i })).not.toBeInTheDocument()
   })
 
-  it("shows a Leave trip affordance inside Details for any member", async () => {
+  it("shows a Leave trip affordance inside Details for any member", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.getByRole("button", { name: /leave trip/i })).toBeInTheDocument()
   })
 
-  it("shows a successor-nomination affordance inside Details for the leader only", async () => {
+  it("shows a successor-nomination affordance inside Details for the leader only", () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.getByRole("button", { name: /nominate a successor/i })).toBeInTheDocument()
   })
 
-  it("does not show a successor-nomination affordance for crew", async () => {
+  it("does not show a successor-nomination affordance for crew", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
     expect(screen.queryByRole("button", { name: /nominate a successor/i })).not.toBeInTheDocument()
   })
 

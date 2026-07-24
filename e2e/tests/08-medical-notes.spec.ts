@@ -31,14 +31,15 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     // Crew: navigate to float plan tab and add medical notes
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()
-    await crewPage.goto(`/trips/${tripId}`)
-    await crewPage.getByRole("tab", { name: /logistics/i }).click()
-    await crewPage.getByRole("tab", { name: /float plan/i }).click()
+    // Medical notes live on the "Emergency info" route segment (formerly a
+    // Logistics → Float plan sub-tab, moved to its own route by the M12 §R
+    // trip-detail tab → route-segment refactor).
+    await crewPage.goto(`/trips/${tripId}/my-float-plan`)
 
     // "Add notes" triggers the re-auth flow
     await crewPage.getByRole("button", { name: /add notes/i }).click()
     // Re-auth: enter password and continue
-    await crewPage.getByLabel(/password/i).fill(CREW_PWD)
+    await crewPage.getByLabel("Password", { exact: true }).fill(CREW_PWD)
     await crewPage.getByRole("button", { name: /continue/i }).click()
     // Textarea is now shown — fill in medical notes
     await crewPage.getByPlaceholder(/allergies/i).fill("Allergic to penicillin")
@@ -54,7 +55,7 @@ test.describe("Medical notes — crew adds, leader decrypts", () => {
     // Leader: navigate to the float plan page where the crew manifest lives
     const leaderContext = await browser.newContext({ storageState: "e2e/.auth/leader.json" })
     const leaderPage = await leaderContext.newPage()
-    await leaderPage.goto(`/trips/${tripId}/float-plan`)
+    await leaderPage.goto(`/trips/float-plan/${tripId}`)
 
     // "View medical notes" button is visible for the crew member who shared their notes
     await expect(leaderPage.getByRole("button", { name: /view medical notes/i })).toBeVisible()

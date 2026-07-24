@@ -25,7 +25,7 @@ import { formatVesselLength } from "@/lib/user/format"
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-sm">
+    <div className="flex gap-2 text-base">
       <span className="text-muted-foreground w-36 shrink-0">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
@@ -36,7 +36,7 @@ function VesselBlock({ member }: { member: TripMember }) {
   const { vesselMake, vesselModel, vesselLengthCm, vesselColorPrimary, vesselColorSecondary } =
     member
   if (!vesselMake && !vesselModel && !vesselLengthCm && !vesselColorPrimary)
-    return <p className="text-muted-foreground text-sm italic">No vessel info recorded.</p>
+    return <p className="text-muted-foreground text-base italic">No vessel info recorded.</p>
   const colors = [vesselColorPrimary, vesselColorSecondary].filter(Boolean).join(" / ")
   return (
     <div className="flex flex-col gap-1">
@@ -53,7 +53,7 @@ function VesselBlock({ member }: { member: TripMember }) {
 function EmergencyBlock({ member }: { member: TripMember }) {
   const { emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = member
   if (!emergencyContactName && !emergencyContactPhone)
-    return <p className="text-muted-foreground text-sm italic">No emergency contact recorded.</p>
+    return <p className="text-muted-foreground text-base italic">No emergency contact recorded.</p>
   return (
     <div className="flex flex-col gap-1">
       <FieldRow label="Name" value={emergencyContactName} />
@@ -91,25 +91,25 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <UserIcon className="text-muted-foreground size-4 shrink-0" />
-          <span className="font-semibold">{fullName}</span>
+          <span className="text-lg font-semibold">{fullName}</span>
           {member.user.mail && (
-            <span className="text-muted-foreground text-xs">{member.user.mail}</span>
+            <span className="text-muted-foreground text-sm">{member.user.mail}</span>
           )}
         </div>
-        <span className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-[10px] font-semibold tracking-widest uppercase">
+        <span className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-xs font-semibold tracking-widest uppercase">
           {member.role}
         </span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+          <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
             Vessel
           </p>
           <VesselBlock member={member} />
         </div>
         <div>
-          <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+          <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
             Emergency Contact
           </p>
           <EmergencyBlock member={member} />
@@ -117,7 +117,7 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
       </div>
 
       <div>
-        <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">
+        <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
           Medical Notes
         </p>
         <MedicalNotesViewer
@@ -130,11 +130,11 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
       </div>
 
       {member.floatPlanConfirmedAt ? (
-        <p className="text-muted-foreground text-[10px]">
+        <p className="text-muted-foreground text-xs">
           Float plan confirmed {formatDayDate(member.floatPlanConfirmedAt)}
         </p>
       ) : (
-        <span className="self-start rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-amber-700 uppercase dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
+        <span className="self-start rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold tracking-[0.08em] text-amber-700 uppercase dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
           Not confirmed
         </span>
       )}

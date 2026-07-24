@@ -3,6 +3,7 @@ from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
 
 from sqlalchemy import UUID, Date, Integer, Numeric, ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel
@@ -32,6 +33,10 @@ class Log(BaseModel):
     trip_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey('trip.id', ondelete='SET NULL'), nullable=True, index=True
     )
+    # GeoJSON LineString of ordered position pings for the day (M8 §8.2), [lon, lat] pairs.
+    # Null for manual logs and stub auto-logs with no ping data.
+    route_geojson: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default='manual', server_default='manual')
 
     user_logs: Mapped[List["User"]] = relationship(back_populates='logs')
     trip: Mapped[Optional["Trip"]] = relationship()

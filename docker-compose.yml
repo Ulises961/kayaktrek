@@ -137,6 +137,7 @@ services:
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
@@ -171,6 +172,56 @@ services:
       retries: 5
       start_period: 10s
 
+  sse:
+    build:
+      context: ./backend
+      target: runtime
+    container_name: kayak_sse
+    ports:
+      - "127.0.0.1:5001:5000"
+    environment:
+      CONFIG_MODE: development
+      SERVICE_ROLE: sse
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
+      CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-kayak}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    healthcheck:
+      # Same probe as backend — the sidecar serves the whole Flask app (D1); routing
+      # via nginx/the reverse proxy is what isolates it to SSE routes, not the process.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   worker:
     build:
       context: ./backend
@@ -184,6 +235,7 @@ services:
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
@@ -192,6 +244,43 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-kayak}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: ./backend
+      target: runtime
+    container_name: kayak_beat
+    # --schedule points at /tmp — /app is owned by root (WORKDIR predates the
+    # Dockerfile's `useradd`/COPY --chown), so appuser can't create the
+    # persistent schedule DB file there.
+    command: celery -A celery_worker beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    environment:
+      CONFIG_MODE: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
+      CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       STORAGE_ENDPOINT: http://minio:9000
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:9000}
       STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-kayak}

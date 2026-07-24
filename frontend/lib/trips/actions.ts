@@ -98,6 +98,40 @@ export async function advanceState(tripId: string, targetState: string): Promise
   }
 }
 
+export async function pauseTrip(tripId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/pause`, {})
+    // The paused banner/timeline live in the layout-owned header.
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to pause trip." }
+  }
+}
+
+export async function resumeTrip(tripId: string, resumeDate?: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/resume`, resumeDate ? { resumeDate } : {})
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to resume trip." }
+  }
+}
+
+export async function abortTrip(tripId: string): Promise<TripActionResult> {
+  try {
+    await apiPost(`/api/trip/${tripId}/abort`, {})
+    revalidatePath("/trips/[id]", "layout")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to abort trip." }
+  }
+}
+
 export async function removeMember(tripId: string, userId: string): Promise<TripActionResult> {
   try {
     await apiDelete(`/api/trip/${tripId}/member/${userId}`)

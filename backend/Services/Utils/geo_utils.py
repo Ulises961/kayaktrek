@@ -9,3 +9,18 @@ def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return 2 * R_nm * math.asin(math.sqrt(a))
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two WGS-84 coordinates in kilometres.
+
+    `Log.distance` is stored in km (frontend converts to nm for display via
+    `toNm` — see `lib/itinerary/distance.ts`), unlike `Itinerary.total_miles`'s
+    nautical-mile convention above.
+    """
+    R_km = 6371.0088
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return 2 * R_km * math.asin(math.sqrt(a))

@@ -19,7 +19,7 @@ export async function upsertLogistics(
   try {
     await apiPut(`/api/logistics/${tripId}`, fields)
     revalidatePath(`/trips/${tripId}/logistics`)
-    revalidatePath(`/trips/${tripId}/float-plan`)
+    revalidatePath(`/trips/float-plan/${tripId}`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
@@ -33,7 +33,7 @@ export async function generateFloatPlanShare(
   try {
     const raw = await apiPost<unknown>(`/api/logistics/${tripId}/share`, {})
     const logistics = LogisticsSchema.parse(raw)
-    revalidatePath(`/trips/${tripId}/float-plan`)
+    revalidatePath(`/trips/float-plan/${tripId}`)
     return { success: true, logistics }
   } catch (e) {
     if (isRedirectError(e)) throw e

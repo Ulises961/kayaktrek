@@ -1,5 +1,6 @@
 "use server"
 
+import { cache } from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { API_URL, API_PREFIX } from "@/lib/api/config"
@@ -253,7 +254,15 @@ export async function logout() {
   redirect("/")
 }
 
-export async function refreshSession(): Promise<boolean> {
+// Refresh tokens are single-use and rotate on every exchange (M11 §2, ADR-032) — a second
+// exchange of the same not-yet-rotated token is indistinguishable, server-side, from theft
+// and revokes every session. A single page render fans out several concurrent apiFetch calls
+// (app layout's Promise.all, getPendingRequestsSummary's own Promise.all, the page's own
+// fetch) that all read the same access_token cookie, so once it expires they all 401 and would
+// otherwise each race to exchange the identical refresh_token cookie. Wrapping in cache()
+// (mirrors getMe(), lib/user/me.ts) makes every concurrent 401 within one request await the
+// same in-flight exchange instead of each consuming the refresh token independently.
+export const refreshSession = cache(async (): Promise<boolean> => {
   const cookieStore = await cookies()
   const refreshToken = cookieStore.get("refresh_token")?.value
   if (!refreshToken) return false
@@ -274,4 +283,4 @@ export async function refreshSession(): Promise<boolean> {
   const { access_token, refresh_token } = await res.json()
   await setAuthCookies(access_token, refresh_token)
   return true
-}
+})

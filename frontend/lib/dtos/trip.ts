@@ -38,6 +38,9 @@ export type TripSort = (typeof TRIP_SORT)[keyof typeof TRIP_SORT]
 export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
 export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]
 
+export const TRIP_OUTCOMES = ["completed", "interrupted"] as const
+export type TripOutcome = (typeof TRIP_OUTCOMES)[number]
+
 export const TRIP_DIFFICULTY_LABELS: Record<TripDifficulty, string> = {
   easy: "Easy",
   moderate: "Moderate",
@@ -57,6 +60,11 @@ export const TripSchema = z.object({
   itinerary: ItinerarySchema.nullish(),
   travellers: z.array(TripMemberSchema).nullish(),
   pendingTravellers: z.array(TravellerSchema).nullish(),
+  isPaused: z.boolean().nullish(),
+  pausedAt: z.string().nullish(),
+  outcome: z.enum(TRIP_OUTCOMES).nullish(),
+  lastCheckpointAlertAt: z.string().nullish(),
+  timezoneName: z.string().nullish(),
 })
 
 export const TripPageSchema = z.object({

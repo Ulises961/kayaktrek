@@ -24,6 +24,9 @@ export const LogSchema = z.object({
   // Derived projections — never sent on create/update.
   endorsementCount: z.number().int().min(0).nullish(),
   endorsers: z.array(EndorserSchema).nullish(),
+  // Set server-side only (M8 §8.2 ExpeditionLogService for auto-generated logs).
+  source: z.enum(["auto", "manual"]).nullish(),
+  routeGeojson: z.record(z.string(), z.unknown()).nullish(),
 })
 
 // Mirrors ExploreSort (lib/dtos/itinerary.ts) — one canonical date-sort convention

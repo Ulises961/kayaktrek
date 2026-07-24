@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation"
 import MapLoader from "@/components/map/map-loader"
+import { LiveStoryMap } from "@/components/story/live-story-map"
 import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { fetchStoryByToken } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { seasonOfDetail } from "@/lib/itinerary/season"
 import { getMe } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 
 // Unlisted trip-narrative share (M7d): reachable by anyone with the link, whether or
 // not the itinerary is also discoverable-public. Renders the same detail view as
@@ -20,11 +22,12 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
 
   const route = extractRouteData(detail)
   const season = seasonOfDetail(detail)
+  const isLive = detail.tripState === TRIP_STATE.HAPPENING
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <div className="relative min-w-0 flex-1">
-        <MapLoader routes={[route]} />
+        {isLive ? <LiveStoryMap token={token} routes={[route]} /> : <MapLoader routes={[route]} />}
       </div>
       <PublicRouteDetail
         route={route}

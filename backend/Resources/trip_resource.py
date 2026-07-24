@@ -1,3 +1,4 @@
+from datetime import date
 from http import HTTPStatus
 from typing import Any, Dict, cast
 from werkzeug.exceptions import HTTPException
@@ -175,6 +176,85 @@ def transition_state(id: str):
         raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip {id} not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/pause", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def pause_trip(id: str):
+    """
+    POST /api/trip/<id>/pause — Leader pauses a happening expedition.
+
+    Returns 200 with the updated trip, 409 if not happening or already paused.
+    """
+    try:
+        trip = TripService.pause_trip(id)
+        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/resume", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def resume_trip(id: str):
+    """
+    POST /api/trip/<id>/resume — Leader resumes a paused expedition.
+
+    Body: {"resumeDate"?: "YYYY-MM-DD"} — defaults to today. Every Day after the
+    pause date shifts forward by the resulting gap; date_to extends to match.
+    Returns 200 with the updated trip, 400 for a malformed date, 409 if not
+    paused or resumeDate precedes the pause date.
+    """
+    try:
+        body = request.get_json(silent=True) or {}
+        resume_date_raw = body.get("resumeDate")
+        try:
+            resume_date = date.fromisoformat(resume_date_raw) if resume_date_raw else None
+        except ValueError:
+            abort(HTTPStatus.BAD_REQUEST, description="resumeDate must be an ISO 8601 date")
+        trip = TripService.resume_trip(id, resume_date)
+        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@trip_api.route("/<string:id>/abort", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@require_leader()
+def abort_trip(id: str):
+    """
+    POST /api/trip/<id>/abort — Leader ends a paused expedition early.
+
+    Returns 200 with the updated trip (state=past, outcome=interrupted),
+    409 if the trip is not happening and paused.
+    """
+    try:
+        trip = TripService.abort_trip(id)
+        return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
+    except ValueError as e:
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except HTTPException:
+        raise
+    except NoResultFound as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

@@ -52,7 +52,9 @@ test.describe("Paddler connections", () => {
   })
 
   test("search → buddy request → accept → mutual buddies", async ({ page, browser }) => {
-    // Leader: find the crew member and send a buddy request.
+    // Leader: find the crew member and send a buddy request. Find and Buddies
+    // are merged into one page (M12 §N) — no tabs, the search box live-filters
+    // existing connections and (once non-empty) also searches the community.
     await page.goto("/paddlers")
     await page.getByRole("textbox", { name: /search paddlers/i }).fill(CREW.name)
     await expect(page.getByText(`@${CREW.username}`)).toBeVisible()
@@ -60,26 +62,21 @@ test.describe("Paddler connections", () => {
     // The action flips locally to Pending without a re-search.
     await expect(page.getByRole("button", { name: /pending/i })).toBeVisible()
 
-    // Crew: accept the incoming request from their Buddies tab.
+    // Crew: the incoming request shows directly on the merged page.
     const crewContext = await browser.newContext({ storageState: CREW_STORAGE })
     const crewPage = await crewContext.newPage()
     await crewPage.goto("/paddlers")
-    await crewPage.getByRole("tab", { name: /buddies/i }).click()
     await expect(crewPage.getByText(LEADER.name)).toBeVisible()
     await mutateAndSettle(
       crewPage,
       () => crewPage.getByRole("button", { name: /accept/i }).click(),
       { reload: true },
     )
-    // The /paddlers tabs are client state, so the settle reload lands back on
-    // "Find" — re-open Buddies before asserting.
-    await crewPage.getByRole("tab", { name: /buddies/i }).click()
     await expect(crewPage.getByRole("button", { name: /unfriend/i })).toBeVisible()
     await crewContext.close()
 
-    // Leader: the accepted buddy now shows under their Buddies tab.
+    // Leader: the accepted buddy now shows in the Buddies section.
     await page.goto("/paddlers")
-    await page.getByRole("tab", { name: /buddies/i }).click()
     await expect(page.getByText(CREW.name)).toBeVisible()
     await expect(page.getByRole("button", { name: /unfriend/i })).toBeVisible()
   })
@@ -100,13 +97,26 @@ test.describe("Paddler connections", () => {
     await expect(page.getByText(`@${CREW.username}`)).toBeVisible()
     await page.getByRole("button", { name: /more actions/i }).click()
     await page.getByRole("menuitem", { name: /block/i }).click()
-    // The card disappears once blocked.
-    await expect(page.getByText(`@${CREW.username}`)).not.toBeVisible()
+    // The card disappears once blocked. Assert on the overflow-menu button,
+    // not the "@username" text — the leader and crew are already buddies at
+    // this point, so the merged Find/Buddies page (M12 §N) renders the crew
+    // member's username twice (search card + Buddies row), which would make
+    // getByText(`@${CREW.username}`) strict-mode-ambiguous. "More actions"
+    // only exists on the search-result card.
+    await expect(page.getByRole("button", { name: /more actions/i })).not.toBeVisible()
 
-    // The buddy connection is gone and the crew member no longer surfaces in search.
-    await page.getByRole("tab", { name: /buddies/i }).click()
+    // The buddy connection is gone. Clear the search term first — the "no
+    // buddies match" empty-state text otherwise embeds CREW.name verbatim,
+    // which would make getByText(CREW.name) find a false positive.
+    await page.getByRole("textbox", { name: /search paddlers/i }).fill("")
     await expect(page.getByText(CREW.name)).not.toBeVisible()
-    await page.getByRole("tab", { name: /find/i }).click()
+    // Re-fill to force a fresh community search — the crew member no longer
+    // surfaces there either. Debounce is 300ms (lib/utils/debounce.ts) and
+    // resets on every keystroke, so an immediate re-fill right after clearing
+    // can collapse into a no-op (debouncedTerm never actually passes through
+    // "" — see useDebouncedValue) and the stale, still-1-item community
+    // result never re-fetches. Let the empty term settle first.
+    await page.waitForTimeout(400)
     await page.getByRole("textbox", { name: /search paddlers/i }).fill(CREW.name)
     await expect(page.getByText(/no paddlers found/i)).toBeVisible()
 

@@ -15,7 +15,7 @@ test("login → dashboard", async ({ page }) => {
 test("login with wrong password shows error", async ({ page }) => {
   await new LoginPage(page).goto()
   await page.getByLabel("Email").fill(LEADER.mail)
-  await page.getByLabel("Password").fill("WrongPassword1!")
+  await page.getByLabel("Password", { exact: true }).fill("WrongPassword1!")
   await page.getByRole("button", { name: "Sign in" }).click()
   await expect(page).toHaveURL(/login/)
   // Wait for button to re-enable (server responded), then check error

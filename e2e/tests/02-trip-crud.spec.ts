@@ -27,7 +27,9 @@ test.describe("Trip CRUD", () => {
     const url = page.url()
     createdTripId = url.split("/trips/")[1]
 
-    await expect(page.getByText("Lofoten Islands")).toBeVisible()
+    // getByText would be ambiguous — the destination also appears in the
+    // breadcrumb, not just the page heading.
+    await expect(page.getByRole("heading", { name: "Lofoten Islands" })).toBeVisible()
   })
 
   test("edit trip destination via PATCH", async ({ page }) => {
@@ -39,15 +41,17 @@ test.describe("Trip CRUD", () => {
     await page.waitForURL(/\/trips\/[0-9a-f-]+$/)
     createdTripId = page.url().split("/trips/")[1]
 
-    // Edit destination inline
+    // Edit destination inline. Locate by label, not placeholder — the
+    // create-trip dialog and the edit-trip form use different placeholder
+    // text for the same "Destination" field.
     await page.getByRole("button", { name: /edit trip/i }).click()
-    const destInput = page.getByPlaceholder("Destination")
+    const destInput = page.getByLabel("Destination")
     await destInput.fill("Faroe Islands")
     await mutateAndSettle(page, () => page.getByRole("button", { name: /save/i }).click(), {
       reload: true,
     })
 
-    await expect(page.getByText("Faroe Islands")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Faroe Islands" })).toBeVisible()
   })
 
   test("created trip shows leader as traveller", async ({ page }) => {

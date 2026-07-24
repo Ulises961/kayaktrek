@@ -23,6 +23,10 @@ class LogSchema(BaseSchema):
     user_id = fields.UUID(dump_only=True)
     # The trip this log documents — loadable (optional) and the endorsement key.
     trip_id = fields.UUID(allow_none=True, load_default=None)
+    # Set server-side only: ExpeditionLogService for auto-generated logs (M8 §8.2),
+    # defaulted 'manual' at the model layer otherwise.
+    route_geojson = fields.Raw(dump_only=True, allow_none=True)
+    source = fields.String(dump_only=True)
     # Derived projections — never stored. endorsers is shallow on purpose (no rank/cert fields):
     # endorsement is flat factual attestation, not a rank broadcast.
     endorsement_count = fields.Method("get_endorsement_count", dump_only=True)

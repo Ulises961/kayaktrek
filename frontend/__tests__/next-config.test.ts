@@ -20,10 +20,10 @@ describe("next.config headers", () => {
     expect(headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin")
   })
 
-  it("denies geolocation, camera, and microphone via Permissions-Policy", async () => {
+  it("allows geolocation for our own origin (M8 Navigate mode) but denies camera and microphone", async () => {
     const headers = await headerMap()
 
-    expect(headers["Permissions-Policy"]).toContain("geolocation=()")
+    expect(headers["Permissions-Policy"]).toContain("geolocation=(self)")
     expect(headers["Permissions-Policy"]).toContain("camera=()")
     expect(headers["Permissions-Policy"]).toContain("microphone=()")
   })

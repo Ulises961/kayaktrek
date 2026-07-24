@@ -2,19 +2,31 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { AnchorIcon, MapPinIcon, PackageIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
+import {
+  AnchorIcon,
+  MapPinIcon,
+  PackageIcon,
+  RadioTowerIcon,
+  ShieldAlertIcon,
+  UsersIcon,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface TripDetailNavProps {
   tripId: string
   /** Only current trip members have their own vessel/emergency/medical info to edit. */
   showFloatPlan: boolean
+  /** Set only while the trip is happening and the caller is a member (M8 Navigate
+   * mode). Points at /itinerary/<id>?navigate=1 — outside /trips/<id>/…, so it's
+   * an outbound link and deliberately never active-matches like the other tabs. */
+  liveHref?: string
 }
 
-export function TripDetailNav({ tripId, showFloatPlan }: TripDetailNavProps) {
+export function TripDetailNav({ tripId, showFloatPlan, liveHref }: TripDetailNavProps) {
   const pathname = usePathname()
 
   const items = [
+    ...(liveHref ? [{ href: liveHref, label: "Live", icon: RadioTowerIcon }] : []),
     { href: `/trips/${tripId}`, label: "Itinerary", icon: MapPinIcon },
     { href: `/trips/${tripId}/crew`, label: "Crew", icon: UsersIcon },
     ...(showFloatPlan

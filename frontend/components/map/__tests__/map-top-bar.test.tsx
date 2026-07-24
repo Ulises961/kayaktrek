@@ -178,3 +178,35 @@ describe("MapTopBar — View/Edit segmented control", () => {
     expect(onToggleViewMode).not.toHaveBeenCalled()
   })
 })
+
+describe("MapTopBar — Navigate segment", () => {
+  it("is hidden by default", () => {
+    render(<MapTopBar {...BASE_PROPS} />)
+    expect(screen.queryByRole("button", { name: "Navigate" })).not.toBeInTheDocument()
+  })
+
+  it("is visible when showNavigate is true", () => {
+    render(<MapTopBar {...BASE_PROPS} showNavigate={true} />)
+    expect(screen.getByRole("button", { name: "Navigate" })).toBeInTheDocument()
+  })
+
+  it("marks Navigate as pressed when navigateMode is true", () => {
+    render(<MapTopBar {...BASE_PROPS} showNavigate={true} navigateMode={true} />)
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("marks Navigate as not pressed when navigateMode is false", () => {
+    render(<MapTopBar {...BASE_PROPS} showNavigate={true} navigateMode={false} />)
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    )
+  })
+
+  it("calls onToggleNavigate when Navigate is clicked", async () => {
+    const onToggleNavigate = vi.fn()
+    render(<MapTopBar {...BASE_PROPS} showNavigate={true} onToggleNavigate={onToggleNavigate} />)
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    expect(onToggleNavigate).toHaveBeenCalledOnce()
+  })
+})

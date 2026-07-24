@@ -15,6 +15,7 @@ import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { fieldLabelClass } from "@/components/common/form-field"
 import { AdvanceStateButton } from "@/components/trips/advance-state-button"
+import { PauseControls } from "@/components/trips/pause-controls"
 import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
 import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { LeaveTripButton } from "@/components/trips/leave-trip-button"
@@ -145,9 +146,9 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
       </div>
 
       {hasDetails && (
-        <Accordion type="single" collapsible>
+        <Accordion type="single" collapsible defaultValue="details">
           <AccordionItem value="details" className="border-none">
-            <AccordionTrigger className="text-muted-foreground w-fit gap-1.5 py-1 text-xs hover:no-underline">
+            <AccordionTrigger className="text-muted-foreground w-fit flex-none justify-start gap-1.5 py-1 text-sm font-medium hover:no-underline">
               Details
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-4 pt-1 pb-2">
@@ -170,6 +171,7 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
                     <span className={fieldLabelClass}>Trip progression</span>
                     <StateTimeline currentState={trip.state} />
                     <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
+                    <PauseControls trip={trip} isLeader={isLeader} />
                   </div>
                 </>
               )}
@@ -180,7 +182,7 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
                   <div className="flex flex-col gap-2">
                     <span className={fieldLabelClass}>Share &amp; print</span>
                     <Button variant="outline" size="sm" className="w-fit" asChild>
-                      <Link href={`/trips/${trip.id}/float-plan`}>
+                      <Link href={`/trips/float-plan/${trip.id}`}>
                         <AnchorIcon className="size-3.5" />
                         Printable float plan
                       </Link>

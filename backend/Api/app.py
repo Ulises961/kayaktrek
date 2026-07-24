@@ -12,6 +12,7 @@ from Api.database import db
 from Api.limiter import limiter
 from Api.mail import mail
 from Api.logging_config import setup_logging
+from Api.observability import setup_logfire
 from Api.error_handlers import register_error_handlers
 from Api.seed import seed_item_categories, seed_place_categories, seed_demo_itinerary
 from Api.celery_app import init_celery
@@ -43,12 +44,15 @@ from Resources.block_resource import block_api
 from Resources.endorsement_request_resource import endorsement_request_api
 from Resources.dev_resource import dev_api
 from Resources.health_resource import health_api
+from Resources.tile_resource import tile_api
+from Resources.live_resource import live_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
 from Models.travel_document import TravelDocument  # noqa: F401
 from Models.shuttle_vehicle import ShuttleVehicle  # noqa: F401
 from Models.shuttle_passenger import ShuttlePassenger  # noqa: F401
+from Models.position_ping import PositionPing  # noqa: F401
 
 
 def createApp(config_mode: str, *, schema: str | None = None):
@@ -70,17 +74,6 @@ def createApp(config_mode: str, *, schema: str | None = None):
     )
     # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
-
-    # Rate limiting (Api/limiter.py) keys on the peer address; behind a reverse proxy every
-    # request otherwise arrives from the proxy's IP, either throttling every client together
-    # or, if X-Forwarded-For were trusted blindly, becoming spoofable. Off by default (0 hops)
-    # so local/dev/direct-exposure setups are unaffected; a deploy behind N proxies sets
-    # PROXY_TRUSTED_HOPS=N deliberately (M11 §4).
-    trusted_hops = int(os.environ.get("PROXY_TRUSTED_HOPS", "0"))
-    if trusted_hops > 0:
-        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
-            app.wsgi_app, x_for=trusted_hops, x_proto=trusted_hops, x_host=trusted_hops
-        )
 
     if schema:
         engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
@@ -114,6 +107,8 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(endorsement_request_api)
     app.register_blueprint(dev_api)
     app.register_blueprint(health_api)
+    app.register_blueprint(tile_api)
+    app.register_blueprint(live_api)
 
     db.init_app(app)
     mail.init_app(app)
@@ -137,6 +132,20 @@ def createApp(config_mode: str, *, schema: str | None = None):
 
     # Configure logging
     setup_logging(app)
+    setup_logfire(app, config_mode)
+
+    # Rate limiting (Api/limiter.py) keys on the peer address; behind a reverse proxy every
+    # request otherwise arrives from the proxy's IP, either throttling every client together
+    # or, if X-Forwarded-For were trusted blindly, becoming spoofable. Off by default (0 hops)
+    # so local/dev/direct-exposure setups are unaffected; a deploy behind N proxies sets
+    # PROXY_TRUSTED_HOPS=N deliberately (M11 §4). Applied after setup_logfire() so ProxyFix
+    # is the outermost WSGI layer — it must resolve the real client IP before the OTel
+    # instrumentation wrapped around app.wsgi_app tags spans with it.
+    trusted_hops = int(os.environ.get("PROXY_TRUSTED_HOPS", "0"))
+    if trusted_hops > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=trusted_hops, x_proto=trusted_hops, x_host=trusted_hops
+        )
 
     @app.before_request
     def attach_request_id():

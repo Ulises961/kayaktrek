@@ -98,7 +98,7 @@ describe("updateMyFloatPlan", () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await updateMyFloatPlan(TRIP_ID, FLOAT_PLAN_FIELDS)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/float-plan/${TRIP_ID}`)
   })
 
   it("returns success: true on success", async () => {

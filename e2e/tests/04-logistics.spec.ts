@@ -18,8 +18,8 @@ test.describe("Logistics — shore contact and float plan", () => {
   })
 
   test("leader sets shore contact on float plan page", async ({ page }) => {
-    // Shore contact lives on the printable /trips/:id/float-plan page, not the logistics segment
-    await page.goto(`/trips/${tripId}/float-plan`)
+    // Shore contact lives on the printable /trips/float-plan/:id page, not the logistics segment
+    await page.goto(`/trips/float-plan/${tripId}`)
 
     await page.getByRole("button", { name: "Edit", exact: true }).click()
     await page.getByLabel(/name/i).fill("Alice Shore")
@@ -38,7 +38,7 @@ test.describe("Logistics — shore contact and float plan", () => {
   })
 
   test("leader generates float plan share link", async ({ page }) => {
-    await page.goto(`/trips/${tripId}/float-plan`)
+    await page.goto(`/trips/float-plan/${tripId}`)
     await page.getByRole("button", { name: /generate float plan link/i }).click()
     await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible()
     await expect(page.getByText(/last generated/i)).toBeVisible()

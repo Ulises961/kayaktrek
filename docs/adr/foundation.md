@@ -89,8 +89,74 @@ Redis DB allocations are fixed to prevent cross-contamination:
 | 0 | `flask-limiter` rate limit counters |
 | 1 | `Flask-Caching` application cache (OpenMeteo responses, POI queries — 6h TTL) |
 | 2 | Celery result backend |
+| 3 | Live-position pub/sub (M8, ADR-033) — channel `live:trip:<trip_id>`, ephemeral only |
 
-Adding a fourth use requires a conscious allocation decision, not a default.
+Adding a fifth use requires a conscious allocation decision, not a default.
+
+### SSE streaming — hybrid Flask-gevent sidecar (M8, ADR-033)
+
+**Context.** M8's live position sharing needs a server→browser push channel. Gunicorn's sync
+workers cannot serve it: each sync worker blocks for the full life of a request, so two workers
+means two concurrent streams total, and `--timeout 120` kills anything longer. The worker-class
+decision was deliberately deferred from M11 to M8 planning (see the 2026-07-04 site evaluation
+and `plans/M11.md`); this entry is that decision.
+
+**Transport: SSE, not WebSockets and not polling.** Position broadcast is strictly
+one-directional (server→viewer; ingestion is ordinary `POST`s), lossy-by-design, and
+low-frequency. `EventSource` gives auto-reconnect for free, rides plain HTTP through every proxy,
+and needs no new protocol or framing library. WebSockets would buy bidirectionality nobody needs
+at the cost of flask-sock + a heavier ops surface; polling wastes the battery of the one device
+we care about (the paddler's phone).
+
+**Serving: a sidecar running the existing Flask app — not gevent-everywhere, not a new async
+app.** Options ranked: **hybrid Flask-gevent sidecar > gevent-everywhere > async (ASGI) sidecar**.
+The chosen shape is the Celery pattern applied to HTTP: a second gunicorn instance from the
+**same image and codebase**, whose only differences are `--worker-class gevent` and being routed
+only the stream traffic — path-routed at the proxy (`/api/v1/live/*` stream endpoints → sidecar,
+everything else → the sync backend). This gets:
+
+- **No duplicated logic** — `JWTService`, share-token validation, trip-state checks reused
+  verbatim; one app factory, one test suite, one deploy artifact.
+- **No second paradigm** — still Flask/WSGI; an ASGI sidecar would mean a parallel framework
+  for a handful of endpoints.
+- **Monkey-patching quarantined** — the main API stays sync and unpatched; gevent's risks apply
+  only to the streaming process, whose endpoints are **I/O-thin by rule**: subscribe to Redis,
+  write events; no bcrypt, no heavy ORM work. The sidecar boots via a dedicated entry module
+  (`wsgi_sse.py`) whose first statements are `gevent.monkey.patch_all()` and psycogreen's
+  `patch_psycopg()` (the driver is C-extension `psycopg2`, which would otherwise block the event
+  loop) — a structural split, not an env-guard in the shared `wsgi.py`, so patching cannot leak
+  into the main service. Container role is selected by `SERVICE_ROLE=sse` in `entrypoint.sh`.
+- Gunicorn `--timeout` is safe to keep on the sidecar: async workers heartbeat to the arbiter
+  from the event loop independent of in-flight request duration, so long-lived streams survive
+  while a genuinely wedged loop is still caught.
+
+**Acknowledged cost** (the price of any sidecar): second-ingress work — dev/prod routing, CSP
+`connect-src`, proxy buffering (`X-Accel-Buffering: no`, flush semantics). **Recorded fallback:**
+if the second ingress proves annoying in the deploy target, gevent-everywhere (one patched
+service) is the sanctioned retreat — same code, remove the routing split.
+
+**Stream auth — short-lived stream ticket, with a header path reserved for native clients.**
+`EventSource` cannot send an `Authorization` header, and JWTs live in httpOnly cookies on the
+*Next.js* origin — a direct browser→Flask `EventSource` carries neither. Public story streams
+need no auth (unlisted token in the path, same no-oracle 404 contract as the float-plan link).
+Crew in-app streams (web) use a **stream ticket**: the authed main API mints a ~5-minute JWT
+(existing `JWT_SECRET_KEY`, claims `{purpose: "live-stream", tripId, exp}` — the `purpose` claim
+rejects replayed access tokens), passed as a query parameter and verified by the sidecar.
+Proxying SSE through a Next route handler was rejected: it adds a buffering-prone streaming hop
+to hide a token that expires in minutes anyway.
+
+The ticket is a workaround for a *browser* limitation, not the general contract. The crew
+stream route also accepts a normal `Authorization: Bearer` header as an alternative credential,
+checked first, ticket checked second. Nothing in the web client uses this today, but React
+Native (M9) has no `EventSource` constraint — it makes real HTTP requests and already stores its
+access token in `expo-secure-store` (`docs/adr/mobile-offline.md`) — so it authenticates the
+stream exactly like every other API call once it exists. Reserved at M8 build time rather than
+retrofitted at M9 build time.
+
+**Future rider.** Lightweight real-time trip-collaboration notifications ("member added an
+item", "date changed" — cache-invalidation + presence broadcast, not Google-Docs-style merge)
+ride this same Redis pub/sub → SSE mechanism and sidecar when scheduled; surfaced during M11,
+recorded here so the infra decision is made once.
 
 ---
 
@@ -281,9 +347,11 @@ lands as one coordinated PR.
 | RabbitMQ / Redis / Celery | ADR-007 | 2025-01-01 | Fixed Redis DB allocation |
 | Structured JSON logging | ADR-010 | 2025-10-01 | Extended by Logfire (ADR-009) when OTel lands |
 | Logfire for observability | ADR-009 | 2026-05-09 | Proposed — replaces manual OTel+Grafana plan |
+| Logfire base wiring | ADR-009 | 2026-07-24 | `LOGFIRE_TOKEN` env var; `Api/observability.py` `setup_logfire()` called from `createApp()` — `logfire.configure(send_to_logfire="if-token-present", console=False)` + `instrument_flask`/`instrument_sqlalchemy`/`instrument_celery`. No-ops cleanly without a token (CI/tests unaffected). `RequestContextFilter` now also injects `trace_id`/`span_id` from the active OTel span into `JsonFormatter` output. ProxyFix must wrap `app.wsgi_app` *after* `setup_logfire()` so it stays the outermost WSGI layer (resolves real client IP before OTel tags spans with it). Frontend browser SDK and Sentry are still open — deferred to when e2e data collection is finished |
 | Thin resources / service layer | ADR-014 | 2025-01-01 | — |
 | Self-hosted architecture | ADR-016 | 2026-05-09 | Logfire is the only managed exception |
 | Static type checking with mypy | ADR-029 | 2026-06-19 | Gradual, layer-by-layer; for correctness/tooling not perf; `TYPE_CHECKING` `Base` shim for `db.Model` |
 | E2E backend mirrors prod concurrency (gunicorn, not `flask run`) | ADR-030 | 2026-06-22 | Single-threaded dev server serialized the 7-call trip-detail fan-out → flaky post-mutation assertions; M6b's +2 calls tipped it over. Full revalidation breadth stays (member-removal cascades); fix is concurrency, not caching. Aggregate `/api/trip/:id/detail` tracked separately |
 | API versioning — URL-path `/api/v1` | ADR-031 | 2026-06-26 | Hard-cut all routes to `/api/v1` before mobile/PWA-offline clients ship (independently-deployed → need versioning); URL-path over header negotiation; frontend versions centrally in `apiFetch` (callers unchanged); v2 will be a parallel blueprint set, not an in-place rewrite |
+| SSE via hybrid Flask-gevent sidecar (M8) | ADR-033 | 2026-07-17 | Ranked hybrid sidecar > gevent-everywhere (recorded fallback) > ASGI sidecar. Same image, Celery-style second gunicorn (`SERVICE_ROLE=sse`, `--worker-class gevent`, dedicated `wsgi_sse.py` with monkey-patch + psycogreen quarantined to it); proxy path-routes `/api/v1/live/*` streams to it. Stream endpoints I/O-thin by rule. Crew stream auth = short-lived `purpose:"live-stream"` JWT ticket minted by the main API (EventSource can't send headers; cookies live on the Next origin), route also accepts a plain `Authorization` header (checked first) so M9's React Native client — no `EventSource` constraint, token already in `expo-secure-store` — authenticates the same as any other API call without a later route change. Redis db/3 allocated for `live:trip:<id>` pub/sub. Future rider: trip-collab notifications over the same path |
 | Production hardening scoped as M11 | ADR-032 | 2026-07-04 | 2026-07-04 site evaluation remediation crystallized in `plans/M11.md`: refresh rotation + reuse detection on `token_version` (no server-side token store); security headers in Next.js not Flask; honest CI (blocking lint, `next build`, migration run + drift check, Dependabot/audits); seeding out of app factory; bucket provisioning to `minio-init`; ProxyFix at deploy; OpenAPI deferred to M9 prerequisite |

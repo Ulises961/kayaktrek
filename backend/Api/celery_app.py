@@ -19,6 +19,7 @@ import logging
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import after_setup_logger
 from dotenv import load_dotenv
 from kombu.transport.pyamqp import Transport as _AMQPTransport
@@ -40,6 +41,8 @@ celery_app = Celery(
         "Tasks.erasure",
         "Tasks.weather_fetch_task",
         "Tasks.weather_beat_task",
+        "Tasks.checkpoint_beat_task",
+        "Tasks.expedition_log_task",
     ],
 )
 
@@ -58,6 +61,14 @@ celery_app.conf.update(
         "weather-refresh": {
             "task": "Tasks.weather_beat_task.refresh_upcoming_weather",
             "schedule": 86400,
+        },
+        "checkpoint-alerts": {
+            "task": "Tasks.checkpoint_beat_task.check_missed_checkpoints",
+            "schedule": crontab(minute=0),
+        },
+        "nightly-log-fallback": {
+            "task": "Tasks.expedition_log_task.nightly_log_fallback",
+            "schedule": crontab(minute=30, hour=0),
         },
     },
 )

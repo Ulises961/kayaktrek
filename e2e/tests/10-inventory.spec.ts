@@ -94,15 +94,19 @@ test.describe("Trip inventory — requirements & authorship", () => {
     await expect(crewPage.getByRole("button", { name: `Remove ${REQ}` })).toHaveCount(0)
     await crewContext.close()
 
-    // Proposer (leader) removes it. Removal goes through a window.confirm().
-    page.on("dialog", (d) => d.accept())
+    // Proposer (leader) removes it. Removal goes through an AlertDialog
+    // confirm step, not a native window.confirm().
     await page.goto(`/trips/${tripId}/items`)
+    await page.getByRole("button", { name: `Remove ${REQ}` }).click()
     // Since M6b, defaults seed at trip-creation/member-join only — a reload
     // does NOT re-seed the removed requirement (the pre-M6b re-seed-on-read
     // behaviour this test used to dodge is gone).
-    await mutateAndSettle(page, () => page.getByRole("button", { name: `Remove ${REQ}` }).click(), {
-      reload: true,
-    })
+    await mutateAndSettle(
+      page,
+      () =>
+        page.getByRole("alertdialog").getByRole("button", { name: "Remove", exact: true }).click(),
+      { reload: true },
+    )
     await expect(page.locator("li").filter({ hasText: REQ })).toHaveCount(0)
   })
 

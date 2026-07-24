@@ -141,6 +141,21 @@
   --state-past-bg: oklch(0.899 0.012 248);
   --state-past-fg: oklch(0.48 0.018 248);
 
+  /* Toast severity tokens (sonner richColors) — punchier than the pale
+     .auth-notice-* variants, since a toast needs to read at a glance. */
+  --toast-success-bg: oklch(0.924 0.085 155);
+  --toast-success-border: oklch(0.78 0.12 155);
+  --toast-success-text: oklch(0.33 0.115 155);
+  --toast-warning-bg: oklch(0.93 0.09 75);
+  --toast-warning-border: oklch(0.8 0.13 75);
+  --toast-warning-text: oklch(0.4 0.15 75);
+  --toast-error-bg: oklch(0.93 0.09 27.325);
+  --toast-error-border: oklch(0.75 0.16 27.325);
+  --toast-error-text: oklch(0.4 0.2 27.325);
+  --toast-info-bg: oklch(0.924 0.07 240);
+  --toast-info-border: oklch(0.78 0.11 240);
+  --toast-info-text: oklch(0.38 0.16 243);
+
   /* Surface layers — v1 baseline */
   --surface-1: oklch(1 0 0); /* pure white — card top */
   --surface-2: oklch(0.965 0.006 90); /* warm mid layer */
@@ -218,6 +233,20 @@
   --state-happening-fg: oklch(0.72 0.14 155);
   --state-past-bg: oklch(0.245 0.016 248);
   --state-past-fg: oklch(0.56 0.014 248);
+
+  /* Toast severity tokens (sonner richColors) */
+  --toast-success-bg: oklch(0.245 0.08 155);
+  --toast-success-border: oklch(0.42 0.11 155);
+  --toast-success-text: oklch(0.78 0.14 155);
+  --toast-warning-bg: oklch(0.26 0.075 75);
+  --toast-warning-border: oklch(0.44 0.1 75);
+  --toast-warning-text: oklch(0.82 0.15 75);
+  --toast-error-bg: oklch(0.28 0.09 27.325);
+  --toast-error-border: oklch(0.46 0.14 27.325);
+  --toast-error-text: oklch(0.78 0.18 27.325);
+  --toast-info-bg: oklch(0.265 0.068 243);
+  --toast-info-border: oklch(0.44 0.1 225);
+  --toast-info-text: oklch(0.75 0.13 225);
 
   /* Surface layers / foam / soft — dark v1 baseline */
   --surface-1: oklch(0.19 0.044 247);
@@ -459,6 +488,15 @@
   .fp-crew-card {
     page-break-inside: avoid;
     border-color: #ccc !important;
+  }
+
+  /* Float plan sections stay fully expanded on print regardless of their
+     on-screen collapsed state (components/trips/float-plan-section.tsx) — a
+     printed safety document should never hide content behind a toggle. */
+  [data-slot="collapsible-content"] {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 }
 

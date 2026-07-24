@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from typing import Literal
 
 import boto3
@@ -231,3 +232,26 @@ class StorageService:
             logger.info("Deleted export %s", object_key)
         except ClientError as e:
             logger.warning("Could not delete export %s: %s", object_key, e)
+
+    # -- Generic object access (M8 tile cache) ---------------------------------
+    # No kind/prefix indirection: callers pass the full key (e.g. `tiles/osm/3/4/2.png`).
+
+    @staticmethod
+    def get_object_with_age(key: str) -> tuple[bytes, datetime] | None:
+        """Return (bytes, last_modified) for a raw object key, or None if absent."""
+        client = _client()
+        try:
+            obj = client.get_object(Bucket=_BUCKET, Key=key)
+            return obj["Body"].read(), obj["LastModified"]
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+                return None
+            raise
+
+    @staticmethod
+    def put_object(key: str, data: bytes, content_type: str) -> None:
+        """Store a raw object at an arbitrary key. No MIME/size validation —
+        the caller (e.g. the tile proxy) already trusts the upstream source."""
+        client = _client()
+        client.put_object(Bucket=_BUCKET, Key=key, Body=data, ContentType=content_type)
+        logger.info("Uploaded object %s (%d bytes, %s)", key, len(data), content_type)

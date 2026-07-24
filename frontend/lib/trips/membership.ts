@@ -11,8 +11,9 @@ export type Membership = {
 }
 
 // The leader/crew/anonymous derivation every trip-detail route segment needs —
-// was duplicated independently in trips/[id]/page.tsx and
-// trips/[id]/float-plan/page.tsx before the route-segment refactor (M12 §R).
+// was duplicated independently in trips/[id]/page.tsx and the printable float
+// plan page (trips/float-plan/[id]/page.tsx) before the route-segment
+// refactor (M12 §R).
 export function deriveMembership(trip: Trip, session: Session | null): Membership {
   const travellers = trip.travellers ?? []
   const leader = travellers.find((m) => m.role === MEMBER_ROLE.LEADER)

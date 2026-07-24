@@ -3,9 +3,10 @@ import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { getMe } from "@/lib/user/me"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
-import { TripSchema } from "@/lib/dtos/trip"
+import { TripSchema, TRIP_STATE } from "@/lib/dtos/trip"
 import type { TripState } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
+import { deriveMembership } from "@/lib/trips/membership"
 import { MapBuilder } from "@/components/map/map-builder"
 
 export default async function ItineraryBuilderPage({
@@ -28,6 +29,7 @@ export default async function ItineraryBuilderPage({
   let tripDateTo: string | null = null
   let tripState: TripState | null = null
   let isLeader = true
+  let showNavigate = false
 
   const me = await getMe()
   const initialDistanceUnit = me?.unitPreference ?? DISTANCE_UNIT.NM
@@ -42,11 +44,9 @@ export default async function ItineraryBuilderPage({
       tripState = trip.state ?? null
 
       const session = await getSession()
-      if (session) {
-        const travellers = trip.travellers ?? []
-        const leaderMember = travellers.find((m) => m.role === "leader")
-        isLeader = !!leaderMember && leaderMember.user.id === session.userId
-      }
+      const membership = deriveMembership(trip, session)
+      isLeader = membership.isLeader
+      showNavigate = membership.isMember && tripState === TRIP_STATE.HAPPENING
     } catch {
       // fall back to defaults
     }
@@ -61,6 +61,7 @@ export default async function ItineraryBuilderPage({
       tripDateTo={tripDateTo}
       tripState={tripState}
       isLeader={isLeader}
+      showNavigate={showNavigate}
       initialDistanceUnit={initialDistanceUnit}
     />
   )

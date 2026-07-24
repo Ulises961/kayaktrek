@@ -20,6 +20,8 @@ import { TidalDiamondForm } from "./tidal-diamond-form"
 import { PlaceMarker } from "./place-marker"
 import { PlaceForm } from "./place-form"
 import { MapAddControl } from "./map-add-control"
+import { LivePositionLayer } from "./live-position-layer"
+import type { LivePosition } from "@/lib/dtos/live-position"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   fetchWindVectors,
@@ -41,6 +43,12 @@ import {
   deletePlace,
 } from "@/lib/places/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
+import {
+  OSM_TILE_URL,
+  SEAMARK_TILE_URL,
+  OSM_ATTRIBUTION,
+  SEAMARK_ATTRIBUTION,
+} from "@/lib/map/tiles"
 import {
   diamondEditToFormValues,
   type TidalDiamond,
@@ -78,6 +86,9 @@ export type MapCoreProps = {
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
+  // Crew positions broadcast during Navigate mode (M8). Absent/empty outside a
+  // happening trip — MapBuilder only ever populates this while navigateMode is on.
+  livePositions?: LivePosition[]
 }
 
 // Module-level constants so options objects are stable across renders.
@@ -357,6 +368,7 @@ export default function MapCore({
   onMarkerDragEnd,
   onMarkerDragMove,
   onMarkerClick,
+  livePositions = [],
 }: MapCoreProps) {
   const [dragState, setDragState] = useState<DragState | null>(null)
 
@@ -688,17 +700,11 @@ export default function MapCore({
       )}
     >
       <MapContainer center={[43, 13]} zoom={9} className="h-full w-full" zoomControl>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
         {/* OpenSeaMap seamark overlay — transparent nautical chart tiles (buoys, beacons,
             depth/seamark data) layered over the OSM base. Default-on: go/no-go relevant
             for kayak planning. Decided in docs/adr/itinerary-frontend.md. */}
-        <TileLayer
-          attribution='Seamarks &copy; <a href="https://www.openseamap.org">OpenSeaMap</a>'
-          url="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
-        />
+        <TileLayer attribution={SEAMARK_ATTRIBUTION} url={SEAMARK_TILE_URL} />
 
         {/* Nautical-chart furniture — a real lat/lon graticule and a scale bar,
             reused from the landing chart (M5b). Always on: an operational chart.
@@ -802,6 +808,8 @@ export default function MapCore({
             interactive={false}
           />
         )}
+
+        <LivePositionLayer positions={livePositions} />
       </MapContainer>
 
       {(selectedDayId || hasPlaces) && (

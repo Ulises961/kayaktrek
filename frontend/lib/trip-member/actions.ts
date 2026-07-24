@@ -43,7 +43,7 @@ export async function updateMyFloatPlan(
     })
     // The own-editing segment plus the leader-facing printable plan (crew manifest).
     revalidatePath(`/trips/${tripId}/my-float-plan`)
-    revalidatePath(`/trips/${tripId}/float-plan`)
+    revalidatePath(`/trips/float-plan/${tripId}`)
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

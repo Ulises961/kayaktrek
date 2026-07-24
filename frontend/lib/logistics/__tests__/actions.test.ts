@@ -57,7 +57,7 @@ describe("upsertLogistics", () => {
     vi.mocked(apiPut).mockResolvedValue(LOGISTICS_FIXTURE)
     await upsertLogistics(TRIP_ID, {})
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/float-plan`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/float-plan/${TRIP_ID}`)
   })
 
   it("returns success: true on success", async () => {

@@ -20,6 +20,11 @@ type MapTopBarProps = {
   onToggleViewMode?: () => void
   isLeader?: boolean
   tripState?: TripState | null
+  // Navigate is a member-facing overlay state (M8), not part of the leader-only
+  // View/Edit toggle — off by default so it never appears outside a happening trip.
+  showNavigate?: boolean
+  navigateMode?: boolean
+  onToggleNavigate?: () => void
 }
 
 export function MapTopBar({
@@ -36,6 +41,9 @@ export function MapTopBar({
   onToggleViewMode = () => {},
   isLeader = true,
   tripState = null,
+  showNavigate = false,
+  navigateMode = false,
+  onToggleNavigate = () => {},
 }: MapTopBarProps) {
   const canEdit = isLeader && tripState !== TRIP_STATE.PAST
   const editDisabled = viewMode && !canEdit
@@ -96,6 +104,21 @@ export function MapTopBar({
       >
         Edit
       </button>
+      {showNavigate && (
+        <button
+          type="button"
+          aria-pressed={navigateMode}
+          onClick={onToggleNavigate}
+          className={cn(
+            "border-border border-l px-2.5 py-1 font-medium transition-colors",
+            navigateMode
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted",
+          )}
+        >
+          Navigate
+        </button>
+      )}
     </div>
   )
 

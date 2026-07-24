@@ -1,5 +1,5 @@
 from marshmallow import fields, post_load, pre_load, validates, validates_schema, ValidationError
-from Models.trip import Trip, TripDifficultyType, TripStateType
+from Models.trip import Trip, TripDifficultyType, TripOutcomeType, TripStateType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.itinerary_schema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
@@ -34,6 +34,11 @@ class TripSchema(BaseSchema):
     destination = fields.String(allow_none=True)
     date_from = fields.Date(allow_none=True)
     date_to = fields.Date(allow_none=True)
+    is_paused = fields.Boolean(dump_only=True)
+    paused_at = fields.Date(dump_only=True, allow_none=True)
+    outcome = fields.Enum(TripOutcomeType, by_value=True, dump_only=True, allow_none=True)
+    last_checkpoint_alert_at = fields.DateTime(dump_only=True, allow_none=True)
+    timezone_name = fields.String(dump_only=True, allow_none=True)
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):

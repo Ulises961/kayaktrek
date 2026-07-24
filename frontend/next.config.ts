@@ -5,12 +5,18 @@ import type { NextConfig } from "next"
 // for the enforcing, nonced Content-Security-Policy.
 
 const nextConfig: NextConfig = {
+  // Lets a second `next build`/`next start` run (e.g. e2e/run-live-stack.sh) target its
+  // own build output instead of the one your normal `pnpm dev` is using in the same
+  // checkout — unset, this is exactly `.next`, the default.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      { key: "Permissions-Policy", value: "geolocation=(), camera=(), microphone=()" },
+      // geolocation=(self): Navigate mode (M8) reads the paddler's own GPS position via
+      // navigator.geolocation, from our own origin only — never embedded/third-party.
+      { key: "Permissions-Policy", value: "geolocation=(self), camera=(), microphone=()" },
     ]
 
     if (process.env.NODE_ENV === "production") {

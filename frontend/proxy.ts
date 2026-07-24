@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { API_URL, API_PREFIX } from "@/lib/api/config"
+import { API_URL, API_PREFIX, SSE_URL } from "@/lib/api/config"
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production"
 
@@ -88,9 +88,16 @@ export function buildCsp(nonce: string, isDev: boolean): string {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https: http://localhost:9000",
+    // API_URL covers the M8 tile proxy (GET /api/v1/tiles/...) — in dev that's
+    // http://localhost:5000, which the bare `https:` grant below doesn't match.
+    `img-src 'self' data: https: http://localhost:9000 ${API_URL}`,
     "font-src 'self' data:",
-    "connect-src 'self'",
+    // Was 'self' only — this app never fetched Flask from client-side JS, every
+    // mutation went through a server action. M8's live-position layer breaks that:
+    // the browser's EventSource connects directly to the API origin (public story
+    // stream) and the SSE sidecar (crew Navigate mode, ticketed), so both must be
+    // allowed here.
+    `connect-src 'self' ${API_URL} ${SSE_URL}`,
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

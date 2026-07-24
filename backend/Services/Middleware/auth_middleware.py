@@ -110,6 +110,36 @@ class JWTService:
         return decorator
 
     @staticmethod
+    def resolve_user_id_from_bearer_header() -> Optional[str]:
+        """Verify the current request's Authorization header exactly as
+        `authenticate_restful` does, but return the user id (or None) instead of
+        aborting/setting `g`. For routes that must also succeed with no header at
+        all (M8's SSE stream route accepts either an access token or a stream
+        ticket) — never a substitute for `authenticate_restful` on a route that
+        actually requires auth."""
+        auth_header = request.headers.get("Authorization", None)
+        if not auth_header:
+            return None
+        try:
+            token = auth_header.split(" ")[1] if auth_header.startswith("Bearer ") else auth_header
+            data = JWTService.verify_token(token)
+            if not data:
+                return None
+            user = UserService.get_user_by_id(data["user_id"])
+            if not user or not user.active:
+                return None
+            iat = data.get("iat")
+            if iat and user.password_changed_at:
+                token_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+                if token_issued_at < user.password_changed_at:
+                    return None
+            if data.get("tv") != user.token_version:
+                return None
+            return str(user.id)
+        except Exception:
+            return None
+
+    @staticmethod
     def authenticate_restful(f):
         @wraps(f)
         def decorator(*args, **kwargs):

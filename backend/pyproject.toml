@@ -36,6 +36,10 @@ dependencies = [
     "shapely",
     "flask-caching",
     "global-land-mask>=1.0.0",
+    "gevent",
+    "psycogreen",
+    "timezonefinder>=8.2.5",
+    "logfire[celery,flask,sqlalchemy]>=4.38.0",
 ]
 
 [dependency-groups]

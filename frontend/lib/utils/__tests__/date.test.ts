@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatDayDate, addDaysIso } from "../date"
+import { formatDayDate, addDaysIso, formatMinutesAgo, minutesSince } from "../date"
 
 describe("formatDayDate", () => {
   it("formats an ISO date as 'd MMM yyyy'", () => {
@@ -38,5 +38,37 @@ describe("addDaysIso", () => {
 
   it("subtracts across a month boundary", () => {
     expect(addDaysIso("2026-07-01", -1)).toBe("2026-06-30")
+  })
+})
+
+describe("minutesSince", () => {
+  const now = new Date("2026-07-20T10:10:00Z")
+
+  it("returns 0 for a timestamp under a minute old", () => {
+    expect(minutesSince("2026-07-20T10:09:30Z", now)).toBe(0)
+  })
+
+  it("returns the whole number of elapsed minutes", () => {
+    expect(minutesSince("2026-07-20T10:05:00Z", now)).toBe(5)
+  })
+
+  it("never goes negative for a timestamp in the future", () => {
+    expect(minutesSince("2026-07-20T10:20:00Z", now)).toBe(0)
+  })
+
+  it("returns 0 for an invalid timestamp", () => {
+    expect(minutesSince("not-a-date", now)).toBe(0)
+  })
+})
+
+describe("formatMinutesAgo", () => {
+  const now = new Date("2026-07-20T10:10:00Z")
+
+  it("says 'just now' under a minute", () => {
+    expect(formatMinutesAgo("2026-07-20T10:09:45Z", now)).toBe("just now")
+  })
+
+  it("formats elapsed minutes as 'x min ago'", () => {
+    expect(formatMinutesAgo("2026-07-20T10:03:00Z", now)).toBe("7 min ago")
   })
 })

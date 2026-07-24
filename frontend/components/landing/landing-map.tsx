@@ -16,6 +16,12 @@ import {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { POINT_TYPE } from "@/lib/dtos/point"
 import { palette } from "@/lib/tokens"
+import {
+  OSM_TILE_URL,
+  SEAMARK_TILE_URL,
+  OSM_ATTRIBUTION,
+  SEAMARK_ATTRIBUTION,
+} from "@/lib/map/tiles"
 
 // "hero" is the full landing chart (all instruments) on the Esri Ocean basemap.
 // "banner" is the calmer in-app bridge — graticule + route only, no forecast cell or
@@ -39,18 +45,10 @@ type Props = {
 // marketing hero.
 const ESRI_OCEAN =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
-// OSM base for the in-app "banner" variant — the same stack the planner uses, so the
-// tiles are cacheable (browser + the future MinIO proxy) and shared with the builder
-// the dashboard card links into. OSM sanctions caching; Esri does not.
-const OSM_BASE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-const SEAMARK = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png"
 
 // Attribution is required by every provider's terms; suppressing it is a ToS gap.
 const ESRI_ATTRIB =
   "Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, National Geographic, Garmin, HERE, and others"
-const OSM_ATTRIB =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-const SEAMARK_ATTRIB = '&copy; <a href="https://www.openseamap.org">OpenSeaMap</a> contributors'
 
 // Zoom is locked to Esri Ocean's useful range for this region: it thins to
 // "no data" past ~z11, and the landing is a calm discovery chart, not the
@@ -195,10 +193,10 @@ export function LandingMap({
       <AttributionPrefix />
       <FrameRoute routes={routes} variant={variant} onReady={() => setChartReady(true)} />
       <TileLayer
-        url={isHero ? ESRI_OCEAN : OSM_BASE}
-        attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIB}
+        url={isHero ? ESRI_OCEAN : OSM_TILE_URL}
+        attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIBUTION}
       />
-      <TileLayer url={SEAMARK} attribution={SEAMARK_ATTRIB} />
+      <TileLayer url={SEAMARK_TILE_URL} attribution={SEAMARK_ATTRIBUTION} />
       {/* Graticule + forecast cell + scale bar are the loud instruments — hero only.
           A banner thumbnail is a small linked-through strip, same "noise, not
           attribution" rationale as the credit line above: a grid overlay on a

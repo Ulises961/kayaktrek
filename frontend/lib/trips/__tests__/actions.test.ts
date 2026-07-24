@@ -22,6 +22,9 @@ import {
   createTrip,
   updateTrip,
   advanceState,
+  pauseTrip,
+  resumeTrip,
+  abortTrip,
   removeMember,
   deleteTripForEveryone,
   leaveTrip,
@@ -160,6 +163,74 @@ describe("advanceState", () => {
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("409"))
     const result = await advanceState(TRIP_ID, "planning")
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("pauseTrip", () => {
+  it("posts to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await pauseTrip(TRIP_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/pause`, {})
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await pauseTrip(TRIP_ID)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    const result = await pauseTrip(TRIP_ID)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("resumeTrip", () => {
+  it("posts the resume date to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await resumeTrip(TRIP_ID, "2026-08-01")
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/resume`, {
+      resumeDate: "2026-08-01",
+    })
+  })
+
+  it("omits resumeDate when not provided", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await resumeTrip(TRIP_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/resume`, {})
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await resumeTrip(TRIP_ID, "2026-08-01")
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    const result = await resumeTrip(TRIP_ID, "2026-08-01")
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("abortTrip", () => {
+  it("posts to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await abortTrip(TRIP_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/abort`, {})
+  })
+
+  it("revalidates the trip layout on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await abortTrip(TRIP_ID)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    const result = await abortTrip(TRIP_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })

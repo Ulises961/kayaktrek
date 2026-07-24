@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { Geist_Mono, DM_Sans, Fraunces } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/providers/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 
 const dmSans = DM_Sans({
   variable: "--font-sans",
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           nonce={nonce}
         >
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

@@ -1,8 +1,8 @@
 import enum
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import Date, Enum, String
+from sqlalchemy import Boolean, Date, DateTime, Enum, String
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +31,11 @@ class TripDifficultyType(enum.Enum):
     MODERATE = "moderate"
     DEMANDING = "demanding"
     EXPERT = "expert"
+
+
+class TripOutcomeType(enum.Enum):
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
 
 
 _VALID_TRANSITIONS = {
@@ -99,6 +104,16 @@ class Trip(BaseModel):
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     date_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     date_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    is_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    paused_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    outcome: Mapped[Optional[TripOutcomeType]] = mapped_column(
+        Enum(TripOutcomeType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )
+    last_checkpoint_alert_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # IANA zone name (e.g. "Europe/London"), resolved from the itinerary's first point on the
+    # building→happening transition — no coordinates exist yet at trip creation (ADR-021 deviation).
+    timezone_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     def transition_state(self, new_state: TripStateType) -> None:
         """Advance the trip state forward. Raises ValueError for invalid transitions."""
@@ -106,4 +121,6 @@ class Trip(BaseModel):
             raise ValueError(
                 f"Cannot transition from '{self.state.value}' to '{new_state.value}'"
             )
+        if self.state == TripStateType.HAPPENING and new_state == TripStateType.PAST and self.outcome is None:
+            self.outcome = TripOutcomeType.COMPLETED
         self.state = new_state

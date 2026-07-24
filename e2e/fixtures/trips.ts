@@ -38,9 +38,23 @@ export async function apiInviteByEmail(
   tripId: string,
   email: string,
 ): Promise<void> {
+  // The invite endpoint takes a userId, never a bare email (M12 §N closed that
+  // enumeration oracle) — resolve it via the same search-by-email-prefix endpoint
+  // the buddy picker/paddler search uses.
+  const searchRes = await request.get(
+    `${API_URL}/api/v1/user/search?q=${encodeURIComponent(email)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!searchRes.ok()) {
+    throw new Error(`user search failed: ${searchRes.status()} ${await searchRes.text()}`)
+  }
+  const matches = (await searchRes.json()) as Array<{ id: string; mail: string }>
+  const user = matches.find((u) => u.mail === email)
+  if (!user) throw new Error(`invite failed: no user found for ${email}`)
+
   const res = await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    data: { email },
+    data: { userId: user.id },
   })
   if (!res.ok()) throw new Error(`invite failed: ${res.status()} ${await res.text()}`)
 }

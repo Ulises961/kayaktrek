@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
 import { deriveMembership } from "@/lib/trips/membership"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 import { TripIdentityHeader } from "@/components/trips/trip-identity-header"
 import { TripDetailNav } from "@/components/trips/trip-detail-nav"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,7 +24,11 @@ export default async function TripDetailLayout({
 
   const session = await getSession()
   const membership = deriveMembership(trip, session)
-  const { isMember } = membership
+  const { isLeader, isMember } = membership
+  const liveHref =
+    isMember && trip.state === TRIP_STATE.HAPPENING && trip.itinerary?.id
+      ? `/itinerary/${trip.itinerary.id}?navigate=1`
+      : undefined
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
@@ -34,7 +39,7 @@ export default async function TripDetailLayout({
         ]}
       />
       <TripIdentityHeader trip={trip} membership={membership} />
-      <TripDetailNav tripId={id} showFloatPlan={isMember} />
+      <TripDetailNav tripId={id} showFloatPlan={isMember} liveHref={liveHref} />
       <Card className="relative overflow-hidden">
         <CardTopRule className="absolute inset-x-0 top-0" />
         <CardContent>{children}</CardContent>
