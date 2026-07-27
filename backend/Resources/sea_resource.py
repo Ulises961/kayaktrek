@@ -29,6 +29,20 @@ _weather_schema = WeatherSchema()
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_sea(id: str):
+    """
+    SeaResource GET method. Retrieves the sea/tidal record for a day.
+    ---
+    get:
+      summary: Get the sea record for a day
+      responses:
+        200:
+          description: The sea record
+          content:
+            application/json:
+              schema: SeaSchema
+        404:
+          description: Sea record not found for this day
+    """
     try:
         sea = SeaService.get_by_day_id(id)
         return jsonify(_schema.dump(sea)), HTTPStatus.OK
@@ -45,6 +59,26 @@ def get_sea(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def create_sea(id: str):
+    """
+    SeaResource POST method. Creates the sea/tidal record for a day.
+    ---
+    post:
+      summary: Create the sea record for a day
+      requestBody:
+        content:
+          application/json:
+            schema: SeaSchema
+      responses:
+        201:
+          description: The created sea record
+          content:
+            application/json:
+              schema: SeaSchema
+        400:
+          description: Validation error
+        409:
+          description: A sea record already exists for this day
+    """
     try:
         body = request.get_json() or {}
         data = _schema.load(body)
@@ -66,6 +100,28 @@ def create_sea(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def update_sea(id: str):
+    """
+    SeaResource PATCH method. Partially updates the sea/tidal record for a day.
+
+    Only fields present in the body are applied; omitted fields are left unchanged.
+    ---
+    patch:
+      summary: Update the sea record for a day
+      requestBody:
+        content:
+          application/json:
+            schema: SeaSchema
+      responses:
+        200:
+          description: The updated sea record
+          content:
+            application/json:
+              schema: SeaSchema
+        400:
+          description: Validation error
+        404:
+          description: Sea record not found for this day
+    """
     try:
         body = request.get_json() or {}
         data = _schema.load(body, partial=True)
@@ -86,6 +142,25 @@ def update_sea(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_tidal_gates(id: str):
+    """
+    SeaResource GET method. Resolves tidal-gate warnings for a day's route points.
+    ---
+    get:
+      summary: Get tidal-gate warnings for a day
+      description: >
+        One warning per route point with an interpolated tidal-stream rate strong
+        enough to be flagged, ordered along the day's route.
+      responses:
+        200:
+          description: The tidal-gate warnings
+          content:
+            application/json:
+              schema:
+                type: array
+                items: TidalGateWarningSchema
+        404:
+          description: Day not found
+    """
     try:
         day = DayService.get_day_by_id(id)
         sea = day.sea
@@ -105,6 +180,20 @@ def get_tidal_gates(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_weather(id: str):
+    """
+    SeaResource GET method. Retrieves the weather record for a day.
+    ---
+    get:
+      summary: Get the weather record for a day
+      responses:
+        200:
+          description: The weather record
+          content:
+            application/json:
+              schema: WeatherSchema
+        404:
+          description: Day not found, or no weather record exists for this day
+    """
     try:
         day = DayService.get_day_by_id(id)
         if day.weather is None:
@@ -123,6 +212,26 @@ def get_weather(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def trigger_weather_fetch(id: str):
+    """
+    SeaResource POST method. Queues a Celery task to fetch weather for a day from OpenMeteo.
+    ---
+    post:
+      summary: Trigger a weather fetch for a day
+      responses:
+        202:
+          description: The fetch task was queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId:
+                    type: string
+        400:
+          description: Day must have a date before fetching weather
+        404:
+          description: Day not found
+    """
     try:
         day = DayService.get_day_by_id(id)
         if not day.date:
@@ -141,6 +250,42 @@ def trigger_weather_fetch(id: str):
 @sea_api.route('/global-wind-vectors', methods=['GET'])
 @JWTService.authenticate_restful
 def get_global_wind_vectors():
+    """
+    SeaResource GET method. Fetches a global 10-degree wind velocity grid from OpenMeteo,
+    for the planner's map-wide wind overlay (independent of any single day/trip).
+    ---
+    get:
+      summary: Get a global wind velocity grid
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: hour
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 12
+      responses:
+        200:
+          description: The velocity grid, in leaflet-velocity format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: string
+                  grid:
+                    type: array
+                    items:
+                      type: object
+        400:
+          description: date parameter required
+    """
     date_str = request.args.get("date")
     try:
         if not date_str:
@@ -168,6 +313,36 @@ def _day_bounding_box(day, pad: float = 0.5) -> tuple:
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_wind_vectors(id: str):
+    """
+    SeaResource GET method. Builds a leaflet-velocity wind grid for a day, from its
+    Weather record's hourly states at the given UTC hour (bounded to the day's route).
+    ---
+    get:
+      summary: Get the wind velocity grid for a day
+      parameters:
+        - name: hour
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 12
+      responses:
+        200:
+          description: The velocity grid, in leaflet-velocity format (empty grid if no weather data)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: string
+                  grid:
+                    type: array
+                    items:
+                      type: object
+        404:
+          description: Day not found
+    """
     try:
         hour = int(request.args.get("hour", 12))
         day = DayService.get_day_by_id(id)
@@ -189,6 +364,36 @@ def get_wind_vectors(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_wave_vectors(id: str):
+    """
+    SeaResource GET method. Builds a leaflet-velocity wave grid for a day, from its
+    Sea record's hourly states at the given UTC hour (land-masked, bounded to the day's route).
+    ---
+    get:
+      summary: Get the wave velocity grid for a day
+      parameters:
+        - name: hour
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 12
+      responses:
+        200:
+          description: The velocity grid, in leaflet-velocity format (empty grid if no sea data)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: string
+                  grid:
+                    type: array
+                    items:
+                      type: object
+        404:
+          description: Day not found
+    """
     try:
         hour = int(request.args.get("hour", 12))
         day = DayService.get_day_by_id(id)
@@ -210,6 +415,32 @@ def get_wave_vectors(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def get_tidal_diamonds(id: str):
+    """
+    SeaResource GET method. Resolves every tidal diamond relevant to a day at the given
+    clock hour (the itinerary's user-created diamonds plus any seeded atlas stations
+    within 50 km of the route), each with its rate/direction for that hour plus its
+    full hourly table.
+    ---
+    get:
+      summary: Get tidal diamonds for a day
+      parameters:
+        - name: hour
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 12
+      responses:
+        200:
+          description: The tidal diamonds
+          content:
+            application/json:
+              schema:
+                type: array
+                items: TidalDiamondSchema
+        404:
+          description: Day not found
+    """
     try:
         hour = int(request.args.get("hour", 12))
         day = DayService.get_day_by_id(id)

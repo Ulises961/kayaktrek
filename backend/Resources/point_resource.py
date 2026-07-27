@@ -32,6 +32,26 @@ def create_point():
 
     Returns:
         JSON response with created point and 201 status code
+    ---
+    post:
+      summary: Add a route point to a day
+      description: >
+        Appended to the tail of the itinerary-wide point chain (linked via
+        `next_id`), not just the day's own points.
+      requestBody:
+        content:
+          application/json:
+            schema: PointSchema
+      responses:
+        201:
+          description: The created point
+          content:
+            application/json:
+              schema: PointSchema
+        400:
+          description: Invalid point data, or the itinerary belongs to a completed trip
+        409:
+          description: Database integrity constraint violated
     """
     try:
         point_data = request.get_json()
@@ -68,6 +88,23 @@ def update_point(id: str):
 
     Returns:
         200 with the updated point object, or 404 if not found.
+    ---
+    patch:
+      summary: Partially update a route point
+      requestBody:
+        content:
+          application/json:
+            schema: PointUpdateSchema
+      responses:
+        200:
+          description: The updated point
+          content:
+            application/json:
+              schema: PointSchema
+        400:
+          description: Invalid field values
+        404:
+          description: Point not found
     """
     try:
         raw = request.get_json()
@@ -100,6 +137,17 @@ def get_point(id: str):
 
     Returns:
         JSON response with point data and 200 status code
+    ---
+    get:
+      summary: Get a route point by id
+      responses:
+        200:
+          description: The point
+          content:
+            application/json:
+              schema: PointSchema
+        404:
+          description: Point not found
     """
     try:
         point = PointService.get_point_by_id(id)
@@ -124,6 +172,24 @@ def delete(id: str):
 
     Returns:
         Success message and 200 status code
+    ---
+    delete:
+      summary: Delete a route point
+      description: >
+        The predecessor's `next_id` is healed to the deleted point's `next_id`
+        before deletion, so the route chain stays intact.
+      responses:
+        200:
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Point not found
     """
     try:
         logger.info(f"Deleting point {id}")
@@ -156,6 +222,29 @@ def upload_image(id: str):
     Raises:
         400: If no file is provided or the file fails validation
         404: If the point does not exist
+    ---
+    post:
+      summary: Upload an image and attach it to a point
+      description: Multipart upload, field name 'file'.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        201:
+          description: The created image
+          content:
+            application/json:
+              schema: ImageSchema
+        400:
+          description: No file provided, file has no name, or the file fails MIME/size validation
+        404:
+          description: Point not found
     """
     if "file" not in request.files:
         abort(HTTPStatus.BAD_REQUEST, description="No file provided")
@@ -198,6 +287,28 @@ def update_image_visibility(id: str, image_id: str):
     Raises:
         400: If isPublic is missing or not a boolean
         404: If the image does not exist
+    ---
+    patch:
+      summary: Toggle an image's public/private visibility
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isPublic]
+              properties:
+                isPublic:
+                  type: boolean
+      responses:
+        200:
+          description: The updated image
+          content:
+            application/json:
+              schema: ImageSchema
+        400:
+          description: isPublic is missing or not a boolean
+        404:
+          description: Image not found
     """
     body = request.get_json() or {}
     is_public = body.get("isPublic")
@@ -232,6 +343,14 @@ def delete_image(id: str, image_id: str):
 
     Raises:
         404: If the point or image does not exist
+    ---
+    delete:
+      summary: Delete an image from a point
+      responses:
+        204:
+          description: Image deleted
+        404:
+          description: Point or image not found
     """
     try:
         ImageService.delete_from_point(image_id, id)

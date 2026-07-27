@@ -18,7 +18,42 @@ tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tid
 
 @tidal_station_api.route('/nearby', methods=['GET'])
 def get_nearby_stations():
-    """GET /api/tidal-station/nearby?lat=&lng=&range= — no auth required."""
+    """GET /api/tidal-station/nearby?lat=&lng=&range= — no auth required.
+    ---
+    get:
+      summary: Find tidal stations near a point
+      description: No auth required.
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+          description: Latitude, between -90 and 90
+        - in: query
+          name: lng
+          required: true
+          schema:
+            type: number
+          description: Longitude, between -180 and 180
+        - in: query
+          name: range
+          required: false
+          schema:
+            type: number
+            default: 5.0
+          description: Search radius in kilometres, between 0 and 100
+      responses:
+        200:
+          description: Tidal stations within range, distance-ordered
+          content:
+            application/json:
+              schema:
+                type: array
+                items: TidalStationSchema
+        400:
+          description: Missing or out-of-range lat/lng/range
+    """
     try:
         lat = request.args.get('lat', type=float)
         lng = request.args.get('lng', type=float)
@@ -44,6 +79,27 @@ def get_nearby_stations():
 @JWTService.authenticate_restful
 @require_admin()
 def create_station():
+    """
+    TidalStationResource POST method. Creates an admin-curated reference tidal station.
+    ---
+    post:
+      summary: Create a reference tidal station
+      description: Admin-only. Distinct from user-created tidal diamonds (`/api/v1/tidal-diamond`).
+      requestBody:
+        content:
+          application/json:
+            schema: TidalStationSchema
+      responses:
+        201:
+          description: The created station
+          content:
+            application/json:
+              schema: TidalStationSchema
+        400:
+          description: Validation error
+        409:
+          description: Station already exists
+    """
     try:
         body = request.get_json() or {}
         station = TidalStationSchema().load(body)
@@ -64,6 +120,27 @@ def create_station():
 @JWTService.authenticate_restful
 @require_admin()
 def update_station(id: str):
+    """
+    TidalStationResource PATCH method. Updates a reference tidal station.
+    ---
+    patch:
+      summary: Update a reference tidal station
+      description: Admin-only.
+      requestBody:
+        content:
+          application/json:
+            schema: TidalStationUpdateSchema
+      responses:
+        200:
+          description: The updated station
+          content:
+            application/json:
+              schema: TidalStationSchema
+        400:
+          description: Validation error
+        404:
+          description: Station not found
+    """
     try:
         body = request.get_json() or {}
         data = TidalStationUpdateSchema().load(body)
@@ -84,6 +161,25 @@ def update_station(id: str):
 @JWTService.authenticate_restful
 @require_admin()
 def delete_station(id: str):
+    """
+    TidalStationResource DELETE method. Deletes a reference tidal station.
+    ---
+    delete:
+      summary: Delete a reference tidal station
+      description: Admin-only.
+      responses:
+        200:
+          description: Confirmation message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Station not found
+    """
     try:
         TidalStationService.delete(id)
         return jsonify({"message": "Station deleted"}), HTTPStatus.OK

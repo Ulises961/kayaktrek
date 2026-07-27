@@ -29,7 +29,20 @@ _category_create_schema = PlaceCategoryCreateSchema()
 @place_api.route('/api/v1/place-categories', methods=['GET'])
 @JWTService.authenticate_restful
 def get_place_categories():
-    """The seeded catalogue of place kinds, for the create picker and marker icons."""
+    """The seeded catalogue of place kinds, for the create picker and marker icons.
+    ---
+    get:
+      summary: List place categories
+      responses:
+        200:
+          description: The place category catalogue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceCategorySchema'
+    """
     try:
         categories = PlaceService.list_categories()
         return jsonify(_category_schema.dump(categories, many=True)), HTTPStatus.OK
@@ -45,7 +58,26 @@ def get_place_categories():
 @require_admin()
 def create_place_category():
     """Admin-only: extend the seeded place-category catalogue without a migration or a
-    raw DB insert. A bridge tool — the public/community taxonomy is M7."""
+    raw DB insert. A bridge tool — the public/community taxonomy is M7.
+    ---
+    post:
+      summary: Create a place category
+      description: Admin-only.
+      requestBody:
+        content:
+          application/json:
+            schema: PlaceCategoryCreateSchema
+      responses:
+        201:
+          description: The created category
+          content:
+            application/json:
+              schema: PlaceCategorySchema
+        400:
+          description: Validation error
+        409:
+          description: A category with that slug or name already exists
+    """
     try:
         data = _category_create_schema.load(request.get_json() or {})
         category = PlaceService.create_category(data)
@@ -65,6 +97,26 @@ def create_place_category():
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_place():
+    """
+    ---
+    post:
+      summary: Add a place to the map
+      description: >
+        Creation is open to any trip member. The caller is stamped as creator and
+        the place starts private (visibility defaults to PRIVATE).
+      requestBody:
+        content:
+          application/json:
+            schema: PlaceSchema
+      responses:
+        201:
+          description: The created place
+          content:
+            application/json:
+              schema: PlaceSchema
+        400:
+          description: itineraryId is missing, or the body fails validation
+    """
     try:
         body = request.get_json() or {}
         itinerary_id = body.get('itineraryId')
@@ -86,7 +138,20 @@ def create_place():
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
 def list_places(itinerary_id: str):
-    """All places of an itinerary — the marker layer reads this."""
+    """All places of an itinerary — the marker layer reads this.
+    ---
+    get:
+      summary: List all places of an itinerary
+      responses:
+        200:
+          description: The itinerary's places
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlaceSchema'
+    """
     try:
         places = PlaceService.list_by_itinerary(itinerary_id)
         return jsonify(_dump_schema.dump(places, many=True)), HTTPStatus.OK
@@ -102,7 +167,45 @@ def list_places(itinerary_id: str):
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
 def list_places_in_range(itinerary_id: str):
     """Places of an itinerary within range_km of (lat, lng), nearest first. The Place
-    equivalent of the retired GET /api/point/pois."""
+    equivalent of the retired GET /api/point/pois.
+    ---
+    get:
+      summary: List places of an itinerary within range of a point
+      description: Results are nearest-first, capped at 100.
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: range
+          in: query
+          required: false
+          description: Radius in kilometres. Defaults to 5, must be between 0 and 100.
+          schema:
+            type: number
+      responses:
+        200:
+          description: Places within range, each with an added distanceKm
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/PlaceSchema'
+                    - type: object
+                      properties:
+                        distanceKm:
+                          type: number
+        400:
+          description: lat/lng missing or out of range, or range out of bounds
+    """
     try:
         lat = request.args.get('lat', type=float)
         lng = request.args.get('lng', type=float)
@@ -131,6 +234,19 @@ def list_places_in_range(itinerary_id: str):
 @JWTService.authenticate_restful
 @require_owner('place', read_only=True)
 def get_place(id: str):
+    """
+    ---
+    get:
+      summary: Get a place by id
+      responses:
+        200:
+          description: The place
+          content:
+            application/json:
+              schema: PlaceSchema
+        404:
+          description: Place not found
+    """
     try:
         place = PlaceService.get_by_id(id)
         return jsonify(_dump_schema.dump(place)), HTTPStatus.OK
@@ -147,6 +263,28 @@ def get_place(id: str):
 @JWTService.authenticate_restful
 @require_owner('place')
 def update_place(id: str):
+    """
+    ---
+    patch:
+      summary: Update a place
+      description: Creator-only. Only whitelisted fields present in the body are applied.
+      requestBody:
+        content:
+          application/json:
+            schema: PlaceUpdateSchema
+      responses:
+        200:
+          description: The updated place
+          content:
+            application/json:
+              schema: PlaceSchema
+        400:
+          description: Validation error
+        403:
+          description: Caller is not the creator of this place
+        404:
+          description: Place not found
+    """
     try:
         body = request.get_json() or {}
         data = _update_schema.load(body, partial=True)
@@ -169,6 +307,26 @@ def update_place(id: str):
 @JWTService.authenticate_restful
 @require_owner('place')
 def delete_place(id: str):
+    """
+    ---
+    delete:
+      summary: Delete a place
+      description: Creator-only.
+      responses:
+        200:
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        403:
+          description: Caller is not the creator of this place
+        404:
+          description: Place not found
+    """
     try:
         PlaceService.delete(id, g.current_user_id)
         return jsonify({"message": "Place deleted"}), HTTPStatus.OK

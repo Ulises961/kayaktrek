@@ -33,6 +33,18 @@ def get_trip(id: str):
 
     Returns:
         JSON response with trip data and 200 status code
+    ---
+    get:
+      summary: Get a trip by id
+      description: Medical notes are redacted for non-leader travellers.
+      responses:
+        200:
+          description: The trip
+          content:
+            application/json:
+              schema: TripSchema
+        404:
+          description: Trip not found
     """
     try:
         logger.info(f"Retrieving trip with id {id}")
@@ -72,6 +84,66 @@ def get_all_user_trips(user_id: str):
 
     Returns:
         JSON response with trip data and 200 status code
+    ---
+    get:
+      summary: Get a paginated, filterable page of a user's trips
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [building, happening, past, archived]
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+            enum: [easy, moderate, demanding, expert]
+        - name: sort
+          in: query
+          description: Defaults to newest-created when omitted.
+          schema:
+            type: string
+            enum: [soonest, latest, latest_end]
+        - name: min_miles
+          in: query
+          schema:
+            type: number
+        - name: max_miles
+          in: query
+          schema:
+            type: number
+      responses:
+        200:
+          description: A page of the user's trips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: TripSchema
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+        400:
+          description: Invalid filter/sort value
+        403:
+          description: The path user_id does not match the authenticated caller
     """
     if str(g.current_user_id) != user_id:
         abort(HTTPStatus.FORBIDDEN, description="Access denied")
@@ -115,6 +187,19 @@ def get_all_user_invitations(user_id: str):
 
     Returns:
         JSON response with trip data and 200 status code
+    ---
+    get:
+      summary: List a user's pending trip invitations
+      responses:
+        200:
+          description: The user's pending invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: TripSchema
+        403:
+          description: The path user_id does not match the authenticated caller
     """
     if str(g.current_user_id) != user_id:
         abort(HTTPStatus.FORBIDDEN, description="Access denied")
@@ -139,6 +224,20 @@ def post():
 
     Returns:
         JSON response with created trip and 201 status code
+    ---
+    post:
+      summary: Create a trip
+      description: The caller becomes the trip's leader.
+      requestBody:
+        content:
+          application/json:
+            schema: TripSchema
+      responses:
+        201:
+          description: The created trip
+          content:
+            application/json:
+              schema: TripSchema
     """
     try:
         trip_data = request.get_json()
@@ -162,6 +261,34 @@ def transition_state(id: str):
 
     Returns:
         JSON response with updated trip and 200 status code
+    ---
+    post:
+      summary: Advance a trip's state forward
+      description: >
+        Leader-only, forward-only. Valid values are building, happening, past,
+        archived; a transition is only allowed to the state machine's next step
+        from the trip's current state.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state:
+                  type: string
+                  enum: [building, happening, past, archived]
+              required:
+                - state
+      responses:
+        200:
+          description: The updated trip
+          content:
+            application/json:
+              schema: TripSchema
+        400:
+          description: "'state' missing, an invalid value, or not the next valid step from the trip's current state"
+        404:
+          description: Trip not found
     """
     try:
         body = request.get_json()
@@ -189,6 +316,19 @@ def pause_trip(id: str):
     POST /api/trip/<id>/pause — Leader pauses a happening expedition.
 
     Returns 200 with the updated trip, 409 if not happening or already paused.
+    ---
+    post:
+      summary: Pause a happening expedition
+      responses:
+        200:
+          description: The updated trip
+          content:
+            application/json:
+              schema: TripSchema
+        404:
+          description: Trip not found
+        409:
+          description: The trip is not in the happening state, or is already paused
     """
     try:
         trip = TripService.pause_trip(id)
@@ -215,6 +355,35 @@ def resume_trip(id: str):
     pause date shifts forward by the resulting gap; date_to extends to match.
     Returns 200 with the updated trip, 400 for a malformed date, 409 if not
     paused or resumeDate precedes the pause date.
+    ---
+    post:
+      summary: Resume a paused expedition
+      description: >
+        Every Day after the pause date shifts forward by the resulting gap;
+        date_to extends to match.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resumeDate:
+                  type: string
+                  format: date
+                  description: Defaults to today.
+      responses:
+        200:
+          description: The updated trip
+          content:
+            application/json:
+              schema: TripSchema
+        400:
+          description: resumeDate is not a valid ISO 8601 date
+        404:
+          description: Trip not found
+        409:
+          description: The trip is not paused, or resumeDate precedes the pause date
     """
     try:
         body = request.get_json(silent=True) or {}
@@ -245,6 +414,20 @@ def abort_trip(id: str):
 
     Returns 200 with the updated trip (state=past, outcome=interrupted),
     409 if the trip is not happening and paused.
+    ---
+    post:
+      summary: End a paused expedition early
+      description: Sets state=past and outcome=interrupted.
+      responses:
+        200:
+          description: The updated trip
+          content:
+            application/json:
+              schema: TripSchema
+        404:
+          description: Trip not found
+        409:
+          description: The trip is not happening and paused
     """
     try:
         trip = TripService.abort_trip(id)
@@ -273,6 +456,26 @@ def update_trip(id: str):
 
     Returns:
         200 with the updated trip object, or 404 if not found.
+    ---
+    patch:
+      summary: Partially update a trip
+      description: >
+        Only fields present in the body are applied. State transitions must go
+        through POST /<id>/state instead.
+      requestBody:
+        content:
+          application/json:
+            schema: TripUpdateSchema
+      responses:
+        200:
+          description: The updated trip
+          content:
+            application/json:
+              schema: TripSchema
+        400:
+          description: Validation error
+        404:
+          description: Trip not found
     """
     try:
         raw = request.get_json()
@@ -302,6 +505,41 @@ def invite_user(id: str):
     a blind email/username guess (M12 §N closed that enumeration oracle). A block in
     either direction between leader and invitee forbids the invitation (403).
     Returns 201, 404 if no account found, 409 if already invited or member.
+    ---
+    post:
+      summary: Invite a user to the trip
+      description: >
+        userId must be sourced from the buddy picker or paddler search, never a
+        blind email/username guess. A block in either direction between leader
+        and invitee forbids the invitation.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+              required:
+                - userId
+      responses:
+        201:
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        400:
+          description: "'userId' is required"
+        403:
+          description: A block exists between the leader and the invitee
+        404:
+          description: No account found for userId
+        409:
+          description: The user is already invited or already a member
     """
     try:
         body = request.get_json() or {}
@@ -333,6 +571,21 @@ def cancel_invitation(id: str, invitee_id: str):
     DELETE /api/trip/<id>/invite/<invitee_id> — Leader cancels a pending invitation.
 
     Returns 200 on success, 404 if no pending invitation exists.
+    ---
+    delete:
+      summary: Cancel a pending invitation
+      responses:
+        200:
+          description: Invitation cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: No pending invitation exists
     """
     try:
         TripService.cancel_invitation(id, invitee_id)
@@ -353,6 +606,33 @@ def handle_invitation(id: str):
 
     Body: {"accepted": true | false}
     Returns 200 on success, 404 if no valid invitation found.
+    ---
+    post:
+      summary: Accept or decline the caller's own invitation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accepted:
+                  type: boolean
+              required:
+                - accepted
+      responses:
+        200:
+          description: Invitation accepted or declined
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        400:
+          description: "'accepted' field is required"
+        404:
+          description: No valid invitation found
     """
     try:
         body = request.get_json()
@@ -378,6 +658,23 @@ def remove_member(id: str, user_id: str):
     DELETE /api/trip/<id>/member/<user_id> — Leader removes a crew member from the trip.
 
     Returns 200 on success, 404 if user is not a member, 409 if target is the leader.
+    ---
+    delete:
+      summary: Remove a crew member from the trip
+      responses:
+        200:
+          description: Member removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: User is not a member of this trip
+        409:
+          description: Cannot remove the trip leader
     """
     try:
         TripService.remove_member(id, user_id)
@@ -395,6 +692,20 @@ def remove_member(id: str, user_id: str):
 @trip_api.route("/<string:id>/member/me", methods=["GET"])
 @JWTService.authenticate_restful
 def get_my_membership(id: str):
+    """
+    GET /api/trip/<id>/member/me — Get the caller's own membership/float-plan record.
+    ---
+    get:
+      summary: Get the caller's own trip membership
+      responses:
+        200:
+          description: The caller's membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        404:
+          description: You are not a member of this trip
+    """
     try:
         membership = TripMemberService.get_my_membership(id)
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
@@ -407,6 +718,28 @@ def get_my_membership(id: str):
 @trip_api.route("/<string:id>/member/me", methods=["PATCH"])
 @JWTService.authenticate_restful
 def update_my_float_plan(id: str):
+    """
+    PATCH /api/trip/<id>/member/me — Update the caller's own float-plan fields
+    (vessel and emergency contact details). Medical notes are managed via the
+    dedicated consent endpoints below, not this route.
+    ---
+    patch:
+      summary: Update the caller's own float-plan fields
+      requestBody:
+        content:
+          application/json:
+            schema: TripMemberUpdateSchema
+      responses:
+        200:
+          description: The updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        400:
+          description: Request body is not a JSON object, or a validation error
+        404:
+          description: You are not a member of this trip
+    """
     try:
         raw = request.get_json(silent=True, force=True) or {}
         if not isinstance(raw, dict):
@@ -428,6 +761,39 @@ def update_my_float_plan(id: str):
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_trip_medical_notes(id: str):
+    """
+    POST /api/trip/<id>/member/me/medical-notes — Decrypt and return the caller's
+    own stored trip medical notes. Requires an elevated (re-authenticated) token.
+    ---
+    post:
+      summary: Decrypt the caller's own trip medical notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        200:
+          description: The decrypted medical notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  medicalNotes:
+                    type: string
+        400:
+          description: password is required
+        401:
+          description: Decryption failed — password may be incorrect
+        404:
+          description: You are not a member of this trip
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw:
@@ -446,6 +812,36 @@ def get_trip_medical_notes(id: str):
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def set_trip_medical_notes(id: str):
+    """
+    POST /api/trip/<id>/member/me/medical-consent — Encrypt and store the
+    caller's own trip medical notes. Requires an elevated (re-authenticated) token.
+    ---
+    post:
+      summary: Set the caller's own trip medical notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                medicalNotes:
+                  type: string
+                password:
+                  type: string
+              required:
+                - medicalNotes
+                - password
+      responses:
+        200:
+          description: The updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        400:
+          description: medicalNotes and password are required
+        404:
+          description: You are not a member of this trip
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw or "medicalNotes" not in raw:
@@ -464,6 +860,21 @@ def set_trip_medical_notes(id: str):
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def revoke_trip_medical_notes(id: str):
+    """
+    DELETE /api/trip/<id>/member/me/medical-consent — Clear the caller's own
+    stored trip medical notes. Requires an elevated (re-authenticated) token.
+    ---
+    delete:
+      summary: Clear the caller's own trip medical notes
+      responses:
+        200:
+          description: The updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        404:
+          description: You are not a member of this trip
+    """
     try:
         membership = TripMemberService.revoke_trip_medical_notes(id)
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
@@ -477,6 +888,36 @@ def revoke_trip_medical_notes(id: str):
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def share_medical_notes(id: str):
+    """
+    POST /api/trip/<id>/member/me/share-medical-notes — Re-encrypt the caller's
+    own stored trip medical notes for the trip leader to read (ECIES to the
+    leader's public key). Requires an elevated (re-authenticated) token.
+    ---
+    post:
+      summary: Share the caller's own trip medical notes with the trip leader
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        200:
+          description: The updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        400:
+          description: password is required, no trip medical notes are stored, or the leader has not set up their keypair yet
+        401:
+          description: Decryption failed — password may be incorrect
+        404:
+          description: You are not a member of this trip
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw:
@@ -497,6 +938,43 @@ def share_medical_notes(id: str):
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def read_member_medical_notes(id: str, member_id: str):
+    """
+    POST /api/trip/<id>/member/<member_id>/medical-notes — Leader decrypts a
+    crew member's shared trip medical notes with the leader's own keypair.
+    Requires an elevated (re-authenticated) token.
+    ---
+    post:
+      summary: Decrypt a crew member's shared trip medical notes
+      description: Leader-only.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        200:
+          description: The decrypted medical notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  medicalNotes:
+                    type: string
+        400:
+          description: password is required
+        401:
+          description: Decryption failed — password may be incorrect
+        403:
+          description: Only the trip leader can read shared medical notes
+        404:
+          description: Member not found in this trip, or the member has no shared medical notes, or the leader keypair is missing
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw:
@@ -520,7 +998,21 @@ def read_member_medical_notes(id: str, member_id: str):
 def get_medical_notes_access_log(id: str):
     """Who has read the caller's own shared medical notes on this trip, and when.
     Metadata only (no notes content), so — unlike the decrypt endpoints above — this
-    does not require an elevated token."""
+    does not require an elevated token.
+    ---
+    get:
+      summary: Get the access log for the caller's own shared medical notes
+      responses:
+        200:
+          description: The access log entries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: MedicalNotesAccessLogSchema
+        404:
+          description: You are not a member of this trip
+    """
     try:
         logs = TripMemberService.get_medical_notes_access_log(id)
         return jsonify(MedicalNotesAccessLogSchema(many=True).dump(logs)), HTTPStatus.OK
@@ -540,6 +1032,22 @@ def delete(id: str):
 
     Returns:
         Success message and 200 status code
+    ---
+    delete:
+      summary: Delete a trip for everyone
+      description: Leader-only. Cascades to the trip's itinerary, inventory, and logistics.
+      responses:
+        200:
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Trip not found
     """
     try:
         TripService.delete_trip_for_everyone(id)
@@ -561,6 +1069,24 @@ def leave(id: str):
 
     Returns:
         Success message and 200 status code
+    ---
+    post:
+      summary: Leave a trip
+      description: >
+        Removes the caller's own membership. If the leader leaves and crew
+        remain, the trip survives with no leader (see POST /<id>/claim-leadership).
+      responses:
+        200:
+          description: Left trip
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Trip not found
     """
     try:
         TripService.leave_trip(id)
@@ -576,7 +1102,24 @@ def leave(id: str):
 @require_owner("trip")
 @require_leader()
 def nominate_successor(id: str, user_id: str):
-    """Leader designates a crew member as the trip's successor."""
+    """Leader designates a crew member as the trip's successor.
+    ---
+    post:
+      summary: Nominate a crew member as the trip's successor
+      description: >
+        Whoever is nominated becomes the only member allowed to claim leadership
+        if the leader leaves (see POST /<id>/claim-leadership).
+      responses:
+        200:
+          description: The nominated member's membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        400:
+          description: Cannot nominate the current leader as their own successor
+        404:
+          description: user_id is not a member of this trip
+    """
     try:
         member = TripLeadershipService.nominate_successor(id, user_id)
         return jsonify(TripMemberSchema().dump(member)), HTTPStatus.OK
@@ -593,7 +1136,22 @@ def nominate_successor(id: str, user_id: str):
 @require_owner("trip")
 @require_leader()
 def clear_successor_nomination(id: str):
-    """Leader clears whichever member is currently nominated (no-op if none)."""
+    """Leader clears whichever member is currently nominated (no-op if none).
+    ---
+    delete:
+      summary: Clear the trip's successor nomination
+      description: No-op if no member is currently nominated.
+      responses:
+        200:
+          description: Nomination cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+    """
     try:
         TripLeadershipService.clear_nomination(id)
         return {"message": "Nomination cleared"}, HTTPStatus.OK
@@ -611,6 +1169,24 @@ def claim_leadership(id: str):
 
     Returns 409 if the trip already has a leader or is archived, 403 if a
     different successor was nominated.
+    ---
+    post:
+      summary: Claim leadership of a leaderless trip
+      description: >
+        If a successor was nominated, only they may claim; otherwise
+        first-come-first-served among crew members.
+      responses:
+        200:
+          description: The caller's updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        403:
+          description: A different successor was nominated
+        404:
+          description: Trip not found, or the caller is not a member of this trip
+        409:
+          description: The trip already has a leader, or is archived
     """
     try:
         member = TripLeadershipService.claim_leadership(id)

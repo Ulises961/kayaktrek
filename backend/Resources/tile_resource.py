@@ -16,6 +16,23 @@ tile_api = Blueprint("tile", __name__, url_prefix=TILE_ENDPOINT)
 @tile_api.route("/<layer>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
 @limiter.limit("600 per minute", key_func=get_remote_address)
 def get_tile(layer: str, z: int, x: int, y: int):
+    """
+    ---
+    get:
+      summary: Proxy a map tile
+      description: >
+        Fetches and caches a tile from the upstream provider for the given layer
+        (e.g. `seamark`) and XYZ coordinate.
+      responses:
+        200:
+          description: The tile image
+          content:
+            image/png: {}
+        404:
+          description: Unknown layer or tile not found upstream
+        502:
+          description: Upstream tile provider unavailable
+    """
     try:
         data, content_type = TileService.get_tile(layer, z, x, y)
     except ValueError as e:

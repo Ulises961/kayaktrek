@@ -187,6 +187,13 @@ class JWTService:
         # auth-invariant canary test relies on this tag to distinguish routes
         # that legitimately read the current user from a silent auth gap.
         decorator._populates_current_user = True
+        # Distinct from the above: authenticate_optional also populates g.current_user_id but
+        # never requires a token, so it can't share this marker. The OpenAPI spec builder
+        # (Api/openapi.py, M13 §B.1) reads this to map onto the "security" field automatically —
+        # functools.wraps copies __dict__ on every further stacked decorator (require_owner,
+        # require_leader, ...), so this propagates to the outermost wrapper Flask actually
+        # registers without each of those decorators needing to know about it.
+        decorator._auth_required = True
         return decorator
 
     @staticmethod

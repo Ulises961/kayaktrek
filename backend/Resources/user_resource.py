@@ -37,6 +37,17 @@ def get_me():
 
     Returns:
         JSON response with the user object and 200 status code
+    ---
+    get:
+      summary: Get the authenticated user's profile
+      responses:
+        200:
+          description: The current user
+          content:
+            application/json:
+              schema: UserSchema
+        404:
+          description: Authenticated user not found
     """
     try:
         user = UserService.get_current_user()
@@ -60,6 +71,42 @@ def search_users():
     Returns:
         JSON array of matching user objects (id, name, surname, mail, avatarUrl)
         and 200 status code
+    ---
+    get:
+      summary: Search users by email prefix for trip invitations
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search string, minimum 2 characters
+      responses:
+        200:
+          description: Matching users, projected to a minimal invite-picker shape
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    surname:
+                      type: string
+                      nullable: true
+                    mail:
+                      type: string
+                      format: email
+                    avatarUrl:
+                      type: string
+                      nullable: true
+        400:
+          description: Search query is missing or shorter than 2 characters
     """
     query = request.args.get("q", "").strip()
     if len(query) < 2:
@@ -83,6 +130,48 @@ def search_paddlers():
     Query params: q (search term), page, per_page. Returns a paginated, block-filtered
     list of public profiles, each annotated with the caller's relationship
     (none | pending_outgoing | pending_incoming | buddy) and connection id.
+    ---
+    get:
+      summary: Search public paddlers (buddy finder)
+      description: >
+        Rate limited to 30 requests per minute per user. Excludes the caller and
+        anyone blocked in either direction. An empty `q` returns an empty page.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Capped at 100
+      responses:
+        200:
+          description: A page of public profiles, each annotated with id, relationship, and connectionId
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: PublicUserSchema
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
     """
     try:
         query = request.args.get("q", "")
@@ -112,6 +201,28 @@ def get_public_profile(username: str):
     Returns a privacy-safe projection (identity, bio, home location, opt-in
     certifications, aggregate stats). Returns a single 404 for a missing, inactive,
     deletion-pending, or non-public profile — no existence oracle.
+    ---
+    get:
+      summary: Get a paddler's public profile by username
+      description: >
+        Auth-optional — anonymous and authenticated callers are both allowed.
+        Undifferentiated 404 for missing, inactive, deletion-pending, or non-public
+        profiles to avoid an existence oracle.
+      responses:
+        200:
+          description: The public profile, with an aggregate stats object attached
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - PublicUserSchema
+                  - type: object
+                    properties:
+                      stats:
+                        type: object
+                        description: Aggregate logbook stats (distance, hours, endorsements, activity history)
+        404:
+          description: Profile not found
     """
     try:
         viewer_id = getattr(g, "current_user_id", None)
@@ -142,6 +253,20 @@ def get(id: str):
 
     Raises:
         404: If the user does not exist
+    ---
+    get:
+      summary: Get a user's full profile by id
+      description: Only the user themselves may retrieve their own full profile.
+      responses:
+        200:
+          description: The user
+          content:
+            application/json:
+              schema: UserSchema
+        403:
+          description: Caller is not this user
+        404:
+          description: User not found
     """
     try:
         user = UserService.get_user_by_id(id)
@@ -175,6 +300,28 @@ def update_user(id: str):
         400: If validation fails
         404: If the user does not exist
         409: If a unique constraint is violated
+    ---
+    patch:
+      summary: Partially update a user's profile
+      description: Only the user themselves may update their own profile. Omitted fields are left unchanged.
+      requestBody:
+        content:
+          application/json:
+            schema: UserUpdateSchema
+      responses:
+        200:
+          description: The updated user
+          content:
+            application/json:
+              schema: UserSchema
+        400:
+          description: Validation failed
+        403:
+          description: Caller is not this user
+        404:
+          description: User not found
+        409:
+          description: A unique constraint (e.g. username) was violated
     """
     try:
         raw = request.get_json()
@@ -200,6 +347,31 @@ def update_user(id: str):
 @user_api.route("/me/password", methods=["PATCH"])
 @JWTService.authenticate_restful
 def change_password():
+    """
+    ---
+    patch:
+      summary: Change the authenticated user's password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPwd
+                - newPwd
+              properties:
+                currentPwd:
+                  type: string
+                newPwd:
+                  type: string
+      responses:
+        204:
+          description: Password changed
+        400:
+          description: currentPwd/newPwd missing, or currentPwd is incorrect
+        404:
+          description: Authenticated user not found
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict):
@@ -224,6 +396,42 @@ def change_password():
 @user_api.route("/me/generate-keypair", methods=["POST"])
 @JWTService.authenticate_restful
 def generate_keypair():
+    """
+    ---
+    post:
+      summary: Generate an X25519 keypair for the authenticated user
+      description: >
+        Used for medical-notes end-to-end encryption. No-op if a keypair already
+        exists (returns 409).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+      responses:
+        200:
+          description: Keypair generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasKeypair:
+                    type: boolean
+        400:
+          description: password is missing
+        401:
+          description: Password is incorrect
+        404:
+          description: Authenticated user not found
+        409:
+          description: Keypair already exists
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw:
@@ -247,6 +455,41 @@ def generate_keypair():
 @JWTService.authenticate_restful
 @limiter.limit("10 per minute", key_func=lambda: str(g.current_user_id))
 def re_auth():
+    """
+    ---
+    post:
+      summary: Re-authenticate with password to obtain a short-lived elevated token
+      description: >
+        Rate limited to 10 requests per minute per user. The elevated token (5 minute
+        TTL) is required via the X-Elevated-Token header on sensitive endpoints like
+        medical-consent and email-change.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+      responses:
+        200:
+          description: Elevated token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  elevatedToken:
+                    type: string
+        400:
+          description: password is missing
+        401:
+          description: Password is incorrect
+        404:
+          description: Authenticated user not found
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or "password" not in raw:
@@ -269,6 +512,38 @@ def re_auth():
 @JWTService.require_elevated_token
 @limiter.limit("5 per minute", key_func=lambda: str(g.current_user_id))
 def request_email_change():
+    """
+    ---
+    post:
+      summary: Request a change of the authenticated user's email address
+      description: >
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
+        Rate limited to 5 requests per minute per user. Sends a verification link to
+        the new address; the change is not applied until confirmed via GET
+        /api/v1/auth/verify-email-change. If the address already belongs to another
+        account, this silently no-ops (still returns 202) to avoid an enumeration
+        oracle.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newMail
+              properties:
+                newMail:
+                  type: string
+                  format: email
+      responses:
+        202:
+          description: Verification email sent (or silently no-opped if the address is taken)
+        400:
+          description: newMail is missing, malformed, or matches the current address
+        403:
+          description: Elevated token missing, invalid, or expired
+        404:
+          description: Authenticated user not found
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict) or not raw.get("newMail"):
@@ -290,6 +565,40 @@ def request_email_change():
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def grant_medical_consent():
+    """
+    ---
+    post:
+      summary: Encrypt and store the authenticated user's medical notes
+      description: >
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
+        Notes are encrypted end-to-end (X25519 ECIES) under the user's keypair,
+        password-derived. Records a consent timestamp.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - medicalNotes
+                - password
+              properties:
+                medicalNotes:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: The updated user
+          content:
+            application/json:
+              schema: UserSchema
+        400:
+          description: medicalNotes or password is missing
+        403:
+          description: Elevated token missing, invalid, or expired
+        404:
+          description: Authenticated user not found
+    """
     try:
         raw = request.get_json()
         if not isinstance(raw, dict):
@@ -315,6 +624,22 @@ def grant_medical_consent():
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def revoke_medical_consent():
+    """
+    ---
+    delete:
+      summary: Revoke medical-notes consent and erase stored notes
+      description: >
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
+        GDPR Art. 7(3): clears the notes from both the User record and every
+        TripMember row for this user.
+      responses:
+        204:
+          description: Consent revoked and notes erased
+        403:
+          description: Elevated token missing, invalid, or expired
+        404:
+          description: Authenticated user not found
+    """
     try:
         UserService.revoke_medical_consent(str(g.current_user_id))
         return "", HTTPStatus.NO_CONTENT
@@ -329,6 +654,40 @@ def revoke_medical_consent():
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_medical_notes():
+    """
+    ---
+    post:
+      summary: Decrypt and retrieve the authenticated user's medical notes
+      description: >
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
+        POST rather than GET because the decryption password travels in the body.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+      responses:
+        200:
+          description: The decrypted notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  medicalNotes:
+                    type: string
+        400:
+          description: password is missing, no medical notes are stored, or decryption failed (password likely incorrect)
+        403:
+          description: Elevated token missing, invalid, or expired
+        404:
+          description: Authenticated user not found
+    """
     try:
         password = (request.get_json() or {}).get("password")
         if not password:
@@ -363,6 +722,30 @@ def upload_avatar():
 
     Raises:
         400: If no file is provided or the file fails validation
+    ---
+    post:
+      summary: Upload or replace the authenticated user's avatar
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: The updated user
+          content:
+            application/json:
+              schema: UserSchema
+        400:
+          description: No file provided, or the file fails validation (type/size)
+        404:
+          description: Authenticated user not found
     """
     if "file" not in request.files:
         abort(HTTPStatus.BAD_REQUEST, description="No file provided")
@@ -392,6 +775,14 @@ def delete_avatar():
 
     Returns:
         204 No Content on success
+    ---
+    delete:
+      summary: Remove the authenticated user's avatar
+      responses:
+        204:
+          description: Avatar removed
+        404:
+          description: Authenticated user not found
     """
     try:
         UserService.delete_avatar(str(g.current_user_id))
@@ -415,6 +806,13 @@ def request_data_export():
 
     Returns:
         202 Accepted
+    ---
+    post:
+      summary: Request a GDPR data export
+      description: Rate limited to 1 request per day per user. Queues a Celery task; an email with a one-time download link (24h TTL) follows.
+      responses:
+        202:
+          description: Export queued
     """
     export_user_data.delay(str(g.current_user_id), request_id=g.get("request_id"))
     return "", HTTPStatus.ACCEPTED
@@ -430,6 +828,21 @@ def download_data_export(token: str):
         200 with the JSON file as an attachment
         400 if the token is invalid / expired / already used
         404 if the object is missing (already downloaded or task not yet complete)
+    ---
+    get:
+      summary: Download a queued GDPR data export
+      description: >
+        No authentication required — the single-use token from the emailed link is
+        the credential. The export file is deleted after this download.
+      responses:
+        200:
+          description: The export as a downloadable JSON attachment
+          content:
+            application/json: {}
+        400:
+          description: Token is invalid, expired, or already used
+        404:
+          description: Export file not found (already downloaded, or the export task has not finished yet)
     """
     try:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -464,6 +877,18 @@ def request_deletion():
 
     Returns:
         202 Accepted
+    ---
+    delete:
+      summary: Begin the GDPR account-erasure grace period
+      description: >
+        Deactivates the account, revokes all sessions, and emails a cancellation
+        link valid for 30 days. The user cannot log in during this period; if the
+        grace period elapses without cancellation, erasure proceeds.
+      responses:
+        202:
+          description: Deletion grace period started
+        404:
+          description: Authenticated user not found
     """
     try:
         user = UserService.get_current_user()
@@ -502,6 +927,31 @@ def cancel_deletion():
     Returns:
         200 on success
         400 if token is invalid / expired / already used
+    ---
+    delete:
+      summary: Cancel a pending account deletion
+      description: No authentication required — the emailed token is the credential.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Raw DELETION_CANCEL token from the cancellation email
+      responses:
+        200:
+          description: Deletion cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        400:
+          description: token is missing, invalid, expired, or already used
+        404:
+          description: User not found
     """
     token = request.args.get("token", "").strip()
     if not token:
@@ -534,6 +984,19 @@ def delete(id: str):
     Raises:
         404: If the user does not exist
         409: If references prevent deletion
+    ---
+    delete:
+      summary: Admin hard-delete a user account
+      description: Bypasses the GDPR grace period — immediate, irreversible deletion.
+      responses:
+        204:
+          description: User deleted
+        403:
+          description: Caller is not an admin
+        404:
+          description: User not found
+        409:
+          description: References prevent deletion
     """
     try:
         UserService.delete_user(id)

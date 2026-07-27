@@ -14,7 +14,20 @@ item_category_api = Blueprint('item_category', __name__, url_prefix=ITEM_CATEGOR
 
 @item_category_api.route("", methods=["GET"])
 def get_item_categories():
-    """GET /api/item-categories — returns all categories (public, no auth required)."""
+    """GET /api/item-categories — returns all categories (public, no auth required).
+    ---
+    get:
+      summary: List item categories
+      description: Seeded reference data — public, no auth required.
+      responses:
+        200:
+          description: All item categories, alphabetical by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: ItemCategorySchema
+    """
     try:
         categories = db.session.query(ItemCategory).order_by(ItemCategory.name).all()
         return jsonify(ItemCategorySchema(many=True).dump(categories)), HTTPStatus.OK

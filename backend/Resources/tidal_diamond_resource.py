@@ -32,6 +32,27 @@ _edit_schema = TidalDiamondEditSchema()
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_diamond():
+    """
+    TidalDiamondResource POST method. Adds a user-created tidal diamond to an itinerary.
+
+    `entry_mode` selects whether the hourly table is synthesised from peak inputs
+    (`simple`, rule of thirds) or supplied verbatim (`atlas`).
+    ---
+    post:
+      summary: Create a user tidal diamond
+      requestBody:
+        content:
+          application/json:
+            schema: TidalDiamondCreateSchema
+      responses:
+        201:
+          description: The created diamond, dumped as a station
+          content:
+            application/json:
+              schema: TidalStationSchema
+        400:
+          description: Missing itineraryId, or validation error
+    """
     try:
         body = request.get_json() or {}
         itinerary_id = body.get('itineraryId')
@@ -55,7 +76,22 @@ def create_diamond():
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def get_diamond(id: str):
-    """Raw editable view of a user diamond, for prefilling the edit form."""
+    """Raw editable view of a user diamond, for prefilling the edit form.
+    ---
+    get:
+      summary: Get a user tidal diamond's raw edit view
+      description: Carries the per-hour table plus reconstructed simple-mode peak inputs
+        (null for atlas diamonds), for prefilling the edit form. The matching write path
+        is the PATCH route, validated by TidalDiamondUpdateSchema.
+      responses:
+        200:
+          description: The diamond's editable fields
+          content:
+            application/json:
+              schema: TidalDiamondEditSchema
+        404:
+          description: Tidal diamond not found
+    """
     try:
         view = TidalStationService.get_diamond_edit_view(id)
         return jsonify(_edit_schema.dump(view)), HTTPStatus.OK
@@ -72,6 +108,29 @@ def get_diamond(id: str):
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def update_diamond(id: str):
+    """
+    TidalDiamondResource PATCH method. Partially updates a user tidal diamond.
+
+    All fields optional; the service rebuilds the hourly table only when the entry mode
+    or a stream input is present.
+    ---
+    patch:
+      summary: Update a user tidal diamond
+      requestBody:
+        content:
+          application/json:
+            schema: TidalDiamondUpdateSchema
+      responses:
+        200:
+          description: The updated diamond, dumped as a station
+          content:
+            application/json:
+              schema: TidalStationSchema
+        400:
+          description: Validation error, or incomplete simple-mode input
+        404:
+          description: Tidal diamond not found
+    """
     try:
         body = request.get_json() or {}
         data = _update_schema.load(body, partial=True)
@@ -94,6 +153,24 @@ def update_diamond(id: str):
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
 def delete_diamond(id: str):
+    """
+    TidalDiamondResource DELETE method. Deletes a user tidal diamond.
+    ---
+    delete:
+      summary: Delete a user tidal diamond
+      responses:
+        200:
+          description: Confirmation message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Tidal diamond not found
+    """
     try:
         TidalStationService.delete(id)
         return jsonify({"message": "Tidal diamond deleted"}), HTTPStatus.OK

@@ -58,6 +58,33 @@ def _get_happening_trip(trip_id: str) -> Optional[Trip]:
 @require_owner("trip")
 @limiter.limit("12 per minute")
 def post_position(id: str):
+    """
+    Record a GPS position ping for a happening trip.
+
+    Persists the ping and publishes it to the trip's live SSE channel. Accepted
+    while the trip is paused — a paused crew relocating to shelter is exactly
+    when shore wants positions.
+    ---
+    post:
+      summary: Record a GPS position ping
+      description: >
+        Persists the ping and publishes it to the trip's live SSE channel. Accepted
+        while the trip is paused.
+      requestBody:
+        content:
+          application/json:
+            schema: PositionPingSchema
+      responses:
+        201:
+          description: The recorded ping
+          content:
+            application/json:
+              schema: PositionPingSchema
+        400:
+          description: Validation error (invalid lat/lon/accuracy/heading/speed)
+        409:
+          description: The trip must be happening to share a position
+    """
     try:
         data = PositionPingSchema().load(request.get_json() or {})
     except ValidationError as e:
@@ -84,6 +111,45 @@ _CLOSE_DAY_ERROR_MESSAGES = {
 @require_owner("trip")
 @require_leader()
 def close_day(id: str):
+    """
+    Close out a happening trip's day and trigger expedition-log generation.
+
+    Leader-only. Validates the day can be closed, then dispatches the
+    generate_trip_day_logs Celery task asynchronously — the log itself is
+    generated out-of-band.
+    ---
+    post:
+      summary: Close a trip day and generate its expedition log
+      description: Leader-only. Dispatches log generation asynchronously; the response returns a task id, not the log itself.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: ISO 8601 date to close. Defaults to the trip's current local day.
+      responses:
+        202:
+          description: Log generation task accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId:
+                    type: string
+                  date:
+                    type: string
+                    format: date
+        400:
+          description: "'date' is not a valid ISO 8601 date"
+        409:
+          description: The trip isn't happening, or has no itinerary day scheduled for that date
+    """
     body = request.get_json(silent=True) or {}
     date_str = body.get("date")
     day_date: Optional[date] = None
@@ -109,7 +175,21 @@ def story_stream(token: str):
     unknown token, tokenless/standalone itinerary, no trip, or trip not happening are
     all indistinguishable — EventSource treats any non-200 as terminal, so this is
     also the correct signal once the trip finishes and the frontend should stop
-    reconnecting."""
+    reconnecting.
+    ---
+    get:
+      summary: Public live position stream for a story share link
+      description: >
+        Server-Sent Events. One `snapshot` event with the current positions, then a
+        `position` event per broadcast update, or a `: hb` heartbeat comment every 15s.
+      responses:
+        200:
+          description: SSE stream
+          content:
+            text/event-stream: {}
+        404:
+          description: Unknown token, or the trip isn't currently happening
+    """
     try:
         itinerary = ItineraryService.get_story_by_token(token)
     except NoResultFound:
@@ -133,6 +213,24 @@ def story_stream(token: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 def post_stream_ticket(id: str):
+    """
+    ---
+    post:
+      summary: Mint a short-lived crew-stream ticket
+      description: >
+        For M9's React Native client, which can't send an Authorization header on an
+        EventSource request — the web frontend only ever uses this.
+      responses:
+        200:
+          description: The ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    type: string
+    """
     return jsonify({"ticket": LiveStreamService.mint_stream_ticket(id)}), HTTPStatus.OK
 
 
@@ -143,7 +241,27 @@ def trip_stream(id: str):
     frontend only ever sends a ticket) or a short-lived stream ticket (§D5), checked
     in that order. Undecorated because path 2 must succeed with no Authorization
     header at all. Either credential succeeding satisfies the gate; both failing,
-    or the trip not being happening, is a single undifferentiated 404."""
+    or the trip not being happening, is a single undifferentiated 404.
+    ---
+    get:
+      summary: Crew live position stream for a trip
+      description: >
+        Server-Sent Events. Authorize via a normal bearer token OR a `?ticket=` query
+        param minted by POST .../stream-ticket — not both required.
+      parameters:
+        - name: ticket
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: SSE stream
+          content:
+            text/event-stream: {}
+        404:
+          description: Neither credential authorized, or the trip isn't currently happening
+    """
     authorized = False
 
     user_id = JWTService.resolve_user_id_from_bearer_header()

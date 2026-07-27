@@ -19,7 +19,20 @@ catalog_item_api = Blueprint('catalog_item', __name__, url_prefix=CATALOG_ITEM_E
 @catalog_item_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
 def get_all_catalog_items():
-    """GET /api/v1/catalog-item/all - Retrieve the caller's shared-requirement template."""
+    """GET /api/v1/catalog-item/all - Retrieve the caller's shared-requirement template.
+    ---
+    get:
+      summary: List the current user's catalog item template
+      responses:
+        200:
+          description: The user's catalog items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItemSchema'
+    """
     try:
         items = CatalogItemService.get_items_by_owner(g.current_user_id)
         return jsonify([CatalogItemSchema().dump(item) for item in items]), HTTPStatus.OK
@@ -39,6 +52,23 @@ def create_catalog_item():
     Catalog items are personal templates owned by the authenticated user
     (stamped from the auth context in CatalogItemSchema), so creation requires
     only a valid session.
+    ---
+    post:
+      summary: Create a catalog item
+      requestBody:
+        content:
+          application/json:
+            schema: CatalogItemSchema
+      responses:
+        201:
+          description: The created catalog item
+          content:
+            application/json:
+              schema: CatalogItemSchema
+        400:
+          description: Invalid catalog item data
+        409:
+          description: Database integrity constraint violated
     """
     try:
         item_data = request.get_json()
@@ -61,6 +91,20 @@ def create_catalog_item():
 def reset_catalog_to_default():
     """POST /api/v1/catalog-item/reset-to-default - Bootstrap the caller's empty
     template from DEFAULT_TRIP_REQUIREMENTS. 400 if the caller already has rows.
+    ---
+    post:
+      summary: Reset the catalog template to the default requirement list
+      responses:
+        201:
+          description: The newly seeded catalog items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItemSchema'
+        400:
+          description: Caller already has catalog items; clear the template before resetting
     """
     try:
         items = CatalogItemService.reset_to_default(g.current_user_id)
@@ -85,6 +129,23 @@ def update_catalog_item(id: str):
     Accepts a JSON body with any subset of mutable fields: name, categoryId.
     Only the fields present in the body are applied; omitted fields are left
     unchanged. Ownership fields (ownerId) are never overwritten by this endpoint.
+    ---
+    patch:
+      summary: Update a catalog item
+      requestBody:
+        content:
+          application/json:
+            schema: CatalogItemSchema
+      responses:
+        200:
+          description: The updated catalog item
+          content:
+            application/json:
+              schema: CatalogItemSchema
+        404:
+          description: Catalog item not found
+        409:
+          description: Database integrity constraint violated
     """
     try:
         logger.info(f"Update catalog item {id} in db")
@@ -107,7 +168,25 @@ def update_catalog_item(id: str):
 @JWTService.authenticate_restful
 @require_owner('catalog_item')
 def delete_catalog_item(id: str):
-    """DELETE /api/v1/catalog-item/<id> - Delete a catalog item by ID"""
+    """DELETE /api/v1/catalog-item/<id> - Delete a catalog item by ID
+    ---
+    delete:
+      summary: Delete a catalog item
+      responses:
+        200:
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Catalog item not found
+        409:
+          description: Cannot delete catalog item due to existing references
+    """
     try:
         logger.info(f"Deleting catalog item {id}")
         CatalogItemService.delete_item(id)

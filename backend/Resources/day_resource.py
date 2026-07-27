@@ -18,6 +18,20 @@ day_api = Blueprint('day', __name__, url_prefix=DAY_ENDPOINT)
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itinerary_id'))
 def read_by_itinerary(itinerary_id: str):
+    """
+    ---
+    get:
+      summary: List all days of an itinerary
+      responses:
+        200:
+          description: The itinerary's days
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DaySchema'
+    """
     days = DayService.get_by_itinerary(itinerary_id)
     return jsonify([DaySchema().dump(day) for day in days]), HTTPStatus.OK
 
@@ -26,6 +40,19 @@ def read_by_itinerary(itinerary_id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def read_by_id(id: str):
+    """
+    ---
+    get:
+      summary: Get a day by id
+      responses:
+        200:
+          description: The day
+          content:
+            application/json:
+              schema: DaySchema
+        404:
+          description: Day not found
+    """
     try:
         day = DayService.get_day_by_id(id)
         return jsonify(DaySchema().dump(day)), HTTPStatus.OK
@@ -40,6 +67,34 @@ def read_by_id(id: str):
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def read_by_key():
+    """
+    ---
+    post:
+      summary: Look up a day by its natural key
+      description: "Body: { itineraryId, dayNumber, date }."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itineraryId, dayNumber, date]
+              properties:
+                itineraryId:
+                  type: string
+                dayNumber:
+                  type: integer
+                date:
+                  type: string
+                  format: date
+      responses:
+        200:
+          description: The matching day
+          content:
+            application/json:
+              schema: DaySchema
+        400:
+          description: Missing or incomplete day key
+    """
     try:
         body = request.get_json()
 
@@ -59,7 +114,25 @@ def read_by_key():
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
 def create_day():
-    """POST /api/day - Create new day"""
+    """POST /api/day - Create new day
+    ---
+    post:
+      summary: Create a day
+      requestBody:
+        content:
+          application/json:
+            schema: DaySchema
+      responses:
+        201:
+          description: The created day
+          content:
+            application/json:
+              schema: DaySchema
+        400:
+          description: Invalid day data
+        409:
+          description: Database integrity constraint violated
+    """
     try:
         body = request.get_json()
         if not isinstance(body, dict):
@@ -92,6 +165,25 @@ def update_day(id: str):
 
     Returns:
         200 with the updated day object, or 404 if not found.
+    ---
+    patch:
+      summary: Partially update a day
+      requestBody:
+        content:
+          application/json:
+            schema: DayUpdateSchema
+      responses:
+        200:
+          description: The updated day
+          content:
+            application/json:
+              schema: DaySchema
+        400:
+          description: Invalid field values
+        404:
+          description: Day not found
+        409:
+          description: Database integrity constraint violated
     """
     try:
         raw = request.get_json()
@@ -121,6 +213,34 @@ def assign_points(id: str):
     Body: { startPointId: uuid, endPointId: uuid }
     Walks the linked list from startPointId to endPointId and sets each
     point's day_id to this day's id.
+    ---
+    post:
+      summary: Assign a range of route points to this day
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startPointId, endPointId]
+              properties:
+                startPointId:
+                  type: string
+                endPointId:
+                  type: string
+      responses:
+        200:
+          description: Assignment confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        400:
+          description: startPointId/endPointId missing, a cycle was detected, or endPointId is not reachable from startPointId
+        404:
+          description: Day or start point not found
     """
     try:
         body = request.get_json()
@@ -143,7 +263,25 @@ def assign_points(id: str):
 @JWTService.authenticate_restful
 @require_owner('day')
 def delete_day_by_id(id: str):
-    """DELETE /api/day/<id> - Delete day by ID"""
+    """DELETE /api/day/<id> - Delete day by ID
+    ---
+    delete:
+      summary: Delete a day
+      responses:
+        200:
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Day not found
+        409:
+          description: Cannot delete day due to existing references
+    """
     try:
         DayService.delete_day(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK

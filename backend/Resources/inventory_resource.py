@@ -18,7 +18,21 @@ inventory_api = Blueprint('inventory', __name__, url_prefix=INVENTORY_ENDPOINT)
 @inventory_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
 def get_all_inventories():
-    """GET /api/inventory/all - Retrieve all inventories for current user"""
+    """
+    GET /api/inventory/all - Retrieve all inventories for current user
+    ---
+    get:
+      summary: List all inventories owned by the current user
+      responses:
+        200:
+          description: The user's inventories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventorySchema'
+    """
     try:
         logger.info("Retrieve all inventories from db")
         user_id = g.current_user_id
@@ -35,7 +49,20 @@ def get_all_inventories():
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def get_inventory(id: str):
-    """GET /api/inventory/<id> - Retrieve inventory by ID"""
+    """
+    GET /api/inventory/<id> - Retrieve inventory by ID
+    ---
+    get:
+      summary: Get an inventory by id
+      responses:
+        200:
+          description: The inventory, including its requirements
+          content:
+            application/json:
+              schema: InventorySchema
+        404:
+          description: Inventory not found
+    """
     try:
         logger.info(f"Retrieve inventory with id {id}")
         inventory = InventoryService.get_inventory_by_id(id)
@@ -52,7 +79,27 @@ def get_inventory(id: str):
 @inventory_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
 def create_inventory():
-    """POST /api/inventory/create - Create new inventory"""
+    """
+    POST /api/inventory/create - Create new inventory
+    ---
+    post:
+      summary: Create an inventory
+      description: >
+        A personal inventory is stamped with the caller as owner. A trip inventory
+        (trip_id present) is owned by the trip instead.
+      requestBody:
+        content:
+          application/json:
+            schema: InventorySchema
+      responses:
+        201:
+          description: The created inventory
+          content:
+            application/json:
+              schema: InventorySchema
+        409:
+          description: Database integrity constraint violated
+    """
     try:
         inventory_data = request.get_json()
         inventory = InventoryService.create_inventory(inventory_data)
@@ -78,6 +125,27 @@ def update_inventory(id: str):
 
     Returns:
         200 with the updated inventory object, or 404 if not found.
+    ---
+    patch:
+      summary: Update an inventory
+      description: >
+        Inventory has no user-editable scalar fields today — trip_id/user_id are set
+        at creation and requirements are managed via their own endpoints — so this
+        currently returns the record unchanged. Kept for API symmetry and future fields.
+      requestBody:
+        content:
+          application/json:
+            schema: InventorySchema
+      responses:
+        200:
+          description: The inventory, unchanged
+          content:
+            application/json:
+              schema: InventorySchema
+        404:
+          description: Inventory not found
+        409:
+          description: Database integrity constraint violated
     """
     try:
         logger.info(f"Update inventory {id} in db")
@@ -99,7 +167,26 @@ def update_inventory(id: str):
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def delete_inventory(id: str):
-    """DELETE /api/inventory/<id> - Delete inventory by ID"""
+    """
+    DELETE /api/inventory/<id> - Delete inventory by ID
+    ---
+    delete:
+      summary: Delete an inventory
+      responses:
+        200:
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Inventory not found
+        409:
+          description: Cannot delete inventory due to existing references
+    """
     try:
         logger.info(f"Deleting inventory {id}")
         InventoryService.delete_inventory(id)
@@ -120,7 +207,25 @@ def delete_inventory(id: str):
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def add_requirement(id: str):
-    """POST /api/inventory/<id>/requirements — Add a requirement to the inventory."""
+    """
+    POST /api/inventory/<id>/requirements — Add a requirement to the inventory.
+    ---
+    post:
+      summary: Add a requirement to an inventory
+      description: The caller is stamped as the proposer of the requirement.
+      requestBody:
+        content:
+          application/json:
+            schema: TripRequirementSchema
+      responses:
+        201:
+          description: The created requirement
+          content:
+            application/json:
+              schema: TripRequirementSchema
+        404:
+          description: Inventory not found
+    """
     try:
         req = InventoryService.add_requirement(id, request.get_json())
         return jsonify(TripRequirementSchema().dump(req)), HTTPStatus.CREATED
@@ -137,7 +242,29 @@ def add_requirement(id: str):
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def remove_requirement(id: str, req_id: str):
-    """DELETE /api/inventory/<id>/requirements/<req_id> — Remove a requirement."""
+    """
+    DELETE /api/inventory/<id>/requirements/<req_id> — Remove a requirement.
+    ---
+    delete:
+      summary: Remove a requirement from an inventory
+      description: >
+        Authorship-scoped — only the member who proposed the requirement may remove
+        it (no leader override).
+      responses:
+        200:
+          description: Removal confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        403:
+          description: Caller did not propose this requirement
+        404:
+          description: Requirement not found
+    """
     try:
         InventoryService.remove_requirement(id, req_id)
         return jsonify({"message": "Requirement removed"}), HTTPStatus.OK
@@ -159,9 +286,33 @@ def remove_requirement(id: str, req_id: str):
 @require_owner('inventory')
 @require_owner('item', id_param='itemId', from_body=True)
 def contribute_item(id: str, req_id: str):
-    """POST /api/inventory/<id>/requirements/<req_id>/contribute
+    """
+    POST /api/inventory/<id>/requirements/<req_id>/contribute
     Body: {"itemId": "<uuid>"}
     Covers the requirement with the caller's personal item.
+    ---
+    post:
+      summary: Contribute a personal item to cover a requirement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId]
+              properties:
+                itemId:
+                  type: string
+                  format: uuid
+      responses:
+        200:
+          description: The updated requirement, now covered by this contribution
+          content:
+            application/json:
+              schema: TripRequirementSchema
+        400:
+          description: itemId is missing, or the item cannot cover this requirement
+        404:
+          description: Inventory, requirement, or item not found
     """
     try:
         body = request.get_json()
@@ -187,8 +338,22 @@ def contribute_item(id: str, req_id: str):
 @JWTService.authenticate_restful
 @require_owner('inventory')
 def unclaim_requirement(id: str, req_id: str):
-    """DELETE /api/inventory/<id>/requirements/<req_id>/contribute
+    """
+    DELETE /api/inventory/<id>/requirements/<req_id>/contribute
     Removes the caller's contribution from the requirement.
+    ---
+    delete:
+      summary: Remove the caller's contribution from a requirement
+      responses:
+        200:
+          description: The updated requirement
+          content:
+            application/json:
+              schema: TripRequirementSchema
+        404:
+          description: >
+            Inventory or requirement not found, or the caller has no contribution
+            to withdraw from this requirement
     """
     try:
         req = InventoryService.unclaim_requirement(id, req_id)

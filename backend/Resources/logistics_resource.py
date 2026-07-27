@@ -21,6 +21,19 @@ logistics_api = Blueprint("logistics", __name__, url_prefix=LOGISTICS_ENDPOINT)
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 def get_logistics(trip_id: str):
+    """
+    LogisticsResource GET method. Retrieves the float plan logistics for a trip.
+    ---
+    get:
+      summary: Get a trip's logistics
+      description: Returns an empty object if the trip has no logistics yet.
+      responses:
+        200:
+          description: The trip's logistics, or an empty object if none exist
+          content:
+            application/json:
+              schema: LogisticsSchema
+    """
     logistics = LogisticsService.get(trip_id)
     if not logistics:
         return jsonify({}), HTTPStatus.OK
@@ -31,6 +44,29 @@ def get_logistics(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 def upsert_logistics(trip_id: str):
+    """
+    LogisticsResource PUT method. Creates or replaces a trip's logistics.
+    ---
+    put:
+      summary: Create or replace a trip's logistics
+      description: Shore-contact fields are leader-only; a crew member sending one is rejected.
+      requestBody:
+        content:
+          application/json:
+            schema: LogisticsSchema
+      responses:
+        200:
+          description: The upserted logistics
+          content:
+            application/json:
+              schema: LogisticsSchema
+        400:
+          description: Trip not found, or other value error
+        403:
+          description: A crew member tried to write a leader-only field
+        422:
+          description: Validation error
+    """
     try:
         body = LogisticsSchema().load(request.get_json(silent=True) or {})
         logistics = LogisticsService.upsert(trip_id, body, g.current_user_id)
@@ -50,6 +86,23 @@ def upsert_logistics(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 def generate_share(trip_id: str):
+    """
+    LogisticsResource POST method. Generates (or rotates) the trip's public float plan share token.
+    ---
+    post:
+      summary: Generate the float plan share link
+      description: Leader-only.
+      responses:
+        200:
+          description: The logistics with a fresh share_token
+          content:
+            application/json:
+              schema: LogisticsSchema
+        403:
+          description: Caller is not the trip leader
+        404:
+          description: Trip not found
+    """
     try:
         logistics = LogisticsService.generate_share(trip_id, g.current_user_id)
         return jsonify(LogisticsSchema().dump(logistics)), HTTPStatus.OK
@@ -66,6 +119,22 @@ def generate_share(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 def send_share_email(trip_id: str):
+    """
+    LogisticsResource POST method. Emails the float plan share link to the shore contact.
+    ---
+    post:
+      summary: Email the float plan link to the shore contact
+      description: Leader-only.
+      responses:
+        204:
+          description: Email sent
+        400:
+          description: No shore contact email on file
+        403:
+          description: Caller is not the trip leader
+        404:
+          description: Trip not found
+    """
     try:
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         LogisticsService.send_share_email(trip_id, g.current_user_id, frontend_url)

@@ -17,7 +17,20 @@ item_api = Blueprint('item', __name__, url_prefix=ITEM_ENDPOINT)
 @item_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
 def get_all_items():
-    """GET /api/item/all - Retrieve all personal items owned by the current user."""
+    """GET /api/item/all - Retrieve all personal items owned by the current user.
+    ---
+    get:
+      summary: List the current user's personal items
+      responses:
+        200:
+          description: The user's personal items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemSchema'
+    """
     try:
         items = ItemService.get_items_by_user(g.current_user_id)
         return jsonify([ItemSchema().dump(item) for item in items]), HTTPStatus.OK
@@ -32,11 +45,23 @@ def get_all_items():
 @JWTService.authenticate_restful
 @require_owner('item')
 def get_item(id: str):
-    """GET /api/item/<id> - Retrieve item by ID"""
+    """GET /api/item/<id> - Retrieve item by ID
+    ---
+    get:
+      summary: Get a personal item by id
+      responses:
+        200:
+          description: The item
+          content:
+            application/json:
+              schema: ItemSchema
+        404:
+          description: Item not found
+    """
     try:
         item = ItemService.get_item_by_id(id)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.OK
-    
+
     except HTTPException:
         raise
     except NoResultFound:
@@ -53,12 +78,27 @@ def create_item():
     Items are personal gear owned by the authenticated user (stamped from the
     auth context in ItemSchema), not scoped to any inventory — so creation
     requires only a valid session, no inventory ownership.
+    ---
+    post:
+      summary: Create a personal item
+      requestBody:
+        content:
+          application/json:
+            schema: ItemSchema
+      responses:
+        201:
+          description: The created item
+          content:
+            application/json:
+              schema: ItemSchema
+        409:
+          description: Database integrity constraint violated
     """
     try:
         item_data = request.get_json()
         item = ItemService.create_item(item_data)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.CREATED
-    
+
     except HTTPException:
         raise
     except IntegrityError:
@@ -80,13 +120,33 @@ def update_item(id: str):
 
     Returns:
         200 with the updated item object, or 404 if not found.
+    ---
+    patch:
+      summary: Update a personal item
+      description: >
+        Accepts any subset of name, checked, categoryId, status, defaultPack.
+        Omitted fields are left unchanged; userId is never overwritten.
+      requestBody:
+        content:
+          application/json:
+            schema: ItemSchema
+      responses:
+        200:
+          description: The updated item
+          content:
+            application/json:
+              schema: ItemSchema
+        404:
+          description: Item not found
+        409:
+          description: Database integrity constraint violated
     """
     try:
         logger.info(f"Update item {id} in db")
         item_data = request.get_json()
         item = ItemService.update_item(id, item_data)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.OK
-        
+
     except HTTPException:
         raise
     except NoResultFound:
@@ -101,12 +161,30 @@ def update_item(id: str):
 @JWTService.authenticate_restful
 @require_owner('item')
 def delete_item(id: str):
-    """DELETE /api/item/<id> - Delete item by ID"""
+    """DELETE /api/item/<id> - Delete item by ID
+    ---
+    delete:
+      summary: Delete a personal item
+      responses:
+        200:
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        404:
+          description: Item not found
+        409:
+          description: Cannot delete item due to existing references
+    """
     try:
         logger.info(f"Deleting item {id}")
         ItemService.delete_item(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-        
+
     except HTTPException:
         raise
     except IntegrityError as e:

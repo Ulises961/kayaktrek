@@ -13,6 +13,7 @@ from Api.limiter import limiter
 from Api.mail import mail
 from Api.logging_config import setup_logging
 from Api.observability import setup_logfire
+from Api.openapi import setup_openapi
 from Api.error_handlers import register_error_handlers
 from Api.seed import seed_item_categories, seed_place_categories, seed_demo_itinerary
 from Api.celery_app import init_celery
@@ -157,5 +158,9 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.json_provider_class = CustomJSONProvider
 
     init_celery(app)
+
+    # Built from the now-fully-registered url_map (M13 Part B) — every blueprint above must
+    # already be registered for path coverage to be complete.
+    setup_openapi(app)
 
     return app

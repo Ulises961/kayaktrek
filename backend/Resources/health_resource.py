@@ -17,7 +17,33 @@ def health():
     """Liveness/readiness probe for the compose healthcheck / a future load balancer.
     No auth (a prerequisite for a healthcheck) and exempt from the default rate limit
     (polled far more often than the 200/hour default allows). Pings the DB so a backend
-    that's up but can't reach Postgres still reports unhealthy."""
+    that's up but can't reach Postgres still reports unhealthy.
+    ---
+    get:
+      summary: Liveness/readiness probe
+      description: No auth required; exempt from the default rate limit.
+      responses:
+        200:
+          description: The backend and its database connection are healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        503:
+          description: The backend cannot reach the database
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+    """
     try:
         db.session.execute(text("SELECT 1"))
         return jsonify({"status": "ok"}), HTTPStatus.OK
