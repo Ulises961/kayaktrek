@@ -101,8 +101,15 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # StagingConfig/ProductionConfig both require this at class-definition time
+      # (os.environ[...], no default, M11 rate-limit hardening) - just importing the
+      # Flask app for `flask seed` crashes without it, even though migrate itself
+      # never handles a rate-limited request.
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: "no"
 
