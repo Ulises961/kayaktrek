@@ -119,10 +119,16 @@ export async function apiDelete(
 }
 
 // Unauthenticated GET — for public endpoints that must not redirect to /login on failure.
+// Callers (fetchLandingRoutes and friends) already treat any thrown error as best-effort
+// degradation to empty data, but without a bound on the request itself, an unresponsive
+// backend hangs indefinitely instead of failing fast into that fallback — surfaced when a
+// Docker build's static generation of the (auth) pages timed out entirely rather than
+// degrading, because the production API wasn't reachable yet at build time.
 export async function apiGetPublic<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${versionPath(path)}`, {
     headers: { "Content-Type": "application/json" },
     next: { revalidate: 300 },
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(await errorMessage("GET", path, res))
   return res.json() as Promise<T>
