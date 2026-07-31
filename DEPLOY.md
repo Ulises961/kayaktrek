@@ -73,41 +73,50 @@ Pull an older tag by SHA instead of `latest` — every image is also tagged with
 built from (`backend-ci.yml`/`frontend-ci.yml`). Edit the `image:` lines in
 `docker-compose.prod.yml` to the known-good SHA, `up -d`, then revert once the fix lands.
 
-## Before going live — open items
+## Status (2026-07-31 — first real deploy)
 
-Not blockers to using this pipeline for LAN-local dev/testing today, but need sorting before the
-app is reachable by anyone off the box's own LAN:
+Live end-to-end for the first time: `kayaktrek.app` (frontend, bare apex — see
+`nginx/kayak-expedition-planner.conf`'s header comment for why there's no `app.` subdomain),
+`api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` (MinIO S3 API, correctly
+denying anonymous root-listing while serving `avatars/`/`point-images/` public-read) all resolve
+through Cloudflare → `cloudflared` Tunnel → host nginx (TLS via certbot-dns-cloudflare,
+auto-renewing) → the right container. GHCR images build and push on every merge to `master`.
+Currently paused at the operator's choice while doing further polish — `cloudflared` stopped
+(`sudo systemctl stop cloudflared`), nginx/Docker stack still running on the box for local
+testing; `sudo systemctl start cloudflared` brings it back with no other changes needed.
 
-- **Local exposure model — resolved, install pending.** The box runs **nginx as a host service**
-  (every app on the box registers there) — `docker-compose.prod.yml`'s existing `127.0.0.1`-only
-  bindings were already correct for this (nginx and the containers' published ports share the
-  same network namespace), no compose change needed. `nginx/kayak-expedition-planner.conf` has
-  the three server blocks to install (frontend/backend/SSE stay separate origins, matching how
-  the app already treats them — see the file's own header comment for why). Blocked only on the
-  domain: `server_name` needs real hostnames to route on, so this can't actually go live until
-  then, even though the config itself is ready. `PROXY_TRUSTED_HOPS` is now `1` by default
-  (`.env.prod.example`) to account for nginx being a hop regardless of Tunnel status — bump to
-  `2` once Tunnel is also added in front of nginx. Routing everything through one nginx entry
-  point rather than binding each container's port directly is also a deliberate security
-  choice, not just a topology-matching one: it keeps per-service ports and internal container
-  layout from being directly probeable by anything scanning the LAN or the box, versus exposing
-  `:3300`/`:5000`/`:5001` etc. as separate discoverable targets.
-- **Domain purchase** — blocks the nginx `server_name`s above and both of the next two items.
-- **Cloudflare Tunnel + DNS** (ADR-034 point 3) — needed before anything outside the box's own LAN
-  can reach it. Points at nginx (`127.0.0.1:80`), not directly at each container.
-- **Brevo account + domain verification** — SPF/DKIM/DMARC TXT records, once the domain exists.
-  `.env.prod.example`'s `MAIL_*` values are placeholders until then.
-- **`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SSE_URL` repo Variables** — currently unset; the frontend
-  image builds with empty values until the real public URLs exist.
+Five real, first-time-ever-exercised bugs surfaced getting here, none of them present in local
+dev/CI-only testing because nothing had ever run this pipeline's `push`-to-`master` path or hit
+a real production domain before:
+1. **`toLower()` isn't a real GitHub Actions expression function** — invalidated the *entire*
+   workflow file (any invalid expression does, regardless of which job references it), blocking
+   `pull_request` CI on every commit since the pipeline's first commit. Fixed by computing the
+   lowercase GHCR owner in a shell step instead (PR #76).
+2. **Missing `docker/setup-buildx-action`** — the runner's default `docker` driver doesn't
+   support `cache-to: type=gha` at all (PR #77).
+3. **`apiGetPublic` had no fetch timeout** — the frontend build's static generation of `(auth)`
+   pages hung until Next's own build watchdog killed it, because the layout's landing-routes
+   fetch had nowhere to fail fast into its own already-correct empty-fallback path when the
+   production API wasn't reachable yet (this deploy's chicken-and-egg: the build ran before the
+   backend had ever been deployed). Fixed with `AbortSignal.timeout(10_000)` (PR #78).
+4. **`migrate` never had `RATELIMIT_STORAGE_URI`** — `StagingConfig`/`ProductionConfig` both
+   require it at class-definition time (M11 hardening, no default), so `flask seed` crashed
+   importing the app at all, even though `migrate` never handles a rate-limited request. Every
+   other service already set it; `migrate` never did (PR #80).
+5. **A pre-existing DNS record at the zone apex** (likely an auto-created placeholder from
+   registration) silently rejected every `cloudflared tunnel route dns kayaktrek kayaktrek.app`
+   attempt — Cloudflare was faithfully proxying `kayaktrek.app` to that stale record the whole
+   time, manifesting as a 522. Deleting it and re-running the route command fixed it.
+
+**Still open, not blockers to the current live state:**
 - **`autosuspend.conf`'s connection-state check** — without it, a live session with light traffic
   (mobile testing, SSE) can get suspended out from under itself.
-- **GHCR PAT + `docker login` on the box, and a first real run-through of this runbook** — nothing
-  in this pipeline has been executed on the physical box yet.
-- **Uptime Kuma monitor configuration** — done in its web UI post-first-boot, not in compose:
-  health-endpoint checks + a notification channel, closing the "silent failure" gap ADR-034 flagged
+- **Uptime Kuma monitor configuration** — the compose service exists
+  (`docker-compose.monitoring.yml`); the actual monitors (health-endpoint checks + a notification
+  channel) still need setting up in its web UI, closing the "silent failure" gap ADR-034 flagged
   for the home-hosted RabbitMQ path.
-- **Carried over from `CLAUDE.md`'s existing pre-production checklist** (unaffected by this PR,
-  listed here so "before going live" has one place to look): Sentry error alerting, the safety
-  disclaimer in-app + Terms of Use, and revisiting `.env`-file secrets management now that a
-  staging-shaped server is genuinely being provisioned (the condition `CLAUDE.md` already names
-  for that revisit).
+- **Carried over from `CLAUDE.md`'s pre-production checklist**: Sentry error alerting, and
+  revisiting `.env`-file secrets management now that a staging-shaped server is genuinely
+  provisioned (the condition `CLAUDE.md` already names for that revisit).
+- Minor: two `apispec` `UserWarning`s during `flask seed` (`User`, `UserCertification` schema
+  name collisions, M13's OpenAPI spec generation) — non-fatal, doc-quality only.
