@@ -73,6 +73,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GitHub Actions expressions have no case-conversion function (`toLower(...)` is not
+      # a real one — it silently invalidated this entire workflow file, blocking every job
+      # in it, push and pull_request alike, since the pipeline's first commit); lowercase
+      # the owner in a shell step instead.
+      - name: Compute lowercase image repository owner
+        id: vars
+        run: echo "owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       # NEXT_PUBLIC_* vars are inlined into the client bundle at build time — sourced from
       # repo Variables (Settings > Actions > Variables), not hardcoded, so the real values
       # get set once a domain exists (ADR-034) without touching this workflow. Empty repo
@@ -86,9 +94,8 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_SSE_URL=${{ vars.NEXT_PUBLIC_SSE_URL }}
-          # GHCR requires a lowercase path — github.repository_owner isn't guaranteed to be.
           tags: |
-            ghcr.io/${{ toLower(github.repository_owner) }}/kayak-expedition-planner-frontend:latest
-            ghcr.io/${{ toLower(github.repository_owner) }}/kayak-expedition-planner-frontend:${{ github.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/kayak-expedition-planner-frontend:latest
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/kayak-expedition-planner-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

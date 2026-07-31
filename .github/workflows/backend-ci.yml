@@ -96,6 +96,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GitHub Actions expressions have no case-conversion function (`toLower(...)` is not
+      # a real one — it silently invalidated this entire workflow file, blocking every job
+      # in it, push and pull_request alike, since the pipeline's first commit); lowercase
+      # the owner in a shell step instead.
+      - name: Compute lowercase image repository owner
+        id: vars
+        run: echo "owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       # ADR-034: images are private by default (not-yet-public app) — the deploy target
       # authenticates with `docker login ghcr.io` using a PAT, see DEPLOY.md.
       - name: Build and push backend image
@@ -104,9 +112,8 @@ jobs:
           context: ./backend
           target: runtime
           push: true
-          # GHCR requires a lowercase path — github.repository_owner isn't guaranteed to be.
           tags: |
-            ghcr.io/${{ toLower(github.repository_owner) }}/kayak-expedition-planner-backend:latest
-            ghcr.io/${{ toLower(github.repository_owner) }}/kayak-expedition-planner-backend:${{ github.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/kayak-expedition-planner-backend:latest
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/kayak-expedition-planner-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
