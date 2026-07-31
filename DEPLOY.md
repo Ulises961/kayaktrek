@@ -85,6 +85,12 @@ Currently paused at the operator's choice while doing further polish — `cloudf
 (`sudo systemctl stop cloudflared`), nginx/Docker stack still running on the box for local
 testing; `sudo systemctl start cloudflared` brings it back with no other changes needed.
 
+`autosuspend.conf`'s connection-state check (ADR-034 point 4) is also done — a new
+`[check.AppConnections]` keys off `ss -tn state established` on the app's serving ports
+(backend `:5000`, SSE sidecar `:5001`, frontend `:3300`), a binary presence signal that doesn't
+average away the way the existing bandwidth check can for a live SSE session's small heartbeat
+frames. Lives in the separate `~/Documents/aspire-sleep` box-management repo, not this one.
+
 Five real, first-time-ever-exercised bugs surfaced getting here, none of them present in local
 dev/CI-only testing because nothing had ever run this pipeline's `push`-to-`master` path or hit
 a real production domain before:
@@ -109,8 +115,6 @@ a real production domain before:
    time, manifesting as a 522. Deleting it and re-running the route command fixed it.
 
 **Still open, not blockers to the current live state:**
-- **`autosuspend.conf`'s connection-state check** — without it, a live session with light traffic
-  (mobile testing, SSE) can get suspended out from under itself.
 - **Uptime Kuma monitor configuration** — the compose service exists
   (`docker-compose.monitoring.yml`); the actual monitors (health-endpoint checks + a notification
   channel) still need setting up in its web UI, closing the "silent failure" gap ADR-034 flagged
