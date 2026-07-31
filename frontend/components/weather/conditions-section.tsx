@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import Link from "next/link"
 import { ChevronDown, RefreshCw, Navigation2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -137,6 +138,16 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
           </Button>
         )}
       </div>
+
+      {hasData && (
+        <p className="text-muted-foreground border-border/50 border-t px-3 py-1.5 text-[11px] leading-snug">
+          Planning aid only — not a substitute for official charts, tide tables, and sound
+          seamanship.{" "}
+          <Link href="/terms" className="underline underline-offset-2 hover:no-underline">
+            Terms of Use
+          </Link>
+        </p>
+      )}
 
       {/* Hourly detail */}
       {(hasWeather || isLeader) && (

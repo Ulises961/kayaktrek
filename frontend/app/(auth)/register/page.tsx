@@ -132,6 +132,14 @@ export default function RegisterPage() {
         </Button>
       </form>
 
+      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+        By creating an account, you agree to our{" "}
+        <Link href="/terms" className="auth-link">
+          Terms of Use
+        </Link>
+        .
+      </p>
+
       <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
         Already have an account?{" "}
         <Link href="/login" className="auth-link">

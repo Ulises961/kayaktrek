@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   // own build output instead of the one your normal `pnpm dev` is using in the same
   // checkout — unset, this is exactly `.next`, the default.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  // Traces only the dependency subset each route actually needs into .next/standalone,
+  // bundled with a minimal server.js — required for a lean self-hosted Docker image
+  // (frontend/Dockerfile) instead of shipping full node_modules.
+  output: "standalone",
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

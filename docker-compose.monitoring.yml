@@ -1,0 +1,67 @@
+# Box-level operator tooling — container management, hardware stats, DB browsing.
+# Deliberately separate from docker-compose.prod.yml: independent lifecycle, so a
+# `docker compose -f docker-compose.prod.yml pull && up -d` app redeploy never touches
+# this stack (or vice versa). Bring up with:
+#   docker compose -f docker-compose.prod.yml up -d      # creates the shared `kayak_net` first
+#   docker compose -f docker-compose.monitoring.yml up -d
+# All UIs stay on 127.0.0.1 only, same as every other infra service in this repo — none
+# of these are ever routed through the public Cloudflare Tunnel domain.
+
+services:
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: kayak_portainer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9002:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+  # nicolargo/glances' documented Docker pattern: --pid host so it sees host processes,
+  # --network host so network throughput is the host's real interface, not a container's
+  # virtual veth. That bypasses `ports:` entirely, so the bind address must be pinned
+  # explicitly — network host mode would otherwise listen on every host interface.
+  glances:
+    image: nicolargo/glances:latest
+    container_name: kayak_glances
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    environment:
+      GLANCES_OPT: "-w --bind 127.0.0.1 --port 61208"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    container_name: kayak_pgweb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}
+
+  # ADR-034: mitigates the home-hosted RabbitMQ silent-failure risk — a health-endpoint
+  # monitor + notification channel here pages the operator instead of a Celery-dispatched
+  # safety alert (missed-checkpoint shore-contact email) silently dropping during a home
+  # power/ISP outage. Monitors and notification channels are configured post-boot in its
+  # own web UI, not declaratively here — this block only brings the service up.
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: kayak_uptime_kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+
+volumes:
+  portainer_data:
+  uptime_kuma_data:
+
+networks:
+  default:
+    name: kayak_net
+    external: true

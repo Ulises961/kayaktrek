@@ -12,6 +12,6 @@ def user_or_ip():
 
 limiter = Limiter(
     key_func=user_or_ip,
-    storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI"),
+    storage_uri=os.getenv("RATELIMIT_STORAGE_URI"),
     default_limits=["200 per hour"],
     headers_enabled=True)

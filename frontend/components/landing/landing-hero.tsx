@@ -128,6 +128,14 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         </div>
       </div>
 
+      {/* Legal footer link — bottom-right corner, clear of the cartouche on both
+          layouts (bottom-center on mobile, bottom-left on desktop). */}
+      <div className="absolute right-4 bottom-3 z-[1001] sm:right-7">
+        <Link href="/terms" className={cn(chartLink, "text-[11px]")}>
+          Terms of Use
+        </Link>
+      </div>
+
       {/* Scroll runway (mobile only) — gives the dissipate its travel distance */}
       {compact && <div aria-hidden className="h-[60vh]" />}
     </div>

@@ -369,6 +369,69 @@ lands as one coordinated PR.
 
 ---
 
+## Deployment hosting — home-first pipeline, DigitalOcean as the pre-defined graduation target
+
+**Context.** M9 (mobile) needs a persistent, network-reachable server so a physical device can hit
+a real API instead of a dev laptop's localhost — the trigger for evaluating remote hosting for the
+first time. An existing homelab box (`autosuspend` idle-detection, Wake-on-LAN, lid-open/close
+session handling already set up on it) was the starting point for a hosting evaluation; the
+comparative reasoning behind it is kept outside this document. **DigitalOcean** is the pre-selected
+graduation target.
+
+**Decision (2026-07-27).**
+
+1. **Build the deployment pipeline now, decoupled from where it deploys to.** Dockerfiles → an
+   image registry (GHCR) → compose pull/deploy is worth having built before it's needed; the
+   pipeline's value doesn't depend on its target, so building it while stakes are low is a
+   rehearsal, not premature work.
+2. **Point that pipeline at the home box for the pre-traction phase.** Full stack — Postgres,
+   Redis, RabbitMQ, Flask, Celery, Next.js — self-hosted. This deliberately keeps RabbitMQ
+   (Celery's broker, per `celery_app.py`) home too, even though it sits behind Celery-dispatched
+   safety-relevant work (missed-checkpoint shore-contact alerts) — see Consequences.
+3. **Expose it via Cloudflare Tunnel, not port-forwarding.** `cloudflared` makes an outbound-only
+   connection to Cloudflare's edge, so no inbound router rule is needed, it works even behind
+   CGNAT, the home IP is never publicly resolvable, and Cloudflare terminates TLS automatically.
+   This requires the app's domain to have its DNS hosted on Cloudflare (the tunnel's CNAME is
+   created via `cloudflared tunnel route dns`) — a **different DNS setup than dynamic DNS**, which
+   solves "my IP keeps changing" by continuously updating an A-record, a problem Tunnel sidesteps
+   entirely by never accepting inbound connections in the first place. The existing No-IP DDNS +
+   port-forward setup for Nextcloud is untouched; the two don't compose under one hostname, so the
+   kayak app gets its own domain/subdomain on Cloudflare-managed DNS.
+4. **Extend `autosuspend.conf` with a connection-state check.** The existing `[check.LAN]`
+   bandwidth-threshold check can miss genuine low-volume activity (SSE heartbeats, sparse API
+   polling from mobile testing) — that traffic can average below any threshold set safely above
+   the real background noise floor within the 60s window. An `ExternalCommand` check testing for
+   established connections on the app's ports (`ss -tn state established '( sport = :5000 or
+   sport = :3000 )'`) is a binary, non-averaged signal layered alongside it, so a live dev/test
+   session can't be suspended out from under itself.
+5. **Bright-line graduation trigger, fixed now rather than re-litigated per incident:** the whole
+   stack moves off the home box onto a paid DO droplet the moment (a) someone outside a personal
+   trusted circle relies on it, or (b) money changes hands (Patreon/paid features). At that point
+   the already-proven pipeline is re-pointed at a fresh DO droplet — a config/DNS change, not a
+   rebuild. Region (Frankfurt vs. Amsterdam) is deferred to a latency check at graduation time;
+   both are EU/EEA and legally equivalent for GDPR residency.
+
+**Consequences.**
+- The stack stays self-hosted through the pre-traction phase, while still testing against a real
+  network-reachable server (mobile devices, friends) rather than only localhost.
+- **Residual risk accepted explicitly, not accidentally**: a home power or ISP outage can delay or
+  silently drop a Celery-dispatched safety alert during this phase. Mitigation is a self-hosted
+  uptime monitor (Uptime Kuma) watching the affected path so a failure pages the operator instead
+  of failing silently; Celery's broker-connection-retry/publish-retry configuration should be
+  confirmed deliberately (not yet verified — open follow-up) so a transient blip degrades to
+  "delayed" rather than "dropped."
+- The box's sleep/wake machinery gets real exercise under light live traffic before the stakes go
+  up, surfacing edge cases (like the chatter-threshold gap above) while they're cheap to fix.
+- At graduation, cutover is "re-point pipeline + DNS," not a first-time deploy build — deliberately
+  front-loaded so the actual migration, whenever it happens, is boring.
+- Once real users' personal data is processed on any third-party processor (i.e., at graduation,
+  not before), DPAs must be signed and sub-processors documented in the privacy policy. Medical
+  notes stay E2E-encrypted client-side regardless of host (`docs/adr/safety-privacy.md`) — that
+  protection comes from the crypto design, not from data locality, so it's unaffected by any of the
+  above.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -392,3 +455,4 @@ lands as one coordinated PR.
 | OpenAPI contract shipped (M13 Part B) | ADR-031 | 2026-07-24 | "Deferred to an M9 prerequisite" resolved ahead of M9a. `apispec` + its Marshmallow plugin — `Api/openapi.py` walks the registered route table (`app.url_map`) rather than hand-maintained per-view YAML docstrings for path/method coverage, so it can't drift from the actual routes; every Marshmallow schema in `Schemas/` is discovered and registered as a component the same way (module walk, not a hand-listed import), so "no second, hand-maintained schema definition" holds structurally. Auth requirement (`security: bearerAuth`) is read from a marker (`_auth_required`) `JWTService.authenticate_restful` sets on its own wrapper — `functools.wraps`' `__dict__` copy propagates it through any further stacked decorator, so this reflects the real decorator stack rather than a third list to keep in sync. Public, no auth (`GET /api/v1/openapi.json`, Swagger UI at `/api/v1/docs`) — read-only schema metadata, decided explicitly rather than defaulted. Validated in CI via `openapi-spec-validator` against the live-generated document, not a committed static file. Representative routes (`trip`, `live`, `itinerary`, `tile`) enriched with real Marshmallow-schema-linked YAML docstrings as proof the wiring works end-to-end; full per-route enrichment across all ~29 resource files is progressive follow-up, not blocking — every route already has correct path/method/auth coverage regardless |
 | SSE via hybrid Flask-gevent sidecar (M8) | ADR-033 | 2026-07-17 | Ranked hybrid sidecar > gevent-everywhere (recorded fallback) > ASGI sidecar. Same image, Celery-style second gunicorn (`SERVICE_ROLE=sse`, `--worker-class gevent`, dedicated `wsgi_sse.py` with monkey-patch + psycogreen quarantined to it); proxy path-routes `/api/v1/live/*` streams to it. Stream endpoints I/O-thin by rule. Crew stream auth = short-lived `purpose:"live-stream"` JWT ticket minted by the main API (EventSource can't send headers; cookies live on the Next origin), route also accepts a plain `Authorization` header (checked first) so M9's React Native client — no `EventSource` constraint, token already in `expo-secure-store` — authenticates the same as any other API call without a later route change. Redis db/3 allocated for `live:trip:<id>` pub/sub. Future rider: trip-collab notifications over the same path |
 | Production hardening scoped as M11 | ADR-032 | 2026-07-04 | 2026-07-04 site evaluation remediation crystallized in `plans/M11.md`: refresh rotation + reuse detection on `token_version` (no server-side token store); security headers in Next.js not Flask; honest CI (blocking lint, `next build`, migration run + drift check, Dependabot/audits); seeding out of app factory; bucket provisioning to `minio-init`; ProxyFix at deploy; OpenAPI deferred to M9 prerequisite |
+| Deployment hosting — home-first pipeline, DO as graduation target | ADR-034 | 2026-07-27 | Full stack (Postgres/Redis/RabbitMQ/Flask/Celery/Next.js) self-hosted on a home box during the pre-traction phase, reached via Cloudflare Tunnel (not port-forwarding — sidesteps CGNAT, hides home IP, auto-TLS) once a domain exists; Nextcloud's existing dynamic-DNS setup untouched, kayak app gets its own Cloudflare-managed DNS. `autosuspend.conf` gains a connection-state check alongside the bandwidth threshold so low-volume dev/mobile chatter can't suspend a live session. Comparative reasoning behind the DigitalOcean pick kept outside this document. Bright-line graduation trigger fixed in advance: move to DigitalOcean the moment a non-trusted-circle user or money is involved, not re-litigated per incident |
