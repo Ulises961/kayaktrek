@@ -47,11 +47,16 @@ services:
       --save ""
       --appendonly no
     ports:
-      # 6380, not 6379: the box also runs an apt-installed redis-server.service bound to
-      # 127.0.0.1:6379, and whichever starts first at boot wins — losing that race killed
-      # this container outright ("address already in use", exit 128), silently, on a reboot.
-      # The app reaches redis as redis://redis:6379/N over kayak_net, so this host publish
-      # is operator convenience only and can live on any free port.
+      # 6380, not 6379, so nothing on the host can contend for this bind. The app reaches
+      # redis as redis://redis:6379/N over kayak_net; this publish is operator convenience
+      # only, so it costs nothing to keep it off the port every other redis defaults to.
+      # Worth keeping even though the specific collision is gone: an apt redis-server was
+      # bound to 127.0.0.1:6379 on the box, and whichever of the two started first at boot
+      # won — the reboot this container lost, it died with "address already in use" (exit
+      # 128) and stayed down, taking cache, rate limiting, Celery results and live positions
+      # with it. Nothing surfaced that; the stack just looked up. That package has since
+      # been removed, but a port a package manager can hand out again is not a port to
+      # depend on being free.
       - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
