@@ -7,6 +7,7 @@ from Api.database import db as _db
 from Models.user import User
 from Resources.user_resource import USER_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 
 _USER_PWD = "testPassword6$"
 _NEW_PWD = "newPassword7$"
@@ -32,7 +33,7 @@ def pw_user(app, client):
         user = User.query.filter_by(mail="pwchange.tmp@example.com").first()
         user.active = True
         _db.session.commit()
-        token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
+        token = access_token_for(user)
         user_id = str(user.id)
     yield {"Authorization": f"Bearer {token}"}
     with app.app_context():

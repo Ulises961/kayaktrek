@@ -10,10 +10,12 @@ from flask_bcrypt import check_password_hash, generate_password_hash
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
+from Models.session import Session
 from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.crypto_service import generate_keypair
 from Services.mail_service import send_template_email
+from Services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +219,7 @@ class AuthService:
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
         user.password_changed_at = datetime.now(timezone.utc)
         user.token_version += 1
+        SessionService.revoke_all_for_user(user.id, reason="password_reset")
         # The private key is derived from the old password; after a reset it is
         # undecryptable. Clear the keypair and any medical notes ciphertext so
         # the UI reflects reality rather than holding orphaned encrypted data.
@@ -277,6 +280,7 @@ class AuthService:
         user.mail = new_mail
         user.pending_mail = None
         user.token_version += 1
+        SessionService.revoke_all_for_user(user.id, reason="email_changed")
         db.session.commit()
 
         AuthService._send_email_changed_notice(user, old_mail)
@@ -284,20 +288,22 @@ class AuthService:
         return user
 
     @staticmethod
-    def advance_refresh_rotation(user: User, payload: dict) -> None:
+    def rotate_session(user: User, payload: dict, location_label: Optional[str] = None) -> Session:
         """
-        Validate a decoded refresh-token payload against the user's current rotation state
-        and, if valid, advance it (rotate-on-use). Caller mints the new access/refresh pair
-        from the user's post-call token_version/refresh_token_version.
+        Validate a decoded refresh-token payload against its own session and, if valid,
+        advance that session's rotation counter. Returns the session so the caller can mint
+        the new access/refresh pair against it.
 
-        A refresh token whose `rtv` claim does not match the user's current
-        refresh_token_version means it was already exchanged once — either the legitimate
-        client raced a retry, or the token was stolen and is being replayed. Either way this
-        is treated as a reuse/theft signal: token_version is bumped, revoking every
-        outstanding access and refresh token for the user, forcing a full re-login.
+        A refresh token whose `rtv` claim does not match its session's token_version was
+        already exchanged once — either the legitimate client raced a retry, or the token
+        was stolen and is being replayed. Either way it is treated as theft, but the
+        blast radius is one device: that session is revoked and its access tokens are
+        denylisted, while the user's other devices stay signed in (M17). The global
+        token_version kill switch is reserved for actions the user actually took.
 
         Raises:
-            ValueError: token invalidated by password change (stale iat), or reuse detected.
+            ValueError: token invalidated by password change (stale iat), unknown/revoked/
+                expired session, or reuse detected.
         """
         iat = payload.get("iat")
         if iat and user.password_changed_at:
@@ -305,14 +311,24 @@ class AuthService:
             if token_issued_at < user.password_changed_at:
                 raise ValueError("Token invalidated by password change — please log in again")
 
-        if payload.get("rtv") != user.refresh_token_version:
-            user.token_version += 1
-            db.session.commit()
-            logger.warning("refresh_token_reuse_detected", extra={"user_id": str(user.id)})
+        session_id = payload.get("sid")
+        if not session_id:
+            raise ValueError("Session invalidated — please log in again")
+
+        session = SessionService.get_usable(str(session_id), user.id)
+        if not session:
+            raise ValueError("Session invalidated — please log in again")
+
+        if payload.get("rtv") != session.token_version:
+            SessionService.revoke(session, reason="refresh_token_reuse")
+            logger.warning(
+                "refresh_token_reuse_detected",
+                extra={"user_id": str(user.id), "session_id": str(session.id)},
+            )
             raise ValueError("Session invalidated — possible token reuse detected, please log in again")
 
-        user.refresh_token_version += 1
-        db.session.commit()
+        SessionService.rotate(session, location_label=location_label)
+        return session
 
     # ------------------------------------------------------------------
     # Internal helpers

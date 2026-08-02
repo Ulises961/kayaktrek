@@ -1,13 +1,8 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, Page } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
 import { mutateAndSettle } from "../fixtures/ui"
 import { API_URL } from "../playwright.config"
-
-// NOTE: This spec requires the frontend advance-state-button.tsx to be updated
-// to the 3-state machine (building → happening → past). Currently the button
-// still references the old draft/planning states and will not render for a
-// building-state trip. These tests will fail until that migration is complete.
 
 test.describe("Trip state transitions", () => {
   let tripId: string
@@ -23,14 +18,27 @@ test.describe("Trip state transitions", () => {
     await apiDeleteTrip(request, leaderToken, tripId)
   })
 
+  /** The state-progression controls live inside the identity card's "Details" disclosure,
+   * which is collapsed on entry — a click on a hidden button just waits out the timeout.
+   *
+   * Tolerant of the disclosure being absent entirely: it only renders when there is
+   * something to put in it, which for a crew member on a bare trip can be nothing. */
+  async function openDetails(page: Page) {
+    const trigger = page.getByRole("button", { name: "Details" })
+    if ((await trigger.count()) > 0) await trigger.click()
+  }
+
   test("leader advances building → happening via UI", async ({ page }) => {
     await page.goto(`/trips/${tripId}`)
+    await openDetails(page)
     await page.getByRole("button", { name: /begin expedition/i }).click()
     // Confirmation dialog
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
       reload: true,
     })
-    // "Mark as past" appearing is the end-state signal: state is now "happening" AND RSC has re-rendered
+    // "Mark as past" appearing is the end-state signal: state is now "happening" AND RSC has
+    // re-rendered. The reload collapsed the disclosure again, so re-open it to read the control.
+    await openDetails(page)
     await expect(page.getByRole("button", { name: /mark as past/i })).toBeVisible()
   })
 
@@ -46,6 +54,7 @@ test.describe("Trip state transitions", () => {
     expect(res.ok()).toBeTruthy()
 
     await page.goto(`/trips/${tripId}`)
+    await openDetails(page)
     await page.getByRole("button", { name: /mark as past/i }).click()
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
       reload: true,
@@ -70,6 +79,9 @@ test.describe("Trip state transitions", () => {
     await crewPage.goto(`/trips/${tripId}`)
 
     // Advance state button must not be present for crew
+    // Opened deliberately: with the disclosure shut, "not visible" would hold even for a
+    // leader, so the assertion would pass without proving anything about crew privileges.
+    await openDetails(crewPage)
     await expect(crewPage.getByRole("button", { name: /begin expedition/i })).not.toBeVisible()
     await crewContext.close()
   })

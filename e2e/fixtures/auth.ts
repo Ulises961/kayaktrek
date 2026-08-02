@@ -25,6 +25,16 @@ export const CREW: UserCredentials = {
   phone: "+391110000002",
 }
 
+// Own account for the per-device session specs (M17): they sign out everywhere,
+// which would invalidate the shared LEADER/CREW storage state other specs rely on.
+export const DEVICES_USER: UserCredentials = {
+  name: "E2E Devices",
+  username: "e2e_devices",
+  mail: "e2e.devices@example.com",
+  pwd: "Devices$ecure1",
+  phone: "+391110000003",
+}
+
 export async function registerAndActivate(
   request: APIRequestContext,
   creds: UserCredentials,

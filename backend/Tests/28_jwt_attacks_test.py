@@ -246,6 +246,9 @@ def test_token_invalidated_after_password_change(client, app, pw_revocation_user
     mail = pw_revocation_user["mail"]
     pwd = pw_revocation_user["pwd"]
     new_pwd = pw_revocation_user["new_pwd"]
+    # A session id that is not on the revocation denylist, so the only thing that can
+    # reject this token is the password-change check under test.
+    session_id = "00000000-0000-7000-8000-000000000028"
 
     token_before = pyjwt.encode(
         {
@@ -254,6 +257,7 @@ def test_token_invalidated_after_password_change(client, app, pw_revocation_user
             "is_admin": False,
             "token_type": "access",
             "tv": 0,
+            "sid": session_id,
             "iat": datetime.now(timezone.utc),
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         },

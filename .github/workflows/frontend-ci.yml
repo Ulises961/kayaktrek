@@ -47,10 +47,15 @@ jobs:
       - name: Test
         run: pnpm run test:run
 
+      # Both NEXT_PUBLIC_* origins are required: lib/api/config.ts throws on an empty one in
+      # a production build, which is the point — a missing repo Variable would otherwise ship
+      # a bundle whose every request is a relative URL back at the Next.js server. The values
+      # here are placeholders; the real ones come from repo Variables at image-build time.
       - name: Build
         run: pnpm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:5000
+          NEXT_PUBLIC_SSE_URL: http://localhost:5001
 
       - name: Dependency audit
         run: pnpm audit --prod --audit-level=high

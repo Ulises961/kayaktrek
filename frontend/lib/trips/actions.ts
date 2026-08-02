@@ -47,7 +47,8 @@ export async function listTrips(filters: TripListFilters): Promise<TripPage> {
   try {
     const raw = await apiGet<unknown>(`/api/trip/${session.userId}/all?${params}`)
     return TripPageSchema.parse(raw)
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     return EMPTY_TRIP_PAGE
   }
 }

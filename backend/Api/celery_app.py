@@ -43,6 +43,7 @@ celery_app = Celery(
         "Tasks.weather_beat_task",
         "Tasks.checkpoint_beat_task",
         "Tasks.expedition_log_task",
+        "Tasks.session_cleanup_task",
     ],
 )
 
@@ -76,6 +77,10 @@ celery_app.conf.update(
         "nightly-log-fallback": {
             "task": "Tasks.expedition_log_task.nightly_log_fallback",
             "schedule": crontab(minute=30, hour=0),
+        },
+        "session-cleanup": {
+            "task": "Tasks.session_cleanup_task.purge_dead_sessions",
+            "schedule": crontab(minute=45, hour=3),
         },
     },
 )

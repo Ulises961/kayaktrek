@@ -52,6 +52,7 @@ from Models.sea_state import SeaState                 # noqa: F401
 from Models.weather import Weather                    # noqa: F401
 from Models.weather_state import WeatherState         # noqa: F401
 from Models.auth_token import AuthToken               # noqa: F401
+from Models.session import Session                    # noqa: F401
 from Models.invitation import Invitation              # noqa: F401
 from Models.user_certification import UserCertification          # noqa: F401
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401

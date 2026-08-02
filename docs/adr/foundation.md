@@ -432,6 +432,52 @@ graduation target.
 
 ---
 
+## Per-device sessions and instant revocation (M17)
+
+**Context.** `token_version` is one counter per user, so the backend could revoke *all* of a
+user's sessions or none of them. Harmless while the web client was the only client — and the
+web UI quietly reflected it, wiring "Sign out" and "Sign out everywhere" to the same action —
+but a paddler signing out on the phone does not expect the dashboard they left open at home to
+die too, so M9's second client turns this into a real, user-visible bug. Reuse detection had the
+same shape: a single retried request could log a user out of every device they own.
+
+**Decision (2026-08-02).** Introduce a `Session` row per device — the refresh-token chain is
+the session — and scope revocation to it. This **extends ADR-001 and ADR-032 rather than
+superseding them**: ADR-001's actual benefit is that *access* tokens verify by signature alone,
+with no DB round-trip per request, and that is unchanged. The session row is read on refresh,
+about once per access-token lifetime per device, not on every request.
+
+- **Access tokens gain a `sid` claim and stay stateless.** Revocation writes `revoked:<sid>` to
+  a Redis denylist (`/4`) with a TTL equal to the access-token lifetime, so keys expire exactly
+  when they stop mattering. Every request costs one Redis `GET`, no Postgres.
+- **The denylist fails open.** An unreachable Redis lets a revoked access token live out its
+  remaining lifetime — precisely the pre-M17 behaviour, so not a regression. Failing closed
+  would turn a Redis blip into a forced logout for every user on the platform.
+- **Access-token lifetime stays 15 minutes.** Current guidance puts the band at 5–15 minutes and
+  major identity providers default looser. Shortening it is the expensive way to buy what the
+  denylist gives for free, and would triple refresh round-trips on the mobile client over exactly
+  the flaky coastal connectivity M9 targets.
+- **No grace window for benign reuse, and no reuse email.** A time-boxed tolerance for replaying
+  the previous token is indistinguishable from the attack it is meant to excuse; the race is a
+  client problem and is fixed by single-flighting refresh on the client. A "suspicious activity"
+  email would fire on backgrounded apps and retried requests, training users to ignore the one
+  that matters — the disclosure channel is **pull, not push**: a sessions list the user can
+  consult whenever they want.
+- **Coarse location, derived at write time, never an IP.** The sessions list shows an
+  approximate origin because "Chrome on Windows, 2 minutes ago" cannot answer "was that me?"
+  while "active from Brazil" can. Resolved in-process from the Cloudflare Tunnel's location
+  headers (ADR-034) — no third-party geo API, no processor relationship — and trusted only when
+  `PROXY_TRUSTED_HOPS` says the request really arrived through the proxy, since a spoofable
+  header must not become displayed fact. Only the resulting label is stored.
+
+**Consequences.** Every user is logged out once at deploy: existing refresh tokens carry no
+`sid`, and a token without one is not honoured. This is deliberate — the alternative is a window
+in which revocation cannot be enforced. `User.refresh_token_version` is superseded by the
+per-session counter and is kept one release for rollback safety, then dropped. The sessions list
+is also the substrate for the session-management UI already cross-referenced in `ROADMAP.md`.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -456,4 +502,5 @@ graduation target.
 | SSE via hybrid Flask-gevent sidecar (M8) | ADR-033 | 2026-07-17 | Ranked hybrid sidecar > gevent-everywhere (recorded fallback) > ASGI sidecar. Same image, Celery-style second gunicorn (`SERVICE_ROLE=sse`, `--worker-class gevent`, dedicated `wsgi_sse.py` with monkey-patch + psycogreen quarantined to it); proxy path-routes `/api/v1/live/*` streams to it. Stream endpoints I/O-thin by rule. Crew stream auth = short-lived `purpose:"live-stream"` JWT ticket minted by the main API (EventSource can't send headers; cookies live on the Next origin), route also accepts a plain `Authorization` header (checked first) so M9's React Native client — no `EventSource` constraint, token already in `expo-secure-store` — authenticates the same as any other API call without a later route change. Redis db/3 allocated for `live:trip:<id>` pub/sub. Future rider: trip-collab notifications over the same path |
 | Production hardening scoped as M11 | ADR-032 | 2026-07-04 | 2026-07-04 site evaluation remediation crystallized in `plans/M11.md`: refresh rotation + reuse detection on `token_version` (no server-side token store); security headers in Next.js not Flask; honest CI (blocking lint, `next build`, migration run + drift check, Dependabot/audits); seeding out of app factory; bucket provisioning to `minio-init`; ProxyFix at deploy; OpenAPI deferred to M9 prerequisite |
 | Deployment hosting — home-first pipeline, DO as graduation target | ADR-034 | 2026-07-27 | Full stack (Postgres/Redis/RabbitMQ/Flask/Celery/Next.js) self-hosted on a home box during the pre-traction phase, reached via Cloudflare Tunnel (not port-forwarding — sidesteps CGNAT, hides home IP, auto-TLS) once a domain exists; Nextcloud's existing dynamic-DNS setup untouched, kayak app gets its own Cloudflare-managed DNS. `autosuspend.conf` gains a connection-state check alongside the bandwidth threshold so low-volume dev/mobile chatter can't suspend a live session. Comparative reasoning behind the DigitalOcean pick kept outside this document. Bright-line graduation trigger fixed in advance: move to DigitalOcean the moment a non-trusted-circle user or money is involved, not re-litigated per incident |
+| Per-device sessions + instant revocation | ADR-035 | 2026-08-02 | Extends ADR-001/032, does not supersede them: access tokens stay stateless and gain a `sid` claim; a `Session` row per device makes revocation family-scoped, so reuse detection and per-device sign-out cost one device rather than all of them. Instant revocation via a Redis `/4` denylist keyed on `sid`, TTL = access-token lifetime, **failing open** (a Redis blip must not log out the platform). 15-minute access lifetime kept — with instant revocation it is a refresh-cadence parameter, not a security window. No benign-reuse grace window (indistinguishable from the attack; single-flight on the client instead) and no reuse-detection email (would cry wolf; the sessions list is a pull channel). Coarse city-level location resolved in-process from the Cloudflare Tunnel's location headers, trusted only behind `PROXY_TRUSTED_HOPS`, stored as a label and never as an IP. Deploy cost: every user is logged out once, since pre-M17 tokens carry no `sid`. `plans/M17-per-device-sessions.md` |
 | Deployment hosting — domain live, first real deploy (ADR-034 execution) | ADR-034 | 2026-07-31 | Domain `kayaktrek.app` purchased, DNS on Cloudflare. Refinement over the original ADR-034 text: `cloudflared`↔nginx loopback hop is also TLS (defense-in-depth, not required by Tunnel itself), via a real certbot-dns-cloudflare Let's Encrypt certificate rather than a Cloudflare Origin Certificate — same auto-renewing path as every other domain on the box, no reliance on `cloudflared`'s special-cased trust of Cloudflare's own Origin CA, and DNS-01 needs no port 80 exposure (there is none). Frontend vhost is the bare apex, not an `app.` subdomain — there's no separate marketing site (landing/auth/dashboard are one Next.js deployment), so `app.` would be an unneeded extra subdomain; decided and switched before any real user had it bookmarked. Fourth vhost added for MinIO's S3 API (`storage.<domain>`) — public-read avatars/point-images and presigned downloads bypass Flask entirely, so MinIO needs its own public hostname (admin console stays 127.0.0.1-only). Five real, first-time-ever-exercised bugs surfaced getting the pipeline's actual first `push`-to-`master` and first `docker compose up` to succeed — none were reachable from local dev or PR-only CI, since nothing had ever run the `push`-gated `docker-build-push` job or hit a real production domain before: (1) `toLower()` isn't a real GitHub Actions expression function — an invalid expression invalidates the *entire* workflow file regardless of which job references it, silently blocking all CI (including `pull_request`, unrelated to the broken job) since the pipeline's first commit; (2) the runner's default `docker` driver doesn't support `cache-to: type=gha`, needing an explicit `docker/setup-buildx-action` step; (3) the frontend build's static generation hung on an unbounded `fetch` to the (not-yet-deployed) production API instead of degrading via its own already-correct empty-fallback path — fixed with `AbortSignal.timeout`; (4) `migrate` never had `RATELIMIT_STORAGE_URI`, which `ProductionConfig`/`StagingConfig` require at import time (M11 hardening) — every other service already set it; (5) a pre-existing DNS record at the zone apex (likely auto-created at domain registration) silently rejected every `cloudflared tunnel route dns` attempt for it, so Cloudflare had been proxying the apex to that stale record the whole time. Full narrative and current live/paused status: `DEPLOY.md`'s "Status" section |

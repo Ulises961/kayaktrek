@@ -8,6 +8,10 @@ const { fetchPublicItineraryDetail, fetchItineraries, getSession } = vi.hoisted(
 }))
 vi.mock("@/lib/itinerary/actions", () => ({ fetchPublicItineraryDetail, fetchItineraries }))
 vi.mock("@/lib/auth/session", () => ({ getSession }))
+// The page renders getMe() for the viewer's unit preference, and getMe reads the auth
+// cookies directly to tell an anonymous visitor (normal on a public page) from a dead
+// session. Outside a request scope next/headers throws, so stand it in as "no cookies".
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }))
 vi.mock("@/components/map/map-loader", () => ({ default: () => <div data-testid="map" /> }))
 vi.mock("@/components/explore/route-detail-actions", () => ({
   RouteDetailActions: () => <div data-testid="actions" />,

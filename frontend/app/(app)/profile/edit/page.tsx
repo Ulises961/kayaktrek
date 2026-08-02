@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { EditProfileForm } from "@/components/profile/edit-profile-form"
@@ -10,7 +10,8 @@ export default async function EditProfilePage() {
   try {
     const raw = await apiGet("/api/user/me")
     user = UserSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowIfRedirect(error)
     notFound()
   }
 

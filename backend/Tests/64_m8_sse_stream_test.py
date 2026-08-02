@@ -8,6 +8,7 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.live_resource import LIVE_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 from Services.trip_service import TripService
 import Services.live_position_service as live_position_service
 import Services.live_stream_service as live_stream_service
@@ -191,9 +192,7 @@ def test_expired_stream_ticket_is_rejected(app, trip_with_user2_as_crew):
 def test_access_token_as_ticket_is_rejected(app, trip_with_user2_as_crew, user_1):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     with app.app_context():
-        access_token = JWTService.generate_access_token(
-            str(user_1.id), user_1.mail, user_1.admin, user_1.token_version
-        )
+        access_token = access_token_for(user_1)
         assert LiveStreamService.verify_stream_ticket(access_token, trip_id) is False
 
 

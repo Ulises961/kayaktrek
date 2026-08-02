@@ -367,8 +367,13 @@ class TestRevocableTokens:
         r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r.status_code == 401
 
-    def test_access_token_rejected_after_logout(self, app, client):
-        """Access token issued before logout is rejected on subsequent requests."""
+    def test_access_token_rejected_after_logout(self, app, client, denylist):
+        """Access token issued before logout is rejected on subsequent requests.
+
+        Since M17 logout ends one device rather than bumping the user-wide token_version,
+        so what kills the still-unexpired access token is the revocation denylist — hence
+        the fixture. Without it this asserts nothing wherever Redis is absent (CI).
+        """
         user, access_tok, _ = _active_user_with_tokens(client)
 
         r1 = client.get("/api/v1/user/me", headers={"Authorization": f"Bearer {access_tok}"})
@@ -434,9 +439,15 @@ class TestRefreshTokenRotation:
         r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r2.status_code == 401
 
-    def test_refresh_token_reuse_revokes_entire_session(self, app, client):
-        """Reuse is treated as theft: it revokes every outstanding token for the user,
-        not just the reused one — the original access token must also stop working."""
+    def test_refresh_token_reuse_revokes_that_devices_session(self, app, client, denylist):
+        """Reuse is treated as theft, and since M17 it costs exactly one device: every
+        token in the offending session dies, and the user's other devices keep working.
+
+        Before M17 this bumped the user-wide token_version and logged out everything —
+        that behaviour is now reserved for actions the user actually took. The sibling
+        session's survival is asserted in detail in 74_m17_session_auth_test.py; what
+        matters here is that the offending chain is fully dead.
+        """
         user, access_tok, refresh_tok = _active_user_with_tokens(client)
 
         r1 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
@@ -447,7 +458,8 @@ class TestRefreshTokenRotation:
         r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r2.status_code == 401
 
-        # The pre-reuse access token is now dead too (token_version bumped).
+        # The pre-reuse access token is dead — instantly, via the denylist, rather than
+        # being left to expire on its own.
         r3 = client.get("/api/v1/user/me", headers={"Authorization": f"Bearer {access_tok}"})
         assert r3.status_code == 401
 

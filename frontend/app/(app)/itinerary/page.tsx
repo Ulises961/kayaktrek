@@ -1,4 +1,4 @@
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { ItinerariesSchema } from "@/lib/dtos/itinerary"
 import { MapPinIcon } from "lucide-react"
 import { NewItineraryButton } from "@/components/itinerary/new-itinerary-button"
@@ -13,7 +13,8 @@ export default async function ItineraryListPage() {
   try {
     const raw = await apiGet<unknown[]>("/api/itinerary/all")
     itineraries = ItinerariesSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowIfRedirect(error)
     itineraries = []
   }
   const me = await getMe()

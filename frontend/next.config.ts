@@ -12,7 +12,12 @@ const nextConfig: NextConfig = {
   // Traces only the dependency subset each route actually needs into .next/standalone,
   // bundled with a minimal server.js — required for a lean self-hosted Docker image
   // (frontend/Dockerfile) instead of shipping full node_modules.
-  output: "standalone",
+  //
+  // `next start` refuses to serve a standalone build (it tells you to run
+  // .next/standalone/server.js instead), and that build does not carry static assets or
+  // public/ without an extra copy step. e2e/run-live-stack.sh serves the app with
+  // `next start`, so it opts out — the harness exercises the app, not the packaging.
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "0" ? {} : { output: "standalone" as const }),
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

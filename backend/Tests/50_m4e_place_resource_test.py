@@ -10,6 +10,7 @@ from Api.database import db
 from Models.place_category import PlaceCategory
 from Models.user import User
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 
 PLACE_BASE = "/api/v1/place"
 CATEGORIES = "/api/v1/place-categories"
@@ -30,7 +31,7 @@ def admin_headers(client):
     user.admin = True
     db.session.commit()
     uid = str(user.id)
-    token = JWTService.generate_access_token(user.id, user.mail, True, user.token_version)
+    token = access_token_for(user)
 
     yield {"Authorization": f"Bearer {token}"}
 

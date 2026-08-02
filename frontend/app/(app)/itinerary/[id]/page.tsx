@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { getMe } from "@/lib/user/me"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
@@ -20,7 +20,8 @@ export default async function ItineraryBuilderPage({
   try {
     const raw = await apiGet(`/api/itinerary/${id}`)
     itinerary = ItinerarySchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowIfRedirect(error)
     notFound()
   }
 
@@ -47,7 +48,8 @@ export default async function ItineraryBuilderPage({
       const membership = deriveMembership(trip, session)
       isLeader = membership.isLeader
       showNavigate = membership.isMember && tripState === TRIP_STATE.HAPPENING
-    } catch {
+    } catch (error) {
+      rethrowIfRedirect(error)
       // fall back to defaults
     }
   }

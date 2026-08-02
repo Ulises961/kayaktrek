@@ -20,6 +20,7 @@ from Models.user import User
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 
 
 def _elevated_headers(client, headers, password):
@@ -38,7 +39,7 @@ def _register_and_activate(app, client, mail, username, phone):
         user = _db.session.query(User).filter_by(mail=mail).first()
         user.active = True
         _db.session.commit()
-        token = JWTService.generate_access_token(user.id, user.mail, user.admin, user.token_version)
+        token = access_token_for(user)
         user_id = str(user.id)
     return user_id, {"Authorization": f"Bearer {token}"}, password
 

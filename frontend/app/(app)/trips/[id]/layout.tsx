@@ -24,7 +24,7 @@ export default async function TripDetailLayout({
 
   const session = await getSession()
   const membership = deriveMembership(trip, session)
-  const { isLeader, isMember } = membership
+  const { isMember } = membership
   const liveHref =
     isMember && trip.state === TRIP_STATE.HAPPENING && trip.itinerary?.id
       ? `/itinerary/${trip.itinerary.id}?navigate=1`

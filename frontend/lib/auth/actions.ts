@@ -229,18 +229,15 @@ export async function resendDeletionCancel(mail: string): Promise<AuthResult> {
   return { success: true }
 }
 
-export async function logout() {
+// Best effort on the server call: an unreachable server or an already-expired token
+// shouldn't block the user from clearing their local cookies and leaving.
+async function endSession(endpoint: "/auth/logout" | "/auth/logout-all") {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get("access_token")?.value
 
   if (accessToken) {
-    // Bumps token_version server-side, revoking every outstanding session for this
-    // user — the backend has no per-device granularity (ADR-032: no server-side
-    // token store), so this is the only "sign out" the architecture can offer. Best
-    // effort: an unreachable server or already-expired token shouldn't block the
-    // user from clearing their local cookies and leaving.
     try {
-      await fetch(`${API_URL}${API_PREFIX}/auth/logout`, {
+      await fetch(`${API_URL}${API_PREFIX}${endpoint}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       })
@@ -254,19 +251,25 @@ export async function logout() {
   redirect("/")
 }
 
-// Refresh tokens are single-use and rotate on every exchange (M11 §2, ADR-032) — a second
-// exchange of the same not-yet-rotated token is indistinguishable, server-side, from theft
-// and revokes every session. A single page render fans out several concurrent apiFetch calls
-// (app layout's Promise.all, getPendingRequestsSummary's own Promise.all, the page's own
-// fetch) that all read the same access_token cookie, so once it expires they all 401 and would
-// otherwise each race to exchange the identical refresh_token cookie. Wrapping in cache()
-// (mirrors getMe(), lib/user/me.ts) makes every concurrent 401 within one request await the
-// same in-flight exchange instead of each consuming the refresh token independently.
-export const refreshSession = cache(async (): Promise<boolean> => {
-  const cookieStore = await cookies()
-  const refreshToken = cookieStore.get("refresh_token")?.value
-  if (!refreshToken) return false
+/** Ends this device's session only; the user's other devices stay signed in (M17). */
+export async function logout() {
+  await endSession("/auth/logout")
+}
 
+/** Ends every session the user has, on every device. */
+export async function logoutEverywhere() {
+  await endSession("/auth/logout-all")
+}
+
+type TokenPair = { access_token: string; refresh_token: string }
+
+// Keyed by the refresh token being spent, and held only while the exchange is actually in
+// flight. Concurrent callers presenting the same token await one exchange instead of each
+// consuming it; the entry is dropped the moment it settles, so a token presented again
+// later is genuinely re-exchanged and reuse detection still sees a replay for what it is.
+const inFlightRefreshes = new Map<string, Promise<TokenPair | null>>()
+
+async function exchangeRefreshToken(refreshToken: string): Promise<TokenPair | null> {
   let res: Response
   try {
     res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
@@ -275,12 +278,35 @@ export const refreshSession = cache(async (): Promise<boolean> => {
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   } catch {
-    return false
+    return null
+  }
+  if (!res.ok) return null
+  return (await res.json()) as TokenPair
+}
+
+// Refresh tokens are single-use and rotate on every exchange (M11 §2, ADR-032; per-session
+// since M17) — presenting the same not-yet-rotated token twice is indistinguishable,
+// server-side, from theft, and revokes that device's session. Two layers guard against
+// spending it twice. cache() (mirrors getMe(), lib/user/me.ts) covers the fan-out inside a
+// single render: the app layout's Promise.all, getPendingRequestsSummary's own Promise.all
+// and the page's own fetch all read the same expired access_token cookie and 401 together.
+// The map above covers what cache() cannot — separate concurrent requests, such as two open
+// tabs, which get their own cache scope but share one cookie jar.
+export const refreshSession = cache(async (): Promise<boolean> => {
+  const cookieStore = await cookies()
+  const refreshToken = cookieStore.get("refresh_token")?.value
+  if (!refreshToken) return false
+
+  let exchange = inFlightRefreshes.get(refreshToken)
+  if (!exchange) {
+    exchange = exchangeRefreshToken(refreshToken)
+    inFlightRefreshes.set(refreshToken, exchange)
+    void exchange.finally(() => inFlightRefreshes.delete(refreshToken))
   }
 
-  if (!res.ok) return false
+  const tokens = await exchange
+  if (!tokens) return false
 
-  const { access_token, refresh_token } = await res.json()
-  await setAuthCookies(access_token, refresh_token)
+  await setAuthCookies(tokens.access_token, tokens.refresh_token)
   return true
 })

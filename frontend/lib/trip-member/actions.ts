@@ -18,7 +18,8 @@ export async function getMyMembership(tripId: string): Promise<TripMember | null
   try {
     const raw = await apiGet(`/api/trip/${tripId}/member/me`)
     return TripMemberSchema.parse(raw)
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     return null
   }
 }

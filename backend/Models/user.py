@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from Models.log import Log
     from Models.trip import Trip
     from Models.auth_token import AuthToken
+    from Models.session import Session
     from Models.invitation import Invitation
     from Models.user_certification import UserCertification
 
@@ -157,6 +158,9 @@ class User(BaseModel):
     items: Mapped[List["Item"]] = relationship(secondary=user_has_items)
     auth_tokens: Mapped[List["AuthToken"]] = relationship(
         "AuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    sessions: Mapped[List["Session"]] = relationship(
+        "Session", back_populates="user", cascade="all, delete-orphan"
     )
     certifications: Mapped[List["UserCertification"]] = relationship(
         "UserCertification", back_populates="user", cascade="all, delete-orphan"

@@ -36,7 +36,8 @@ export async function listMyLogs(
   try {
     const raw = await apiGet<unknown>(`/api/log/all?${logListParams(page, sort, filters)}`)
     return LogPageSchema.parse(raw)
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     return EMPTY_LOG_PAGE
   }
 }
@@ -49,7 +50,8 @@ export async function listEndorsedLogs(
   try {
     const raw = await apiGet<unknown>(`/api/log/endorsed?${logListParams(page, sort, filters)}`)
     return LogPageSchema.parse(raw)
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     return EMPTY_LOG_PAGE
   }
 }

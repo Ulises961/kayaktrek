@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { format } from "date-fns"
 import { AnchorIcon, LinkIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
 import { LogisticsSchema } from "@/lib/dtos/logistics"
@@ -20,7 +20,8 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
   try {
     const raw = await apiGet(`/api/trip/${id}`)
     trip = TripSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowIfRedirect(error)
     notFound()
   }
 

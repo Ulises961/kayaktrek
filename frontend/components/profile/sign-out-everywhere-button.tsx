@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { LogOutIcon } from "lucide-react"
-import { logout } from "@/lib/auth/actions"
+import { logoutEverywhere } from "@/lib/auth/actions"
 import { Button } from "@/components/ui/button"
 
 export function SignOutEverywhereButton() {
@@ -13,7 +13,7 @@ export function SignOutEverywhereButton() {
       variant="outline"
       size="sm"
       disabled={isPending}
-      onClick={() => startTransition(() => logout())}
+      onClick={() => startTransition(() => logoutEverywhere())}
       className="self-start"
     >
       <LogOutIcon className="size-4" />

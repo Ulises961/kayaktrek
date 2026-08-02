@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatDayDate, addDaysIso, formatMinutesAgo, minutesSince } from "../date"
+import { formatDayDate, addDaysIso, formatMinutesAgo, formatTimeAgo, minutesSince } from "../date"
 
 describe("formatDayDate", () => {
   it("formats an ISO date as 'd MMM yyyy'", () => {
@@ -70,5 +70,30 @@ describe("formatMinutesAgo", () => {
 
   it("formats elapsed minutes as 'x min ago'", () => {
     expect(formatMinutesAgo("2026-07-20T10:03:00Z", now)).toBe("7 min ago")
+  })
+})
+
+describe("formatTimeAgo", () => {
+  const now = new Date("2026-08-02T12:00:00Z")
+
+  it("reads as 'just now' under a minute", () => {
+    expect(formatTimeAgo("2026-08-02T11:59:30Z", now)).toBe("just now")
+  })
+
+  it("scales from minutes to hours to days", () => {
+    expect(formatTimeAgo("2026-08-02T11:15:00Z", now)).toBe("45 min ago")
+    expect(formatTimeAgo("2026-08-02T09:00:00Z", now)).toBe("3 hours ago")
+    expect(formatTimeAgo("2026-08-02T11:00:00Z", now)).toBe("1 hour ago")
+    expect(formatTimeAgo("2026-07-31T12:00:00Z", now)).toBe("2 days ago")
+    expect(formatTimeAgo("2026-08-01T12:00:00Z", now)).toBe("1 day ago")
+  })
+
+  it("falls back to a date once the elapsed time stops being useful", () => {
+    expect(formatTimeAgo("2026-06-02T12:00:00Z", now)).toBe("2 Jun 2026")
+  })
+
+  it("returns a dash for a missing or unparseable timestamp", () => {
+    expect(formatTimeAgo("", now)).toBe("—")
+    expect(formatTimeAgo("not-a-date", now)).toBe("—")
   })
 })

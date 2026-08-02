@@ -9,6 +9,7 @@ import pytest
 from Api.database import db
 from Models.user import User
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 
 STATION_ENDPOINT = "/api/v1/tidal-station"
 _FAKE_UUID = "00000000-0000-7000-8000-000000000111"
@@ -33,7 +34,7 @@ def admin_headers(client):
     user.admin = True
     db.session.commit()
     uid = str(user.id)
-    token = JWTService.generate_access_token(user.id, user.mail, True, user.token_version)
+    token = access_token_for(user)
 
     yield {"Authorization": f"Bearer {token}"}
 

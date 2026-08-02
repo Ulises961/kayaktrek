@@ -10,7 +10,15 @@ vi.mock("next/navigation", () => ({
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { login, register, logout, forgotPassword, resetPassword, refreshSession } from "../actions"
+import {
+  login,
+  register,
+  logout,
+  logoutEverywhere,
+  forgotPassword,
+  resetPassword,
+  refreshSession,
+} from "../actions"
 
 const mockCookieStore = {
   set: vi.fn(),
@@ -78,8 +86,12 @@ describe("logout", () => {
 
     await logout()
 
+    // Ends only this device (M17) — asserted exactly, since /auth/logout-all is a
+    // different endpoint that would also match a "contains /auth/logout" check.
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toMatch(/\/auth\/logout$/)
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/auth/logout"),
+      expect.any(String),
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ Authorization: "Bearer the-access-token" }),
@@ -178,6 +190,22 @@ describe("resetPassword", () => {
   })
 })
 
+describe("logoutEverywhere", () => {
+  it("calls the sign-out-everywhere endpoint, not the per-device one", async () => {
+    mockCookieStore.get.mockReturnValue({ value: "the-access-token" })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await logoutEverywhere()
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toMatch(/\/auth\/logout-all$/)
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("access_token")
+    expect(mockCookieStore.delete).toHaveBeenCalledWith("refresh_token")
+    expect(redirect).toHaveBeenCalledWith("/")
+  })
+})
+
 describe("refreshSession", () => {
   it("returns false without fetching when there is no refresh_token cookie", async () => {
     mockCookieStore.get.mockReturnValue(undefined)
@@ -253,6 +281,57 @@ describe("refreshSession", () => {
     const result = await refreshSession()
 
     expect(result).toBe(false)
+  })
+
+  it("single-flights concurrent refreshes of the same token into one exchange", async () => {
+    // Refresh tokens are single-use: presenting the same one twice is indistinguishable
+    // from theft server-side and revokes that device's session (M17). Two requests
+    // arriving together read the same cookie, so without this only one of them would
+    // survive.
+    mockCookieStore.get.mockReturnValue({ value: "shared-refresh" })
+    let resolveExchange: (value: unknown) => void = () => {}
+    const inFlight = new Promise((resolve) => {
+      resolveExchange = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      await inFlight
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "new-access", refresh_token: "new-refresh" }),
+      }
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const both = Promise.all([refreshSession(), refreshSession()])
+    resolveExchange(undefined)
+    const results = await both
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toEqual([true, true])
+    // Both callers still write the rotated pair to their own cookie store.
+    expect(mockCookieStore.set).toHaveBeenCalledWith(
+      "refresh_token",
+      "new-refresh",
+      expect.any(Object),
+    )
+  })
+
+  it("does not reuse a settled exchange for a later call with the same token", async () => {
+    // Holding the result past the in-flight window would hand a valid new pair to a
+    // replayed token, which is the exact attack reuse detection exists to catch.
+    mockCookieStore.get.mockReturnValue({ value: "shared-refresh" })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: "new-access", refresh_token: "new-refresh" }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await refreshSession()
+    await refreshSession()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
 

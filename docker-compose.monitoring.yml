@@ -41,7 +41,11 @@ services:
     ports:
       - "127.0.0.1:8081:8081"
     environment:
-      PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}
+      # sslmode=disable is required, not a shortcut: pgweb's driver (lib/pq) defaults to
+      # `require`, and the postgis image doesn't serve TLS — without this pgweb restart-loops
+      # on `pq: SSL is not enabled on the server`. The hop is container-to-container on
+      # kayak_net and never leaves the box, so there's nothing on the wire to protect.
+      PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}?sslmode=disable
 
   # ADR-034: mitigates the home-hosted RabbitMQ silent-failure risk — a health-endpoint
   # monitor + notification channel here pages the operator instead of a Celery-dispatched

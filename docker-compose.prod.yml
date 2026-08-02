@@ -47,7 +47,12 @@ services:
       --save ""
       --appendonly no
     ports:
-      - "127.0.0.1:6379:6379"
+      # 6380, not 6379: the box also runs an apt-installed redis-server.service bound to
+      # 127.0.0.1:6379, and whichever starts first at boot wins — losing that race killed
+      # this container outright ("address already in use", exit 128), silently, on a reboot.
+      # The app reaches redis as redis://redis:6379/N over kayak_net, so this host publish
+      # is operator convenience only and can live on any free port.
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -127,6 +132,7 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -178,6 +184,7 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -227,6 +234,7 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -260,6 +268,7 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}

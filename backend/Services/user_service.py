@@ -26,6 +26,7 @@ from Services.storage_service import StorageService
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
 from Services.block_service import BlockService
+from Services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -375,6 +376,7 @@ class UserService:
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
         user.password_changed_at = datetime.now(timezone.utc)
         user.token_version += 1
+        SessionService.revoke_all_for_user(user.id, reason="password_change")
         if user.public_key:
             private_key_b64 = decrypt(
                 user.private_key_ciphertext,  # type: ignore
@@ -545,6 +547,7 @@ class UserService:
         user.deletion_requested_at = datetime.now(timezone.utc)
         user.active = False
         user.token_version += 1
+        SessionService.revoke_all_for_user(user.id, reason="deletion_requested")
         db.session.query(AuthToken).filter_by(user_id=user.id).delete()
         db.session.commit()
 
@@ -601,8 +604,9 @@ class UserService:
     @staticmethod
     def invalidate_sessions(id: str) -> None:
         """
-        Bump token_version, instantly invalidating all outstanding access and
-        refresh tokens for the user. Used by explicit logout / "log out everywhere".
+        Bump token_version and revoke every one of the user's sessions, instantly
+        invalidating all outstanding access and refresh tokens. Used by "sign out
+        everywhere" — signing out a single device goes through SessionService.revoke.
 
         Raises:
             NoResultFound: If the user does not exist
@@ -610,6 +614,7 @@ class UserService:
         user = UserService.get_user_by_id(id)
         user.token_version += 1
         db.session.commit()
+        SessionService.revoke_all_for_user(user.id, reason="sign_out_everywhere")
         logger.info("sessions_invalidated", extra={"user_id": id})
 
     @staticmethod

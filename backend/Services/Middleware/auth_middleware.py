@@ -5,6 +5,7 @@ from werkzeug.exceptions import HTTPException
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Dict
 from flask import current_app, abort, g, request
+from Services.session_service import ACCESS_TOKEN_LIFETIME, REFRESH_TOKEN_LIFETIME, SessionService
 from Services.user_service import UserService
 
 class JWTService:
@@ -16,27 +17,31 @@ class JWTService:
         return token
 
     @staticmethod
-    def generate_access_token(user_id: str, email: str, is_admin: bool, token_version: int) -> str:
+    def generate_access_token(user_id: str, email: str, is_admin: bool, token_version: int, session_id: str) -> str:
         payload = {
             'user_id': str(user_id),
             'email': email,
             'is_admin': is_admin,
             'token_type': 'access',
             'tv': token_version,
+            'sid': str(session_id),
             'iat': datetime.now(timezone.utc),
-            'exp': datetime.now(timezone.utc) + timedelta(minutes=15),
+            'exp': datetime.now(timezone.utc) + ACCESS_TOKEN_LIFETIME,
         }
         return JWTService.generate_token(payload)
 
     @staticmethod
-    def generate_refresh_token(user_id: str, token_version: int, refresh_token_version: int) -> str:
+    def generate_refresh_token(user_id: str, token_version: int, session_token_version: int, session_id: str) -> str:
+        """`rtv` is the session's own rotation counter (M17) — a stale value means this
+        chain was already advanced, which is the reuse signal."""
         payload = {
             'user_id': str(user_id),
             'token_type': 'refresh',
             'tv': token_version,
-            'rtv': refresh_token_version,
+            'rtv': session_token_version,
+            'sid': str(session_id),
             'iat': datetime.now(timezone.utc),
-            'exp': datetime.now(timezone.utc) + timedelta(days=30),
+            'exp': datetime.now(timezone.utc) + REFRESH_TOKEN_LIFETIME,
         }
         return JWTService.generate_token(payload)
 
@@ -76,6 +81,19 @@ class JWTService:
         except ValueError:
             return None
         
+    @staticmethod
+    def session_is_live(payload: Dict) -> bool:
+        """Whether the session this token was issued for is still current (M17).
+
+        A token with no `sid` predates per-device sessions and is not honoured — that is
+        the one-time logout the rollout accepts, rather than a fifteen-minute window in
+        which revocation cannot be enforced.
+        """
+        session_id = payload.get("sid")
+        if not session_id:
+            return False
+        return not SessionService.is_revoked(str(session_id))
+
     @staticmethod
     def generate_elevated_token(user_id: str) -> str:
         """Short-lived token (5 min) gating sensitive data access and destructive actions.
@@ -135,6 +153,8 @@ class JWTService:
                     return None
             if data.get("tv") != user.token_version:
                 return None
+            if not JWTService.session_is_live(data):
+                return None
             return str(user.id)
         except Exception:
             return None
@@ -174,8 +194,12 @@ class JWTService:
                     if data.get("tv") != user.token_version:
                         abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
 
+                    if not JWTService.session_is_live(data):
+                        abort(HTTPStatus.UNAUTHORIZED, description="Session ended — please log in again")
+
                     g.current_user_mail = user.mail
                     g.current_user_id = str(user.id)
+                    g.current_session_id = str(data["sid"])
 
             except HTTPException:
                 raise
@@ -209,6 +233,7 @@ class JWTService:
         def decorator(*args, **kwargs):
             g.current_user_id = None
             g.current_user_mail = None
+            g.current_session_id = None
             auth_header = request.headers.get("Authorization", None)
             if auth_header:
                 try:
@@ -224,9 +249,10 @@ class JWTService:
                                 and datetime.fromtimestamp(iat, tz=timezone.utc) < user.password_changed_at
                             )
                             tv_invalidated = data.get("tv") != user.token_version
-                            if not pwd_invalidated and not tv_invalidated:
+                            if not pwd_invalidated and not tv_invalidated and JWTService.session_is_live(data):
                                 g.current_user_mail = user.mail
                                 g.current_user_id = str(user.id)
+                                g.current_session_id = str(data["sid"])
                 except Exception:
                     pass  # malformed/invalid token → remain unauthenticated
             return f(*args, **kwargs)

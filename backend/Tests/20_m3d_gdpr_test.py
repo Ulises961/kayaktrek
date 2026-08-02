@@ -20,6 +20,7 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
 from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import access_token_for
 from Tasks.data_export import export_user_data
 from Tasks.erasure import run_erasure
 
@@ -44,7 +45,7 @@ def _register_and_activate(app, client, *, mail, phone, username, pwd=_GDPR_PWD)
         user.active = True
         db.session.commit()
         user_id = str(user.id)
-        token = JWTService.generate_access_token(user_id, user.mail, user.admin, user.token_version)
+        token = access_token_for(user)
     return user_id, {"Authorization": f"Bearer {token}"}
 
 

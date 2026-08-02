@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { listSessions } from "@/lib/sessions/actions"
 import { UserSchema } from "@/lib/dtos/user"
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import { PhoneSection } from "@/components/settings/phone-section"
 import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
+import { DeviceSessions } from "@/components/settings/device-sessions"
 import { PageHeading } from "@/components/common/page-heading"
 import { LockIcon, RulerIcon, MailIcon, ShieldIcon, DownloadIcon } from "lucide-react"
 
@@ -20,9 +22,14 @@ export default async function SettingsPage() {
   try {
     const raw = await apiGet("/api/user/me")
     user = UserSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowIfRedirect(error)
     notFound()
   }
+
+  // Best effort: a failed device lookup degrades to a message in the Security card
+  // rather than taking the whole settings page down with it.
+  const sessionsResult = await listSessions()
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -85,12 +92,25 @@ export default async function SettingsPage() {
             Security
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-sm">
-            Signing out ends your session on every device at once — there is no separate per-device
-            session list to manage individually.
-          </p>
-          <SignOutEverywhereButton />
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Your devices</p>
+            <p className="text-muted-foreground text-sm">
+              Where your account is signed in. Locations are approximate. If you do not recognise a
+              device, sign it out and change your password.
+            </p>
+            <DeviceSessions
+              sessions={sessionsResult.success ? sessionsResult.sessions : []}
+              loadError={sessionsResult.success ? undefined : sessionsResult.error}
+            />
+          </div>
+          <Separator />
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-muted-foreground text-sm">
+              Ends every session at once, including this one.
+            </p>
+            <SignOutEverywhereButton />
+          </div>
         </CardContent>
       </Card>
 

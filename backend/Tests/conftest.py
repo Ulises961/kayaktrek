@@ -2,6 +2,7 @@ import os
 from datetime import date
 import json
 import pytest
+from unittest.mock import patch
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.pool import NullPool as _NullPool
@@ -16,6 +17,7 @@ from Resources.item_resource import ITEM_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Tests.auth_helpers import FakeDenylist, access_token_for
 from Api.app import createApp
 from Api.database import db as _db
 from Api.seed import seed_item_categories, seed_place_categories
@@ -140,6 +142,15 @@ def user_2(app):
     assert response.status_code == 201
     return _activate_user("test1.user@gmail.com")
 
+@pytest.fixture(scope="function")
+def denylist(app):
+    """Deterministic revocation denylist (M17) — see FakeDenylist for why it is not a
+    real Redis. Request it in any test that asserts an access token dies *immediately*."""
+    fake = FakeDenylist()
+    with patch("Services.session_service.revocation_redis", return_value=fake):
+        yield fake
+
+
 @pytest.fixture(scope='session')
 def client(app):
     """Test client for making requests."""
@@ -161,8 +172,7 @@ def id_2(user_2):
 def auth_token(app, user_1):
     """Get JWT token for the test user."""
 
-    token = JWTService.generate_access_token(user_1.id, user_1.mail, user_1.admin, user_1.token_version)
-    return token
+    return access_token_for(user_1)
 
 @pytest.fixture(scope='session')
 def auth_headers(auth_token):
@@ -172,8 +182,7 @@ def auth_headers(auth_token):
 @pytest.fixture(scope='session')
 def auth_token_2(app, user_2):
     """Get JWT token for the second test user."""
-    token = JWTService.generate_access_token(user_2.id, user_2.mail, user_2.admin, user_2.token_version)
-    return token
+    return access_token_for(user_2)
 
 @pytest.fixture(scope='session')
 def auth_headers_2(auth_token_2):
@@ -196,7 +205,7 @@ def outsider_headers(app, client):
     client.post("/api/v1/auth/register", json=outsider_data)
     with app.app_context():
         outsider = _activate_user("outsider.tmp@example.com")
-        token = JWTService.generate_access_token(str(outsider.id), outsider.mail, outsider.admin, outsider.token_version)
+        token = access_token_for(outsider)
         outsider_id = str(outsider.id)
 
     yield {"Authorization": f"Bearer {token}"}
@@ -452,7 +461,7 @@ def trip_with_crew(app, client, auth_headers):
         crew_user = _activate_user("crew.member@example.com")
         assert crew_user is not None
         crew_id = str(crew_user.id)
-        crew_token = JWTService.generate_access_token(str(crew_user.id), crew_user.mail, crew_user.admin, crew_user.token_version)
+        crew_token = access_token_for(crew_user)
 
         # Directly insert crew membership (invitation flow is M3a)
         membership = TripMemberSchema().load({

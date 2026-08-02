@@ -1,5 +1,6 @@
 import "server-only"
 export { isRedirectError } from "next/dist/client/components/redirect-error"
+import { isRedirectError as isRedirect } from "next/dist/client/components/redirect-error"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { refreshSession } from "@/lib/auth/actions"
@@ -9,6 +10,19 @@ import { API_URL, API_PREFIX } from "@/lib/api/config"
 // the versioned prefix in this single place so the API version lives in one constant.
 function versionPath(path: string): string {
   return path.replace(/^\/api(?=\/|$)/, API_PREFIX)
+}
+
+/**
+ * Re-throw Next's redirect signal, leaving every other failure to the caller.
+ *
+ * When a session is gone, `apiFetch` redirects to /login — and Next implements
+ * `redirect()` by throwing. A bare `catch` around a fetch therefore swallows the
+ * sign-out and renders whatever the catch decided (a 404, an empty list), which
+ * reads as a broken app rather than as "you are signed out". Call this first in
+ * any catch that wraps an authenticated fetch.
+ */
+export function rethrowIfRedirect(error: unknown): void {
+  if (isRedirect(error)) throw error
 }
 
 async function getAccessToken(): Promise<string | null> {

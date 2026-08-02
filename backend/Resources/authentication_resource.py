@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from flask import Blueprint, request, jsonify, abort, current_app, g
 from flask_limiter.util import get_remote_address
@@ -11,7 +12,9 @@ from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
+from Services.session_service import SessionService
 from Services.user_service import UserService
+from Services.Utils.client_identity import resolve_device_label, resolve_location_label
 from Services.Middleware.auth_middleware import JWTService
 
 logger = logging.getLogger(__name__)
@@ -85,8 +88,13 @@ def login_user():
         user = AuthService.authenticate_user(password, mail_addr=mail, username=username)
 
         if user:
-            access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
-            refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, user.refresh_token_version)
+            session = SessionService.start(
+                user.id,
+                device_label=resolve_device_label(request.headers.get("User-Agent")),
+                location_label=resolve_location_label(),
+            )
+            access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version, str(session.id))
+            refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, session.token_version, str(session.id))
 
             if access_token and refresh_token:
                 response_object = {
@@ -459,12 +467,12 @@ def refresh_token():
         abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
 
     try:
-        AuthService.advance_refresh_rotation(user, payload)
+        session = AuthService.rotate_session(user, payload, location_label=resolve_location_label())
     except ValueError as e:
         abort(HTTPStatus.UNAUTHORIZED, description=str(e))
 
-    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version)
-    refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, user.refresh_token_version)
+    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version, str(session.id))
+    refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, session.token_version, str(session.id))
 
     return jsonify({
         "status": "success",
@@ -479,14 +487,36 @@ def logout():
     """
     ---
     post:
-      summary: Log out everywhere
-      description: Bumps token_version, invalidating every outstanding access/refresh token.
+      summary: Log out this device
+      description: >
+        Revokes only the session this token belongs to; the user's other devices stay
+        signed in. Use /auth/logout-all to end every session.
       responses:
         200:
           description: Logged out
+    """
+    session = SessionService.get_usable(str(g.current_session_id), UUID(str(g.current_user_id)))
+    if session:
+        SessionService.revoke(session, reason="user_logout")
+    return jsonify({"status": "success", "message": "Logged out"}), HTTPStatus.OK
+
+
+@api.route("/api/v1/auth/logout-all", methods=["POST"])
+@JWTService.authenticate_restful
+def logout_all():
+    """
+    ---
+    post:
+      summary: Log out everywhere
+      description: >
+        Bumps token_version and revokes every session, invalidating every outstanding
+        access/refresh token on all of the user's devices.
+      responses:
+        200:
+          description: Logged out everywhere
     """
     try:
         UserService.invalidate_sessions(str(g.current_user_id))
     except NoResultFound:
         abort(HTTPStatus.UNAUTHORIZED)
-    return jsonify({"status": "success", "message": "Logged out"}), HTTPStatus.OK
+    return jsonify({"status": "success", "message": "Logged out everywhere"}), HTTPStatus.OK

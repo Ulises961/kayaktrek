@@ -112,7 +112,8 @@ export async function fetchItineraries(): Promise<Itinerary[]> {
   try {
     const raw = await apiGet<unknown[]>("/api/itinerary/all")
     return ItinerariesSchema.parse(raw)
-  } catch {
+  } catch (e) {
+    if (isRedirectError(e)) throw e
     return []
   }
 }
