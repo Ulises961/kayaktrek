@@ -1,7 +1,12 @@
 from uuid import UUID
 from Resources.trip_resource import TRIP_ENDPOINT
+from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Resources.point_resource import POINT_ENDPOINT
+from Models.day import Day
 from Models.invitation import Invitation
+from Models.itinerary import Itinerary
 from Models.user import User
+from Services.itinerary_service import ItineraryService
 from Api.database import db as _db
 import json
 
@@ -31,6 +36,70 @@ def test_insert_trip_w_o_itinerary(client, auth_headers):
     inventory = {"items": [{"category": "travel", "name": "compass"}]}
     response = client.post(f"{TRIP_ENDPOINT}/create", json={"inventory": inventory}, headers=auth_headers)
     assert response.status_code == 201
+
+
+def test_nested_itinerary_gets_a_staging_day(client, auth_headers):
+    """A trip created with a nested itinerary must still get its Day 0.
+
+    TripSchema's nested load builds the Itinerary directly, bypassing
+    ItineraryService — the only place Day 0 used to be created. Without it the
+    itinerary cannot stage a single point.
+    """
+    data = _create_trip(client, auth_headers)
+    itinerary_id = data["itinerary"]["id"]
+
+    day0 = (
+        _db.session.query(Day)
+        .filter_by(itinerary_id=UUID(itinerary_id), day_number=0)
+        .first()
+    )
+    assert day0 is not None
+
+
+def test_nested_itinerary_can_accept_a_point(client, auth_headers):
+    """The consequence that actually matters: a nested-created itinerary is usable.
+
+    Asserting the Day 0 row exists proves the fix; this proves it fixes the thing
+    it was for — every dropped point stages into Day 0, so an itinerary without
+    one silently accepts nothing.
+    """
+    data = _create_trip(client, auth_headers)
+    itinerary_id = data["itinerary"]["id"]
+
+    builder = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
+    assert builder.status_code == 200
+    days = json.loads(builder.data)["days"]
+    staging = [day for day in days if day["dayNumber"] == 0]
+    assert len(staging) == 1
+
+    point = client.post(
+        f"{POINT_ENDPOINT}/create",
+        json={"dayId": staging[0]["id"], "type": "position", "latitude": 43.5, "longitude": -7.0},
+        headers=auth_headers,
+    )
+    assert point.status_code == 201
+
+
+def test_staging_day_is_not_duplicated(client, auth_headers):
+    """ensure_staging_day is idempotent — a second call reuses the existing Day 0.
+
+    Matters because three creation paths now call it, and two of them run against
+    an itinerary that may already have one.
+    """
+    data = _create_trip(client, auth_headers)
+    itinerary_id = UUID(data["itinerary"]["id"])
+    itinerary = _db.session.query(Itinerary).filter_by(id=itinerary_id).first()
+
+    first = ItineraryService.ensure_staging_day(itinerary)
+    second = ItineraryService.ensure_staging_day(itinerary)
+
+    assert first.id == second.id
+    assert (
+        _db.session.query(Day)
+        .filter_by(itinerary_id=itinerary_id, day_number=0)
+        .count()
+        == 1
+    )
 
 
 def test_new_trip_defaults_to_building_state(client, auth_headers):

@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 
 class Sea(Base):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'], ['day.id'], name="day_foreign_key_in_sea"),
+        ForeignKeyConstraint(
+            ['day_id'], ['day.id'], name="day_foreign_key_in_sea", ondelete="CASCADE"
+        ),
     )
     day_id: Mapped[_UUID] = mapped_column(UUID, primary_key=True)
     moon_phase: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

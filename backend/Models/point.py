@@ -16,7 +16,9 @@ class PointType(enum.Enum):
 
 class Point(BaseModel):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'], ['day.id'], name="day_foreign_key_in_point"),
+        ForeignKeyConstraint(
+            ['day_id'], ['day.id'], name="day_foreign_key_in_point", ondelete="CASCADE"
+        ),
     )
 
     latitude: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
@@ -32,7 +34,11 @@ class Point(BaseModel):
         nullable=True,
     )
     day_id: Mapped[Optional[_UUID]] = mapped_column(UUID, nullable=True, index=True)
-    next_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey('point.id'), nullable=True)
+    # SET NULL, not CASCADE: next_id points forward down the route chain, so
+    # cascading would delete a point's predecessor when the successor goes.
+    next_id: Mapped[Optional[_UUID]] = mapped_column(
+        UUID, ForeignKey('point.id', ondelete="SET NULL"), nullable=True
+    )
 
     next: Mapped[Optional['Point']] = relationship(
         'Point',

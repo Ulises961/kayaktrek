@@ -7,7 +7,12 @@ from uuid import UUID as _UUID
 
 class WeatherState(Base):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'], ['weather.day_id'], name="weather_day_foreign_keys_in_weather_state"),
+        ForeignKeyConstraint(
+            ['day_id'],
+            ['weather.day_id'],
+            name="weather_day_foreign_keys_in_weather_state",
+            ondelete="CASCADE",
+        ),
     )
     day_id: Mapped[_UUID] = mapped_column(UUID, primary_key=True)
     time: Mapped[Time] = mapped_column(Time, primary_key=True)

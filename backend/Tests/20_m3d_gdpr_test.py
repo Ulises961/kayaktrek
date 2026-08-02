@@ -14,6 +14,8 @@ from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.trip import Trip, TripStateType
 from Models.user import User
+from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Resources.point_resource import POINT_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
 from Services.auth_service import AuthService
@@ -133,7 +135,23 @@ def erasure_leader_with_trip(app, client):
         headers=headers,
     )
     assert r.status_code == 201
-    trip_id = json.loads(r.data)["id"]
+    body = json.loads(r.data)
+    trip_id = body["id"]
+
+    # Seed the itinerary the way real usage leaves it — a staging Day 0 with an
+    # actual route point on it. An empty itinerary is a state the app never
+    # produces, and seeding one here is what let a broken erasure cascade pass
+    # this suite for months.
+    itinerary_id = body["itinerary"]["id"]
+    builder = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=headers)
+    assert builder.status_code == 200
+    day0 = next(d for d in json.loads(builder.data)["days"] if d["dayNumber"] == 0)
+    point = client.post(
+        f"{POINT_ENDPOINT}/create",
+        json={"dayId": day0["id"], "type": "position", "latitude": 43.5, "longitude": -7.0},
+        headers=headers,
+    )
+    assert point.status_code == 201
 
     with app.app_context():
         user = db.session.query(User).filter_by(id=UUID(user_id)).first()

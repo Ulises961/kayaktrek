@@ -88,5 +88,24 @@ def test_delete_point(client, auth_headers, points):
     response = client.get(f"{POINT_ENDPOINT}/{point["id"]}", headers=auth_headers)
     assert response.status_code == 404
 
+
+def test_delete_point_heals_the_chain(client, auth_headers, points):
+    """Deleting a mid-chain point must relink its predecessor to its successor.
+
+    point.next_id is ON DELETE SET NULL at the DB level, so if this healing ever
+    regresses the database will not complain — it will quietly blank the
+    predecessor's next_id and truncate the route from that point on. Nothing else
+    guards that, so assert the relink itself rather than just the 200.
+    """
+    [first, middle, third, _] = points
+
+    response = client.delete(f"{POINT_ENDPOINT}/{middle["id"]}", headers=auth_headers)
+    assert response.status_code == 200
+
+    predecessor = client.get(f"{POINT_ENDPOINT}/{first["id"]}", headers=auth_headers)
+    assert predecessor.status_code == 200
+    assert json.loads(predecessor.data)["nextId"] == third["id"]
+
+
 # Points of interest are no longer route points — the POI range query moved to the
 # Place entity (M4e §1). Its proximity tests live in 50_m4e_place_resource_test.py.

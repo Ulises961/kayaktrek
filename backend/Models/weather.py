@@ -10,7 +10,9 @@ if TYPE_CHECKING:
 
 class Weather(Base):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'],['day.id'], name="day_foreign_key_in_weather"),
+        ForeignKeyConstraint(
+            ['day_id'], ['day.id'], name="day_foreign_key_in_weather", ondelete="CASCADE"
+        ),
     )
     day_id: Mapped[_UUID] = mapped_column(UUID, primary_key=True)
     model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

@@ -394,6 +394,24 @@ class ItineraryService:
     # ------------------------------------------------------------------ #
 
     @staticmethod
+    def ensure_staging_day(itinerary: Itinerary) -> Day:
+        """Return the itinerary's Day 0, creating it if absent.
+
+        Day 0 is the staging area every newly dropped point is assigned to before
+        any day boundary owns it. An itinerary without one cannot accept a point
+        at all, so every path that creates an Itinerary must run through here.
+        Flushes but does not commit — the caller owns the transaction.
+        """
+        day0 = db.session.query(Day).filter_by(
+            itinerary_id=itinerary.id, day_number=0
+        ).first()
+        if day0 is None:
+            day0 = Day(day_number=0, itinerary_id=itinerary.id, date=None)
+            db.session.add(day0)
+            db.session.flush()
+        return day0
+
+    @staticmethod
     def create_itinerary(itinerary_data: dict, user_id: str) -> Itinerary:
         """Create a new itinerary.
 
@@ -417,8 +435,7 @@ class ItineraryService:
         db.session.add(itinerary)
         db.session.flush()
 
-        day0 = Day(day_number=0, itinerary_id=itinerary.id, date=None)
-        db.session.add(day0)
+        ItineraryService.ensure_staging_day(itinerary)
         db.session.commit()
         db.session.refresh(itinerary)
 
@@ -758,9 +775,7 @@ class ItineraryService:
         db.session.add(itinerary)
         db.session.flush()
 
-        day0 = Day(day_number=0, itinerary_id=itinerary.id, date=None)
-        db.session.add(day0)
-        db.session.flush()
+        day0 = ItineraryService.ensure_staging_day(itinerary)
 
         prev_point: Optional[Point] = None
         for lat, lon, name in raw_points:

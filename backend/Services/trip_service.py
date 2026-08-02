@@ -22,6 +22,7 @@ from Services.Utils.point_ordering import walk_linked_list
 from Services.Utils.timezone_utils import resolve_timezone
 from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Services.catalog_item_service import CatalogItemService
+from Services.itinerary_service import ItineraryService
 from Models.user import User
 from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -204,6 +205,13 @@ class TripService:
             })
             db.session.add(membership)
             db.session.flush()  # obtain membership.id before seeding requirements
+
+        # A nested itinerary is built by TripSchema's own load, which bypasses
+        # ItineraryService and so never creates the Day 0 every dropped point
+        # stages into. Give it one here, the same way the nested inventory below
+        # is reconciled.
+        if trip.itinerary is not None:
+            ItineraryService.ensure_staging_day(trip.itinerary)
 
         # Every trip owns exactly one inventory, pre-populated with a leader-owned
         # default requirement set so the gear checklist never starts empty. The trip

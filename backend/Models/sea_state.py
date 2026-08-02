@@ -7,7 +7,12 @@ from uuid import UUID as _UUID
 
 class SeaState(Base):
     __table_args__ = (
-        ForeignKeyConstraint(['day_id'], ['sea.day_id'], name="sea_day_foreign_key_in_sea_state"),
+        ForeignKeyConstraint(
+            ['day_id'],
+            ['sea.day_id'],
+            name="sea_day_foreign_key_in_sea_state",
+            ondelete="CASCADE",
+        ),
     )
 
     day_id: Mapped[_UUID] = mapped_column(UUID, primary_key=True)
