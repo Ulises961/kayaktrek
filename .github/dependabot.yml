@@ -4,11 +4,49 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+    groups:
+      # One PR per weekly run instead of one per package. The backend suite is
+      # the gate either way, so a single PR means a single CI run to read.
+      # Majors stay ungrouped (no update-types match) and get their own PR.
+      backend-dependencies:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    groups:
+      # react and react-dom are version-locked at runtime — React aborts on a
+      # mismatch ("Incompatible React versions"), so a PR moving one without the
+      # other cannot pass CI. Dependabot raised them separately twice (#51, #86);
+      # #86 failed 139 of 204 test files before a single assertion ran. This
+      # group deliberately has no update-types filter: a 19 -> 20 major carries
+      # the same lockstep constraint as a patch, so it must group too.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Everything else in one PR. Each npm PR rewrites pnpm-lock.yaml, so N open
+      # PRs mean N-1 conflicts the moment one merges — clearing eight of them on
+      # 2026-08-02 cost three serial rebase cycles.
+      #
+      # `next` is excluded on purpose, not overlooked: 16.1.6 -> 16.2.10 shipped
+      # the streamed-apply regression that still forces `mutateAndSettle` to
+      # reload-settle every mutation (docs/reviews/2026-07-10-e2e-alignment.md).
+      # A framework bump that can move e2e behaviour needs its own PR and its own
+      # bisect point, not a shared one with five unrelated packages.
+      frontend-dependencies:
+        patterns: ["*"]
+        exclude-patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "next"
+        update-types: ["minor", "patch"]
     ignore:
       # shadcn is a scaffolding CLI: CI never exercises its codegen, and v4
       # changes generated component conventions (base-ui default). Upgrade
@@ -20,3 +58,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      # These land unvalidated: docker-build-push is `if:`-gated off on PRs, so a
+      # green check says nothing about an actions bump — the next deploy is its
+      # first real exercise. One reviewable PR beats three that each look green
+      # for the wrong reason.
+      github-actions:
+        patterns: ["*"]
