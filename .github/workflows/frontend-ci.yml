@@ -93,7 +93,7 @@ jobs:
       # vars just bake in an empty string until then.
       # ADR-034: images are private by default — see DEPLOY.md for the deploy-side login.
       - name: Build and push frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: true

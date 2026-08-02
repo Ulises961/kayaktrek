@@ -113,7 +113,7 @@ jobs:
       # ADR-034: images are private by default (not-yet-public app) — the deploy target
       # authenticates with `docker login ghcr.io` using a PAT, see DEPLOY.md.
       - name: Build and push backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           target: runtime
