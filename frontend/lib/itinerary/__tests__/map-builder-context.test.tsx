@@ -19,8 +19,10 @@ const BASE_STATE: MapState = {
 const MOCK_CTX: MapBuilderContextValue = {
   state: BASE_STATE,
   dispatch: () => {},
-  draftSlices: null,
-  setDraftSlices: () => {},
+  draft: null,
+  setDraft: () => {},
+  removedRealDayIds: [],
+  setRemovedRealDayIds: () => {},
   tripId: null,
   tripName: "Test Trip",
   tripDateFrom: null,
@@ -63,12 +65,12 @@ describe("useMapBuilder", () => {
     expect(result.current.tripId).toBeNull()
   })
 
-  it("provides draftSlices as null initially", () => {
+  it("provides draft as null initially", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(MapBuilderContext.Provider, { value: MOCK_CTX }, children)
 
     const { result } = renderHook(() => useMapBuilder(), { wrapper })
-    expect(result.current.draftSlices).toBeNull()
+    expect(result.current.draft).toBeNull()
   })
 
   it("exposes selectedPointId and day0Id from context", () => {

@@ -1,6 +1,6 @@
 "use client"
 import { useRef, type ReactNode } from "react"
-import { GripVerticalIcon, Trash2Icon } from "lucide-react"
+import { GripVerticalIcon, Trash2Icon, PlusIcon } from "lucide-react"
 import type { DaySlice } from "@/lib/itinerary/boundaries"
 import { legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/utils/date"
@@ -23,6 +23,9 @@ export type BoundaryDividerProps = {
   onDateChange?: (date: string | null) => void
   onBoundaryMove?: (newEndPointIdx: number) => void
   onDelete?: () => void
+  /** When provided, renders an add-day (+) button. Passed only for the last
+   * divider in the list — this component does not decide who is last. */
+  onAddDay?: () => void
 }
 
 type RowSnapshot = {
@@ -48,6 +51,7 @@ export function BoundaryDivider({
   onDateChange,
   onBoundaryMove,
   onDelete,
+  onAddDay,
 }: BoundaryDividerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const snapshotRef = useRef<RowSnapshot | null>(null)
@@ -175,6 +179,17 @@ export function BoundaryDivider({
     </button>
   )
 
+  const addButton = onAddDay && (
+    <button
+      type="button"
+      aria-label={`Add day after day ${labelDayNumber}`}
+      onClick={onAddDay}
+      className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+    >
+      <PlusIcon className="size-3.5" />
+    </button>
+  )
+
   // Non-interactive (view mode) has no grip, editable picker, or delete button —
   // "Day N · date · distance" alone never overflows the pane, so it stays one line.
   if (!interactive) {
@@ -196,9 +211,9 @@ export function BoundaryDivider({
   // Interactive (boundary-edit) mode: the grip is its own column, stretched to
   // the full height of both lines below — a larger drag target than confining
   // it to line 1 alone, without adding a third row. Line 1 is Day N · date ·
-  // delete; line 2 is just the distance/time metrics, flush left under the
-  // whole row. Drag is confined to the grip so the date picker and delete
-  // button receive normal clicks.
+  // add (if last) · delete; line 2 is just the distance/time metrics, flush left
+  // under the whole row. Drag is confined to the grip so the date picker and
+  // action buttons receive normal clicks.
   return (
     <div
       ref={containerRef}
@@ -221,7 +236,12 @@ export function BoundaryDivider({
             footer={footer}
             className="h-6 w-auto border-none bg-transparent px-1 text-xs font-normal shadow-none"
           />
-          {deleteButton && <div className="ml-auto">{deleteButton}</div>}
+          {(addButton || deleteButton) && (
+            <div className="ml-auto flex items-center gap-1">
+              {addButton}
+              {deleteButton}
+            </div>
+          )}
         </div>
         <span className="text-muted-foreground font-normal whitespace-nowrap">{displayDist}</span>
       </div>

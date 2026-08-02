@@ -14,7 +14,6 @@ export type PointRowProps = {
   isBoundary: boolean
   dayColor: string
   onTypeChange?: (type: PointType) => void
-  onNameChange?: (name: string) => void
   onNameBlur?: (name: string) => void
   saveStatus?: SaveStatus
   onDelete?: () => void
@@ -37,7 +36,6 @@ export function PointRow({
   isBoundary,
   dayColor,
   onTypeChange,
-  onNameChange,
   onNameBlur,
   saveStatus = "idle",
   onDelete,
@@ -111,18 +109,15 @@ export function PointRow({
         </div>
       )}
 
-      {onNameChange && (
+      {onNameBlur && (
         <div className="flex flex-col gap-1">
           <input
             type="text"
             className="border-border bg-background w-full rounded border px-2 py-1 text-sm"
             placeholder="Point name"
             value={localName}
-            onChange={(e) => {
-              setLocalName(e.target.value)
-              onNameChange(e.target.value)
-            }}
-            onBlur={() => onNameBlur?.(localName)}
+            onChange={(e) => setLocalName(e.target.value)}
+            onBlur={() => onNameBlur(localName)}
           />
           <SaveStatusLine status={saveStatus} />
         </div>

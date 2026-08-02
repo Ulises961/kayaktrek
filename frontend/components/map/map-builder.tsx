@@ -14,7 +14,7 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
-import type { DaySlice } from "@/lib/itinerary/boundaries"
+import type { DraftBoundary } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
 import { getStreamTicket } from "@/lib/live/actions"
@@ -59,7 +59,8 @@ export function MapBuilder({
 
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)
-  const [draftSlices, setDraftSlices] = useState<DaySlice[] | null>(null)
+  const [draft, setDraft] = useState<DraftBoundary[] | null>(null)
+  const [removedRealDayIds, setRemovedRealDayIds] = useState<string[]>([])
   const [viewMode, setViewMode] = useState(true)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
@@ -251,8 +252,10 @@ export function MapBuilder({
     () => ({
       state,
       dispatch,
-      draftSlices,
-      setDraftSlices,
+      draft,
+      setDraft,
+      removedRealDayIds,
+      setRemovedRealDayIds,
       tripId: tripId ?? null,
       tripName,
       tripDateFrom,
@@ -279,7 +282,8 @@ export function MapBuilder({
     [
       state,
       dispatch,
-      draftSlices,
+      draft,
+      removedRealDayIds,
       tripId,
       tripName,
       tripDateFrom,

@@ -81,7 +81,7 @@ describe("PointRow — collapsed", () => {
         onExpand={vi.fn()}
         isBoundary={false}
         dayColor="#888"
-        onNameChange={vi.fn()}
+        onNameBlur={vi.fn()}
       />,
     )
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
@@ -130,7 +130,7 @@ describe("PointRow — expanded", () => {
         onExpand={vi.fn()}
         isBoundary={false}
         dayColor="#888"
-        onNameChange={vi.fn()}
+        onNameBlur={vi.fn()}
       />,
     )
     expect(screen.getByRole("textbox")).toBeInTheDocument()
@@ -208,14 +208,14 @@ describe("PointRow — expanded", () => {
         onExpand={vi.fn()}
         isBoundary={false}
         dayColor="#888"
-        onNameChange={vi.fn()}
+        onNameBlur={vi.fn()}
       />,
     )
     expect(screen.getByRole("textbox")).toHaveValue("Cedeira")
   })
 
-  it("calls onNameChange as the user types", async () => {
-    const onNameChange = vi.fn()
+  it("calls onNameBlur with the typed name when the input loses focus", async () => {
+    const onNameBlur = vi.fn()
     render(
       <PointRow
         point={pt("a")}
@@ -224,11 +224,12 @@ describe("PointRow — expanded", () => {
         onExpand={vi.fn()}
         isBoundary={false}
         dayColor="#888"
-        onNameChange={onNameChange}
+        onNameBlur={onNameBlur}
       />,
     )
     await userEvent.type(screen.getByRole("textbox"), "Porto")
-    expect(onNameChange).toHaveBeenLastCalledWith("Porto")
+    await userEvent.tab()
+    expect(onNameBlur).toHaveBeenCalledWith("Porto")
   })
 })
 

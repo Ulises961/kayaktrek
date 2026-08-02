@@ -105,13 +105,14 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 
 **Edit mode** (leader-only during `building` and `happening`):
 - The full M4b builder: PointListPane, drag-boundary editor, point dropping.
-- Entry: `[Edit]` button in the top bar (or `[+ Add day]` which enters edit mode implicitly).
-- Confirmed boundary dividers become draggable in place — same visual, now interactive.
-- Exit: `[Apply]` commits via `apply-boundaries` and returns to view mode.
-  `[Cancel]` discards draft and returns to view mode.
+- Entry: `[Edit]` button in the top bar.
+- Boundary dividers are always draggable in Edit mode — see "Flat edit surface" (M14)
+  below for the current draft/commit model (supersedes the `[Apply]`/`[Cancel]` and
+  `[+ Add day]`-enters-edit-mode framing below, both stale since M12/M14).
 - During `past`: edit mode locked.
 
-**Header states — PointListPane**:
+**Header states — PointListPane** (superseded by M14 — see "Flat edit surface" below;
+kept here only as the original M4c framing referenced by the decision log):
 
 | Condition | Header |
 |-----------|--------|
@@ -119,13 +120,11 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 | `days.length > 0`, view mode | `[Edit]` · `[+ Add day]` |
 | Edit mode active | `[Apply]` · `[Cancel]` |
 
-`[+ Add day]` from view mode enters edit mode then places the new handle. From edit mode
-it places another handle without exiting draft. Delete-day is no longer in the header — it
-lives on each BoundaryDivider in edit mode (generalised from "delete last" to "delete by
-dayId"). **Day 1 is the permanent anchor**: it renders as a static header at the top of
-`PointListPane` (not a `BoundaryDivider`) and has no delete control, so once any day exists
-the itinerary cannot be reduced below Day 1. Deleting a later day reassigns its points to
-the preceding day.
+Delete-day lives on each BoundaryDivider in edit mode (generalised from "delete last" to
+"delete by dayId"). **Day 1 is the permanent anchor**: it renders as a static header at
+the top of `PointListPane` (not a `BoundaryDivider`) and has no delete control, so once
+any day exists the itinerary cannot be reduced below Day 1. Deleting a later day
+reassigns its points to the preceding day.
 
 **Boundary handle = Day 1 header, made draggable.** A `BoundaryDivider` in edit mode is a
 full-width bar visually identical to the static Day 1 header (`Day N · date · distance`).
@@ -297,6 +296,75 @@ Outside boundary-edit mode, individual point changes continue to save immediatel
 ### React context — MapBuilderContext
 
 The `MapBuilder` component owns `mapReducer` state, draft boundary state, and `avg_speed_knots`. Rather than prop-drilling through `PointListPane → point rows → expanded accordions → boundary handles`, a `MapBuilderContext` is provided by `MapBuilder` and consumed via `useMapBuilder()`. Tests wrap components in `<MapBuilderProvider value={...}>`.
+
+---
+
+## Flat edit surface: implicit boundary draft (M14)
+
+M12 (item 16, 2026-07-09) formalized boundary editing as an **explicitly-entered draft
+sub-state**: a leader had to press "Edit days" before any divider became draggable, then
+"Save days" or "Discard" to leave it — fixing a real bug (Add day created a real `Day` row
+immediately, so Cancel left an orphaned row the user never confirmed) but at the cost of a
+mode nested inside Edit mode. Living with it, the user rejected the *interaction gate*
+itself: nudging one boundary by one point cost Edit → Edit days → drag → Save days → back.
+M14 (2026-08-01/02) flattens this to a single edit surface while keeping the part of M12's
+fix that mattered — atomic, server-side-nothing-happens-before-Save boundary commits.
+
+**Rejected alternatives** (discussed and dismissed before settling on the design below):
+- *Literal tool palette* (point tool / day tool, click to arm): tools are modes too, just
+  spatial instead of temporal — trades "which level am I in?" for "which tool is armed?"
+  and loses the builder's best property, zero armed tools (tap map = add point, tap
+  marker = select).
+- *Live per-gesture boundary commit* (no Save/Discard at all): loses Discard entirely and
+  would churn stop/position type promotions into the DB on every drag sweep.
+
+**Implicit draft, ID-anchored.** Boundary dividers are always interactive in Edit mode —
+no "Edit days" button, no entry ceremony. The first boundary gesture (drag, date change,
+Add day, delete day) silently materializes a draft; **Save days / Discard render
+persistently** in the same header position as before, `disabled` until the draft is
+dirty (a disabled→enabled transition, not an appear/disappear — deliberately chosen over
+hiding them, so the affordance is discoverable before first use). The prior
+index-anchored `DaySlice` (`startIdx`/`endIdx` into a frozen `pointOrder` snapshot) is why
+the interaction gate existed in the first place — any point mutation mid-draft would shift
+every later index. The draft is re-anchored by **point ID** (`endPointId`, mirroring the
+DB's own `Day.startPointId`/`endPointId`) and resolved to indices only at render time, so
+point drops/deletes/renames/type-changes are well-defined — and continue to **save
+immediately, live, even while a boundary draft is dirty**. `apply-boundaries` (the M4b
+atomic batch endpoint) and its all-or-nothing backend transaction are unchanged.
+
+**Add-day moves onto the last boundary handle.** Each `BoundaryDivider` is visually the
+header of the day *below* it; the plus-icon add-day button therefore renders on the
+**last divider only** (the Day 1 static header carries it when exactly one day exists; a
+slim bootstrap row carries it when zero days exist) — one unambiguous append point at the
+bottom of the sequence, never on an earlier handle. Clicking it hands the new day N+1
+**all of day N's points**; day N collapses to zero length (`endPointId` becomes its own
+start anchor — the overnight stop it shares with day N-1), so the new handle appears
+immediately below the one that created it with no point rows between them, and the user
+drags it down to place day N's actual end. This is a deliberate change from M4c's midpoint
+split. A day saved while still collapsed is not an inconsistency: `apply_boundaries`
+already accepts a `start === end` boundary item (the same state a drag-to-clamp produces
+today), and a day dropped from the payload entirely has its boundary FKs nulled
+server-side (`itinerary_service.py` boundary-apply loop) — both paths pre-existed M14.
+A zero-length day anchored at a stop is, incidentally, a natural rest-day
+representation — noted as a free side effect, not implemented as a feature here.
+
+**Real-day deletion joins the draft.** Previously, deleting a *real* day was immediate and
+non-discardable while every other draft edit reverted on Discard — an inconsistency. M14
+folds day deletion (real or draft-only) into the draft; a real day's row is only actually
+deleted server-side inside Save, symmetric with how draft-day rows were already only
+*created* inside Save. This extends M12's orphan-leak invariant from "no day creation
+before Save" to **no server-side `Day` mutation of any kind before Save**.
+
+**Discard narrows to day-structure.** Because point edits now save live during a dirty
+draft, Discard can only revert boundaries/dates/day-add/day-remove — it no longer implies
+reverting the point edits made while it was open (M12's model made this trivial by
+freezing points during the draft; M14 gives that up deliberately). Point mutations are
+never silently lost; they were saved, on purpose, the moment they happened.
+
+Backend: unchanged. All orchestration (draft-day creation, real-day deletion, payload
+assembly, optimistic dispatch, rollback-on-failure) stays client-side, exactly as M4b's
+batch-apply design intended. Full design and step-by-step implementation plan:
+`plans/M14-flat-itinerary-edit.md`.
 
 Values that are local to a component subtree (expanded accordion item, scroll position) remain as props.
 
@@ -513,3 +581,5 @@ migrate to `FieldError` when next touched.
 | M4e landed: `interest` gone from `PointType`; `Place` marker layer (day-independent, toggleable) + drop-a-pin; place/diamond add-actions unified in a top-centre `MapAddControl` "+ Add" disclosure | — | 2026-06-21 | Type selectors and icon legend now `stop`/`position` only; star icon removed; see `features.md` decision log for the `Place`/`PlaceCategory` entity |
 | Shared form primitives (`form-field.tsx`, `AccentDialogContent`) + one-form-per-create/edit-pair convention | ADR-032 | 2026-07-03 | Component abstraction review; `VehicleForm`/`DocumentForm` join the `PlaceForm` pattern; accent colors from `lib/tokens` palette; sheet/modal merge and generic form-builder rejected; findings in `plans/component-abstraction-review.md` |
 | Tile caching Layer 1 landed, narrowed to priority rows 1–2 only (M8 §D10) | ADR-033 | 2026-07-17 | `GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png`, `layer ∈ {osm, seamark}`; MinIO-cached via `StorageService`, 7-day upstream refresh, stale-serves-on-upstream-failure; unauthenticated, `600/min` per-IP; all four map surfaces (`public-map`, `map-core`, `landing-map`, `explore-discovery-map`) route through it, `{s}` subdomain dropped. Sentinel-2/titiler (row 3) and Mapbox HD (row 4) stay deferred — `<layer>` is their future seam. Landing hero's Esri Ocean base is unaffected (client-direct per Esri terms, was never proposed for this proxy). |
+| Builder mode architecture: real View/Edit segmented control; boundary editing becomes an explicitly-entered draft sub-state ("Save days"/"Discard"); "Add day" deferred until Save (M12 item 16) | — | 2026-07-09 | Fixed a real bug: immediate `Day` row creation on Add day meant Cancel left an orphaned row. Superseded by M14 below — the entry gate itself is removed, not the atomic-save behavior it introduced |
+| Flat edit surface: boundary draft becomes implicit (first gesture materializes it) and ID-anchored (`endPointId`, not frozen indices); Save/Discard persistent-disabled instead of appear/hide; Add-day moves to the last boundary handle only, new day takes all of the old last day's points (collapse-and-drag, not midpoint split); real-day deletion joins the draft (no server `Day` mutation before Save); point edits save live even mid-draft, Discard narrows to day-structure only (M14) | — | 2026-08-02 | Supersedes M12 item 16's entry gate while keeping its atomic-apply/no-premature-server-mutation guarantee, extended to day deletion too; `plans/M14-flat-itinerary-edit.md` |

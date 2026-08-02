@@ -146,7 +146,7 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
       </div>
 
       {hasDetails && (
-        <Accordion type="single" collapsible defaultValue="details">
+        <Accordion type="single" collapsible>
           <AccordionItem value="details" className="border-none">
             <AccordionTrigger className="text-muted-foreground w-fit flex-none justify-start gap-1.5 py-1 text-sm font-medium hover:no-underline">
               Details

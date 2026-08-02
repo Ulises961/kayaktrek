@@ -48,8 +48,10 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
   return {
     state,
     dispatch: vi.fn(),
-    draftSlices: null,
-    setDraftSlices: vi.fn(),
+    draft: null,
+    setDraft: vi.fn(),
+    removedRealDayIds: [],
+    setRemovedRealDayIds: vi.fn(),
     tripId: null,
     tripName: "Test Trip",
     tripDateFrom: null,

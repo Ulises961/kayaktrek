@@ -4,10 +4,13 @@ import {
   applySlicesToPreviewDays,
   computeSlicesApplyPayload,
   isDraftDay,
-  appendDraftSlice,
-  removeDraftSlice,
   latestDatedSliceDate,
+  resolveDraft,
+  initDraftBoundaries,
+  appendDraftBoundary,
+  removeDraftBoundary,
   type DaySlice,
+  type DraftBoundary,
 } from "../boundaries"
 import type { Day } from "@/lib/dtos/day"
 import type { MapState } from "../map-reducer"
@@ -289,94 +292,6 @@ describe("isDraftDay", () => {
   })
 })
 
-// ─── appendDraftSlice ─────────────────────────────────────────────────────────
-
-describe("appendDraftSlice", () => {
-  it("with zero slices: new slice covers the whole point range and gets draft-1", () => {
-    const result = appendDraftSlice([], 3)
-    expect(result).toEqual([{ dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 2, date: null }])
-  })
-
-  it("with zero slices and zero points: endIdx stays 0", () => {
-    const result = appendDraftSlice([], 0)
-    expect(result[0]).toMatchObject({ startIdx: 0, endIdx: 0 })
-  })
-
-  it("splits the last slice at its midpoint and appends the new one after it", () => {
-    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }]
-    const result = appendDraftSlice(slices, 4)
-    expect(result).toEqual([
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
-    ])
-  })
-
-  it("leaves earlier slices untouched", () => {
-    const slices: DaySlice[] = [
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: "2026-07-01" },
-      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
-    ]
-    const result = appendDraftSlice(slices, 4)
-    expect(result[0]).toEqual(slices[0])
-  })
-
-  it("numbers a second draft append draft-3 when appending onto an existing draft-2", () => {
-    const slices: DaySlice[] = [
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
-    ]
-    const result = appendDraftSlice(slices, 4)
-    expect(result[2]).toMatchObject({ dayId: "draft-3", dayNumber: 3 })
-  })
-})
-
-// ─── removeDraftSlice ─────────────────────────────────────────────────────────
-
-describe("removeDraftSlice", () => {
-  it("removing the only slice leaves an empty array", () => {
-    const slices: DaySlice[] = [
-      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
-    ]
-    expect(removeDraftSlice(slices, "draft-1")).toEqual([])
-  })
-
-  it("removing the last slice extends the previous slice's endIdx to absorb it", () => {
-    const slices: DaySlice[] = [
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
-    ]
-    const result = removeDraftSlice(slices, "draft-2")
-    expect(result).toEqual([{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }])
-  })
-
-  it("removing the first slice extends the next slice's startIdx down to 0", () => {
-    const slices: DaySlice[] = [
-      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-      { dayId: D2, dayNumber: 2, startIdx: 1, endIdx: 3, date: null },
-    ]
-    const result = removeDraftSlice(slices, "draft-1")
-    expect(result).toEqual([{ dayId: D2, dayNumber: 1, startIdx: 0, endIdx: 3, date: null }])
-  })
-
-  it("removing a middle slice merges it into the previous slice and renumbers the rest", () => {
-    const slices: DaySlice[] = [
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null },
-      { dayId: "draft-2", dayNumber: 2, startIdx: 1, endIdx: 2, date: null },
-      { dayId: D3, dayNumber: 3, startIdx: 2, endIdx: 4, date: null },
-    ]
-    const result = removeDraftSlice(slices, "draft-2")
-    expect(result).toEqual([
-      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
-      { dayId: D3, dayNumber: 2, startIdx: 2, endIdx: 4, date: null },
-    ])
-  })
-
-  it("is a no-op when the dayId is not found", () => {
-    const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null }]
-    expect(removeDraftSlice(slices, "does-not-exist")).toEqual(slices)
-  })
-})
-
 // ─── latestDatedSliceDate ─────────────────────────────────────────────────────
 
 describe("latestDatedSliceDate", () => {
@@ -408,5 +323,201 @@ describe("latestDatedSliceDate", () => {
   it("returns undefined for a negative index (day 1 has nothing before it)", () => {
     const slices: DaySlice[] = [{ dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 1, date: null }]
     expect(latestDatedSliceDate(slices, -1)).toBeUndefined()
+  })
+})
+
+// ─── resolveDraft ───────────────────────────────────────────────────────────
+
+describe("resolveDraft", () => {
+  it("resolves a normal multi-day draft: each day's start is the previous day's end", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: PC, date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ]
+    expect(resolveDraft(draft, pointOrder)).toEqual([
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
+      { dayId: D2, dayNumber: 2, startIdx: 2, endIdx: 4, date: null },
+    ])
+  })
+
+  it("last-day tail rule: the last day's endIdx is always M-1, ignoring its stored endPointId", () => {
+    const draft: DraftBoundary[] = [{ dayId: D1, dayNumber: 1, endPointId: PB, date: null }]
+    const [slice] = resolveDraft(draft, pointOrder)
+    expect(slice).toMatchObject({ startIdx: 0, endIdx: 4 })
+  })
+
+  it("anchor loss (null endPointId on a non-last day) clamps to a zero-length day", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: null, date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ]
+    const slices = resolveDraft(draft, pointOrder)
+    expect(slices[0]).toMatchObject({ startIdx: 0, endIdx: 0 })
+    expect(slices[1]).toMatchObject({ startIdx: 0, endIdx: 4 })
+  })
+
+  it("anchor loss (stale endPointId not in pointOrder) clamps to a zero-length day", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: "no-longer-exists", date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ]
+    const slices = resolveDraft(draft, pointOrder)
+    expect(slices[0]).toMatchObject({ startIdx: 0, endIdx: 0 })
+  })
+
+  it("monotonicity: an anchor pointing backwards clamps to the day's own startIdx", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: PC, date: null }, // idx 2
+      { dayId: D2, dayNumber: 2, endPointId: PB, date: null }, // idx 1 — before day 2's start
+      { dayId: D3, dayNumber: 3, endPointId: PE, date: null },
+    ]
+    const slices = resolveDraft(draft, pointOrder)
+    expect(slices[0]).toMatchObject({ startIdx: 0, endIdx: 2 })
+    expect(slices[1]).toMatchObject({ startIdx: 2, endIdx: 2 }) // clamped, zero-length
+    expect(slices[2]).toMatchObject({ startIdx: 2, endIdx: 4 }) // tail rule
+  })
+
+  it("M === 0: every slice is explicitly empty (startIdx 0, endIdx -1)", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: "irrelevant", date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, endPointId: null, date: null },
+    ]
+    expect(resolveDraft(draft, [])).toEqual([
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: -1, date: "2026-07-01" },
+      { dayId: D2, dayNumber: 2, startIdx: 0, endIdx: -1, date: null },
+    ])
+  })
+})
+
+// ─── initDraftBoundaries + round-trip invariant ────────────────────────────
+
+describe("initDraftBoundaries", () => {
+  it("materializes a draft from real Day rows via initDaySlices", () => {
+    const draft = initDraftBoundaries([day1, day2], pointOrder)
+    expect(draft).toEqual([
+      { dayId: D1, dayNumber: 1, endPointId: PC, date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ])
+  })
+
+  it("round-trips through resolveDraft back to initDaySlices for saved-boundary days", () => {
+    const days = [day1, day2]
+    expect(resolveDraft(initDraftBoundaries(days, pointOrder), pointOrder)).toEqual(
+      initDaySlices(days, pointOrder),
+    )
+  })
+
+  it("round-trips for days with no saved endPointId (even-spread fallback exercised)", () => {
+    const freshDay1: Day = { id: D1, dayNumber: 1, itineraryId: ITIN }
+    const freshDay2: Day = { id: D2, dayNumber: 2, itineraryId: ITIN }
+    const freshDay3: Day = { id: D3, dayNumber: 3, itineraryId: ITIN }
+    const days = [freshDay1, freshDay2, freshDay3]
+    expect(resolveDraft(initDraftBoundaries(days, pointOrder), pointOrder)).toEqual(
+      initDaySlices(days, pointOrder),
+    )
+  })
+})
+
+// ─── appendDraftBoundary ────────────────────────────────────────────────────
+
+describe("appendDraftBoundary", () => {
+  it("on an empty draft: Day 1 spans everything", () => {
+    const result = appendDraftBoundary([], pointOrder)
+    expect(result).toEqual([{ dayId: "draft-1", dayNumber: 1, endPointId: null, date: null }])
+    expect(resolveDraft(result, pointOrder)).toEqual([
+      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 4, date: null },
+    ])
+  })
+
+  it("collapse-and-drag on a one-day draft: new day takes over all points, old day zero-length", () => {
+    const tenPoints = Array.from({ length: 10 }, (_, i) => `p${i}`)
+    const oneDay = appendDraftBoundary([], tenPoints) // [{ draft-1, endPointId: null }]
+
+    const result = appendDraftBoundary(oneDay, tenPoints)
+    expect(result).toEqual([
+      { dayId: "draft-1", dayNumber: 1, endPointId: "p0", date: null },
+      { dayId: "draft-2", dayNumber: 2, endPointId: null, date: null },
+    ])
+
+    // Worked example from the plan: Day 1 owns just p0, Day 2 owns p1..p9.
+    expect(resolveDraft(result, tenPoints)).toEqual([
+      { dayId: "draft-1", dayNumber: 1, startIdx: 0, endIdx: 0, date: null },
+      { dayId: "draft-2", dayNumber: 2, startIdx: 0, endIdx: 9, date: null },
+    ])
+  })
+
+  it("collapse-and-drag on a multi-day draft: only the old last day collapses, earlier days untouched", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: PC, date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ]
+    const result = appendDraftBoundary(draft, pointOrder)
+    expect(result[0]).toEqual(draft[0]) // day 1 untouched
+    expect(result[1]).toMatchObject({ dayId: D2, endPointId: PC }) // collapsed to its own start
+    expect(result[2]).toMatchObject({ dayNumber: 3, endPointId: null })
+
+    // Assert the resolved slices, not just the raw draft — proves the intent.
+    expect(resolveDraft(result, pointOrder)).toEqual([
+      { dayId: D1, dayNumber: 1, startIdx: 0, endIdx: 2, date: null },
+      { dayId: D2, dayNumber: 2, startIdx: 2, endIdx: 2, date: null }, // zero-length
+      { dayId: result[2].dayId, dayNumber: 3, startIdx: 2, endIdx: 4, date: null },
+    ])
+  })
+
+  it("draft-id uniqueness: fills the smallest available gap, not just the next sequential number", () => {
+    // Simulates a draft where draft-2 was previously removed, leaving a gap.
+    const draft: DraftBoundary[] = [
+      { dayId: "draft-1", dayNumber: 1, endPointId: PC, date: null },
+      { dayId: "draft-3", dayNumber: 2, endPointId: null, date: null },
+    ]
+    const result = appendDraftBoundary(draft, pointOrder)
+    expect(result[2].dayId).toBe("draft-2")
+  })
+
+  it("draft-id uniqueness across a remove-then-append cycle", () => {
+    const afterFirstAppend = appendDraftBoundary([], pointOrder) // draft-1
+    const afterSecondAppend = appendDraftBoundary(afterFirstAppend, pointOrder) // draft-1, draft-2
+    const afterRemove = removeDraftBoundary(afterSecondAppend, "draft-2") // back to just draft-1
+    const afterThirdAppend = appendDraftBoundary(afterRemove, pointOrder)
+    expect(afterThirdAppend[1].dayId).toBe("draft-2")
+    expect(new Set(afterThirdAppend.map((d) => d.dayId)).size).toBe(afterThirdAppend.length)
+  })
+})
+
+// ─── removeDraftBoundary ────────────────────────────────────────────────────
+
+describe("removeDraftBoundary", () => {
+  it("removing the only day leaves an empty array", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: "draft-1", dayNumber: 1, endPointId: null, date: null },
+    ]
+    expect(removeDraftBoundary(draft, "draft-1")).toEqual([])
+  })
+
+  it("removing a middle day: the previous day absorbs its endPointId, remaining days renumber", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: D1, dayNumber: 1, endPointId: PB, date: null },
+      { dayId: "draft-2", dayNumber: 2, endPointId: PC, date: null },
+      { dayId: D3, dayNumber: 3, endPointId: PE, date: null },
+    ]
+    const result = removeDraftBoundary(draft, "draft-2")
+    expect(result).toEqual([
+      { dayId: D1, dayNumber: 1, endPointId: PC, date: null },
+      { dayId: D3, dayNumber: 2, endPointId: PE, date: null },
+    ])
+  })
+
+  it("removing the first day: just drops it, nothing to patch, remaining days renumber", () => {
+    const draft: DraftBoundary[] = [
+      { dayId: "draft-1", dayNumber: 1, endPointId: PB, date: null },
+      { dayId: D2, dayNumber: 2, endPointId: PE, date: null },
+    ]
+    const result = removeDraftBoundary(draft, "draft-1")
+    expect(result).toEqual([{ dayId: D2, dayNumber: 1, endPointId: PE, date: null }])
+  })
+
+  it("is a no-op when the dayId is not found", () => {
+    const draft: DraftBoundary[] = [{ dayId: D1, dayNumber: 1, endPointId: PC, date: null }]
+    expect(removeDraftBoundary(draft, "does-not-exist")).toEqual(draft)
   })
 })

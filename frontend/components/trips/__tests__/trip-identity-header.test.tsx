@@ -120,56 +120,74 @@ describe("TripIdentityHeader", () => {
     expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument()
   })
 
-  it("shows description/difficulty expanded by default under the Details disclosure", () => {
+  async function openDetails() {
+    await userEvent.click(screen.getByRole("button", { name: /details/i }))
+  }
+
+  it("keeps the Details disclosure collapsed by default", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
+  })
+
+  it("shows description/difficulty once Details is expanded", async () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.getByText("A coastal paddle")).toBeInTheDocument()
     expect(screen.getByText("Moderate")).toBeInTheDocument()
   })
 
-  it("collapses Details again when clicked", async () => {
+  it("collapses Details again on a second click", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
+    await openDetails()
+    await openDetails()
     expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
   })
 
-  it("shows the advance-state action inside Details for the leader on a non-past trip", () => {
+  it("shows the advance-state action inside Details for the leader on a non-past trip", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.getByRole("button", { name: /begin expedition/i })).toBeInTheDocument()
   })
 
-  it("does not show the advance-state action for crew", () => {
+  it("does not show the advance-state action for crew", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
   })
 
-  it("shows a Printable float plan link inside Details for the leader", () => {
+  it("shows a Printable float plan link inside Details for the leader", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    await openDetails()
     const link = screen.getByRole("link", { name: /printable float plan/i })
     expect(link.getAttribute("href")).toBe(`/trips/float-plan/${TRIP.id}`)
   })
 
-  it("shows the trip-state timeline inside Details for the leader on a non-past trip", () => {
+  it("shows the trip-state timeline inside Details for the leader on a non-past trip", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.getByText("Happening")).toBeInTheDocument()
     expect(screen.getByText("Past")).toBeInTheDocument()
   })
 
-  it("does not show the trip-state timeline for crew", () => {
+  it("does not show the trip-state timeline for crew", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.queryByText("Happening")).not.toBeInTheDocument()
   })
 
-  it("shows pause controls inside Details for the leader on a happening trip", () => {
+  it("shows pause controls inside Details for the leader on a happening trip", async () => {
     render(
       <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={LEADER_MEMBERSHIP} />,
     )
+    await openDetails()
     expect(screen.getByRole("button", { name: /pause expedition/i })).toBeInTheDocument()
   })
 
-  it("does not show pause controls for crew", () => {
+  it("does not show pause controls for crew", async () => {
     render(
       <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={CREW_MEMBERSHIP} />,
     )
+    await openDetails()
     expect(screen.queryByRole("button", { name: /pause expedition/i })).not.toBeInTheDocument()
   })
 
@@ -179,18 +197,21 @@ describe("TripIdentityHeader", () => {
     expect(screen.queryByRole("button", { name: /details/i })).not.toBeInTheDocument()
   })
 
-  it("shows a Leave trip affordance inside Details for any member", () => {
+  it("shows a Leave trip affordance inside Details for any member", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.getByRole("button", { name: /leave trip/i })).toBeInTheDocument()
   })
 
-  it("shows a successor-nomination affordance inside Details for the leader only", () => {
+  it("shows a successor-nomination affordance inside Details for the leader only", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.getByRole("button", { name: /nominate a successor/i })).toBeInTheDocument()
   })
 
-  it("does not show a successor-nomination affordance for crew", () => {
+  it("does not show a successor-nomination affordance for crew", async () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    await openDetails()
     expect(screen.queryByRole("button", { name: /nominate a successor/i })).not.toBeInTheDocument()
   })
 

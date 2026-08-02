@@ -289,6 +289,101 @@ describe("BoundaryDivider — two-line layout (interactive mode)", () => {
   })
 })
 
+describe("BoundaryDivider — add button (interactive mode)", () => {
+  it("renders an add button when onAddDay is provided", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onAddDay={vi.fn()}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole("button", { name: /add day after day 2/i })).toBeInTheDocument()
+  })
+
+  it("calls onAddDay when add button is clicked", async () => {
+    const onAddDay = vi.fn()
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onAddDay={onAddDay}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /add day after day 2/i }))
+    expect(onAddDay).toHaveBeenCalledOnce()
+  })
+
+  it("does not render an add button when onAddDay is not provided", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /add day/i })).not.toBeInTheDocument()
+  })
+
+  it("does not render an add button in non-interactive mode even if onAddDay is provided", () => {
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        interactive={false}
+        onAddDay={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /add day/i })).not.toBeInTheDocument()
+  })
+
+  it("renders both add and delete buttons when both handlers are provided", async () => {
+    const onAddDay = vi.fn()
+    const onDelete = vi.fn()
+    render(
+      <BoundaryDivider
+        boundary={BOUNDARY}
+        totalDistanceNm={8.4}
+        distanceUnit="nm"
+        avgSpeedKnots={2.5}
+        labelDayNumber={2}
+        labelDate="2026-06-02"
+        onAddDay={onAddDay}
+        onDelete={onDelete}
+        onBoundaryMove={vi.fn()}
+      />,
+    )
+    const addBtn = screen.getByRole("button", { name: /add day after day 2/i })
+    const deleteBtn = screen.getByRole("button", { name: /delete day 2/i })
+    expect(addBtn).toBeInTheDocument()
+    expect(deleteBtn).toBeInTheDocument()
+
+    await userEvent.click(addBtn)
+    expect(onAddDay).toHaveBeenCalledOnce()
+
+    await userEvent.click(deleteBtn)
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
+})
+
 describe("BoundaryDivider — non-interactive (view mode)", () => {
   it("does not render a drag handle", () => {
     render(

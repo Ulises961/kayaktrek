@@ -3,17 +3,21 @@
 import { createContext, useContext } from "react"
 import type { Dispatch } from "react"
 import type { MapState, MapAction } from "./map-reducer"
-import type { DaySlice } from "./boundaries"
+import type { DaySlice, DraftBoundary } from "./boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import type { DistanceUnit } from "@/lib/itinerary/distance"
 
-export type { DaySlice }
+export type { DaySlice, DraftBoundary }
 
 export type MapBuilderContextValue = {
   state: MapState
   dispatch: Dispatch<MapAction>
-  draftSlices: DaySlice[] | null
-  setDraftSlices: (s: DaySlice[] | null) => void
+  draft: DraftBoundary[] | null
+  setDraft: (d: DraftBoundary[] | null) => void
+  /** Real (non-draft) day ids the user has removed during this draft session —
+   * their server-side rows are deleted only at Save. */
+  removedRealDayIds: string[]
+  setRemovedRealDayIds: (ids: string[]) => void
   tripId: string | null
   tripName: string
   /** ISO date (YYYY-MM-DD) — the trip's own declared start/end, used to bound

@@ -39,51 +39,134 @@ export function isDraftDay(dayId: string): boolean {
   return dayId.startsWith(DRAFT_DAY_PREFIX)
 }
 
-// Appends a new slice at the end of the draft list, splitting the last
-// slice's point range at its midpoint. The new slice gets a synthetic,
-// client-only dayId — no Day is created server-side until the draft is saved.
-export function appendDraftSlice(slices: DaySlice[], pointOrderLength: number): DaySlice[] {
-  const nextDayNumber = slices.length + 1
-  const dayId = `${DRAFT_DAY_PREFIX}${nextDayNumber}`
-
-  if (slices.length === 0) {
-    return [
-      {
-        dayId,
-        dayNumber: nextDayNumber,
-        startIdx: 0,
-        endIdx: Math.max(0, pointOrderLength - 1),
-        date: null,
-      },
-    ]
-  }
-
-  const lastSlice = slices[slices.length - 1]
-  const midIdx = Math.floor((lastSlice.startIdx + lastSlice.endIdx) / 2)
-  return [
-    ...slices.slice(0, -1),
-    { ...lastSlice, endIdx: midIdx },
-    { dayId, dayNumber: nextDayNumber, startIdx: midIdx, endIdx: lastSlice.endIdx, date: null },
-  ]
+// M14: ID-anchored boundary draft. Unlike DaySlice (index-based, frozen at draft
+// start), a DraftBoundary survives point mutations mid-draft — indices are only
+// ever resolved at render time via resolveDraft, never stored.
+//
+// Invariants:
+//   - The array is ordered by dayNumber; index 0 is Day 1.
+//   - A day's *start* is never stored — it is always the previous day's
+//     endPointId (shared overnight-stop semantics). Day 1 starts at pointOrder[0].
+//   - The *last* day always extends to the tail of pointOrder at resolution time,
+//     so its stored endPointId is ignored while it remains last — but it is still
+//     carried, because it becomes load-bearing the moment another day is
+//     appended after it (see appendDraftBoundary).
+export type DraftBoundary = {
+  dayId: string
+  dayNumber: number
+  endPointId: string | null
+  date: string | null
 }
 
-// Removes a slice and merges its point range into the previous slice (or the
-// next one, if it was first), renumbering the remaining slices sequentially.
-// Only meant for draft-only days: nothing was ever created server-side, so
-// there's nothing to roll back beyond this local state change.
-export function removeDraftSlice(slices: DaySlice[], dayId: string): DaySlice[] {
-  const i = slices.findIndex((s) => s.dayId === dayId)
-  if (i === -1) return slices
-  const removed = slices[i]
+// Pure. Recomputes DaySlice indices from a DraftBoundary[] against the current
+// pointOrder — safe to call on every render, including mid-draft after point
+// mutations shift indices around.
+export function resolveDraft(draft: DraftBoundary[], pointOrder: string[]): DaySlice[] {
+  const M = pointOrder.length
 
-  return slices
-    .filter((_, idx) => idx !== i)
-    .map((s, idx) => {
-      if (i > 0 && idx === i - 1) return { ...s, endIdx: removed.endIdx }
-      if (i === 0 && idx === 0) return { ...s, startIdx: removed.startIdx }
-      return s
+  // No points at all: every slice is explicitly empty. startIdx > endIdx is the
+  // existing empty-day convention consumers already understand.
+  if (M === 0) {
+    return draft.map((boundary) => ({
+      dayId: boundary.dayId,
+      dayNumber: boundary.dayNumber,
+      startIdx: 0,
+      endIdx: -1,
+      date: boundary.date,
+    }))
+  }
+
+  const slices: DaySlice[] = []
+  for (let i = 0; i < draft.length; i++) {
+    const boundary = draft[i]
+    const startIdx = i === 0 ? 0 : slices[i - 1].endIdx
+    const isLast = i === draft.length - 1
+
+    let endIdx: number
+    if (isLast) {
+      // Tail rule: the last day always extends to the end of pointOrder,
+      // unconditionally — its stored endPointId is ignored here.
+      endIdx = M - 1
+    } else if (boundary.endPointId === null) {
+      // Anchor loss (never set): clamp to the predecessor, a zero-length day.
+      endIdx = startIdx
+    } else {
+      const idx = pointOrder.indexOf(boundary.endPointId)
+      // Anchor loss (stale id, point deleted without patching the draft):
+      // same clamp.
+      endIdx = idx === -1 ? startIdx : idx
+    }
+
+    // Monotonicity: never overlap backwards or run off the end.
+    endIdx = Math.min(M - 1, Math.max(endIdx, startIdx))
+
+    slices.push({
+      dayId: boundary.dayId,
+      dayNumber: boundary.dayNumber,
+      startIdx,
+      endIdx,
+      date: boundary.date,
     })
-    .map((s, idx) => ({ ...s, dayNumber: idx + 1 }))
+  }
+  return slices
+}
+
+// The materializer — converts real Day rows into a draft, seeded by delegating
+// to initDaySlices (reusing its even-spread fallback for days with no saved
+// endPointId). Round-trip invariant: resolveDraft(initDraftBoundaries(days,
+// pointOrder), pointOrder) deep-equals initDaySlices(days, pointOrder) for any
+// pointOrder.length > 0 (see the boundaries test file).
+export function initDraftBoundaries(days: Day[], pointOrder: string[]): DraftBoundary[] {
+  const slices = initDaySlices(days, pointOrder)
+  return slices.map((slice) => ({
+    dayId: slice.dayId,
+    dayNumber: slice.dayNumber,
+    endPointId: pointOrder[slice.endIdx] ?? null,
+    date: slice.date,
+  }))
+}
+
+// Appends a new day using "collapse and drag" semantics (M14 — deliberately
+// replaces appendDraftSlice's midpoint-split behavior, do not copy it): the new
+// day takes over all of the old last day's points, and the old last day
+// collapses to zero length, anchored at its own start (the overnight stop it
+// shares with its predecessor).
+export function appendDraftBoundary(draft: DraftBoundary[], pointOrder: string[]): DraftBoundary[] {
+  const usedIds = new Set(draft.map((d) => d.dayId))
+  let n = 1
+  while (usedIds.has(`${DRAFT_DAY_PREFIX}${n}`)) n++
+  const dayId = `${DRAFT_DAY_PREFIX}${n}`
+
+  if (draft.length === 0) {
+    return [{ dayId, dayNumber: 1, endPointId: null, date: null }]
+  }
+
+  const resolved = resolveDraft(draft, pointOrder)
+  const lastSlice = resolved[resolved.length - 1]
+  const oldLastDayStartAnchor = pointOrder[lastSlice.startIdx] ?? null
+
+  const collapsedDraft = draft.map((boundary, idx) =>
+    idx === draft.length - 1 ? { ...boundary, endPointId: oldLastDayStartAnchor } : boundary,
+  )
+
+  return [...collapsedDraft, { dayId, dayNumber: draft.length + 1, endPointId: null, date: null }]
+}
+
+// Removes a day and merges its point range into the previous day (or just
+// drops it, if it was first — the new first day implicitly starts at
+// pointOrder[0]), renumbering the remaining days sequentially.
+export function removeDraftBoundary(draft: DraftBoundary[], dayId: string): DraftBoundary[] {
+  const i = draft.findIndex((d) => d.dayId === dayId)
+  if (i === -1) return draft
+  const removed = draft[i]
+
+  return draft
+    .filter((_, idx) => idx !== i)
+    .map((boundary, idx) => {
+      if (i > 0 && idx === i - 1) return { ...boundary, endPointId: removed.endPointId }
+      return boundary
+    })
+    .map((boundary, idx) => ({ ...boundary, dayNumber: idx + 1 }))
 }
 
 // Walks backward from `index` (inclusive) to find the nearest slice with a
