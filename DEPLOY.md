@@ -1,4 +1,8 @@
-# Deploy runbook
+# Release & deploy runbook
+
+Two separate operations, in this order: **cutting a release** publishes versioned images to GHCR
+from a git tag, and **deploying** pulls a published version onto a box. They are kept in one file
+because for a single operator they are one continuous flow, and two files would drift.
 
 Per ADR-034 (`docs/adr/foundation.md`): deploy target is a home server through the pre-traction
 phase, DigitalOcean after the graduation trigger. Same steps either way — only the box changes.
@@ -63,17 +67,9 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-`pull` fetches `:latest`, i.e. the most recently *tagged* release. To deploy or roll back to a
-specific version, set `KAYAK_IMAGE_TAG` (it defaults to `latest`):
-
-```bash
-KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
-KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
-```
-
-Put it in the box's `.env` to make a pin stick across deploys. Note that rolling *back* only
-rolls back code — `migrate` runs `alembic upgrade head`, never a downgrade, so a release
-containing a destructive migration is not reversible this way.
+`pull` fetches `:latest`, i.e. the most recently *tagged* release. To deploy a specific version
+instead, set `KAYAK_IMAGE_TAG` (it defaults to `latest`); put it in the box's `.env` to make the
+pin stick across deploys. See "Rolling back" for the full form and its one real caveat.
 
 `migrate` re-runs `alembic upgrade head && flask seed` on every `up` — both are idempotent, so
 this is safe to run on every deploy, not just the first one.
@@ -107,9 +103,21 @@ one DNS record away from.
 
 ## Rolling back
 
-Pull an older tag by SHA instead of `latest` — every image is also tagged with the git SHA it was
-built from (`backend-ci.yml`/`frontend-ci.yml`). Edit the `image:` lines in
-`docker-compose.prod.yml` to the known-good SHA, `up -d`, then revert once the fix lands.
+Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:
+
+```bash
+KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
+KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+Every release is also tagged `:sha-<short>`, so a specific build can be pinned the same way when
+there is no version boundary to fall back to (`KAYAK_IMAGE_TAG=sha-1a2b3c4`). Both images are
+published together by `release.yml`, so one tag always names a matching pair.
+
+**This rolls back code only.** `migrate` runs `alembic upgrade head` and never a downgrade, so a
+release containing a destructive migration is not reversible this way — the schema stays forward
+while the code goes back, and an older image may not understand it. Check what the release's
+migrations did before relying on this.
 
 ## Status (2026-07-31 — first real deploy)
 
@@ -118,7 +126,9 @@ Live end-to-end for the first time: `kayaktrek.app` (frontend, bare apex — see
 `api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` (MinIO S3 API, correctly
 denying anonymous root-listing while serving `avatars/`/`point-images/` public-read) all resolve
 through Cloudflare → `cloudflared` Tunnel → host nginx (TLS via certbot-dns-cloudflare,
-auto-renewing) → the right container. GHCR images build and push on every merge to `master`.
+auto-renewing) → the right container. GHCR images built and pushed on every merge to `master` at
+the time; since 2026-08-02 (PR #100) publishing is driven by version tags instead — see "Cutting a
+release" above.
 Currently paused at the operator's choice while doing further polish — `cloudflared` stopped
 (`sudo systemctl stop cloudflared`), nginx/Docker stack still running on the box for local
 testing; `sudo systemctl start cloudflared` brings it back with no other changes needed.
