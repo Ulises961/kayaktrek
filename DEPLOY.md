@@ -19,14 +19,42 @@ phase, DigitalOcean after the graduation trigger. Same steps either way — only
 
 3. **Set the frontend's public URLs as repo Variables** (GitHub → repo → Settings → Secrets and
    variables → Actions → Variables tab): `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SSE_URL`. These get
-   baked into the frontend image at build time (`frontend-ci.yml`) — there's no way to change
-   them after the fact without rebuilding. Until Cloudflare Tunnel + a domain exist (ADR-034
+   baked into the frontend image at build time (`release.yml`) — there's no way to change
+   them after the fact without cutting a new release. An unset one now fails the build outright
+   (`lib/api/config.ts`) rather than silently baking in an empty origin. Until Cloudflare Tunnel + a domain exist (ADR-034
    point 3), point them at whatever address the box is reachable at for testing; expect to bump
    these and let CI rebuild once the real domain is live.
 
 4. **Copy the deploy files onto the box**: `docker-compose.prod.yml` and a filled-in `.env`
    (copy `.env.prod.example` → `.env`, fill in every blank — secrets, mail, storage/frontend
    URLs). Keep `.env` out of git, same as every other workspace's `.env`.
+
+## Cutting a release
+
+Merging to `master` runs the gates (Backend CI, Frontend CI) but **publishes nothing**. Images
+are built and pushed only by `release.yml`, which triggers on a version tag:
+
+```bash
+git checkout master && git pull
+git tag -a v0.2.0 -m "Per-device sessions"
+git push origin v0.2.0
+```
+
+That builds *both* images regardless of which paths changed and pushes
+`:v0.2.0`, `:sha-<short>` and `:latest` for each. The workflow refuses to publish a commit that
+isn't an ancestor of `origin/master`, so a tag on an unmerged branch can't reach GHCR without
+having been through PR CI.
+
+To rebuild without a code change (e.g. after changing a `NEXT_PUBLIC_*` repo Variable, which is
+baked in at build time), run it by hand:
+
+```bash
+gh workflow run release.yml --ref v0.2.0     # republishes that version, moves :latest
+gh workflow run release.yml --ref master     # publishes :sha-<short> only, never :latest
+```
+
+A manual run on a branch deliberately does **not** move `:latest` — `:latest` only ever points at
+a tagged version, so "what is deployed" stays answerable.
 
 ## Deploying (every time)
 
@@ -35,10 +63,20 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-`pull` fetches whatever's currently tagged `:latest` in GHCR (i.e., whatever last merged to
-`master` and passed CI) for both the backend and frontend images. `migrate` re-runs
-`alembic upgrade head && flask seed` on every `up` — both are idempotent, so this is safe to run
-on every deploy, not just the first one.
+`pull` fetches `:latest`, i.e. the most recently *tagged* release. To deploy or roll back to a
+specific version, set `KAYAK_IMAGE_TAG` (it defaults to `latest`):
+
+```bash
+KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml pull
+KAYAK_IMAGE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+```
+
+Put it in the box's `.env` to make a pin stick across deploys. Note that rolling *back* only
+rolls back code — `migrate` runs `alembic upgrade head`, never a downgrade, so a release
+containing a destructive migration is not reversible this way.
+
+`migrate` re-runs `alembic upgrade head && flask seed` on every `up` — both are idempotent, so
+this is safe to run on every deploy, not just the first one.
 
 Check it came up clean:
 ```bash

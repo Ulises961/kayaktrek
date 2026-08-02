@@ -98,7 +98,7 @@ services:
     restart: "no"
 
   migrate:
-    image: ghcr.io/ulises961/kayak-expedition-planner-backend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_migrate
     command: sh -c "alembic upgrade head && flask seed"
     environment:
@@ -119,7 +119,7 @@ services:
     restart: "no"
 
   backend:
-    image: ghcr.io/ulises961/kayak-expedition-planner-backend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_backend
     restart: unless-stopped
     ports:
@@ -170,7 +170,7 @@ services:
       start_period: 10s
 
   sse:
-    image: ghcr.io/ulises961/kayak-expedition-planner-backend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_sse
     restart: unless-stopped
     ports:
@@ -222,7 +222,7 @@ services:
       start_period: 10s
 
   worker:
-    image: ghcr.io/ulises961/kayak-expedition-planner-backend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_worker
     restart: unless-stopped
     command: celery -A celery_worker worker --loglevel=info
@@ -256,7 +256,7 @@ services:
         condition: service_healthy
 
   beat:
-    image: ghcr.io/ulises961/kayak-expedition-planner-backend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_beat
     restart: unless-stopped
     command: celery -A celery_worker beat --loglevel=info --schedule=/tmp/celerybeat-schedule
@@ -294,7 +294,7 @@ services:
   # NEXT_PUBLIC_* values are already baked into this image at build time (frontend-ci.yml);
   # nothing here can change them at runtime.
   frontend:
-    image: ghcr.io/ulises961/kayak-expedition-planner-frontend:latest
+    image: ghcr.io/ulises961/kayak-expedition-planner-frontend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_frontend
     restart: unless-stopped
     ports:
