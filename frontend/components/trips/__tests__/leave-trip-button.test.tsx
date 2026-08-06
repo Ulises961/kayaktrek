@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("@/lib/trips/actions", () => ({ leaveTrip: vi.fn() }))
@@ -33,5 +33,21 @@ describe("LeaveTripButton", () => {
     await userEvent.click(screen.getByRole("button", { name: /leave trip/i }))
     await userEvent.click(screen.getByRole("button", { name: "Leave" }))
     expect(leaveTrip).toHaveBeenCalledWith(TRIP_ID)
+  })
+
+  // No error UI exists on this component — leaveTrip redirects on success and
+  // returns { success: false, error } on failure, without throwing. This
+  // guards the failure branch actually resolves isPending instead of leaving
+  // the trigger button stuck disabled.
+  it("re-enables the trigger button after a failed leave instead of hanging", async () => {
+    vi.mocked(leaveTrip).mockResolvedValue({ success: false, error: "Failed to leave trip." })
+    render(<LeaveTripButton tripId={TRIP_ID} isLeader={false} soleMember={false} />)
+    await userEvent.click(screen.getByRole("button", { name: /leave trip/i }))
+    await userEvent.click(screen.getByRole("button", { name: "Leave" }))
+
+    await waitFor(() => {
+      expect(leaveTrip).toHaveBeenCalledWith(TRIP_ID)
+      expect(screen.getByRole("button", { name: /leave trip/i })).not.toBeDisabled()
+    })
   })
 })

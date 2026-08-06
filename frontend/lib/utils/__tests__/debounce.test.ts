@@ -61,4 +61,20 @@ describe("useDebouncedValue", () => {
     act(() => vi.advanceTimersByTime(300))
     expect(result.current).toBe("b")
   })
+
+  it("collapses rapid value changes into a single update with the final value", () => {
+    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
+      initialProps: { value: "a" },
+    })
+
+    rerender({ value: "b" })
+    rerender({ value: "c" })
+    rerender({ value: "d" })
+    // All still show the initial value before the delay
+    expect(result.current).toBe("a")
+
+    act(() => vi.advanceTimersByTime(300))
+    // Only the final value settles
+    expect(result.current).toBe("d")
+  })
 })

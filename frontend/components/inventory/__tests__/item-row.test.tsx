@@ -82,6 +82,19 @@ describe("ItemRow", () => {
     expect(mockSetItemOwned).toHaveBeenCalledWith(SUGGESTED.id, true)
   })
 
+  it("displays an error when setting item owned status fails", async () => {
+    const user = userEvent.setup()
+    mockSetItemOwned.mockResolvedValueOnce({
+      success: false,
+      error: "Failed to update item status",
+    })
+    render(<ItemRow item={SUGGESTED} />)
+
+    await user.click(screen.getByRole("switch"))
+
+    expect(screen.getByText("Failed to update item status")).toBeTruthy()
+  })
+
   it("demotes an owned item back to suggested via the switch", async () => {
     const user = userEvent.setup()
     render(<ItemRow item={OWNED} />)
@@ -99,6 +112,20 @@ describe("ItemRow", () => {
     await user.click(screen.getByRole("button", { name: /^delete$/i }))
 
     expect(mockDeleteItem).toHaveBeenCalledWith(OWNED.id)
+  })
+
+  it("displays an error when deleting an item fails", async () => {
+    const user = userEvent.setup()
+    mockDeleteItem.mockResolvedValueOnce({
+      success: false,
+      error: "Cannot delete item in use",
+    })
+    render(<ItemRow item={OWNED} />)
+
+    await user.click(screen.getByRole("button", { name: /delete/i }))
+    await user.click(screen.getByRole("button", { name: /^delete$/i }))
+
+    expect(screen.getByText("Cannot delete item in use")).toBeTruthy()
   })
 
   it("does not delete when the dialog is cancelled", async () => {
@@ -139,5 +166,18 @@ describe("ItemRow", () => {
     await user.click(screen.getByRole("button", { name: /trip checklist/i }))
 
     expect(mockToggleDefaultPack).toHaveBeenCalledWith(ALWAYS_PACKED.id, false)
+  })
+
+  it("displays an error when toggling default-pack fails", async () => {
+    const user = userEvent.setup()
+    mockToggleDefaultPack.mockResolvedValueOnce({
+      success: false,
+      error: "Failed to update default pack setting",
+    })
+    render(<ItemRow item={OWNED} />)
+
+    await user.click(screen.getByRole("button", { name: /add.*trip checklist/i }))
+
+    expect(screen.getByText("Failed to update default pack setting")).toBeTruthy()
   })
 })

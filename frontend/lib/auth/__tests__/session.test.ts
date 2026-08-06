@@ -46,4 +46,23 @@ describe("getSession", () => {
     const session = await getSession()
     expect(session?.isAdmin).toBe(true)
   })
+
+  it("returns isAdmin false (default) when the token omits is_admin", async () => {
+    mockCookies(makeToken({ user_id: "user-1", email: "user@example.com" }))
+    const session = await getSession()
+    expect(session?.isAdmin).toBe(false)
+  })
+
+  // decodeJwtPayload's catch branch — a cookie holding garbage rather than a well-formed JWT
+  // (corrupted, truncated, or from a different signing scheme entirely) must fail closed to
+  // "no session", not throw and take the page down with it.
+  it("returns null for a malformed token (not valid base64/JSON in the payload segment)", async () => {
+    mockCookies("header.not-valid-base64url-json!!!.signature")
+    expect(await getSession()).toBeNull()
+  })
+
+  it("returns null for a token with too few segments to have a payload", async () => {
+    mockCookies("only-one-segment")
+    expect(await getSession()).toBeNull()
+  })
 })

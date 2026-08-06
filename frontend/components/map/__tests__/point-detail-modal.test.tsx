@@ -149,6 +149,22 @@ describe("PointDetailModal", () => {
     expect(await screen.findByText(/saved/i)).toBeInTheDocument()
   })
 
+  it("does not apply the notes change locally and does not show Saved when updatePoint fails", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    const textarea = screen.getByPlaceholderText(/landing notes/i)
+    await userEvent.clear(textarea)
+    await userEvent.type(textarea, "New note")
+    await userEvent.tab()
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { notes: "New note" })
+    expect(baseCtx.dispatch).not.toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { notes: "New note" },
+    })
+    expect(screen.queryByText(/^saved$/i)).not.toBeInTheDocument()
+  })
+
   it("saves notes on Ctrl+Enter without needing blur first", async () => {
     renderModal(POINT, true)
     const textarea = screen.getByPlaceholderText(/landing notes/i)
@@ -178,6 +194,14 @@ describe("PointDetailModal", () => {
       id: "p1",
       fields: { type: "position" },
     })
+  })
+
+  it("does not dispatch the type change when updatePoint fails", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    await userEvent.click(screen.getByRole("button", { name: /^position$/i }))
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { type: "position" })
+    expect(baseCtx.dispatch).not.toHaveBeenCalled()
   })
 
   it("does not show a point-type control when not editable", () => {
@@ -242,6 +266,37 @@ describe("PointDetailModal", () => {
     await userEvent.keyboard("{Escape}")
     expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it("still closes even when the flush-on-close save fails, and does not apply the change", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    const onClose = vi.fn()
+    renderModal(POINT, true, onClose)
+    const nameInput = screen.getByDisplayValue("Vikten Sea Caves")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.keyboard("{Escape}")
+    expect(onClose).toHaveBeenCalled()
+    expect(baseCtx.dispatch).not.toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { name: "New name" },
+    })
+  })
+
+  it("does not apply the name change locally when updatePoint fails", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    renderModal(POINT, true)
+    const nameInput = screen.getByDisplayValue("Vikten Sea Caves")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.tab()
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+    expect(baseCtx.dispatch).not.toHaveBeenCalledWith({
+      type: "POINT_UPDATE",
+      id: "p1",
+      fields: { name: "New name" },
+    })
   })
 
   it("renders the name as static (non-editable) text, not an input, when not editable", () => {

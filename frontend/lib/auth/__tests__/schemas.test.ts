@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { LoginSchema, RegisterSchema, PASSWORD_RULES } from "../schemas"
+import {
+  LoginSchema,
+  RegisterSchema,
+  PASSWORD_RULES,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from "../schemas"
 
 // A password that satisfies all RegisterSchema rules
 const STRONG_PASSWORD = "Expedition#24"
@@ -137,6 +143,69 @@ describe("RegisterSchema", () => {
 
     it("accepts a password satisfying all rules", () => {
       expect(RegisterSchema.safeParse({ ...valid, password: STRONG_PASSWORD }).success).toBe(true)
+    })
+  })
+})
+
+describe("ForgotPasswordSchema", () => {
+  it("accepts a valid email", () => {
+    expect(ForgotPasswordSchema.safeParse({ mail: "user@example.com" }).success).toBe(true)
+  })
+
+  it("rejects an invalid email", () => {
+    const result = ForgotPasswordSchema.safeParse({ mail: "not-an-email" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a missing email", () => {
+    const result = ForgotPasswordSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("ResetPasswordSchema", () => {
+  const valid = {
+    token: "reset-token-123",
+    password: STRONG_PASSWORD,
+    confirmPassword: STRONG_PASSWORD,
+  }
+
+  it("accepts a fully valid payload", () => {
+    expect(ResetPasswordSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it("rejects a missing token", () => {
+    const result = ResetPasswordSchema.safeParse({ ...valid, token: "" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a password that fails the complexity rules, same as RegisterSchema", () => {
+    const result = ResetPasswordSchema.safeParse({
+      ...valid,
+      password: "weak",
+      confirmPassword: "weak",
+    })
+    expect(result.success).toBe(false)
+  })
+
+  // The cross-field refine is the one piece of behaviour unique to this schema (RegisterSchema
+  // has no confirm field) — the M14-style bug this rubric exists for is exactly this kind of
+  // "covered but unasserted" branch, so pin down both that it fails AND where the error lands.
+  describe("confirmPassword", () => {
+    it("rejects when confirmPassword does not match password", () => {
+      const result = ResetPasswordSchema.safeParse({
+        ...valid,
+        confirmPassword: STRONG_PASSWORD + "x",
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues[0].path).toEqual(["confirmPassword"])
+        expect(result.error.issues[0].message).toBe("Passwords do not match.")
+      }
+    })
+
+    it("accepts when confirmPassword matches password exactly", () => {
+      expect(ResetPasswordSchema.safeParse(valid).success).toBe(true)
     })
   })
 })

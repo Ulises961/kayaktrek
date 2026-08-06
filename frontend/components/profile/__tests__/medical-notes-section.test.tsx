@@ -123,6 +123,21 @@ describe("MedicalNotesSection — authenticating state", () => {
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
     expect(screen.queryByLabelText(/password/i, { selector: "input" })).toBeNull()
   })
+
+  it("shows an error and stays out of the editing phase when getMedicalNotes fails after a valid password", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
+    vi.mocked(getMedicalNotes).mockResolvedValue({ success: false, error: "Decryption failed." })
+    render(<MedicalNotesSection hasStoredNotes={true} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
+    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
+
+    await waitFor(() => expect(screen.getByText("Decryption failed.")).toBeDefined())
+    // A failed decrypt must not drop the user into the editing textarea with
+    // whatever partial/undefined notes state happened to be lying around.
+    expect(screen.queryByRole("textbox")).toBeNull()
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDefined()
+  })
 })
 
 describe("MedicalNotesSection — editing state", () => {
@@ -180,6 +195,24 @@ describe("MedicalNotesSection — editing state", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete/i }))
     await waitFor(() => expect(revokeMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN))
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
+  })
+
+  it("shows an error and keeps the notes in place when delete fails — no silent success", async () => {
+    vi.mocked(revokeMedicalConsent).mockResolvedValue({
+      success: false,
+      error: "Could not delete notes.",
+    })
+    await openToEdit(true)
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }))
+
+    await waitFor(() => expect(screen.getByText("Could not delete notes.")).toBeDefined())
+    // Must still be in the editing phase with the notes and Delete button intact —
+    // a failed revoke must not present as if the notes were removed.
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "Allergic to penicillin",
+    )
+    expect(screen.getByRole("button", { name: /delete/i })).toBeDefined()
+    expect(screen.queryByRole("button", { name: /add notes/i })).toBeNull()
   })
 
   it("returns to idle when Done is clicked", async () => {

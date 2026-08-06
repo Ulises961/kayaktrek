@@ -169,10 +169,11 @@ export function PointListPane() {
 
   const handleTypeChange = useCallback(
     async (pointId: string, type: PointType) => {
-      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { type } })
       dispatch({ type: "SAVING_START" })
-      await updatePoint(pointId, { type })
+      const result = await updatePoint(pointId, { type })
       dispatch({ type: "SAVING_END" })
+      if (!result.success) return
+      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { type } })
     },
     [dispatch],
   )
@@ -184,12 +185,18 @@ export function PointListPane() {
       const trimmed = name.trim()
       const currentName = state.points.find((p) => p.id === pointId)?.name ?? ""
       if (trimmed === currentName) return
-      await runNameSave(async () => {
-        dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
-        dispatch({ type: "SAVING_START" })
-        await updatePoint(pointId, { name: trimmed || null })
-        dispatch({ type: "SAVING_END" })
-      })
+      try {
+        await runNameSave(async () => {
+          dispatch({ type: "SAVING_START" })
+          const result = await updatePoint(pointId, { name: trimmed || null })
+          dispatch({ type: "SAVING_END" })
+          if (!result.success) throw new Error(result.error)
+          dispatch({ type: "POINT_UPDATE", id: pointId, fields: { name: trimmed || null } })
+        })
+      } catch {
+        // Status already reverted to idle by runNameSave; the blur handler
+        // has nothing further to react to.
+      }
     },
     [dispatch, state.points, runNameSave],
   )

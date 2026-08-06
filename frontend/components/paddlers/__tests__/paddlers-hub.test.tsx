@@ -130,4 +130,12 @@ describe("PaddlersHub", () => {
     await userEvent.click(screen.getByText(/blocked/i))
     await waitFor(() => expect(screen.getByText("Bob")).toBeInTheDocument())
   })
+
+  it("shows 'No paddlers found' when search returns empty results", async () => {
+    mockSearch.mockResolvedValue(searchPage([]))
+    render(<PaddlersHub connections={CONNECTIONS} blocks={[]} currentUserId={ME} />)
+    await userEvent.type(screen.getByLabelText(/search paddlers/i), "nomatch")
+
+    await waitFor(() => expect(screen.getByText(/no paddlers found/i)).toBeInTheDocument())
+  })
 })

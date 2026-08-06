@@ -233,4 +233,58 @@ describe("RequirementsChecklist", () => {
     renderChecklist({ canManage: false })
     expect(screen.queryByPlaceholderText(/add a requirement/i)).toBeNull()
   })
+
+  it("displays an error when adding a requirement fails", async () => {
+    const user = userEvent.setup()
+    mockAddRequirement.mockResolvedValueOnce({
+      success: false,
+      error: "Requirement name too long",
+    })
+    renderChecklist()
+
+    await user.type(screen.getByPlaceholderText(/add a requirement/i), "Flares")
+    await user.click(screen.getByRole("button", { name: /^add$/i }))
+
+    expect(screen.getByText("Requirement name too long")).toBeTruthy()
+  })
+
+  it("displays an error when removing a requirement fails", async () => {
+    const user = userEvent.setup()
+    mockRemoveRequirement.mockResolvedValueOnce({
+      success: false,
+      error: "Cannot remove covered requirement",
+    })
+    renderChecklist()
+
+    await user.click(screen.getByRole("button", { name: /remove tow line/i }))
+    await user.click(screen.getByRole("button", { name: /^remove$/i }))
+
+    expect(screen.getByText("Cannot remove covered requirement")).toBeTruthy()
+  })
+
+  it("displays an error when contributing an item fails", async () => {
+    const user = userEvent.setup()
+    mockContributeItem.mockResolvedValueOnce({
+      success: false,
+      error: "Item already contributed elsewhere",
+    })
+    renderChecklist()
+
+    await user.selectOptions(screen.getByLabelText(/contribute to tow line/i), LIFE_JACKET_ID)
+
+    expect(screen.getByText("Item already contributed elsewhere")).toBeTruthy()
+  })
+
+  it("displays an error when withdrawing a contribution fails", async () => {
+    const user = userEvent.setup()
+    mockUnclaimRequirement.mockResolvedValueOnce({
+      success: false,
+      error: "Cannot withdraw from completed requirement",
+    })
+    renderChecklist()
+
+    await user.click(screen.getByRole("button", { name: /withdraw/i }))
+
+    expect(screen.getByText("Cannot withdraw from completed requirement")).toBeTruthy()
+  })
 })

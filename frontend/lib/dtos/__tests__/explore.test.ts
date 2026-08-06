@@ -34,6 +34,12 @@ describe("ExploreItemSchema", () => {
     const item = ExploreItemSchema.parse({ ...ITEM, centroidLat: null, centroidLng: null })
     expect(item.centroidLat).toBeNull()
   })
+
+  it("rejects missing id", () => {
+    const { id: _id, ...withoutId } = ITEM
+    void _id
+    expect(ExploreItemSchema.safeParse(withoutId).success).toBe(false)
+  })
 })
 
 describe("ExplorePageSchema", () => {

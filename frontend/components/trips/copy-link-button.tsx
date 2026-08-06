@@ -8,7 +8,15 @@ export function CopyLinkButton() {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(window.location.href)
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+    } catch {
+      // Clipboard access can be denied (insecure context, missing
+      // permission) — leave the label unchanged rather than let the
+      // rejection go unhandled (matches this app's other copy-link
+      // affordances, which are similarly best-effort with no error UI).
+      return
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { RouteIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -195,7 +196,11 @@ export function ExploreDiscovery({
     }
     startFork(async () => {
       const result = await forkItinerary(id)
-      if (result.success) router.push(`/itinerary/${result.itineraryId}`)
+      if (result.success) {
+        router.push(`/itinerary/${result.itineraryId}`)
+        return
+      }
+      toast.error(result.error)
     })
   }
 

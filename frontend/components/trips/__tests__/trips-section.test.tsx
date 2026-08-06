@@ -181,6 +181,55 @@ describe("TripsSection", () => {
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument()
   })
 
+  // Guards the `latestRequest` ref check: if a slow first request resolves
+  // after a second, later request already replaced the view, the stale
+  // response must be discarded rather than clobbering the newer state.
+  it("discards a stale response that resolves after a newer request", async () => {
+    let resolveFirst: (v: TripPage) => void
+    let resolveSecond: (v: TripPage) => void
+    mockListTrips
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolveFirst = r
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolveSecond = r
+          }),
+      )
+
+    render(
+      <TripsSection
+        label="Planning"
+        state={TRIP_STATE.BUILDING}
+        initial={page([trip({ destination: "Original" })])}
+        defaultSort={TRIP_SORT.SOONEST}
+        sortOptions={PLANNING_SORT_OPTIONS}
+        filters={NO_FILTERS}
+      />,
+    )
+
+    // Fire two sort changes in a row — two in-flight requests.
+    await userEvent.selectOptions(screen.getByLabelText(/sort trips/i), TRIP_SORT.LATEST)
+    await waitFor(() => expect(resolveFirst).toBeDefined())
+    await userEvent.selectOptions(screen.getByLabelText(/sort trips/i), TRIP_SORT.SOONEST)
+    await waitFor(() => expect(resolveSecond).toBeDefined())
+
+    // Resolve the newer (second) request first, then the stale first one.
+    resolveSecond!(page([trip({ id: "newer", destination: "Newer result" })]))
+    await waitFor(() => expect(screen.getByText("Newer result")).toBeInTheDocument())
+
+    resolveFirst!(page([trip({ id: "stale", destination: "Stale result" })]))
+    await waitFor(() => expect(mockListTrips).toHaveBeenCalledTimes(2))
+
+    // The stale response must not have overwritten the newer one.
+    expect(screen.queryByText("Stale result")).not.toBeInTheDocument()
+    expect(screen.getByText("Newer result")).toBeInTheDocument()
+  })
+
   it("reports emptiness via onEmptyChange", () => {
     const onEmptyChange = vi.fn()
     render(

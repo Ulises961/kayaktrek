@@ -69,9 +69,19 @@ export function usePositionWatch(tripId: string, enabled: boolean) {
         accuracyM: accuracy ?? undefined,
         headingDeg: heading ?? undefined,
         speedMs: speed ?? undefined,
-      }).then((result) => {
-        if (!cancelled && result.success) setLastSentAt(new Date())
       })
+        .then((result) => {
+          if (!cancelled && result.success) setLastSentAt(new Date())
+        })
+        .catch(() => {
+          // sendPositionPing normalizes ordinary failures into { success: false,
+          // error } — the only way this promise rejects is a thrown session-expiry
+          // redirect signal. A background geolocation ping has no render/transition
+          // context to redirect through, so there is nothing useful to do with it
+          // here beyond not leaking it as an unhandled rejection; the next
+          // authenticated navigation hits the same expired session and redirects
+          // normally.
+        })
     }
 
     function handleError(error: GeolocationPositionError) {

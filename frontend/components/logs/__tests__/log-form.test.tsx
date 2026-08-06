@@ -64,4 +64,14 @@ describe("LogForm — dialog callbacks", () => {
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalled()
   })
+
+  it("displays an error when creating a log fails", async () => {
+    vi.mocked(createLog).mockResolvedValueOnce({
+      success: false,
+      error: "Log date is in the future",
+    })
+    render(<LogForm onSuccess={noop} onCancel={noop} />)
+    await userEvent.click(screen.getByRole("button", { name: /add log/i }))
+    await waitFor(() => expect(screen.getByText("Log date is in the future")).toBeInTheDocument())
+  })
 })

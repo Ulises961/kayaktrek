@@ -64,13 +64,17 @@ describe("EmailChangeSection — authenticating state", () => {
     await waitFor(() => expect(reAuth).toHaveBeenCalledWith(PASSWORD))
   })
 
-  it("shows an error when reAuth returns wrong password", async () => {
+  it("shows an error when reAuth returns wrong password, without exposing the email form", async () => {
     vi.mocked(reAuth).mockResolvedValue({ success: false, error: "Password incorrect." })
     render(<EmailChangeSection currentMail={CURRENT_MAIL} />)
     await userEvent.click(screen.getByRole("button", { name: /change email/i }))
     await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), "wrong")
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
+    // A failed re-auth must not advance to the editing phase — no elevated token
+    // was actually granted, so the new-email input must not appear.
+    expect(screen.queryByLabelText(/new email/i)).not.toBeInTheDocument()
+    expect(requestEmailChange).not.toHaveBeenCalled()
   })
 
   it("returns to idle on Cancel", async () => {
@@ -116,7 +120,13 @@ describe("EmailChangeSection — editing state", () => {
     await waitFor(() =>
       expect(screen.getByText("That address can't be used. Try a different one.")).toBeDefined(),
     )
-    expect(screen.getByLabelText(/new email/i)).toBeDefined()
+    // A failed request must not flip to the "pending confirmation" banner or leak
+    // the rejected address as if it were awaiting a confirmation click.
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(new RegExp(`pending change to.*${NEW_MAIL}`, "i")),
+    ).not.toBeInTheDocument()
+    expect((screen.getByLabelText(/new email/i) as HTMLInputElement).value).toBe(NEW_MAIL)
   })
 
   it("returns to idle on Cancel", async () => {

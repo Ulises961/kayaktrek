@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+const refresh = vi.fn()
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }))
 vi.mock("@/lib/trips/actions", () => ({ updateTrip: vi.fn() }))
 
 import { updateTrip } from "@/lib/trips/actions"
@@ -37,5 +38,20 @@ describe("ExtendTripRangeFooter", () => {
     await waitFor(() =>
       expect(updateTrip).toHaveBeenCalledWith("trip-1", { dateFrom: "2026-08-06" }),
     )
+  })
+
+  it("refreshes the route on a successful extend, so the picker sees the new bound", async () => {
+    vi.mocked(updateTrip).mockResolvedValue({ success: true })
+    render(<ExtendTripRangeFooter tripId="trip-1" direction="max" currentBound="2026-08-13" />)
+    await userEvent.click(screen.getByRole("button", { name: /extend trip/i }))
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
+  })
+
+  it("does not refresh the route when the extend fails", async () => {
+    vi.mocked(updateTrip).mockResolvedValue({ success: false, error: "Failed to update trip." })
+    render(<ExtendTripRangeFooter tripId="trip-1" direction="max" currentBound="2026-08-13" />)
+    await userEvent.click(screen.getByRole("button", { name: /extend trip/i }))
+    await waitFor(() => expect(updateTrip).toHaveBeenCalledOnce())
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

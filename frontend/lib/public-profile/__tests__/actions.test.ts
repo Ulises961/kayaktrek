@@ -46,4 +46,14 @@ describe("getPublicProfile", () => {
     GET.mockRejectedValue(new Error("GET ... failed: 404"))
     expect(await getPublicProfile("ghost")).toBeNull()
   })
+
+  it("returns null on other errors", async () => {
+    GET.mockRejectedValue(new Error("Internal Server Error"))
+    expect(await getPublicProfile("seapaddler")).toBeNull()
+  })
+
+  it("returns null for non-Error throws", async () => {
+    GET.mockRejectedValue("Network error")
+    expect(await getPublicProfile("seapaddler")).toBeNull()
+  })
 })

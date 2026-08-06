@@ -72,6 +72,74 @@ describe("apiUpload", () => {
   })
 })
 
+// apiUpload above implements the one-shot 401-refresh-and-retry guard with its own
+// duplicated copy of the logic (it can't share `apiFetch` because of the FormData body /
+// Content-Type constraint noted in client.ts). The get/post/put/patch/delete quintet all
+// funnel through the shared internal `apiFetch`, which is a separate implementation of the
+// same guard and was previously only exercised indirectly via apiUpload's tests — a
+// regression in `apiFetch`'s retry-once logic specifically would not have been caught here.
+describe("apiFetch retry-once guard (via apiGet/apiPost, the shared internal implementation)", () => {
+  it("retries once after a successful refresh on 401", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 401, ok: false })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "1" }) })
+    vi.stubGlobal("fetch", fetchMock)
+    refreshSession.mockResolvedValue(true)
+
+    const result = await apiGet("/api/thing/1")
+
+    expect(result).toEqual({ id: "1" })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("throws instead of retrying again when still 401 after the one retry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 401, ok: false, json: async () => ({}) })
+    vi.stubGlobal("fetch", fetchMock)
+    refreshSession.mockResolvedValue(true)
+
+    await expect(apiGet("/api/thing/1")).rejects.toThrow("GET /api/thing/1 failed: 401")
+
+    // One-shot: the initial attempt plus exactly one retry, never an unbounded loop.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("redirects to /login immediately when the refresh itself fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 401, ok: false })
+    vi.stubGlobal("fetch", fetchMock)
+    refreshSession.mockResolvedValue(false)
+
+    await expect(apiGet("/api/thing/1")).rejects.toThrow("NEXT_REDIRECT")
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(redirect).toHaveBeenCalledWith("/login")
+  })
+
+  // apiPost/apiPatch/apiDelete deliberately disable the retry guard when the caller passes
+  // extraHeaders — that's the elevated-token path (re-auth-gated actions like certifications,
+  // see lib/certifications/actions.ts's `elevated()`), where a 401 means the short-lived
+  // elevated token is bad, not the session's access token. Retrying via a session refresh
+  // there would be meaningless: it would never fix an elevated-token failure and would mask it
+  // behind an unrelated session-refresh cycle.
+  it("does not attempt a session refresh when extraHeaders are present (elevated-token calls)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ status: 401, ok: false, json: async () => ({ message: "bad token" }) })
+    vi.stubGlobal("fetch", fetchMock)
+    refreshSession.mockResolvedValue(true)
+
+    await expect(
+      apiPost("/api/user/me/certifications", {}, { "X-Elevated-Token": "tok" }),
+    ).rejects.toThrow("bad token")
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(refreshSession).not.toHaveBeenCalled()
+    expect(redirect).not.toHaveBeenCalled()
+  })
+})
+
 describe("apiPut", () => {
   it("surfaces the backend error message on failure, like apiPost/apiPatch", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

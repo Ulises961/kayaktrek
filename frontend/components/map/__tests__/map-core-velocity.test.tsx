@@ -285,4 +285,18 @@ describe("MapCore — velocity layer controls", () => {
     expect(await screen.findByTestId("graticule")).toBeInTheDocument()
     expect(screen.getByTestId("scale-bar")).toBeInTheDocument()
   })
+
+  it("degrades to no velocity overlay, without crashing, when every vector fetch fails", async () => {
+    // beforeEach already fails wind/swell/global and resolves diamonds empty —
+    // the map's default state whenever the backend has no data for a day yet.
+    render(<MapCore {...BASE_PROPS} selectedDayId="day-1" selectedHour={12} />)
+
+    await waitFor(() => expect(WIND).toHaveBeenCalled())
+    expect(screen.queryByTestId("velocity-layer")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("forecast-cell")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("diamond-marker")).not.toBeInTheDocument()
+    // The toggles themselves are keyed off day-selection, not fetch success —
+    // they still render so the user can tell overlays exist, just have no data.
+    expect(screen.getByTestId("wind-toggle")).toBeInTheDocument()
+  })
 })

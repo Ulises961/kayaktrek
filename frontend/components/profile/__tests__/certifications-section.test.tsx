@@ -9,6 +9,7 @@ vi.mock("@/lib/certifications/actions", () => ({
   deleteCertification: vi.fn(),
   listCertifications: vi.fn(),
 }))
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }))
 
 import { reAuth } from "@/lib/profile/actions"
 import {
@@ -16,6 +17,7 @@ import {
   deleteCertification,
   listCertifications,
 } from "@/lib/certifications/actions"
+import { toast } from "sonner"
 import { CertificationsSection } from "../certifications-section"
 import type { Certification } from "@/lib/dtos/certification"
 
@@ -94,5 +96,79 @@ describe("CertificationsSection", () => {
 
     await waitFor(() => expect(deleteCertification).toHaveBeenCalledWith("tok", CERT.id))
     await waitFor(() => expect(screen.queryByText("Sea Kayak Leader")).toBeNull())
+  })
+
+  it("shows the wrong-password error and never calls the mutation", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: false, error: "Incorrect password." })
+
+    render(<CertificationsSection initialCerts={[]} />)
+    await fillAndSubmitAddForm()
+    await confirmPassword()
+
+    await waitFor(() => expect(screen.getByText("Incorrect password.")).toBeInTheDocument())
+    expect(addCertification).not.toHaveBeenCalled()
+    // The password dialog stays open so the user can retry.
+    expect(screen.getByRole("dialog", { name: /confirm your password/i })).toBeInTheDocument()
+  })
+
+  it("keeps the cert list unchanged and shows the error when adding fails after re-auth", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: "tok" })
+    vi.mocked(addCertification).mockResolvedValue({
+      success: false,
+      error: "Please check the certification details.",
+    })
+
+    render(<CertificationsSection initialCerts={[]} />)
+    await fillAndSubmitAddForm()
+    await confirmPassword()
+
+    await waitFor(() =>
+      expect(screen.getByText("Please check the certification details.")).toBeInTheDocument(),
+    )
+    // Failure must not have closed the form or added a phantom row.
+    expect(screen.getByRole("dialog", { name: /add certification/i })).toBeInTheDocument()
+    expect(screen.queryByText(/no certifications yet/i)).toBeInTheDocument()
+    expect(listCertifications).not.toHaveBeenCalled()
+  })
+
+  it("forces a fresh re-auth on the next attempt when the cached token has expired", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: "tok" })
+    vi.mocked(addCertification).mockResolvedValue({
+      success: false,
+      error: "Session expired. Please re-authenticate.",
+    })
+
+    render(<CertificationsSection initialCerts={[]} />)
+    await fillAndSubmitAddForm()
+    await confirmPassword()
+    await waitFor(() =>
+      expect(screen.getByText("Session expired. Please re-authenticate.")).toBeInTheDocument(),
+    )
+
+    // Retrying immediately must prompt for the password again — the failed
+    // attempt's token was discarded, not cached and silently reused. The form
+    // dialog is still open (a failed add doesn't close it) with the fields intact.
+    vi.mocked(reAuth).mockClear()
+    const formDialog = screen.getByRole("dialog", { name: /add certification/i })
+    await userEvent.click(within(formDialog).getByRole("button", { name: /add certification/i }))
+    await waitFor(() => expect(screen.getByText(/confirm your password/i)).toBeInTheDocument())
+  })
+
+  it("shows a toast and keeps the row when deleting fails — no silent success", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: "tok" })
+    vi.mocked(deleteCertification).mockResolvedValue({
+      success: false,
+      error: "Could not delete this certification.",
+    })
+
+    render(<CertificationsSection initialCerts={[CERT]} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete certification/i }))
+    await confirmPassword()
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Could not delete this certification."),
+    )
+    // The row must still be there — a failed delete must not look like it worked.
+    expect(screen.getByText("Sea Kayak Leader")).toBeInTheDocument()
   })
 })

@@ -67,5 +67,9 @@ describe("NewTripDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
 
     await waitFor(() => expect(screen.getByText("Server error.")).toBeDefined())
+    // Not rolled forward on failure — no navigation, and the dialog (with the
+    // typed data still in it) stays open for the user to retry.
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
 })

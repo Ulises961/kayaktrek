@@ -27,8 +27,10 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
 
   function handleOpen(v: boolean) {
     setOpen(v)
-    if (!v) {
+    if (v) {
+      // Clear error when opening a fresh dialog, not when closing
       setError(null)
+    } else {
       clearFile()
     }
   }
@@ -57,7 +59,6 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
           setError(
             "Document saved, but the file could not be uploaded. Add it from the edit dialog.",
           )
-          setOpen(false)
           return
         }
       }

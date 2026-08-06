@@ -478,6 +478,55 @@ is also the substrate for the session-management UI already cross-referenced in 
 
 ---
 
+## Testing standards — assertion completeness over coverage percentage (M15)
+
+**Context.** M14's build surfaced a specific failure mode: the `applyBoundaries`-fails branch
+of `handleSaveDays` leaked orphaned `Day` rows, and a test **already covered that branch** —
+it asserted the state rollback and never asserted the cleanup, so a coverage report showed the
+line green while the bug sat inside it. A 2026-08-02 measurement of the frontend suite found
+this was not an isolated case: of 204 test files / 2008 tests, **143 files (71%) never
+exercise a failure path** at all — only "what happens when everything works." Every bug found
+by manual walkthrough in M8's phase-9 QA and M12's review (blank error UX, a UTC/local date
+drift, mutually-exclusive modes that weren't) lived in exactly the space those tests decline to
+enter.
+
+**Decision.** Coverage percentage is explicitly **not** a target — it is the metric that
+scored the M14 orphan leak as green, since line coverage cannot distinguish "this line ran"
+from "this line's effect was checked." The target is **assertion completeness**, governed by a
+frozen rubric (`frontend/CLAUDE.md`'s "Testing standards" section is the canonical copy — this
+entry is the decision record, not a duplicate to keep in sync by hand):
+
+1. A lone `toHaveBeenCalledWith` on a mocked module is acceptable only when the call *is* the
+   entire contract (a Discard that performs no server call; an action's URL/body mapping).
+   Whenever the call has consequences — state, ordering, cleanup, navigation, a toast — assert
+   the consequence, not just the call.
+2. Every failure-path test asserts what is cleaned up or compensated, not only what is rolled
+   back. This is the rule the M14 orphan leak escaped through.
+3. Every server action has at least one non-ok-response test and one thrown-error test,
+   asserting the returned failure shape — not just that it didn't throw.
+4. Every component that can display an error state has a test that puts it in that state and
+   asserts what the user sees. A mutation with no failure test is incomplete.
+5. Mocks must not encode behaviour the real implementation does not have — spot-check the real
+   signature/return shape when mocking a module ([[feedback_mock_fidelity]]).
+6. Do not test the framework (pre-existing rule, restated because a coverage-driven sweep is
+   tempted to pad counts with framework-mechanics assertions).
+7. No test is added purely to raise a number. "This file is genuinely well-covered, no changes
+   needed" is a valid, reportable outcome of a review pass — not a gap.
+
+Two failure shapes need different remedies: server-action tests (`lib/<domain>/__tests__/actions.test.ts`)
+are missing the error branches entirely (non-ok response, the one-shot 401-refresh-and-retry
+guard, thrown network errors); component tests assert "the handler was invoked" where they
+should assert the user-visible consequence (what renders, disables, disappears, or is
+communicated on failure).
+
+**Consequences.** Every work package's production-code fixes are kept in their own commit,
+separate from test-only changes — a sweep that silently alters behaviour while "just adding
+tests" is worse than the coverage gap it closes. The rubric is frozen before any sweep work
+starts (M15's Wave 0) so every parallel work package reads one source of truth rather than
+drifting per-agent interpretations.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -504,4 +553,5 @@ is also the substrate for the session-management UI already cross-referenced in 
 | Deployment hosting — home-first pipeline, DO as graduation target | ADR-034 | 2026-07-27 | Full stack (Postgres/Redis/RabbitMQ/Flask/Celery/Next.js) self-hosted on a home box during the pre-traction phase, reached via Cloudflare Tunnel (not port-forwarding — sidesteps CGNAT, hides home IP, auto-TLS) once a domain exists; Nextcloud's existing dynamic-DNS setup untouched, kayak app gets its own Cloudflare-managed DNS. `autosuspend.conf` gains a connection-state check alongside the bandwidth threshold so low-volume dev/mobile chatter can't suspend a live session. Comparative reasoning behind the DigitalOcean pick kept outside this document. Bright-line graduation trigger fixed in advance: move to DigitalOcean the moment a non-trusted-circle user or money is involved, not re-litigated per incident |
 | Image publishing moves from every-merge to release tags | ADR-034 | 2026-08-02 | `:latest` moved on every merge to `master`, so "what is deployed" was only answerable by correlating GHCR push timestamps against the commit log, and redeploying a known-good build meant hand-editing `image:` lines. Publishing now lives in one `release.yml` triggered by a `v*.*.*` tag (or a manual `workflow_dispatch`), builds **both** images regardless of which paths changed — per-workflow path filters keep CI fast on a one-line change, which is the opposite of what a release wants — and publishes `:vX.Y.Z`/`:sha-<short>`/`:latest`. Backend and Frontend CI stay as gates and build nothing. The workflow refuses to publish a commit that is not an ancestor of `origin/master`, which is why it does not re-run the suites itself; a manual run on a branch publishes a sha tag only and never moves `:latest`, since `:latest` pointing at something with no version behind it is the problem being fixed. `docker-compose.prod.yml` takes `KAYAK_IMAGE_TAG` (default `latest`) so rollback is a tag change, not a rebuild — code only, since `migrate` never downgrades. PR #100; runbook in `DEPLOY.md` |
 | Per-device sessions + instant revocation | ADR-035 | 2026-08-02 | Extends ADR-001/032, does not supersede them: access tokens stay stateless and gain a `sid` claim; a `Session` row per device makes revocation family-scoped, so reuse detection and per-device sign-out cost one device rather than all of them. Instant revocation via a Redis `/4` denylist keyed on `sid`, TTL = access-token lifetime, **failing open** (a Redis blip must not log out the platform). 15-minute access lifetime kept — with instant revocation it is a refresh-cadence parameter, not a security window. No benign-reuse grace window (indistinguishable from the attack; single-flight on the client instead) and no reuse-detection email (would cry wolf; the sessions list is a pull channel). Coarse city-level location resolved in-process from the Cloudflare Tunnel's location headers, trusted only behind `PROXY_TRUSTED_HOPS`, stored as a label and never as an IP. Deploy cost: every user is logged out once, since pre-M17 tokens carry no `sid`. `plans/M17-per-device-sessions.md` |
+| Testing standards — assertion completeness over coverage % | — | 2026-08-04 | M15 scoping: 71% of frontend test files (143/201) never exercised a failure path; coverage % is explicitly not the target since it scored the M14 orphan leak as green. 7-point rubric frozen here + `frontend/CLAUDE.md` before any sweep work starts (M15 Wave 0) |
 | Deployment hosting — domain live, first real deploy (ADR-034 execution) | ADR-034 | 2026-07-31 | Domain `kayaktrek.app` purchased, DNS on Cloudflare. Refinement over the original ADR-034 text: `cloudflared`↔nginx loopback hop is also TLS (defense-in-depth, not required by Tunnel itself), via a real certbot-dns-cloudflare Let's Encrypt certificate rather than a Cloudflare Origin Certificate — same auto-renewing path as every other domain on the box, no reliance on `cloudflared`'s special-cased trust of Cloudflare's own Origin CA, and DNS-01 needs no port 80 exposure (there is none). Frontend vhost is the bare apex, not an `app.` subdomain — there's no separate marketing site (landing/auth/dashboard are one Next.js deployment), so `app.` would be an unneeded extra subdomain; decided and switched before any real user had it bookmarked. Fourth vhost added for MinIO's S3 API (`storage.<domain>`) — public-read avatars/point-images and presigned downloads bypass Flask entirely, so MinIO needs its own public hostname (admin console stays 127.0.0.1-only). Five real, first-time-ever-exercised bugs surfaced getting the pipeline's actual first `push`-to-`master` and first `docker compose up` to succeed — none were reachable from local dev or PR-only CI, since nothing had ever run the `push`-gated `docker-build-push` job or hit a real production domain before: (1) `toLower()` isn't a real GitHub Actions expression function — an invalid expression invalidates the *entire* workflow file regardless of which job references it, silently blocking all CI (including `pull_request`, unrelated to the broken job) since the pipeline's first commit; (2) the runner's default `docker` driver doesn't support `cache-to: type=gha`, needing an explicit `docker/setup-buildx-action` step; (3) the frontend build's static generation hung on an unbounded `fetch` to the (not-yet-deployed) production API instead of degrading via its own already-correct empty-fallback path — fixed with `AbortSignal.timeout`; (4) `migrate` never had `RATELIMIT_STORAGE_URI`, which `ProductionConfig`/`StagingConfig` require at import time (M11 hardening) — every other service already set it; (5) a pre-existing DNS record at the zone apex (likely auto-created at domain registration) silently rejected every `cloudflared tunnel route dns` attempt for it, so Cloudflare had been proxying the apex to that stale record the whole time. Full narrative and current live/paused status: `DEPLOY.md`'s "Status" section |

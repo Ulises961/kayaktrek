@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
@@ -110,5 +110,28 @@ describe("LeaderlessTripBanner", () => {
     )
     await userEvent.click(screen.getByRole("button", { name: /claim leadership/i }))
     expect(claimLeadership).toHaveBeenCalledWith(TRIP_ID)
+  })
+
+  it("shows an error and keeps the claim button when claiming fails", async () => {
+    vi.mocked(claimLeadership).mockResolvedValue({
+      success: false,
+      error: "Someone else already claimed leadership.",
+    })
+    render(
+      <LeaderlessTripBanner
+        tripId={TRIP_ID}
+        tripState="building"
+        travellers={[CREW_A]}
+        isMember={true}
+        currentMemberId="member-2"
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /claim leadership/i }))
+
+    await waitFor(() =>
+      expect(screen.getByText(/someone else already claimed leadership/i)).toBeInTheDocument(),
+    )
+    // The claim button is still offered — the banner didn't silently disappear.
+    expect(screen.getByRole("button", { name: /claim leadership/i })).toBeInTheDocument()
   })
 })

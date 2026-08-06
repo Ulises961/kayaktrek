@@ -191,12 +191,26 @@ export function MapBuilder({
     }
   }
 
-  const handleMarkerDragEnd = useCallback(async (pointId: string, lat: number, lng: number) => {
-    dispatch({ type: "POINT_UPDATE", id: pointId, fields: { latitude: lat, longitude: lng } })
-    dispatch({ type: "SAVING_START" })
-    await updatePoint(pointId, { latitude: lat, longitude: lng })
-    dispatch({ type: "SAVING_END" })
-  }, [])
+  const handleMarkerDragEnd = useCallback(
+    async (pointId: string, lat: number, lng: number) => {
+      const original = state.points.find((p) => p.id === pointId)
+      dispatch({ type: "POINT_UPDATE", id: pointId, fields: { latitude: lat, longitude: lng } })
+      dispatch({ type: "SAVING_START" })
+      const result = await updatePoint(pointId, { latitude: lat, longitude: lng })
+      dispatch({ type: "SAVING_END" })
+      // The drag already moved the marker optimistically — if the persist failed,
+      // put it back where it was rather than leaving an unsaved position on screen
+      // with nothing to say it never made it to the server.
+      if (!result.success && original) {
+        dispatch({
+          type: "POINT_UPDATE",
+          id: pointId,
+          fields: { latitude: original.latitude, longitude: original.longitude },
+        })
+      }
+    },
+    [state.points],
+  )
 
   const handleMarkerDragMove = useCallback((_pointId: string, _lat: number, _lng: number) => {
     /* intentional — MapCore handles live label updates locally */

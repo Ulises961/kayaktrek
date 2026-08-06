@@ -71,4 +71,24 @@ describe("PlaceForm", () => {
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalled()
   })
+
+  it("surfaces a server-side error message when the save fails", () => {
+    render(<PlaceForm categories={CATEGORIES} onSubmit={vi.fn()} error="Could not save place" />)
+    expect(screen.getByText("Could not save place")).toBeInTheDocument()
+  })
+
+  it("shows no error text when error is null", () => {
+    render(<PlaceForm categories={CATEGORIES} onSubmit={vi.fn()} error={null} />)
+    expect(screen.queryByText(/could not save/i)).not.toBeInTheDocument()
+  })
+
+  it("disables inputs and buttons while a save is pending, so the user cannot double-submit", () => {
+    const onCancel = vi.fn()
+    render(<PlaceForm categories={CATEGORIES} onSubmit={vi.fn()} onCancel={onCancel} isPending />)
+    expect(screen.getByLabelText(/category/i)).toBeDisabled()
+    expect(screen.getByLabelText(/label/i)).toBeDisabled()
+    expect(screen.getByLabelText(/note/i)).toBeDisabled()
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled()
+  })
 })

@@ -8,6 +8,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) 
 vi.mock("@/lib/connections/actions", () => ({
   requestConnection: vi.fn(),
   acceptConnection: vi.fn(),
+  removeConnection: vi.fn(),
 }))
 vi.mock("@/lib/blocks/actions", () => ({ blockPaddler: vi.fn() }))
 
@@ -79,5 +80,56 @@ describe("PaddlerResultCard", () => {
     await waitFor(() => expect(blockPaddler).toHaveBeenCalledWith({ username: "seapaddler" }))
     // A successful block hides the card entirely.
     await waitFor(() => expect(container.querySelector("div")).toBeNull())
+  })
+
+  it("displays an error when adding a buddy fails", async () => {
+    vi.mocked(requestConnection).mockResolvedValue({
+      success: false,
+      error: "Cannot add at this time",
+    })
+    render(<PaddlerResultCard paddler={BASE} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /add buddy/i }))
+    await waitFor(() => expect(screen.getByText("Cannot add at this time")).toBeInTheDocument())
+  })
+
+  it("displays an error when accepting a request fails", async () => {
+    vi.mocked(acceptConnection).mockResolvedValue({
+      success: false,
+      error: "Request expired",
+    })
+    render(
+      <PaddlerResultCard
+        paddler={{
+          ...BASE,
+          relationship: "pending_incoming",
+          connectionId: "01952f1a-0000-7000-8000-0000000000aa",
+        }}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /accept/i }))
+    await waitFor(() => expect(screen.getByText("Request expired")).toBeInTheDocument())
+  })
+
+  it("displays an error when blocking fails", async () => {
+    vi.mocked(blockPaddler).mockResolvedValue({
+      success: false,
+      error: "Already blocked",
+    })
+    const { container } = render(<PaddlerResultCard paddler={BASE} />)
+    await userEvent.click(screen.getByRole("button", { name: /more actions/i }))
+    await userEvent.click(await screen.findByText(/block/i))
+    await waitFor(() => expect(screen.getByText("Already blocked")).toBeInTheDocument())
+    // Card should remain visible on error
+    expect(container.querySelector("div")).not.toBeNull()
+  })
+
+  it("calls refresh() on successful add buddy", async () => {
+    vi.mocked(requestConnection).mockResolvedValue({ success: true })
+    render(<PaddlerResultCard paddler={BASE} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /add buddy/i }))
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
   })
 })

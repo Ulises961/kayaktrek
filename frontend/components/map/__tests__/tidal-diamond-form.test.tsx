@@ -90,4 +90,33 @@ describe("TidalDiamondForm", () => {
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalled()
   })
+
+  it("surfaces a server-side error message when the save fails", () => {
+    render(<TidalDiamondForm onSubmit={vi.fn()} error="Could not save diamond" />)
+    expect(screen.getByText("Could not save diamond")).toBeInTheDocument()
+  })
+
+  it("shows no error text when error is null", () => {
+    render(<TidalDiamondForm onSubmit={vi.fn()} error={null} />)
+    expect(screen.queryByText(/could not save/i)).not.toBeInTheDocument()
+  })
+
+  it("disables inputs and buttons while a save is pending, so the user cannot double-submit", () => {
+    const onCancel = vi.fn()
+    render(<TidalDiamondForm onSubmit={vi.fn()} onCancel={onCancel} isPending />)
+    expect(screen.getByLabelText(/name/i)).toBeDisabled()
+    expect(screen.getByLabelText(/peak spring rate/i)).toBeDisabled()
+    expect(screen.getByLabelText(/flood direction/i)).toBeDisabled()
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled()
+  })
+
+  it("disables the advanced per-hour rate inputs while pending", async () => {
+    render(<TidalDiamondForm onSubmit={vi.fn()} isPending />)
+    await userEvent.click(screen.getByRole("tab", { name: /advanced/i }))
+    const firstRow = screen.getAllByTestId("diamond-hour-row")[0]
+    for (const input of within(firstRow).getAllByRole("spinbutton")) {
+      expect(input).toBeDisabled()
+    }
+  })
 })

@@ -56,24 +56,34 @@ vi.mock("../tidal-diamond-marker", () => ({
   },
 }))
 
-// Stand-in form: one button that emits a valid simple-mode entry on submit.
+// Stand-in form: one button that emits a valid simple-mode entry on submit, plus
+// the real component's error rendering so a failed submit is actually observable.
 vi.mock("../tidal-diamond-form", () => ({
-  TidalDiamondForm: ({ onSubmit }: { onSubmit: (f: unknown) => void }) => (
-    <button
-      data-testid="form-submit"
-      onClick={() =>
-        onSubmit({
-          name: "The Race",
-          entryMode: "simple",
-          radiusM: 500,
-          maxSpringRateKnots: 3,
-          floodDirectionDegrees: 45,
-          ebbDirectionDegrees: 225,
-        })
-      }
-    >
-      submit
-    </button>
+  TidalDiamondForm: ({
+    onSubmit,
+    error,
+  }: {
+    onSubmit: (f: unknown) => void
+    error?: string | null
+  }) => (
+    <div>
+      <button
+        data-testid="form-submit"
+        onClick={() =>
+          onSubmit({
+            name: "The Race",
+            entryMode: "simple",
+            radiusM: 500,
+            maxSpringRateKnots: 3,
+            floodDirectionDegrees: 45,
+            ebbDirectionDegrees: 225,
+          })
+        }
+      >
+        submit
+      </button>
+      {error && <p data-testid="form-error">{error}</p>}
+    </div>
   ),
 }))
 
@@ -172,6 +182,21 @@ describe("MapCore — tidal diamond placement", () => {
         expect.objectContaining({ name: "The Race", entryMode: "simple" }),
       ),
     )
+  })
+
+  it("shows the create error in the dialog and keeps it open instead of closing on failure", async () => {
+    CREATE.mockResolvedValueOnce({ success: false, error: "That location is inland." })
+    render(<MapCore {...BASE_PROPS} selectedDayId="day-1" itineraryId="itin-1" canManageDiamonds />)
+
+    fireEvent.click(await screen.findByTestId("add-diamond-button"))
+    await waitFor(() => expect(clickHandlers.length).toBeGreaterThan(0))
+    act(() => clickHandlers[clickHandlers.length - 1]({ latlng: { lat: 50, lng: -4 } }))
+    fireEvent.click(await screen.findByTestId("form-submit"))
+
+    await waitFor(() => expect(CREATE).toHaveBeenCalled())
+    expect(await screen.findByTestId("form-error")).toHaveTextContent("That location is inland.")
+    // The dialog stays open on failure — closeDialog/reloadDiamonds only run on success.
+    expect(screen.getByTestId("form-submit")).toBeInTheDocument()
   })
 
   it("repositions a user diamond on drag and re-fetches", async () => {

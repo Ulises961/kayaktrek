@@ -186,6 +186,34 @@ describe("PointListPane — no active draft", () => {
     expect(await screen.findByText(/saved/i)).toBeInTheDocument()
   })
 
+  it("does not dispatch POINT_UPDATE or show Saved for a name edit when updatePoint fails", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    const dispatch = vi.fn()
+    const ctx = makeCtx({ selectedPointId: "p1", dispatch })
+    renderWithCtx(ctx)
+    const nameInput = screen.getByPlaceholderText("Point name")
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, "New name")
+    await userEvent.tab()
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { name: "New name" })
+    expect(screen.queryByText(/^saved$/i)).not.toBeInTheDocument()
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "POINT_UPDATE", id: "p1", fields: { name: "New name" } }),
+    )
+  })
+
+  it("does not dispatch POINT_UPDATE for a type chip click when updatePoint fails", async () => {
+    vi.mocked(actions.updatePoint).mockResolvedValueOnce({ success: false, error: "nope" })
+    const dispatch = vi.fn()
+    const ctx = makeCtx({ selectedPointId: "p1", dispatch })
+    renderWithCtx(ctx)
+    await userEvent.click(screen.getByRole("button", { name: /^stop$/i }))
+    expect(actions.updatePoint).toHaveBeenCalledWith("p1", { type: "stop" })
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "POINT_UPDATE", id: "p1", fields: { type: "stop" } }),
+    )
+  })
+
   it("renders Save days and Discard, both disabled, when there is no active draft", () => {
     renderWithCtx(makeCtx())
     expect(screen.getByRole("button", { name: /save days/i })).toBeDisabled()

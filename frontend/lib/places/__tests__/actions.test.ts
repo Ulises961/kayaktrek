@@ -62,6 +62,18 @@ describe("fetchPlaceCategories", () => {
     expect(GET).toHaveBeenCalledWith("/api/place-categories")
     expect(result).toEqual({ success: true, data: [categoryFixture] })
   })
+
+  it("returns an error on failure", async () => {
+    GET.mockRejectedValue(new Error("Failed to fetch"))
+    const result = await fetchPlaceCategories()
+    expect(result).toEqual({ success: false, error: "Failed to fetch" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("Unknown error")
+    const result = await fetchPlaceCategories()
+    expect(result).toEqual({ success: false, error: "Failed to fetch place categories." })
+  })
 })
 
 describe("fetchPlaces", () => {
@@ -91,6 +103,18 @@ describe("fetchPlaces", () => {
     const result = await fetchPlaces(ITINERARY_ID)
     expect(result.success && result.data[0].mine).toBe(false)
   })
+
+  it("returns an error on failure", async () => {
+    GET.mockRejectedValue(new Error("Failed to fetch"))
+    const result = await fetchPlaces(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fetch" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("Unknown error")
+    const result = await fetchPlaces(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fetch places." })
+  })
 })
 
 describe("createPlace", () => {
@@ -115,32 +139,82 @@ describe("createPlace", () => {
 })
 
 describe("updatePlace", () => {
-  it("patches the editable fields", async () => {
+  it("patches the editable fields and returns success", async () => {
     PATCH.mockResolvedValue(placeFixture)
-    await updatePlace(placeFixture.id, { categoryId: CATEGORY_ID, label: "New", note: null })
+    const result = await updatePlace(placeFixture.id, {
+      categoryId: CATEGORY_ID,
+      label: "New",
+      note: null,
+    })
     expect(PATCH).toHaveBeenCalledWith(`/api/place/${placeFixture.id}`, {
       categoryId: CATEGORY_ID,
       label: "New",
       note: null,
     })
+    expect(result).toEqual({ success: true, data: placeFixture })
+  })
+
+  it("returns an error on failure", async () => {
+    PATCH.mockRejectedValue(new Error("Forbidden"))
+    const result = await updatePlace(placeFixture.id, {
+      categoryId: CATEGORY_ID,
+      label: "New",
+      note: null,
+    })
+    expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    PATCH.mockRejectedValue("Unknown error")
+    const result = await updatePlace(placeFixture.id, {
+      categoryId: CATEGORY_ID,
+      label: "New",
+      note: null,
+    })
+    expect(result).toEqual({ success: false, error: "Failed to update place." })
   })
 })
 
 describe("repositionPlace", () => {
-  it("patches only the location as GeoJSON", async () => {
+  it("patches only the location as GeoJSON and returns success", async () => {
     PATCH.mockResolvedValue(placeFixture)
-    await repositionPlace(placeFixture.id, 51.0, -5.0)
+    const result = await repositionPlace(placeFixture.id, 51.0, -5.0)
     expect(PATCH).toHaveBeenCalledWith(`/api/place/${placeFixture.id}`, {
       location: { type: "Point", coordinates: [-5.0, 51.0] },
     })
+    expect(result).toEqual({ success: true, data: placeFixture })
+  })
+
+  it("returns an error on failure", async () => {
+    PATCH.mockRejectedValue(new Error("Not found"))
+    const result = await repositionPlace(placeFixture.id, 51.0, -5.0)
+    expect(result).toEqual({ success: false, error: "Not found" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    PATCH.mockRejectedValue("Unknown error")
+    const result = await repositionPlace(placeFixture.id, 51.0, -5.0)
+    expect(result).toEqual({ success: false, error: "Failed to move place." })
   })
 })
 
 describe("deletePlace", () => {
-  it("deletes by id", async () => {
+  it("deletes by id and returns success", async () => {
     DELETE.mockResolvedValue(undefined)
     const result = await deletePlace(placeFixture.id)
     expect(DELETE).toHaveBeenCalledWith(`/api/place/${placeFixture.id}`)
     expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error on failure", async () => {
+    DELETE.mockRejectedValue(new Error("Forbidden"))
+    const result = await deletePlace(placeFixture.id)
+    expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    DELETE.mockRejectedValue("Unknown error")
+    const result = await deletePlace(placeFixture.id)
+    expect(result).toEqual({ success: false, error: "Failed to delete place." })
   })
 })

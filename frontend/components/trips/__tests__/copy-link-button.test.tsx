@@ -32,4 +32,20 @@ describe("CopyLinkButton", () => {
     await userEvent.click(screen.getByRole("button", { name: /copy link/i }))
     await waitFor(() => expect(screen.getByText(/copied/i)).toBeDefined())
   })
+
+  // Clipboard access can be denied (insecure context, missing permission).
+  // The button has no error UI (matches float-plan-share-section's and
+  // story-share-button's copy handlers) — this asserts the actual, current
+  // consequence: the label never flips to "Copied!" and the button is left
+  // usable, rather than asserting fiction about error handling that doesn't
+  // exist.
+  it("leaves the label unchanged when clipboard.writeText rejects", async () => {
+    mockWriteText.mockRejectedValue(new Error("denied"))
+    render(<CopyLinkButton />)
+    await userEvent.click(screen.getByRole("button", { name: /copy link/i }))
+
+    await waitFor(() => expect(mockWriteText).toHaveBeenCalled())
+    expect(screen.queryByText(/copied/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled()
+  })
 })

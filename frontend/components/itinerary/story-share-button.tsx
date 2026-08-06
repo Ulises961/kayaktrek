@@ -52,9 +52,16 @@ export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
     })
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!token) return
-    navigator.clipboard.writeText(buildStoryUrl(token))
+    try {
+      await navigator.clipboard.writeText(buildStoryUrl(token))
+    } catch {
+      // Clipboard access can be denied (insecure context, missing permission) —
+      // leave the label unchanged rather than let the rejection go unhandled
+      // (matches copy-link-button.tsx's same best-effort, no-error-UI pattern).
+      return
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

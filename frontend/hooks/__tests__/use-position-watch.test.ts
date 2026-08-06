@@ -150,4 +150,39 @@ describe("usePositionWatch", () => {
     unmount()
     expect(geolocation.cleared).toEqual([1])
   })
+
+  it("stays on sending and never records lastSentAt when the ping fails", async () => {
+    sendPositionPing.mockResolvedValue({ success: false, error: "network error" })
+    const { result } = renderHook(() => usePositionWatch(TRIP_ID, true))
+
+    await act(async () => {
+      geolocation.emit(43.0, 13.0)
+      await vi.runOnlyPendingTimersAsync()
+    })
+
+    expect(result.current.status).toBe("sending")
+    expect(result.current.lastSentAt).toBeNull()
+  })
+
+  it("does not update lastSentAt or crash when the ping promise rejects", async () => {
+    sendPositionPing.mockRejectedValue(new Error("session expired"))
+    const { result } = renderHook(() => usePositionWatch(TRIP_ID, true))
+
+    await act(async () => {
+      geolocation.emit(43.0, 13.0)
+      await vi.runOnlyPendingTimersAsync()
+    })
+
+    expect(result.current.lastSentAt).toBeNull()
+    expect(result.current.status).toBe("sending")
+  })
+
+  it("ignores a non-permission geolocation error, leaving status unaffected", () => {
+    const { result } = renderHook(() => usePositionWatch(TRIP_ID, true))
+    expect(result.current.status).toBe("acquiring")
+
+    act(() => geolocation.emitError(2)) // POSITION_UNAVAILABLE
+
+    expect(result.current.status).toBe("acquiring")
+  })
 })

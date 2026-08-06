@@ -49,4 +49,12 @@ describe("BlockedList", () => {
     await userEvent.click(screen.getByRole("button", { name: /unblock/i }))
     await waitFor(() => expect(screen.getByText("Nope")).toBeDefined())
   })
+
+  it("calls refresh() on successful unblock", async () => {
+    vi.mocked(unblockPaddler).mockResolvedValue({ success: true })
+    render(<BlockedList blocks={[BLOCK]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /unblock/i }))
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+  })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatHour, representativeHour } from "../hourly"
+import { formatHour, hourOf, representativeHour } from "../hourly"
 
 describe("formatHour", () => {
   it("trims seconds from an HH:MM:SS time", () => {
@@ -9,6 +9,28 @@ describe("formatHour", () => {
   it("returns — for missing time", () => {
     expect(formatHour(null)).toBe("—")
     expect(formatHour(undefined)).toBe("—")
+  })
+})
+
+describe("hourOf", () => {
+  it("extracts the hour from HH:MM:SS time strings", () => {
+    expect(hourOf("12:30:00")).toBe(12)
+    expect(hourOf("06:15:45")).toBe(6)
+    expect(hourOf("23:59:59")).toBe(23)
+  })
+
+  it("returns 0 for midnight", () => {
+    expect(hourOf("00:00:00")).toBe(0)
+  })
+
+  it("returns null for null or undefined", () => {
+    expect(hourOf(null)).toBeNull()
+    expect(hourOf(undefined)).toBeNull()
+  })
+
+  it("returns null for unparseable hour values", () => {
+    expect(hourOf("XX:00:00")).toBeNull()
+    expect(hourOf("not-a-time")).toBeNull()
   })
 })
 

@@ -37,5 +37,19 @@ describe("PublicProfileToggle", () => {
     await userEvent.click(screen.getByRole("switch"))
     await waitFor(() => expect(screen.getByText("Nope.")).toBeDefined())
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false")
+    // A reverted "turn public" must not leave the public-profile link showing —
+    // that link is the one place a private profile could otherwise look public.
+    expect(screen.queryByRole("link", { name: /view your public profile/i })).toBeNull()
+  })
+
+  it("reverts back to public and keeps the link when turning private fails", async () => {
+    vi.mocked(setProfileVisibility).mockResolvedValue({ success: false, error: "Nope." })
+    render(<PublicProfileToggle username="seapaddler" initialIsPublic={true} />)
+    await userEvent.click(screen.getByRole("switch"))
+    expect(setProfileVisibility).toHaveBeenCalledWith(false)
+
+    await waitFor(() => expect(screen.getByText("Nope.")).toBeDefined())
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true")
+    expect(screen.getByRole("link", { name: /view your public profile/i })).toBeDefined()
   })
 })

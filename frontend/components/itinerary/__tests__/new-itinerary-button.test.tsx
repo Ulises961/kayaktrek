@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockCreateItinerary, mockPush } = vi.hoisted(() => ({
+const { mockCreateItinerary, mockPush, mockToastError } = vi.hoisted(() => ({
   mockCreateItinerary: vi.fn(),
   mockPush: vi.fn(),
+  mockToastError: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -14,6 +15,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/itinerary/actions", () => ({
   createItinerary: mockCreateItinerary,
 }))
+
+vi.mock("sonner", () => ({ toast: { error: mockToastError } }))
 
 import { NewItineraryButton } from "../new-itinerary-button"
 
@@ -55,7 +58,7 @@ describe("NewItineraryButton", () => {
     expect(mockCreateItinerary).not.toHaveBeenCalled()
   })
 
-  it("does not redirect when createItinerary returns failure", async () => {
+  it("shows an error toast and keeps the dialog open when createItinerary returns failure", async () => {
     mockCreateItinerary.mockResolvedValue({ success: false, error: "Server error" })
     render(<NewItineraryButton />)
 
@@ -63,6 +66,8 @@ describe("NewItineraryButton", () => {
     await userEvent.type(screen.getByLabelText(/name/i), "Some Route")
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
 
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Server error"))
     expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
 })

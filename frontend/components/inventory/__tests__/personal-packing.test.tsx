@@ -125,4 +125,40 @@ describe("PersonalPacking", () => {
     renderKit({ packingItems: [] })
     expect(screen.getByText(/nothing in your kit yet/i)).toBeTruthy()
   })
+
+  it("displays an error when adding a packing item fails", async () => {
+    const user = userEvent.setup()
+    mockAdd.mockResolvedValueOnce({
+      success: false,
+      error: "Item already in kit",
+    })
+    renderKit()
+
+    await user.selectOptions(screen.getByLabelText(/add to your kit/i), UNPACKED_OWNED.id!)
+    expect(screen.getByText("Item already in kit")).toBeTruthy()
+  })
+
+  it("displays an error when toggling a packing item fails", async () => {
+    const user = userEvent.setup()
+    mockToggle.mockResolvedValueOnce({
+      success: false,
+      error: "Failed to update item",
+    })
+    renderKit()
+
+    await user.click(screen.getByRole("checkbox", { name: /drysuit/i }))
+    expect(screen.getByText("Failed to update item")).toBeTruthy()
+  })
+
+  it("displays an error when removing a packing item fails", async () => {
+    const user = userEvent.setup()
+    mockRemove.mockResolvedValueOnce({
+      success: false,
+      error: "Cannot remove item",
+    })
+    renderKit()
+
+    await user.click(screen.getByRole("button", { name: /remove drysuit/i }))
+    expect(screen.getByText("Cannot remove item")).toBeTruthy()
+  })
 })

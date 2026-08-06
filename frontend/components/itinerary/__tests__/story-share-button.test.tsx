@@ -72,6 +72,17 @@ describe("StoryShareButton — token already exists", () => {
     )
     await waitFor(() => expect(screen.getByRole("button", { name: /copied/i })).toBeInTheDocument())
   })
+
+  it("leaves the label unchanged when clipboard access is denied", async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    })
+    render(<StoryShareButton itinerary={WITH_TOKEN} />)
+    await userEvent.click(screen.getByRole("button", { name: /share story/i }))
+    await userEvent.click(screen.getByRole("button", { name: /copy link/i }))
+    expect(await screen.findByRole("button", { name: /copy link/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /copied/i })).not.toBeInTheDocument()
+  })
 })
 
 describe("StoryShareButton — regenerate flow", () => {

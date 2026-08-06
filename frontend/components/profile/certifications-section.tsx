@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
@@ -114,11 +115,18 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
   }
 
   function handleDelete(cert: Certification) {
-    setFormError(null)
     runElevated((t) =>
       startTransition(async () => {
         const result = await deleteCertification(t, cert.id!)
-        afterMutation(result, () => setCerts((prev) => prev.filter((c) => c.id !== cert.id)))
+        if (result.success) {
+          setCerts((prev) => prev.filter((c) => c.id !== cert.id))
+          return
+        }
+        // Delete is a one-click row action, not a dialog flow — there's no open
+        // dialog to host `formError` here (that's only rendered inside the add/edit
+        // form), so a failure needs its own visible surface or it disappears silently.
+        if (result.error.includes("re-authenticate")) setToken(null)
+        toast.error(result.error)
       }),
     )
   }

@@ -117,4 +117,28 @@ describe("BuddiesList", () => {
       expect(removeConnection).toHaveBeenCalledWith("01952f1a-0000-7000-8000-0000000000c1"),
     )
   })
+
+  it("displays an error when accepting a request fails", async () => {
+    vi.mocked(acceptConnection).mockResolvedValue({ success: false, error: "Request expired" })
+    render(<BuddiesList connections={CONNECTIONS} currentUserId={ME} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /accept/i }))
+    await waitFor(() => expect(screen.getByText("Request expired")).toBeInTheDocument())
+  })
+
+  it("displays an error when declining a request fails", async () => {
+    vi.mocked(removeConnection).mockResolvedValue({ success: false, error: "Cannot decline" })
+    render(<BuddiesList connections={CONNECTIONS} currentUserId={ME} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /decline/i }))
+    await waitFor(() => expect(screen.getByText("Cannot decline")).toBeInTheDocument())
+  })
+
+  it("displays an error when unfriending fails", async () => {
+    vi.mocked(removeConnection).mockResolvedValue({ success: false, error: "Operation failed" })
+    render(<BuddiesList connections={CONNECTIONS} currentUserId={ME} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /unfriend/i }))
+    await waitFor(() => expect(screen.getByText("Operation failed")).toBeInTheDocument())
+  })
 })

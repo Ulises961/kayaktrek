@@ -3,7 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("@/lib/sessions/actions", () => ({ revokeSession: vi.fn() }))
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+const mockRefresh = vi.fn()
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) }))
 
 import { revokeSession } from "@/lib/sessions/actions"
 import { DeviceSessions } from "../device-sessions"
@@ -77,6 +78,31 @@ describe("DeviceSessions", () => {
     await userEvent.click(within(row("iPhone")).getByRole("button", { name: /sign out/i }))
 
     await waitFor(() => expect(screen.getByText("Could not sign out.")).toBeDefined())
+    // The device must still be listed as signed in, and its button must return to
+    // "Sign out" (not remain stuck on "Signing out…") — a failed revoke that looks
+    // like a stuck or vanished device is as dangerous as one that looks successful.
+    expect(within(row("iPhone")).getByRole("button", { name: /^sign out$/i })).toBeEnabled()
+    expect(screen.getByText("iPhone")).toBeInTheDocument()
+  })
+
+  it("does not call router.refresh when the revoke fails", async () => {
+    vi.mocked(revokeSession).mockResolvedValue({ success: false, error: "Could not sign out." })
+    render(<DeviceSessions sessions={[thisDevice, otherDevice]} now={NOW} />)
+
+    await userEvent.click(within(row("iPhone")).getByRole("button", { name: /sign out/i }))
+    await waitFor(() => expect(screen.getByText("Could not sign out.")).toBeDefined())
+
+    expect(mockRefresh).not.toHaveBeenCalled()
+  })
+
+  it("calls router.refresh (to re-fetch the session list) on a successful revoke", async () => {
+    vi.mocked(revokeSession).mockResolvedValue({ success: true })
+    render(<DeviceSessions sessions={[thisDevice, otherDevice]} now={NOW} />)
+
+    await userEvent.click(within(row("iPhone")).getByRole("button", { name: /sign out/i }))
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+    expect(screen.queryByText("Could not sign out.")).not.toBeInTheDocument()
   })
 
   it("explains the empty case rather than rendering a bare list", () => {

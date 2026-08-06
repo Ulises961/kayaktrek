@@ -13,7 +13,7 @@ vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
 import {
@@ -31,6 +31,8 @@ import {
   nominateSuccessor,
   clearNomination,
   claimLeadership,
+  getTripCrew,
+  inviteBuddy,
   listTrips,
   listTripInvitations,
 } from "../actions"
@@ -165,6 +167,19 @@ describe("advanceState", () => {
     const result = await advanceState(TRIP_ID, "planning")
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
+
+  it("does not revalidate when the transition is rejected", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("409"))
+    await advanceState(TRIP_ID, "planning")
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiPost).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(advanceState(TRIP_ID, "planning")).rejects.toBe(redirectError)
+  })
 })
 
 describe("pauseTrip", () => {
@@ -273,6 +288,19 @@ describe("deleteTripForEveryone", () => {
     const result = await deleteTripForEveryone(TRIP_ID)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
+
+  it("does not redirect when the delete fails", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("403"))
+    await deleteTripForEveryone(TRIP_ID)
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("rethrows a redirect signal instead of returning a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiDelete).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(deleteTripForEveryone(TRIP_ID)).rejects.toBe(redirectError)
+  })
 })
 
 describe("leaveTrip", () => {
@@ -358,6 +386,90 @@ describe("claimLeadership", () => {
   })
 })
 
+describe("getTripCrew", () => {
+  const CREW_MEMBER = {
+    id: USER_ID,
+    role: "crew",
+    user: {
+      id: USER_ID,
+      mail: "ada@example.com",
+      username: "ada",
+      name: "Ada",
+    },
+  }
+
+  it("fetches the trip and returns its travellers", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ id: TRIP_ID, travellers: [CREW_MEMBER] })
+    const result = await getTripCrew(TRIP_ID)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}`)
+    expect(result).toEqual([expect.objectContaining({ id: USER_ID, role: "crew" })])
+  })
+
+  it("returns an empty array when the trip has no travellers", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ id: TRIP_ID })
+    const result = await getTripCrew(TRIP_ID)
+    expect(result).toEqual([])
+  })
+
+  it("returns an empty array when the API throws", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("404"))
+    const result = await getTripCrew(TRIP_ID)
+    expect(result).toEqual([])
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into an empty list", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiGet).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(getTripCrew(TRIP_ID)).rejects.toBe(redirectError)
+  })
+})
+
+describe("inviteBuddy", () => {
+  it("posts the invitee's userId to the correct path", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await inviteBuddy(TRIP_ID, USER_ID)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/invite`, { userId: USER_ID })
+  })
+
+  it("revalidates the crew segment on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await inviteBuddy(TRIP_ID, USER_ID)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/crew`)
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    const result = await inviteBuddy(TRIP_ID, USER_ID)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns a user-friendly message when the invite is forbidden (blocked/ineligible paddler)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("403"))
+    const result = await inviteBuddy(TRIP_ID, USER_ID)
+    expect(result).toEqual({ success: false, error: "You can't invite this paddler." })
+  })
+
+  it("returns the raw error message for non-403 failures", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500 Internal Server Error"))
+    const result = await inviteBuddy(TRIP_ID, USER_ID)
+    expect(result).toEqual({ success: false, error: "500 Internal Server Error" })
+  })
+
+  it("does not revalidate when the invite fails", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("403"))
+    await inviteBuddy(TRIP_ID, USER_ID)
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiPost).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(inviteBuddy(TRIP_ID, USER_ID)).rejects.toBe(redirectError)
+  })
+})
+
 describe("listTrips", () => {
   const SESSION = { userId: USER_ID, email: "paddler@example.com", isAdmin: false }
   const EMPTY_PAGE = { items: [], total: 0, page: 1, pages: 1 }
@@ -397,6 +509,14 @@ describe("listTrips", () => {
     vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
     const result = await listTrips({})
     expect(result).toEqual(EMPTY_PAGE)
+  })
+
+  it("rethrows a redirect signal instead of returning an empty page", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(listTrips({})).rejects.toBe(redirectError)
   })
 })
 

@@ -126,6 +126,30 @@ describe("AddDocumentDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   })
+
+  it("shows error when uploadTravelDocumentAttachment fails after document creation", async () => {
+    vi.mocked(createTravelDocument).mockResolvedValue({ success: true, document: DOCUMENT })
+    vi.mocked(uploadTravelDocumentAttachment).mockResolvedValue({
+      success: false,
+      error: "File is too large.",
+    })
+
+    render(<AddDocumentDialog tripId={TRIP_ID} />)
+    await userEvent.click(screen.getByRole("button", { name: /add document/i }))
+    await userEvent.type(screen.getByPlaceholderText(/document name/i), "Ferry La Escala")
+
+    const file = new File(["content"], "ticket.pdf", { type: "application/pdf" })
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(fileInput, file)
+
+    await userEvent.click(screen.getByRole("button", { name: /^add$/i }))
+    // Dialog stays open so error is visible and can be read
+    await waitFor(() =>
+      expect(screen.getByText(/Document saved, but the file could not be uploaded/)).toBeDefined(),
+    )
+    // Dialog should still be visible
+    expect(screen.getByRole("dialog")).toBeDefined()
+  })
 })
 
 describe("EditDocumentDialog", () => {

@@ -71,13 +71,15 @@ describe("listConnections", () => {
 })
 
 describe("requestConnection", () => {
-  it("posts the addressee identifiers", async () => {
+  it("posts the addressee identifiers and revalidates", async () => {
+    const { revalidatePath } = await import("next/cache")
     vi.mocked(apiPost).mockResolvedValue(undefined)
     const result = await requestConnection({ username: "seapaddler" })
     expect(apiPost).toHaveBeenCalledWith("/api/connections/request", {
       addresseeUsername: "seapaddler",
       addresseeId: undefined,
     })
+    expect(revalidatePath).toHaveBeenCalledWith("/paddlers")
     expect(result).toEqual({ success: true })
   })
 
@@ -95,19 +97,43 @@ describe("requestConnection", () => {
     const result = await requestConnection({ username: "ghost" })
     expect(result).toEqual({ success: false, error: "That paddler could not be found." })
   })
+
+  it("returns a generic error for other failures", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("Internal Server Error"))
+    const result = await requestConnection({ username: "seapaddler" })
+    expect(result).toEqual({ success: false, error: "Failed to send buddy request." })
+  })
 })
 
 describe("acceptConnection / removeConnection", () => {
-  it("accepts by connection id", async () => {
+  it("accepts by connection id and revalidates", async () => {
+    const { revalidatePath } = await import("next/cache")
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    await acceptConnection("abc")
+    const result = await acceptConnection("abc")
     expect(apiPost).toHaveBeenCalledWith("/api/connections/abc/accept", {})
+    expect(revalidatePath).toHaveBeenCalledWith("/paddlers")
+    expect(result).toEqual({ success: true })
   })
 
-  it("removes by connection id", async () => {
+  it("returns an error when accepting fails", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("Not found"))
+    const result = await acceptConnection("abc")
+    expect(result).toEqual({ success: false, error: "Failed to accept buddy request." })
+  })
+
+  it("removes by connection id and revalidates", async () => {
+    const { revalidatePath } = await import("next/cache")
     vi.mocked(apiDelete).mockResolvedValue(undefined)
-    await removeConnection("abc")
+    const result = await removeConnection("abc")
     expect(apiDelete).toHaveBeenCalledWith("/api/connections/abc")
+    expect(revalidatePath).toHaveBeenCalledWith("/paddlers")
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error when removing fails", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("Not found"))
+    const result = await removeConnection("abc")
+    expect(result).toEqual({ success: false, error: "Failed to remove connection." })
   })
 })
 

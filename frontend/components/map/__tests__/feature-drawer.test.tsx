@@ -12,7 +12,12 @@ vi.mock("@/lib/weather/actions", () => ({
   fetchDayWeather: vi.fn().mockResolvedValue({ success: false }),
   fetchDaySea: vi.fn().mockResolvedValue({ success: false }),
   fetchTidalGates: vi.fn().mockResolvedValue({ success: false }),
-  triggerWeatherFetch: vi.fn().mockResolvedValue({ success: true }),
+  // Default to failure like every other action mocked here. success:true would send
+  // useDayConditions().refresh() into its real-timer 2s×10 poll loop, which outlives
+  // the test that triggered it (RTL cleanup unmounts but doesn't cancel the pending
+  // setTimeout chain) and can steal a later test's mockResolvedValueOnce — override
+  // per test when a specific value matters.
+  triggerWeatherFetch: vi.fn().mockResolvedValue({ success: false }),
 }))
 
 vi.mock("@/components/weather/weather-grid", () => ({
@@ -297,5 +302,23 @@ describe("FeatureDrawer — Forecast fetch", () => {
     await openForecast(makeCtx({ selectedDayId: DAY1_ID, isLeader: true }))
     await userEvent.click(screen.getByRole("button", { name: /fetch forecast/i }))
     expect(actions.triggerWeatherFetch).toHaveBeenCalledWith(DAY1_ID)
+  })
+
+  // useDayConditions().refresh() swallows a triggerWeatherFetch failure (returns
+  // early with no error surfaced — see lib/weather/use-day-conditions.ts). The
+  // drawer's own responsibility is at least not to get stuck: the button must
+  // recover to its idle label and the empty state must not be corrupted.
+  it("recovers to the idle Fetch forecast button when triggerWeatherFetch fails, instead of getting stuck", async () => {
+    const actions = await import("@/lib/weather/actions")
+    vi.mocked(actions.triggerWeatherFetch).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to trigger weather fetch.",
+    })
+    await openForecast(makeCtx({ selectedDayId: DAY1_ID, isLeader: true }))
+
+    await userEvent.click(screen.getByRole("button", { name: /fetch forecast/i }))
+
+    expect(await screen.findByRole("button", { name: /^fetch forecast$/i })).toBeInTheDocument()
+    expect(screen.getByText(/no forecast fetched for this day/i)).toBeInTheDocument()
   })
 })

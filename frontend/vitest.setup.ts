@@ -1,4 +1,13 @@
 import "@testing-library/jest-dom"
+import { configure } from "@testing-library/react"
+
+// RTL's waitFor/findBy* default to a 1000ms timeout, independent of vitest's own
+// testTimeout above — under full-suite CPU contention (all workers running at
+// once) that's tight enough to flake on an otherwise-correct assertion. Same
+// "generous on purpose" rationale as testTimeout/hookTimeout: a real hang still
+// fails, just later. Found via a reproducible (~1-in-3 full-run) flake in
+// certifications-section.test.tsx under this sandbox's 4-core load (M15).
+configure({ asyncUtilTimeout: 5000 })
 
 // jsdom does not implement the Pointer Capture API. Components that call these
 // during drag gestures (e.g. BoundaryDivider) would otherwise throw uncaught

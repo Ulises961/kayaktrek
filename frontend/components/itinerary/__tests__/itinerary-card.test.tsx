@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, within, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const {
@@ -8,12 +8,14 @@ const {
   mockPush,
   mockCreateTripFromItinerary,
   mockDeleteItinerary,
+  mockToastError,
 } = vi.hoisted(() => ({
   mockUpdateItinerary: vi.fn(),
   mockRefresh: vi.fn(),
   mockPush: vi.fn(),
   mockCreateTripFromItinerary: vi.fn(),
   mockDeleteItinerary: vi.fn(),
+  mockToastError: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -26,6 +28,8 @@ vi.mock("@/lib/itinerary/actions", () => ({
   deleteItinerary: mockDeleteItinerary,
   generateStoryShare: vi.fn(),
 }))
+
+vi.mock("sonner", () => ({ toast: { error: mockToastError } }))
 
 import { ItineraryCard } from "../itinerary-card"
 import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
@@ -127,6 +131,14 @@ describe("ItineraryCard — public toggle", () => {
     await userEvent.click(screen.getByRole("button", { name: /make public/i }))
     expect(mockRefresh).toHaveBeenCalled()
   })
+
+  it("shows an error toast and does not refresh when the toggle fails", async () => {
+    mockUpdateItinerary.mockResolvedValue({ success: false, error: "Could not update itinerary." })
+    render(<ItineraryCard itinerary={BASE} />)
+    await userEvent.click(screen.getByRole("button", { name: /make public/i }))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not update itinerary."))
+    expect(mockRefresh).not.toHaveBeenCalled()
+  })
 })
 
 describe("ItineraryCard — GPX download", () => {
@@ -189,6 +201,19 @@ describe("ItineraryCard — create trip", () => {
     const submitBtn = screen.getByRole("button", { name: /^create$/i }) as HTMLButtonElement
     expect(submitBtn.disabled).toBe(true)
   })
+
+  it("shows an error toast and keeps the dialog open when create fails", async () => {
+    mockCreateTripFromItinerary.mockResolvedValue({
+      success: false,
+      error: "Could not create trip.",
+    })
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /create trip/i }))
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not create trip."))
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+  })
 })
 
 describe("ItineraryCard — delete", () => {
@@ -222,5 +247,15 @@ describe("ItineraryCard — delete", () => {
     const dialog = screen.getByRole("alertdialog")
     await userEvent.click(within(dialog).getByRole("button", { name: /cancel/i }))
     expect(mockDeleteItinerary).not.toHaveBeenCalled()
+  })
+
+  it("shows an error toast and does not refresh when delete fails", async () => {
+    mockDeleteItinerary.mockResolvedValue({ success: false, error: "Could not delete itinerary." })
+    render(<ItineraryCard itinerary={{ ...BASE, tripId: undefined }} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }))
+    const dialog = screen.getByRole("alertdialog")
+    await userEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not delete itinerary."))
+    expect(mockRefresh).not.toHaveBeenCalled()
   })
 })

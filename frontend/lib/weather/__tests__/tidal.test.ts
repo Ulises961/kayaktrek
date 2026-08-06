@@ -46,6 +46,18 @@ describe("deriveCorrectedTide", () => {
     expect(result.tidalRangeM).toBe(5)
   })
 
+  it("handles partial data — high tide without low tide", () => {
+    const result = deriveCorrectedTide({
+      baseHighTide: "09:42",
+      baseHwHeightM: 7.2,
+      baseLwHeightM: 1.1,
+    })
+    expect(result.highTide).toBe("09:42")
+    expect(result.lowTide).toBeNull()
+    // Range still computes because both heights are present
+    expect(result.tidalRangeM).toBe(6.1)
+  })
+
   it("returns nulls when base values are missing", () => {
     const result = deriveCorrectedTide({ hwTimeOffsetMinutes: 35 })
     expect(result.highTide).toBeNull()

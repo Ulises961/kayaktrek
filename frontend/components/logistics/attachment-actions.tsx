@@ -36,12 +36,17 @@ export function AttachmentActions({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
 
   function handleFile(file: File) {
     const formData = new FormData()
     formData.append("file", file)
+    setError(null)
     startTransition(async () => {
-      await uploadTravelDocumentAttachment(tripId, documentId, formData)
+      const result = await uploadTravelDocumentAttachment(tripId, documentId, formData)
+      if (!result.success) {
+        setError(result.error)
+      }
     })
   }
 
@@ -63,51 +68,58 @@ export function AttachmentActions({
   }
 
   function handleRemove() {
+    setError(null)
     startTransition(async () => {
-      await deleteTravelDocumentAttachment(tripId, documentId)
+      const result = await deleteTravelDocumentAttachment(tripId, documentId)
+      if (!result.success) {
+        setError(result.error)
+      }
     })
   }
 
   if (attachmentPath) {
     return (
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground h-7 px-2 text-xs"
-          onClick={handleDownload}
-          disabled={isPending}
-        >
-          <DownloadIcon className="mr-1 size-3" />
-          Download
-        </Button>
-        {canEdit && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive h-7 px-2 text-xs"
-                disabled={isPending}
-              >
-                <Trash2Icon className="mr-1 size-3" />
-                Remove
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remove attachment?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  The file will be permanently deleted. This cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleRemove}>Remove</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground h-7 px-2 text-xs"
+            onClick={handleDownload}
+            disabled={isPending}
+          >
+            <DownloadIcon className="mr-1 size-3" />
+            Download
+          </Button>
+          {canEdit && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive h-7 px-2 text-xs"
+                  disabled={isPending}
+                >
+                  <Trash2Icon className="mr-1 size-3" />
+                  Remove
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove attachment?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    The file will be permanently deleted. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRemove}>Remove</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
     )
   }
@@ -151,6 +163,7 @@ export function AttachmentActions({
           </Button>
         </div>
       </div>
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   )
 }

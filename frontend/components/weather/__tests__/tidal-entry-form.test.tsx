@@ -110,4 +110,17 @@ describe("TidalEntryForm — leader", () => {
     expect(fields).not.toHaveProperty("floodDirectionDegrees")
     expect(fields).not.toHaveProperty("maxSpringRateKnots")
   })
+
+  it("shows error when updateDaySea fails", async () => {
+    const user = userEvent.setup()
+    UPDATE.mockResolvedValue({ success: false, error: "Server error during save." })
+
+    render(<TidalEntryForm dayId={DAY_ID} sea={null} isLeader onSaved={vi.fn()} />)
+
+    await user.type(screen.getByLabelText("High water"), "09:42")
+    await user.type(screen.getByLabelText("Low water"), "03:10")
+    await user.click(screen.getByRole("button", { name: /save tidal data/i }))
+
+    await waitFor(() => expect(screen.getByText("Server error during save.")).toBeInTheDocument())
+  })
 })

@@ -10,6 +10,8 @@ import {
   fetchTidalDiamonds,
   fetchGlobalWindVectors,
   createTidalDiamond,
+  fetchTidalDiamondForEdit,
+  editTidalDiamond,
   repositionTidalDiamond,
   deleteTidalDiamond,
 } from "../actions"
@@ -25,12 +27,13 @@ vi.mock("@/lib/api/client", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 
 const GET = apiGet as ReturnType<typeof vi.fn>
 const POST = apiPost as ReturnType<typeof vi.fn>
 const PATCH = apiPatch as ReturnType<typeof vi.fn>
 const DELETE = apiDelete as ReturnType<typeof vi.fn>
+const REDIRECT = vi.mocked(isRedirectError)
 
 const DAY_ID = "01900000-0000-7000-8000-000000000001"
 const POINT_ID = "01900000-0000-7000-8000-000000000002"
@@ -102,6 +105,19 @@ describe("fetchDaySea", () => {
     const result = await fetchDaySea(DAY_ID)
     expect(result).toEqual({ success: false, error: "Not found" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchDaySea(DAY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fetch sea data." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    GET.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(fetchDaySea(DAY_ID)).rejects.toBe(redirectError)
+  })
 })
 
 describe("updateDaySea", () => {
@@ -119,6 +135,19 @@ describe("updateDaySea", () => {
     PATCH.mockRejectedValue(new Error("Forbidden"))
     const result = await updateDaySea(DAY_ID, {})
     expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    PATCH.mockRejectedValue("oops")
+    const result = await updateDaySea(DAY_ID, {})
+    expect(result).toEqual({ success: false, error: "Failed to update sea data." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    PATCH.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(updateDaySea(DAY_ID, {})).rejects.toBe(redirectError)
   })
 })
 
@@ -138,6 +167,19 @@ describe("fetchDayWeather", () => {
     const result = await fetchDayWeather(DAY_ID)
     expect(result).toEqual({ success: false, error: "Not found" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchDayWeather(DAY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fetch weather data." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    GET.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(fetchDayWeather(DAY_ID)).rejects.toBe(redirectError)
+  })
 })
 
 describe("triggerWeatherFetch", () => {
@@ -152,6 +194,19 @@ describe("triggerWeatherFetch", () => {
     POST.mockRejectedValue(new Error("Day date is not set"))
     const result = await triggerWeatherFetch(DAY_ID)
     expect(result).toEqual({ success: false, error: "Day date is not set" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    POST.mockRejectedValue("oops")
+    const result = await triggerWeatherFetch(DAY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to trigger weather fetch." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    POST.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(triggerWeatherFetch(DAY_ID)).rejects.toBe(redirectError)
   })
 })
 
@@ -176,6 +231,12 @@ describe("fetchTidalGates", () => {
     GET.mockRejectedValue(new Error("Server error"))
     const result = await fetchTidalGates(DAY_ID)
     expect(result).toEqual({ success: false, error: "Server error" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchTidalGates(DAY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fetch tidal gates." })
   })
 })
 
@@ -213,6 +274,12 @@ describe("fetchWindVectors", () => {
     const result = await fetchWindVectors(DAY_ID, 12)
     expect(result).toEqual({ success: false, error: "No data" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchWindVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "Failed to fetch wind vectors." })
+  })
 })
 
 describe("fetchWaveVectors", () => {
@@ -227,6 +294,12 @@ describe("fetchWaveVectors", () => {
     GET.mockRejectedValue(new Error("No data"))
     const result = await fetchWaveVectors(DAY_ID, 12)
     expect(result).toEqual({ success: false, error: "No data" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchWaveVectors(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "Failed to fetch wave vectors." })
   })
 })
 
@@ -255,6 +328,12 @@ describe("fetchTidalDiamonds", () => {
     GET.mockRejectedValue(new Error("No data"))
     const result = await fetchTidalDiamonds(DAY_ID, 12)
     expect(result).toEqual({ success: false, error: "No data" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchTidalDiamonds(DAY_ID, 12)
+    expect(result).toEqual({ success: false, error: "Failed to fetch tidal diamonds." })
   })
 })
 
@@ -321,6 +400,103 @@ describe("createTidalDiamond", () => {
     const result = await createTidalDiamond(ITINERARY_ID, 50.3, -4.1, simpleForm)
     expect(result).toEqual({ success: false, error: "Forbidden" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    POST.mockRejectedValue("oops")
+    const result = await createTidalDiamond(ITINERARY_ID, 50.3, -4.1, simpleForm)
+    expect(result).toEqual({ success: false, error: "Failed to create tidal diamond." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    POST.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(createTidalDiamond(ITINERARY_ID, 50.3, -4.1, simpleForm)).rejects.toBe(
+      redirectError,
+    )
+  })
+})
+
+describe("fetchTidalDiamondForEdit", () => {
+  const editFixture = {
+    id: stationFixture.id,
+    name: "The Race",
+    entryMode: "simple" as const,
+    radiusM: 500,
+    isUserCreated: true,
+    maxSpringRateKnots: 3.0,
+    maxNeapRateKnots: 1.5,
+    floodDirectionDegrees: 45,
+    ebbDirectionDegrees: 225,
+    tidalStreamEntries: [],
+  }
+
+  it("gets /api/tidal-diamond/:id and returns the parsed edit view", async () => {
+    GET.mockResolvedValue(editFixture)
+    const result = await fetchTidalDiamondForEdit(stationFixture.id)
+    expect(GET).toHaveBeenCalledWith(`/api/tidal-diamond/${stationFixture.id}`)
+    expect(result).toEqual({ success: true, data: editFixture })
+  })
+
+  it("returns an error on failure", async () => {
+    GET.mockRejectedValue(new Error("Not Found"))
+    const result = await fetchTidalDiamondForEdit(stationFixture.id)
+    expect(result).toEqual({ success: false, error: "Not Found" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchTidalDiamondForEdit(stationFixture.id)
+    expect(result).toEqual({ success: false, error: "Failed to load tidal diamond." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    GET.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(fetchTidalDiamondForEdit(stationFixture.id)).rejects.toBe(redirectError)
+  })
+})
+
+describe("editTidalDiamond", () => {
+  it("patches /api/tidal-diamond/:id with the diamond body", async () => {
+    PATCH.mockResolvedValue(stationFixture)
+    await editTidalDiamond(stationFixture.id, simpleForm)
+    expect(PATCH).toHaveBeenCalledWith(`/api/tidal-diamond/${stationFixture.id}`, {
+      name: "The Race",
+      entryMode: "simple",
+      radiusM: 500,
+      maxSpringRateKnots: 3.0,
+      maxNeapRateKnots: 1.5,
+      floodDirectionDegrees: 45,
+      ebbDirectionDegrees: 225,
+    })
+  })
+
+  it("returns success with the parsed station on success", async () => {
+    PATCH.mockResolvedValue(stationFixture)
+    const result = await editTidalDiamond(stationFixture.id, simpleForm)
+    expect(result).toEqual({ success: true, data: expect.objectContaining({ name: "The Race" }) })
+  })
+
+  it("returns an error on failure", async () => {
+    PATCH.mockRejectedValue(new Error("Conflict"))
+    const result = await editTidalDiamond(stationFixture.id, simpleForm)
+    expect(result).toEqual({ success: false, error: "Conflict" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    PATCH.mockRejectedValue("oops")
+    const result = await editTidalDiamond(stationFixture.id, simpleForm)
+    expect(result).toEqual({ success: false, error: "Failed to update tidal diamond." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    PATCH.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(editTidalDiamond(stationFixture.id, simpleForm)).rejects.toBe(redirectError)
+  })
 })
 
 describe("repositionTidalDiamond", () => {
@@ -338,6 +514,12 @@ describe("repositionTidalDiamond", () => {
     const result = await repositionTidalDiamond(stationFixture.id, 51.0, -5.0)
     expect(result).toEqual({ success: false, error: "Nope" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    PATCH.mockRejectedValue("oops")
+    const result = await repositionTidalDiamond(stationFixture.id, 51.0, -5.0)
+    expect(result).toEqual({ success: false, error: "Failed to move tidal diamond." })
+  })
 })
 
 describe("deleteTidalDiamond", () => {
@@ -353,6 +535,19 @@ describe("deleteTidalDiamond", () => {
     const result = await deleteTidalDiamond(stationFixture.id)
     expect(result).toEqual({ success: false, error: "Boom" })
   })
+
+  it("returns a generic error for non-Error throws", async () => {
+    DELETE.mockRejectedValue("oops")
+    const result = await deleteTidalDiamond(stationFixture.id)
+    expect(result).toEqual({ success: false, error: "Failed to delete tidal diamond." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    DELETE.mockRejectedValue(redirectError)
+    REDIRECT.mockReturnValueOnce(true)
+    await expect(deleteTidalDiamond(stationFixture.id)).rejects.toBe(redirectError)
+  })
 })
 
 describe("fetchGlobalWindVectors", () => {
@@ -367,5 +562,11 @@ describe("fetchGlobalWindVectors", () => {
     GET.mockRejectedValue(new Error("No data"))
     const result = await fetchGlobalWindVectors("2026-07-15", 12)
     expect(result).toEqual({ success: false, error: "No data" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    GET.mockRejectedValue("oops")
+    const result = await fetchGlobalWindVectors("2026-07-15", 12)
+    expect(result).toEqual({ success: false, error: "Failed to fetch global wind vectors." })
   })
 })

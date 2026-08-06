@@ -71,6 +71,24 @@ describe("InviteBuddyPicker", () => {
     await waitFor(() => expect(inviteBuddy).toHaveBeenCalledWith(TRIP_ID, BOB.id))
   })
 
+  it("shows an error and keeps the buddy listed when invite fails", async () => {
+    vi.mocked(listConnections).mockResolvedValue(BUDDIES)
+    vi.mocked(inviteBuddy).mockResolvedValue({
+      success: false,
+      error: "You can't invite this paddler.",
+    })
+    render(<InviteBuddyPicker tripId={TRIP_ID} currentUserId={ME} excludeUserIds={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /invite a buddy/i }))
+    await userEvent.click(await screen.findByText(/Bob/))
+
+    await waitFor(() =>
+      expect(screen.getByText(/you can't invite this paddler/i)).toBeInTheDocument(),
+    )
+    // Not removed from the list — invite failed, so it stays available to retry.
+    expect(screen.getByText(/Bob/)).toBeInTheDocument()
+  })
+
   it("shows an empty message when no buddies are available", async () => {
     vi.mocked(listConnections).mockResolvedValue([])
     render(<InviteBuddyPicker tripId={TRIP_ID} currentUserId={ME} excludeUserIds={[]} />)

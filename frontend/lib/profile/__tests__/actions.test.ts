@@ -28,6 +28,10 @@ import {
   grantMedicalConsent,
   revokeMedicalConsent,
   setUnitPreference,
+  setProfileVisibility,
+  setPhone,
+  sendTestEmail,
+  generateKeypair,
   requestEmailChange,
 } from "../actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
@@ -139,6 +143,99 @@ describe("setUnitPreference", () => {
     vi.mocked(getSession).mockResolvedValue(null)
     await setUnitPreference(DISTANCE_UNIT.KM)
     expect(redirect).toHaveBeenCalledWith("/login")
+  })
+})
+
+describe("setProfileVisibility", () => {
+  it("patches profileIsPublic at /api/user/<id>", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setProfileVisibility(true)
+    expect(apiPatch).toHaveBeenCalledWith(`/api/user/${USER_ID}`, { profileIsPublic: true })
+  })
+
+  it("revalidates /profile on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setProfileVisibility(true)
+    expect(revalidatePath).toHaveBeenCalledWith("/profile")
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    expect(await setProfileVisibility(false)).toEqual({ success: true })
+  })
+
+  it("returns success: false when the API throws, without flipping the toggle's apparent state", async () => {
+    vi.mocked(apiPatch).mockRejectedValue(new Error("500"))
+    const result = await setProfileVisibility(true)
+    expect(result).toEqual({ success: false, error: expect.any(String) })
+    // A failed visibility change must not be reported as a revalidation — the caller's
+    // optimistic UI (public-profile-toggle.tsx) reverts on this shape, and a stray
+    // revalidatePath call here would mask that a change that should be private leaked
+    // no data, but did leave stale cached state.
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("redirects to /login when there is no session", async () => {
+    vi.mocked(getSession).mockResolvedValue(null)
+    await setProfileVisibility(true)
+    expect(redirect).toHaveBeenCalledWith("/login")
+    expect(apiPatch).not.toHaveBeenCalled()
+  })
+})
+
+describe("setPhone", () => {
+  it("patches phone at /api/user/<id>", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setPhone("+34600000000")
+    expect(apiPatch).toHaveBeenCalledWith(`/api/user/${USER_ID}`, { phone: "+34600000000" })
+  })
+
+  it("trims whitespace and sends null for an empty value, clearing the stored number", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setPhone("   ")
+    expect(apiPatch).toHaveBeenCalledWith(`/api/user/${USER_ID}`, { phone: null })
+  })
+
+  it("revalidates /settings (not /profile — phone isn't shown there) on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    await setPhone("+34600000000")
+    expect(revalidatePath).toHaveBeenCalledWith("/settings")
+    expect(revalidatePath).not.toHaveBeenCalledWith("/profile")
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    expect(await setPhone("+34600000000")).toEqual({ success: true })
+  })
+
+  it("returns a user-friendly error on 400 (invalid format)", async () => {
+    vi.mocked(apiPatch).mockRejectedValue(new Error("PATCH /api/user/x failed: 400"))
+    const result = await setPhone("123")
+    expect(result).toEqual({
+      success: false,
+      error: "Enter a valid phone number (7–15 digits).",
+    })
+  })
+
+  it("returns a user-friendly error on 409 (already in use by another account)", async () => {
+    vi.mocked(apiPatch).mockRejectedValue(new Error("PATCH /api/user/x failed: 409"))
+    const result = await setPhone("+34600000000")
+    expect(result).toEqual({ success: false, error: "That phone number is already in use." })
+  })
+
+  it("returns a generic error on other failures", async () => {
+    vi.mocked(apiPatch).mockRejectedValue(new Error("500"))
+    expect(await setPhone("+34600000000")).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+
+  it("redirects to /login when there is no session", async () => {
+    vi.mocked(getSession).mockResolvedValue(null)
+    await setPhone("+34600000000")
+    expect(redirect).toHaveBeenCalledWith("/login")
+    expect(apiPatch).not.toHaveBeenCalled()
   })
 })
 
@@ -273,6 +370,24 @@ describe("requestAccountDeletion", () => {
   })
 })
 
+describe("sendTestEmail", () => {
+  it("posts to /api/dev/test-email", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await sendTestEmail()
+    expect(apiPost).toHaveBeenCalledWith("/api/dev/test-email", {})
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    expect(await sendTestEmail()).toEqual({ success: true })
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
+    expect(await sendTestEmail()).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
 const ELEVATED_TOKEN = "eyJ.elevated.token"
 const PASSWORD = "MyPass1!"
 
@@ -384,6 +499,41 @@ describe("revokeMedicalConsent", () => {
       new Error("DELETE /api/user/me/medical-consent failed: 403"),
     )
     expect(await revokeMedicalConsent(ELEVATED_TOKEN)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+})
+
+describe("generateKeypair", () => {
+  it("posts to /api/user/me/generate-keypair with the password", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    await generateKeypair(PASSWORD)
+    expect(apiPost).toHaveBeenCalledWith("/api/user/me/generate-keypair", { password: PASSWORD })
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPost).mockResolvedValue(undefined)
+    expect(await generateKeypair(PASSWORD)).toEqual({ success: true })
+  })
+
+  it("returns a user-friendly error on 401 (wrong password), not the raw status text", async () => {
+    vi.mocked(apiPost).mockRejectedValue(
+      new Error("POST /api/user/me/generate-keypair failed: 401"),
+    )
+    expect(await generateKeypair("wrong")).toEqual({ success: false, error: "Password incorrect." })
+  })
+
+  it("treats 409 (keypair already exists) as success, not an error — generation is idempotent", async () => {
+    vi.mocked(apiPost).mockRejectedValue(
+      new Error("POST /api/user/me/generate-keypair failed: 409"),
+    )
+    expect(await generateKeypair(PASSWORD)).toEqual({ success: true })
+  })
+
+  it("returns a generic error on other failures", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
+    expect(await generateKeypair(PASSWORD)).toEqual({
       success: false,
       error: expect.any(String),
     })

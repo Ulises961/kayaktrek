@@ -76,22 +76,41 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   // Name is a quick edit — flush quietly (blur/Ctrl+Enter/close), no dedicated
   // button. Notes is where people spend real typing time, so it also gets an
   // explicit Save they can reach for without needing to know the flush triggers.
+  // Bug fix (M15 sweep): both flushes used to dispatch the optimistic update
+  // *before* awaiting updatePoint and never inspected its result — a failed
+  // save (non-ok response) still landed in local state and still flipped the
+  // status line to "Saved", identical in shape to the M14 orphan-leak bug
+  // (state mutated unconditionally regardless of the outcome). Now the
+  // dispatch only happens after a confirmed success, and a failure throws
+  // inside runXSave so the status line correctly reverts to idle instead of
+  // lying that the save succeeded.
   const flushName = useCallback(async () => {
     const trimmed = draftName.trim()
     if (trimmed === (point.name ?? "")) return
-    await runNameSave(async () => {
-      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { name: trimmed } })
-      await updatePoint(point.id!, { name: trimmed })
-    })
+    try {
+      await runNameSave(async () => {
+        const result = await updatePoint(point.id!, { name: trimmed })
+        if (!result.success) throw new Error(result.error)
+        dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { name: trimmed } })
+      })
+    } catch {
+      // Status already reverted to idle by runNameSave; nothing left to do —
+      // callers (blur/Ctrl+Enter/close) don't need to react further.
+    }
   }, [draftName, point.id, point.name, dispatch, runNameSave])
 
   const flushNotes = useCallback(async () => {
     const trimmed = draftNotes.trim()
     if (trimmed === (point.notes ?? "")) return
-    await runNotesSave(async () => {
-      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { notes: trimmed } })
-      await updatePoint(point.id!, { notes: trimmed })
-    })
+    try {
+      await runNotesSave(async () => {
+        const result = await updatePoint(point.id!, { notes: trimmed })
+        if (!result.success) throw new Error(result.error)
+        dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { notes: trimmed } })
+      })
+    } catch {
+      // Status already reverted to idle by runNotesSave.
+    }
   }, [draftNotes, point.id, point.notes, dispatch, runNotesSave])
 
   const handleKeyDownFlush = useCallback(
@@ -111,8 +130,12 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
 
   const handleTypeChange = useCallback(
     async (type: PointType) => {
+      // Same fix as flushName/flushNotes above: check the result before
+      // dispatching, matching the pattern already used by every image
+      // mutation below (visibility toggle, upload, delete).
+      const result = await updatePoint(point.id!, { type })
+      if (!result.success) return
       dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { type } })
-      await updatePoint(point.id!, { type })
     },
     [point.id, dispatch],
   )

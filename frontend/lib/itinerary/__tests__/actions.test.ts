@@ -1,26 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockApiPost, mockApiPatch, mockApiDelete, mockApiUpload, mockRevalidatePath } = vi.hoisted(
-  () => ({
-    mockApiPost: vi.fn(),
-    mockApiPatch: vi.fn(),
-    mockApiDelete: vi.fn(),
-    mockApiUpload: vi.fn(),
-    mockRevalidatePath: vi.fn(),
-  }),
-)
+const {
+  mockApiGet,
+  mockApiGetPublic,
+  mockApiPost,
+  mockApiPatch,
+  mockApiDelete,
+  mockApiUpload,
+  mockIsRedirectError,
+  mockRevalidatePath,
+} = vi.hoisted(() => ({
+  mockApiGet: vi.fn(),
+  mockApiGetPublic: vi.fn(),
+  mockApiPost: vi.fn(),
+  mockApiPatch: vi.fn(),
+  mockApiDelete: vi.fn(),
+  mockApiUpload: vi.fn(),
+  mockIsRedirectError: vi.fn().mockReturnValue(false),
+  mockRevalidatePath: vi.fn(),
+}))
 
 vi.mock("@/lib/api/client", () => ({
+  apiGet: mockApiGet,
+  apiGetPublic: mockApiGetPublic,
   apiPost: mockApiPost,
   apiPatch: mockApiPatch,
   apiDelete: mockApiDelete,
   apiUpload: mockApiUpload,
-  isRedirectError: () => false,
+  isRedirectError: mockIsRedirectError,
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
 import {
   createItinerary,
+  updateItinerary,
+  fetchItineraries,
   createTripFromItinerary,
   createPoint,
   updatePoint,
@@ -28,12 +42,19 @@ import {
   deleteItinerary,
   createDay,
   updateDay,
+  deleteDay,
   assignPointsToDay,
   applyBoundaries,
+  forkItinerary,
+  importGpx,
   generateStoryShare,
   setImagePublic,
   uploadPointImage,
   deletePointImage,
+  searchPublicItineraries,
+  fetchPublicItineraryDetail,
+  fetchPublicRouteData,
+  fetchStoryByToken,
 } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -103,6 +124,85 @@ describe("createItinerary", () => {
     const result = await createItinerary({ tripId: TRIP_ID })
     expect(result).toEqual({ success: false, error: "Failed to create itinerary." })
   })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiPost.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(createItinerary({ tripId: TRIP_ID })).rejects.toBe(redirectError)
+  })
+})
+
+describe("updateItinerary", () => {
+  const UPDATED = { id: ITINERARY_ID, name: "Renamed Route", isPublic: true }
+
+  it("patches /api/itinerary/:id with the given fields", async () => {
+    mockApiPatch.mockResolvedValue(UPDATED)
+    await updateItinerary(ITINERARY_ID, { name: "Renamed Route", isPublic: true })
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`, {
+      name: "Renamed Route",
+      isPublic: true,
+    })
+  })
+
+  it("returns success with the parsed itinerary on success", async () => {
+    mockApiPatch.mockResolvedValue(UPDATED)
+    const result = await updateItinerary(ITINERARY_ID, { name: "Renamed Route" })
+    expect(result).toEqual({ success: true, itinerary: UPDATED })
+  })
+
+  it("revalidates /itinerary on success", async () => {
+    mockApiPatch.mockResolvedValue(UPDATED)
+    await updateItinerary(ITINERARY_ID, { name: "Renamed Route" })
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+  })
+
+  it("returns error result when the API throws", async () => {
+    mockApiPatch.mockRejectedValue(new Error("Conflict"))
+    const result = await updateItinerary(ITINERARY_ID, { name: "x" })
+    expect(result).toEqual({ success: false, error: "Conflict" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPatch.mockRejectedValue("oops")
+    const result = await updateItinerary(ITINERARY_ID, { name: "x" })
+    expect(result).toEqual({ success: false, error: "Failed to update itinerary." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiPatch.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(updateItinerary(ITINERARY_ID, { name: "x" })).rejects.toBe(redirectError)
+  })
+})
+
+describe("fetchItineraries", () => {
+  it("gets /api/itinerary/all and returns the parsed list", async () => {
+    mockApiGet.mockResolvedValue([{ id: ITINERARY_ID, name: "Route A" }])
+    const result = await fetchItineraries()
+    expect(mockApiGet).toHaveBeenCalledWith("/api/itinerary/all")
+    expect(result).toEqual([expect.objectContaining({ id: ITINERARY_ID, name: "Route A" })])
+  })
+
+  it("returns an empty array when the API throws", async () => {
+    mockApiGet.mockRejectedValue(new Error("Server error"))
+    const result = await fetchItineraries()
+    expect(result).toEqual([])
+  })
+
+  it("returns an empty array for non-Error throws", async () => {
+    mockApiGet.mockRejectedValue("oops")
+    const result = await fetchItineraries()
+    expect(result).toEqual([])
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into an empty list", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiGet.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(fetchItineraries()).rejects.toBe(redirectError)
+  })
 })
 
 describe("createPoint", () => {
@@ -166,6 +266,13 @@ describe("updatePoint", () => {
     const result = await updatePoint(POINT_ID, { type: "position" })
     expect(result).toEqual({ success: false, error: "Failed to update point." })
   })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiPatch.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(updatePoint(POINT_ID, { type: "stop" })).rejects.toBe(redirectError)
+  })
 })
 
 describe("deletePoint", () => {
@@ -192,6 +299,13 @@ describe("deletePoint", () => {
     const result = await deletePoint(POINT_ID)
     expect(result).toEqual({ success: false, error: "Failed to delete point." })
   })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiDelete.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(deletePoint(POINT_ID)).rejects.toBe(redirectError)
+  })
 })
 
 describe("deleteItinerary", () => {
@@ -211,6 +325,12 @@ describe("deleteItinerary", () => {
     mockApiDelete.mockRejectedValue(new Error("Forbidden"))
     const result = await deleteItinerary(ITINERARY_ID)
     expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiDelete.mockRejectedValue("oops")
+    const result = await deleteItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to delete itinerary." })
   })
 })
 
@@ -266,6 +386,39 @@ describe("updateDay", () => {
     mockApiPatch.mockRejectedValue(null)
     const result = await updateDay(DAY_ID_2, { endPointId: END_PT })
     expect(result).toEqual({ success: false, error: "Failed to update day." })
+  })
+})
+
+describe("deleteDay", () => {
+  it("sends DELETE to /api/day/:id", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    await deleteDay(DAY_ID_2)
+    expect(mockApiDelete).toHaveBeenCalledWith(`/api/day/${DAY_ID_2}`)
+  })
+
+  it("returns success: true on success", async () => {
+    mockApiDelete.mockResolvedValue(undefined)
+    const result = await deleteDay(DAY_ID_2)
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns success: false with error message on failure", async () => {
+    mockApiDelete.mockRejectedValue(new Error("Forbidden"))
+    const result = await deleteDay(DAY_ID_2)
+    expect(result).toEqual({ success: false, error: "Forbidden" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiDelete.mockRejectedValue("oops")
+    const result = await deleteDay(DAY_ID_2)
+    expect(result).toEqual({ success: false, error: "Failed to delete day." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiDelete.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(deleteDay(DAY_ID_2)).rejects.toBe(redirectError)
   })
 })
 
@@ -333,6 +486,85 @@ describe("assignPointsToDay", () => {
     mockApiPost.mockRejectedValue(undefined)
     const result = await assignPointsToDay(DAY_ID_2, START_PT, END_PT)
     expect(result).toEqual({ success: false, error: "Failed to assign points." })
+  })
+})
+
+describe("forkItinerary", () => {
+  it("posts to /api/itinerary/:id/fork", async () => {
+    mockApiPost.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    await forkItinerary(ITINERARY_ID)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}/fork`, {})
+  })
+
+  it("returns success with the forked itineraryId", async () => {
+    mockApiPost.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    const result = await forkItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: true, itineraryId: ITINERARY_ID_2 })
+  })
+
+  it("revalidates /itinerary on success", async () => {
+    mockApiPost.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    await forkItinerary(ITINERARY_ID)
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+  })
+
+  it("returns error result when the API throws", async () => {
+    mockApiPost.mockRejectedValue(new Error("Not Found"))
+    const result = await forkItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Not Found" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await forkItinerary(ITINERARY_ID)
+    expect(result).toEqual({ success: false, error: "Failed to fork itinerary." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiPost.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(forkItinerary(ITINERARY_ID)).rejects.toBe(redirectError)
+  })
+})
+
+describe("importGpx", () => {
+  it("uploads the form data to /api/itinerary/import", async () => {
+    mockApiUpload.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    const formData = new FormData()
+    await importGpx(formData)
+    expect(mockApiUpload).toHaveBeenCalledWith("/api/itinerary/import", formData)
+  })
+
+  it("returns success with the created itineraryId", async () => {
+    mockApiUpload.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    const result = await importGpx(new FormData())
+    expect(result).toEqual({ success: true, itineraryId: ITINERARY_ID_2 })
+  })
+
+  it("revalidates /itinerary on success", async () => {
+    mockApiUpload.mockResolvedValue({ itineraryId: ITINERARY_ID_2 })
+    await importGpx(new FormData())
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/itinerary")
+  })
+
+  it("returns error result when the API throws", async () => {
+    mockApiUpload.mockRejectedValue(new Error("Malformed GPX"))
+    const result = await importGpx(new FormData())
+    expect(result).toEqual({ success: false, error: "Malformed GPX" })
+  })
+
+  it("returns a generic error for non-Error throws", async () => {
+    mockApiUpload.mockRejectedValue("oops")
+    const result = await importGpx(new FormData())
+    expect(result).toEqual({ success: false, error: "Failed to import GPX." })
+  })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiUpload.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(importGpx(new FormData())).rejects.toBe(redirectError)
   })
 })
 
@@ -475,6 +707,13 @@ describe("uploadPointImage", () => {
     const result = await uploadPointImage(POINT_ID, new FormData())
     expect(result).toEqual({ success: false, error: "Failed to upload photo." })
   })
+
+  it("rethrows a redirect signal instead of swallowing it into a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    mockApiUpload.mockRejectedValue(redirectError)
+    mockIsRedirectError.mockReturnValueOnce(true)
+    await expect(uploadPointImage(POINT_ID, new FormData())).rejects.toBe(redirectError)
+  })
 })
 
 describe("deletePointImage", () => {
@@ -495,5 +734,167 @@ describe("deletePointImage", () => {
     mockApiDelete.mockRejectedValue("oops")
     const result = await deletePointImage(POINT_ID, IMAGE_ID)
     expect(result).toEqual({ success: false, error: "Failed to delete photo." })
+  })
+})
+
+// The public-fetch group (searchPublicItineraries, fetchPublicItineraryDetail,
+// fetchPublicRouteData, fetchStoryByToken) is unauthenticated: it goes through
+// apiGetPublic, never apiGet, and its actions correctly do NOT check
+// isRedirectError — apiGetPublic has no token/401-retry/redirect path to begin
+// with (see lib/api/client.ts). Their failure branch is a bare catch that
+// degrades to empty/null data regardless of what was thrown.
+
+describe("searchPublicItineraries", () => {
+  const EXPLORE_RESPONSE = {
+    items: [{ id: ITINERARY_ID, name: "Coastal Route", dayCount: 3 }],
+    total: 1,
+    page: 1,
+    pages: 1,
+  }
+
+  it("gets /api/itinerary/explore with no query string when no filters given", async () => {
+    mockApiGetPublic.mockResolvedValue(EXPLORE_RESPONSE)
+    await searchPublicItineraries()
+    expect(mockApiGetPublic).toHaveBeenCalledWith("/api/itinerary/explore")
+  })
+
+  it("builds the query string from name, seasons, mile/day range, bbox, sort and paging", async () => {
+    mockApiGetPublic.mockResolvedValue(EXPLORE_RESPONSE)
+    await searchPublicItineraries({
+      name: " Fjord ",
+      seasons: ["summer", "autumn"],
+      minMiles: 5,
+      maxMiles: 50,
+      minDays: 2,
+      maxDays: 7,
+      bbox: { minLat: 1, minLng: 2, maxLat: 3, maxLng: 4 },
+      sort: "distance",
+      page: 2,
+      perPage: 10,
+    })
+    const [path] = mockApiGetPublic.mock.calls[0]
+    expect(path).toBe(
+      "/api/itinerary/explore?name=Fjord&season=summer&season=autumn&minMiles=5&maxMiles=50" +
+        "&minDays=2&maxDays=7&minLat=1&minLng=2&maxLat=3&maxLng=4&sort=distance&page=2&per_page=10",
+    )
+  })
+
+  it("returns the parsed explore page on success", async () => {
+    mockApiGetPublic.mockResolvedValue(EXPLORE_RESPONSE)
+    const result = await searchPublicItineraries()
+    expect(result).toEqual({
+      items: [expect.objectContaining({ id: ITINERARY_ID, name: "Coastal Route" })],
+      total: 1,
+      page: 1,
+      pages: 1,
+    })
+  })
+
+  it("returns an empty page when the API throws", async () => {
+    mockApiGetPublic.mockRejectedValue(new Error("Server error"))
+    const result = await searchPublicItineraries()
+    expect(result).toEqual({ items: [], total: 0, page: 1, pages: 1 })
+  })
+
+  it("returns an empty page for non-Error throws too", async () => {
+    mockApiGetPublic.mockRejectedValue("oops")
+    const result = await searchPublicItineraries()
+    expect(result).toEqual({ items: [], total: 0, page: 1, pages: 1 })
+  })
+})
+
+describe("fetchPublicItineraryDetail", () => {
+  const DETAIL_RESPONSE = { id: ITINERARY_ID, name: "Coastal Route", days: [] }
+
+  it("gets /api/itinerary/:id/public and returns the parsed detail", async () => {
+    mockApiGetPublic.mockResolvedValue(DETAIL_RESPONSE)
+    const result = await fetchPublicItineraryDetail(ITINERARY_ID)
+    expect(mockApiGetPublic).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}/public`)
+    expect(result).toEqual(expect.objectContaining({ id: ITINERARY_ID, name: "Coastal Route" }))
+  })
+
+  it("returns null when the API throws", async () => {
+    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+    const result = await fetchPublicItineraryDetail(ITINERARY_ID)
+    expect(result).toBeNull()
+  })
+
+  it("returns null for non-Error throws too", async () => {
+    mockApiGetPublic.mockRejectedValue("oops")
+    const result = await fetchPublicItineraryDetail(ITINERARY_ID)
+    expect(result).toBeNull()
+  })
+})
+
+describe("fetchPublicRouteData", () => {
+  const ROUTE_POINT_ID = "01952f1a-0000-7000-8000-00000000000a"
+  const DETAIL_WITH_ROUTE = {
+    id: ITINERARY_ID,
+    name: "Coastal Route",
+    days: [
+      {
+        dayNumber: 1,
+        date: "2026-06-01",
+        startPointId: ROUTE_POINT_ID,
+        endPointId: ROUTE_POINT_ID,
+        points: [
+          {
+            id: ROUTE_POINT_ID,
+            latitude: 51.1,
+            longitude: -4.2,
+            type: "stop",
+            name: "Put-in",
+            images: [],
+          },
+        ],
+      },
+    ],
+  }
+
+  it("returns the extracted route data when the detail fetch succeeds", async () => {
+    mockApiGetPublic.mockResolvedValue(DETAIL_WITH_ROUTE)
+    const result = await fetchPublicRouteData(ITINERARY_ID)
+    expect(result).toMatchObject({
+      id: ITINERARY_ID,
+      name: "Coastal Route",
+      positions: [[51.1, -4.2]],
+      dayCount: 1,
+    })
+  })
+
+  it("returns null without throwing when the detail fetch fails", async () => {
+    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+    const result = await fetchPublicRouteData(ITINERARY_ID)
+    expect(result).toBeNull()
+  })
+
+  it("returns null when the itinerary has no route data (not found)", async () => {
+    mockApiGetPublic.mockResolvedValue(null)
+    const result = await fetchPublicRouteData(ITINERARY_ID)
+    expect(result).toBeNull()
+  })
+})
+
+describe("fetchStoryByToken", () => {
+  const TOKEN = "story-tok-abc"
+  const STORY_RESPONSE = { id: ITINERARY_ID, name: "Our Trip", days: [] }
+
+  it("gets /api/itinerary/story/public/:token and returns the parsed detail", async () => {
+    mockApiGetPublic.mockResolvedValue(STORY_RESPONSE)
+    const result = await fetchStoryByToken(TOKEN)
+    expect(mockApiGetPublic).toHaveBeenCalledWith(`/api/itinerary/story/public/${TOKEN}`)
+    expect(result).toEqual(expect.objectContaining({ id: ITINERARY_ID, name: "Our Trip" }))
+  })
+
+  it("returns null when the token is invalid/expired", async () => {
+    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+    const result = await fetchStoryByToken(TOKEN)
+    expect(result).toBeNull()
+  })
+
+  it("returns null for non-Error throws too", async () => {
+    mockApiGetPublic.mockRejectedValue("oops")
+    const result = await fetchStoryByToken(TOKEN)
+    expect(result).toBeNull()
   })
 })

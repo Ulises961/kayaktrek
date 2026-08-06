@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
@@ -65,5 +65,35 @@ describe("SuccessorPicker", () => {
     render(<SuccessorPicker tripId={TRIP_ID} travellers={[LEADER, nominated, CREW_B]} />)
     await userEvent.click(screen.getByRole("button", { name: /clear nomination/i }))
     expect(clearNomination).toHaveBeenCalledWith(TRIP_ID)
+  })
+
+  it("shows an error and keeps the popover open when nominating fails", async () => {
+    vi.mocked(nominateSuccessor).mockResolvedValue({
+      success: false,
+      error: "Only the leader can nominate a successor.",
+    })
+    render(<SuccessorPicker tripId={TRIP_ID} travellers={[LEADER, CREW_A, CREW_B]} />)
+    await userEvent.click(screen.getByRole("button", { name: /nominate a successor/i }))
+    await userEvent.click(screen.getByText("Grace Hopper"))
+
+    await waitFor(() =>
+      expect(screen.getByText(/only the leader can nominate/i)).toBeInTheDocument(),
+    )
+    // Not closed on failure — the candidate list is still showing.
+    expect(screen.getByText("Mary Jackson")).toBeInTheDocument()
+  })
+
+  it("shows an error and keeps the nominee displayed when clearing fails", async () => {
+    vi.mocked(clearNomination).mockResolvedValue({
+      success: false,
+      error: "Failed to clear nomination.",
+    })
+    const nominated = { ...CREW_A, nominatedSuccessor: true }
+    render(<SuccessorPicker tripId={TRIP_ID} travellers={[LEADER, nominated, CREW_B]} />)
+    await userEvent.click(screen.getByRole("button", { name: /clear nomination/i }))
+
+    await waitFor(() => expect(screen.getByText("Failed to clear nomination.")).toBeInTheDocument())
+    // The nominee is still shown — clearing didn't silently drop it client-side.
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument()
   })
 })

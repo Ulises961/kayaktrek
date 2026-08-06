@@ -2,23 +2,27 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
+const mockPush = vi.fn()
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }))
 vi.mock("@/lib/itinerary/actions", () => ({
   searchPublicItineraries: vi.fn(),
   fetchPublicRouteData: vi.fn().mockResolvedValue(null),
   forkItinerary: vi.fn(),
 }))
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }))
 // Stub the Leaflet map — react-leaflet does not run in jsdom.
 vi.mock("@/components/explore/explore-discovery-map", () => ({
   default: () => <div data-testid="map" />,
 }))
 
-import { searchPublicItineraries } from "@/lib/itinerary/actions"
+import { searchPublicItineraries, forkItinerary } from "@/lib/itinerary/actions"
+import { toast } from "sonner"
 import { ExploreDiscovery } from "../explore-discovery"
 import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { ExploreItem, ExplorePage } from "@/lib/dtos/itinerary"
 
 const mockSearch = vi.mocked(searchPublicItineraries)
+const mockFork = vi.mocked(forkItinerary)
 
 function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
   return {
@@ -43,6 +47,53 @@ function page(items: ExploreItem[], overrides: Partial<ExplorePage> = {}): Explo
 beforeEach(() => {
   vi.clearAllMocks()
   mockSearch.mockResolvedValue(page([]))
+})
+
+describe("ExploreDiscovery — search failure", () => {
+  // searchPublicItineraries never rejects to its caller — it swallows fetch/parse
+  // errors internally and resolves to an empty page (lib/itinerary/actions.ts). The
+  // user-visible failure mode is therefore an empty-page response, not a thrown error.
+  it("shows the empty state, not stale results, when a re-query resolves empty", async () => {
+    mockSearch.mockResolvedValue(page([]))
+    render(<ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /filters/i }))
+    await userEvent.click(screen.getByRole("button", { name: "winter" }))
+
+    await waitFor(() =>
+      expect(screen.getByText("No public routes match these filters.")).toBeInTheDocument(),
+    )
+    expect(screen.queryByText("Aegean loop")).not.toBeInTheDocument()
+  })
+})
+
+describe("ExploreDiscovery — fork failure", () => {
+  it("shows an error toast and stays on the page when forking fails", async () => {
+    mockFork.mockResolvedValue({ success: false, error: "Could not fork this route." })
+    render(
+      <ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={["some-other-id"]} />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /use this route/i }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not fork this route."))
+    expect(mockPush).not.toHaveBeenCalled()
+    // Still on the explore page with the "Use this route" affordance intact.
+    expect(screen.getByRole("button", { name: /use this route/i })).toBeInTheDocument()
+  })
+
+  it("redirects to login instead of forking when the viewer is unauthenticated", async () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item()])}
+        isAuthenticated={false}
+        ownedIds={["some-other-id"]}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /use this route/i }))
+    expect(mockPush).toHaveBeenCalledWith("/login")
+    expect(mockFork).not.toHaveBeenCalled()
+  })
 })
 
 describe("ExploreDiscovery", () => {

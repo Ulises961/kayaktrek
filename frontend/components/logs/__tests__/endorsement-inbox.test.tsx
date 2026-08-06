@@ -83,4 +83,28 @@ describe("EndorsementInbox", () => {
       expect(deleteEndorsementRequest).toHaveBeenCalledWith("01952f1a-0000-7000-8000-0000000000d1"),
     )
   })
+
+  it("displays an error when endorsing fails", async () => {
+    vi.mocked(endorseLog).mockResolvedValue({
+      success: false,
+      error: "You can only endorse trips you shared",
+    })
+    render(<EndorsementInbox requests={[REQUEST]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /endorse/i }))
+    await waitFor(() =>
+      expect(screen.getByText("You can only endorse trips you shared")).toBeTruthy(),
+    )
+  })
+
+  it("displays an error when declining fails", async () => {
+    vi.mocked(deleteEndorsementRequest).mockResolvedValue({
+      success: false,
+      error: "Cannot decline at this time",
+    })
+    render(<EndorsementInbox requests={[REQUEST]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /decline/i }))
+    await waitFor(() => expect(screen.getByText("Cannot decline at this time")).toBeTruthy())
+  })
 })

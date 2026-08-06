@@ -18,6 +18,8 @@ import {
   forgotPassword,
   resetPassword,
   refreshSession,
+  cancelDeletion,
+  resendDeletionCancel,
 } from "../actions"
 
 const mockCookieStore = {
@@ -59,22 +61,106 @@ describe("login", () => {
     expect(mockCookieStore.set).toHaveBeenCalledWith("refresh_token", "ref", expect.any(Object))
     expect(redirect).toHaveBeenCalledWith("/dashboard")
   })
+
+  it("returns a distinct, actionable error when the account is scheduled for deletion (403)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ code: "deletion_pending" }),
+      }),
+    )
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+    expect(result).toEqual({
+      success: false,
+      error: "This account is scheduled for deletion.",
+      code: "deletion_pending",
+    })
+    // Must not fall into the generic 403 branch, and must not redirect/set cookies.
+    expect(redirect).not.toHaveBeenCalled()
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+
+  it("returns a generic access-denied error for a 403 that isn't deletion_pending", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({}) }),
+    )
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+    // Deliberately not "Invalid email or password" — a 403 is a different failure mode
+    // (e.g. disabled account) than wrong credentials, and the two must stay distinguishable.
+    expect(result).toEqual({ success: false, error: "Access denied." })
+  })
+
+  it("does not attach a code when the 403 body has none, so callers can't mistake it for deletion_pending", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({}) }),
+    )
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+    expect(result).not.toHaveProperty("code")
+  })
+
+  it("falls back to a generic body when the 403 response has no parseable JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => {
+          throw new Error("not json")
+        },
+      }),
+    )
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+    expect(result).toEqual({ success: false, error: "Access denied." })
+  })
+
+  it("returns a generic error for an unexpected server failure (500)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+    // Deliberately generic and distinct from the 401 "Invalid email or password" copy —
+    // a server outage must not read to the user as "your credentials are wrong".
+    expect(result).toEqual({ success: false, error: "Something went wrong. Please try again." })
+  })
 })
+
+const VALID_REGISTRATION = {
+  mail: "a@b.com",
+  username: "kayaker",
+  name: "N",
+  phone: "+34600000000",
+  password: "Expedition#24",
+}
 
 describe("register", () => {
   it("returns an error for duplicate email/username (409)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409 }))
-    const result = await register(
-      null,
-      formData({
-        mail: "a@b.com",
-        username: "kayaker",
-        name: "N",
-        phone: "+34600000000",
-        password: "Expedition#24",
-      }),
-    )
+    const result = await register(null, formData(VALID_REGISTRATION))
+    // Deliberately pooled ("email or username") rather than naming which one collided —
+    // naming the field would reopen the account-enumeration oracle M7a §4 closed.
     expect(result).toEqual({ success: false, error: expect.stringContaining("already in use") })
+  })
+
+  it("redirects to the registered-confirmation login page on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 201 }))
+    await register(null, formData(VALID_REGISTRATION))
+    expect(redirect).toHaveBeenCalledWith("/login?registered=1")
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await register(null, formData(VALID_REGISTRATION))
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("returns a generic error for an unexpected server failure (500)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    const result = await register(null, formData(VALID_REGISTRATION))
+    expect(result).toEqual({ success: false, error: "Something went wrong. Please try again." })
+    expect(redirect).not.toHaveBeenCalled()
   })
 })
 
@@ -186,6 +272,85 @@ describe("resetPassword", () => {
       null,
       formData({ token: "tok", password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD }),
     )
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+  })
+})
+
+describe("cancelDeletion", () => {
+  it("sends a DELETE with the token as a query param", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await cancelDeletion("the-token")
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain("token=the-token")
+    expect(init).toEqual(expect.objectContaining({ method: "DELETE" }))
+  })
+
+  it("returns success: true on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }))
+    const result = await cancelDeletion("the-token")
+    expect(result).toEqual({ success: true })
+  })
+
+  it("surfaces the backend's description on a non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ description: "This link has already been used." }),
+      }),
+    )
+    const result = await cancelDeletion("used-token")
+    expect(result).toEqual({ success: false, error: "This link has already been used." })
+  })
+
+  it("falls back to a generic message when the error body has no description", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => {
+          throw new Error("not json")
+        },
+      }),
+    )
+    const result = await cancelDeletion("bad-token")
+    expect(result).toEqual({
+      success: false,
+      error: "The cancellation link is invalid or has expired.",
+    })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await cancelDeletion("the-token")
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+  })
+})
+
+describe("resendDeletionCancel", () => {
+  it("posts the email to /auth/resend-deletion-cancel", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await resendDeletionCancel("a@b.com")
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toMatch(/\/auth\/resend-deletion-cancel$/)
+    expect(JSON.parse(init.body)).toEqual({ mail: "a@b.com" })
+  })
+
+  it("returns success: true even when the server responds non-ok (mirrors backend always-200 intent, avoids disclosing whether a pending deletion exists for that email)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }))
+    const result = await resendDeletionCancel("a@b.com")
+    expect(result).toEqual({ success: true })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    const result = await resendDeletionCancel("a@b.com")
     expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
   })
 })

@@ -54,6 +54,11 @@ describe("getShuttleVehicles", () => {
     expect(result[0].seatsAvailable).toBe(4)
     expect(result[0].passengers).toEqual([])
   })
+
+  it("throws on API failure", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("Forbidden"))
+    await expect(getShuttleVehicles(TRIP_ID)).rejects.toThrow("Forbidden")
+  })
 })
 
 describe("createShuttleVehicle", () => {

@@ -147,6 +147,23 @@ describe("ItineraryTab — no itinerary", () => {
     expect(mockPush).toHaveBeenCalledWith(`/itinerary/${ITIN_ID}`)
   })
 
+  // PRODUCTION BUG (fixed alongside this test): handleCreate previously
+  // dropped a failed result on the floor — no error shown, no navigation,
+  // no way for the user to know why nothing happened. It now surfaces
+  // result.error, matching every sibling create/edit form in this directory.
+  it("shows an error and does not navigate when createItinerary fails", async () => {
+    mockCreateItinerary.mockResolvedValue({
+      success: false,
+      error: "Failed to create itinerary.",
+    })
+    render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader />)
+    await userEvent.type(screen.getByRole("textbox"), "Galician Coast")
+    await userEvent.click(screen.getByRole("button", { name: /create itinerary/i }))
+
+    expect(await screen.findByText("Failed to create itinerary.")).toBeInTheDocument()
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
   it("shows no itinerary message for crew", () => {
     render(<ItineraryTab tripId={TRIP_ID} itinerary={null} isLeader={false} />)
     expect(screen.getByText(/no itinerary/i)).toBeDefined()

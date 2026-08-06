@@ -49,6 +49,7 @@ jobs:
 
       - name: Test
         run: pnpm run test:run
+        timeout-minutes: 10
 
       # Both NEXT_PUBLIC_* origins are required: lib/api/config.ts throws on an empty one in
       # a production build, which is the point — a missing repo Variable would otherwise ship

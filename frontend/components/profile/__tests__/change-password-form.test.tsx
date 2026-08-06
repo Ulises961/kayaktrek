@@ -65,6 +65,21 @@ describe("ChangePasswordForm", () => {
     await fillAndSubmit("WrongPass1!", "NewPass1!", "NewPass1!")
 
     await waitFor(() => expect(screen.getByText("Current password is incorrect.")).toBeDefined())
+    // A failed change must not redirect away or look like it succeeded.
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it("shows a root-level error for a non-field failure and does not navigate", async () => {
+    vi.mocked(changePassword).mockResolvedValue({
+      success: false,
+      error: "Too many attempts. Try again later.",
+    })
+    await fillAndSubmit("OldPass1!", "NewPass1!", "NewPass1!")
+
+    await waitFor(() =>
+      expect(screen.getByText("Too many attempts. Try again later.")).toBeDefined(),
+    )
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it("does not submit with an empty current password", async () => {

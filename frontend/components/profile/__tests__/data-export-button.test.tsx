@@ -44,5 +44,9 @@ describe("DataExportButton", () => {
     await waitFor(() =>
       expect(screen.getByText("You can only request a data export once per day.")).toBeDefined(),
     )
+    // A failed request must not look like it succeeded — the button stays for a
+    // retry, and the "sent" confirmation must not appear.
+    expect(screen.getByRole("button", { name: /download my data/i })).toBeEnabled()
+    expect(screen.queryByText(/download link has been sent/i)).not.toBeInTheDocument()
   })
 })

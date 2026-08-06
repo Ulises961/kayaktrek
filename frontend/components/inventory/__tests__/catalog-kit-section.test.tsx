@@ -86,6 +86,19 @@ describe("CatalogKitSection", () => {
     expect(mockResetCatalogToDefault).toHaveBeenCalled()
   })
 
+  it("displays an error when reset fails", async () => {
+    const user = userEvent.setup()
+    mockResetCatalogToDefault.mockResolvedValueOnce({
+      success: false,
+      error: "Failed to reset catalog",
+    })
+    render(<CatalogKitSection items={[]} categories={CATEGORIES} />)
+
+    await user.click(screen.getByRole("button", { name: /start from the default list/i }))
+
+    expect(screen.getByText("Failed to reset catalog")).toBeTruthy()
+  })
+
   it("adds a new template item from the form", async () => {
     const user = userEvent.setup()
     render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
@@ -96,6 +109,20 @@ describe("CatalogKitSection", () => {
     expect(mockCreateCatalogItem).toHaveBeenCalledWith(expect.objectContaining({ name: "Drogue" }))
   })
 
+  it("displays an error when adding a template item fails", async () => {
+    const user = userEvent.setup()
+    mockCreateCatalogItem.mockResolvedValueOnce({
+      success: false,
+      error: "Item name already exists",
+    })
+    render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
+
+    await user.type(screen.getByPlaceholderText(/add.*default trip kit|add.*item/i), "Drogue")
+    await user.click(screen.getByRole("button", { name: /^add$/i }))
+
+    expect(screen.getByText("Item name already exists")).toBeTruthy()
+  })
+
   it("removes a template item after confirming in the dialog", async () => {
     const user = userEvent.setup()
     render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
@@ -104,6 +131,20 @@ describe("CatalogKitSection", () => {
     await user.click(screen.getByRole("button", { name: /^remove$/i }))
 
     expect(mockDeleteCatalogItem).toHaveBeenCalledWith(CATALOG_ITEMS[0].id)
+  })
+
+  it("displays an error when removing a template item fails", async () => {
+    const user = userEvent.setup()
+    mockDeleteCatalogItem.mockResolvedValueOnce({
+      success: false,
+      error: "Cannot remove item in use",
+    })
+    render(<CatalogKitSection items={CATALOG_ITEMS} categories={CATEGORIES} />)
+
+    await user.click(screen.getByRole("button", { name: /remove spare paddle/i }))
+    await user.click(screen.getByRole("button", { name: /^remove$/i }))
+
+    expect(screen.getByText("Cannot remove item in use")).toBeTruthy()
   })
 
   it("does not remove a template item when the dialog is cancelled", async () => {

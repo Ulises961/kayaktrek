@@ -38,6 +38,33 @@ describe("getMe", () => {
     expect(apiGet).not.toHaveBeenCalled()
   })
 
+  it("returns the user when authenticated and the API succeeds", async () => {
+    withCookies(["access_token"])
+    const mockUser = {
+      id: "01952f1a-0000-7000-8000-00000000a001",
+      mail: "test@example.com",
+      username: "testuser",
+      name: "Test",
+      surname: "User",
+    }
+    apiGet.mockResolvedValue(mockUser)
+
+    const result = await getMe()
+    // Schema parsing may add defaults (e.g., unitPreference), so match the returned shape
+    expect(result).toMatchObject(mockUser)
+    expect(result).not.toBeNull()
+    expect(apiGet).toHaveBeenCalledWith("/api/user/me")
+  })
+
+  it("returns null when the API response fails validation", async () => {
+    withCookies(["access_token"])
+    // Mock an invalid response (missing required fields: mail, username, name)
+    apiGet.mockResolvedValue({ id: "01952f1a-0000-7000-8000-00000000a001" })
+
+    const result = await getMe()
+    expect(result).toBeNull()
+  })
+
   it("still lets a dead session redirect when credentials are present", async () => {
     withCookies(["refresh_token"])
     apiGet.mockImplementation(() => redirect("/login"))

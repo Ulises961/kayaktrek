@@ -58,4 +58,23 @@ describe("InvitationActions", () => {
 
     resolve!({ success: true })
   })
+
+  // No error UI exists on this component (it relies on the invitations list's
+  // own revalidation) — this guards the failure branch actually resolves the
+  // pending state rather than leaving the buttons stuck disabled.
+  it("re-enables both buttons after a failed response instead of hanging", async () => {
+    vi.mocked(handleInvitation).mockResolvedValue({
+      success: false,
+      error: "Failed to respond to invitation.",
+    })
+    render(<InvitationActions tripId={TRIP_ID} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /accept/i }))
+
+    await waitFor(() => {
+      expect(handleInvitation).toHaveBeenCalledWith(TRIP_ID, true)
+      expect(screen.getByRole("button", { name: /accept/i })).not.toBeDisabled()
+      expect(screen.getByRole("button", { name: /decline/i })).not.toBeDisabled()
+    })
+  })
 })

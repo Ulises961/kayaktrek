@@ -190,3 +190,85 @@ describe("AttachmentActions — drag and drop", () => {
     expect(zone).toBeDefined()
   })
 })
+
+describe("AttachmentActions — upload failure", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("shows error when uploadTravelDocumentAttachment fails", async () => {
+    vi.mocked(uploadTravelDocumentAttachment).mockResolvedValue({
+      success: false,
+      error: "File is too large.",
+    })
+
+    render(
+      <AttachmentActions
+        tripId={TRIP_ID}
+        documentId={DOC_ID}
+        attachmentPath={null}
+        canEdit={true}
+      />,
+    )
+
+    const file = new File(["content"], "big-file.pdf", { type: "application/pdf" })
+    const input = document.querySelector("input[type=file]") as HTMLInputElement
+    await userEvent.upload(input, file)
+
+    await waitFor(() => expect(screen.getByText("File is too large.")).toBeDefined())
+  })
+})
+
+describe("AttachmentActions — delete failure", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("shows error when deleteTravelDocumentAttachment fails", async () => {
+    vi.mocked(deleteTravelDocumentAttachment).mockResolvedValue({
+      success: false,
+      error: "Permission denied.",
+    })
+
+    render(
+      <AttachmentActions
+        tripId={TRIP_ID}
+        documentId={DOC_ID}
+        attachmentPath="trips/abc/doc/voucher.pdf"
+        canEdit={true}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /remove/i }))
+    // AlertDialog confirmation
+    const confirmBtn = await screen.findByRole("button", { name: /remove/i })
+    await userEvent.click(confirmBtn)
+
+    await waitFor(() => expect(screen.getByText("Permission denied.")).toBeDefined())
+  })
+})
+
+describe("AttachmentActions — download failure", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("does not open window when getTravelDocumentAttachmentUrl fails", async () => {
+    vi.mocked(getTravelDocumentAttachmentUrl).mockResolvedValue({
+      success: false,
+      error: "File not found.",
+    })
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+
+    render(
+      <AttachmentActions
+        tripId={TRIP_ID}
+        documentId={DOC_ID}
+        attachmentPath="trips/abc/doc/voucher.pdf"
+        canEdit={false}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /download/i }))
+
+    await waitFor(() => {
+      expect(getTravelDocumentAttachmentUrl).toHaveBeenCalledWith(DOC_ID)
+      expect(openSpy).not.toHaveBeenCalled()
+    })
+    openSpy.mockRestore()
+  })
+})

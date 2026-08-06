@@ -15,6 +15,7 @@ vi.mock("@/lib/weather/actions", () => ({
 }))
 
 import { DayRail } from "../day-rail"
+import { fetchDayWeather } from "@/lib/weather/actions"
 
 const DAY1_ID = "day-1"
 const DAY2_ID = "day-2"
@@ -156,6 +157,30 @@ describe("DayRail — entries", () => {
     const swatches = screen.getAllByTestId("day-color-swatch")
     expect(swatches[0]).toHaveStyle({ backgroundColor: getDayColor(1) })
     expect(swatches[1]).toHaveStyle({ backgroundColor: getDayColor(2) })
+  })
+
+  it("shows 'No forecast' (not 'No points') for a populated day when the weather fetch fails", async () => {
+    renderWithCtx(makeCtx())
+    const entries = screen.getAllByTestId("day-rail-entry")
+    expect(await within(entries[0]).findByText("No forecast")).toBeInTheDocument()
+    expect(within(entries[0]).queryByText("No points")).not.toBeInTheDocument()
+  })
+
+  it("renders a Beaufort wind pill once the weather fetch succeeds with wind data", async () => {
+    vi.mocked(fetchDayWeather).mockResolvedValueOnce({
+      success: true,
+      data: {
+        dayId: DAY1_ID,
+        model: "gfs",
+        weatherStates: [
+          { dayId: DAY1_ID, time: "2026-07-01T12:00", windForce: 15, windDirection: 180 },
+        ],
+      },
+    })
+    renderWithCtx(makeCtx())
+    const entries = screen.getAllByTestId("day-rail-entry")
+    expect(await within(entries[0]).findByText("S 15 kn")).toBeInTheDocument()
+    expect(within(entries[0]).queryByText(/no forecast/i)).not.toBeInTheDocument()
   })
 
   it("shows empty state message when there are no numbered days", () => {

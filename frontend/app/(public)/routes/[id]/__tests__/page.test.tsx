@@ -16,7 +16,13 @@ vi.mock("@/components/map/map-loader", () => ({ default: () => <div data-testid=
 vi.mock("@/components/explore/route-detail-actions", () => ({
   RouteDetailActions: () => <div data-testid="actions" />,
 }))
+vi.mock("next/navigation", () => ({
+  notFound: vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND")
+  }),
+}))
 
+import { notFound } from "next/navigation"
 import PublicRoutePage from "../page"
 
 const DETAIL = {
@@ -62,5 +68,18 @@ describe("PublicRoutePage", () => {
 
     const link = screen.getByRole("link", { name: "All routes" })
     expect(link).toHaveAttribute("href", "/explore")
+  })
+
+  it("404s when the route does not exist or is not public", async () => {
+    fetchPublicItineraryDetail.mockResolvedValue(null)
+    fetchItineraries.mockResolvedValue([])
+    getSession.mockResolvedValue(null)
+
+    await expect(
+      PublicRoutePage({
+        params: Promise.resolve({ id: "01952f1a-0000-7000-8000-000000000r01" }),
+      }),
+    ).rejects.toThrow("NEXT_NOT_FOUND")
+    expect(notFound).toHaveBeenCalled()
   })
 })

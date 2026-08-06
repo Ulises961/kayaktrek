@@ -3,6 +3,7 @@
 import { useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { forkItinerary } from "@/lib/itinerary/actions"
 
@@ -32,7 +33,11 @@ export function RouteDetailActions({ itineraryId, isAuthenticated, isOwner }: Pr
     }
     startTransition(async () => {
       const result = await forkItinerary(itineraryId)
-      if (result.success) router.push(`/itinerary/${result.itineraryId}`)
+      if (result.success) {
+        router.push(`/itinerary/${result.itineraryId}`)
+        return
+      }
+      toast.error(result.error)
     })
   }
 

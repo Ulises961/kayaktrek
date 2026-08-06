@@ -94,4 +94,30 @@ describe("LiveStoryMap", () => {
       expect.stringContaining("/api/v1/live/story/tok123/stream"),
     )
   })
+
+  it("hides the pill once the stream drops to an error status, even with stale positions still cached", () => {
+    // The hook's own EventSource retry logic (hooks/use-live-positions.ts) keeps
+    // the last-known positions around across a dropped connection so a brief
+    // blip doesn't blank the map — but "LIVE" must not keep claiming a live feed
+    // once the stream itself has errored.
+    useLivePositions.mockReturnValue({ positions: [position()], status: "live" })
+    const { rerender } = render(<LiveStoryMap token="tok123" routes={[route()]} />)
+    expect(screen.getByText(/LIVE/)).toBeInTheDocument()
+
+    useLivePositions.mockReturnValue({ positions: [position()], status: "error" })
+    rerender(<LiveStoryMap token="tok123" routes={[route()]} />)
+
+    expect(screen.queryByText(/LIVE/)).not.toBeInTheDocument()
+    // The route/map itself must keep rendering regardless — a dropped live feed
+    // on a public share page degrades the pill, not the whole page.
+    expect(screen.getByTestId("map-loader")).toBeInTheDocument()
+  })
+
+  it("hides the pill when the stream has ended, not just before it starts", () => {
+    useLivePositions.mockReturnValue({ positions: [position()], status: "ended" })
+
+    render(<LiveStoryMap token="tok123" routes={[route()]} />)
+
+    expect(screen.queryByText(/LIVE/)).not.toBeInTheDocument()
+  })
 })

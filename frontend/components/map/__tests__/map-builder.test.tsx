@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const {
@@ -60,12 +60,23 @@ vi.mock("@/lib/live/actions", () => ({
 vi.mock("next/dynamic", () => ({
   default: (_importFn: unknown, _opts?: unknown) =>
     function MockMapCore(props: {
+      points?: { id?: string; latitude?: number | null; longitude?: number | null }[]
       onMarkerClick?: (pointId: string) => void
+      onMapClick?: (lat: number, lng: number) => void
+      onMarkerDragEnd?: (pointId: string, lat: number, lng: number) => void
       livePositions?: unknown[]
     }) {
       return (
         <div data-testid="map-core" data-live-position-count={props.livePositions?.length ?? 0}>
+          {/* Exposes the points MapBuilder is actually rendering so tests can assert on
+              optimistic-update outcomes (confirm/rollback/revert), not just that a handler
+              prop exists. */}
+          <div data-testid="map-core-points">{JSON.stringify(props.points ?? [])}</div>
           <button onClick={() => props.onMarkerClick?.("p1")}>simulate-marker-click</button>
+          <button onClick={() => props.onMapClick?.(44.5, 14.5)}>simulate-map-click</button>
+          <button onClick={() => props.onMarkerDragEnd?.("p1", 45, 15)}>
+            simulate-marker-drag-end
+          </button>
         </div>
       )
     },
@@ -115,6 +126,7 @@ vi.mock("@/lib/profile/actions", () => ({
 import { MapBuilder } from "../map-builder"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { setUnitPreference } from "@/lib/profile/actions"
+import { createPoint, updatePoint } from "@/lib/itinerary/actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000030"
@@ -277,6 +289,95 @@ describe("MapBuilder", () => {
     await userEvent.click(screen.getByRole("button", { name: "Edit" }))
     await userEvent.click(screen.getByText("simulate-marker-click"))
     expect(screen.queryByTestId("selected-info")).not.toBeInTheDocument()
+  })
+})
+
+describe("MapBuilder — dropping a point on the map", () => {
+  const withDay0: Itinerary = {
+    ...ITINERARY,
+    days: [{ dayNumber: 0, id: "day-0", points: [] }],
+  }
+
+  it("confirms the optimistically-added point with the server id on success", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"id":"confirmed-1"/),
+    )
+    expect(screen.getByTestId("map-core-points")).not.toHaveTextContent(/tmp-/)
+  })
+
+  it("rolls back the optimistically-added point when createPoint fails, leaving no orphan on the map", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to create point.",
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() => expect(createPoint).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByTestId("map-core-points")).toHaveTextContent("[]"))
+  })
+})
+
+describe("MapBuilder — dragging a point marker", () => {
+  const withPoint: Itinerary = {
+    ...ITINERARY,
+    days: [
+      {
+        dayNumber: 1,
+        id: "day-1",
+        points: [{ id: "p1", type: "stop", latitude: 44, longitude: 14, dayId: "day-1" }],
+      },
+    ],
+  }
+
+  it("persists the dragged position via updatePoint", async () => {
+    vi.mocked(updatePoint).mockResolvedValueOnce({
+      success: true,
+      point: { id: "p1", type: "stop", latitude: 45, longitude: 15, dayId: "day-1" },
+    })
+    render(<MapBuilder itinerary={withPoint} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-marker-drag-end"))
+
+    await waitFor(() =>
+      expect(updatePoint).toHaveBeenCalledWith("p1", { latitude: 45, longitude: 15 }),
+    )
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"latitude":45/)
+  })
+
+  it("reverts the marker to its original position when the drag-end save fails", async () => {
+    vi.mocked(updatePoint).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to update point.",
+    })
+    render(<MapBuilder itinerary={withPoint} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-marker-drag-end"))
+
+    // The drag was attempted (and failed) at the dragged-to coordinates...
+    await waitFor(() =>
+      expect(updatePoint).toHaveBeenCalledWith("p1", { latitude: 45, longitude: 15 }),
+    )
+    // ...but the marker ends up back where it started, not stuck at an unsaved position.
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"latitude":44/),
+    )
+    expect(screen.getByTestId("map-core-points")).not.toHaveTextContent(/"latitude":45/)
   })
 })
 

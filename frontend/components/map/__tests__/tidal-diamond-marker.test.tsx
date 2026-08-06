@@ -126,4 +126,11 @@ describe("TidalDiamondMarker", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete diamond/i }))
     expect(onDelete).toHaveBeenCalled()
   })
+
+  it("renders an edit control that calls onEdit when editable", async () => {
+    const onEdit = vi.fn()
+    render(<TidalDiamondMarker diamond={DIAMOND} editable onEdit={onEdit} />)
+    await userEvent.click(screen.getByRole("button", { name: /^edit$/i }))
+    expect(onEdit).toHaveBeenCalled()
+  })
 })

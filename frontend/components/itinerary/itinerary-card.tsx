@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
 import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
 import { StoryShareButton } from "@/components/itinerary/story-share-button"
@@ -47,7 +48,11 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
   function handleTogglePublic(e: React.MouseEvent) {
     e.preventDefault()
     startTransition(async () => {
-      await updateItinerary(itinerary.id ?? "", { isPublic: !itinerary.isPublic })
+      const result = await updateItinerary(itinerary.id ?? "", { isPublic: !itinerary.isPublic })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       router.refresh()
     })
   }
@@ -60,7 +65,11 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
 
   function handleDelete() {
     startDeleteTransition(async () => {
-      await deleteItinerary(itinerary.id ?? "")
+      const result = await deleteItinerary(itinerary.id ?? "")
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       router.refresh()
     })
   }
@@ -73,7 +82,9 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
       if (result.success) {
         setShowCreateDialog(false)
         router.push(`/trips/${result.tripId}`)
+        return
       }
+      toast.error(result.error)
     })
   }
 

@@ -22,7 +22,11 @@ vi.mock("react-leaflet", () => ({
 const { RouteDayLayers } = vi.hoisted(() => ({ RouteDayLayers: vi.fn(() => null) }))
 vi.mock("@/components/map/route-day-layers", () => ({ RouteDayLayers }))
 
+const { LivePositionLayer } = vi.hoisted(() => ({ LivePositionLayer: vi.fn(() => null) }))
+vi.mock("@/components/map/live-position-layer", () => ({ LivePositionLayer }))
+
 import PublicMap from "../public-map"
+import type { LivePosition } from "@/lib/dtos/live-position"
 
 function daySegment(overrides: Partial<RouteDaySegment> = {}): RouteDaySegment {
   return {
@@ -58,11 +62,38 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const LIVE_POSITION: LivePosition = {
+  userId: "u1",
+  name: "Alex",
+  lat: 41.95,
+  lon: 12.45,
+  accuracyM: 5,
+  headingDeg: 90,
+  speedMs: 1.2,
+  recordedAt: "2026-08-01T10:00:00Z",
+}
+
 describe("PublicMap", () => {
   it("renders the day-coloured route layers with the given routes", () => {
     render(<PublicMap routes={[route()]} />)
     expect(RouteDayLayers).toHaveBeenCalledWith(
       expect.objectContaining({ routes: [route()] }),
+      undefined,
+    )
+  })
+
+  it("passes live positions through to the live position layer", () => {
+    render(<PublicMap routes={[route()]} livePositions={[LIVE_POSITION]} />)
+    expect(LivePositionLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ positions: [LIVE_POSITION] }),
+      undefined,
+    )
+  })
+
+  it("passes an empty live positions array through by default", () => {
+    render(<PublicMap routes={[route()]} />)
+    expect(LivePositionLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ positions: [] }),
       undefined,
     )
   })

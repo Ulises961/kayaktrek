@@ -160,14 +160,20 @@ export function ItineraryTab({
   const [isPending, startTransition] = useTransition()
   const [showAll, setShowAll] = useState(false)
   const [name, setName] = useState(tripName ?? "")
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return
+    setError(null)
     startTransition(async () => {
       const result = await createItinerary({ tripId, name: trimmed })
-      if (result.success) router.push(`/itinerary/${result.itineraryId}`)
+      if (result.success) {
+        router.push(`/itinerary/${result.itineraryId}`)
+      } else {
+        setError(result.error)
+      }
     })
   }
 
@@ -197,6 +203,7 @@ export function ItineraryTab({
             Create itinerary
           </Button>
         </div>
+        {error && <p className="text-destructive text-xs">{error}</p>}
       </div>
     )
   }

@@ -107,4 +107,18 @@ describe("GearCloset", () => {
 
     expect(mockCreateItem).toHaveBeenCalledWith(expect.objectContaining({ name: "Spare paddle" }))
   })
+
+  it("displays an error when adding gear fails", async () => {
+    const user = userEvent.setup()
+    mockCreateItem.mockResolvedValueOnce({
+      success: false,
+      error: "You already own this item",
+    })
+    render(<GearCloset items={ITEMS} categories={CATEGORIES} />)
+
+    await user.type(screen.getByPlaceholderText(/add gear/i), "Bilge pump")
+    await user.click(screen.getByRole("button", { name: /^add$/i }))
+
+    expect(screen.getByText("You already own this item")).toBeTruthy()
+  })
 })

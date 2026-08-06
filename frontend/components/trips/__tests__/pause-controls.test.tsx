@@ -122,6 +122,9 @@ describe("PauseControls — paused", () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith("Resume date must be on or after the pause date.")
     })
+    // Only closed on success (setResumeOpen(false) is in the success branch) —
+    // the dialog's own content should still be showing, not silently dismissed.
+    expect(screen.getByLabelText(/resume date/i)).toBeInTheDocument()
   })
 
   it("calls abortTrip when abort is confirmed", async () => {

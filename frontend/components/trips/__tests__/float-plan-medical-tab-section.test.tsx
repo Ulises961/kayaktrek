@@ -107,6 +107,23 @@ describe("FloatPlanMedicalTabSection — authenticating state", () => {
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
   })
+
+  it("shows error and stays on the password step when the trip-notes fetch fails", async () => {
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
+    vi.mocked(getTripMedicalNotes).mockResolvedValue({
+      success: false,
+      error: "Session expired.",
+    })
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
+    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
+
+    await waitFor(() => expect(screen.getByText("Session expired.")).toBeDefined())
+    // Never reached the editing phase — no textarea, password field still present.
+    expect(screen.queryByRole("textbox")).toBeNull()
+    expect(screen.getByLabelText(/password/i, { selector: "input" })).toBeInTheDocument()
+  })
 })
 
 describe("FloatPlanMedicalTabSection — editing state, note loading", () => {
@@ -162,6 +179,22 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
     await waitFor(() => expect(screen.getByText(/saved/i)).toBeDefined())
   })
 
+  it("shows error and stays in editing without confirming when Save fails", async () => {
+    vi.mocked(setTripMedicalNotes).mockResolvedValue({
+      success: false,
+      error: "Encryption key unavailable.",
+    })
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={false} sharedAt={null} />)
+    await openToEdit()
+    await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
+
+    await waitFor(() => expect(screen.getByText("Encryption key unavailable.")).toBeDefined())
+    expect(screen.queryByText(/^saved\.$/i)).toBeNull()
+    // Still in the editing phase with the typed notes intact, not reverted to idle.
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument()
+  })
+
   it("shows Delete button when notes are already stored", async () => {
     render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
     await openToEdit({ hasStoredTripNotes: true })
@@ -183,6 +216,22 @@ describe("FloatPlanMedicalTabSection — editing state, save / delete / share", 
       expect(revokeTripMedicalNotes).toHaveBeenCalledWith(TRIP_ID, ELEVATED_TOKEN),
     )
     expect(screen.getByRole("button", { name: /add notes/i })).toBeDefined()
+  })
+
+  it("shows error and does not return to idle when Delete fails", async () => {
+    vi.mocked(revokeTripMedicalNotes).mockResolvedValue({
+      success: false,
+      error: "Failed to revoke notes.",
+    })
+    render(<FloatPlanMedicalTabSection tripId={TRIP_ID} hasStoredNotes={true} sharedAt={null} />)
+    await openToEdit({ hasStoredTripNotes: true })
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }))
+
+    await waitFor(() => expect(screen.getByText("Failed to revoke notes.")).toBeDefined())
+    // Not reverted to idle — the notes, Save, and Delete controls are still shown.
+    expect(screen.queryByRole("button", { name: /add notes/i })).toBeNull()
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument()
   })
 
   it("shows a Share with trip leader button", async () => {

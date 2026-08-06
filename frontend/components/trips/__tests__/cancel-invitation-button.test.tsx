@@ -45,4 +45,23 @@ describe("CancelInvitationButton", () => {
 
     resolve!({ success: true })
   })
+
+  // The component has no error UI of its own (relies on the crew list's own
+  // revalidation-driven refresh) — this guards against the failure branch
+  // leaving the button stuck disabled, the M14 orphan-leak failure shape
+  // (a pending/cleanup step silently never completing).
+  it("re-enables the button after a failed cancellation instead of hanging", async () => {
+    vi.mocked(cancelInvitation).mockResolvedValue({
+      success: false,
+      error: "Failed to cancel invitation.",
+    })
+    render(<CancelInvitationButton tripId={TRIP_ID} inviteeId={INVITEE_ID} />)
+
+    await userEvent.click(screen.getByRole("button"))
+
+    await waitFor(() => {
+      expect(cancelInvitation).toHaveBeenCalledWith(TRIP_ID, INVITEE_ID)
+      expect(screen.getByRole("button")).not.toBeDisabled()
+    })
+  })
 })

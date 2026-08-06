@@ -89,16 +89,34 @@ export function useLivePositions(url: string | null, options: Options = {}) {
         if (!mintUrl) return // let the browser's built-in retry handle it
 
         source?.close()
-        const delay = backoffMs
-        backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS)
-        retryTimeout = setTimeout(async () => {
-          if (cancelled) return
-          const freshUrl = await mintUrl()
-          if (cancelled || !freshUrl) return
-          setStatus("connecting")
-          connect(freshUrl)
-        }, delay)
+        scheduleReconnect(mintUrl)
       }
+    }
+
+    // Re-mint-and-reconnect with exponential backoff. Also the retry path for a
+    // mint that itself fails (rejects, or resolves null) — without this, one bad
+    // ticket refresh (a transient network blip, an expired session) left the
+    // stream permanently stuck on "error" with nothing left scheduled to recover
+    // it, unlike the no-mintUrl path where the browser keeps retrying on its own.
+    function scheduleReconnect(mintUrl: () => Promise<string | null>) {
+      const delay = backoffMs
+      backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS)
+      retryTimeout = setTimeout(async () => {
+        if (cancelled) return
+        let freshUrl: string | null = null
+        try {
+          freshUrl = await mintUrl()
+        } catch {
+          freshUrl = null
+        }
+        if (cancelled) return
+        if (!freshUrl) {
+          scheduleReconnect(mintUrl)
+          return
+        }
+        setStatus("connecting")
+        connect(freshUrl)
+      }, delay)
     }
 
     connect(url)

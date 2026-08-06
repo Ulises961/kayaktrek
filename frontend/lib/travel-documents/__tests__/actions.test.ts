@@ -55,6 +55,11 @@ describe("getTravelDocuments", () => {
     expect(result).toHaveLength(1)
     expect(result[0].name).toBe("Hotel Cap de Creus")
   })
+
+  it("throws on API failure", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("Unauthorized"))
+    await expect(getTravelDocuments(TRIP_ID)).rejects.toThrow("Unauthorized")
+  })
 })
 
 describe("createTravelDocument", () => {
@@ -153,10 +158,11 @@ describe("uploadTravelDocumentAttachment", () => {
 })
 
 describe("deleteTravelDocumentAttachment", () => {
-  it("sends DELETE to the attachment path", async () => {
+  it("sends DELETE to the attachment path and revalidates the logistics segment", async () => {
     vi.mocked(apiDelete).mockResolvedValue(undefined)
     await deleteTravelDocumentAttachment(TRIP_ID, DOC_ID)
     expect(apiDelete).toHaveBeenCalledWith(`/api/travel-document/${DOC_ID}/attachment`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
   })
 
   it("returns success: false when the API throws", async () => {

@@ -39,6 +39,19 @@ function trip(overrides: Record<string, unknown> = {}) {
   }
 }
 
+describe("TripDetailLayout", () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it("404s when the trip does not exist", async () => {
+    getTripCore.mockResolvedValue(null)
+    getSession.mockResolvedValue(null)
+
+    await expect(
+      TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND")
+  })
+})
+
 describe("TripDetailLayout — liveHref", () => {
   afterEach(() => vi.clearAllMocks())
 

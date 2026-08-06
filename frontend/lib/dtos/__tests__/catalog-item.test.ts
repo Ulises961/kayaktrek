@@ -41,4 +41,10 @@ describe("CatalogItemSchema", () => {
     const result = CatalogItemsSchema.safeParse([CATALOG_ITEM_FIXTURE])
     expect(result.success).toBe(true)
   })
+
+  it("rejects missing name", () => {
+    const { name: _name, ...withoutName } = CATALOG_ITEM_FIXTURE
+    void _name
+    expect(CatalogItemSchema.safeParse(withoutName).success).toBe(false)
+  })
 })

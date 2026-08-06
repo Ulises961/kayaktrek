@@ -1,16 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import type { ReactNode } from "react"
 import type { Point } from "@/lib/dtos/point"
+
+// Capture the last Marker props so tests can assert draggability/handlers and
+// fire the drag/dragend events the real Leaflet marker would emit.
+type CapturedMarkerProps = {
+  draggable?: boolean
+  eventHandlers?: {
+    drag?: (e: unknown) => void
+    dragend?: (e: unknown) => void
+    click?: () => void
+    mouseover?: () => void
+  }
+}
+let lastMarkerProps: CapturedMarkerProps = {}
 
 vi.mock("leaflet", () => ({ default: {} }))
 vi.mock("react-leaflet", () => ({
-  Marker: vi.fn(({ children }) => children ?? null),
+  Marker: vi.fn((props: CapturedMarkerProps & { children?: ReactNode }) => {
+    lastMarkerProps = props
+    return props.children ?? null
+  }),
   Tooltip: vi.fn(({ children }) => children ?? null),
 }))
 vi.mock("../ring-icon", () => ({ ringIcon: vi.fn(() => ({ _mocked: true })) }))
 
 import { PointMarker } from "../point-marker"
 import * as ringIconModule from "../ring-icon"
+
+const leafletDragEvent = (lat: number, lng: number) => ({
+  target: { getLatLng: () => ({ lat, lng }) },
+})
 
 const BASE_POINT: Point & { latitude: number; longitude: number } = {
   id: "point-1",
@@ -87,5 +108,52 @@ describe("PointMarker — distance label", () => {
   it("renders no label tooltip when label is null", () => {
     render(<PointMarker {...BASE_PROPS} label={null} />)
     expect(screen.queryByText(/nm/)).not.toBeInTheDocument()
+  })
+})
+
+describe("PointMarker — dragging", () => {
+  it("reports the live position via onDragMove while dragging", () => {
+    const onDragMove = vi.fn()
+    render(<PointMarker {...BASE_PROPS} onDragMove={onDragMove} />)
+    lastMarkerProps.eventHandlers?.drag?.(leafletDragEvent(44.5, -3.2))
+    expect(onDragMove).toHaveBeenCalledWith(44.5, -3.2)
+  })
+
+  it("reports the final position via onDragEnd when the drag finishes", () => {
+    const onDragEnd = vi.fn()
+    render(<PointMarker {...BASE_PROPS} onDragEnd={onDragEnd} />)
+    lastMarkerProps.eventHandlers?.dragend?.(leafletDragEvent(44.7, -3.4))
+    expect(onDragEnd).toHaveBeenCalledWith(44.7, -3.4)
+  })
+
+  it("is draggable by default", () => {
+    render(<PointMarker {...BASE_PROPS} />)
+    expect(lastMarkerProps.draggable).toBe(true)
+  })
+
+  it("is not draggable when draggable is explicitly false (e.g. a locked boundary marker)", () => {
+    render(<PointMarker {...BASE_PROPS} draggable={false} />)
+    expect(lastMarkerProps.draggable).toBe(false)
+  })
+})
+
+describe("PointMarker — click/hover forwarding", () => {
+  it("does not wire a click handler when onClick is not provided", () => {
+    render(<PointMarker {...BASE_PROPS} />)
+    expect(lastMarkerProps.eventHandlers?.click).toBeUndefined()
+  })
+
+  it("fires onClick via the marker's click handler when provided", () => {
+    const onClick = vi.fn()
+    render(<PointMarker {...BASE_PROPS} onClick={onClick} />)
+    lastMarkerProps.eventHandlers?.click?.()
+    expect(onClick).toHaveBeenCalledOnce()
+  })
+
+  it("fires onMouseOver via the marker's mouseover handler when provided", () => {
+    const onMouseOver = vi.fn()
+    render(<PointMarker {...BASE_PROPS} onMouseOver={onMouseOver} />)
+    lastMarkerProps.eventHandlers?.mouseover?.()
+    expect(onMouseOver).toHaveBeenCalledOnce()
   })
 })

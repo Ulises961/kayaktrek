@@ -61,4 +61,19 @@ describe("AskToEndorsePicker", () => {
       expect(requestEndorsement).toHaveBeenCalledWith(LOG_ID, { userId: CANDIDATE }),
     )
   })
+
+  it("displays an error when requesting an endorsement fails", async () => {
+    vi.mocked(getTripCrew).mockResolvedValue(CREW)
+    vi.mocked(requestEndorsement).mockResolvedValue({
+      success: false,
+      error: "You have already asked this person",
+    })
+    render(
+      <AskToEndorsePicker logId={LOG_ID} tripId={TRIP_ID} authorId={AUTHOR} endorserIds={[]} />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /ask to endorse/i }))
+    await userEvent.click(await screen.findByText("Candidate"))
+    await waitFor(() => expect(screen.getByText("You have already asked this person")).toBeTruthy())
+  })
 })
