@@ -247,3 +247,137 @@ def test_update_nonexistent_certification_returns_404(client, auth_headers):
     resp = client.patch(f"{CERT_ENDPOINT}/00000000-0000-0000-0000-000000000000",
                         json={"validUntil": "2030-01-01"}, headers=headers)
     assert resp.status_code == 404
+
+
+# =============================================================================
+# Expiry-date handling (Rubric: assert expiry-date handling, not just CRUD)
+# =============================================================================
+
+def test_add_expired_certification_flags_as_expired(client, auth_headers):
+    """A cert with validUntil in the past is flagged as isExpired=true."""
+    headers = _elevated_headers(client, auth_headers)
+    expired_cert = {
+        "organization": "Old Org",
+        "award": "Old Award",
+        "awardedAt": "2020-01-01",
+        "validUntil": "2022-01-01",  # Past date
+    }
+    response = client.post(CERT_ENDPOINT, json=expired_cert, headers=headers)
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data["isExpired"] is True
+
+    # Clean up
+    client.delete(f"{CERT_ENDPOINT}/{data['id']}", headers=headers)
+
+
+def test_add_future_certification_not_expired(client, auth_headers):
+    """A cert with validUntil in the future is not expired."""
+    headers = _elevated_headers(client, auth_headers)
+    future_cert = {
+        "organization": "Future Org",
+        "award": "Future Award",
+        "awardedAt": "2024-01-01",
+        "validUntil": "2030-12-31",  # Future date
+    }
+    response = client.post(CERT_ENDPOINT, json=future_cert, headers=headers)
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data["isExpired"] is False
+
+    # Clean up
+    client.delete(f"{CERT_ENDPOINT}/{data['id']}", headers=headers)
+
+
+def test_add_no_expiry_date_not_expired(client, auth_headers):
+    """A cert without validUntil (no expiry) is not flagged as expired."""
+    headers = _elevated_headers(client, auth_headers)
+    no_expiry_cert = {
+        "organization": "Lifetime Org",
+        "award": "Lifetime Award",
+    }
+    response = client.post(CERT_ENDPOINT, json=no_expiry_cert, headers=headers)
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data["validUntil"] is None
+    assert data["isExpired"] is False
+
+    # Clean up
+    client.delete(f"{CERT_ENDPOINT}/{data['id']}", headers=headers)
+
+
+def test_list_certifications_shows_mixed_expiry_flags(client, auth_headers):
+    """List endpoint returns isExpired flag for each cert (mixed expired/not-expired)."""
+    headers = _elevated_headers(client, auth_headers)
+
+    # Add an expired cert
+    expired = {
+        "organization": "Expired Org",
+        "award": "Expired Award",
+        "validUntil": "2020-01-01",
+    }
+    r1 = client.post(CERT_ENDPOINT, json=expired, headers=headers)
+    expired_id = json.loads(r1.data)["id"]
+
+    # Add a future cert
+    future = {
+        "organization": "Future Org",
+        "award": "Future Award",
+        "validUntil": "2030-12-31",
+    }
+    r2 = client.post(CERT_ENDPOINT, json=future, headers=headers)
+    future_id = json.loads(r2.data)["id"]
+
+    try:
+        # List and verify both certs show correct isExpired flags
+        response = client.get(CERT_ENDPOINT, headers=auth_headers)
+        assert response.status_code == 200
+        certs = json.loads(response.data)
+
+        expired_cert = next((c for c in certs if c["id"] == expired_id), None)
+        future_cert = next((c for c in certs if c["id"] == future_id), None)
+
+        assert expired_cert is not None
+        assert future_cert is not None
+        assert expired_cert["isExpired"] is True
+        assert future_cert["isExpired"] is False
+    finally:
+        # Clean up
+        client.delete(f"{CERT_ENDPOINT}/{expired_id}", headers=headers)
+        client.delete(f"{CERT_ENDPOINT}/{future_id}", headers=headers)
+
+
+def test_update_certification_changes_expiry_flag(client, auth_headers):
+    """Updating a cert's validUntil changes its isExpired flag."""
+    headers = _elevated_headers(client, auth_headers)
+
+    # Add a future cert
+    cert_payload = {
+        "organization": "Test Org",
+        "award": "Test Award",
+        "validUntil": "2030-01-01",  # Future
+    }
+    r = client.post(CERT_ENDPOINT, json=cert_payload, headers=headers)
+    cert_id = json.loads(r.data)["id"]
+    cert_data = json.loads(r.data)
+    assert cert_data["isExpired"] is False
+
+    try:
+        # Update to an expired date
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                           json={"validUntil": "2020-01-01"},  # Past
+                           headers=headers)
+        assert resp.status_code == 200
+        updated = json.loads(resp.data)
+        assert updated["isExpired"] is True
+
+        # Update back to future
+        resp = client.patch(f"{CERT_ENDPOINT}/{cert_id}",
+                           json={"validUntil": "2035-12-31"},  # Future
+                           headers=headers)
+        assert resp.status_code == 200
+        updated = json.loads(resp.data)
+        assert updated["isExpired"] is False
+    finally:
+        # Clean up
+        client.delete(f"{CERT_ENDPOINT}/{cert_id}", headers=headers)

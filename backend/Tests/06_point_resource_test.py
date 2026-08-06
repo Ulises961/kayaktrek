@@ -89,6 +89,38 @@ def test_delete_point(client, auth_headers, points):
     assert response.status_code == 404
 
 
+def test_delete_point_not_found_returns_404(client, auth_headers):
+    """Regression: the resource caught NoResultFound and called
+    abort(HTTPStatus.NOT_FOUND, message=...) — werkzeug's HTTPException has no
+    `message` kwarg, so this raised an unhandled TypeError (500) instead of a 404.
+    """
+    resp = client.delete(f"{POINT_ENDPOINT}/00000000-0000-7000-8000-000000000abc", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_get_point_not_found_returns_404(client, auth_headers):
+    resp = client.get(f"{POINT_ENDPOINT}/00000000-0000-7000-8000-000000000abc", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_update_point_not_found_returns_404(client, auth_headers):
+    resp = client.patch(
+        f"{POINT_ENDPOINT}/00000000-0000-7000-8000-000000000abc",
+        headers=auth_headers,
+        json={"type": "stop"},
+    )
+    assert resp.status_code == 404
+
+
+def test_create_point_missing_type_returns_400(client, auth_headers, itinerary):
+    """`type` is required on PointSchema — omitting it must not silently default."""
+    day_id = itinerary["days"][0]["id"]
+    resp = client.post(
+        f"{POINT_ENDPOINT}/create", headers=auth_headers, json={"dayId": day_id}
+    )
+    assert resp.status_code == 400
+
+
 def test_delete_point_heals_the_chain(client, auth_headers, points):
     """Deleting a mid-chain point must relink its predecessor to its successor.
 

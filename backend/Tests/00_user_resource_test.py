@@ -1,7 +1,10 @@
 from unittest.mock import patch
+from uuid import UUID
 import io
 import json
 
+from Api.database import db
+from Models.user import User
 from Resources.user_resource import USER_ENDPOINT
 
 
@@ -39,15 +42,73 @@ def test_update_user(client, auth_headers, id):
         'surname': 'Sosa',
         'username': originalUser['username'],
         'phone': originalUser['phone'],
-        'pwd': 'testPassword6$',
     }
     response = client.patch(f"{USER_ENDPOINT}/{id}", json=updatedUser, headers=auth_headers)
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data['name'] == "Ulises"
     assert data['surname'] == "Sosa"
+    assert data['username'] == originalUser['username']
+    assert data['phone'] == originalUser['phone']
     assert data['mail'] == originalUser['mail']
     assert data['id'] == originalUser["id"]
+
+    # Persisted, not just echoed back: a fresh GET reflects the same values.
+    refetched = client.get(f"{USER_ENDPOINT}/{id}", headers=auth_headers)
+    assert refetched.status_code == 200
+    refetched_data = json.loads(refetched.data)
+    assert refetched_data['name'] == "Ulises"
+    assert refetched_data['surname'] == "Sosa"
+
+
+def test_update_user_ignores_pwd_field(client):
+    """PATCH /user/<id> must not accept a password change via a 'pwd' key.
+
+    Regression test: UserService.update_user used to hash and store a bare
+    'pwd' field with none of change_password's safeguards — no current-password
+    check, no token_version bump, no session revocation, and (for any user with
+    an X25519 keypair) no re-encryption of the private key, which would have
+    silently and permanently locked the user out of their own encrypted medical
+    notes. Password changes must go through PATCH /me/password only.
+    """
+    unique = "pwdguard001"
+    mail = f"{unique}@example.com"
+    original_pwd = "OriginalPass9$"
+    reg = client.post("/api/v1/auth/register", json={
+        "mail": mail,
+        "pwd": original_pwd,
+        "phone": "+390000000111",
+        "name": "Guard",
+        "username": unique,
+    })
+    assert reg.status_code == 201
+    user = User.query.filter_by(mail=mail).first()
+    assert user is not None
+    user.active = True
+    db.session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"mail": mail, "pwd": original_pwd})
+    assert login.status_code == 200
+    token = login.get_json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    attempted_new_pwd = "AttemptedNew9$"
+    patch = client.patch(
+        f"{USER_ENDPOINT}/{user.id}",
+        headers=headers,
+        json={"pwd": attempted_new_pwd, "name": "Guard2"},
+    )
+    assert patch.status_code == 200
+    assert json.loads(patch.data)["name"] == "Guard2"
+    assert "pwd" not in json.loads(patch.data)
+
+    # The old password must still work — the pwd field in the body was ignored.
+    still_old = client.post("/api/v1/auth/login", json={"mail": mail, "pwd": original_pwd})
+    assert still_old.status_code == 200
+
+    # The "new" password from the payload must never have been applied.
+    not_new = client.post("/api/v1/auth/login", json={"mail": mail, "pwd": attempted_new_pwd})
+    assert not_new.status_code == 401
 
 
 def test_delete_user_forbidden_for_other_user(client, auth_headers, id_2):
@@ -218,16 +279,32 @@ def test_upload_avatar_storage_validation_error_returns_400(client, auth_headers
     assert response.status_code == 400
 
 
-def test_delete_avatar_success(client, auth_headers):
+def test_delete_avatar_success(client, auth_headers, id):
     """Deleting the avatar clears avatar_url and returns 204."""
     with patch("Services.user_service.StorageService.upload",
                return_value="http://minio/avatars/test.jpg"), \
-         patch("Services.user_service.StorageService.delete"):
-        client.post(
+         patch("Services.user_service.StorageService.delete") as mock_delete:
+        upload_response = client.post(
             f"{USER_ENDPOINT}/me/avatar",
             data={"file": (io.BytesIO(_FAKE_AVATAR), "avatar.jpg")},
             content_type="multipart/form-data",
             headers=auth_headers,
         )
+        assert upload_response.status_code == 200
+
         response = client.delete(f"{USER_ENDPOINT}/me/avatar", headers=auth_headers)
-    assert response.status_code == 204
+        assert response.status_code == 204
+        # The uploaded object is actually removed from storage, not just unlinked in the DB.
+        # `id`/`auth_headers` are session-scoped, so the upload above may itself have
+        # triggered a delete-old-avatar call if an earlier test in the suite left this
+        # user with an avatar — at least one call is the real, order-independent contract.
+        assert mock_delete.called
+
+    # avatar_url is actually cleared, both in the DB and as read back through the API.
+    user = User.query.filter_by(id=UUID(id)).first()
+    assert user is not None
+    assert user.avatar_url is None
+
+    me_response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
+    assert me_response.status_code == 200
+    assert json.loads(me_response.data)["avatarUrl"] is None

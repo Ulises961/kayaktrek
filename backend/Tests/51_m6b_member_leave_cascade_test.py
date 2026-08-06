@@ -9,10 +9,12 @@ from uuid import UUID
 
 from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
+from Resources.shuttle_resource import SHUTTLE_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.personal_packing_resource import PACKING_ENDPOINT
 from Api.database import db as _db
 from Models.personal_packing_item import PersonalPackingItem
+from Models.shuttle_vehicle import ShuttleVehicle
 
 
 def test_member_leave_cascades_entries_but_keeps_items(app, client, auth_headers, trip_with_crew):
@@ -77,3 +79,37 @@ def test_member_leave_cascades_entries_but_keeps_items(app, client, auth_headers
         i['id'] for i in json.loads(client.get(f"{ITEM_ENDPOINT}/all", headers=crew_headers).data)
     }
     assert {contrib_item_id, pack_item_id} <= crew_item_ids
+
+
+def test_member_leave_nulls_shuttle_arrangement_without_deleting_the_vehicle(
+    app, client, trip_with_crew
+):
+    """
+    ShuttleVehicle.arranged_by_id/driver_id are FKs to trip_member.id with
+    ondelete="SET NULL" (unlike TripService.remove_member's leader-driven removal,
+    self-leave does no explicit reassignment — it relies on that DB-level rule).
+    Leaving must null the assignment, not delete the vehicle or leave a dangling FK.
+    """
+    trip_id = trip_with_crew['trip']['id']
+    crew_headers = trip_with_crew['crew_headers']
+
+    vehicle_id = json.loads(client.post(
+        f"{SHUTTLE_ENDPOINT}/{trip_id}/create",
+        headers=crew_headers, json={"vehicleDescription": "Crew's van"},
+    ).data)['id']
+
+    with app.app_context():
+        vehicle = _db.session.get(ShuttleVehicle, UUID(vehicle_id))
+        assert vehicle is not None
+        assert vehicle.arranged_by_id is not None
+        assert vehicle.driver_id is None  # never set — driver defaults unassigned
+
+    assert client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/leave", headers=crew_headers
+    ).status_code == 200
+
+    with app.app_context():
+        _db.session.expire_all()
+        vehicle = _db.session.get(ShuttleVehicle, UUID(vehicle_id))
+        assert vehicle is not None, "the vehicle itself must survive the member leaving"
+        assert vehicle.arranged_by_id is None, "arranged_by_id must be nulled, not left dangling"

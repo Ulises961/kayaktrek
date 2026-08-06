@@ -489,3 +489,61 @@ class TestCrewBlockedOnLeaderActions:
         assert r.status_code in (403, 400), (
             f"[CREW] POST /member/{mid}/medical-notes → {r.status_code}, want 403 or 400"
         )
+
+
+# ===========================================================================
+# §4 — A 403 status must not carry the resource in its body
+# ===========================================================================
+#
+# `_assert_status` above (and by extension every sweep test) only checks the
+# status code — appropriate for sweeping ~100 endpoints, but a decorator that
+# fires after a fetch would still "pass" that sweep while leaking data in the
+# denial body. `@require_owner`/`@require_leader` are `abort()`-based, so they
+# short-circuit before the view (and any DB fetch it would do) runs at all —
+# assert that directly on a representative GET per resource family, so a
+# future refactor that moves the check after a fetch breaks a test instead of
+# shipping a leak.
+class TestNoDataLeaksInDenialBody:
+
+    def test_trip_403_body_has_no_trip_fields(self, client, authz_resources, outsider_headers):
+        tid = authz_resources["trip_id"]
+        r = client.get(f"{TRIP_ENDPOINT}/{tid}", headers=outsider_headers)
+        assert r.status_code == 403
+        body = json.loads(r.data)
+        assert "destination" not in body
+        assert "itinerary" not in body
+        assert "inventory" not in body
+
+    def test_itinerary_403_body_has_no_route_fields(self, client, authz_resources, outsider_headers):
+        iid = authz_resources["itinerary_id"]
+        r = client.get(f"{ITINERARY_ENDPOINT}/{iid}", headers=outsider_headers)
+        assert r.status_code == 403
+        body = json.loads(r.data)
+        assert "days" not in body
+        assert "isPublic" not in body
+
+    def test_logistics_403_body_has_no_shore_contact_fields(self, client, authz_resources, outsider_headers):
+        tid = authz_resources["trip_id"]
+        r = client.get(f"{LOGISTICS_ENDPOINT}/{tid}", headers=outsider_headers)
+        assert r.status_code == 403
+        body = json.loads(r.data)
+        assert "shoreContactName" not in body
+        assert "shoreContactEmail" not in body
+        assert "shoreContactPhone" not in body
+
+    def test_log_403_body_has_no_log_fields(self, client, authz_resources, auth_headers_2):
+        log_id = authz_resources["log_id"]
+        r = client.get(f"{LOG_ENDPOINT}/{log_id}", headers=auth_headers_2)
+        assert r.status_code == 403
+        body = json.loads(r.data)
+        assert "hours" not in body
+        assert "notes" not in body
+        assert "distance" not in body
+
+    def test_personal_inventory_403_body_has_no_item_fields(self, client, authz_resources, auth_headers_2):
+        inv_id = authz_resources["personal_inv_id"]
+        r = client.get(f"{INVENTORY_ENDPOINT}/{inv_id}", headers=auth_headers_2)
+        assert r.status_code == 403
+        body = json.loads(r.data)
+        assert "items" not in body
+        assert "requirements" not in body

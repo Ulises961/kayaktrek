@@ -1,4 +1,6 @@
 """§0 model round-trip tests — M5 sea/tidal additions."""
+import uuid as _uuid
+
 import pytest
 from datetime import time
 from decimal import Decimal
@@ -7,10 +9,14 @@ from geoalchemy2.shape import from_shape
 from shapely.geometry import Point as ShapelyPoint
 
 from Api.database import db as _db
+from Models.day import Day
+from Models.itinerary import Itinerary
 from Models.sea import Sea
 from Models.sea_state import SeaState
-from Models.tidal_station import TidalStation
+from Models.tidal_station import StreamEntryMode, TidalStation
 from Models.tidal_stream_entry import TidalStreamEntry
+from Models.user import User
+from Services.tidal_station_service import TidalStationService
 
 
 # ── Sea.tidal_range_m ─────────────────────────────────────────────────────────
@@ -160,8 +166,13 @@ def test_tidal_stream_entry_composite_pk(app):
     hours = sorted(e.hours_from_hw for e in entries)
     assert hours == list(range(-6, 7))
 
+    station_id = station.id
     _db.session.delete(station)
     _db.session.commit()
+
+    # ondelete="CASCADE" on TidalStreamEntry.station_id — deleting the station
+    # must not leave the 13 hourly rows orphaned.
+    assert _db.session.query(TidalStreamEntry).filter_by(station_id=station_id).all() == []
 
 
 def test_tidal_stream_entry_optional_rate_fields(app):
@@ -261,5 +272,80 @@ def test_sea_tidal_operability_fields_all_nullable(app, itinerary):
     assert loaded.max_spring_rate_knots is None
     assert loaded.max_neap_rate_knots is None
 
-    _db.session.delete(loaded)
+
+# ── Cascade / constraint behaviour (rubric #4) ────────────────────────────────
+# Deletion fate down the day → sea → sea_state chain, the tidal-diamond
+# itinerary scoping, and the diamond-creator FK, exercised explicitly rather
+# than assumed from the ondelete= declarations in the model files.
+
+def test_deleting_day_cascades_to_sea_and_sea_state(app, itinerary):
+    """Day.id → Sea.day_id → SeaState.day_id are both ondelete=CASCADE: deleting
+    the Day must not leave either child table's rows behind."""
+    day_id = itinerary["days"][0]["id"]
+    sea = Sea(day_id=day_id, high_tide=time(12, 0), low_tide=time(6, 0), tidal_range_m=Decimal("4.0"))
+    _db.session.add(sea)
+    _db.session.flush()
+    state = SeaState(day_id=day_id, time=time(9, 0), wave_height=Decimal("1.2"))
+    _db.session.add(state)
+    _db.session.commit()
+
+    day = _db.session.get(Day, day_id)
+    _db.session.delete(day)
+    _db.session.commit()
+
+    assert _db.session.query(Sea).filter_by(day_id=day_id).first() is None
+    assert _db.session.query(SeaState).filter_by(day_id=day_id).first() is None
+
+
+def test_deleting_itinerary_cascades_to_user_created_diamond(app, itinerary, id):
+    """TidalStation.itinerary_id is ondelete=CASCADE: deleting an itinerary must
+    take its user-created diamonds (and their stream entries) with it — a
+    diamond scoped to a deleted itinerary would otherwise be an orphaned,
+    unreachable row (no resource route can look it up without an itinerary)."""
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, {
+        "name": "Doomed Diamond", "location": from_shape(ShapelyPoint(-4.3, 50.2), srid=4326),
+        "entry_mode": StreamEntryMode.SIMPLE, "max_spring_rate_knots": 2.0,
+        "flood_direction_degrees": 90, "ebb_direction_degrees": 270,
+    })
+    station_id = station.id
+
+    itin = _db.session.get(Itinerary, itinerary["id"])
+    _db.session.delete(itin)
+    _db.session.commit()
+
+    assert _db.session.query(TidalStation).filter_by(id=station_id).first() is None
+    assert _db.session.query(TidalStreamEntry).filter_by(station_id=station_id).all() == []
+
+
+def test_deleting_diamond_creator_nulls_created_by_not_the_diamond(app, client, itinerary):
+    """TidalStation.created_by_user_id is ondelete=SET NULL (not CASCADE): the
+    diamond itself is itinerary-scoped, so deleting the crew member who placed
+    it must not delete a station other crew still rely on for route planning —
+    only the attribution should go."""
+    suffix = _uuid.uuid4().hex[:8]
+    mail = f"throwaway.{suffix}@example.com"
+    resp = client.post("/api/v1/auth/register", json={
+        "mail": mail, "pwd": "ThrowAway9$",
+        "phone": f"+39{_uuid.uuid4().int % 10**10:010d}",
+        "name": "Throwaway", "username": f"throwaway_{suffix}",
+    })
+    assert resp.status_code == 201
+    creator = _db.session.query(User).filter_by(mail=mail).first()
+    creator_id = creator.id
+
+    station = TidalStationService.create_user_diamond(itinerary["id"], str(creator_id), {
+        "name": "Orphaned-Creator Diamond", "location": from_shape(ShapelyPoint(-4.4, 50.1), srid=4326),
+        "entry_mode": StreamEntryMode.SIMPLE, "max_spring_rate_knots": 2.0,
+        "flood_direction_degrees": 90, "ebb_direction_degrees": 270,
+    })
+    station_id = station.id
+
+    _db.session.delete(creator)
+    _db.session.commit()
+
+    reloaded = _db.session.query(TidalStation).filter_by(id=station_id).first()
+    assert reloaded is not None
+    assert reloaded.created_by_user_id is None
+
+    _db.session.delete(reloaded)
     _db.session.commit()

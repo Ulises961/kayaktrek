@@ -1,4 +1,6 @@
 """Unit tests for the ownerless public demo-itinerary seed (landing chart)."""
+import pytest
+
 from Api.database import db
 from Api.seed import (
     DEMO_ITINERARY_NAME,
@@ -25,6 +27,9 @@ def test_seed_creates_ownerless_public_itinerary(app):
     assert itinerary.is_public is True
     assert itinerary.user_id is None  # no paddler owns it
     assert itinerary.trip_id is None  # not attached to any trip/crew
+    assert itinerary.name == DEMO_ITINERARY_NAME
+    assert float(itinerary.avg_speed_knots) == pytest.approx(2.5)
+    assert float(itinerary.total_miles) == pytest.approx(18)
 
 
 def test_seed_creates_three_days_with_chained_points(app):
@@ -56,6 +61,44 @@ def test_seed_creates_three_days_with_chained_points(app):
         tails = {point.id for point in points if point.next_id is None}
         assert len(heads) == 1
         assert len(tails) == 1
+
+
+def test_seed_points_are_ordered_and_match_the_route_data(app):
+    """The structural chain check above (single head/tail) can't catch a
+    swapped lat/lng, a scrambled linking order, or a name/type dropped along
+    the way — walk the actual chain and compare it to DEMO_ITINERARY_ROUTE
+    element-for-element."""
+    seed_demo_itinerary()
+    itinerary = _demo_itinerary()
+
+    days = (
+        db.session.query(Day)
+        .filter_by(itinerary_id=itinerary.id)
+        .order_by(Day.day_number)
+        .all()
+    )
+
+    for day, (_, point_specs) in zip(days, DEMO_ITINERARY_ROUTE):
+        points_by_id = {p.id: p for p in db.session.query(Point).filter_by(day_id=day.id).all()}
+        assert day.start_point_id in points_by_id
+        assert day.end_point_id in points_by_id
+
+        ordered = []
+        current = points_by_id[day.start_point_id]
+        seen: set = set()
+        while current is not None and current.id not in seen:
+            ordered.append(current)
+            seen.add(current.id)
+            current = points_by_id.get(current.next_id)
+
+        assert len(ordered) == len(point_specs)
+        assert ordered[-1].id == day.end_point_id
+
+        for point, (lat, lon, name, point_type) in zip(ordered, point_specs):
+            assert float(point.latitude) == pytest.approx(lat)
+            assert float(point.longitude) == pytest.approx(lon)
+            assert point.name == name
+            assert point.type == PointType(point_type)
 
 
 def test_seed_is_idempotent(app):

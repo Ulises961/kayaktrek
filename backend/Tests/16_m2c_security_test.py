@@ -33,16 +33,32 @@ def test_get_other_user_forbidden(client, auth_headers, id_2):
     assert r.status_code == 403
 
 
-def test_patch_other_user_forbidden(client, auth_headers, id_2):
-    """Authenticated user cannot PATCH another user's profile."""
+def test_patch_other_user_forbidden(client, auth_headers, auth_headers_2, id_2):
+    """Authenticated user cannot PATCH another user's profile.
+
+    Asserts the exploit is actually closed, not just that the request was
+    rejected: re-fetch the target's own profile and confirm the attempted
+    field never landed.
+    """
     r = client.patch(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers, json={"name": "hacked"})
     assert r.status_code == 403
 
+    victim_view = client.get(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers_2)
+    assert victim_view.status_code == 200
+    assert json.loads(victim_view.data)["name"] != "hacked"
 
-def test_delete_other_user_forbidden(client, auth_headers, id_2):
-    """Authenticated user cannot DELETE another user's account."""
+
+def test_delete_other_user_forbidden(client, auth_headers, auth_headers_2, id_2):
+    """Authenticated user cannot DELETE another user's account.
+
+    Confirms the account still exists and is unaffected, not just that the
+    delete attempt itself returned 403.
+    """
     r = client.delete(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers)
     assert r.status_code == 403
+
+    still_there = client.get(f"{USER_ENDPOINT}/{id_2}", headers=auth_headers_2)
+    assert still_there.status_code == 200
 
 
 def test_get_own_user_allowed(client, auth_headers, id):
@@ -68,7 +84,9 @@ def test_get_other_user_invitations_forbidden(client, auth_headers, id_2):
 
 
 def test_patch_trip_non_member_forbidden(client, outsider_headers, auth_headers):
-    """Non-member cannot PATCH a trip."""
+    """Non-member cannot PATCH a trip. Re-fetch as the owner to confirm the
+    attempted field never actually landed, not just that the attempt was
+    rejected."""
     r = client.post(f"{TRIP_ENDPOINT}/create", headers=auth_headers, json={"inventory": {}})
     assert r.status_code == 201
     trip_id = json.loads(r.data)["id"]
@@ -76,17 +94,25 @@ def test_patch_trip_non_member_forbidden(client, outsider_headers, auth_headers)
     patch = client.patch(f"{TRIP_ENDPOINT}/{trip_id}", headers=outsider_headers, json={"destination": "Stolen"})
     assert patch.status_code == 403
 
+    owner_view = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+    assert owner_view.status_code == 200
+    assert json.loads(owner_view.data)["destination"] != "Stolen"
+
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_delete_trip_non_member_forbidden(client, outsider_headers, auth_headers):
-    """Non-member cannot DELETE a trip."""
+    """Non-member cannot DELETE a trip. Confirm the trip still exists rather
+    than trusting the 403 alone."""
     r = client.post(f"{TRIP_ENDPOINT}/create", headers=auth_headers, json={"inventory": {}})
     assert r.status_code == 201
     trip_id = json.loads(r.data)["id"]
 
     delete = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=outsider_headers)
     assert delete.status_code == 403
+
+    still_there = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+    assert still_there.status_code == 200
 
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
@@ -117,21 +143,31 @@ def test_non_member_can_read_public_itinerary(client, outsider_headers, auth_hea
 
 
 def test_non_member_cannot_patch_public_itinerary(client, outsider_headers, auth_headers):
-    """Non-member cannot PATCH a public itinerary even though it is readable."""
+    """Non-member cannot PATCH a public itinerary even though it is readable.
+    Re-fetch to confirm totalMiles was not actually applied under the 403."""
     trip_id, itinerary_id = _create_public_itinerary(client, auth_headers)
 
     r = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=outsider_headers, json={"totalMiles": 99})
     assert r.status_code == 403
 
+    refetched = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
+    assert refetched.status_code == 200
+    assert json.loads(refetched.data)["totalMiles"] != 99
+
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
 def test_owner_cannot_patch_public_itinerary(client, auth_headers):
-    """Even the owner cannot PATCH a public (frozen) itinerary — must clone first."""
+    """Even the owner cannot PATCH a public (frozen) itinerary — must clone first.
+    Re-fetch to confirm the 409 actually left totalMiles untouched."""
     trip_id, itinerary_id = _create_public_itinerary(client, auth_headers)
 
     r = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers, json={"totalMiles": 99})
     assert r.status_code == 409
+
+    refetched = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
+    assert refetched.status_code == 200
+    assert json.loads(refetched.data)["totalMiles"] == 0
 
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
@@ -167,9 +203,12 @@ def test_get_all_itineraries_returns_200(client, auth_headers):
 # ---------------------------------------------------------------------------
 
 def test_crew_cannot_delete_trip(client, trip_with_invitation):
-    """A crew member must not be able to delete the trip for everyone."""
+    """A crew member must not be able to delete the trip for everyone.
+    Confirm the trip is still readable by the leader afterward, not just
+    that the crew's own attempt bounced."""
     trip_id = trip_with_invitation["trip"]["id"]
     crew_headers = trip_with_invitation["invitee_headers"]
+    leader_headers = trip_with_invitation["leader_headers"]
 
     accept = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/invitation",
@@ -180,6 +219,9 @@ def test_crew_cannot_delete_trip(client, trip_with_invitation):
 
     delete = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=crew_headers)
     assert delete.status_code == 403
+
+    still_there = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=leader_headers)
+    assert still_there.status_code == 200
 
 
 def test_leader_delete_removes_trip_for_everyone(client, auth_headers):

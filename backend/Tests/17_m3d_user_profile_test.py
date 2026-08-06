@@ -213,3 +213,81 @@ def test_after_revoke_consent_at_is_null(client, auth_headers):
     response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
     data = json.loads(response.data)
     assert data["medicalNotesConsentAt"] is None
+
+
+# =============================================================================
+# medical_notes_reset_at flag lifecycle (security review remediation)
+# =============================================================================
+
+def test_medical_notes_reset_flag_after_password_reset(client, pw_user, app):
+    """Password reset sets medical_notes_reset_at flag (security fix).
+
+    When a password is reset, medical notes are potentially compromised (the
+    old password may have been leaked), so the flag is set to prompt the
+    user to re-grant consent.
+    """
+    # First, grant consent on our throwaway user
+    headers = _elevated_headers(client, pw_user, password=_USER_PWD)
+    client.post(
+        f"{USER_ENDPOINT}/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        headers=headers,
+    )
+
+    # Verify the flag is initially None
+    response = client.get(f"{USER_ENDPOINT}/me", headers=pw_user)
+    data = json.loads(response.data)
+    assert data["medicalNotesResetAt"] is None
+
+    # Now change password
+    response = client.patch(
+        f"{USER_ENDPOINT}/me/password",
+        json={"currentPwd": _USER_PWD, "newPwd": _NEW_PWD},
+        headers=pw_user,
+    )
+    assert response.status_code == 204
+
+    # After password change, verify via DB that the flag WAS set
+    # (the old token is now invalid, so we can't use it for requests)
+    with app.app_context():
+        user = _db.session.query(User).filter_by(mail="pwchange.tmp@example.com").first()
+        assert user is not None, "Test user should exist"
+        assert user.medical_notes_reset_at is not None, \
+            "medical_notes_reset_at should be set after password reset when user has medical notes"
+
+
+def test_medical_notes_reset_flag_cleared_on_re_consent(client, pw_user, app):
+    """Re-granting consent clears the medical_notes_reset_at flag.
+
+    When user re-consents to store medical notes after a password reset,
+    the flag is cleared to indicate they've acknowledged the situation.
+    Uses pw_user (function-scoped throwaway) instead of session-scoped user_1.
+    """
+    # Manually set the flag on the pw_user (simulating a password reset)
+    from datetime import datetime, timezone
+    with app.app_context():
+        user = _db.session.query(User).filter_by(mail="pwchange.tmp@example.com").first()
+        assert user is not None
+        user.medical_notes_reset_at = datetime.now(timezone.utc)
+        _db.session.commit()
+
+    # Verify the flag was set via DB query
+    with app.app_context():
+        user = _db.session.query(User).filter_by(mail="pwchange.tmp@example.com").first()
+        assert user.medical_notes_reset_at is not None, "Flag should be set in DB after manual setting"
+
+    # Re-grant consent
+    headers = _elevated_headers(client, pw_user)
+    response = client.post(
+        f"{USER_ENDPOINT}/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        headers=headers,
+    )
+    assert response.status_code == 200, f"POST /medical-consent failed: {response.status_code} {response.data}"
+
+    # Verify the flag is now cleared via DB query
+    with app.app_context():
+        user = _db.session.query(User).filter_by(mail="pwchange.tmp@example.com").first()
+        assert user is not None
+        assert user.medical_notes_reset_at is None, \
+            f"medical_notes_reset_at should be cleared after re-granting consent, but was {user.medical_notes_reset_at}"

@@ -50,11 +50,17 @@ def test_request_by_id_success(client, auth_headers, id_2, both_public):
     resp = _request(client, auth_headers, addresseeId=id_2)
     assert resp.status_code == 201
     assert resp.json["status"] == "pending"
+    # Verify the connection was actually created by querying it back
+    assert db.session.query(Connection).count() == 1
+    connection = db.session.query(Connection).first()
+    assert str(connection.addressee_id) == id_2
 
 
 def test_request_self_returns_403(client, auth_headers, user_1, both_public):
     resp = _request(client, auth_headers, addresseeUsername=user_1.username)
     assert resp.status_code == 403
+    # Verify no connection was created
+    assert db.session.query(Connection).count() == 0
 
 
 def test_request_missing_field_returns_400(client, auth_headers):
@@ -77,6 +83,8 @@ def test_request_duplicate_returns_409(client, auth_headers, user_2, both_public
     assert _request(client, auth_headers, addresseeUsername=user_2.username).status_code == 201
     dup = _request(client, auth_headers, addresseeUsername=user_2.username)
     assert dup.status_code == 409
+    # Verify that duplicate attempt did not create a second connection
+    assert db.session.query(Connection).count() == 1
 
 
 def test_request_mirror_duplicate_returns_409(
@@ -86,6 +94,8 @@ def test_request_mirror_duplicate_returns_409(
     assert _request(client, auth_headers, addresseeUsername=user_2.username).status_code == 201
     mirror = _request(client, auth_headers_2, addresseeUsername=user_1.username)
     assert mirror.status_code == 409
+    # Verify that the mirror request did not create a second connection
+    assert db.session.query(Connection).count() == 1
 
 
 # ── accept ───────────────────────────────────────────────────────────────────
@@ -113,6 +123,9 @@ def test_accept_by_non_addressee_returns_403(client, auth_headers, user_2, both_
     created = _request(client, auth_headers, addresseeUsername=user_2.username).json
     resp = client.post(f"{CONNECTION_ENDPOINT}/{created['id']}/accept", headers=auth_headers)
     assert resp.status_code == 403
+    # Verify the connection status did not change
+    connection = db.session.query(Connection).first()
+    assert connection.status == ConnectionStatusType.PENDING
 
 
 def test_accept_unknown_returns_404(client, auth_headers_2):
@@ -145,6 +158,8 @@ def test_remove_by_outsider_returns_403(
     created = _request(client, auth_headers, addresseeUsername=user_2.username).json
     resp = client.delete(f"{CONNECTION_ENDPOINT}/{created['id']}", headers=outsider_headers)
     assert resp.status_code == 403
+    # Verify the connection still exists
+    assert db.session.query(Connection).count() == 1
 
 
 def test_remove_unknown_returns_404(client, auth_headers):

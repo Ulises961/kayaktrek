@@ -98,6 +98,15 @@ def test_create_simple_diamond_missing_peak_fields_raises(app, itinerary, id):
     with pytest.raises(ValueError):
         TidalStationService.create_user_diamond(itinerary["id"], id, data)
 
+    # The ValueError fires before anything is added to the session (no partial
+    # station row was flushed), so the session must still be perfectly usable —
+    # a follow-up valid create should succeed with no dangling PendingRollbackError.
+    station = TidalStationService.create_user_diamond(itinerary["id"], id, {
+        "name": "Good", "location": _loc(), "entry_mode": StreamEntryMode.SIMPLE,
+        "max_spring_rate_knots": 3.0, "flood_direction_degrees": 45, "ebb_direction_degrees": 225,
+    })
+    assert station.name == "Good"
+
 
 # ── update_user_diamond ──────────────────────────────────────────────────────
 

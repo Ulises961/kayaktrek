@@ -54,11 +54,20 @@ def test_crew_cannot_pause_trip(client, trip_with_crew):
     response = client.post(f"{TRIP_ENDPOINT}/{trip_id}/pause", headers=trip_with_crew["crew_headers"])
     assert response.status_code == 403
 
+    # Denial must be a true DB-level no-op, not just a rejected response.
+    check = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_crew["leader_headers"])
+    data = json.loads(check.data)
+    assert data["isPaused"] is False
+    assert data["pausedAt"] is None
+
 
 def test_non_member_cannot_pause_trip(client, auth_headers, outsider_headers):
     trip = _create_happening_trip(client, auth_headers)
     response = _pause(client, outsider_headers, trip["id"])
     assert response.status_code == 403
+
+    check = client.get(f"{TRIP_ENDPOINT}/{trip['id']}", headers=auth_headers)
+    assert json.loads(check.data)["isPaused"] is False
 
 
 # --- Resume ---
@@ -122,12 +131,55 @@ def test_resume_gap_shift_math(client, auth_headers):
     assert data["dateTo"] == (date.fromisoformat(date_to) + timedelta(days=3)).isoformat()
 
 
+def test_state_transition_blocked_while_paused(client, auth_headers):
+    """
+    Regression: POST /trip/<id>/state must not be usable to sidestep pause.
+    ADR-025 (docs/adr/trip-lifecycle.md) states abort() is "the only way to
+    reach past without resuming" while paused — before this guard existed,
+    the generic state-transition endpoint could carry a paused happening trip
+    straight to past, leaving is_paused/paused_at stale and defaulting
+    outcome to completed instead of the interrupted an aborted trip records.
+    """
+    trip = _create_happening_trip(client, auth_headers)
+    _pause(client, auth_headers, trip["id"])
+
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip['id']}/state", json={"state": "past"}, headers=auth_headers
+    )
+    assert response.status_code == 400
+
+    # The rejected transition must leave state and pause fields untouched in the DB.
+    check = client.get(f"{TRIP_ENDPOINT}/{trip['id']}", headers=auth_headers)
+    data = json.loads(check.data)
+    assert data["state"] == "happening"
+    assert data["isPaused"] is True
+    assert data["outcome"] is None
+
+
+def test_trip_metadata_still_editable_while_paused(client, auth_headers):
+    """Pause halts state transitions, not ordinary editing — a leader relocating
+    to shelter still needs to update trip metadata while paused."""
+    trip = _create_happening_trip(client, auth_headers)
+    _pause(client, auth_headers, trip["id"])
+
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{trip['id']}", json={"destination": "Storm shelter cove"}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)["destination"] == "Storm shelter cove"
+
+
 def test_crew_cannot_resume_trip(client, trip_with_crew):
     trip_id = trip_with_crew["trip"]["id"]
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": "happening"}, headers=trip_with_crew["leader_headers"])
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/pause", headers=trip_with_crew["leader_headers"])
     response = client.post(f"{TRIP_ENDPOINT}/{trip_id}/resume", json={}, headers=trip_with_crew["crew_headers"])
     assert response.status_code == 403
+
+    # Denial must be a true DB-level no-op: still paused, not resumed underneath the 403.
+    check = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_crew["leader_headers"])
+    data = json.loads(check.data)
+    assert data["isPaused"] is True
 
 
 # --- Abort ---
@@ -155,6 +207,13 @@ def test_crew_cannot_abort_trip(client, trip_with_crew):
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/pause", headers=trip_with_crew["leader_headers"])
     response = client.post(f"{TRIP_ENDPOINT}/{trip_id}/abort", headers=trip_with_crew["crew_headers"])
     assert response.status_code == 403
+
+    # Denial must be a true DB-level no-op: still happening + paused, never past.
+    check = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_crew["leader_headers"])
+    data = json.loads(check.data)
+    assert data["state"] == "happening"
+    assert data["isPaused"] is True
+    assert data["outcome"] is None
 
 
 # --- Normal transition still infers outcome=completed ---

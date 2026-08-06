@@ -349,3 +349,51 @@ def test_weather_schema_weather_states_exactly_24_is_valid(app):
     states = [_VALID_WEATHER_STATE] * 24
     result = WeatherSchema().load({"dayId": _DAY_ID, "model": "best_match", "weatherStates": states})
     assert isinstance(result, Weather)
+
+
+# ── dump_only field behavior ───────────────────────────────────────────────
+# Regression guard: fields marked dump_only must be ignored on load, not serialized
+# back to the client if they attempt to override them. M14's nested boundary-field
+# drop would have been caught if schemas tested that dump_only fields don't leak.
+
+def test_user_schema_dump_only_fields_ignored_on_load(app):
+    """UserSchema has several dump_only fields (admin, avatar_url, etc.).
+    When loading, these must be ignored if the client sends them."""
+    from Schemas.user_schema import UserSchema
+
+    schema = UserSchema()
+    data = {
+        "mail": "test@example.com",
+        "pwd": "ValidPass1!",
+        "username": "testuser",
+        "name": "Test",
+        "surname": "User",
+        "admin": True,  # dump_only — client attempt to set this
+        "avatar_url": "http://example.com/avatar.jpg",  # dump_only
+    }
+
+    # Load should succeed and ignore the dump_only fields
+    result = schema.load(data)
+    # The result should not have admin=True or avatar_url set (they're dump_only)
+    # Marshmallow silently ignores dump_only fields during load
+    assert result.mail == "test@example.com"
+
+
+def test_user_update_schema_dump_only_fields_ignored_on_load(app):
+    """UserUpdateSchema marks mail and pwd as dump_only to prevent accidental mutation.
+    If client sends these, they must be ignored."""
+    from Schemas.user_schema import UserUpdateSchema
+
+    schema = UserUpdateSchema()
+    data = {
+        "username": "newusername",
+        "name": "New Name",
+        "mail": "newemail@example.com",  # dump_only — must be ignored
+        "pwd": "NewPassword1!",  # dump_only — must be ignored
+    }
+
+    result = schema.load(data)
+    # The dict should not contain the dump_only fields
+    assert "mail" not in result
+    assert "pwd" not in result
+    assert result["username"] == "newusername"

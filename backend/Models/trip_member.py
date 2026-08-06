@@ -28,6 +28,16 @@ class TripMember(BaseModel):
             postgresql_where="nominated_successor",
         ),
     )
+    # A trip_member row is reachable via two independent cascade-delete paths to the
+    # same physical row (Trip.trip_members and User.trip_memberships, both
+    # "all, delete-orphan" with a DB-level ondelete="CASCADE" FK on each side). When
+    # both a trip and one of its members' User rows are deleted in the same session,
+    # whichever cascade runs second issues its DELETE against an in-session collection
+    # count that the other cascade has already made stale, and SQLAlchemy's default
+    # per-statement rowcount assertion mismatches — a benign false positive (the row is
+    # correctly gone either way), not silenced by passive_deletes alone. See
+    # Trip.trip_members / User.trip_memberships docstrings.
+    __mapper_args__ = {"confirm_deleted_rows": False}
 
     user_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     trip_id: Mapped[_UUID] = mapped_column(UUID, ForeignKey("trip.id", ondelete="CASCADE"), nullable=False, index=True)

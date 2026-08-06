@@ -31,6 +31,7 @@ def _build_trip(
     shore_email="shore@example.com",
     share_token="tok-123",
     last_alert_at=None,
+    destination=_DESTINATION,
 ):
     itinerary = Itinerary(is_public=False, total_miles=0)
     _db.session.add(itinerary)
@@ -39,7 +40,7 @@ def _build_trip(
     trip = Trip(
         state=TripStateType.HAPPENING,
         is_paused=paused,
-        destination=_DESTINATION,
+        destination=destination,
         date_from=_today_utc(),
         date_to=_today_utc() + timedelta(days=2),
         last_checkpoint_alert_at=last_alert_at,
@@ -72,19 +73,19 @@ def _add_ping(trip_id, user, recorded_at):
     _db.session.commit()
 
 
-def _calls_for_our_trip(mock_send):
+def _calls_for_our_trip(mock_send, destination=_DESTINATION):
     """Filter mock calls down to this test's own trip — a shared worker schema
     can carry stray `happening` trips left behind by other test files, so
     identifying by our own unique destination keeps assertions immune to that
     rather than relying on a global call count."""
-    return [c for c in mock_send.call_args_list if c.kwargs.get("destination") == _DESTINATION]
+    return [c for c in mock_send.call_args_list if c.kwargs.get("destination") == destination]
 
 
 @pytest.fixture(autouse=True)
 def _cleanup(app):
     yield
     with app.app_context():
-        for trip in _db.session.query(Trip).filter_by(destination=_DESTINATION).all():
+        for trip in _db.session.query(Trip).filter(Trip.destination.like(f"{_DESTINATION}%")).all():
             _db.session.delete(trip)  # cascades itinerary/days/trip_members/logistics/pings
         _db.session.commit()
 
@@ -177,3 +178,54 @@ def test_missing_shore_email_warns_without_crash(app, user_1):
         check_missed_checkpoints.run()  # must not raise
 
     assert _calls_for_our_trip(mock_send) == []
+
+
+# --- failure path: mail service down (§5 of the rubric — beat tasks run unattended) ---
+
+
+def test_mail_failure_is_not_swallowed_and_leaves_trip_unmarked_for_retry(app, user_1):
+    """A single trip whose alert email fails must not be recorded as alerted —
+    otherwise a mail outage would permanently silence its checkpoint alert
+    instead of retrying on the next hourly beat tick."""
+    trip_id = _build_trip(user_1)
+    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    _add_ping(trip_id, user_1, stale)
+
+    with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
+        mock_send.side_effect = ConnectionError("smtp unreachable")
+        check_missed_checkpoints.run()  # the beat task itself must not raise
+
+    trip = _db.session.get(Trip, trip_id)
+    assert trip.last_checkpoint_alert_at is None
+
+    # session left usable — a plain query after the failure must not raise
+    # PendingRollbackError or similar.
+    assert _db.session.query(Trip).filter_by(id=trip_id).count() == 1
+
+
+def test_mail_failure_for_one_trip_does_not_block_alerts_for_others_in_the_batch(app, user_1):
+    """Before the fix, one trip's mail failure aborted the whole task before its
+    single end-of-loop commit, so a trip processed earlier in the same run lost
+    its alert too even though sending for it had already succeeded."""
+    failing_destination = _DESTINATION
+    ok_destination = f"{_DESTINATION} B"
+    failing_trip_id = _build_trip(user_1, destination=failing_destination, share_token="tok-fail")
+    ok_trip_id = _build_trip(user_1, destination=ok_destination, share_token="tok-ok")
+    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    _add_ping(failing_trip_id, user_1, stale)
+    _add_ping(ok_trip_id, user_1, stale)
+
+    def _send(*, destination, **kwargs):
+        if destination == failing_destination:
+            raise ConnectionError("smtp unreachable")
+
+    with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
+        mock_send.side_effect = _send
+        check_missed_checkpoints.run()
+
+    assert _calls_for_our_trip(mock_send, ok_destination) != []
+    ok_trip = _db.session.get(Trip, ok_trip_id)
+    assert ok_trip.last_checkpoint_alert_at is not None
+
+    failing_trip = _db.session.get(Trip, failing_trip_id)
+    assert failing_trip.last_checkpoint_alert_at is None

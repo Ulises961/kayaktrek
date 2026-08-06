@@ -80,3 +80,23 @@ def test_regenerating_invalidates_previous_token(client, make_private_itinerary,
 def test_unknown_token_returns_generic_404(client):
     r = client.get(f"{ITINERARY_ENDPOINT}/story/public/does-not-exist")
     assert r.status_code == 404
+
+
+def test_story_share_payload_excludes_private_fields(client, make_private_itinerary, auth_headers):
+    """Story payloads must not leak trip-level private data like crew contacts or medical notes."""
+    itinerary = make_private_itinerary()
+    token = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary.id}/story-share", headers=auth_headers
+    ).json["storyShareToken"]
+
+    r = client.get(f"{ITINERARY_ENDPOINT}/story/public/{token}")
+    assert r.status_code == 200
+    payload = r.json
+
+    # Verify no trip data leaks into the public story payload
+    assert "tripId" not in payload
+    assert "userId" not in payload
+    assert "trip" not in payload
+    # The payload should only contain itinerary and route data
+    assert "name" in payload
+    assert "id" in payload

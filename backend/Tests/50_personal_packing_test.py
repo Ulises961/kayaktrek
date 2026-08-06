@@ -192,3 +192,36 @@ def test_list_scoped_to_caller(client, auth_headers, trip_with_crew):
         for e in json.loads(client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=auth_headers).data)
     }
     assert item_id not in leader_item_ids
+
+
+# ---------------------------------------------------------------------------
+# Cascade behavior: deleting an item cascades to packing entries
+# ---------------------------------------------------------------------------
+
+def test_delete_item_cascades_packing_entries(client, trip_with_crew):
+    """Deleting an item cascades to PersonalPackingItem entries referencing it."""
+    from Resources.item_resource import ITEM_ENDPOINT
+
+    trip_id = trip_with_crew['trip']['id']
+    crew_headers = trip_with_crew['crew_headers']
+
+    # Create and add an item to the packing list
+    item_id = json.loads(_create_owned_item(client, crew_headers, "crew paddle").data)['id']
+    entry = json.loads(_add_packing(client, crew_headers, trip_id, item_id).data)
+    entry_id = entry['id']
+
+    # Verify it's there
+    packing_list = json.loads(
+        client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=crew_headers).data
+    )
+    assert entry_id in {e['id'] for e in packing_list}
+
+    # Delete the item
+    delete_response = client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=crew_headers)
+    assert delete_response.status_code == 200
+
+    # Packing entry should be cascade-deleted
+    packing_list_after = json.loads(
+        client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=crew_headers).data
+    )
+    assert entry_id not in {e['id'] for e in packing_list_after}

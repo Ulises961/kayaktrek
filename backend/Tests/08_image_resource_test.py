@@ -10,7 +10,11 @@ from unittest.mock import patch
 import io
 import json
 import pytest
+from uuid import UUID
 
+from Api.database import db as _db
+from Models.image import Image
+from Models.point_has_image import PointHasImage
 from Resources.point_resource import POINT_ENDPOINT
 
 _FAKE_IMAGE = b"\xff\xd8\xff" + b"X" * 600   # JPEG magic bytes + padding, > 512 B
@@ -244,3 +248,48 @@ def test_delete_image_nonexistent_returns_404(client, auth_headers, point):
             headers=auth_headers,
         )
     assert response.status_code == 404
+
+
+# ============================================================================
+# Cascade delete behavior (rubric 4: explicit cascade/constraint testing)
+# ============================================================================
+
+def test_cascade_delete_point_deletes_images(client, auth_headers, point, app):
+    """Deleting a point cascades to delete its images (verify via DB query)."""
+    point_id = point["id"]
+
+    # Upload an image to the point
+    with patch("Services.image_service.StorageService.upload", return_value=_MOCK_URL), \
+         patch("Services.image_service.StorageService.delete"), \
+         patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        upload_resp = client.post(
+            f"{POINT_ENDPOINT}/{point_id}/images",
+            data={"file": (io.BytesIO(_FAKE_IMAGE), "photo.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert upload_resp.status_code == 201
+    image_data = json.loads(upload_resp.data)
+    image_id = image_data["id"]
+
+    # Verify the image exists in the DB, attached to the point via the
+    # point_has_image junction table (Image has no direct point_id column).
+    with app.app_context():
+        image = _db.session.query(Image).filter_by(id=UUID(image_id)).first()
+        assert image is not None, "Image should exist after upload"
+        junction_row = _db.session.execute(
+            _db.select(PointHasImage).where(
+                PointHasImage.c.point_id == UUID(point_id),
+                PointHasImage.c.image_id == UUID(image_id),
+            )
+        ).first()
+        assert junction_row is not None, "Image should be linked to the point"
+
+    # Delete the point
+    delete_resp = client.delete(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
+    assert delete_resp.status_code == 200
+
+    # Verify the image is cascade-deleted from the DB
+    with app.app_context():
+        image = _db.session.query(Image).filter_by(id=UUID(image_id)).first()
+        assert image is None, "Image should be cascade-deleted when point is deleted"

@@ -19,6 +19,10 @@ def test_read_days_by_itinerary_returns_200(client, auth_headers, itinerary):
     resp = client.get(f"{DAY_ENDPOINT}/itinerary/{itinerary['id']}", headers=auth_headers)
     assert resp.status_code == 200
     assert isinstance(resp.json, list)
+    # This endpoint excludes day 0 (staging) — assert the actual numbered days
+    # come back, not just any list.
+    expected_ids = {d["id"] for d in itinerary["days"] if d["dayNumber"] != 0}
+    assert {d["id"] for d in resp.json} == expected_ids
 
 
 # ── GET /api/day/<id> ────────────────────────────────────────────────────────
@@ -93,12 +97,16 @@ def test_assign_points_missing_fields_returns_400(client, auth_headers, itinerar
 
 def test_assign_points_returns_200(client, auth_headers, itinerary):
     day = _a_day(itinerary)
+    other_day = next(d for d in itinerary["days"] if d["id"] != day["id"] and d["dayNumber"] != 0)
     point = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers, json={
-        "dayId": day["id"], "type": "position", "latitude": 44.0, "longitude": 8.5,
+        "dayId": other_day["id"], "type": "position", "latitude": 44.0, "longitude": 8.5,
     }).json
     resp = client.post(f"{DAY_ENDPOINT}/{day['id']}/assign", headers=auth_headers,
                        json={"startPointId": point["id"], "endPointId": point["id"]})
     assert resp.status_code == 200
+    # The consequence beyond the 200: the point actually moved to this day.
+    moved = client.get(f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers)
+    assert moved.json["dayId"] == day["id"]
 
 
 def test_assign_points_unreachable_end_returns_400(client, auth_headers, itinerary):
@@ -119,3 +127,5 @@ def test_delete_day_returns_200(client, auth_headers, itinerary):
     day = _a_day(itinerary)
     resp = client.delete(f"{DAY_ENDPOINT}/{day['id']}", headers=auth_headers)
     assert resp.status_code == 200
+    # The delete must actually take effect, not just return 200.
+    assert client.get(f"{DAY_ENDPOINT}/{day['id']}", headers=auth_headers).status_code == 404

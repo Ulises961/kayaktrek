@@ -162,15 +162,22 @@ def test_item_endpoint_requires_auth(client):
     assert response.status_code in (401, 403)
 
 
-def test_wrong_user_cannot_patch_item(client, outsider_headers, inventory_with_items):
-    """A user who does not own an item must receive 403 on PATCH."""
+def test_wrong_user_cannot_patch_item(client, auth_headers, outsider_headers, inventory_with_items):
+    """A user who does not own an item must receive 403 on PATCH, and the
+    attempted change must not have landed — re-fetch as the real owner."""
     item_id = inventory_with_items["items"][0]["id"]
+    original_name = inventory_with_items["items"][0]["name"]
     response = client.patch(
         f"{ITEM_ENDPOINT}/{item_id}",
         headers=outsider_headers,
         json={"name": "stolen"},
     )
     assert response.status_code == 403
+
+    owner_view = client.get(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+    assert owner_view.status_code == 200
+    assert json.loads(owner_view.data)["name"] == original_name
+
 
 
 def test_wrong_user_cannot_patch_trip(client, outsider_headers):

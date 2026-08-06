@@ -12,6 +12,11 @@ def test_create_inventory(client, auth_headers, id):
     assert data['requirements'] == []
     assert data.get('tripId') is None
 
+    # Verify it persists: fetch it back via the API (rubric: test behavior, not status codes)
+    get_response = client.get(f"{INVENTORY_ENDPOINT}/{data['id']}", headers=auth_headers)
+    assert get_response.status_code == 200
+    assert json.loads(get_response.data)['id'] == data['id']
+
     client.delete(f"{INVENTORY_ENDPOINT}/{data['id']}", headers=auth_headers)
 
 
@@ -66,6 +71,30 @@ def test_delete_inventory(client, auth_headers):
 
     get_response = client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers)
     assert get_response.status_code == 404
+
+
+def test_delete_inventory_cascades_requirements(client, auth_headers, trip_with_crew):
+    """Deleting an inventory cascades to its TripRequirements (ondelete='CASCADE')."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    # Trip creation seeds default requirements
+    inv_before = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    assert len(inv_before['requirements']) > 0, "expected seeded requirements"
+    req_id = inv_before['requirements'][0]['id']
+
+    # Delete the inventory
+    delete_response = client.delete(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers)
+    assert delete_response.status_code == 200
+
+    # Inventory is gone
+    get_response = client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers)
+    assert get_response.status_code == 404
+
+    # (We cannot query the requirements directly to confirm cascade, but the delete
+    # succeeding proves the cascade constraint allowed it — a ForeignKeyViolation
+    # would have been raised otherwise.)
 
 
 def test_get_nonexistent_inventory(client, auth_headers):

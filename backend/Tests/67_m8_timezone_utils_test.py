@@ -1,6 +1,6 @@
 """§8.1 Timezone helper + trip-transition tz resolution tests."""
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
@@ -57,6 +57,51 @@ def test_trip_today_uses_resolved_zone(monkeypatch):
 
     trip_utc = type("Trip", (), {"timezone_name": None})()
     assert timezone_utils.trip_today(trip_utc) == date(2026, 1, 1)
+
+
+# --- day_bounds_utc ---
+#
+# Used by ExpeditionLogService to bucket UTC-stamped PositionPing rows into a
+# trip-local calendar day. Previously exercised only indirectly through
+# expedition-log tests, all of which leave trip.timezone_name unset (UTC
+# fallback) — so a bug that only manifests for a resolved, offset timezone
+# would have slipped through untested.
+
+
+def test_day_bounds_utc_positive_offset_zone():
+    trip = type("Trip", (), {"timezone_name": "Pacific/Kiritimati"})()  # UTC+14, no DST
+    start, end = timezone_utils.day_bounds_utc(trip, date(2026, 1, 2))
+    assert start == datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 1, 2, 10, 0, tzinfo=timezone.utc)
+
+
+def test_day_bounds_utc_negative_offset_zone():
+    trip = type("Trip", (), {"timezone_name": "Pacific/Honolulu"})()  # UTC-10, no DST
+    start, end = timezone_utils.day_bounds_utc(trip, date(2026, 6, 15))
+    assert start == datetime(2026, 6, 15, 10, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 6, 16, 10, 0, tzinfo=timezone.utc)
+
+
+def test_day_bounds_utc_falls_back_to_utc_when_unresolved():
+    trip = type("Trip", (), {"timezone_name": None})()
+    start, end = timezone_utils.day_bounds_utc(trip, date(2026, 6, 15))
+    assert start == datetime(2026, 6, 15, 0, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 6, 16, 0, 0, tzinfo=timezone.utc)
+
+
+def test_day_bounds_utc_spans_only_23_hours_on_a_spring_forward_dst_day():
+    """A day containing a DST 'spring forward' transition is 23 wall-clock
+    hours wide in UTC. Asserting exactly that (not a naive +24h) proves each
+    endpoint's UTC offset is resolved from its own local date rather than
+    inherited from the day's start — the bug this would catch is subtle:
+    `start_local + timedelta(days=1)` looks like it should just work, and
+    silently degrading to fixed-offset arithmetic wouldn't raise anywhere,
+    it would just misbucket pings for an hour on two days a year."""
+    trip = type("Trip", (), {"timezone_name": "America/New_York"})()  # DST starts 2026-03-08 02:00 local
+    start, end = timezone_utils.day_bounds_utc(trip, date(2026, 3, 8))
+    assert start == datetime(2026, 3, 8, 5, 0, tzinfo=timezone.utc)  # EST, UTC-5
+    assert end == datetime(2026, 3, 9, 4, 0, tzinfo=timezone.utc)  # EDT, UTC-4
+    assert (end - start) == timedelta(hours=23)
 
 
 # --- TripService transition tz resolution ---

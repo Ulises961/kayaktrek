@@ -76,11 +76,21 @@ class TestFloatPlanShareGenerate:
             headers=trip_with_user2_as_crew["crew_headers"],
         )
         assert r.status_code == 403
+        # denial must be a true no-op — a crew member must not be able to mint a
+        # public link for a trip's private data even implicitly on a failed call
+        check = client.get(
+            f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"]
+        )
+        assert json.loads(check.data).get("shareToken") is None
 
     def test_non_member_cannot_generate_share_link(self, client, outsider_headers, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         r = client.post(f"{LOGISTICS_ENDPOINT}/{trip_id}/share", headers=outsider_headers)
         assert r.status_code == 403
+        check = client.get(
+            f"{LOGISTICS_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"]
+        )
+        assert json.loads(check.data).get("shareToken") is None
 
     def test_snapshot_excludes_medical_notes(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -178,8 +188,8 @@ class TestFloatPlanShareEmail:
 
     def test_leader_can_send_email_when_token_and_email_set(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
-        _set_shore_contact(client, trip_id, trip_with_user2_as_crew["leader_headers"])
-        _generate_share(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+        _set_shore_contact(client, trip_id, trip_with_user2_as_crew["leader_headers"], email="captain.shore@example.com")
+        share = _generate_share(client, trip_id, trip_with_user2_as_crew["leader_headers"])
         with patch("Services.logistics_service.send_template_email") as mock_send:
             r = client.post(
                 f"{LOGISTICS_ENDPOINT}/{trip_id}/share/email",
@@ -189,24 +199,33 @@ class TestFloatPlanShareEmail:
         mock_send.assert_called_once()
         _, kwargs = mock_send.call_args
         assert kwargs.get("template") == "float_plan_share" or mock_send.call_args[0][2] == "float_plan_share"
+        # The consequence that actually matters: the email goes to the shore
+        # contact that was configured, and its link embeds *this* trip's live
+        # share token — not some other trip's, and not a stale one.
+        assert kwargs["to"] == "captain.shore@example.com"
+        assert kwargs["float_plan_url"].endswith(f"/float-plan/{share['shareToken']}")
 
     def test_email_fails_with_400_when_no_token(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         _set_shore_contact(client, trip_id, trip_with_user2_as_crew["leader_headers"])
-        r = client.post(
-            f"{LOGISTICS_ENDPOINT}/{trip_id}/share/email",
-            headers=trip_with_user2_as_crew["leader_headers"],
-        )
+        with patch("Services.logistics_service.send_template_email") as mock_send:
+            r = client.post(
+                f"{LOGISTICS_ENDPOINT}/{trip_id}/share/email",
+                headers=trip_with_user2_as_crew["leader_headers"],
+            )
         assert r.status_code == 400
+        mock_send.assert_not_called()
 
     def test_email_fails_with_400_when_no_shore_contact_email(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         _generate_share(client, trip_id, trip_with_user2_as_crew["leader_headers"])
-        r = client.post(
-            f"{LOGISTICS_ENDPOINT}/{trip_id}/share/email",
-            headers=trip_with_user2_as_crew["leader_headers"],
-        )
+        with patch("Services.logistics_service.send_template_email") as mock_send:
+            r = client.post(
+                f"{LOGISTICS_ENDPOINT}/{trip_id}/share/email",
+                headers=trip_with_user2_as_crew["leader_headers"],
+            )
         assert r.status_code == 400
+        mock_send.assert_not_called()
 
     def test_crew_cannot_send_email(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from Api.database import db
 from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
+from Models.session import Session
 from Models.user import User
 
 USER_ENDPOINT = "/api/v1/user"
@@ -280,6 +281,44 @@ class TestVerifyEmailChange:
 
         r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r.status_code == 401
+
+    def test_verify_revokes_every_device_not_just_the_requesting_one(self, app, client):
+        """
+        AuthService.verify_email_change calls SessionService.revoke_all_for_user
+        (M17) — assert that consequence directly on a second, unrelated device,
+        not only on the token used to request the change (the case above).
+        Mirrors 74_m17_session_auth_test.py's multi-device pattern.
+        """
+        data, user = _register_active(client)
+        laptop = client.post(
+            "/api/v1/auth/login", json={"mail": data["mail"], "pwd": data["pwd"]},
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"},
+        ).get_json()
+        phone = client.post(
+            "/api/v1/auth/login", json={"mail": data["mail"], "pwd": data["pwd"]},
+            headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Safari/605.1"},
+        ).get_json()
+
+        headers = _elevated_headers(client, data, laptop["access_token"])
+        new_mail = f"multidevice_{uuid.uuid4().hex[:8]}@example.com"
+        with mail.record_messages() as outbox:
+            client.post(f"{USER_ENDPOINT}/me/email-change", headers=headers, json={"newMail": new_mail})
+        raw = _extract_token(outbox[0].body)
+        client.get(f"/api/v1/auth/verify-email-change?token={raw}")
+
+        # Both devices' refresh tokens must be dead, not just the one used to
+        # request the change.
+        assert client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": laptop["refresh_token"]}
+        ).status_code == 401
+        assert client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": phone["refresh_token"]}
+        ).status_code == 401
+
+        with app.app_context():
+            sessions = db.session.query(Session).filter_by(user_id=user.id).all()
+            assert len(sessions) == 2
+            assert all(s.revoked_at is not None for s in sessions)
 
     def test_login_with_new_email_works_after_verify(self, app, client):
         data, _ = _register_active(client)

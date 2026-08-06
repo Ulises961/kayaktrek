@@ -156,6 +156,17 @@ def test_stub_log_when_no_pings_and_no_itinerary_data(user_1):
     assert log.route_geojson is None
 
 
+def test_returns_none_and_writes_nothing_for_a_nonexistent_trip(user_1):
+    from uuid import uuid4
+
+    missing_trip_id = str(uuid4())
+
+    log = ExpeditionLogService.generate_day_log(missing_trip_id, str(user_1.id), _DAY_DATE)
+
+    assert log is None
+    assert _db.session.query(Log).filter_by(trip_id=missing_trip_id).count() == 0
+
+
 def test_idempotent_when_log_already_exists(user_1):
     trip_id, _day_id = _build_trip_with_itinerary(user_1)
 
@@ -213,6 +224,35 @@ def test_generate_trip_day_logs_fans_out_across_members(user_1, user_2):
 
     count = _db.session.query(Log).filter_by(trip_id=trip_id).count()
     assert count == 2
+
+
+def test_generate_trip_day_logs_isolates_one_members_failure_from_the_rest(user_1, user_2):
+    """A member whose log generation raises (malformed data, DB error, ...) must
+    not abort the fan-out for the other crew members — nightly_log_fallback only
+    ever dispatches this task for *yesterday*, so a member skipped here because an
+    earlier member's exception aborted the loop would never get that day's log."""
+    trip_id, _day_id = _build_trip_with_itinerary(user_1)
+    _db.session.add(TripMember(user_id=user_2.id, trip_id=trip_id, role=MemberRoleType.CREW))
+    _db.session.commit()
+
+    original_generate = ExpeditionLogService.generate_day_log
+    failing_user_id = str(user_1.id)
+
+    def _flaky(trip_id_arg, user_id_arg, day_date_arg):
+        if user_id_arg == failing_user_id:
+            raise RuntimeError("boom")
+        return original_generate(trip_id_arg, user_id_arg, day_date_arg)
+
+    with patch(
+        "Tasks.expedition_log_task.ExpeditionLogService.generate_day_log", side_effect=_flaky
+    ):
+        generate_trip_day_logs.run(str(trip_id), _DAY_DATE.isoformat())  # must not raise
+
+    assert _db.session.query(Log).filter_by(trip_id=trip_id, user_id=user_1.id).count() == 0
+    assert _db.session.query(Log).filter_by(trip_id=trip_id, user_id=user_2.id).count() == 1
+
+    # session left usable after the rollback — a plain query must not raise.
+    assert _db.session.query(Trip).filter_by(id=trip_id).count() == 1
 
 
 # --- nightly_log_fallback beat task ---

@@ -1,6 +1,7 @@
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from Api.database import db
 from Api.mail import mail
@@ -326,6 +327,65 @@ class TestMedicalNotesReset:
         db.session.refresh(user)
         assert user.medical_notes_reset_at is None
         assert user.medical_notes_ciphertext is not None
+
+
+# ---------------------------------------------------------------------------
+# Mail-failure resilience
+# ---------------------------------------------------------------------------
+#
+# Services/mail_service.send_template_email swallows every exception (logs and
+# returns) specifically so a transient SMTP outage never blocks the auth flow
+# that triggered it. That intent is never exercised elsewhere in this file —
+# every other test runs against the real (test-mode no-op) mail backend, which
+# never raises, so a regression that let a mail failure propagate and abort
+# the transaction would pass the whole suite.
+
+class TestMailFailureResilience:
+
+    def test_register_persists_user_even_if_email_send_fails(self, app, client):
+        """Registration must still create the (inactive) account when the
+        verification email itself fails to send."""
+        unique = uuid.uuid4().hex[:8]
+        numeric = str(int(unique, 16) % 100_000_000).zfill(8)
+        data = {
+            "mail": f"mailfail_{unique}@example.com",
+            "pwd": "MailFail9$",
+            "phone": f"+390{numeric}",
+            "name": "Mail",
+            "username": f"mailfail_{unique}",
+        }
+        with patch("Api.mail.mail.send", side_effect=Exception("smtp down")):
+            r = client.post("/api/v1/auth/register", json=data)
+        assert r.status_code == 201
+
+        user = User.query.filter_by(mail=data["mail"]).first()
+        assert user is not None
+        assert user.active is False
+
+    def test_reset_password_applies_even_if_notification_email_fails(self, app, client):
+        """A password reset that clears medical notes sends a notification email;
+        that email failing must not roll back the password change or the notes
+        wipe — the new password must still work for login."""
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
+        user.active = True
+        user.medical_notes_ciphertext = "ciphertext"
+        user.medical_notes_nonce = "nonce"
+        user.medical_notes_salt = "salt"
+        user.public_key = "pubkey"
+        db.session.commit()
+        raw = _insert_token(user.id, AuthTokenType.RESET)
+
+        with patch("Api.mail.mail.send", side_effect=Exception("smtp down")):
+            r = client.post("/api/v1/auth/reset-password", json={"token": raw, "pwd": "NewSecure9$"})
+        assert r.status_code == 200
+
+        db.session.refresh(user)
+        assert user.medical_notes_ciphertext is None
+
+        login = client.post("/api/v1/auth/login", json={"mail": d["mail"], "pwd": "NewSecure9$"})
+        assert login.status_code == 200
 
 
 # ---------------------------------------------------------------------------

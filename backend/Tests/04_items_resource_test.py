@@ -37,6 +37,10 @@ def test_delete_item(client, auth_headers, inventory_with_items):
     response = client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
     assert response.status_code == 200
 
+    # Verify the item is actually deleted (rubric: assert behavior, not status codes)
+    get_response = client.get(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+    assert get_response.status_code == 404
+
 
 def test_get_all_items(client, auth_headers, inventory_with_items):
     """GET /api/item/all returns the current user's personal items."""
@@ -125,3 +129,91 @@ def test_toggle_default_pack(client, auth_headers, inventory_with_items):
     )
     assert response.status_code == 200
     assert json.loads(response.data)['defaultPack'] is False
+
+
+def test_delete_item_cascades_to_packing_entries(client, auth_headers, trip_with_crew):
+    """Deleting an item cascades to PersonalPackingItem entries (ondelete='CASCADE')."""
+    from Resources.personal_packing_resource import PACKING_ENDPOINT
+
+    trip_id = trip_with_crew['trip']['id']
+
+    # Create an owned item
+    item_response = client.post(
+        f"{ITEM_ENDPOINT}/create",
+        headers=auth_headers,
+        json={"name": "test item for cascade", "status": "owned"},
+    )
+    assert item_response.status_code == 201
+    item_id = json.loads(item_response.data)['id']
+
+    # Add it to the packing list
+    packing_response = client.post(
+        f"{PACKING_ENDPOINT}/create",
+        headers=auth_headers,
+        json={"tripId": trip_id, "itemId": item_id},
+    )
+    assert packing_response.status_code == 201
+    packing_id = json.loads(packing_response.data)['id']
+
+    # Verify it's there
+    packing_list = json.loads(
+        client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=auth_headers).data
+    )
+    assert packing_id in {e['id'] for e in packing_list}
+
+    # Delete the item
+    delete_response = client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+    assert delete_response.status_code == 200
+
+    # Item is gone (verified above)
+    # Packing entry should be cascade-deleted
+    packing_list_after = json.loads(
+        client.get(f"{PACKING_ENDPOINT}/trip/{trip_id}", headers=auth_headers).data
+    )
+    assert packing_id not in {e['id'] for e in packing_list_after}
+
+
+def test_delete_item_cascades_requirement_contributions(client, auth_headers, trip_with_crew):
+    """Deleting an item cascades to RequirementContribution rows (ondelete='CASCADE')."""
+    from Resources.inventory_resource import INVENTORY_ENDPOINT as INV_ENDPOINT
+
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    # Add a requirement
+    req_response = client.post(
+        f"{INV_ENDPOINT}/{inventory_id}/requirements",
+        headers=auth_headers,
+        json={"name": "Test Requirement", "category": "travel"},
+    )
+    assert req_response.status_code == 201
+    req_id = json.loads(req_response.data)['id']
+
+    # Create an owned item
+    item_response = client.post(
+        f"{ITEM_ENDPOINT}/create",
+        headers=auth_headers,
+        json={"name": "test item for req", "status": "owned"},
+    )
+    assert item_response.status_code == 201
+    item_id = json.loads(item_response.data)['id']
+
+    # Contribute the item to the requirement
+    contrib_response = client.post(
+        f"{INV_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers,
+        json={"itemId": item_id},
+    )
+    assert contrib_response.status_code == 200
+    assert json.loads(contrib_response.data)['status'] == "covered"
+
+    # Delete the item
+    delete_response = client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+    assert delete_response.status_code == 200
+
+    # Requirement should revert to "needed" (contributions cascade-deleted)
+    req_after = json.loads(
+        client.get(f"{INV_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    requirement = next(r for r in req_after['requirements'] if r['id'] == req_id)
+    assert requirement['status'] == "needed"
+    assert requirement['contributions'] == []

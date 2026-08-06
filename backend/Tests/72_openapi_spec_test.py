@@ -38,9 +38,15 @@ def test_openapi_json_maps_auth_requirement_from_the_real_decorator_stack(client
 
 
 def test_docs_ui_is_served(client):
+    """Verify that the Swagger UI documentation page is served and loaded with the spec."""
     res = client.get("/api/v1/docs/")
     assert res.status_code == 200
+    # Check for Swagger UI content in the response
     assert b"swagger" in res.data.lower()
+    # Verify it's HTML (contains common HTML tags)
+    assert b"<!DOCTYPE" in res.data or b"<html" in res.data.lower()
+    # Verify the page references the OpenAPI spec endpoint
+    assert b"/api/v1/openapi.json" in res.data or b"openapi.json" in res.data
 
 
 def test_servers_url_plus_path_resolves_to_a_real_route(app, client):

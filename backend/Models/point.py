@@ -40,11 +40,19 @@ class Point(BaseModel):
         UUID, ForeignKey('point.id', ondelete="SET NULL"), nullable=True
     )
 
+    # passive_deletes=True: next_id already carries ondelete="SET NULL" at the DB
+    # level. Without this, SQLAlchemy's unit-of-work tries to order and null out
+    # next_id itself in Python before issuing deletes — which raises a "Circular
+    # dependency detected" FlushError the moment two Points being deleted in the
+    # same flush (e.g. via Day.points' cascade="all, delete") reference each other,
+    # even indirectly. The DB's own SET NULL handles this with no ordering problem
+    # at all; deferring to it entirely sidesteps the ORM's graph-sorting limitation.
     next: Mapped[Optional['Point']] = relationship(
         'Point',
         foreign_keys=[next_id],
         remote_side='Point.id',
         uselist=False,
+        passive_deletes=True,
     )
     images: Mapped[List["Image"]] = relationship(
         secondary=PointHasImage, lazy="subquery", cascade='all, delete'

@@ -243,8 +243,10 @@ class UserService:
         """
         Partially update a user's profile fields.
 
-        Only fields listed in _MUTABLE_FIELDS are applied. Password, if present,
-        is hashed before being stored. Avatar is managed through dedicated methods.
+        Only fields listed in _MUTABLE_FIELDS are applied. Avatar is managed
+        through dedicated methods. Password changes are NOT accepted here —
+        see change_password() below; UserUpdateSchema makes `pwd` dump_only
+        so a `pwd` key can never reach user_data in the first place.
 
         Args:
             id: UUID string of the user to update
@@ -266,9 +268,6 @@ class UserService:
                 key = camelcase(field)
                 if key in user_data:
                     setattr(saved_user, field, user_data[key])
-
-            if 'pwd' in user_data:
-                saved_user.pwd = generate_password_hash(user_data['pwd']).decode("UTF-8")
 
             db.session.commit()
             db.session.refresh(saved_user)
@@ -365,6 +364,8 @@ class UserService:
         """
         Verify current password then replace with the new one.
         If the user has an X25519 keypair, re-encrypts the private key under the new password.
+        If user has medical notes, sets medical_notes_reset_at flag to require re-consent
+        (security: old password may have been leaked, medical notes potentially compromised).
 
         Raises:
             NoResultFound: If user does not exist
@@ -377,6 +378,9 @@ class UserService:
         user.password_changed_at = datetime.now(timezone.utc)
         user.token_version += 1
         SessionService.revoke_all_for_user(user.id, reason="password_change")
+        # If user has medical notes, flag them for re-consent after password reset
+        if user.medical_notes_consent_at is not None:
+            user.medical_notes_reset_at = datetime.now(timezone.utc)
         if user.public_key:
             private_key_b64 = decrypt(
                 user.private_key_ciphertext,  # type: ignore

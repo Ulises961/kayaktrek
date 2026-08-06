@@ -22,6 +22,12 @@ def test_upload_only_calls_put_object_no_bucket_provisioning():
     fake_client.create_bucket.assert_not_called()
     fake_client.put_bucket_policy.assert_not_called()
 
+    # Verify put_object was called with the correct arguments
+    call_kwargs = fake_client.put_object.call_args.kwargs
+    assert call_kwargs["Key"] == "avatars/some-key.jpg"
+    assert call_kwargs["ContentType"] == "image/jpeg"
+    assert call_kwargs["Body"] == _FAKE_JPEG
+
 
 def test_upload_export_only_calls_put_object_no_bucket_provisioning():
     fake_client = MagicMock()
@@ -32,3 +38,9 @@ def test_upload_export_only_calls_put_object_no_bucket_provisioning():
     fake_client.head_bucket.assert_not_called()
     fake_client.create_bucket.assert_not_called()
     fake_client.put_bucket_policy.assert_not_called()
+
+    # Verify put_object was called with the correct arguments for exports
+    call_kwargs = fake_client.put_object.call_args.kwargs
+    assert call_kwargs["Key"] == "exports/some-export-key"
+    assert call_kwargs["ContentType"] == "application/json"
+    assert call_kwargs["Body"] == b'{"ok": true}'

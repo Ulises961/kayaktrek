@@ -72,10 +72,18 @@ class Trip(BaseModel):
         cascade="all, delete,save-update",
     )
     # Association object: full role-aware access
+    #
+    # passive_deletes=True: trip_member.trip_id already has ondelete="CASCADE" at the
+    # DB level (matching the reverse TripMember.trip side, which already sets
+    # passive_deletes=True) — deleting a Trip should just trust the DB cascade rather
+    # than the ORM re-deriving the same result. TripMember.__mapper_args__'s
+    # confirm_deleted_rows=False covers the remaining benign rowcount-mismatch warning
+    # this alone doesn't silence — see that model for why.
     trip_members: Mapped[List["TripMember"]] = relationship(
         "TripMember",
         back_populates="trip",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     # Viewonly convenience relationship — use trip_members for mutations
     travellers: Mapped[List["User"]] = relationship(
@@ -116,7 +124,19 @@ class Trip(BaseModel):
     timezone_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     def transition_state(self, new_state: TripStateType) -> None:
-        """Advance the trip state forward. Raises ValueError for invalid transitions."""
+        """Advance the trip state forward. Raises ValueError for invalid transitions.
+
+        A paused trip cannot transition state through this generic path — per
+        ADR-025 (docs/adr/trip-lifecycle.md), abort() is "the only way to reach
+        past without resuming" while paused. Without this guard, POST .../state
+        could carry a paused happening trip straight to past, leaving is_paused/
+        paused_at stale on a supposedly-terminal trip and defaulting outcome to
+        COMPLETED instead of the INTERRUPTED an aborted trip should record.
+        """
+        if self.is_paused:
+            raise ValueError(
+                f"Cannot transition trip '{self.id}' while paused — resume or abort first"
+            )
         if _VALID_TRANSITIONS.get(self.state) != new_state:
             raise ValueError(
                 f"Cannot transition from '{self.state.value}' to '{new_state.value}'"

@@ -19,14 +19,22 @@ def test_position_requires_auth(client, trip_with_user2_as_crew):
     assert r.status_code in (401, 403)
 
 
-def test_position_non_member_is_forbidden(client, outsider_headers, trip_with_user2_as_crew):
-    trip_id = trip_with_user2_as_crew["trip"]["id"]
+def test_position_non_member_is_forbidden(client, outsider_headers, trip_with_user2_as_crew, monkeypatch):
+    """A non-crew ping must be rejected AND must not reach persistence or broadcast —
+    not just answer 403 while quietly still writing the row."""
+    trip = trip_with_user2_as_crew["trip"]
+    _promote_to_happening(client, trip_with_user2_as_crew["leader_headers"], trip["id"])
+    fake_redis = _NoopRedis()
+    monkeypatch.setattr(live_position_service, "live_redis", lambda: fake_redis)
+
     r = client.post(
-        f"{LIVE_ENDPOINT}/trip/{trip_id}/position",
+        f"{LIVE_ENDPOINT}/trip/{trip['id']}/position",
         json={"lat": 43.0, "lon": 13.0},
         headers=outsider_headers,
     )
     assert r.status_code == 403
+    assert PositionPing.query.filter_by(trip_id=trip["id"]).all() == []
+    assert fake_redis.published == []
 
 
 def test_position_while_building_is_409(client, trip_with_user2_as_crew, monkeypatch):
@@ -71,6 +79,57 @@ def test_position_while_happening_persists_and_returns_201(client, trip_with_use
     pings = PositionPing.query.filter_by(trip_id=trip["id"]).all()
     assert len(pings) == 1
     assert pings[0].accuracy_m == 5.0
+
+
+def test_position_missing_required_fields_returns_400(client, trip_with_user2_as_crew, monkeypatch):
+    trip = trip_with_user2_as_crew["trip"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    _promote_to_happening(client, leader_headers, trip["id"])
+    monkeypatch.setattr(live_position_service, "live_redis", lambda: _NoopRedis())
+
+    r = client.post(f"{LIVE_ENDPOINT}/trip/{trip['id']}/position", json={"lat": 43.0}, headers=leader_headers)
+    assert r.status_code == 400
+    assert PositionPing.query.filter_by(trip_id=trip["id"]).all() == []
+
+
+def test_position_out_of_range_lat_returns_400(client, trip_with_user2_as_crew, monkeypatch):
+    trip = trip_with_user2_as_crew["trip"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    _promote_to_happening(client, leader_headers, trip["id"])
+    monkeypatch.setattr(live_position_service, "live_redis", lambda: _NoopRedis())
+
+    r = client.post(
+        f"{LIVE_ENDPOINT}/trip/{trip['id']}/position",
+        json={"lat": 200.0, "lon": 13.0},
+        headers=leader_headers,
+    )
+    assert r.status_code == 400
+    assert PositionPing.query.filter_by(trip_id=trip["id"]).all() == []
+
+
+def test_position_persists_even_when_broadcast_publish_fails(client, trip_with_user2_as_crew, monkeypatch):
+    """`_publish` is lossy by design (a dropped live broadcast must never fail the
+    request — the ping is already durably persisted). A raising Redis client must
+    still leave the caller with a 201 and a persisted row, not a 500."""
+    trip = trip_with_user2_as_crew["trip"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    _promote_to_happening(client, leader_headers, trip["id"])
+
+    class _BrokenRedis:
+        def publish(self, channel, message):
+            raise ConnectionError("redis unreachable")
+
+    monkeypatch.setattr(live_position_service, "live_redis", lambda: _BrokenRedis())
+
+    r = client.post(
+        f"{LIVE_ENDPOINT}/trip/{trip['id']}/position",
+        json={"lat": 43.5, "lon": 13.25},
+        headers=leader_headers,
+    )
+    assert r.status_code == 201
+    pings = PositionPing.query.filter_by(trip_id=trip["id"]).all()
+    assert len(pings) == 1
+    assert pings[0].lat == 43.5
 
 
 def test_position_publishes_camelcase_payload_to_trip_channel(client, trip_with_user2_as_crew, monkeypatch):

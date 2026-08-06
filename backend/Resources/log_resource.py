@@ -359,15 +359,22 @@ def post():
           content:
             application/json:
               schema: LogSchema
+        400:
+          description: Validation error
         409:
           description: Database integrity violated
     """
     try:
+        from marshmallow.exceptions import ValidationError
         log_json = request.get_json()
         log = LogService.create_log(log_json)
         return jsonify(LogSchema().dump(log)), HTTPStatus.CREATED
     except HTTPException:
         raise
+    except ValidationError as e:
+        logger.error(f"Validation error creating log: {e.messages}")
+        db.session.rollback()
+        abort(HTTPStatus.BAD_REQUEST, description=str(e.messages))
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
@@ -439,9 +446,11 @@ def update_log(id: str):
         updated_log = LogService.update_log(id, request.get_json())
 
         return jsonify(LogSchema().dump(updated_log)), HTTPStatus.OK
-    
+
     except HTTPException:
         raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
@@ -450,7 +459,7 @@ def update_log(id: str):
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
 
     except Exception as e:
-        logger.error(f"Error creating log: {e}")
+        logger.error(f"Error updating log: {e}")
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
@@ -473,6 +482,8 @@ def delete_log(id: str):
                 properties:
                   message:
                     type: string
+        404:
+          description: Log not found
         409:
           description: Database integrity violated
     """
@@ -481,17 +492,19 @@ def delete_log(id: str):
 
         LogService.delete_log(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-    
+
     except HTTPException:
         raise
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
         db.session.rollback()
-        abort(HTTPStatus.CONFLICT, message="Database integrity violated")
+        abort(HTTPStatus.CONFLICT, description="Database integrity violated")
 
     except Exception as e:
-        logger.error(f"Error creating log: {e}")
+        logger.error(f"Error deleting log: {e}")
         db.session.rollback()
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

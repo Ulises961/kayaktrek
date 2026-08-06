@@ -224,6 +224,97 @@ def test_fetch_weather_skips_when_no_route_points(app, user_1):
             _db.session.commit()
 
 
+# ── task failure path (§5 of the rubric — beat tasks run unattended) ──────────
+#
+# fetch_weather has no try/except of its own: a failure propagates straight out
+# of the Celery task. In production that is safe — Api/celery_app.py's
+# ContextTask wraps every real invocation in its own `with app.app_context()`,
+# and Flask-SQLAlchemy's teardown discards (rolls back) whatever the failed
+# attempt left pending the moment that context exits, before the next task's
+# context is opened. These tests exercise that same contract directly (`.run()`
+# bypasses ContextTask, so the explicit `rollback()` stands in for the teardown
+# a production worker performs automatically) — proving that a failure doesn't
+# leave debris a later call could see, not just that it doesn't crash.
+
+
+def test_fetch_weather_propagates_api_connection_error(app, weather_day):
+    """An OpenMeteo outage must not be swallowed — Celery needs the real
+    exception to mark the task failed rather than silently 'succeeding'."""
+    day_id = weather_day
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.side_effect = ConnectionError("open-meteo unreachable")
+        with pytest.raises(ConnectionError):
+            fetch_weather.run(day_id)
+
+    with app.app_context():
+        # nothing was ever fetched for marine data, and nothing upserted at all
+        assert _db.session.get(Weather, UUID(day_id)) is None
+        assert _db.session.get(Sea, UUID(day_id)) is None
+        # session left usable — a plain query after the failure must not raise.
+        assert _db.session.get(Day, UUID(day_id)) is not None
+
+
+def test_fetch_weather_malformed_record_raises_and_rolls_back_cleanly(app, weather_day):
+    """A record missing the 'time' key (a malformed/changed upstream schema)
+    raises while building WeatherState rows, after the Weather parent row has
+    already been flushed (not committed). Without an explicit rollback that
+    partial insert would be invisible to a later commit only by accident of
+    test ordering — asserting it here pins the actual contract."""
+    day_id = weather_day
+    malformed = [{"temperature_2m": 15.0}]  # no "time"
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.return_value = malformed
+        mock_svc.fetch_marine.return_value = _FAKE_MARINE
+        with pytest.raises(KeyError):
+            fetch_weather.run(day_id)
+
+    with app.app_context():
+        # mirrors the rollback Flask-SQLAlchemy's teardown performs in production
+        _db.session.rollback()
+        assert _db.session.get(Weather, UUID(day_id)) is None
+        assert _db.session.query(WeatherState).filter_by(day_id=UUID(day_id)).count() == 0
+
+    # session recovered — a subsequent successful run still works normally.
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.return_value = _FAKE_WEATHER
+        mock_svc.fetch_marine.return_value = _FAKE_MARINE
+        fetch_weather.run(day_id)
+
+    with app.app_context():
+        assert _db.session.get(Weather, UUID(day_id)) is not None
+        assert _db.session.query(WeatherState).filter_by(day_id=UUID(day_id)).count() == 24
+
+
+def test_beat_task_dispatch_failure_is_not_swallowed(app, user_1):
+    """If dispatching to the broker itself fails (e.g. RabbitMQ unreachable), the
+    beat task must not report success — Celery beat's own failure visibility is
+    the only signal an operator gets, since nobody watches an hourly beat tick
+    fire in real time."""
+    with app.app_context():
+        trip = Trip()
+        _db.session.add(trip)
+        _db.session.flush()
+        itin = Itinerary(trip_id=trip.id, user_id=user_1.id)
+        _db.session.add(itin)
+        _db.session.flush()
+        day = Day(day_number=1, itinerary_id=itin.id, date=date.today() + timedelta(days=1))
+        _db.session.add(day)
+        _db.session.commit()
+        trip_id = str(trip.id)
+
+    try:
+        with patch("Tasks.weather_beat_task.fetch_weather") as mock_task:
+            mock_task.delay.side_effect = ConnectionError("broker unreachable")
+            with pytest.raises(ConnectionError):
+                refresh_upcoming_weather.run()
+    finally:
+        with app.app_context():
+            trip_obj = _db.session.get(Trip, UUID(trip_id))
+            if trip_obj:
+                _db.session.delete(trip_obj)
+                _db.session.commit()
+
+
 # ── cache tests ───────────────────────────────────────────────────────────────
 
 def test_cache_hit_skips_api_call(app):

@@ -367,3 +367,54 @@ def test_cross_user_idor(client, auth_headers_2, idor_resources):
     ]
     for method, url, body, label in cases:
         _assert(client, method, url, 403, auth_headers_2, body=body, label=label)
+
+
+# ---------------------------------------------------------------------------
+# §4 — Denied writes must be true no-ops, not just a 403 response
+# ---------------------------------------------------------------------------
+#
+# §1-§3 above only assert the status code of the attempted write. A 403 with
+# the mutation silently applied anyway (e.g. a commit before the auth check
+# raises, or a service method that mutates before validating ownership) would
+# still pass every case above. Re-fetch a representative sample as the
+# legitimate owner afterwards and assert the attacker's payload never landed.
+
+def test_outsider_patch_attempts_are_true_no_ops(client, auth_headers, outsider_headers, idor_resources):
+    r = idor_resources
+
+    client.patch(f"{POINT_ENDPOINT}/{r['point_a_id']}", json={"name": "pwned"}, headers=outsider_headers)
+    point = json.loads(client.get(f"{POINT_ENDPOINT}/{r['point_a_id']}", headers=auth_headers).data)
+    assert point["name"] != "pwned"
+
+    client.patch(f"{ITEM_ENDPOINT}/{r['trip_item_a_id']}", json={"name": "pwned"}, headers=outsider_headers)
+    item = json.loads(client.get(f"{ITEM_ENDPOINT}/{r['trip_item_a_id']}", headers=auth_headers).data)
+    assert item["name"] != "pwned"
+
+    client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{r['doc_a_id']}", json={"name": "pwned"}, headers=outsider_headers)
+    docs = json.loads(client.get(f"{TRAVEL_DOCUMENT_ENDPOINT}/{r['trip_a_id']}/all", headers=auth_headers).data)
+    doc = next(d for d in docs if d["id"] == r["doc_a_id"])
+    assert doc["name"] != "pwned"
+
+
+def test_cross_trip_patch_attempts_are_true_no_ops(client, auth_headers, auth_headers_2, idor_resources):
+    r = idor_resources
+
+    client.patch(f"{ITINERARY_ENDPOINT}/{r['itin_b_id']}", json={"totalMiles": 1}, headers=auth_headers_2)
+    itin = json.loads(client.get(f"{ITINERARY_ENDPOINT}/{r['itin_b_id']}", headers=auth_headers).data)
+    assert itin["totalMiles"] != 1
+
+    client.patch(f"{DAY_ENDPOINT}/{r['day_b_id']}", json={"dayNumber": 99}, headers=auth_headers_2)
+    day = json.loads(client.get(f"{DAY_ENDPOINT}/{r['day_b_id']}", headers=auth_headers).data)
+    assert day["dayNumber"] != 99
+
+
+def test_cross_user_patch_attempts_are_true_no_ops(client, auth_headers, auth_headers_2, idor_resources):
+    r = idor_resources
+
+    client.patch(f"{LOG_ENDPOINT}/{r['log_a_id']}", json={"hours": 99}, headers=auth_headers_2)
+    log = json.loads(client.get(f"{LOG_ENDPOINT}/{r['log_a_id']}", headers=auth_headers).data)
+    assert log["hours"] != 99
+
+    client.patch(f"{USER_ENDPOINT}/{r['user_1_id']}", json={"name": "pwned"}, headers=auth_headers_2)
+    profile = json.loads(client.get(f"{USER_ENDPOINT}/{r['user_1_id']}", headers=auth_headers).data)
+    assert profile["name"] != "pwned"

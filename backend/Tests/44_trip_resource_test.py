@@ -2,6 +2,8 @@
 and membership validation, and not-found/conflict responses not covered by the
 trip / member / invitation test files.
 """
+import json
+
 from Resources.trip_resource import TRIP_ENDPOINT
 
 _FAKE_UUID = "00000000-0000-7000-8000-0000000000ee"
@@ -74,6 +76,11 @@ def test_remove_leader_returns_409(client, auth_headers, trip_w_o_itinerary, id)
     trip_id = trip_w_o_itinerary["id"]
     resp = client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/{id}", headers=auth_headers)
     assert resp.status_code == 409
+
+    # The rejected removal must be a true no-op — the leader is still on the trip.
+    check = client.get(f"{TRIP_ENDPOINT}/{trip_id}/member/me", headers=auth_headers)
+    assert check.status_code == 200
+    assert json.loads(check.data)["role"] == "leader"
 
 
 def test_get_my_membership_when_not_member_returns_404(client, auth_headers_2, trip_w_o_itinerary):

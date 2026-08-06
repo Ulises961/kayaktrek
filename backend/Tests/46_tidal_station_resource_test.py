@@ -133,3 +133,7 @@ def test_delete_station_happy_returns_200(client, admin_headers):
                           json={"name": "Doomed", "location": _point(-4.2, 50.4)}).json
     resp = client.delete(f"{STATION_ENDPOINT}/{created['id']}", headers=admin_headers)
     assert resp.status_code == 200
+
+    # The station must actually be gone, not merely a 200 on the route.
+    from Models.tidal_station import TidalStation
+    assert db.session.get(TidalStation, created["id"]) is None

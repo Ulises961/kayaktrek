@@ -186,3 +186,18 @@ def test_delete_by_non_member_returns_403(client, auth_headers, auth_headers_2, 
     diamond_id = _create(client, auth_headers, itinerary).get_json()["id"]
     resp = client.delete(f"{DIAMOND_BASE}/{diamond_id}", headers=auth_headers_2)
     assert resp.status_code == 403
+
+
+def test_delete_global_station_returns_403(client, auth_headers):
+    """Globally seeded atlas stations (itinerary_id is None) are not user-editable —
+    require_owner must reject the delete rather than removing a shared atlas diamond."""
+    station = TidalStation(name="Seeded", location=from_shape(ShapelyPoint(-4.0, 50.0), srid=4326))
+    _db.session.add(station)
+    _db.session.commit()
+    try:
+        resp = client.delete(f"{DIAMOND_BASE}/{station.id}", headers=auth_headers)
+        assert resp.status_code == 403
+        assert _db.session.get(TidalStation, station.id) is not None
+    finally:
+        _db.session.delete(station)
+        _db.session.commit()

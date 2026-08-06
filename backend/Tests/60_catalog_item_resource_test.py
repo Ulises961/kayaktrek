@@ -204,3 +204,55 @@ def test_create_trip_falls_back_to_defaults_without_catalog(client, outsider_hea
     assert all(r["catalogItemId"] is None for r in requirements)
 
     client.delete(f"{TRIP_ENDPOINT}/{trip_data['id']}", headers=outsider_headers)
+
+
+# ---------------------------------------------------------------------------
+# CatalogItem deletion and orphaned references
+# ---------------------------------------------------------------------------
+
+def test_delete_catalog_item_referenced_by_requirements(client, auth_headers, category_ids):
+    """When a CatalogItem is deleted, TripRequirements that reference it via
+    catalogItemId retain the stale reference (orphaned reference, not cascade-deleted).
+    This is acceptable: the reference is informational only (provenance tracking),
+    not a foreign key constraint. Seeded requirements survive catalog deletion."""
+    created = client.post(
+        f"{CATALOG_ITEM_ENDPOINT}/create",
+        json={"name": "Catalog drogue", "categoryId": category_ids["gear"]},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201
+    catalog_item = json.loads(created.data)
+    catalog_id = catalog_item["id"]
+
+    # Create a trip with this catalog
+    trip_response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": {"isPublic": True, "totalMiles": 0, "days": []}},
+        headers=auth_headers,
+    )
+    assert trip_response.status_code == 201
+    trip_data = json.loads(trip_response.data)
+    inventory_id = trip_data["inventory"]["id"]
+
+    # Get requirements — should have one seeded from the catalog
+    inv = json.loads(client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data)
+    requirements = inv["requirements"]
+    assert len(requirements) == 1, "should be seeded from the single catalog item"
+    assert requirements[0]["catalogItemId"] == catalog_id
+
+    # Delete the catalog item
+    delete_response = client.delete(f"{CATALOG_ITEM_ENDPOINT}/{catalog_id}", headers=auth_headers)
+    assert delete_response.status_code == 200
+
+    # Requirement should still exist (not cascade-deleted)
+    inv_after = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    requirements_after = inv_after["requirements"]
+    assert len(requirements_after) == 1
+    assert requirements_after[0]["id"] == requirements[0]["id"]
+    # The catalogItemId reference is now orphaned but still stored
+    assert requirements_after[0]["catalogItemId"] == catalog_id
+
+    # Cleanup
+    client.delete(f"{TRIP_ENDPOINT}/{trip_data['id']}", headers=auth_headers)

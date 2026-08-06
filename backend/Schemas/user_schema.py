@@ -157,11 +157,16 @@ class UserUpdateSchema(UserSchema):
 
     All fields are optional — only present fields are validated.
     mail is excluded: email changes require a dedicated verification flow.
-    pwd is accepted and validated here; the service handles hashing.
+    pwd is excluded: password changes go through PATCH /me/password
+    (Services.user_service.UserService.change_password), which verifies the
+    current password, bumps token_version, revokes other sessions, and
+    re-encrypts the X25519 private key under the new password. Accepting pwd
+    here would silently skip all four of those and corrupt the encrypted
+    medical-notes keypair for any user who has one.
     Medical notes fields are excluded — managed via dedicated consent endpoints.
     """
     mail = fields.Email(dump_only=True)
-    pwd = fields.String(load_only=True)
+    pwd = fields.String(dump_only=True)
     # allow_none so Settings can clear a stored number, not just change it
     phone = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(validate=lambda x: 3 <= len(x.strip()) <= 50)

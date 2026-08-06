@@ -2,6 +2,10 @@ from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Services.itinerary_service import ItineraryService
+from Api.database import db
+from Models.day import Day
+from Models.point import Point
+from uuid import UUID
 import json
 import types
 from datetime import date
@@ -59,6 +63,43 @@ def test_remove_days_from_itinerary(client, auth_headers, itinerary):
 def test_delete_itinerary(client, auth_headers, itinerary):
     response = client.delete(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers)
     assert response.status_code == 200
+    # The delete must actually take effect, not just return 200.
+    assert client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers).status_code == 404
+
+
+def test_delete_itinerary_cascades_days_and_points(client, auth_headers, itinerary):
+    """The GDPR-motivating cascade (plans/M16-backend-test-quality.md): deleting
+    an Itinerary must cascade-delete its Days and its Points cleanly (DB-level
+    ondelete=CASCADE down the itinerary -> day -> point chain), not raise a
+    ForeignKeyViolation and not leave orphaned rows behind.
+
+    Regression: Day.points had no ORM cascade, so SQLAlchemy's unit-of-work
+    NULLed each eager-loaded Point's day_id instead of deleting it — the DB-level
+    ondelete=CASCADE on Point.day_id never got a chance to fire. Fixed in
+    Models/day.py (points relationship now carries cascade="all, delete").
+    """
+    day0_id = next(d["id"] for d in itinerary["days"] if d["dayNumber"] == 0)
+    p1 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                      json={"dayId": day0_id, "type": "position",
+                            "latitude": 44.0, "longitude": 8.5}).json
+    p2 = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                      json={"dayId": day0_id, "type": "position",
+                            "latitude": 44.1, "longitude": 8.6}).json
+    # p1 -> p2 linked-list chain: exercises point.next_id (ON DELETE SET NULL)
+    # alongside the day/point CASCADE, so both FK rules fire in the same delete.
+    assert client.patch(f"{POINT_ENDPOINT}/{p1['id']}", headers=auth_headers,
+                        json={"next": p2}).status_code == 200
+
+    response = client.delete(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    assert client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers).status_code == 404
+
+    remaining_days = db.session.query(Day).filter_by(itinerary_id=UUID(itinerary['id'])).all()
+    assert remaining_days == []
+    remaining_points = db.session.query(Point).filter(
+        Point.id.in_([UUID(p1['id']), UUID(p2['id'])])
+    ).all()
+    assert remaining_points == []
 
 
 def test_apply_boundaries_clears_empty_day(client, auth_headers, itinerary):

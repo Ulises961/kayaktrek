@@ -131,6 +131,24 @@ class TestProxyFixWiring:
         assert isinstance(app.wsgi_app, ProxyFix)
         assert app.wsgi_app.x_for == 1
 
+    def test_requests_without_trusted_proxy_header_not_trusted_when_proxy_fix_disabled(self, monkeypatch):
+        """Regression guard: when PROXY_TRUSTED_HOPS is not set, X-Forwarded-For
+        must NOT be trusted, even if present. A client sending a spoofed X-Forwarded-For
+        to bypass rate limiting should see their real IP used, not the header value."""
+        monkeypatch.delenv("PROXY_TRUSTED_HOPS", raising=False)
+        from Api.app import createApp
+        from flask import request
+
+        app = createApp("testing")
+        with app.test_request_context(
+            "/api/v1/health",
+            headers={"X-Forwarded-For": "10.0.0.1"},
+            environ_base={"REMOTE_ADDR": "192.168.1.100"},
+        ):
+            # Without ProxyFix, the request.remote_addr should be the real address,
+            # not the spoofed X-Forwarded-For header
+            assert request.remote_addr == "192.168.1.100"
+
 
 # ---------------------------------------------------------------------------
 # KeyError handler no longer echoes the missing key name to the client — it can fire

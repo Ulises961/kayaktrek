@@ -133,6 +133,10 @@ def test_nominate_successor_non_leader_forbidden(app, client, trip_with_two_crew
     )
     assert r.status_code == 403
 
+    # The denial must be a true no-op — nobody got nominated.
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["leader_headers"]).data)
+    assert all(not m["nominatedSuccessor"] for m in trip["travellers"])
+
 
 def test_nominate_successor_target_not_member_404(app, client, trip_with_two_crew, outsider_headers):
     t = trip_with_two_crew
@@ -162,6 +166,11 @@ def test_clear_nomination_leader_only(app, client, trip_with_two_crew):
     forbidden = client.delete(f"{TRIP_ENDPOINT}/{t['trip_id']}/nominate-successor", headers=t["crew_a_headers"])
     assert forbidden.status_code == 403
 
+    # The denial must be a true no-op — crew_a is still nominated.
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["leader_headers"]).data)
+    by_id = {m["user"]["id"]: m for m in trip["travellers"]}
+    assert by_id[t["crew_a_id"]]["nominatedSuccessor"] is True
+
     ok = client.delete(f"{TRIP_ENDPOINT}/{t['trip_id']}/nominate-successor", headers=t["leader_headers"])
     assert ok.status_code == 200
 
@@ -184,11 +193,22 @@ def test_claim_leadership_blocked_when_leader_present(app, client, trip_with_two
     r = client.post(f"{TRIP_ENDPOINT}/{t['trip_id']}/claim-leadership", headers=t["crew_a_headers"])
     assert r.status_code == 409
 
+    # The rejected claim must be a true no-op — crew_a is still crew, leader still leader.
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["leader_headers"]).data)
+    by_id = {m["user"]["id"]: m for m in trip["travellers"]}
+    assert by_id[t["crew_a_id"]]["role"] == "crew"
+    assert any(m["role"] == "leader" for m in trip["travellers"])
+
 
 def test_claim_leadership_non_member_forbidden(app, client, trip_with_two_crew, outsider_headers):
     t = trip_with_two_crew
     r = client.post(f"{TRIP_ENDPOINT}/{t['trip_id']}/claim-leadership", headers=outsider_headers)
     assert r.status_code == 403
+
+    # The outsider must not have been added as a member of the trip.
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["leader_headers"]).data)
+    member_user_ids = {m["user"]["id"] for m in trip["travellers"]}
+    assert len(member_user_ids) == 3  # leader + crew_a + crew_b, unchanged
 
 
 def test_claim_leadership_first_come_first_serve_when_not_nominated(app, client, trip_with_two_crew):
@@ -215,6 +235,13 @@ def test_claim_leadership_nominee_exclusive_when_nominated(app, client, trip_wit
     rejected = client.post(f"{TRIP_ENDPOINT}/{t['trip_id']}/claim-leadership", headers=t["crew_b_headers"])
     assert rejected.status_code == 403
 
+    # The rejected claim must be a true no-op — crew_b is still crew, the trip is
+    # still leaderless (nobody but the nominee may claim).
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["crew_a_headers"]).data)
+    by_id = {m["user"]["id"]: m for m in trip["travellers"]}
+    assert by_id[t["crew_b_id"]]["role"] == "crew"
+    assert not any(m["role"] == "leader" for m in trip["travellers"])
+
     accepted = client.post(f"{TRIP_ENDPOINT}/{t['trip_id']}/claim-leadership", headers=t["crew_a_headers"])
     assert accepted.status_code == 200
 
@@ -237,6 +264,16 @@ def test_claim_leadership_blocked_on_archived_trip(app, client, trip_with_two_cr
 
     r = client.post(f"{TRIP_ENDPOINT}/{t['trip_id']}/claim-leadership", headers=t["crew_a_headers"])
     assert r.status_code == 409
+
+    # The rejected claim must be a true no-op — the trip stays leaderless and archived.
+    with app.app_context():
+        _db.session.expire_all()
+        remaining_leader = _db.session.query(TripMember).filter_by(
+            trip_id=UUID(t["trip_id"]), role=MemberRoleType.LEADER
+        ).first()
+        assert remaining_leader is None
+        trip = _db.session.query(Trip).filter_by(id=UUID(t["trip_id"])).first()
+        assert trip.state == TripStateType.ARCHIVED
 
 
 def test_claim_leadership_clears_shared_medical_notes_trip_wide(app, client, trip_with_two_crew):

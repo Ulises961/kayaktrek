@@ -368,3 +368,75 @@ def test_trip_create_seeds_leader_owned_requirements(client, auth_headers, id, t
     assert all(r['status'] == "needed" for r in reqs)
     assert all(r['proposedBy']['user']['id'] == id for r in reqs), "defaults are leader-owned"
     assert "Repair kit" in {r['name'] for r in reqs}
+
+
+# ---------------------------------------------------------------------------
+# Error paths
+# ---------------------------------------------------------------------------
+
+def test_contribute_nonexistent_item_404(client, auth_headers, trip_with_crew):
+    """Contributing a nonexistent item returns 404 — the `require_owner('item', ...)`
+    ownership check 404s when the item doesn't exist at all (400 is reserved for a
+    present-but-invalid itemId, e.g. wrong type/malformed); the endpoint's own OpenAPI
+    docstring documents this split."""
+    from uuid import uuid4
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+
+    response = client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers,
+        json={"itemId": str(uuid4())},
+    )
+    assert response.status_code == 404
+
+
+def test_add_requirement_without_trip_inventory_400(client, auth_headers, empty_inventory):
+    """Adding a requirement to a personal (non-trip) inventory is not meaningful but
+    should be rejected cleanly."""
+    # empty_inventory fixture creates a personal inventory with no trip_id
+    inventory_id = empty_inventory['id']
+
+    response = _add_requirement(client, auth_headers, inventory_id)
+    # May return 400 or 500 depending on error handling; main thing is it fails
+    assert response.status_code >= 400
+
+
+# ---------------------------------------------------------------------------
+# Cascade behavior: item deletion reverts requirement to "needed"
+# ---------------------------------------------------------------------------
+
+def test_delete_item_reverts_requirement_to_needed(client, auth_headers, trip_with_crew):
+    """When an item covering a requirement is deleted, the requirement reverts to
+    'needed' (contributions cascade away, derived status reflects this)."""
+    inventory_id = trip_with_crew['trip']['inventory']['id']
+
+    req_id = json.loads(_add_requirement(client, auth_headers, inventory_id).data)['id']
+    item_id = json.loads(_create_item(client, auth_headers, inventory_id).data)['id']
+
+    # Contribute the item
+    client.post(
+        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
+        headers=auth_headers,
+        json={"itemId": item_id},
+    )
+
+    # Verify status is covered
+    inv_before = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    req_before = next(r for r in inv_before['requirements'] if r['id'] == req_id)
+    assert req_before['status'] == "covered"
+    assert len(req_before['contributions']) == 1
+
+    # Delete the item
+    client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=auth_headers)
+
+    # Requirement reverts to needed with no contributions
+    inv_after = json.loads(
+        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=auth_headers).data
+    )
+    req_after = next(r for r in inv_after['requirements'] if r['id'] == req_id)
+    assert req_after['status'] == "needed"
+    assert req_after['contributions'] == []

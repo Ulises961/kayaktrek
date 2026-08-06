@@ -34,6 +34,7 @@ from uuid import UUID
 import pytest
 
 from Api.database import db
+from Models.point import Point
 from Models.travel_document import TravelDocument
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.travel_document_resource import TRAVEL_DOCUMENT_ENDPOINT
@@ -130,7 +131,7 @@ def test_image_upload_too_large(client, auth_headers, point):
     assert r.status_code == 400, f"expected 400, got {r.status_code}"
 
 
-def test_image_upload_php_spoofing(client, auth_headers, point):
+def test_image_upload_php_spoofing(client, app, auth_headers, point):
     """
     PHP bytes submitted with filename photo.jpg must be rejected.
     python-magic inspects the raw bytes and detects text/x-php, which is not
@@ -138,6 +139,12 @@ def test_image_upload_php_spoofing(client, auth_headers, point):
     """
     r = _image_post(client, auth_headers, point["id"], _PHP_BYTES, "photo.jpg")
     assert r.status_code == 400, f"PHP bytes accepted as image → {r.status_code}"
+    # The 400 must be a true no-op, not a row left behind by a validation
+    # failure that raised after the DB write — StorageService.upload runs
+    # before Image row creation, so a rejected upload must leave zero images.
+    with app.app_context():
+        pt = db.session.get(Point, UUID(point["id"]))
+        assert pt.images == []
 
 
 def test_image_upload_html_spoofing(client, auth_headers, point):
@@ -214,13 +221,18 @@ def test_doc_upload_too_large(client, auth_headers, travel_doc):
     assert r.status_code == 400, f"expected 400, got {r.status_code}"
 
 
-def test_doc_upload_php_spoofing(client, auth_headers, travel_doc):
+def test_doc_upload_php_spoofing(client, app, auth_headers, travel_doc):
     """
     PHP bytes submitted with filename booking.pdf must be rejected.
     python-magic detects text/x-php, not in ALLOWED_DOCUMENT_MIMES.
     """
     r = _doc_post(client, auth_headers, travel_doc["id"], _PHP_BYTES, "booking.pdf")
     assert r.status_code == 400, f"PHP bytes accepted as document → {r.status_code}"
+    # A rejected upload must not leave a dangling attachment_path — the object
+    # was never written, so the DB row must not claim otherwise.
+    with app.app_context():
+        doc = db.session.query(TravelDocument).filter_by(id=UUID(travel_doc["id"])).first()
+        assert doc.attachment_path is None
 
 
 def test_doc_upload_image_bytes_rejected(client, auth_headers, travel_doc):

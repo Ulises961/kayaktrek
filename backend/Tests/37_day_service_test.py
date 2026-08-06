@@ -198,3 +198,43 @@ def test_update_day_sea_create_then_update_then_remove(itinerary_with_days):
 def test_delete_day_not_found_raises(client, auth_headers):
     with pytest.raises(NoResultFound):
         DayService.delete_day(_FAKE_UUID)
+
+
+def test_delete_day_moves_its_points_to_staging_day(itinerary_with_days):
+    """delete_day's real consequence: a deleted day's points are reassigned to
+    Day 0 (staging), not left with a dangling day_id — Point.day_id has no
+    ondelete rule of its own at the column level (only the table-level
+    ForeignKeyConstraint cascades), so leaving this untested would hide a
+    regression to a silent orphan/cascade-delete instead of a relocation.
+    """
+    day0_id = itinerary_with_days["day0_id"]
+    target = itinerary_with_days["target_day_id"]
+
+    p1 = _make_point(target)
+    p2 = _make_point(target, next_id=p1.id)
+
+    DayService.delete_day(target)
+
+    assert db.session.get(Day, uuid.UUID(target)) is None
+    assert str(db.session.get(Point, p1.id).day_id) == day0_id
+    assert str(db.session.get(Point, p2.id).day_id) == day0_id
+    # The linked-list link itself is untouched by the move.
+    assert db.session.get(Point, p2.id).next_id == p1.id
+
+
+def test_delete_staging_day_cascade_deletes_its_own_points(itinerary_with_days):
+    """Deleting Day 0 itself is a degenerate case of the same code path: the
+    "move to day0" query finds day_to_delete == day0, so it is a no-op, and the
+    points are cascade-deleted along with their day (Point's day_id FK is
+    ondelete=CASCADE). Nothing in DayService or the day resource currently
+    guards against a client deleting the staging day — this pins the resulting
+    behaviour (silent data loss of any unplaced points) so a future change to
+    that guard is a deliberate decision, not an accidental regression either way.
+    """
+    day0_id = itinerary_with_days["day0_id"]
+    p1 = _make_point(day0_id)
+
+    DayService.delete_day(day0_id)
+
+    assert db.session.get(Day, uuid.UUID(day0_id)) is None
+    assert db.session.get(Point, p1.id) is None

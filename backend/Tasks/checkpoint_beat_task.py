@@ -68,11 +68,21 @@ def check_missed_checkpoints(self, request_id: Optional[str] = None) -> None:
         if latest_ping is None or now - latest_ping.recorded_at < threshold:
             continue
 
-        _send_checkpoint_alert(trip, today_day, now)
-        trip.last_checkpoint_alert_at = now
-        alerted += 1
+        try:
+            _send_checkpoint_alert(trip, today_day, now)
+            trip.last_checkpoint_alert_at = now
+            db.session.commit()
+            alerted += 1
+        except Exception:
+            # Isolate one trip's failure (e.g. mail service down) from the rest of
+            # the batch — committing per-trip means a mid-batch exception can only
+            # discard *this* trip's uncommitted change, not the alerts already
+            # confirmed sent for trips processed earlier in the same hourly run.
+            # Not re-alerting here is correct: last_checkpoint_alert_at stays
+            # unset, so the trip is retried on the next hourly beat tick.
+            logger.exception("checkpoint_alert_failed", extra={"trip_id": str(trip.id)})
+            db.session.rollback()
 
-    db.session.commit()
     logger.info(
         "checkpoint_beat_dispatched",
         extra={"task_id": self.request.id, "request_id": request_id, "alerted": alerted, "run_date": str(run_date)},

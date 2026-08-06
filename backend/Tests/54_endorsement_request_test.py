@@ -65,6 +65,8 @@ def test_create_by_non_author_returns_403(client, trip_with_user2_as_crew, id):
     log_id = _create_trip_log(client, leader, trip_with_user2_as_crew["trip"]["id"])
     resp = _request(client, crew, logId=log_id, addresseeId=id)
     assert resp.status_code == 403
+    # Verify no endorsement request was created
+    assert db.session.query(EndorsementRequest).count() == 0
 
 
 def test_create_for_standalone_log_returns_422(client, auth_headers, id_2):
@@ -82,6 +84,8 @@ def test_create_for_non_member_returns_403(
     log_id = _create_trip_log(client, leader, trip_with_user2_as_crew["trip"]["id"])
     resp = _request(client, leader, logId=log_id, addresseeUsername="outsider_tmp")
     assert resp.status_code == 403
+    # Verify no endorsement request was created
+    assert db.session.query(EndorsementRequest).count() == 0
 
 
 def test_create_self_returns_403(client, trip_with_user2_as_crew, id):
@@ -89,6 +93,8 @@ def test_create_self_returns_403(client, trip_with_user2_as_crew, id):
     log_id = _create_trip_log(client, leader, trip_with_user2_as_crew["trip"]["id"])
     resp = _request(client, leader, logId=log_id, addresseeId=id)
     assert resp.status_code == 403
+    # Verify no endorsement request was created
+    assert db.session.query(EndorsementRequest).count() == 0
 
 
 def test_create_blocked_returns_403(client, trip_with_user2_as_crew, id_2):
@@ -97,6 +103,8 @@ def test_create_blocked_returns_403(client, trip_with_user2_as_crew, id_2):
     assert client.post(BLOCK_ENDPOINT, headers=leader, json={"blockedId": id_2}).status_code == 201
     resp = _request(client, leader, logId=log_id, addresseeId=id_2)
     assert resp.status_code == 403
+    # Verify no endorsement request was created
+    assert db.session.query(EndorsementRequest).count() == 0
 
 
 def test_create_duplicate_returns_409(client, trip_with_user2_as_crew, id_2):
@@ -176,6 +184,8 @@ def test_delete_by_outsider_returns_403(
     log_id = _create_trip_log(client, leader, trip_with_user2_as_crew["trip"]["id"])
     created = _request(client, leader, logId=log_id, addresseeId=id_2).json
     assert client.delete(f"{ER}/{created['id']}", headers=outsider_headers).status_code == 403
+    # Verify the endorsement request still exists
+    assert db.session.query(EndorsementRequest).count() == 1
 
 
 def test_delete_unknown_returns_404(client, auth_headers):

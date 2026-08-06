@@ -285,10 +285,13 @@ def get(id: str):
 @require_self()
 def update_user(id: str):
     """
-    Partially update a user's profile (name, surname, phone, username, password).
+    Partially update a user's profile (name, surname, phone, username, and other
+    profile fields).
 
     Only fields present in the request body are applied. Email changes require
-    a dedicated verification flow and are not accepted here.
+    a dedicated verification flow and are not accepted here. Password changes
+    are not accepted here either — use PATCH /api/v1/user/me/password, which
+    verifies the current password and revokes other sessions.
 
     Args:
         id: UUID of the user to update

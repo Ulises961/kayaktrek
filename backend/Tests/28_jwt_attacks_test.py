@@ -19,11 +19,16 @@ the only thing distinguishing valid from invalid is the specific flaw under test
 
 §3  Claim tampering
       - Valid-signature token but user_id references a non-existent user → 401
+      - Valid-signature token missing the `sid` claim (pre-M17 shape, or a forgery
+        that never had one) → 401. `session_is_live` treats no-`sid` as "not live"
+        by design (ADR-035) — this is the one-time logout the M17 rollout accepts.
 
-§4  Known gap — password change does not revoke outstanding tokens
-      Stateless JWT: no jti / revocation list implemented yet.
-      The test asserts the CURRENT behaviour (token stays valid) and documents
-      the gap so it can be addressed before production launch.
+§4  Password change revokes outstanding tokens (M11 §2 / M17, ADR-032/035)
+      A token issued before a password change is rejected afterwards — the
+      per-user token_version bump is the global kill switch. See
+      Tests/74_m17_session_auth_test.py for the fuller per-device reuse-detection
+      and instant-revocation surface (M17); this file only covers the
+      password-change trigger as a JWT-claim-tampering-adjacent case.
 """
 import base64
 import json
@@ -198,6 +203,62 @@ def test_nonexistent_user_id_rejected(client, app):
     token = _forge(app, {"user_id": DUMMY_UUID, "email": "ghost@example.com"})
     r = client.get(_PROTECTED, headers=_bearer(token))
     assert r.status_code == 401, f"non-existent user token accepted → {r.status_code}"
+
+
+def test_token_with_no_sid_is_never_honoured(client, app, user_1):
+    """
+    A correctly signed, unexpired, otherwise-valid access token with no `sid` claim
+    must still be rejected (ADR-035): `JWTService.session_is_live` treats a missing
+    `sid` as "not live" rather than skipping the revocation check, since there would
+    be nothing to look up in the denylist either way. This is the one specific
+    compatibility case for tokens issued before per-device sessions existed — a real
+    attack surface if it silently degraded to "trust the token" instead.
+    """
+    token = _forge(app, {
+        "user_id": str(user_1.id),
+        "email": user_1.mail,
+        "tv": user_1.token_version,
+        # no "sid" key at all
+    })
+    r = client.get(_PROTECTED, headers=_bearer(token))
+    assert r.status_code == 401, f"sid-less token accepted → {r.status_code}"
+
+
+def test_token_with_sid_for_a_different_users_session_still_authenticates_as_the_signed_user(
+    client, app, user_1, user_2
+):
+    """
+    `sid` only gates revocation, not identity — `g.current_user_id` is always taken
+    from the signed `user_id` claim. A token can't be used to "borrow" another
+    session's authorization by citing its `sid`; at most it rides along on that
+    session's live/revoked status. Pin this down explicitly since it is easy to
+    accidentally wire identity resolution off the wrong claim in a refactor.
+    """
+    from Models.session import Session
+    from Api.database import db as _db2
+
+    with app.app_context():
+        other_session = Session()
+        other_session.user_id = user_2.id
+        other_session.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        _db2.session.add(other_session)
+        _db2.session.commit()
+        other_sid = str(other_session.id)
+
+    token = _forge(app, {
+        "user_id": str(user_1.id),
+        "email": user_1.mail,
+        "tv": user_1.token_version,
+        "sid": other_sid,
+    })
+    r = client.get(_PROTECTED, headers=_bearer(token))
+    assert r.status_code == 200, f"valid token with borrowed sid rejected → {r.status_code}: {r.data}"
+    body = json.loads(r.data)
+    assert body["id"] == str(user_1.id), "authenticated as the wrong user"
+
+    with app.app_context():
+        _db2.session.delete(_db2.session.get(Session, UUID(other_sid)))
+        _db2.session.commit()
 
 
 # ---------------------------------------------------------------------------

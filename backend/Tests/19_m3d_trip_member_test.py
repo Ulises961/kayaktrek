@@ -135,6 +135,12 @@ def test_set_trip_medical_notes_requires_elevated_token(client, auth_headers, tr
     )
     assert response.status_code == 403
 
+    # The denial must be a true no-op — no notes got stored without the elevated token.
+    membership = json.loads(
+        client.get(f"{TRIP_ENDPOINT}/{trip_id}/member/me", headers=auth_headers).data
+    )
+    assert membership["hasTripMedicalNotes"] is False
+
 
 def test_set_trip_medical_notes_success(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -218,11 +224,29 @@ def test_get_trip_medical_notes_wrong_password(client, auth_headers, trip_with_u
 
 def test_revoke_trip_medical_notes_requires_elevated_token(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
+
+    headers = _elevated_headers(client, auth_headers)
+    client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        headers=headers,
+    )
+
     response = client.delete(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
         headers=auth_headers,
     )
     assert response.status_code == 403
+
+    # The denial must be a true no-op — the notes set up above must survive it.
+    membership = json.loads(
+        client.get(f"{TRIP_ENDPOINT}/{trip_id}/member/me", headers=auth_headers).data
+    )
+    assert membership["hasTripMedicalNotes"] is True
+
+    # Cleanup
+    headers = _elevated_headers(client, auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=headers)
 
 
 def test_revoke_trip_medical_notes_success(client, auth_headers, trip_with_user2_as_crew):
@@ -244,12 +268,30 @@ def test_revoke_trip_medical_notes_success(client, auth_headers, trip_with_user2
 
 def test_share_medical_notes_requires_elevated_token(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
+
+    headers = _elevated_headers(client, auth_headers)
+    client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        headers=headers,
+    )
+
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
         json={"password": _USER_1_PWD},
         headers=auth_headers,
     )
     assert response.status_code == 403
+
+    # The denial must be a true no-op — the notes must not have been shared with the leader.
+    membership = json.loads(
+        client.get(f"{TRIP_ENDPOINT}/{trip_id}/member/me", headers=auth_headers).data
+    )
+    assert membership["hasLeaderMedicalNotes"] is False
+
+    # Cleanup
+    headers = _elevated_headers(client, auth_headers)
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=headers)
 
 
 def test_share_medical_notes_success(client, auth_headers, trip_with_user2_as_crew):
@@ -507,8 +549,14 @@ def test_read_member_medical_notes_crew_forbidden(client, auth_headers_2, trip_w
     )
     assert response.status_code == 403
 
+    # The denial must be a true no-op — no access-log row for an unauthorized attempt.
+    log_response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert json.loads(log_response.data) == []
 
-def test_read_member_medical_notes_requires_elevated_token(client, auth_headers, trip_with_user2_as_crew):
+
+def test_read_member_medical_notes_requires_elevated_token(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
     """Endpoint requires an elevated token, not just a regular JWT."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     crew_id = trip_with_user2_as_crew["crew_id"]
@@ -519,6 +567,12 @@ def test_read_member_medical_notes_requires_elevated_token(client, auth_headers,
         headers=auth_headers,
     )
     assert response.status_code == 403
+
+    # The denial must be a true no-op — no access-log row for a non-elevated attempt.
+    log_response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
+    )
+    assert json.loads(log_response.data) == []
 
 
 # =============================================================================

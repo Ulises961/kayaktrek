@@ -43,6 +43,18 @@ def _create_vehicle(client, trip_id: str, headers: dict, **kwargs) -> dict:
     return json.loads(r.data)
 
 
+def _list_docs(client, trip_id: str, headers: dict) -> dict:
+    r = client.get(f"{TRAVEL_DOCUMENT_ENDPOINT}/{trip_id}/all", headers=headers)
+    assert r.status_code == 200, r.data
+    return {d["id"]: d for d in json.loads(r.data)}
+
+
+def _list_vehicles(client, trip_id: str, headers: dict) -> dict:
+    r = client.get(f"{SHUTTLE_ENDPOINT}/{trip_id}/all", headers=headers)
+    assert r.status_code == 200, r.data
+    return {v["id"]: v for v in json.loads(r.data)}
+
+
 # ===========================================================================
 # Logistics — GET / PUT
 # ===========================================================================
@@ -208,6 +220,10 @@ class TestTravelDocumentUpdate:
                          json={"name": "Hacked"})
         assert r.status_code == 403
 
+        # The rejected update must be a true no-op.
+        docs = _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+        assert docs[doc["id"]]["name"] == "Hotel Marisol"
+
     def test_expiry_before_date_returns_422(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
@@ -229,6 +245,7 @@ class TestTravelDocumentDelete:
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 204
+        assert doc["id"] not in _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
     def test_leader_can_delete_any_document(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -237,6 +254,7 @@ class TestTravelDocumentDelete:
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                           headers=trip_with_user2_as_crew["leader_headers"])
         assert r.status_code == 204
+        assert doc["id"] not in _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
     def test_non_owner_crew_cannot_delete(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -246,12 +264,17 @@ class TestTravelDocumentDelete:
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 403
 
+        # The rejected delete must be a true no-op — the document still exists.
+        assert doc["id"] in _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+
     def test_non_member_gets_403(self, client, outsider_headers, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
                           date="2026-10-01")
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=outsider_headers)
         assert r.status_code == 403
+
+        assert doc["id"] in _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
 
 # ===========================================================================
@@ -437,6 +460,10 @@ class TestShuttleVehicleUpdate:
                          json={"seatsAvailable": 99})
         assert r.status_code == 403
 
+        # The rejected update must be a true no-op.
+        vehicles = _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+        assert vehicles[vehicle["id"]]["seatsAvailable"] != 99
+
 
 class TestShuttleVehicleDelete:
 
@@ -446,6 +473,7 @@ class TestShuttleVehicleDelete:
         r = client.delete(f"{SHUTTLE_ENDPOINT}/vehicle/{vehicle['id']}",
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 204
+        assert vehicle["id"] not in _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
     def test_leader_can_delete_any_vehicle(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -453,6 +481,7 @@ class TestShuttleVehicleDelete:
         r = client.delete(f"{SHUTTLE_ENDPOINT}/vehicle/{vehicle['id']}",
                           headers=trip_with_user2_as_crew["leader_headers"])
         assert r.status_code == 204
+        assert vehicle["id"] not in _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
     def test_non_arranger_crew_cannot_delete(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -460,6 +489,9 @@ class TestShuttleVehicleDelete:
         r = client.delete(f"{SHUTTLE_ENDPOINT}/vehicle/{vehicle['id']}",
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 403
+
+        # The rejected delete must be a true no-op — the vehicle still exists.
+        assert vehicle["id"] in _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
 
 
 # ===========================================================================
@@ -534,6 +566,10 @@ class TestShuttlePassenger:
         )
         assert r.status_code == 204
 
+        vehicles = _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+        passenger_ids = {p["tripMemberId"] for p in vehicles[vehicle["id"]]["passengers"]}
+        assert crew_tm_id not in passenger_ids
+
     def test_leader_can_remove_any_passenger(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         vehicle = _create_vehicle(client, trip_id, trip_with_user2_as_crew["leader_headers"])
@@ -548,6 +584,10 @@ class TestShuttlePassenger:
             headers=trip_with_user2_as_crew["leader_headers"],
         )
         assert r.status_code == 204
+
+        vehicles = _list_vehicles(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+        passenger_ids = {p["tripMemberId"] for p in vehicles[vehicle["id"]]["passengers"]}
+        assert crew_tm_id not in passenger_ids
 
     def test_vehicles_appear_in_list_with_passengers(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]

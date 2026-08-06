@@ -20,22 +20,84 @@ def _create_trip(client, auth_headers, **kwargs):
 
 
 def test_insert_trip_w_itinerary_and_inventory(client, auth_headers):
+    """
+    `inventory.items` is a nested payload the real API has never accepted since
+    the M6b redesign — InventorySchema has no `items` field (only dump_only
+    `requirements`, managed exclusively through dedicated endpoints), and
+    BaseSchema's `unknown = EXCLUDE` means the client's nested items are
+    silently dropped, not an error. A bare 201 assertion here would never
+    reveal that: the request "succeeds" whether or not the payload did
+    anything. Assert what actually happened instead — the itinerary was
+    created with a staging Day 0 (every dropped point stages into it), and
+    the inventory got the leader-seeded default requirements, not the client's
+    inert "items".
+    """
     itinerary = {"isPublic": True, "totalMiles": 25, "days": []}
     inventory = {"items": [{"category": "travel", "name": "compass"}, {"category": "firstAid", "name": "scissors"}]}
     response = client.post(f"{TRIP_ENDPOINT}/create", json={"inventory": inventory, "itinerary": itinerary}, headers=auth_headers)
     assert response.status_code == 201
+    body = json.loads(response.data)
+
+    assert body["itinerary"]["isPublic"] is True
+    # totalMiles is dump_only (derived on read from actual route distance —
+    # Schemas/itinerary_schema.py's get_total_miles) — the payload's 25 is
+    # inert too, same class of finding as the ignored nested inventory items.
+    assert body["itinerary"]["totalMiles"] == 0.0
+    day0 = (
+        _db.session.query(Day)
+        .filter_by(itinerary_id=UUID(body["itinerary"]["id"]), day_number=0)
+        .first()
+    )
+    assert day0 is not None
+
+    requirement_names = {r["name"] for r in body["inventory"]["requirements"]}
+    assert len(requirement_names) > 0, "a fresh inventory must be seeded with default requirements"
+    assert "compass" not in requirement_names
+    assert "scissors" not in requirement_names
 
 
 def test_insert_trip_w_itinerary_and_empty_inventory(client, auth_headers):
     itinerary = {"isPublic": True, "totalMiles": 25, "days": []}
     response = client.post(f"{TRIP_ENDPOINT}/create", json={"inventory": {}, "itinerary": itinerary}, headers=auth_headers)
     assert response.status_code == 201
+    body = json.loads(response.data)
+
+    # An explicit empty inventory ({}) still becomes one real Inventory row per
+    # trip, seeded with the default requirement set — never left with zero rows.
+    assert body["inventory"]["id"] is not None
+    assert len(body["inventory"]["requirements"]) > 0
 
 
 def test_insert_trip_w_o_itinerary(client, auth_headers):
+    """
+    The real app's trip-creation flow (`frontend/lib/trips/actions.ts`'s
+    `createTrip`) never sends a nested itinerary or inventory at all — trip
+    metadata is created first, and the itinerary is created later, lazily,
+    from the trip detail page's "Create itinerary" button. This is that
+    real shape: no `itinerary` key, and an `inventory.items` payload that
+    (per the sibling test above) the schema silently ignores anyway.
+
+    `TripService.create_trip` has an explicit fallback that always creates an
+    Inventory row even when none is nested in the payload; there is no such
+    fallback for itinerary, so a trip created this way has no itinerary at
+    all until the user explicitly creates one. Assert that real, current
+    consequence — not just that the request routed successfully.
+    """
     inventory = {"items": [{"category": "travel", "name": "compass"}]}
     response = client.post(f"{TRIP_ENDPOINT}/create", json={"inventory": inventory}, headers=auth_headers)
     assert response.status_code == 201
+    body = json.loads(response.data)
+
+    assert body["itinerary"] is None
+    assert body["inventory"]["id"] is not None
+    requirement_names = {r["name"] for r in body["inventory"]["requirements"]}
+    assert len(requirement_names) > 0
+    assert "compass" not in requirement_names
+
+    # The trip is fully usable (retrievable) despite having no itinerary yet.
+    fetched = client.get(f"{TRIP_ENDPOINT}/{body['id']}", headers=auth_headers)
+    assert fetched.status_code == 200
+    assert json.loads(fetched.data)["itinerary"] is None
 
 
 def test_nested_itinerary_gets_a_staging_day(client, auth_headers):
@@ -261,6 +323,10 @@ def test_non_member_cannot_patch_trip(client, auth_headers, outsider_headers):
     )
     assert response.status_code == 403
 
+    # The rejected patch must be a true no-op.
+    check = client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers)
+    assert json.loads(check.data)["destination"] is None
+
 
 # --- DELETE ---
 
@@ -294,6 +360,9 @@ def test_non_member_cannot_delete_trip(client, auth_headers, outsider_headers):
     data = _create_trip(client, auth_headers)
     response = client.delete(f"{TRIP_ENDPOINT}/{data['id']}", headers=outsider_headers)
     assert response.status_code == 403
+
+    # The rejected delete must be a true no-op — the trip still exists.
+    assert client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers).status_code == 200
 
 
 # --- Invitation flow ---
@@ -416,6 +485,10 @@ def test_leader_cannot_remove_self(client, trip_with_user2_as_crew, id):
     )
     assert response.status_code == 409
 
+    # The rejected self-removal must be a true no-op — the leader is still on the trip.
+    body = json.loads(client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"]).data)
+    assert id in [m["user"]["id"] for m in body["travellers"]]
+
 
 def test_non_leader_cannot_remove_member(client, trip_with_user2_as_crew, id):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
@@ -424,6 +497,10 @@ def test_non_leader_cannot_remove_member(client, trip_with_user2_as_crew, id):
         headers=trip_with_user2_as_crew["crew_headers"],
     )
     assert response.status_code == 403
+
+    # The rejected removal must be a true no-op — the leader is still on the trip.
+    body = json.loads(client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_user2_as_crew["leader_headers"]).data)
+    assert id in [m["user"]["id"] for m in body["travellers"]]
 
 
 def test_remove_nonmember_returns_404(client, auth_headers, outsider_headers):

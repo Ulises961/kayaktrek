@@ -227,6 +227,7 @@ def test_tidal_station_create_and_delete(admin_user_1, client, auth_headers):
 
     del_resp = client.delete(f"/api/v1/tidal-station/{station_id}", headers=auth_headers)
     assert del_resp.status_code == 200
+    assert _db.session.get(TidalStation, station_id) is None
 
 
 def test_tidal_station_patch(admin_user_1, client, auth_headers):

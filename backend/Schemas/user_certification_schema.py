@@ -1,4 +1,5 @@
 import bleach
+from datetime import date
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
 
 from Models.user_certification import UserCertification
@@ -14,6 +15,7 @@ class UserCertificationSchema(BaseSchema):
     membership_number = fields.String(allow_none=True, load_default=None)
     awarded_at = fields.Date(allow_none=True, load_default=None)
     valid_until = fields.Date(allow_none=True, load_default=None)
+    is_expired = fields.Method("get_is_expired", dump_only=True)
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
@@ -40,6 +42,12 @@ class UserCertificationSchema(BaseSchema):
     def validate_membership_number(self, value, **kwargs):
         if value is not None and len(value.strip()) > 100:
             raise ValidationError("Membership number cannot exceed 100 characters")
+
+    def get_is_expired(self, obj):
+        """Compute whether a certification has expired (valid_until is in the past)."""
+        if obj.valid_until is None:
+            return False
+        return obj.valid_until < date.today()
 
     @post_load
     def make_certification(self, data, **kwargs):

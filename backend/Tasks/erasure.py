@@ -69,6 +69,19 @@ def _erase_user(user: User) -> None:
         trip = db.session.query(Trip).filter_by(id=membership.trip_id).first()
         if trip and trip.state != TripStateType.ARCHIVED:
             trip.state = TripStateType.ARCHIVED
+        # Itinerary.user_id carries ON DELETE CASCADE (it also owns standalone,
+        # non-trip itineraries, where cascading on user delete is correct). For a
+        # trip itinerary we are archiving specifically to preserve it for the
+        # remaining crew, that same cascade would otherwise silently delete the
+        # route (Day/Point chain included, since those cascade off Itinerary) the
+        # moment the user row goes — leaving an "archived" trip with no itinerary
+        # at all. Null the ownership pointer first so the cascade has nothing to
+        # walk. Note this is erasure, not anonymization: the leader's own
+        # TripMember row (and AuthToken/Invitation/UserCertification rows) still
+        # hard-cascade-delete below — there is no "Deleted User" placeholder, so
+        # an archived trip retains its route but loses any record of who led it.
+        if trip and trip.itinerary is not None:
+            trip.itinerary.user_id = None
 
     # Delete personal logs (Log.user_id has no ON DELETE CASCADE, so this must be
     # explicit. Cascade on user_endorses_log.log_id handles junction rows for these logs.)

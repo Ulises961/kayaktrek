@@ -21,16 +21,21 @@ ARCHIVED is terminal; only the GDPR erasure task may set it.
       - Unknown:  any → "nonexistent_state"
 
 §4  Mutation on a past trip is blocked
-      _require_editable guards exist in logistics, travel_document, and shuttle services.
-      Day and point creation lack this guard — test expects blocking and will reveal the gap.
+      _require_editable guards exist in logistics, travel_document, shuttle, day, and
+      point services alike — all raise ValueError, which day/point/logistics resources
+      map to 400 and shuttle/travel_doc map to 403.
 
-Note on error codes: logistics ValueError → 400; shuttle/travel_doc ValueError → 403
-(inconsistency in the resource layer; tests assert actual expected behavior).
+Note on error codes: logistics/day/point ValueError → 400; shuttle/travel_doc ValueError
+→ 403 (inconsistency in the resource layer; tests assert actual expected behavior).
 """
 import json
+from uuid import UUID
 
 import pytest
 
+from Api.database import db as _db
+from Models.day import Day
+from Models.point import Point
 from Resources.day_resource import DAY_ENDPOINT
 from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
@@ -120,6 +125,9 @@ def test_crew_cannot_transition_state(client, auth_headers, auth_headers_2, user
 
         r = _transition(client, trip_id, "happening", auth_headers_2)
         assert r.status_code == 403, f"crew triggered state transition → {r.status_code}"
+
+        # The denial must be a true no-op: the trip must still be "building".
+        assert _get_trip_state(client, trip_id, auth_headers) == "building"
     finally:
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
@@ -145,6 +153,8 @@ def test_invalid_transitions(client, auth_headers):
         for state, label in cases_from_building:
             r = _transition(client, trip_id, state, auth_headers)
             assert r.status_code == 400, f"[{label}] got {r.status_code}, want 400"
+        # None of the rejected attempts above may have mutated the trip's actual state.
+        assert _get_trip_state(client, trip_id, auth_headers) == "building"
 
         # Advance to HAPPENING legitimately
         r = _transition(client, trip_id, "happening", auth_headers)
@@ -159,6 +169,7 @@ def test_invalid_transitions(client, auth_headers):
         for state, label in cases_from_happening:
             r = _transition(client, trip_id, state, auth_headers)
             assert r.status_code == 400, f"[{label}] got {r.status_code}, want 400"
+        assert _get_trip_state(client, trip_id, auth_headers) == "happening"
 
         # Advance to PAST legitimately
         r = _transition(client, trip_id, "past", auth_headers)
@@ -174,6 +185,7 @@ def test_invalid_transitions(client, auth_headers):
         for state, label in cases_from_past:
             r = _transition(client, trip_id, state, auth_headers)
             assert r.status_code == 400, f"[{label}] got {r.status_code}, want 400"
+        assert _get_trip_state(client, trip_id, auth_headers) == "past"
     finally:
         client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
@@ -268,29 +280,36 @@ def test_travel_document_blocked_on_past_trip(client, auth_headers, past_trip):
     assert r.status_code == 403, f"travel doc edit on past trip returned {r.status_code}"
 
 
-def test_day_create_blocked_on_past_trip(client, auth_headers, past_trip):
-    """
-    POST /api/day/create on a past trip's itinerary must be blocked.
-    DayService.create_day has no _require_editable guard — this test documents the gap.
-    Expected: 400 or 422. If 201 is returned, the guard is missing and must be added.
-    """
+def test_day_create_blocked_on_past_trip(app, client, auth_headers, past_trip):
+    """POST /api/day/create on a past trip's itinerary is rejected, and no Day row
+    is left behind by the rejected attempt."""
+    with app.app_context():
+        day_count_before = _db.session.query(Day).filter_by(
+            itinerary_id=UUID(past_trip["itin_id"])
+        ).count()
+
     r = client.post(
         f"{DAY_ENDPOINT}/create",
         json={"itineraryId": past_trip["itin_id"], "dayNumber": 99, "date": "2026-09-02"},
         headers=auth_headers,
     )
-    assert r.status_code in (400, 422), (
-        f"day create on past trip returned {r.status_code} — "
-        "DayService.create_day is missing a _require_editable guard"
-    )
+    assert r.status_code == 400, f"day create on past trip returned {r.status_code}"
+
+    with app.app_context():
+        day_count_after = _db.session.query(Day).filter_by(
+            itinerary_id=UUID(past_trip["itin_id"])
+        ).count()
+        assert day_count_after == day_count_before, "rejected day create must not persist a new Day row"
 
 
-def test_point_create_blocked_on_past_trip(client, auth_headers, past_trip):
-    """
-    POST /api/point/create on a past trip's day must be blocked.
-    PointService.create_point has no _require_editable guard — this test documents the gap.
-    Expected: 400 or 422. If 201 is returned, the guard is missing and must be added.
-    """
+def test_point_create_blocked_on_past_trip(app, client, auth_headers, past_trip):
+    """POST /api/point/create on a past trip's day is rejected, and no Point row is
+    left behind by the rejected attempt."""
+    with app.app_context():
+        point_count_before = _db.session.query(Point).filter_by(
+            day_id=UUID(past_trip["day_id"])
+        ).count()
+
     r = client.post(
         f"{POINT_ENDPOINT}/create",
         json={
@@ -302,7 +321,10 @@ def test_point_create_blocked_on_past_trip(client, auth_headers, past_trip):
         },
         headers=auth_headers,
     )
-    assert r.status_code in (400, 422), (
-        f"point create on past trip returned {r.status_code} — "
-        "PointService.create_point is missing a _require_editable guard"
-    )
+    assert r.status_code == 400, f"point create on past trip returned {r.status_code}"
+
+    with app.app_context():
+        point_count_after = _db.session.query(Point).filter_by(
+            day_id=UUID(past_trip["day_id"])
+        ).count()
+        assert point_count_after == point_count_before, "rejected point create must not persist a new Point row"

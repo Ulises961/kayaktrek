@@ -67,7 +67,7 @@ def create_point():
     except IntegrityError as e:
         logger.error(f"Integrity Error creating point: {e}")
         db.session.rollback()
-        abort(HTTPStatus.CONFLICT, message="Database integrity violated")
+        abort(HTTPStatus.CONFLICT, description="Database integrity violated")
     except Exception as e:
         logger.error(f"Error creating point: {e}")
         db.session.rollback()
@@ -199,7 +199,7 @@ def delete(id: str):
     except HTTPException:
         raise
     except NoResultFound:
-        abort(HTTPStatus.NOT_FOUND, message=f"Point with id {id} not found")
+        abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
     except Exception as e:
         logger.error(f"Error deleting point: {e}")
         db.session.rollback()

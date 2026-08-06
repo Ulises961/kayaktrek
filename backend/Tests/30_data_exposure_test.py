@@ -67,6 +67,31 @@ def _assert_no_sensitive(data: dict, label: str = "") -> None:
         assert key not in data, f"[{label}] sensitive field '{key}' present in response"
 
 
+def _flatten_dicts(data):
+    """Recursively yield every dict node in a JSON-decoded structure.
+
+    GET /api/user/me dumps the full UserSchema, which nests `trips` →
+    TripSchema → `travellers` → TripMemberSchema → `user` (another UserSchema
+    projection). A shallow top-level check on the outer dict would miss a
+    sensitive field reintroduced several levels down — walk the whole tree.
+    """
+    if isinstance(data, dict):
+        yield data
+        for value in data.values():
+            yield from _flatten_dicts(value)
+    elif isinstance(data, list):
+        for item in data:
+            yield from _flatten_dicts(item)
+
+
+def _assert_no_sensitive_deep(data, label: str = "") -> None:
+    for node in _flatten_dicts(data):
+        for key in _SENSITIVE_FIELDS:
+            assert key not in node, (
+                f"[{label}] sensitive field '{key}' present (possibly nested) in response"
+            )
+
+
 # ---------------------------------------------------------------------------
 # §1 — User profile endpoints
 # ---------------------------------------------------------------------------
@@ -94,6 +119,28 @@ def test_search_users_no_sensitive_fields(client, auth_headers, user_2):
     results = json.loads(r.data)
     for user_data in results:
         _assert_no_sensitive(user_data, "search result")
+
+
+def test_get_me_no_sensitive_fields_in_nested_trip_data(client, trip_with_user2_as_crew):
+    """
+    GET /api/user/me dumps the full UserSchema, including `trips` — a list of
+    TripSchema, each nesting `travellers` (TripMemberSchema, one per crew
+    member incl. fellow travellers, not just the caller) and, on each of
+    those, another UserSchema projection for that traveller. A field-name
+    check on the outer dict alone would miss a leak reintroduced several
+    levels down; walk the whole response tree instead, for both the leader
+    (viewing their own trip, which includes the crew member's record) and the
+    crew member (viewing the leader's record on the same trip).
+    """
+    leader_r = client.get(f"{USER_ENDPOINT}/me", headers=trip_with_user2_as_crew["leader_headers"])
+    assert leader_r.status_code == 200
+    leader_data = json.loads(leader_r.data)
+    assert len(leader_data.get("trips", [])) >= 1, "fixture should have produced at least one trip"
+    _assert_no_sensitive_deep(leader_data, "GET /api/user/me (leader, nested trips)")
+
+    crew_r = client.get(f"{USER_ENDPOINT}/me", headers=trip_with_user2_as_crew["crew_headers"])
+    assert crew_r.status_code == 200
+    _assert_no_sensitive_deep(json.loads(crew_r.data), "GET /api/user/me (crew, nested trips)")
 
 
 # ---------------------------------------------------------------------------

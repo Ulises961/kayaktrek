@@ -97,8 +97,12 @@ class TestLogPagination:
             client.delete(f"{LOG_ENDPOINT}/{lid}", headers=auth_headers)
 
     def test_per_page_capped_at_100(self, client, auth_headers):
+        """Even when requesting per_page=999, the response should be capped at 100."""
         r = client.get(f"{LOG_ENDPOINT}/all?per_page=999", headers=auth_headers)
         assert r.status_code == 200
+        data = json.loads(r.data)
+        # The resource layer caps per_page at 100 via min(per_page, 100)
+        assert len(data["items"]) <= 100, "per_page not capped at 100"
 
     def test_total_reflects_all_items(self, client, auth_headers):
         """total matches regardless of which page is requested."""
@@ -179,9 +183,13 @@ class TestEndorsedLogPagination:
         assert p1["total"] == 3
 
     def test_per_page_capped_at_100(self, client, trip_with_user2_as_crew):
+        """Even when requesting per_page=999, the response should be capped at 100."""
         crew = trip_with_user2_as_crew["crew_headers"]
         r = client.get(f"{LOG_ENDPOINT}/endorsed?per_page=999", headers=crew)
         assert r.status_code == 200
+        data = json.loads(r.data)
+        # The resource layer caps per_page at 100 via min(per_page, 100)
+        assert len(data["items"]) <= 100, "per_page not capped at 100"
 
     def test_sort_oldest_reverses_order(self, client, trip_with_user2_as_crew):
         leader = trip_with_user2_as_crew["leader_headers"]
@@ -239,8 +247,12 @@ class TestTripPagination:
             client.delete(f"{TRIP_ENDPOINT}/{tid}", headers=auth_headers)
 
     def test_per_page_capped_at_100(self, client, auth_headers, id):
+        """Even when requesting per_page=999, the response should be capped at 100."""
         r = client.get(f"{TRIP_ENDPOINT}/{id}/all?per_page=999", headers=auth_headers)
         assert r.status_code == 200
+        data = json.loads(r.data)
+        # The resource layer caps per_page at 100 via min(per_page, 100)
+        assert len(data["items"]) <= 100, "per_page not capped at 100"
 
 
 # ---------------------------------------------------------------------------
@@ -353,12 +365,20 @@ class TestTripFiltering:
             client.delete(f"{TRIP_ENDPOINT}/{happening['id']}", headers=auth_headers)
 
     def test_invalid_state_returns_400(self, client, auth_headers, id):
+        """Invalid enum values on state filter should return 400 with error details."""
         r = client.get(f"{TRIP_ENDPOINT}/{id}/all?state=bogus", headers=auth_headers)
         assert r.status_code == 400
+        data = json.loads(r.data)
+        # Verify the response has error information
+        assert "error" in data or "message" in data, "missing error details in response"
 
     def test_invalid_difficulty_returns_400(self, client, auth_headers, id):
+        """Invalid enum values on difficulty filter should return 400 with error details."""
         r = client.get(f"{TRIP_ENDPOINT}/{id}/all?difficulty=bogus", headers=auth_headers)
         assert r.status_code == 400
+        data = json.loads(r.data)
+        # Verify the response has error information
+        assert "error" in data or "message" in data, "missing error details in response"
 
     def test_sort_soonest_orders_by_date_from(self, client, auth_headers, id):
         later = _create_trip(client, auth_headers)

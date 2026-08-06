@@ -52,11 +52,17 @@ def test_block_success_by_username(client, auth_headers, user_2):
 def test_block_success_by_id(client, auth_headers, id_2):
     resp = _block(client, auth_headers, blockedId=id_2)
     assert resp.status_code == 201
+    # Verify the block was actually created in the DB
+    assert db.session.query(Block).count() == 1
+    block = db.session.query(Block).first()
+    assert str(block.blocked_id) == id_2
 
 
 def test_block_self_returns_403(client, auth_headers, user_1):
     resp = _block(client, auth_headers, blockedUsername=user_1.username)
     assert resp.status_code == 403
+    # Verify no block was created
+    assert db.session.query(Block).count() == 0
 
 
 def test_block_missing_field_returns_400(client, auth_headers):
@@ -119,6 +125,8 @@ def test_unblock_by_non_blocker_returns_403(client, auth_headers, auth_headers_2
     created = _block(client, auth_headers, blockedId=id_2).json
     resp = client.delete(f"{BLOCK_ENDPOINT}/{created['id']}", headers=auth_headers_2)
     assert resp.status_code == 403
+    # Verify the block still exists
+    assert db.session.query(Block).count() == 1
 
 
 def test_unblock_unknown_returns_404(client, auth_headers):

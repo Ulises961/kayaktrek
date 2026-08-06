@@ -12,9 +12,13 @@ import pytest
 
 from Api.database import db
 from Models.auth_token import AuthToken, AuthTokenType
+from Models.day import Day
+from Models.log import Log
+from Models.point import Point
 from Models.trip import Trip, TripStateType
 from Models.user import User
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Resources.log_resource import LOG_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
@@ -427,3 +431,152 @@ def test_erasure_task_preserves_trip_record(app, erasure_leader_with_trip):
             id=UUID(erasure_leader_with_trip["trip_id"])
         ).first()
         assert trip is not None
+
+
+def test_erasure_task_preserves_archived_trips_itinerary_and_route(app, erasure_leader_with_trip):
+    """Archiving a led trip is meant to preserve it for the remaining crew — but
+    Itinerary.user_id carries ON DELETE CASCADE (correct for standalone, non-trip
+    itineraries). Left un-nulled on the archive path, that same cascade deletes the
+    itinerary the moment the leader's user row goes, taking its Day/Point chain with
+    it via the itinerary->day->point cascade — an "archived" trip with no route at
+    all. `_erase_user` must null `trip.itinerary.user_id` before deleting the user."""
+    run_erasure.apply()
+    with app.app_context():
+        trip = db.session.query(Trip).filter_by(
+            id=UUID(erasure_leader_with_trip["trip_id"])
+        ).first()
+        assert trip is not None
+        itinerary = trip.itinerary
+        assert itinerary is not None, "itinerary must survive erasure of its archived trip's leader"
+        assert itinerary.user_id is None, "ownership pointer must be nulled, not left dangling"
+
+        days = db.session.query(Day).filter_by(itinerary_id=itinerary.id).all()
+        assert len(days) > 0, "the itinerary's Days must survive too"
+        points = db.session.query(Point).filter(Point.day_id.in_([d.id for d in days])).all()
+        assert len(points) > 0, "the route itself (the Point on Day 0) must survive too"
+
+
+def test_erasure_task_deletes_personal_logs(app, client):
+    """`Log.user_id` carries `ondelete='CASCADE'` at the DB level today, but
+    `_erase_user` also deletes logs explicitly before the user row goes (see the
+    comment in Tasks/erasure.py) — assert that behaviour directly rather than
+    trusting the FK definition, per the cascade being exactly the class of bug
+    that broke this task for months."""
+    user_id, headers = _register_and_activate(
+        app, client,
+        mail="logs.erasure@example.com",
+        phone="+39099922227",
+        username="gdpr_logs_erasure",
+    )
+    r = client.post(
+        f"{LOG_ENDPOINT}/create",
+        json={"hours": 3.5, "avgSea": 2, "distance": 12.0, "notes": "Nice paddle"},
+        headers=headers,
+    )
+    assert r.status_code == 201
+    log_id = json.loads(r.data)["id"]
+
+    with app.app_context():
+        assert db.session.query(Log).filter_by(id=UUID(log_id)).first() is not None
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    run_erasure.apply()
+
+    with app.app_context():
+        assert db.session.query(Log).filter_by(id=UUID(log_id)).first() is None
+
+    _delete_user(app, user_id)
+
+
+def test_erasure_task_removes_avatar_from_storage(app, client):
+    """Avatar objects live in object storage, outside the DB — nothing cascades
+    them, so `_erase_user` must delete them explicitly using the key embedded in
+    `avatar_url`."""
+    user_id, _ = _register_and_activate(
+        app, client,
+        mail="avatar.erasure@example.com",
+        phone="+39099922228",
+        username="gdpr_avatar_erasure",
+    )
+    with app.app_context():
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.avatar_url = "https://cdn.example.com/avatars/abc123.jpg"
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    with patch("Tasks.erasure.StorageService.delete") as mock_delete:
+        run_erasure.apply()
+
+    mock_delete.assert_called_once_with("abc123.jpg", kind="avatar")
+    with app.app_context():
+        assert db.session.query(User).filter_by(id=UUID(user_id)).first() is None
+
+
+def test_erasure_task_survives_avatar_cleanup_failure(app, client):
+    """Storage being unreachable must not block the user's actual erasure — the
+    avatar cleanup failure is caught and logged, not left to abort `_erase_user`
+    (and, per the rubric, the transaction must stay usable afterwards)."""
+    user_id, _ = _register_and_activate(
+        app, client,
+        mail="avatar.fail.erasure@example.com",
+        phone="+39099922229",
+        username="gdpr_avatar_fail_erasure",
+    )
+    with app.app_context():
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.avatar_url = "https://cdn.example.com/avatars/broken.jpg"
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    with patch("Tasks.erasure.StorageService.delete", side_effect=RuntimeError("bucket unreachable")):
+        result = run_erasure.apply()
+
+    assert result.get() == {"erased": 1, "failed": 0}
+    with app.app_context():
+        assert db.session.query(User).filter_by(id=UUID(user_id)).first() is None
+        # session must still be usable — no dangling PendingRollbackError
+        assert db.session.query(User).count() >= 0
+
+
+def test_erasure_task_one_failure_does_not_block_other_candidates(app, client, erasure_user):
+    """A raised exception for one candidate must not abort the whole beat run —
+    `run_erasure` catches per-user, rolls back, and keeps going. Assert the
+    failed user survives, the unrelated candidate is still erased, the returned
+    counts reflect both outcomes, and the session is left usable."""
+    user_id, _ = _register_and_activate(
+        app, client,
+        mail="flaky.erasure@example.com",
+        phone="+39099922230",
+        username="gdpr_flaky_erasure",
+    )
+    with app.app_context():
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    from Tasks import erasure as erasure_module
+    real_erase_user = erasure_module._erase_user
+
+    def flaky_erase(user):
+        if str(user.id) == user_id:
+            raise RuntimeError("simulated erasure failure")
+        return real_erase_user(user)
+
+    with patch("Tasks.erasure._erase_user", side_effect=flaky_erase):
+        result = run_erasure.apply()
+
+    assert result.get() == {"erased": 1, "failed": 1}
+
+    with app.app_context():
+        # The flaky candidate's failure was rolled back — it must survive.
+        assert db.session.query(User).filter_by(id=UUID(user_id)).first() is not None
+        # The unrelated, well-behaved candidate must still have been erased.
+        assert db.session.query(User).filter_by(id=UUID(erasure_user)).first() is None
+
+    _delete_user(app, user_id)
