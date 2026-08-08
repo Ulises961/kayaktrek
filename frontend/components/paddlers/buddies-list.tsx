@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button"
 import { ListRow } from "@/components/common/list-row"
 import { acceptConnection, removeConnection } from "@/lib/connections/actions"
 import type { Connection, ConnectionUser } from "@/lib/dtos/connection"
+import { formatPaddlerName } from "@/lib/user/format"
+import { EmptyState } from "@/components/common/empty-state"
+import { UserGroupIcon } from "@/components/icons/heroicons-user-group"
 
 interface BuddiesListProps {
   connections: Connection[]
@@ -33,11 +36,17 @@ export function BuddiesList({ connections, currentUserId, searchTerm }: BuddiesL
 
   if (connections.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
-        {searchTerm
-          ? `No buddies match "${searchTerm}".`
-          : "No buddies yet. Find paddlers and send a buddy request."}
-      </p>
+      // A search miss is transient and the buddies do exist — that stays a
+      // plain line. Having none at all is the empty state.
+      searchTerm ? (
+        <EmptyState variant="inline" title={`No buddies match "${searchTerm}".`} />
+      ) : (
+        <EmptyState
+          icon={UserGroupIcon}
+          title="No buddies yet"
+          description="Paddlers you connect with appear here, so you can invite them to a trip without searching each time."
+        />
+      )
     )
   }
 
@@ -73,7 +82,7 @@ export function BuddiesList({ connections, currentUserId, searchTerm }: BuddiesL
       )}
       <Section title={`Buddies (${buddies.length})`}>
         {buddies.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No buddies yet.</p>
+          <EmptyState variant="inline" title="No buddies yet." />
         ) : (
           <ul className="flex flex-col">
             {buddies.map((c) => {
@@ -109,7 +118,7 @@ function ConnectionRow({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const fullName = [user.name, user.surname].filter(Boolean).join(" ")
+  const fullName = formatPaddlerName(user)
 
   function run(action: () => Promise<{ success: boolean; error?: string }>) {
     setError(null)

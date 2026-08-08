@@ -132,7 +132,7 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-center text-[11px]">
         By creating an account, you agree to our{" "}
         <Link href="/terms" className="auth-link">
           Terms of Use
@@ -140,7 +140,7 @@ export default function RegisterPage() {
         .
       </p>
 
-      <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-center text-sm">
         Already have an account?{" "}
         <Link href="/login" className="auth-link">
           Sign in

@@ -33,6 +33,12 @@ async function signIn(browser: Browser): Promise<Device> {
   return device
 }
 
+/** Sign out from the account menu in the app header, where the control lives. */
+async function signOutFromHeader(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Account menu" }).click()
+  await mutateAndSettle(page, () => page.getByRole("menuitem", { name: "Sign out" }).click())
+}
+
 /** True while this context can still load an authenticated page. A revoked session
  * fails the server-side auth check and the app redirects to /login. */
 async function isSignedIn(page: Page): Promise<boolean> {
@@ -80,9 +86,7 @@ test.describe("Per-device sessions", () => {
     const laptop = await signIn(browser)
     const phone = await signIn(browser)
 
-    await mutateAndSettle(laptop.page, () =>
-      laptop.page.getByRole("button", { name: "Sign out" }).click(),
-    )
+    await signOutFromHeader(laptop.page)
 
     expect(await isSignedIn(laptop.page)).toBe(false)
     // The device that did nothing must be untouched — this is the regression the
@@ -101,7 +105,7 @@ test.describe("Per-device sessions", () => {
     await expect(rows).toHaveCount(2)
 
     // Exactly one row is the caller's own, and it offers no way to sign itself out
-    // from the list (that is what the sidebar's Sign out is for).
+    // from the list (that is what the header account menu's Sign out is for).
     await expect(laptop.page.getByText("(this device)")).toHaveCount(1)
     await expect(
       laptop.page.getByTestId(DEVICES_LIST).getByRole("button", { name: "Sign out" }),

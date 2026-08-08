@@ -32,7 +32,7 @@ export default async function SettingsPage() {
   const sessionsResult = await listSessions()
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <SetBreadcrumbs crumbs={[{ label: "Settings" }]} />
 
       <div>
@@ -136,6 +136,6 @@ export default async function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </>
   )
 }

@@ -448,8 +448,10 @@ export default function MapCore({
   )
   const cellLayers = useMemo<ForecastCellLayer[]>(() => {
     const layers: ForecastCellLayer[] = []
-    if (windCellGrid && windEnabled) layers.push({ grid: windCellGrid, options: WIND_OPTIONS })
-    if (swellCellGrid && swellEnabled) layers.push({ grid: swellCellGrid, options: SWELL_OPTIONS })
+    if (windCellGrid && windEnabled)
+      layers.push({ key: "wind", grid: windCellGrid, options: WIND_OPTIONS })
+    if (swellCellGrid && swellEnabled)
+      layers.push({ key: "swell", grid: swellCellGrid, options: SWELL_OPTIONS })
     return layers
   }, [windCellGrid, swellCellGrid, windEnabled, swellEnabled])
 

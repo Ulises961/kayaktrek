@@ -20,7 +20,7 @@ import { MedicalNotesViewer } from "@/components/trips/medical-notes-viewer"
 import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
 import type { TripMember } from "@/lib/dtos/trip-member"
 import { formatDayDate } from "@/lib/utils/date"
-import { formatVesselLength } from "@/lib/user/format"
+import { formatVesselLength, formatPaddlerName } from "@/lib/user/format"
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
@@ -83,7 +83,7 @@ interface MemberCardProps {
 }
 
 function MemberCard({ member, notes, loading, notesError, onView }: MemberCardProps) {
-  const fullName = [member.user.name, member.user.surname].filter(Boolean).join(" ")
+  const fullName = formatPaddlerName(member.user)
   const memberId = member.user.id ?? ""
 
   return (

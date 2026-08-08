@@ -25,6 +25,7 @@ import { isCertExpired, isElevatedValid } from "@/lib/certifications/expiry"
 import type { Certification, CertificationFields } from "@/lib/dtos/certification"
 import { CertificationForm } from "./certification-form"
 import { AwardIcon, PencilIcon, Trash2Icon, PlusIcon } from "lucide-react"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface CertificationsSectionProps {
   initialCerts: Certification[]
@@ -134,10 +135,11 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
   return (
     <div className="flex flex-col gap-3">
       {certs.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No certifications yet. Add your awards and qualifications — they appear on your public
-          profile if you choose to share it.
-        </p>
+        <EmptyState
+          icon={AwardIcon}
+          title="No certifications yet"
+          description="Awards and qualifications you add appear here, and on your public profile if you choose to share it."
+        />
       ) : (
         <ul className="flex flex-col">
           {certs.map((cert) => {

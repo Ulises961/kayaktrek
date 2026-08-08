@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { MapIcon, CompassIcon, PlusIcon, CalendarIcon, BellIcon } from "lucide-react"
+import { MapIcon, CompassIcon, PlusIcon, CalendarIcon, BellIcon, KayakIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TRIP_STATE, TripPageSchema } from "@/lib/dtos/trip"
@@ -15,6 +15,7 @@ import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
 import { formatDateRange } from "@/lib/trips/format"
 import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { EmptyState } from "@/components/common/empty-state"
 
 async function fetchTrips(userId: string): Promise<Trip[]> {
   // No catch: let apiGet's redirect("/login") (a thrown NEXT_REDIRECT) propagate, and
@@ -117,7 +118,7 @@ export default async function DashboardPage() {
   })
 
   return (
-    <div className="flex max-w-2xl flex-col gap-8 p-6">
+    <>
       {/* Greeting */}
       <div>
         <PageHeading>Welcome back{user?.username ? `, ${user.username}` : ""}</PageHeading>
@@ -146,29 +147,27 @@ export default async function DashboardPage() {
           )}
         </section>
       ) : (
-        <section className="border-border flex flex-col items-center gap-4 rounded-xl border border-dashed p-8 text-center">
-          <MapIcon className="text-muted-foreground/40 size-10" />
-          <div>
-            <p className="font-medium">No active or upcoming trips</p>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Plan a new expedition or explore public routes for inspiration.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button asChild size="sm" className="w-full sm:w-auto">
-              <Link href="/trips">
-                <PlusIcon className="mr-1.5 size-4" />
-                New trip
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-              <Link href="/explore">
-                <CompassIcon className="mr-1.5 size-4" />
-                Explore routes
-              </Link>
-            </Button>
-          </div>
-        </section>
+        <EmptyState
+          icon={KayakIcon}
+          title="No active or upcoming trips"
+          description="Plan a new expedition or explore public routes for inspiration."
+          action={
+            <>
+              <Button asChild size="sm" className="w-full sm:w-auto">
+                <Link href="/trips">
+                  <PlusIcon className="mr-1.5 size-4" />
+                  New trip
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                <Link href="/explore">
+                  <CompassIcon className="mr-1.5 size-4" />
+                  Explore routes
+                </Link>
+              </Button>
+            </>
+          }
+        />
       )}
 
       {/* Quick links */}
@@ -194,6 +193,6 @@ export default async function DashboardPage() {
           </Button>
         </section>
       )}
-    </div>
+    </>
   )
 }

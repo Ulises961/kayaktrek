@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     return (
       <AuthCard>
         <AuthCardHeading title="Check your email" />
-        <p className="text-[11px] text-[oklch(0.52_0.065_240)]">
+        <p className="auth-footnote text-[11px]">
           If that address is registered, a reset link has been sent.
         </p>
         <Link href="/login" className="auth-link text-[11px]">
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-center text-[11px]">
         Remembered it?{" "}
         <Link href="/login" className="auth-link">
           Sign in

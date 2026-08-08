@@ -5,7 +5,6 @@ import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { RouteIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,6 +30,7 @@ import type {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import { SeasonBadge } from "./season-badge"
+import { EmptyState } from "@/components/common/empty-state"
 
 const ExploreDiscoveryMap = dynamic(() => import("./explore-discovery-map"), { ssr: false })
 
@@ -318,10 +318,14 @@ export function ExploreDiscovery({
             {total === 0 ? "No routes match" : `${total} ${total === 1 ? "route" : "routes"}`}
           </p>
           {items.length === 0 && !isSearching ? (
-            <div className="text-muted-foreground flex flex-col items-center gap-3 py-16">
-              <RouteIcon className="size-8 opacity-30" />
-              <p className="text-center text-sm">No public routes match these filters.</p>
-            </div>
+            // Filter-driven, so no ghost rows: the panel is warranted at this
+            // size, the promise that content will arrive on its own is not.
+            <EmptyState
+              className="m-4"
+              title="No public routes match these filters."
+              description="Widen the search, or clear a filter to see the full library."
+              ghostRows={0}
+            />
           ) : (
             items.map((item) => (
               <Card

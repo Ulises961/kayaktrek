@@ -5,19 +5,19 @@ import { createElement } from "react"
 import { ContentAreaProvider, useContentArea } from "../content-area-context"
 
 describe("ContentAreaProvider / useContentArea", () => {
-  it("defaults fullBleed to false", () => {
+  it("defaults to the centred column", () => {
     const { result } = renderHook(() => useContentArea(), {
       wrapper: ({ children }) => createElement(ContentAreaProvider, null, children),
     })
-    expect(result.current.fullBleed).toBe(false)
+    expect(result.current.layout).toBe("column")
   })
 
-  it("updates fullBleed via setFullBleed", () => {
+  it("updates the layout via setLayout", () => {
     const { result } = renderHook(() => useContentArea(), {
       wrapper: ({ children }) => createElement(ContentAreaProvider, null, children),
     })
-    act(() => result.current.setFullBleed(true))
-    expect(result.current.fullBleed).toBe(true)
+    act(() => result.current.setLayout("bleed"))
+    expect(result.current.layout).toBe("bleed")
   })
 
   it("throws when used outside a ContentAreaProvider", () => {
@@ -35,13 +35,13 @@ describe("ContentAreaProvider / useContentArea", () => {
 
   it("consumers re-render with the updated value", () => {
     function Probe() {
-      const { fullBleed } = useContentArea()
-      return createElement("span", null, fullBleed ? "full-bleed" : "padded")
+      const { layout } = useContentArea()
+      return createElement("span", null, layout)
     }
     function Harness() {
       return createElement(ContentAreaProvider, null, createElement(Probe))
     }
     render(createElement(Harness))
-    expect(screen.getByText("padded")).toBeInTheDocument()
+    expect(screen.getByText("column")).toBeInTheDocument()
   })
 })

@@ -5,6 +5,7 @@ Storage calls (upload, delete, presigned_url) are patched so tests run without M
 """
 import io
 import json
+from datetime import date, timedelta
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -13,10 +14,17 @@ from Resources.logistics_resource import LOGISTICS_ENDPOINT
 from Resources.travel_document_resource import TRAVEL_DOCUMENT_ENDPOINT
 from Resources.shuttle_resource import SHUTTLE_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
+from Models.trip import TripStateType
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# Document dates are relative to the run date, never hardcoded: the editable
+# window is evaluated against date.today(), so a literal turns these tests into
+# a time bomb that silently changes what they cover on the day it passes.
+FUTURE_DATE = (date.today() + timedelta(days=60)).isoformat()
+PAST_DATE = (date.today() - timedelta(days=60)).isoformat()
 
 def _member_id(client, trip_id: str, headers: dict) -> str:
     """Return the TripMember.id for the calling user on the given trip."""
@@ -241,7 +249,7 @@ class TestTravelDocumentDelete:
     def test_owner_can_delete(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
-                          date="2026-10-01")
+                          date=FUTURE_DATE)
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 204
@@ -250,7 +258,7 @@ class TestTravelDocumentDelete:
     def test_leader_can_delete_any_document(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
-                          date="2026-10-01")
+                          date=FUTURE_DATE)
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                           headers=trip_with_user2_as_crew["leader_headers"])
         assert r.status_code == 204
@@ -259,7 +267,7 @@ class TestTravelDocumentDelete:
     def test_non_owner_crew_cannot_delete(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
-                          date="2026-10-01")
+                          date=FUTURE_DATE)
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                           headers=trip_with_user2_as_crew["crew_headers"])
         assert r.status_code == 403
@@ -270,11 +278,98 @@ class TestTravelDocumentDelete:
     def test_non_member_gets_403(self, client, outsider_headers, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
-                          date="2026-10-01")
+                          date=FUTURE_DATE)
         r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=outsider_headers)
         assert r.status_code == 403
-
         assert doc["id"] in _list_docs(client, trip_id, trip_with_user2_as_crew["leader_headers"])
+
+    def test_owner_can_delete_document_whose_date_has_passed(self, client, trip_with_user2_as_crew):
+        """An expired document is the one you most want gone — a mistyped year, a
+        booking that fell through, the wrong scan. Freezing edits on it is
+        defensible; refusing to remove it leaves it on the trip forever."""
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
+                          date=PAST_DATE)
+        r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
+                          headers=trip_with_user2_as_crew["crew_headers"])
+        assert r.status_code == 204
+
+        listed = client.get(f"{TRAVEL_DOCUMENT_ENDPOINT}/{trip_id}/all",
+                            headers=trip_with_user2_as_crew["crew_headers"])
+        assert doc["id"] not in [d["id"] for d in json.loads(listed.data)]
+
+    def test_owner_can_delete_document_whose_expiry_has_passed(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
+                          type="insurance", expiryDate=PAST_DATE)
+        r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
+                          headers=trip_with_user2_as_crew["crew_headers"])
+        assert r.status_code == 204
+
+    def test_cannot_delete_on_a_completed_trip(self, client, trip_with_user2_as_crew):
+        """The trip-level freeze is the boundary that survives: once a trip is
+        past, its paperwork is the record of what happened."""
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        leader_headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, leader_headers)
+
+        for state in (TripStateType.HAPPENING.value, TripStateType.PAST.value):
+            assert client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": state},
+                               headers=leader_headers).status_code == 200
+
+        r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=leader_headers)
+        assert r.status_code == 403
+
+
+class TestTravelDocumentEditableWindow:
+    """The window is evaluated against the date the document actually stops
+    being current, which for anything carrying both dates is the expiry."""
+
+    def test_old_issue_date_with_future_expiry_stays_editable(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        # A passport issued years ago and valid for years yet.
+        doc = _create_doc(client, trip_id, headers, type="permit",
+                          date=PAST_DATE, expiryDate=FUTURE_DATE)
+        r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=headers,
+                         json={"name": "Renewed passport"})
+        assert r.status_code == 200
+        assert json.loads(r.data)["name"] == "Renewed passport"
+
+    def test_expired_document_cannot_be_edited(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, headers, type="insurance", expiryDate=PAST_DATE)
+        r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=headers,
+                         json={"name": "Backdated"})
+        assert r.status_code == 403
+
+    def test_undated_document_cannot_be_edited_on_a_completed_trip(self, client, trip_with_user2_as_crew):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, headers)
+
+        for state in (TripStateType.HAPPENING.value, TripStateType.PAST.value):
+            assert client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": state},
+                               headers=headers).status_code == 200
+
+        r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=headers,
+                         json={"name": "Backdated"})
+        assert r.status_code == 403
+
+    def test_dated_document_cannot_be_edited_on_a_completed_trip(self, client, trip_with_user2_as_crew):
+        """Carrying a date must not exempt a document from the trip-level freeze."""
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, headers, date=FUTURE_DATE)
+
+        for state in (TripStateType.HAPPENING.value, TripStateType.PAST.value):
+            assert client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": state},
+                               headers=headers).status_code == 200
+
+        r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=headers,
+                         json={"name": "Backdated"})
+        assert r.status_code == 403
 
 
 # ===========================================================================
@@ -325,6 +420,59 @@ class TestTravelDocumentAttachment:
         assert r.status_code == 200
         assert json.loads(r.data)["attachmentPath"] is None
         mock_delete.assert_called()
+
+    @patch("Services.travel_document_service.StorageService.upload")
+    @patch("Services.travel_document_service.StorageService.delete")
+    def test_can_remove_attachment_once_the_document_date_has_passed(
+        self, mock_delete, mock_upload, client, trip_with_user2_as_crew
+    ):
+        """The wrong scan on an out-of-date document is still the wrong scan —
+        and it is the copy of a real permit or policy sitting in object storage,
+        which is exactly the thing a member should be able to take back."""
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, headers, date=FUTURE_DATE)
+
+        with patch("magic.from_buffer", return_value="application/pdf"):
+            client.post(
+                f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}/attachment",
+                headers=headers,
+                data={"file": (io.BytesIO(_FAKE_PDF), "booking.pdf")},
+                content_type="multipart/form-data",
+            )
+
+        # The date is corrected to the one it actually held, in the past.
+        assert client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}", headers=headers,
+                            json={"date": PAST_DATE}).status_code == 200
+
+        r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}/attachment", headers=headers)
+        assert r.status_code == 200
+        assert json.loads(r.data)["attachmentPath"] is None
+        mock_delete.assert_called()
+
+    @patch("Services.travel_document_service.StorageService.upload")
+    @patch("Services.travel_document_service.StorageService.delete")
+    def test_cannot_remove_attachment_on_a_completed_trip(
+        self, mock_delete, mock_upload, client, trip_with_user2_as_crew
+    ):
+        trip_id = trip_with_user2_as_crew["trip"]["id"]
+        headers = trip_with_user2_as_crew["leader_headers"]
+        doc = _create_doc(client, trip_id, headers)
+
+        with patch("magic.from_buffer", return_value="application/pdf"):
+            client.post(
+                f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}/attachment",
+                headers=headers,
+                data={"file": (io.BytesIO(_FAKE_PDF), "booking.pdf")},
+                content_type="multipart/form-data",
+            )
+
+        for state in (TripStateType.HAPPENING.value, TripStateType.PAST.value):
+            assert client.post(f"{TRIP_ENDPOINT}/{trip_id}/state", json={"state": state},
+                               headers=headers).status_code == 200
+
+        r = client.delete(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}/attachment", headers=headers)
+        assert r.status_code == 403
 
     def test_delete_attachment_when_none_returns_404(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]

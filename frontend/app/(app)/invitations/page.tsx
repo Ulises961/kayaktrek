@@ -4,9 +4,10 @@ import { listTripInvitations } from "@/lib/trips/actions"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InvitationActions } from "@/components/trips/invitation-actions"
-import { NoTripsIllustration } from "@/components/illustrations/no-trips"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeading } from "@/components/common/page-heading"
+import { EmptyState } from "@/components/common/empty-state"
+import { BellIcon } from "lucide-react"
 
 export default async function InvitationsPage() {
   const session = await getSession()
@@ -16,15 +17,16 @@ export default async function InvitationsPage() {
 
   return (
     <>
-      <PageHeading className="mb-6">Invitations</PageHeading>
+      <PageHeading>Invitations</PageHeading>
 
       {trips.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center gap-4 text-center">
-          <NoTripsIllustration className="w-56 opacity-80" />
-          <p className="text-muted-foreground text-sm">No pending invitations.</p>
-        </div>
+        <EmptyState
+          icon={BellIcon}
+          title="No pending invitations"
+          description="When another paddler invites you onto a trip it lands here, with the route and crew attached so you can decide before joining."
+        />
       ) : (
-        <div className="flex max-w-2xl flex-col gap-3">
+        <div className="flex flex-col gap-3">
           {trips.map((trip) => {
             const leader = trip.travellers?.find((m) => m.role === "leader")
             const leaderName = leader

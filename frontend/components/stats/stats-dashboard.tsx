@@ -2,6 +2,9 @@ import { SeaStateChip } from "@/components/logs/sea-state-chip"
 import { RouteIcon, ClockIcon, NotebookIcon, MapIcon, BadgeCheckIcon } from "lucide-react"
 import type { Stats } from "@/lib/dtos/public-profile"
 import { DISTANCE_UNIT, toNm, type DistanceUnit } from "@/lib/itinerary/distance"
+import { monthSeries, ACTIVITY_MONTH_WINDOW } from "@/lib/logs/activity"
+import { EmptyState } from "@/components/common/empty-state"
+import { ActivityIcon } from "lucide-react"
 
 interface StatsDashboardProps {
   stats: Stats
@@ -11,6 +14,15 @@ interface StatsDashboardProps {
 // Round to at most one decimal place, dropping a trailing ".0".
 function tidy(value: number): string {
   return Number(value.toFixed(1)).toString()
+}
+
+// Proportional bar width, floored at a visible sliver. The previous chart floored
+// at 4% of the tallest bar, so every month next to a large outlier collapsed to
+// exactly the same nub — it drew a flat distribution it did not have.
+const MIN_BAR_PCT = 1.5
+
+function barWidth(distance: number, max: number): number {
+  return distance === 0 ? 0 : Math.max(MIN_BAR_PCT, (distance / max) * 100)
 }
 
 const MONTH_LABEL = new Intl.DateTimeFormat("en", { month: "short", year: "2-digit" })
@@ -41,13 +53,19 @@ export function StatsDashboard({ stats, unit = DISTANCE_UNIT.KM }: StatsDashboar
     .sort((a, b) => a.beaufort - b.beaufort)
   const maxConditionCount = Math.max(1, ...conditions.map((c) => c.count))
 
-  const maxMonthDistance = Math.max(1, ...stats.activityByMonth.map((m) => m.distance))
+  // A single month is a number, not a distribution — there is nothing to compare
+  // it against, and one full-height bar implies a trend that isn't there.
+  const months = monthSeries(stats.activityByMonth, ACTIVITY_MONTH_WINDOW)
+  const showActivity = months.length > 1
+  const maxMonthDistance = Math.max(1, ...months.map((m) => m.distance))
 
   if (stats.logCount === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
-        No paddling logged yet. Stats appear here once logs are recorded.
-      </p>
+      <EmptyState
+        icon={ActivityIcon}
+        title="No paddling logged yet"
+        description="Distance, time on the water and your busiest months appear here once you record a log."
+      />
     )
   }
 
@@ -93,28 +111,54 @@ export function StatsDashboard({ stats, unit = DISTANCE_UNIT.KM }: StatsDashboar
         </div>
       )}
 
-      {/* Activity over time */}
-      {stats.activityByMonth.length > 0 && (
+      {/* Activity over time. Same row grammar as Sea conditions above — label,
+          magnitude, value — so the two read as one card rather than as two chart
+          languages, and so the number is on screen without a hover. The previous
+          vertical bars put every value in a `title` tooltip, which does not fire
+          on touch at all: on a phone, and on the public profile where the reader
+          has no logs to fall back on, the chart carried no numbers whatsoever. */}
+      {showActivity && (
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Distance by month
-          </p>
-          <div className="flex items-end gap-1.5" style={{ height: "80px" }}>
-            {stats.activityByMonth.map((m) => (
-              <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
-                <div className="flex w-full flex-1 items-end">
-                  <div
-                    className="bg-primary/60 w-full rounded-t-sm"
-                    style={{ height: `${Math.max(4, (m.distance / maxMonthDistance) * 100)}%` }}
-                    title={`${monthLabel(m.month)}: ${tidy(toDisplay(m.distance))} ${unit}, ${m.count} log(s)`}
-                  />
-                </div>
-                <span className="text-muted-foreground text-[10px] whitespace-nowrap">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              Distance by month
+            </p>
+            <p className="text-muted-foreground text-[10px]">last {months.length} months</p>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {months.map((m) => (
+              <li key={m.month} className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground w-14 shrink-0 text-xs whitespace-nowrap">
                   {monthLabel(m.month)}
                 </span>
-              </div>
+                <span className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
+                  <span
+                    className="bg-primary/60 block h-full rounded-full"
+                    style={{ width: `${barWidth(m.distance, maxMonthDistance)}%` }}
+                  />
+                </span>
+                {m.hasData ? (
+                  <>
+                    <span className="w-20 shrink-0 text-right tabular-nums">
+                      {tidy(toDisplay(m.distance))} {unit}
+                    </span>
+                    <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
+                      {m.count} {m.count === 1 ? "log" : "logs"}
+                    </span>
+                  </>
+                ) : (
+                  // An em dash, not "0 km" — the paddler recorded nothing that
+                  // month, which is not the same as paddling zero distance.
+                  <>
+                    <span className="text-muted-foreground w-20 shrink-0 text-right">—</span>
+                    <span className="text-muted-foreground w-12 shrink-0 text-right text-xs">
+                      no logs
+                    </span>
+                  </>
+                )}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>

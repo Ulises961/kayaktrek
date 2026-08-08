@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { ListRow } from "@/components/common/list-row"
 import { unblockPaddler } from "@/lib/blocks/actions"
 import type { Block } from "@/lib/dtos/block"
+import { formatPaddlerName } from "@/lib/user/format"
 
 interface BlockedListProps {
   blocks: Block[]
@@ -34,7 +35,7 @@ function BlockRow({ block }: { block: Block }) {
   const [error, setError] = useState<string | null>(null)
 
   const user = block.blocked
-  const fullName = [user.name, user.surname].filter(Boolean).join(" ")
+  const fullName = formatPaddlerName(user)
 
   function unblock() {
     setError(null)

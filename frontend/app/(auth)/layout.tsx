@@ -8,8 +8,9 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
   // Card anchors bottom-left on desktop — the same spot as the landing cartouche
   // (left-9 / bottom-9), so moving landing ↔ auth the title block stays put.
-  // Centered on mobile, where the chart is hidden under the scrim. Top padding
-  // is taller than the bottom (pt-20 vs pb-12) to clear the full-width header.
+  // Centered on mobile, where the scrim washes the chart out around it. Top
+  // padding is taller than the bottom (pt-20 vs pb-12) to clear the full-width
+  // header.
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 pt-20 pb-12 sm:items-start sm:justify-end sm:p-9">
       <ChartBackdrop routes={routes} />

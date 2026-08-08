@@ -158,6 +158,37 @@ describe("AttachmentActions — attachment exists", () => {
   })
 })
 
+// Master covers the upload and removal refusals below; the gap this closes is the
+// download. Its presigned URL comes from a separate request that can fail on its
+// own (expired object, revoked access), and the handler simply declined to open a
+// window — leaving a click that did nothing at all.
+describe("AttachmentActions — a refused download says so", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("shows the reason a presigned URL could not be issued", async () => {
+    vi.mocked(getTravelDocumentAttachmentUrl).mockResolvedValue({
+      success: false,
+      error: "This document has no attachment",
+    })
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null)
+
+    render(
+      <AttachmentActions
+        tripId={TRIP_ID}
+        documentId={DOC_ID}
+        attachmentPath="trips/abc/doc/voucher.pdf"
+        canEdit={false}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /download/i }))
+
+    await waitFor(() => expect(screen.getByText("This document has no attachment")).toBeDefined())
+    expect(openSpy).not.toHaveBeenCalled()
+    openSpy.mockRestore()
+  })
+})
+
 describe("AttachmentActions — drag and drop", () => {
   beforeEach(() => vi.clearAllMocks())
 

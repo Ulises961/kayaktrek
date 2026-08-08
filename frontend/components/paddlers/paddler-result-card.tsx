@@ -28,6 +28,7 @@ import {
 import { blockPaddler } from "@/lib/blocks/actions"
 import type { PaddlerSearchResult } from "@/lib/dtos/paddler-search"
 import type { Relationship } from "@/lib/dtos/connection"
+import { formatPaddlerName } from "@/lib/user/format"
 
 interface PaddlerResultCardProps {
   paddler: PaddlerSearchResult
@@ -45,7 +46,7 @@ export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
   const [relationship, setRelationship] = useState<Relationship>(paddler.relationship)
   const [hidden, setHidden] = useState(false)
 
-  const fullName = [paddler.name, paddler.surname].filter(Boolean).join(" ")
+  const fullName = formatPaddlerName(paddler)
 
   function run(
     action: () => Promise<ConnectionActionResult | { success: boolean; error?: string }>,

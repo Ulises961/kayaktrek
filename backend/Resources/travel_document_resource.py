@@ -134,13 +134,14 @@ def delete_document(id: str):
       summary: Delete a travel document
       description: >
         Only the document's owner or the trip leader may delete it, and only
-        while it is still within its editable window. Removes the MinIO
-        attachment first if one exists.
+        while the trip is still open. A document whose own date has passed can
+        still be deleted — that restriction applies to edits, not removal.
+        Removes the MinIO attachment first if one exists.
       responses:
         204:
           description: Document deleted
         403:
-          description: Caller is neither the document owner nor the trip leader, or the document is no longer editable
+          description: Caller is neither the document owner nor the trip leader, or the trip is complete
         404:
           description: Document not found
     """
@@ -225,7 +226,8 @@ def delete_attachment(id: str):
       summary: Remove a travel document's file attachment
       description: >
         Only the document's owner or the trip leader may delete it, and only
-        while it is still within its editable window.
+        while the trip is still open. An attachment on a document whose own date
+        has passed can still be removed — that restriction applies to edits.
       responses:
         200:
           description: The travel document with its attachment removed
@@ -233,7 +235,7 @@ def delete_attachment(id: str):
             application/json:
               schema: TravelDocumentSchema
         403:
-          description: Caller is neither the document owner nor the trip leader, or the document is no longer editable
+          description: Caller is neither the document owner nor the trip leader, or the trip is complete
         404:
           description: Document not found, or has no attachment
     """

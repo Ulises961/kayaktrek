@@ -384,15 +384,15 @@ export default function DesignPage() {
       {/* ── 8. State visuals ─────────────────────────────────────────────────── */}
       <Section
         title="8 — State visuals"
-        subtitle="Domain-anchored grammar: compass · waypoints · route · paddle · horizon. All five states — toggle dark mode to verify both themes."
+        subtitle="Two grammars. Empty/loading/success are seascapes: compass · waypoints · route · paddle · horizon. 404/500 are the Reinel chart rose, true or adrift — a broken page is not an unfinished route. Toggle dark mode to verify both themes."
       >
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {(["empty", "loading", "not-found", "error", "success"] as const).map((state) => {
             const meta = {
               empty: { label: "Empty", desc: "Paddle ready — no voyages yet." },
               loading: { label: "Loading", desc: "Navigating toward something." },
-              "not-found": { label: "404", desc: "Destination doesn't exist." },
-              error: { label: "500", desc: "Lost bearing — system failure." },
+              "not-found": { label: "404", desc: "Rose true. Destination doesn't exist." },
+              error: { label: "500", desc: "Rose adrift — hunting for north." },
               success: { label: "Success", desc: "Route resolved. Flag planted." },
             }[state]
             return (

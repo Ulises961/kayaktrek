@@ -13,7 +13,7 @@ export default async function VerifyEmailChangePage({
     return (
       <AuthCard>
         <AuthCardHeading title="Confirmation failed" />
-        <p className="text-[11px] text-[oklch(0.52_0.065_240)]">Missing confirmation token.</p>
+        <p className="auth-footnote text-[11px]">Missing confirmation token.</p>
       </AuthCard>
     )
   }

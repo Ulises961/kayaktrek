@@ -13,13 +13,9 @@ export function SidebarToggleButton() {
     <SidebarMenuItem>
       <SidebarMenuButton
         onClick={toggleSidebar}
-        tooltip={collapsed ? "Expand" : undefined}
-        className="text-muted-foreground hover:text-foreground"
+        className="text-muted-foreground hover:text-foreground justify-end"
       >
         {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-        <span className="group-data-[collapsible=icon]:hidden">
-          {isMobile ? "Close" : "Collapse"}
-        </span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   )

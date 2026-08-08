@@ -10,6 +10,8 @@ import { listMyLogs, listEndorsedLogs, type LogListFilters } from "@/lib/logs/ac
 import { LogCard } from "./log-card"
 import { LOG_SORT, type Log, type LogPage, type LogSort } from "@/lib/dtos/log"
 import type { DistanceUnit } from "@/lib/itinerary/distance"
+import { EmptyState } from "@/components/common/empty-state"
+import { NewspaperIcon } from "lucide-react"
 
 const SORTS: { value: LogSort; label: string }[] = [
   { value: LOG_SORT.NEWEST, label: "Newest first" },
@@ -163,13 +165,23 @@ export function LogsList({ initial, kind, currentUserId, unit }: LogsListProps) 
       </div>
 
       {items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {activeFilterCount > 0
-            ? "No logs match these filters."
-            : kind === "mine"
-              ? "No logs yet. Record your first session."
-              : "No endorsed logs yet."}
-        </p>
+        // A filter miss is transient and the logs do exist — plain line. Having
+        // none at all is the empty state.
+        activeFilterCount > 0 ? (
+          <EmptyState variant="inline" title="No logs match these filters." />
+        ) : kind === "mine" ? (
+          <EmptyState
+            icon={NewspaperIcon}
+            title="No logs yet"
+            description="Record a paddle and it lands here with its distance, conditions and anyone who was on the water with you."
+          />
+        ) : (
+          <EmptyState
+            icon={NewspaperIcon}
+            title="No endorsed logs yet"
+            description="Logs that paddlers from the same trip vouch for appear here, building a record others can trust."
+          />
+        )
       ) : (
         // LogCard stays a full Card (it carries endorsers/actions) — only the
         // inter-card separation adopts the shared hairline language (M12 §O)

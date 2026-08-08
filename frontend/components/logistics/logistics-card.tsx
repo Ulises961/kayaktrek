@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EditShoreContactDialog } from "./edit-logistics-dialog"
 import { fieldLabelClass } from "@/components/common/form-field"
 import type { Logistics } from "@/lib/dtos/logistics"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface LogisticsCardProps {
   logistics: Logistics | null
@@ -39,9 +40,11 @@ export function LogisticsCard({ logistics, isLeader, tripId }: LogisticsCardProp
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {!logistics ? (
-          <p className="text-muted-foreground text-sm">
-            Logistics not yet set up — shore contact and shuttle details will appear here.
-          </p>
+          <EmptyState
+            variant="inline"
+            title="Logistics not yet set up."
+            description="Shore contact and shuttle details will appear here."
+          />
         ) : (
           <>
             {/* Shore contact */}

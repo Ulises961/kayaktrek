@@ -71,10 +71,7 @@ export function LoginForm() {
             <label htmlFor="password" className="auth-label">
               Password
             </label>
-            <Link
-              href="/forgot-password"
-              className="text-sm tracking-wide text-[oklch(0.52_0.065_240)] underline underline-offset-2 hover:text-[oklch(0.43_0.165_243)]"
-            >
+            <Link href="/forgot-password" className="auth-link text-xs">
               Forgot password?
             </Link>
           </div>
@@ -111,7 +108,7 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-center">
         No account?{" "}
         <Link href="/register" className="auth-link">
           Create one

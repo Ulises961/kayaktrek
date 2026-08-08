@@ -13,9 +13,7 @@ export default async function ResetPasswordPage({
     return (
       <AuthCard>
         <AuthCardHeading title="Invalid reset link" />
-        <p className="text-[11px] text-[oklch(0.52_0.065_240)]">
-          The reset link is missing or malformed.
-        </p>
+        <p className="auth-footnote text-[11px]">The reset link is missing or malformed.</p>
         <Link href="/forgot-password" className="auth-link text-[11px]">
           Request a new link
         </Link>

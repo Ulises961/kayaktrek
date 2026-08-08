@@ -12,6 +12,7 @@ import {
   type TripPage,
 } from "@/lib/dtos/trip"
 import { TripsSection, PLANNING_SORT_OPTIONS } from "./trips-section"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface TripsBoardProps {
   initialHappening: TripPage
@@ -104,7 +105,7 @@ export function TripsBoard({ initialHappening, initialPlanning, initialPast }: T
       </div>
 
       {activeFilterCount > 0 && allSectionsEmpty && (
-        <p className="text-muted-foreground text-sm">No trips match these filters.</p>
+        <EmptyState variant="inline" title="No trips match these filters." />
       )}
 
       <TripsSection

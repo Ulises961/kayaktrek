@@ -11,6 +11,7 @@ import { JoinVehicleButton, RemovePassengerButton } from "./passenger-actions"
 import type { Logistics } from "@/lib/dtos/logistics"
 import type { ShuttleVehicle } from "@/lib/dtos/shuttle-vehicle"
 import type { TripMember } from "@/lib/dtos/trip-member"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface ShuttleSectionProps {
   logistics: Logistics | null
@@ -257,7 +258,12 @@ export function ShuttleSection({
       )}
 
       {vehicles.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No vehicles added yet.</p>
+        <EmptyState
+          icon={CarIcon}
+          title="No vehicles yet"
+          description="Cars used for the shuttle appear here, with who drives and how many seats and boats each takes."
+          ghostRows={2}
+        />
       ) : (
         <div className="divide-border divide-y">
           {vehicles.map((v) => (

@@ -3,6 +3,7 @@ import { ListRow } from "@/components/common/list-row"
 import { RemoveMemberButton } from "@/components/trips/remove-member-button"
 import { cn } from "@/lib/utils"
 import type { TripMember } from "@/lib/dtos/trip-member"
+import { formatPaddlerName } from "@/lib/user/format"
 
 const roleStyles: Record<"leader" | "crew", string> = {
   leader: "bg-primary/10 text-primary border border-primary/20",
@@ -28,7 +29,7 @@ export function CrewList({ members, tripId, isLeader, leaderId }: CrewListProps)
     <ul className="flex flex-col">
       {members.map((member) => {
         const { user, role } = member
-        const displayName = [user.name, user.surname].filter(Boolean).join(" ")
+        const displayName = formatPaddlerName(user)
         const canRemove = isLeader && tripId && user.id && user.id !== leaderId
 
         return (

@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import { useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet-velocity"
@@ -20,9 +20,15 @@ export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
   const map = useMap()
   const layerRef = useRef<VelocityLayerHandle | null>(null)
   // Latest options for layer creation without forcing a rebuild when only the
-  // options change (that path is handled in place below). Kept current via the
-  // options effect, not during render. Initialised for the first creation.
+  // options change (that path is handled in place below).
   const optionsRef = useRef(options)
+
+  // Layout effects flush ahead of passive ones, so this lands before the creation
+  // effect reads the ref — a render changing data and options together must build
+  // the new layer from the new options.
+  useLayoutEffect(() => {
+    optionsRef.current = options
+  }, [options])
 
   // Create / destroy the layer when the map or the underlying data changes.
   useEffect(() => {
@@ -105,7 +111,6 @@ export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
   // "showing velocity is delayed" blank that destroying + recreating would cause
   // on every zoom. No-ops on first run (layer not added yet — creation used the ref).
   useEffect(() => {
-    optionsRef.current = options
     layerRef.current?.setOptions?.(options)
   }, [options])
 

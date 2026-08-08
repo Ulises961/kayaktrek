@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import { Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
 import { deleteShuttleVehicle } from "@/lib/shuttle/actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,7 +33,8 @@ export function DeleteVehicleButton({
 
   function handleConfirm() {
     startTransition(async () => {
-      await deleteShuttleVehicle(tripId, vehicleId)
+      const result = await deleteShuttleVehicle(tripId, vehicleId)
+      if (!result.success) toast.error(result.error)
     })
   }
 

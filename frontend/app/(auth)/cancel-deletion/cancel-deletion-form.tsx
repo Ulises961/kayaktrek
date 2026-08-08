@@ -94,7 +94,7 @@ export function CancelDeletionForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-[11px]">
         Click below to cancel your deletion request and restore your account.
       </p>
       <Button disabled={isPending} onClick={handleCancel} className="auth-btn">

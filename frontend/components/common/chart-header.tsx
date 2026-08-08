@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
-import Link from "next/link"
-import { CompassRose } from "@/components/landing/compass-rose"
+import { BrandLockup } from "@/components/common/brand-lockup"
+import { ThemeToggle } from "@/components/common/theme-toggle"
 import { cn } from "@/lib/utils"
 
 interface ChartHeaderBarProps {
@@ -16,16 +16,21 @@ interface ChartHeaderBarProps {
 // only needs z-10), so the caller owns those via `className`. `nav` is
 // optional — auth pages have no header nav, their cross-links live inside the
 // card.
+//
+// The theme toggle is unconditional, unlike `nav`. Every anonymous-facing page
+// in the app renders through this strip and none of them has anywhere else to
+// put it — before this, the control lived only in the authenticated shell, so a
+// visitor who landed in dark mode had to sign in to get back out of it.
 export function ChartHeaderBar({ className, nav }: ChartHeaderBarProps) {
   return (
     <header
       className={cn("chart-header flex items-center justify-between px-5 py-3 sm:px-7", className)}
     >
-      <Link href="/" className="flex items-center gap-2.5">
-        <CompassRose size={26} />
-        <span className="chart-wordmark text-[0.95rem] sm:text-base">Kayak Expedition Planner</span>
-      </Link>
-      {nav ? <nav className="flex items-center gap-1 sm:gap-3">{nav}</nav> : null}
+      <BrandLockup wordmarkClassName="text-[0.95rem] sm:text-base" />
+      <nav className="flex items-center gap-1 sm:gap-3">
+        {nav}
+        <ThemeToggle className="chart-header-toggle" />
+      </nav>
     </header>
   )
 }

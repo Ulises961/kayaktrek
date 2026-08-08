@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event"
 
 const {
   mockUseCollapseSidebar,
-  mockUseFullBleedContent,
+  mockUseContentLayout,
   mockUseBreadcrumbs,
   mockUseSearchParams,
   mockUsePositionWatch,
@@ -13,7 +13,7 @@ const {
   mockCloseDay,
 } = vi.hoisted(() => ({
   mockUseCollapseSidebar: vi.fn(),
-  mockUseFullBleedContent: vi.fn(),
+  mockUseContentLayout: vi.fn(),
   mockUseBreadcrumbs: vi.fn(),
   mockUseSearchParams: vi.fn(() => new URLSearchParams()),
   mockUsePositionWatch: vi.fn((): { status: string; lastSentAt: Date | null } => ({
@@ -32,8 +32,8 @@ vi.mock("@/hooks/use-collapse-sidebar", () => ({
   useCollapseSidebar: mockUseCollapseSidebar,
 }))
 
-vi.mock("@/hooks/use-full-bleed-content", () => ({
-  useFullBleedContent: mockUseFullBleedContent,
+vi.mock("@/hooks/use-content-layout", () => ({
+  useContentLayout: mockUseContentLayout,
 }))
 
 vi.mock("@/hooks/use-breadcrumbs", () => ({
@@ -158,7 +158,7 @@ describe("MapBuilder", () => {
 
   it("requests full-bleed content on mount", () => {
     render(<MapBuilder itinerary={ITINERARY} tripId={TRIP_ID} tripName="Cinque Terre" />)
-    expect(mockUseFullBleedContent).toHaveBeenCalled()
+    expect(mockUseContentLayout).toHaveBeenCalled()
   })
 
   it("renders the map top bar, pushing the trip name into the header breadcrumb", () => {

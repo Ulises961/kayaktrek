@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest"
-import { formatVesselLength } from "../format"
+import { formatVesselLength, formatPaddlerName } from "../format"
+
+describe("formatPaddlerName", () => {
+  it("joins name and surname", () => {
+    expect(formatPaddlerName({ name: "Ada", surname: "Lovelace" })).toBe("Ada Lovelace")
+  })
+
+  it("drops the missing half rather than leaving a stray space", () => {
+    expect(formatPaddlerName({ name: "Ada", surname: null })).toBe("Ada")
+    expect(formatPaddlerName({ name: "", surname: "Lovelace" })).toBe("Lovelace")
+  })
+
+  it("falls back to the username when there is no name at all", () => {
+    expect(formatPaddlerName({ name: "", surname: null, username: "paddler7" })).toBe("paddler7")
+  })
+
+  it("returns an empty string when nothing identifies the paddler", () => {
+    expect(formatPaddlerName({ name: "", surname: null })).toBe("")
+  })
+})
 
 describe("formatVesselLength", () => {
   it("converts centimetres to metres with two decimal places", () => {

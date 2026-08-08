@@ -120,6 +120,21 @@
   /* Chart-paper ivory — scoped to the landing nautical-chart variant
      (cartouche, neat-line, ticks, header). #f7f4ec in tokens.ts. */
   --chart-paper: oklch(0.966 0.009 92);
+  /* Ink printed on chart paper. One scale for every chart surface — the landing
+     cartouche, the header strip, and the auth card, which is a cartouche too.
+     They share it so a title on the login form and a title on the hero are the
+     same colour by construction rather than by two literals agreeing. */
+  --chart-ink: oklch(0.155 0.04 245); /* titles, wordmark */
+  --chart-ink-em: oklch(0.3 0.085 240); /* the tagline's italic clause */
+  --chart-ink-body: oklch(0.45 0.07 240); /* running copy */
+  --chart-ink-quiet: oklch(0.52 0.065 240); /* eyebrows, labels, marginalia */
+  --chart-hairline: oklch(0.43 0.165 243); /* rules and neat-lines */
+
+  /* App shell header height. The strip spans the full width above both the
+     sidebar and the content, so the sidebar has to start below it — see the
+     [data-slot="sidebar-container"] rule further down, the only other place
+     this value is consumed. */
+  --app-header-h: 3rem;
 
   /* Sidebar — slightly deeper than background */
   --sidebar: oklch(0.965 0.006 90);
@@ -169,6 +184,48 @@
   --primary-soft: oklch(0.928 0.038 215);
   --accent-soft: oklch(0.96 0.03 75);
 
+  /* Reinel rose — the 404/500 artwork (components/illustrations/reinel-rose.tsx).
+     Its own scale, so a change to --foreground/--primary/--accent can't collapse
+     the value separation the shaded and sunlit halves of each point depend on.
+     Light mode is engraved ink on chart paper.
+
+     Three hues: ocean ink, ocean blue, sunset amber. The heavy rings sit in the
+     blue family so they read as structure, leaving amber as the only warm note
+     and putting the eye on north — the fleur-de-lys and its dots. */
+  --rose-ink: oklch(0.22 0.048 245); /* line work + shaded point halves */
+  --rose-lit: oklch(0.6 0.145 240); /* sunlit halves — must stay clear of ink */
+  --rose-leaf: oklch(0.73 0.145 75); /* intermediate flourishes — sunset amber */
+  --rose-ring: oklch(0.52 0.1 240); /* the two heavy rings */
+  --rose-north: oklch(0.3 0.1 243); /* fleur-de-lys */
+  --rose-north-mark: oklch(0.73 0.145 75); /* the fleur's dots */
+
+  /* Brand mark — the header/tab rose (components/common/brand-mark.tsx). Same
+     three-hue idea as the Reinel rose above and deliberately not the same
+     variables: the mark sits on surfaces the artwork never touches, so it has
+     to be retintable without dragging the 404 pages along. */
+  --mark-ink: oklch(0.22 0.048 245); /* shaded point halves */
+  --mark-lit: oklch(0.52 0.13 243); /* sunlit halves */
+  /* The sunlit halves of north and south, warm against the blue rose. Named for
+     what the two of them draw together: amber on north alone was a slice of one
+     point, carried through south it closes into a hull, pointed at each end. */
+  --mark-hull: oklch(0.7 0.16 55);
+
+  /* Auth surfaces. These were baked literals, which is why the auth pages stayed
+     a lit sheet in dark mode — see the .dark block for the night colourway. The
+     link and field tints are the two that matter most: a link at the button's
+     navy disappears into a dark cartouche, and a near-white field on a dark card
+     is the "ugly filled box" giveaway that a surface was never themed. */
+  --auth-heading-ink: var(--chart-ink);
+  --auth-body-ink: var(--chart-ink-body);
+  --auth-quiet-ink: var(--chart-ink-quiet);
+  --auth-field: oklch(0.975 0.004 220);
+  --auth-field-border: oklch(0.865 0.042 218);
+  --auth-accent: oklch(0.43 0.165 243);
+  --auth-accent-hover: oklch(0.38 0.165 243);
+  --auth-accent-ink: oklch(0.985 0.008 220);
+  --auth-link: oklch(0.43 0.165 243);
+  --auth-link-hover: oklch(0.38 0.165 243);
+
   /* Card shadows — blue-tinted depth */
   --card-shadow: 0 1px 3px oklch(0.43 0.165 243 / 0.08), 0 4px 12px oklch(0.43 0.165 243 / 0.06);
   --card-shadow-hover:
@@ -209,6 +266,29 @@
   --accent-foreground: oklch(0.155 0.04 245);
 
   --destructive: oklch(0.65 0.22 25);
+
+  /* Chart paper at night. Every chart surface reads this — the cartouche, the
+     header strip, the planner's top bar — so they all turn together instead of
+     staying a lit sheet in a dark room. Kept a step lighter than --background
+     so a card still lifts off the page. */
+  --chart-paper: oklch(0.255 0.032 244);
+  --chart-ink: oklch(0.95 0.012 225);
+  --chart-ink-em: oklch(0.84 0.05 230);
+  --chart-ink-body: oklch(0.79 0.032 230);
+  --chart-ink-quiet: oklch(0.71 0.035 230);
+  --chart-hairline: oklch(0.72 0.09 235);
+
+  /* Auth surfaces at night, against the dark --chart-paper cartouche. The field
+     is a shade *darker* than the card it sits in — an inset well rather than a
+     lit box — and the link lifts well clear of the button navy, which is close
+     enough to the card to vanish into it. */
+  --auth-field: oklch(0.205 0.028 245);
+  --auth-field-border: oklch(0.36 0.045 238);
+  --auth-accent: oklch(0.52 0.15 243);
+  --auth-accent-hover: oklch(0.58 0.15 243);
+  --auth-accent-ink: oklch(0.98 0.008 220);
+  --auth-link: oklch(0.76 0.115 232);
+  --auth-link-hover: oklch(0.85 0.09 232);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
@@ -257,6 +337,22 @@
   --primary-soft: oklch(0.265 0.068 243);
   --accent-soft: oklch(0.265 0.04 75);
 
+  /* Brand mark, inverted: on navy the line work carries the light, so the
+     shaded halves become the brightest part of the star. North keeps its amber
+     — it reads on both grounds, which is the point of it being the warm one. */
+  --mark-ink: oklch(0.93 0.018 225);
+  --mark-lit: oklch(0.6 0.12 240);
+
+  /* Reinel rose — a chart negative: the line work carries the light, so the ink
+     is the brightest thing in the mark. The leaves and the fleur are re-picked
+     rather than inverted, which would wash them out against the navy. */
+  --rose-ink: oklch(0.9 0.02 220);
+  --rose-lit: oklch(0.58 0.12 232);
+  --rose-leaf: oklch(0.76 0.155 80);
+  --rose-ring: oklch(0.55 0.1 232);
+  --rose-north: oklch(0.74 0.09 235);
+  --rose-north-mark: oklch(0.76 0.155 80);
+
   /* Card shadows */
   --card-shadow: 0 1px 3px oklch(0 0 0 / 0.3), 0 4px 12px oklch(0 0 0 / 0.25);
   --card-shadow-hover: 0 4px 8px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
@@ -269,8 +365,8 @@
 }
 
 /* ── State-visual animation keyframes ───────────────────────────────────────
- * Used by components/illustrations/state-visual.tsx.
- * All three are domain-neutral: the SVG primitives supply the meaning.
+ * Used by components/illustrations/state-visual.tsx. Domain-neutral: the SVG
+ * primitives supply the meaning.
  * ── */
 @keyframes sv-oscillate {
   0%,
@@ -281,39 +377,68 @@
     transform: translateY(-6px);
   }
 }
-/* Erratic bearing loss — used on the compass needle and broken route half */
-@keyframes sv-disrupt {
-  0%,
-  100% {
-    transform: translate(0px, 0px);
+
+/* ── Reinel rose (404 / 500 artwork) ────────────────────────────────────────
+ * Both motion classes go on a group inside the SVG, which supplies its own
+ * transform-origin (the rose's hub) — only the component knows where the hub
+ * sits in its viewBox.
+ * ── */
+
+/* Settling onto north: the rose swings past true and comes to rest. The brand
+   mark's .chart-needle gesture, at the amplitude a full-page illustration can
+   carry. */
+@keyframes rose-settle {
+  from {
+    transform: rotate(-38deg);
   }
-  25% {
-    transform: translate(-2px, 1px);
+  62% {
+    transform: rotate(8deg);
   }
-  50% {
-    transform: translate(2px, -2px);
-  }
-  75% {
-    transform: translate(-1px, 2px);
-  }
-}
-/* Compass needle searching for north */
-@keyframes sv-needle {
-  0%,
-  100% {
+  to {
     transform: rotate(0deg);
   }
-  20% {
-    transform: rotate(24deg);
+}
+/* Hunting for a north it cannot find — never resting on 0deg, so it reads as an
+   instrument that has lost its bearing rather than one still settling. */
+@keyframes rose-hunt {
+  0%,
+  100% {
+    transform: rotate(-4deg);
   }
-  45% {
-    transform: rotate(-19deg);
+  22% {
+    transform: rotate(5.5deg);
   }
-  65% {
-    transform: rotate(13deg);
+  46% {
+    transform: rotate(-6.5deg);
+  }
+  68% {
+    transform: rotate(3deg);
   }
   85% {
-    transform: rotate(-8deg);
+    transform: rotate(-1.5deg);
+  }
+}
+.rose-settle {
+  animation: rose-settle 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rose-hunt {
+  animation: rose-hunt 7s ease-in-out infinite;
+}
+/* Colour drained toward destructive while the geometry stays intact — only the
+   variables move, the rose itself doesn't know it is in an error state. The
+   drained blue is one literal, not a light/dark pair: a mid near-neutral is the
+   one value that reads as absence of colour on both chart paper and navy. */
+.rose-adrift {
+  --rose-lit: oklch(0.62 0.022 245);
+  --rose-ring: oklch(0.62 0.022 245);
+  --rose-leaf: var(--destructive);
+  --rose-north: var(--destructive);
+  --rose-north-mark: var(--destructive);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rose-settle,
+  .rose-hunt {
+    animation: none;
   }
 }
 
@@ -355,87 +480,6 @@
      navy shell. One shared rule, not per-map component edits. */
   .dark .leaflet-tile-pane {
     filter: brightness(0.65) contrast(1.15) saturate(0.85);
-  }
-
-  /* ── Auth surfaces ──────────────────────────────────────────────────────── */
-  /* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
-     These rules style the contents that sit inside it. */
-  .auth-heading {
-    font-family: var(--font-display), serif;
-    font-size: 1.6rem;
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    color: oklch(0.155 0.04 245);
-  }
-  .auth-subheading {
-    font-size: 0.7rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: oklch(0.52 0.065 240);
-  }
-  .auth-label {
-    font-size: 0.625rem;
-    font-weight: 500;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: oklch(0.52 0.065 240);
-  }
-  .auth-input {
-    border-radius: 2px;
-    border-color: oklch(0.865 0.042 218);
-    background-color: oklch(0.975 0.004 220);
-    font-size: 0.875rem;
-  }
-  .auth-input:focus-visible {
-    --tw-ring-color: oklch(0.43 0.165 243);
-  }
-  .auth-btn {
-    width: 100%;
-    border-radius: 2px;
-    background-color: oklch(0.43 0.165 243);
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition:
-      background-color 0.15s ease,
-      transform 0.1s ease;
-  }
-  .auth-btn:hover {
-    background-color: oklch(0.38 0.165 243);
-  }
-  .auth-btn:active {
-    transform: scale(0.99);
-  }
-  .auth-link {
-    color: oklch(0.43 0.165 243);
-    font-weight: 500;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-  .auth-link:hover {
-    color: oklch(0.38 0.165 243);
-  }
-  .auth-notice {
-    border-radius: 2px;
-    padding: 0.625rem 0.75rem;
-    font-size: 0.75rem;
-  }
-  .auth-notice-success {
-    background-color: oklch(0.97 0.04 155);
-    border: 1px solid oklch(0.88 0.08 155);
-    color: oklch(0.38 0.1 155);
-  }
-  .auth-notice-error {
-    background-color: oklch(0.97 0.02 25);
-    border: 1px solid oklch(0.88 0.06 25);
-    color: oklch(0.45 0.15 25);
-  }
-  .auth-notice-warning {
-    background-color: oklch(0.97 0.04 75);
-    border: 1px solid oklch(0.88 0.08 75);
-    color: oklch(0.45 0.12 75);
   }
 
   /* ── App cards ──────────────────────────────────────────────────────────── */
@@ -508,26 +552,165 @@
  * ======================================================================== */
 /* Plain (unlayered) rules so Lightning CSS always emits them and they win
    over the base `* { border }` reset. */
+/* ── Auth surfaces ────────────────────────────────────────────────────────
+   Unlayered, for the same reason as the chart motifs below: these style shadcn
+   primitives (Input, Button) whose own `rounded-md` / `bg-transparent` /
+   `text-base` are Tailwind UTILITIES, which beat anything inside
+   @layer components. Keep them out of a layer or they apply only for the
+   properties no utility competes for. */
+/* The card itself is the landing Cartouche (chart-paper); see auth-card.tsx.
+   These rules style the contents that sit inside it. */
+.auth-heading {
+  font-family: var(--font-display), serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--auth-heading-ink);
+}
+/* Supporting line under the title. Sentence case, because call sites pass whole
+   sentences ("Choose a new password for your account."); the wide-tracked caps
+   treatment belongs on .auth-label. */
+.auth-subheading {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--auth-body-ink);
+}
+/* Quiet ink for the marginalia under a form — "No account?", token-missing
+   notes, the sent-email confirmations. Colour only: the size varies between the
+   11px fine print and the sm cross-links, and an unlayered font-size here would
+   beat the call site's utility and flatten both. */
+.auth-footnote {
+  color: var(--auth-quiet-ink);
+}
+.auth-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--auth-quiet-ink);
+}
+.auth-input {
+  border-radius: 2px;
+  border-color: var(--auth-field-border);
+  background-color: var(--auth-field);
+  color: var(--auth-heading-ink);
+  font-size: 0.875rem;
+}
+.auth-input:focus-visible {
+  --tw-ring-color: var(--auth-accent);
+}
+.auth-btn {
+  width: 100%;
+  border-radius: 2px;
+  background-color: var(--auth-accent);
+  color: var(--auth-accent-ink);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
+}
+.auth-btn:hover {
+  background-color: var(--auth-accent-hover);
+}
+.auth-btn:active {
+  transform: scale(0.99);
+}
+.auth-link {
+  color: var(--auth-link);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.auth-link:hover {
+  color: var(--auth-link-hover);
+}
+.auth-notice {
+  border-radius: 2px;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.75rem;
+}
+.auth-notice-success {
+  background-color: oklch(0.97 0.04 155);
+  border: 1px solid oklch(0.88 0.08 155);
+  color: oklch(0.38 0.1 155);
+}
+.auth-notice-error {
+  background-color: oklch(0.97 0.02 25);
+  border: 1px solid oklch(0.88 0.06 25);
+  color: oklch(0.45 0.15 25);
+}
+.auth-notice-warning {
+  background-color: oklch(0.97 0.04 75);
+  border: 1px solid oklch(0.88 0.08 75);
+  color: oklch(0.45 0.12 75);
+}
+
+/* Notices at night. The tints above are near-white boxes on a dark cartouche;
+   these keep the same three hues and invert the relationship — a deep wash
+   carrying light text, rather than a pale wash carrying dark text. */
+.dark .auth-notice-success {
+  background-color: oklch(0.27 0.055 155);
+  border-color: oklch(0.42 0.085 155);
+  color: oklch(0.87 0.1 155);
+}
+.dark .auth-notice-error {
+  background-color: oklch(0.27 0.06 25);
+  border-color: oklch(0.44 0.11 25);
+  color: oklch(0.88 0.09 25);
+}
+.dark .auth-notice-warning {
+  background-color: oklch(0.28 0.055 75);
+  border-color: oklch(0.44 0.09 75);
+  color: oklch(0.89 0.09 75);
+}
+
 /* Header — slim chart publication strip. */
 .chart-header {
   background: color-mix(in oklch, var(--chart-paper) 78%, transparent);
-  border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
+  border-bottom: 1px solid color-mix(in oklch, var(--chart-hairline) 16%, transparent);
   backdrop-filter: blur(8px);
 }
+/* Theme toggle on the chart strip. The ghost Button's own colours come from the
+   app palette, which is a different surface from chart paper — this keeps it in
+   the strip's ink so it reads as part of the publication line, not as a control
+   borrowed from the app shell. */
+.chart-header-toggle {
+  color: var(--chart-ink-quiet);
+}
+.chart-header-toggle:hover {
+  color: var(--chart-ink);
+  background-color: color-mix(in oklch, var(--chart-hairline) 10%, transparent);
+}
+
 /* App shell variant — tints from the app's own --background token (which
    already has a dark-mode value) instead of chart-paper, so the header
    reads as part of the content area below it rather than matching the
    sidebar's tone and looking like a separate strip (M12 §B22 follow-up). */
 .chart-header-app {
   background: color-mix(in oklch, var(--background) 78%, transparent);
-  border-bottom: 1px solid oklch(0.43 0.165 243 / 0.16);
+  border-bottom: 1px solid color-mix(in oklch, var(--chart-hairline) 16%, transparent);
   backdrop-filter: blur(8px);
+}
+/* shadcn's Sidebar pins its desktop container to the viewport
+   (`fixed inset-y-0 ... h-svh`, components/ui/sidebar.tsx), which would run it
+   up behind the full-width app header. Offset it by the header height here,
+   next to --app-header-h, rather than through the Sidebar's className:
+   tailwind-merge does NOT drop the primitive's `inset-y-0`, so the winner would
+   come down to utility ordering. Desktop only — the mobile sidebar is a Sheet
+   and never renders this slot. */
+[data-slot="sidebar-container"] {
+  top: var(--app-header-h);
+  height: calc(100svh - var(--app-header-h));
 }
 .chart-wordmark {
   font-family: var(--font-display), serif;
   font-weight: 500;
   letter-spacing: -0.015em;
-  color: oklch(0.155 0.04 245);
+  color: var(--chart-ink);
   line-height: 1;
 }
 
@@ -552,41 +735,66 @@
 /* Cartouche — chart title block, the page's signature element. */
 .chart-cartouche {
   background: color-mix(in oklch, var(--chart-paper) 90%, transparent);
-  border: 1px solid oklch(0.43 0.165 243 / 0.26);
+  border: 1px solid color-mix(in oklch, var(--chart-hairline) 26%, transparent);
   border-radius: 2px;
   box-shadow:
     0 1px 0 oklch(1 0 0 / 0.7) inset,
     0 14px 44px oklch(0.155 0.04 245 / 0.26);
   backdrop-filter: blur(7px);
 }
+/* Solid variant for the auth cards. The translucent cartouche is a title block
+   floating over open water and is meant to take some of the sea with it; a form
+   is not — at 90% paper it tints with whatever the chart draws underneath. The
+   form surface holds a fixed colour, and the chart stays behind it. */
+.chart-cartouche-solid {
+  background: var(--chart-paper);
+  backdrop-filter: none;
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.7) inset,
+    0 18px 52px oklch(0.155 0.04 245 / 0.3);
+}
+/* On dark paper the inset highlight is a lit rim rather than a paper edge, and
+   a drop shadow does nothing against a dark ground — so the card is separated
+   by its own border instead. */
+.dark .chart-cartouche,
+.dark .chart-cartouche-solid {
+  border-color: oklch(1 0 0 / 0.14);
+  box-shadow:
+    0 1px 0 oklch(1 0 0 / 0.06) inset,
+    0 18px 52px oklch(0 0 0 / 0.45);
+}
 .chart-eyebrow {
   font-family: var(--font-mono), monospace;
   font-size: 0.625rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: oklch(0.52 0.09 240);
+  color: var(--chart-ink-quiet);
 }
 .chart-tagline {
   font-family: var(--font-display), serif;
   font-weight: 400;
   letter-spacing: -0.015em;
   line-height: 1.06;
-  color: oklch(0.155 0.04 245);
+  color: var(--chart-ink);
 }
 .chart-tagline em {
   font-style: italic;
-  color: oklch(0.3 0.085 240);
+  color: var(--chart-ink-em);
 }
 .chart-invite {
   font-family: var(--font-mono), monospace;
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
   line-height: 1.5;
-  color: oklch(0.45 0.07 240);
+  color: var(--chart-ink-body);
 }
 .chart-rule {
   height: 1px;
-  background: linear-gradient(to right, oklch(0.43 0.165 243 / 0.5), oklch(0.43 0.165 243 / 0.06));
+  background: linear-gradient(
+    to right,
+    color-mix(in oklch, var(--chart-hairline) 50%, transparent),
+    color-mix(in oklch, var(--chart-hairline) 6%, transparent)
+  );
 }
 
 /* Actions use the shadcn `Button` primitive (default + link variants) with the

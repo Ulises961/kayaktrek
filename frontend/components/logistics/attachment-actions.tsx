@@ -63,8 +63,13 @@ export function AttachmentActions({
   }
 
   async function handleDownload() {
+    setError(null)
     const result = await getTravelDocumentAttachmentUrl(documentId)
-    if (result.success) window.open(result.url, "_blank")
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    window.open(result.url, "_blank")
   }
 
   function handleRemove() {

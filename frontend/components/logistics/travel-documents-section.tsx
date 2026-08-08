@@ -19,6 +19,7 @@ import {
   type TravelDocument,
   type TravelDocumentType,
 } from "@/lib/dtos/travel-document"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface TravelDocumentsSectionProps {
   documents: TravelDocument[]
@@ -213,9 +214,11 @@ export function TravelDocumentsSection({
           </div>
         )}
         {documents.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No travel documents added yet — bookings, permits, and insurance go here.
-          </p>
+          <EmptyState
+            icon={PaperclipIcon}
+            title="No travel documents yet"
+            description="Bookings, permits and insurance for this trip go here, ready to hand over at a checkpoint."
+          />
         ) : (
           <div className="divide-border divide-y">
             {TRAVEL_DOCUMENT_TYPES.filter((t) => documents.some((d) => d.type === t)).map(

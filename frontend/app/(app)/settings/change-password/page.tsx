@@ -4,7 +4,7 @@ import { PageHeading } from "@/components/common/page-heading"
 
 export default function ChangePasswordPage() {
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <SetBreadcrumbs
         crumbs={[{ label: "Settings", href: "/settings" }, { label: "Change password" }]}
       />
@@ -16,6 +16,6 @@ export default function ChangePasswordPage() {
         </p>
       </div>
       <ChangePasswordForm />
-    </div>
+    </>
   )
 }

@@ -14,6 +14,7 @@ import { TidalEntryForm } from "@/components/weather/tidal-entry-form"
 import { RuleOfTwelfthsTable } from "@/components/weather/rule-of-twelfths-table"
 import { TidalGateWarnings } from "@/components/weather/tidal-gate-warnings"
 import type { Sea } from "@/lib/dtos/sea"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface ConditionsSectionProps {
   dayId: string
@@ -121,7 +122,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
               </span>
             </>
           ) : (
-            <span className="text-muted-foreground text-xs">No forecast yet.</span>
+            <EmptyState variant="inline" title="No forecast yet." className="text-xs" />
           )}
         </div>
         {isLeader && (

@@ -11,6 +11,7 @@ import {
   grantMedicalConsent,
   revokeMedicalConsent,
 } from "@/lib/profile/actions"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface MedicalNotesSectionProps {
   hasStoredNotes: boolean
@@ -113,11 +114,17 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
           </div>
         )}
         <div className="flex items-center justify-between gap-4">
-          <p className="text-muted-foreground text-sm">
-            {hasNotes
-              ? "Notes stored — encrypted on your account."
-              : "No notes stored yet. Add allergies, medications, blood type, or anything relevant to rescue crews."}
-          </p>
+          {hasNotes ? (
+            <p className="text-muted-foreground text-sm">
+              Notes stored — encrypted on your account.
+            </p>
+          ) : (
+            <EmptyState
+              variant="inline"
+              title="No notes stored yet."
+              description="Add allergies, medications, blood type, or anything relevant to rescue crews."
+            />
+          )}
           <Button
             type="button"
             variant="outline"

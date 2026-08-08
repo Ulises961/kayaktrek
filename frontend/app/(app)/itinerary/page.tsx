@@ -1,12 +1,13 @@
 import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { ItinerariesSchema } from "@/lib/dtos/itinerary"
-import { MapPinIcon } from "lucide-react"
 import { NewItineraryButton } from "@/components/itinerary/new-itinerary-button"
 import { ImportGpxButton } from "@/components/itinerary/import-gpx-button"
 import { ItineraryCard } from "@/components/itinerary/itinerary-card"
 import { getMe } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { PageHeading } from "@/components/common/page-heading"
+import { EmptyState } from "@/components/common/empty-state"
+import { SignpostBigIcon } from "lucide-react"
 
 export default async function ItineraryListPage() {
   let itineraries: Awaited<ReturnType<typeof ItinerariesSchema.parse>> = []
@@ -22,7 +23,7 @@ export default async function ItineraryListPage() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <PageHeading>Itineraries</PageHeading>
         <div className="flex items-center gap-2">
           <ImportGpxButton />
@@ -30,12 +31,13 @@ export default async function ItineraryListPage() {
         </div>
       </div>
       {itineraries.length === 0 ? (
-        <div className="text-muted-foreground flex flex-col items-center gap-3 py-16">
-          <MapPinIcon className="size-10 opacity-30" />
-          <p className="text-sm">No itineraries yet.</p>
-        </div>
+        <EmptyState
+          icon={SignpostBigIcon}
+          title="No itineraries yet"
+          description="Routes you plan on the map appear here — days, distances and stops, ready to attach to a trip."
+        />
       ) : (
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           {itineraries.map((itinerary) => (
             <ItineraryCard key={itinerary.id} itinerary={itinerary} unit={unit} />
           ))}

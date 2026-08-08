@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
-import { useFullBleedContent } from "@/hooks/use-full-bleed-content"
+import { useContentLayout } from "@/hooks/use-content-layout"
 import { usePositionWatch } from "@/hooks/use-position-watch"
 import { useLivePositions } from "@/hooks/use-live-positions"
 import { CloseDayButton } from "./close-day-button"
@@ -55,7 +55,7 @@ export function MapBuilder({
   initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
-  useFullBleedContent()
+  useContentLayout("bleed")
 
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(initialDistanceUnit)
   const [avgSpeedKnots, setAvgSpeedKnots] = useState(itinerary.avgSpeedKnots ?? 2.5)

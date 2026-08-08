@@ -8,6 +8,7 @@ import { UserAvatar } from "@/components/common/user-avatar"
 import { InviteBuddyPicker } from "@/components/trips/invite-buddy-picker"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
 import type { Trip } from "@/lib/dtos/trip"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface CrewTabProps {
   tripId: string
@@ -28,7 +29,12 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
           Crew ({travellers.length})
         </SectionLabel>
         {travellers.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No crew members yet.</p>
+          <EmptyState
+            icon={UsersIcon}
+            title="No crew yet"
+            description="Paddlers who accept an invitation appear here with their vessel and emergency contact."
+            ghostRows={2}
+          />
         ) : (
           <CrewList
             members={travellers}

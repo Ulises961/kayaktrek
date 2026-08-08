@@ -80,25 +80,10 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
         {/* Neat-line frame (graticule lines + labels are drawn on the map itself) */}
         <NeatLine className="chart-anim-fade z-[1000]" />
 
-        {/* Header — chart publication strip */}
-        <ChartHeaderBar
-          className="absolute top-0 right-0 left-0 z-[1001]"
-          nav={
-            <>
-              <Button asChild size="sm" className={chartCta}>
-                <Link href="/register">Sign up</Link>
-              </Button>
-              <Button
-                asChild
-                variant="link"
-                size="sm"
-                className={cn(chartLink, "hidden sm:inline-flex")}
-              >
-                <Link href="/login">Log in</Link>
-              </Button>
-            </>
-          }
-        />
+        {/* Header — chart publication strip. Carries the mark and wordmark only;
+            the actions live in the cartouche, where the copy that argues for
+            them is. */}
+        <ChartHeaderBar className="absolute top-0 right-0 left-0 z-[1001]" />
 
         {/* Cartouche — title block / signature. Outer holds the placement; the
             inner box fades + rises out of the way as the mobile page scrolls
@@ -123,6 +108,14 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
               <CartoucheNote className="mt-4">
                 A growing chart of paddled waters — add the one you know best.
               </CartoucheNote>
+              <div className="mt-5 flex items-center gap-4">
+                <Button asChild size="sm" className={chartCta}>
+                  <Link href="/register">Sign up</Link>
+                </Button>
+                <Button asChild variant="link" size="sm" className={chartLink}>
+                  <Link href="/login">Log in</Link>
+                </Button>
+              </div>
             </Cartouche>
           </div>
         </div>

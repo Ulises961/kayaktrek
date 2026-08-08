@@ -27,7 +27,7 @@ export default async function LogsPage() {
     unit === DISTANCE_UNIT.NM ? toNm(stats.totalDistance) : stats.totalDistance
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <div className="flex items-center justify-between">
         <PageHeading>Paddling logs</PageHeading>
         <AddLogDialog unit={unit} />
@@ -68,6 +68,6 @@ export default async function LogsPage() {
         currentUserId={session?.userId}
         unit={unit}
       />
-    </div>
+    </>
   )
 }

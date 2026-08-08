@@ -9,14 +9,18 @@ describe("ChartHeaderBar", () => {
     expect(link).toHaveAttribute("href", "/")
   })
 
-  it("renders nav content when provided", () => {
+  it("renders nav content alongside the toggle when provided", () => {
     render(<ChartHeaderBar nav={<a href="/login">Log in</a>} />)
     expect(screen.getByRole("navigation")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Log in" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /toggle theme/i })).toBeInTheDocument()
   })
 
-  it("omits the nav element entirely when no nav is provided", () => {
+  it("carries the theme toggle even with no nav", () => {
+    // Every anonymous-facing page renders through this strip and none of them
+    // has another home for the control — without it here, a visitor who landed
+    // in dark mode has to sign in to get back out of it.
     render(<ChartHeaderBar />)
-    expect(screen.queryByRole("navigation")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /toggle theme/i })).toBeInTheDocument()
   })
 })

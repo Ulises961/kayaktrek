@@ -21,17 +21,33 @@ _UPDATABLE_FIELDS = ("type", "name", "date", "expiry_date", "confirmation_number
 
 
 def _governing_date(doc: TravelDocument) -> Optional[date]:
+    """The date the document stops being current.
+
+    For anything carrying both an issue and an expiry date — a passport, an
+    insurance policy — that is the expiry: an issue date in the past says
+    nothing about whether the document is still good.
+    """
     dates = [d for d in (doc.date, doc.expiry_date) if d is not None]
-    return min(dates) if dates else None
+    return max(dates) if dates else None
+
+
+def _require_trip_open(trip: Trip) -> None:
+    """Once a trip is over, its paperwork is the record of what happened."""
+    if trip.state in (TripStateType.PAST, TripStateType.ARCHIVED):
+        raise ValueError("This document cannot be changed on a completed trip")
 
 
 def _require_editable(doc: TravelDocument, trip: Trip) -> None:
+    """Guard for edits only.
+
+    Deletion deliberately does not go through here: an out-of-date document is
+    the one most worth removing, and freezing it leaves a mistyped year or a
+    booking that fell through attached to the trip permanently.
+    """
+    _require_trip_open(trip)
     gov = _governing_date(doc)
-    if gov is not None:
-        if gov < date.today():
-            raise ValueError("This document's date has passed and can no longer be edited")
-    elif trip.state in (TripStateType.PAST, TripStateType.ARCHIVED):
-        raise ValueError("This document cannot be edited on a completed trip")
+    if gov is not None and gov < date.today():
+        raise ValueError("This document's date has passed and can no longer be edited")
 
 
 def _require_owner_or_leader(doc: TravelDocument, user_id: str) -> None:
@@ -131,16 +147,19 @@ class TravelDocumentService:
         Delete a travel document. Removes the MinIO attachment first if one exists.
         Membership is pre-validated by the resource layer.
 
+        Unlike an edit, this is allowed on a document whose own date has passed —
+        only a completed trip freezes it.
+
         Raises:
             NoResultFound: Document not found
             PermissionError: User is neither owner nor leader
-            ValueError: Document's governing date has passed or trip is complete
+            ValueError: Trip is complete
         """
         doc = db.session.query(TravelDocument).filter_by(id=UUID(document_id)).first()
         if not doc:
             raise NoResultFound(f"TravelDocument {document_id} not found")
 
-        _require_editable(doc, doc.trip)
+        _require_trip_open(doc.trip)
         _require_owner_or_leader(doc, user_id)
 
         if doc.attachment_path:
@@ -189,10 +208,14 @@ class TravelDocumentService:
         """
         Remove the file attachment from a travel document.
 
+        Like deleting the document itself, this is allowed once the document's own
+        date has passed — the attachment is a stored copy of someone's permit or
+        policy, and withdrawing it must not depend on the date on its face.
+
         Raises:
             NoResultFound: Document not found or has no attachment
             PermissionError: User is neither owner nor leader
-            ValueError: Document's governing date has passed or trip is complete
+            ValueError: Trip is complete
         """
         doc = db.session.query(TravelDocument).filter_by(id=UUID(document_id)).first()
         if not doc:
@@ -200,7 +223,7 @@ class TravelDocumentService:
         if not doc.attachment_path:
             raise NoResultFound("This document has no attachment")
 
-        _require_editable(doc, doc.trip)
+        _require_trip_open(doc.trip)
         _require_owner_or_leader(doc, user_id)
 
         StorageService.delete(doc.attachment_path, "document")

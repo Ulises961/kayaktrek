@@ -1,0 +1,160 @@
+/**
+ * Brand mark — the compass rose in the header lockup and in the browser tab.
+ *
+ * A modern nautical rose by Kertase, released CC0 1.0 (public domain
+ * dedication). The absence of any attribution obligation is what lets it serve
+ * as a brand mark rather than as credited artwork; see `docs/brand/licences.md`.
+ *
+ * Three edits to the original. Its enclosing ring and fleur-de-lys crown are
+ * dropped: at header size the ring hides the one thing that identifies a rose,
+ * its eight-point silhouette, and the crown is a speck above the star. Every
+ * fill is rebound to a `--mark-*` custom property, so the mark inverts to line
+ * work on navy in dark mode the way `ReinelRose` does. And the north–south axis
+ * is tinted as one shape: north's sunlit half was already warm, south's is
+ * warmed to match and its shaded half raised from `ink` to the same `lit` blue
+ * north carries, so bow and stern are identical. The axis closes into a hull —
+ * pointed at both ends, beam at the centre — while the east/west fold stays
+ * intact, which is what keeps it reading as a rose that suggests a kayak rather
+ * than a flat spindle laid over a star.
+ */
+import { cn } from "@/lib/utils"
+
+// The source drawing is millimetre-scaled and offset; this is the single matrix
+// every one of its paths sat under, with the artwork's bounding box folded in so
+// the viewBox starts at the origin.
+const FLATTEN = "matrix(0.264583,0,0,0.264583,-44.785859,-101.392814)"
+const BOX = 135.987
+
+const TONE = {
+  ink: "var(--mark-ink)",
+  lit: "var(--mark-lit)",
+  hull: "var(--mark-hull)",
+} as const
+
+// Ink and lit are the shaded and sunlit halves of each point — the fold that
+// makes a rose read as engraved rather than as a flat star. Hull is the warm
+// tone the north and south points share; north's half is painted last so it
+// sits over its neighbours.
+const POINTS: { tone: keyof typeof TONE; d: string }[] = [
+  {
+    tone: "ink",
+    d: "m 350.76172,599.31836 c 9.41474,-2.121 18.8294,-4.24229 28.24414,-6.36328 -29.25265,-29.25135 -58.50516,-58.50256 -87.75781,-87.75391 19.83801,31.37262 39.67566,62.74461 59.51367,94.11719 z",
+  },
+  {
+    tone: "ink",
+    d: "m 473.49805,592.95117 c 29.24929,-29.25059 58.49875,-58.50136 87.74804,-87.75195 l -94.11132,59.50976 c 2.12086,9.41415 4.24241,18.82805 6.36328,28.24219 z",
+  },
+  {
+    tone: "ink",
+    d: "m 473.5,687.44531 c 29.25265,29.25136 58.50516,58.50255 87.75781,87.75391 -19.78847,-31.29426 -39.71935,-62.82293 -59.50781,-94.11719 -9.41688,2.12145 -18.83312,4.2418 -28.25,6.36328 z",
+  },
+  {
+    tone: "ink",
+    d: "m 379.00781,687.44727 c -29.25125,29.25254 -58.50266,58.50527 -87.7539,87.75781 31.33222,-19.8124 62.78691,-39.69346 94.11914,-59.50586 z",
+  },
+  {
+    tone: "ink",
+    d: "m 426.25391,657.57227 c 15.74885,9.95758 31.49724,19.91546 47.24609,29.87304 -15.74875,-15.74805 -31.49735,-31.49609 -47.24609,-47.24414 z",
+  },
+  {
+    tone: "ink",
+    d: "m 426.25195,640.20117 h -17.37109 c -9.95729,15.74837 -19.91576,31.49577 -29.87305,47.24414 15.74767,-15.74836 31.49648,-31.49577 47.24414,-47.24414 z",
+  },
+  {
+    tone: "ink",
+    d: "m 426.25195,622.82812 c -15.74885,-9.95758 -31.49724,-19.91546 -47.24609,-29.87304 15.74875,15.74805 31.49735,31.49609 47.24609,47.24414 z",
+  },
+  {
+    tone: "ink",
+    d: "m 426.25195,640.19922 0.002,0.002 H 443.625 c 9.95758,-15.74887 19.91546,-31.49917 29.87305,-47.24805 l -0.004,0.002 c -15.74702,15.74771 -31.49322,31.49642 -47.24023,47.24414 z",
+  },
+  {
+    tone: "ink",
+    d: "m 473.5,687.44531 c 9.41688,-2.12148 18.83312,-4.24183 28.25,-6.36328 60.4954,-13.62871 120.99095,-27.25804 181.48633,-40.88672 l -239.61133,0.006 z",
+  },
+  {
+    // South's shaded half. Lit, not ink, so it matches north's and the axis is
+    // symmetric — on ink the stern sat in shadow while the bow was lit.
+    tone: "lit",
+    d: "m 379.00781,687.44727 6.36524,28.25195 40.88476,181.48437 -0.004,-239.61132 c -15.74842,9.95829 -31.49768,19.9167 -47.2461,29.875 z",
+  },
+  {
+    tone: "ink",
+    d: "m 169.26953,640.20703 239.61133,-0.006 -29.875,-47.24609 c -9.41474,2.12099 -18.8294,4.24228 -28.24414,6.36328 0,0 0,0 0,0 -60.49753,13.62917 -120.99466,27.25947 -181.49219,40.88867 z",
+  },
+  {
+    tone: "lit",
+    d: "m 291.24805,505.20117 c 29.25265,29.25135 58.50516,58.50256 87.75781,87.75391 l 6.36133,-28.24414 C 353.99367,544.87416 322.62154,525.0378 291.24805,505.20117 Z",
+  },
+  {
+    tone: "lit",
+    d: "m 473.49805,592.95312 c 9.4147,2.12056 18.82943,4.24078 28.24414,6.36133 19.83625,-31.37288 39.6735,-62.74621 59.50976,-94.11914 l -0.006,0.004 c -29.24929,29.25059 -58.49875,58.50136 -87.74804,87.75195 0,0 0,0.002 0,0.002 z",
+  },
+  {
+    tone: "lit",
+    d: "m 473.5,687.44531 c -2.12055,9.41471 -4.24077,18.82944 -6.36133,28.24414 31.37344,19.83661 62.7457,39.67317 94.11914,59.50977 C 532.00516,745.94786 502.75265,716.69667 473.5,687.44531 Z",
+  },
+  {
+    tone: "lit",
+    d: "m 379.00781,687.44727 c -9.41472,-2.12056 -18.82941,-4.24077 -28.24414,-6.36133 -19.83648,31.37326 -39.67329,62.74588 -59.50976,94.11914 29.25124,-29.25254 58.50265,-58.50527 87.7539,-87.75781 z",
+  },
+  {
+    tone: "lit",
+    d: "m 473.5,687.44531 -29.875,-47.24414 h -17.37109 c 15.74874,15.74805 31.49734,31.49609 47.24609,47.24414 z",
+  },
+  {
+    tone: "lit",
+    d: "m 426.25195,640.20117 c -15.74766,15.74837 -31.49647,31.49578 -47.24414,47.24414 0,0 0,0.002 0,0.002 15.74842,-9.9583 31.49768,-19.91671 47.2461,-29.875 v -17.3711 z",
+  },
+  {
+    tone: "lit",
+    d: "m 426.25195,640.19922 c -15.74874,-15.74805 -31.49734,-31.49609 -47.24609,-47.24414 l 29.875,47.24609 h 17.37109 c 0,0 0,-0.002 0,-0.002 z",
+  },
+  {
+    tone: "lit",
+    d: "m 426.25195,622.82812 v 17.3711 h 0.002 c 15.74701,-15.74772 31.49321,-31.49643 47.24023,-47.24414 z",
+  },
+  {
+    tone: "lit",
+    d: "m 443.625,640.20117 239.61133,-0.006 C 622.73805,626.56877 562.24045,612.941 501.74219,599.31445 c 0,0 0,0 0,0 -9.41471,-2.12055 -18.82944,-4.24077 -28.24414,-6.36133 -9.95759,15.74888 -19.91547,31.49918 -29.87305,47.24805 z",
+  },
+  {
+    // South's sunlit half — north's warm triangle reflected across the
+    // east–west axis. The stern to north's bow.
+    tone: "hull",
+    d: "m 426.25391,657.57227 0.004,239.61132 c 13.62654,-60.49824 27.25433,-120.99589 40.88086,-181.49414 0,0 0,0 0,0 2.12056,-9.4147 4.24078,-18.82943 6.36133,-28.24414 -15.74885,-9.95758 -31.49724,-19.91546 -47.24609,-29.87304 z",
+  },
+  {
+    tone: "lit",
+    d: "m 379.00781,687.44531 c 9.95729,-15.74837 19.91576,-31.49577 29.87305,-47.24414 l -239.61133,0.006 c 60.49824,13.62654 120.9959,27.25238 181.49414,40.87891 0,0 0,0 0,0 9.41473,2.12056 18.82942,4.24077 28.24414,6.36133 0,0 0,-0.002 0,-0.002 z",
+  },
+  {
+    tone: "lit",
+    d: "m 426.24805,383.2168 -40.88086,181.49414 c 0,0 0,0 0,0 l -6.36133,28.24414 c 15.74885,9.95758 31.49724,19.91546 47.24609,29.87304 z",
+  },
+  {
+    // North's sunlit half — the bow. Last in the list so it paints over its
+    // neighbours.
+    tone: "hull",
+    d: "m 426.24805,383.2168 0.004,239.61132 47.24219,-29.87304 0.004,-0.002 c 0,0 0,-0.002 0,-0.002 -2.12087,-9.41414 -4.24242,-18.82804 -6.36328,-28.24219 v 0 C 453.5056,504.21146 439.87722,443.71431 426.24805,383.2168 Z",
+  },
+]
+
+export function BrandMark({ size = 28, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${BOX} ${BOX}`}
+      fill="none"
+      aria-hidden="true"
+      className={cn("chart-needle", className)}
+    >
+      <g transform={FLATTEN}>
+        {POINTS.map(({ tone, d }, index) => (
+          <path key={index} d={d} fill={TONE[tone]} />
+        ))}
+      </g>
+    </svg>
+  )
+}

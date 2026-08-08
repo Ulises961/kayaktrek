@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { BackLink } from "@/components/common/back-link"
+import { BrandLockup } from "@/components/common/brand-lockup"
 import { SeasonBadge } from "@/components/explore/season-badge"
 import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
 import { daySummariesFromRoute } from "@/lib/itinerary/public-routes"
@@ -51,10 +52,11 @@ export function PublicRouteDetail({
       data-testid="route-detail-panel"
       className="border-border bg-background flex h-full w-full shrink-0 flex-col overflow-y-auto border-l sm:w-96"
     >
+      {/* Brand strip. This panel IS the chrome on /routes/[id] and /story/[token]
+          — both are full-height map splits with no room for a header bar above
+          them — so the lockup lives here rather than in a ChartHeaderBar. */}
       <div className="border-border shrink-0 border-b px-5 py-4">
-        <Link href="/" className="text-foreground font-semibold tracking-tight">
-          Kayak Expedition Planner
-        </Link>
+        <BrandLockup size={20} wordmarkClassName="text-sm" />
       </div>
 
       <div className="flex flex-col gap-4 p-5">

@@ -13,7 +13,7 @@ export default async function VerifyPage({
     return (
       <AuthCard>
         <AuthCardHeading title="Verification failed" />
-        <p className="text-[11px] text-[oklch(0.52_0.065_240)]">Missing verification token.</p>
+        <p className="auth-footnote text-[11px]">Missing verification token.</p>
       </AuthCard>
     )
   }

@@ -3,8 +3,9 @@ import { listTrips } from "@/lib/trips/actions"
 import { TRIP_STATE, TRIP_SORT } from "@/lib/dtos/trip"
 import { TripsBoard } from "@/components/trips/trips-board"
 import { NewTripDialog } from "@/components/trips/new-trip-dialog"
-import { StateVisual } from "@/components/illustrations/state-visual"
 import { PageHeading } from "@/components/common/page-heading"
+import { EmptyState } from "@/components/common/empty-state"
+import { KayakIcon } from "lucide-react"
 import { redirect } from "next/navigation"
 
 export default async function Page() {
@@ -24,21 +25,18 @@ export default async function Page() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <PageHeading>Trips</PageHeading>
         <NewTripDialog />
       </div>
       {grandTotal === 0 ? (
-        <div className="mt-16 flex flex-col items-center gap-6 text-center xl:mt-24">
-          <StateVisual state="empty" className="3xl:w-[32rem] w-56 opacity-80 xl:w-80 2xl:w-96" />
-          <p className="text-muted-foreground text-sm xl:text-base 2xl:text-lg">
-            No trips yet. Create one to get started.
-          </p>
-        </div>
+        <EmptyState
+          icon={KayakIcon}
+          title="No trips yet"
+          description="An expedition holds your route, crew, gear and float plan in one place. Use New trip above to get started."
+        />
       ) : (
-        <div className="mt-4">
-          <TripsBoard initialHappening={happening} initialPlanning={planning} initialPast={past} />
-        </div>
+        <TripsBoard initialHappening={happening} initialPlanning={planning} initialPast={past} />
       )}
     </>
   )

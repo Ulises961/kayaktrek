@@ -23,6 +23,7 @@ import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
+import { EmptyState } from "@/components/common/empty-state"
 
 export interface ItineraryTabProps {
   tripId: string
@@ -180,7 +181,13 @@ export function ItineraryTab({
   // ── No itinerary ──────────────────────────────────────────────────────────
   if (!itinerary) {
     if (!isLeader) {
-      return <p className="text-muted-foreground text-sm italic">No itinerary yet.</p>
+      return (
+        <EmptyState
+          icon={MapIcon}
+          title="No itinerary yet"
+          description="Once the leader plans the route, the day-by-day passage appears here."
+        />
+      )
     }
     return (
       <div className="flex flex-col gap-3">

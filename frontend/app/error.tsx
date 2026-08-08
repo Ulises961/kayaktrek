@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { StateVisual } from "@/components/illustrations/state-visual"
 import { PageHeading } from "@/components/common/page-heading"
+import { RoseCredit } from "@/components/illustrations/rose-credit"
 
 interface ErrorPageProps {
   error: Error & { digest?: string }
@@ -12,7 +13,9 @@ interface ErrorPageProps {
 export default function ErrorPage({ reset }: ErrorPageProps) {
   return (
     <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <StateVisual state="error" className="w-full max-w-sm" />
+      {/* The rose is portrait — capped by height rather than width so it can't
+          run off a short viewport, which a max-w cap on a 450×760 box does. */}
+      <StateVisual state="error" className="max-h-[min(62vh,30rem)] w-auto" />
       <div className="flex flex-col gap-2 text-center">
         <p className="text-muted-foreground font-mono text-xs tracking-widest uppercase">500</p>
         <PageHeading className="text-foreground">Lost bearing</PageHeading>
@@ -35,6 +38,7 @@ export default function ErrorPage({ reset }: ErrorPageProps) {
           Back to home
         </Link>
       </div>
+      <RoseCredit />
     </div>
   )
 }

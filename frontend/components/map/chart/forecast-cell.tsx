@@ -5,7 +5,6 @@ import { Circle, Marker, useMapEvents } from "react-leaflet"
 import L from "leaflet"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { cellForRoutes, WIND_COLOR_SCALE } from "@/lib/landing/ambient-wind"
-import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { VelocityGridLayer } from "@/lib/types/ui"
 import { CHART_INK as INK, CHART_PAPER_GLOW as PAPER_GLOW } from "./chart-theme"
 
@@ -68,6 +67,9 @@ function noteIcon(radiusKm: number, illustrative: boolean): L.DivIcon {
 }
 
 export type ForecastCellLayer = {
+  // Stable per field, never positional: a field toggled off must not hand its
+  // slot — and its colour scale — to the field that shifts up into it.
+  key: string
   grid: VelocityGridLayer[]
   options: Record<string, unknown>
 }
@@ -95,8 +97,8 @@ export function ForecastCellShell({
 
   return (
     <>
-      {layers.map((layer, index) => (
-        <VelocityLayer key={index} data={layer.grid} options={layer.options} />
+      {layers.map((layer) => (
+        <VelocityLayer key={layer.key} data={layer.grid} options={layer.options} />
       ))}
       {/* Contour ring — chart neat-line language. Outline only: a fill would
           tint the map (the very "heatmap on top" we're removing). */}
@@ -122,14 +124,16 @@ export function ForecastCellShell({
 }
 
 // Decorative landing wrapper: synthesizes the ambient flow disc and renders it
-// through the shared shell, labelled "illustrative".
-export function ForecastCell({ routes }: { routes: RouteData[] }) {
+// through the shared shell, labelled "illustrative". Takes the positions of the
+// passage the chart is framed on, so the disc lands on-screen rather than at the
+// centroid of every published route.
+export function ForecastCell({ positions }: { positions: [number, number][] }) {
   // Track LIVE zoom (the prop was the static initial value). zoomend is enough —
   // density only needs to settle after the gesture, not update mid-animation.
   const map = useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
   const [zoom, setZoom] = useState(() => map.getZoom())
 
-  const cell = useMemo(() => cellForRoutes(routes.flatMap((r) => r.positions)), [routes])
+  const cell = useMemo(() => cellForRoutes(positions), [positions])
   // A NEW object each time zoom changes, so VelocityLayer's options effect fires
   // and applies the multiplier in place (mutating a shared const would not).
   const options = useMemo(
@@ -139,7 +143,7 @@ export function ForecastCell({ routes }: { routes: RouteData[] }) {
 
   return (
     <ForecastCellShell
-      layers={[{ grid: cell.grid, options }]}
+      layers={[{ key: "ambient", grid: cell.grid, options }]}
       center={cell.center}
       radiusKm={cell.radiusKm}
       illustrative

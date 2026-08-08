@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import { Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
 import { deleteTravelDocument } from "@/lib/travel-documents/actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +32,8 @@ export function DeleteDocumentButton({
 
   function handleConfirm() {
     startTransition(async () => {
-      await deleteTravelDocument(tripId, documentId)
+      const result = await deleteTravelDocument(tripId, documentId)
+      if (!result.success) toast.error(result.error)
     })
   }
 

@@ -10,6 +10,8 @@ import { ItemRow } from "@/components/inventory/item-row"
 import { SectionLabel } from "@/components/common/section-label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { EmptyState } from "@/components/common/empty-state"
+import { PocketKnifeIcon } from "lucide-react"
 
 interface GearClosetProps {
   items: Item[]
@@ -103,9 +105,11 @@ export function GearCloset({ items, categories }: GearClosetProps) {
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {items.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-          No gear yet. Add your first piece of kit above to start your gear closet.
-        </div>
+        <EmptyState
+          icon={PocketKnifeIcon}
+          title="No gear yet"
+          description="Kit you own lands here, ready to add to any trip's packing list. Add your first piece above."
+        />
       ) : (
         <>
           <div className="flex flex-wrap gap-2">

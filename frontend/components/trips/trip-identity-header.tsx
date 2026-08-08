@@ -31,6 +31,7 @@ import {
   type Trip,
   type TripState,
 } from "@/lib/dtos/trip"
+import { PageHeading } from "@/components/common/page-heading"
 
 const MAX_VISIBLE_AVATARS = 5
 
@@ -99,7 +100,7 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
       />
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-xl font-semibold">{trip.destination ?? "Untitled trip"}</h1>
+          <PageHeading className="truncate">{trip.destination ?? "Untitled trip"}</PageHeading>
           {trip.state && <StateBadge state={trip.state} />}
         </div>
         {isLeader && (

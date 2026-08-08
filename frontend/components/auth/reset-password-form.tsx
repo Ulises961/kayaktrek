@@ -76,7 +76,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         </Button>
       </form>
 
-      <p className="text-center text-[11px] text-[oklch(0.52_0.065_240)]">
+      <p className="auth-footnote text-center text-[11px]">
         <Link href="/login" className="auth-link">
           Back to sign in
         </Link>

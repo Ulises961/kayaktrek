@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -14,6 +14,7 @@ import {
   CHART_PAPER as PAPER,
 } from "@/components/map/chart"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { pickFeatureRoute } from "@/lib/landing/feature-route"
 import { POINT_TYPE } from "@/lib/dtos/point"
 import { palette } from "@/lib/tokens"
 import {
@@ -86,31 +87,32 @@ function RouteMarkers({ route }: { route: RouteData }) {
   )
 }
 
-// Frame the chart ON the itinerary (zoomed in, capped at the overview max) rather
+// Frame the chart ON one itinerary (zoomed in, capped at the overview max) rather
 // than a fixed far-out centre — so the parallax reveal lands on a well-scaled
-// passage and the route sits centred, not stranded high. Re-fits on resize/
-// breakpoint. Falls back to the fixed centre/zoom when there is no route yet.
+// passage and the route sits centred, not stranded high. Every published route is
+// still drawn; only the framing is single-route (see pickFeatureRoute), so the
+// chart opens on a legible passage and the rest are found by panning. Re-fits on
+// resize/breakpoint. Falls back to the fixed centre/zoom when there is no route yet.
 // `onReady` fires once, the first time this effect runs — win or skip (no
 // routes). It's the explicit "the initial view is whatever it's going to be"
 // signal chart furniture like Graticule waits on, rather than each guessing it
 // from event timing (see Graticule's `ready` prop for why that races).
 function FrameRoute({
-  routes,
+  feature,
   variant,
   onReady,
 }: {
-  routes: RouteData[]
+  feature: RouteData | null
   variant: Variant
   onReady?: () => void
 }) {
   const map = useMap()
   useEffect(() => {
-    const pts = routes.flatMap((r) => r.positions) as [number, number][]
-    if (pts.length === 0) {
+    if (!feature) {
       onReady?.()
       return
     }
-    const bounds = L.latLngBounds(pts)
+    const bounds = L.latLngBounds(feature.positions)
     const fit = () => {
       const compact = window.matchMedia("(max-width: 639px)").matches
       // The banner is a short strip with no header to clear, so it frames tight.
@@ -128,7 +130,7 @@ function FrameRoute({
     onReady?.()
     window.addEventListener("resize", fit)
     return () => window.removeEventListener("resize", fit)
-  }, [map, routes, variant, onReady])
+  }, [map, feature, variant, onReady])
   return null
 }
 
@@ -175,6 +177,9 @@ export function LandingMap({
   // has actually applied — otherwise the grid draws once from the map's fixed
   // construction-time center/zoom before catching up to the fitted extent.
   const [chartReady, setChartReady] = useState(false)
+  // The one passage the chart opens on. Framing and the forecast cell both read
+  // it, so the disc can never drift off the framed extent.
+  const feature = useMemo(() => pickFeatureRoute(routes), [routes])
   return (
     <MapContainer
       center={center}
@@ -191,7 +196,7 @@ export function LandingMap({
     >
       <Interactions interactive={interactive} />
       <AttributionPrefix />
-      <FrameRoute routes={routes} variant={variant} onReady={() => setChartReady(true)} />
+      <FrameRoute feature={feature} variant={variant} onReady={() => setChartReady(true)} />
       <TileLayer
         url={isHero ? ESRI_OCEAN : OSM_TILE_URL}
         attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIBUTION}
@@ -205,7 +210,7 @@ export function LandingMap({
           never runs on the dashboard. */}
       {isHero && <Graticule ready={chartReady} />}
       {isHero && <ScaleBar />}
-      {isHero && <ForecastCell routes={routes} />}
+      {isHero && <ForecastCell positions={feature?.positions ?? []} />}
       {routes.map((route) =>
         route.positions.length === 0 ? null : (
           <Fragment key={route.id}>

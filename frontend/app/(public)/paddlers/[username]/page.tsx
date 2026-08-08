@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation"
-import Link from "next/link"
 import { getPublicProfile } from "@/lib/public-profile/actions"
 import { getSession } from "@/lib/auth/session"
 import { getMe } from "@/lib/user/me"
@@ -11,7 +10,8 @@ import { ProfileRelationshipControls } from "@/components/paddlers/profile-relat
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeading } from "@/components/common/page-heading"
-import { AwardIcon, MapPinIcon, ActivityIcon, AnchorIcon } from "lucide-react"
+import { AwardIcon, MapPinIcon, ActivityIcon } from "lucide-react"
+import { ChartHeaderBar } from "@/components/common/chart-header"
 
 interface PublicProfilePageProps {
   params: Promise<{ username: string }>
@@ -42,16 +42,9 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-10">
-        {/* Brand */}
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1.5 text-sm"
-        >
-          <AnchorIcon className="size-4" />
-          Kayak Expedition Planner
-        </Link>
+      <ChartHeaderBar className="relative" />
 
+      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-10">
         {/* Header */}
         <div className="flex items-start gap-5">
           <UserAvatar

@@ -1,10 +1,14 @@
-import { AlertTriangleIcon, AnchorIcon, ShipWheelIcon, UserIcon } from "lucide-react"
+import { AlertTriangleIcon, AnchorIcon } from "lucide-react"
+import { ChartHeaderBar } from "@/components/common/chart-header"
 import { FloatPlanSnapshotSchema, type SnapshotCrewMember } from "@/lib/dtos/float-plan-snapshot"
 import { API_URL, API_PREFIX } from "@/lib/api/config"
 import { formatDayDate } from "@/lib/utils/date"
 import { formatVesselLength } from "@/lib/user/format"
 import { formatDateRange } from "@/lib/trips/format"
 import { PageHeading } from "@/components/common/page-heading"
+import { SectionLabel } from "@/components/common/section-label"
+import { UserAvatar } from "@/components/common/user-avatar"
+import { EmptyState } from "@/components/common/empty-state"
 
 async function fetchSnapshot(token: string) {
   try {
@@ -30,11 +34,13 @@ function DocRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+// The document's section rule. The label itself is the app-wide SectionLabel —
+// only the underline and spacing, which are this document's own, live here.
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-muted-foreground border-border mb-4 flex items-center gap-2 border-b pb-2 font-mono text-[11px] font-medium tracking-[0.1em] uppercase">
+    <SectionLabel as="h2" className="border-border mb-4 flex items-center gap-2 border-b pb-2">
       {children}
-    </h2>
+    </SectionLabel>
   )
 }
 
@@ -52,7 +58,7 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
         <span className="text-muted-foreground w-5 shrink-0 font-mono text-xs">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <UserIcon className="text-muted-foreground size-3.5 shrink-0" />
+        <UserAvatar name={member.name} size="sm" />
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="text-sm font-semibold">{member.name}</span>
           <span className="text-primary bg-primary/10 rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase">
@@ -65,9 +71,7 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
       <div className="divide-border grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         {/* Vessel */}
         <div className="p-4">
-          <p className="text-muted-foreground mb-3 font-mono text-[10px] font-medium tracking-[0.1em] uppercase">
-            Vessel
-          </p>
+          <SectionLabel className="mb-3">Vessel</SectionLabel>
           {hasVessel ? (
             <div className="flex flex-col gap-1.5">
               {vesselDesc && <DocRow label="Make / model" value={vesselDesc} />}
@@ -76,15 +80,17 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
               {v.colorSecondary && <DocRow label="Secondary colour" value={v.colorSecondary} />}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs italic">No vessel information provided.</p>
+            <EmptyState
+              variant="inline"
+              title="No vessel information provided."
+              className="text-xs italic"
+            />
           )}
         </div>
 
         {/* Emergency contact */}
         <div className="bg-surface-1 p-4">
-          <p className="text-muted-foreground mb-3 font-mono text-[10px] font-medium tracking-[0.1em] uppercase">
-            Emergency Contact
-          </p>
+          <SectionLabel className="mb-3">Emergency contact</SectionLabel>
           {hasEc ? (
             <div className="flex flex-col gap-1.5">
               {ec.name && <DocRow label="Name" value={ec.name} />}
@@ -92,7 +98,11 @@ function CrewCard({ member, index }: { member: SnapshotCrewMember; index: number
               {ec.relationship && <DocRow label="Relationship" value={ec.relationship} />}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs italic">No emergency contact provided.</p>
+            <EmptyState
+              variant="inline"
+              title="No emergency contact provided."
+              className="text-xs italic"
+            />
           )}
         </div>
       </div>
@@ -133,14 +143,13 @@ export default async function PublicFloatPlanPage({
 
   return (
     <div className="bg-background min-h-screen">
-      {/* Header — hidden on print */}
-      <header className="border-border bg-card flex items-center gap-2 border-b px-6 py-3.5 print:hidden">
-        <ShipWheelIcon className="text-primary size-4 shrink-0" />
-        <span className="text-primary text-sm font-semibold tracking-tight">Kayak Planner</span>
-        <span className="text-muted-foreground ml-auto font-mono text-[11px] tracking-widest uppercase">
-          Float Plan
-        </span>
-      </header>
+      {/* Header — the shared chart strip, hidden on print (the print-only
+          document label below takes over there). The document kind rides in the
+          nav slot, where the landing's actions sit. */}
+      <ChartHeaderBar
+        className="relative print:hidden"
+        nav={<span className="chart-eyebrow">Float plan</span>}
+      />
 
       {/* Print-only document label */}
       <p className="text-muted-foreground hidden px-6 pt-4 font-mono text-[10px] tracking-widest uppercase print:block">
@@ -151,28 +160,19 @@ export default async function PublicFloatPlanPage({
         {/* Title block */}
         <div className="flex flex-col gap-4">
           <div>
-            <h1
-              className="text-primary text-3xl font-light tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {snap.trip.destination ?? "Kayak Expedition"}
-            </h1>
+            <PageHeading>{snap.trip.destination ?? "Kayak Expedition"}</PageHeading>
             <p className="text-muted-foreground mt-1 text-sm">{dateLabel}</p>
           </div>
 
           <div className="border-border flex flex-wrap gap-x-6 gap-y-1 border-y py-3">
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground font-mono text-[10px] tracking-[0.08em] uppercase">
-                Crew
-              </span>
+              <SectionLabel as="span">Crew</SectionLabel>
               <span className="text-sm font-semibold">
                 {sortedCrew.length} {sortedCrew.length === 1 ? "person" : "people"}
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground font-mono text-[10px] tracking-[0.08em] uppercase">
-                Issued
-              </span>
+              <SectionLabel as="span">Issued</SectionLabel>
               <span className="text-sm font-semibold">{formatDayDate(snap.generatedAt)}</span>
             </div>
           </div>
@@ -222,8 +222,8 @@ export default async function PublicFloatPlanPage({
         </section>
 
         <footer className="border-border text-muted-foreground border-t pt-5 text-center text-xs leading-relaxed">
-          Generated by Kayak Planner · This document contains logistical information only. Medical
-          information is not included.
+          Generated by Kayak Expedition Planner · This document contains logistical information
+          only. Medical information is not included.
         </footer>
       </main>
     </div>

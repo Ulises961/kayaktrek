@@ -15,8 +15,7 @@ interface RequestsMenuProps {
   pendingRequests: PendingRequestsSummary
 }
 
-// Header-level notification entry, next to ThemeToggle — the natural home for
-// account-scoped chrome (profile avatar is slated to join this same area).
+// Header-level notification entry, between the breadcrumb and the account menu.
 // Collapses the three independent "someone is waiting on you" surfaces (trip
 // invitations, incoming buddy requests, incoming endorsement asks) into one
 // entry that routes each item to where it's actually handled (/invitations,

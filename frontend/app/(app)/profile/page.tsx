@@ -43,7 +43,7 @@ export default async function ProfilePage() {
   const hasEmergency = user.emergencyContactName || user.emergencyContactPhone
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       {/* Header */}
       <div className="flex items-start gap-5">
         <UserAvatar
@@ -266,6 +266,6 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </>
   )
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { ChartHeaderBar } from "@/components/common/chart-header"
+import { PageHeading } from "@/components/common/page-heading"
 
 export const metadata = {
   title: "Terms of Use — Kayak Expedition Planner",
@@ -34,7 +35,7 @@ export default function TermsPage() {
 
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
         <div className="flex flex-col gap-1">
-          <h1 className="text-foreground text-2xl font-semibold tracking-[0.01em]">Terms of Use</h1>
+          <PageHeading>Terms of Use</PageHeading>
           <p className="text-muted-foreground text-xs">Last updated 31 July 2026</p>
         </div>
 

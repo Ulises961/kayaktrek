@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface RequirementsChecklistProps {
   inventoryId: string
@@ -100,9 +101,11 @@ export function RequirementsChecklist({
   return (
     <div className="flex flex-col gap-4">
       {requirements.length === 0 ? (
-        <p className="text-muted-foreground text-sm italic">
-          No requirements yet{canManage ? " — add the gear this trip needs below." : "."}
-        </p>
+        <EmptyState
+          variant="inline"
+          className="italic"
+          title={`No requirements yet${canManage ? " — add the gear this trip needs below." : "."}`}
+        />
       ) : (
         // Grouped by the free-text category (trimmed + case-folded — see
         // lib/inventory/format's known rough edge vs the ItemCategory FK).

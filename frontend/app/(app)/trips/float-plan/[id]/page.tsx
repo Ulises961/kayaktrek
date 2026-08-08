@@ -12,6 +12,7 @@ import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-fo
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
 import { FloatPlanShareSection } from "@/components/trips/float-plan-share-section"
 import { FloatPlanSection } from "@/components/trips/float-plan-section"
+import { PageHeading } from "@/components/common/page-heading"
 
 export default async function FloatPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -47,12 +48,12 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
   })
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 text-base">
+    <div className="flex flex-col gap-6 text-base">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <BackLink href={`/trips/${id}`} label="Back to trip" size="xs" className="print:hidden" />
-          <h1 className="text-2xl font-bold tracking-tight">Float Plan</h1>
+          <PageHeading>Float plan</PageHeading>
           <p className="text-lg font-medium">{trip.destination ?? "Unnamed expedition"}</p>
           <p className="text-muted-foreground text-base">{dateLabel}</p>
         </div>

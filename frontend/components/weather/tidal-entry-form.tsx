@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { deriveCorrectedTide } from "@/lib/weather/tidal"
 import { updateDaySea } from "@/lib/weather/actions"
 import { TidalEntryFieldsSchema, type TidalEntryFields, type Sea } from "@/lib/dtos/sea"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface TidalEntryFormProps {
   dayId: string
@@ -55,9 +56,12 @@ function ReadOnlyTidal({ sea }: { sea: Sea | null }) {
   const hasTide = sea?.highTide != null || sea?.lowTide != null || sea?.tidalRangeM != null
   if (!hasTide) {
     return (
-      <p className="text-muted-foreground text-xs" data-testid="tidal-empty">
-        No tidal data recorded for this day yet.
-      </p>
+      <EmptyState
+        variant="inline"
+        title="No tidal data recorded for this day yet."
+        className="text-xs"
+        data-testid="tidal-empty"
+      />
     )
   }
   const hw = sea?.highTide ?? "—"

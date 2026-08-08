@@ -24,7 +24,7 @@ export default async function PaddlersPage({
   ])
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <>
       <div>
         <PageHeading>Paddlers</PageHeading>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -38,6 +38,6 @@ export default async function PaddlersPage({
         currentUserId={session.userId}
         initialQuery={q ?? ""}
       />
-    </div>
+    </>
   )
 }

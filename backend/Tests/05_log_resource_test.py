@@ -114,6 +114,46 @@ def test_get_stats(client, auth_headers):
         assert key in data
 
 
+def test_stats_activity_by_month_buckets_logs(client, auth_headers):
+    """activityByMonth sums distance/hours per calendar month, oldest first.
+
+    The shape assertion above passes on an empty list, so it never exercised the
+    bucketing at all — the only thing that makes the profile's chart a chart.
+    """
+    for entry in (
+        {"date": "2026-05-04", "distance": 12.5, "hours": 3},
+        {"date": "2026-05-19", "distance": 7.5, "hours": 2},
+        {"date": "2026-06-02", "distance": 20, "hours": 4},
+    ):
+        assert client.post(f"{LOG_ENDPOINT}/create", headers=auth_headers,
+                           json=entry).status_code == 201
+
+    data = json.loads(client.get(f"{LOG_ENDPOINT}/stats", headers=auth_headers).data)
+    by_month = {bucket["month"]: bucket for bucket in data["activityByMonth"]}
+
+    assert [bucket["month"] for bucket in data["activityByMonth"]] == sorted(by_month)
+    assert by_month["2026-05"]["distance"] == 20.0
+    assert by_month["2026-05"]["count"] == 2
+    assert by_month["2026-06"]["distance"] == 20.0
+    assert by_month["2026-06"]["count"] == 1
+
+
+def test_stats_activity_by_month_omits_undated_logs(client, auth_headers):
+    """A log with no date cannot be bucketed, so it contributes to totals only.
+
+    This is the common case in practice: the log form's date field is optional,
+    so an undated log is a normal thing to have — it must not vanish from the
+    totals just because it has no month to sit in.
+    """
+    assert client.post(f"{LOG_ENDPOINT}/create", headers=auth_headers,
+                       json={"distance": 9, "hours": 2}).status_code == 201
+
+    data = json.loads(client.get(f"{LOG_ENDPOINT}/stats", headers=auth_headers).data)
+
+    assert data["totalDistance"] >= 9.0
+    assert all(bucket["month"] for bucket in data["activityByMonth"])
+
+
 def test_endorse_log_shared_trip(client, trip_with_user2_as_crew):
     """A crew member may endorse the leader's trip-linked log; schema exposes the endorser."""
     leader_headers = trip_with_user2_as_crew["leader_headers"]

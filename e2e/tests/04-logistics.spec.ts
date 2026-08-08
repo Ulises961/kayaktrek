@@ -125,8 +125,7 @@ test.describe("Logistics — shuttle vehicle", () => {
     await crewPage.goto(`/trips/${tripId}/logistics`)
     await crewPage.getByRole("button", { name: /shuttle/i }).click()
     await mutateAndSettle(crewPage, () => crewPage.getByRole("button", { name: /join/i }).click())
-    // Scoped to <main>.first(): crew's own sidebar profile link also matches
-    // their name, and the passenger-candidate picker still lists them too.
+    // Scoped to <main>.first(): the passenger-candidate picker lists them too.
     await expect(crewPage.locator("main").getByText(CREW.name).first()).toBeVisible()
     await crewContext.close()
 

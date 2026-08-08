@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { ReinelRose } from "@/components/illustrations/reinel-rose"
 
 export type VisualState = "empty" | "loading" | "not-found" | "error" | "success"
 
@@ -14,23 +15,7 @@ const ROUTE = "M 72 192 Q 160 168 240 186 Q 320 204 408 186"
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-function Horizon({ tilted }: { tilted?: boolean }) {
-  if (tilted) {
-    // Static tilt encoded in coordinates — disruption via CSS on a wrapping <g>
-    return (
-      <g style={{ animation: "sv-disrupt 0.9s ease-in-out infinite" }}>
-        <line
-          x1="-10"
-          y1={H - 6}
-          x2="490"
-          y2={H + 6}
-          stroke="var(--border)"
-          strokeWidth="1"
-          strokeDasharray="8 10"
-        />
-      </g>
-    )
-  }
+function Horizon() {
   return (
     <line
       x1="0"
@@ -67,18 +52,7 @@ function Sea() {
 }
 
 // Compass with cardinal ticks and a north needle.
-// `disrupted` makes the needle oscillate erratically via CSS animation.
-function Compass({
-  cx,
-  cy,
-  r = 26,
-  disrupted,
-}: {
-  cx: number
-  cy: number
-  r?: number
-  disrupted?: boolean
-}) {
+function Compass({ cx, cy, r = 26 }: { cx: number; cy: number; r?: number }) {
   const ticks = [0, 90, 180, 270] // degrees from east in SVG coord space
   return (
     <g>
@@ -113,34 +87,14 @@ function Compass({
         d={`M${cx} ${cy - r + 5} L${cx - 3.5} ${cy + 3} L${cx + 3.5} ${cy + 3} Z`}
         fill="var(--accent)"
         opacity="0.65"
-        style={
-          disrupted
-            ? {
-                animation: "sv-needle 1.6s ease-in-out infinite",
-                transformOrigin: `${cx}px ${cy}px`,
-              }
-            : undefined
-        }
       />
     </g>
   )
 }
 
 // Waypoint marker: filled dot with an outer ring.
-// `faded` = destination that should exist but doesn't (404 ghost node).
 // `pulse` = emits a slow expanding ring (active / just placed).
-function Waypoint({
-  cx,
-  cy,
-  faded,
-  pulse,
-}: {
-  cx: number
-  cy: number
-  faded?: boolean
-  pulse?: boolean
-}) {
-  const op = faded ? 0.18 : 0.85
+function Waypoint({ cx, cy, pulse }: { cx: number; cy: number; pulse?: boolean }) {
   return (
     <g>
       {pulse && (
@@ -149,58 +103,14 @@ function Waypoint({
           <animate attributeName="opacity" values="0.4;0;0.4" dur="2.4s" repeatCount="indefinite" />
         </circle>
       )}
-      {faded && (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={6}
-          stroke="var(--muted-foreground)"
-          strokeWidth="1"
-          fill="none"
-          opacity="0.2"
-          strokeDasharray="2 2"
-        />
-      )}
-      <circle cx={cx} cy={cy} r={4} fill="var(--accent)" opacity={op} />
+      <circle cx={cx} cy={cy} r={4} fill="var(--accent)" opacity={0.85} />
     </g>
   )
 }
 
-// Route path — dashed by default, broken = gap with misaligned second half.
-function Route({
-  broken,
-  solid,
-  opacity = 0.45,
-}: {
-  broken?: boolean
-  solid?: boolean
-  opacity?: number
-}) {
+// Route path — dashed by default, solid once resolved.
+function Route({ solid, opacity = 0.45 }: { solid?: boolean; opacity?: number }) {
   const dash = solid ? undefined : "6 4"
-  if (broken) {
-    return (
-      <>
-        <path
-          d="M 72 192 Q 132 174 168 182"
-          stroke="var(--muted-foreground)"
-          strokeWidth="1.5"
-          strokeDasharray="6 4"
-          fill="none"
-          opacity={opacity}
-        />
-        <g style={{ animation: "sv-disrupt 1.1s ease-in-out infinite" }}>
-          <path
-            d="M 212 194 Q 310 206 408 186"
-            stroke="var(--muted-foreground)"
-            strokeWidth="1.5"
-            strokeDasharray="6 4"
-            fill="none"
-            opacity={opacity}
-          />
-        </g>
-      </>
-    )
-  }
   return (
     <path
       d={ROUTE}
@@ -334,67 +244,6 @@ function LoadingScene() {
   )
 }
 
-// Not-found: route planned, destination absent — the last node simply doesn't exist.
-function NotFoundScene() {
-  return (
-    <>
-      <Compass cx={68} cy={86} r={22} />
-      <Horizon />
-      <Sea />
-      <Waypoint cx={96} cy={194} />
-      <Waypoint cx={228} cy={176} />
-      <Waypoint cx={348} cy={192} />
-      {/* Ghost node — expected position, nothing there */}
-      <Waypoint cx={412} cy={183} faded />
-      <Route opacity={0.42} />
-      {/* Path dissolves past last confirmed waypoint */}
-      <path
-        d="M 348 192 Q 382 180 422 182"
-        stroke="var(--muted-foreground)"
-        strokeWidth="1.2"
-        strokeDasharray="2 6"
-        fill="none"
-        opacity="0.16"
-      />
-    </>
-  )
-}
-
-// Error: compass lost, horizon breaks, route cannot be resolved.
-function ErrorScene() {
-  return (
-    <>
-      <Compass cx={68} cy={86} r={22} disrupted />
-      <Horizon tilted />
-      <Sea />
-      <Waypoint cx={72} cy={196} />
-      <Waypoint cx={408} cy={186} faded />
-      <Route broken opacity={0.48} />
-      {/* Break mark at gap */}
-      <g style={{ animation: "sv-disrupt 0.8s ease-in-out infinite" }}>
-        <line
-          x1="182"
-          y1="179"
-          x2="196"
-          y2="193"
-          stroke="var(--destructive)"
-          strokeWidth="2"
-          opacity="0.72"
-        />
-        <line
-          x1="196"
-          y1="179"
-          x2="182"
-          y2="193"
-          stroke="var(--destructive)"
-          strokeWidth="2"
-          opacity="0.72"
-        />
-      </g>
-    </>
-  )
-}
-
 // Success: route resolved, compass true north, flag planted, sun on the horizon.
 function SuccessScene() {
   return (
@@ -428,6 +277,15 @@ function SuccessScene() {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 export function StateVisual({ state, className }: StateVisualProps) {
+  // The two failure states are the app's full-page 404/500 artwork and speak a
+  // different visual language on purpose: a single chart rose, not a seascape.
+  // A route that trails off into nothing reads as a plan you have yet to
+  // finish — exactly what the three seascapes below are for — so reusing that
+  // vocabulary for a page that is broken says the wrong thing.
+  if (state === "not-found" || state === "error") {
+    return <ReinelRose bearing={state === "error" ? "adrift" : "true"} className={className} />
+  }
+
   return (
     <svg
       viewBox="0 0 480 400"
@@ -439,8 +297,6 @@ export function StateVisual({ state, className }: StateVisualProps) {
       <rect width="480" height="400" fill="var(--background)" />
       {state === "empty" && <EmptyScene />}
       {state === "loading" && <LoadingScene />}
-      {state === "not-found" && <NotFoundScene />}
-      {state === "error" && <ErrorScene />}
       {state === "success" && <SuccessScene />}
     </svg>
   )

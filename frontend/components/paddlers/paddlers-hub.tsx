@@ -17,6 +17,7 @@ import { useDebouncedValue } from "@/lib/utils/debounce"
 import type { Connection } from "@/lib/dtos/connection"
 import type { Block } from "@/lib/dtos/block"
 import type { PaddlerSearchResult } from "@/lib/dtos/paddler-search"
+import { EmptyState } from "@/components/common/empty-state"
 
 interface PaddlersHubProps {
   connections: Connection[]
@@ -104,7 +105,7 @@ export function PaddlersHub({
           {isSearching ? (
             <p className="text-muted-foreground text-sm">Searching…</p>
           ) : communityResults.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No paddlers found.</p>
+            <EmptyState variant="inline" title="No paddlers found." />
           ) : (
             <div className="flex flex-col">
               {communityResults.map((paddler) => (
