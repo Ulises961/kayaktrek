@@ -59,13 +59,16 @@ describe("DeleteAccountButton", () => {
     await openDialog()
     await userEvent.click(screen.getByRole("button", { name: /yes, delete my account/i }))
 
-    await waitFor(() => expect(screen.getByText("Server error.")).toBeDefined())
     // A failed deletion request must not act like a successful one: no redirect
     // to the logged-out state, and the confirmation dialog stays open so the user
     // sees the error rather than the button quietly reappearing as if nothing happened.
+    // Button re-enabled is the settle signal — the error paints before it. See vitest.setup.ts.
+    await waitFor(() => {
+      expect(screen.getByText("Server error.")).toBeDefined()
+      expect(screen.getByRole("button", { name: /yes, delete my account/i })).toBeEnabled()
+    })
     expect(mockPush).not.toHaveBeenCalled()
     expect(screen.getByRole("dialog")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /yes, delete my account/i })).toBeEnabled()
   })
 
   it("closes the dialog without calling the action when cancelled", async () => {

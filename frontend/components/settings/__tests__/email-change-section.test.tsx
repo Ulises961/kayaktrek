@@ -23,7 +23,13 @@ async function openToEditing() {
   await userEvent.click(screen.getByRole("button", { name: /change email/i }))
   await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
   await userEvent.click(screen.getByRole("button", { name: /continue/i }))
-  await waitFor(() => expect(screen.getByLabelText(/new email/i)).toBeInTheDocument())
+  // The input appears before the re-auth transition exits, and every caller goes
+  // on to click the submit button — which is still named "Sending…" until it does.
+  // See vitest.setup.ts.
+  await waitFor(() => {
+    expect(screen.getByLabelText(/new email/i)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send confirmation link/i })).toBeInTheDocument()
+  })
 }
 
 describe("EmailChangeSection — idle state", () => {

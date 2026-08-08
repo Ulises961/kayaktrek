@@ -83,7 +83,8 @@ describe("MedicalNotesSection — reset prompt", () => {
     await waitFor(() => expect(screen.getByRole("textbox")).toBeDefined())
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
-    await userEvent.click(screen.getByRole("button", { name: /done/i }))
+    // Done only appears once the save transition has exited. See vitest.setup.ts.
+    await userEvent.click(await screen.findByRole("button", { name: /done/i }))
     expect(screen.queryByText(/reset your password/i)).toBeNull()
   })
 })

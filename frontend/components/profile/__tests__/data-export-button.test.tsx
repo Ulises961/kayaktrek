@@ -41,12 +41,13 @@ describe("DataExportButton", () => {
     render(<DataExportButton />)
     await userEvent.click(screen.getByRole("button", { name: /download my data/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText("You can only request a data export once per day.")).toBeDefined(),
-    )
     // A failed request must not look like it succeeded — the button stays for a
-    // retry, and the "sent" confirmation must not appear.
-    expect(screen.getByRole("button", { name: /download my data/i })).toBeEnabled()
+    // retry, and the "sent" confirmation must not appear. Both in one waitFor:
+    // the error paints before the transition exits. See vitest.setup.ts.
+    await waitFor(() => {
+      expect(screen.getByText("You can only request a data export once per day.")).toBeDefined()
+      expect(screen.getByRole("button", { name: /download my data/i })).toBeEnabled()
+    })
     expect(screen.queryByText(/download link has been sent/i)).not.toBeInTheDocument()
   })
 })

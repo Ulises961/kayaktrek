@@ -75,10 +75,13 @@ describe("EditProfileForm — avatar section", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     await userEvent.upload(input, file)
 
-    await waitFor(() => expect(screen.getByText("File too large.")).toBeInTheDocument())
+    // Both conditions in one waitFor: the failure is only settled once the
+    // transition has exited too. See vitest.setup.ts.
+    await waitFor(() => {
+      expect(screen.getByText("File too large.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /upload photo/i })).toBeEnabled()
+    })
     // Still no avatar — upload failure must not flip the button to "Replace photo".
-    expect(screen.getByRole("button", { name: /upload photo/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /upload photo/i })).toBeEnabled()
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument()
   })
 
@@ -100,9 +103,11 @@ describe("EditProfileForm — avatar section", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /remove/i }))
 
-    await waitFor(() => expect(screen.getByText("Could not remove photo.")).toBeInTheDocument())
     // A failed removal must not silently succeed — the photo controls stay as-is.
-    expect(screen.getByRole("button", { name: /replace photo/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText("Could not remove photo.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /replace photo/i })).toBeEnabled()
+    })
     expect(screen.getByRole("button", { name: /remove/i })).toBeEnabled()
   })
 })
@@ -127,11 +132,11 @@ describe("EditProfileForm — submit", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /save changes/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText("That username is already taken.")).toBeInTheDocument(),
-    )
-    expect(mockPush).not.toHaveBeenCalled()
     // The save button re-enables so the user can correct the field and retry.
-    expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled()
+    await waitFor(() => {
+      expect(screen.getByText("That username is already taken.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled()
+    })
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

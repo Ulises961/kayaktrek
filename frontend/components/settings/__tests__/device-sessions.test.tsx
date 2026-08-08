@@ -77,11 +77,15 @@ describe("DeviceSessions", () => {
 
     await userEvent.click(within(row("iPhone")).getByRole("button", { name: /sign out/i }))
 
-    await waitFor(() => expect(screen.getByText("Could not sign out.")).toBeDefined())
     // The device must still be listed as signed in, and its button must return to
     // "Sign out" (not remain stuck on "Signing out…") — a failed revoke that looks
     // like a stuck or vanished device is as dangerous as one that looks successful.
-    expect(within(row("iPhone")).getByRole("button", { name: /^sign out$/i })).toBeEnabled()
+    // Both in one waitFor: the error paints before the transition exits, so the
+    // button is legitimately still "Signing out…" for a moment. See vitest.setup.ts.
+    await waitFor(() => {
+      expect(screen.getByText("Could not sign out.")).toBeDefined()
+      expect(within(row("iPhone")).getByRole("button", { name: /^sign out$/i })).toBeEnabled()
+    })
     expect(screen.getByText("iPhone")).toBeInTheDocument()
   })
 

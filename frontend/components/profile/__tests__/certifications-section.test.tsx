@@ -141,15 +141,18 @@ describe("CertificationsSection", () => {
     render(<CertificationsSection initialCerts={[]} />)
     await fillAndSubmitAddForm()
     await confirmPassword()
-    await waitFor(() =>
-      expect(screen.getByText("Session expired. Please re-authenticate.")).toBeInTheDocument(),
-    )
+    // The submit button leaving "Saving…" is what marks the attempt settled; the
+    // error can paint while the transition is still pending. See vitest.setup.ts.
+    const formDialog = await screen.findByRole("dialog", { name: /add certification/i })
+    await waitFor(() => {
+      expect(screen.getByText("Session expired. Please re-authenticate.")).toBeInTheDocument()
+      expect(within(formDialog).getByRole("button", { name: /add certification/i })).toBeEnabled()
+    })
 
     // Retrying immediately must prompt for the password again — the failed
     // attempt's token was discarded, not cached and silently reused. The form
     // dialog is still open (a failed add doesn't close it) with the fields intact.
     vi.mocked(reAuth).mockClear()
-    const formDialog = screen.getByRole("dialog", { name: /add certification/i })
     await userEvent.click(within(formDialog).getByRole("button", { name: /add certification/i }))
     await waitFor(() => expect(screen.getByText(/confirm your password/i)).toBeInTheDocument())
   })

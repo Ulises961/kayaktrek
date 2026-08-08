@@ -2,11 +2,22 @@ import "@testing-library/jest-dom"
 import { configure } from "@testing-library/react"
 
 // RTL's waitFor/findBy* default to a 1000ms timeout, independent of vitest's own
-// testTimeout above — under full-suite CPU contention (all workers running at
-// once) that's tight enough to flake on an otherwise-correct assertion. Same
-// "generous on purpose" rationale as testTimeout/hookTimeout: a real hang still
-// fails, just later. Found via a reproducible (~1-in-3 full-run) flake in
-// certifications-section.test.tsx under this sandbox's 4-core load (M15).
+// testTimeout — under full-suite CPU contention (all workers running at once)
+// that's tight enough to flake on an otherwise-correct assertion. Same "generous
+// on purpose" rationale as testTimeout/hookTimeout: a real hang still fails, just
+// later.
+//
+// This does NOT cover the other flake this suite has had, so don't reach for a
+// bigger number when one appears. A mutation's error message paints BEFORE the
+// `startTransition` that owns the pending flag exits, so there is a real window
+// where the error is on screen and the control is still disabled and still
+// labelled "Saving…"/"Uploading…"/"Sending…". A test that waits for the message
+// and then synchronously asserts on the control lands inside that window under
+// load — and no timeout closes it, because both states are settled, just not at
+// the same instant. Wait for the settle signal, not the error: put both
+// expectations in ONE waitFor, or use findBy* for the control. Reproduced and
+// fixed across five files (2026-08-08); `forks` vs `vmThreads` makes no
+// difference, which is what ruled out pool isolation as the cause.
 configure({ asyncUtilTimeout: 5000 })
 
 // jsdom does not implement the Pointer Capture API. Components that call these

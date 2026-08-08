@@ -49,10 +49,14 @@ describe("RouteDetailActions", () => {
     render(<RouteDetailActions itineraryId={ID} isAuthenticated isOwner={false} />)
 
     await userEvent.click(screen.getByRole("button", { name: /^use this route$/i }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not fork this route."))
-    expect(mockPush).not.toHaveBeenCalled()
     // The button stays available for a retry — it isn't stuck disabled/hidden.
-    expect(screen.getByRole("button", { name: /^use this route$/i })).toBeEnabled()
+    // Both in one waitFor: the toast fires inside the transition, so the button
+    // is still disabled for a moment after it. See vitest.setup.ts.
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Could not fork this route.")
+      expect(screen.getByRole("button", { name: /^use this route$/i })).toBeEnabled()
+    })
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it("navigates to the forked itinerary on success", async () => {
