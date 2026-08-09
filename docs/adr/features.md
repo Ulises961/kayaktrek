@@ -2,6 +2,7 @@
 id: features
 title: "Features: Weather & Sea Data, Tidal Model, Expedition Log, Map Annotations & Inventory"
 abstract: OpenMeteo for weather/swell, manual tidal entry with rule-of-12s (automation deferred), TidalStation stream tables and chart-diamond overlays, Celery dual-trigger expedition log auto-generation, map annotations as standalone Place entities (replacing Point.interest), and a two-tier personal-gear / trip-requirement inventory model.
+implementation: shipped
 status: accepted
 date: 2026-06-10
 deciders: []

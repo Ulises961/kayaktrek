@@ -2,6 +2,7 @@
 id: itinerary-frontend
 title: "Itinerary & Frontend: Map-First UX, Next.js Architecture & the Builder Evolution"
 abstract: Map-first itinerary building (react-leaflet), Next.js 16 App Router with server actions, unified view/edit modes, drag-boundary day assignment, tile caching with OpenSeaMap priority, and GPX import/export.
+implementation: shipped
 status: accepted
 date: 2026-06-10
 deciders: []

@@ -14,6 +14,26 @@ Decisions that shape the system are recorded here as a set of thematic knowledge
 
 Read the relevant document before working in an area. When a significant new decision is made, update the appropriate document and append to its decision log.
 
+## `status` is about the decision; `implementation` is about the code
+
+Every document carries two frontmatter fields, and conflating them is how a design gets
+mistaken for a feature:
+
+- **`status`** — does this decision still stand? `accepted`, `superseded`, `rejected`. A design
+  nobody has built yet is still `accepted`; being unbuilt is not a mark against the decision.
+- **`implementation`** — has it been built? `shipped`, `partial`, or `not-built`.
+
+The distinction is not academic. `mobile-offline.md` is `accepted` and `not-built`: 289 lines of
+sync protocol, conflict resolution and GPS integration, with no `mobile/` workspace, no
+WatermelonDB dependency and no service worker in the repo. It also states, as a settled decision,
+that the PWA-offline tier ships first — and that was read as done, so `plans/M9.md` inherited a
+prerequisite nobody had built, which M18's planning is what finally surfaced. One word in the
+header would have said so.
+
+`implementation` describes the document's **dominant** state. Where an individual decision differs
+from it, say so in that row's **Notes** — an unbuilt decision inside a mostly-shipped document is
+exactly the case that goes unnoticed.
+
 ## Documents
 
 | File | Domain |

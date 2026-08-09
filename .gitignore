@@ -20,5 +20,11 @@ e2e/*/.*
 e2e/node_modules/
 e2e/playwright-report/
 e2e/test-results/
-skills/
+# `skills/` used to be ignored outright (2ae7b2b, M4b). That bare pattern matched
+# `.claude/skills/` at any depth, so every skill this project relies on — including the
+# two coding-rules skills that are force-loaded before any backend/frontend edit — was
+# invisible to git. They are instructions the next change is written from, so they need
+# to travel in the same diff as the code they describe; a rule that silently deletes a
+# domain concept has to be able to fix the skill that still teaches it.
+# The only other `skills` dir is inside backend/.venv, already covered by backend/.gitignore.
 .claude/settings.local.json

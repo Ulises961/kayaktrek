@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ImageIcon,
 } from "lucide-react"
+import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import { cn } from "@/lib/utils"
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
@@ -46,7 +47,11 @@ const SEA: Record<
   d2: { waveH: "1.4 m", waveP: "9 s", waveDir: "W", swellH: "1.8 m", current: "0.6 kn" },
 }
 
-type PType = "stop" | "position" | "interest"
+// Route points come from the real union so this mock cannot drift from the domain — it
+// carried an `interest` point type for two months after M4e deleted one. `place` is not a
+// point type: POIs are standalone `Place` entities off the route linked list, and the
+// wireframe shows one only because the drawer it is illustrating lists them beside points.
+type PType = PointType | "place"
 
 type MockPoint = {
   id: string
@@ -81,7 +86,7 @@ const POINTS: Record<string, MockPoint[]> = {
     {
       id: "p3",
       name: "Vikten Sea Caves",
-      type: "interest",
+      type: "place",
       dist: "12.1 nm",
       lat: 68.071,
       lon: 13.512,
@@ -148,7 +153,7 @@ const POINTS: Record<string, MockPoint[]> = {
     {
       id: "p10",
       name: "Nusfjord outlook",
-      type: "interest",
+      type: "place",
       dist: "4.3 nm",
       lat: 68.032,
       lon: 13.362,
@@ -206,7 +211,7 @@ const POINTS: Record<string, MockPoint[]> = {
     {
       id: "p16",
       name: "Fredvang Bridges",
-      type: "interest",
+      type: "place",
       dist: "5.1 nm",
       lat: 67.921,
       lon: 13.121,
@@ -233,7 +238,7 @@ const POINTS: Record<string, MockPoint[]> = {
     {
       id: "p19",
       name: "Hamnøy viewpoint",
-      type: "interest",
+      type: "place",
       dist: "16.2 nm",
       lat: 67.921,
       lon: 13.062,
@@ -285,8 +290,8 @@ function bftPillClasses(bft: number | null, active: boolean): string {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PIcon({ type }: { type: PType }) {
-  if (type === "stop") return <Anchor className="text-primary size-3 shrink-0" />
-  if (type === "interest") return <Eye className="size-3 shrink-0 text-[var(--accent,#f97316)]" />
+  if (type === POINT_TYPE.STOP) return <Anchor className="text-primary size-3 shrink-0" />
+  if (type === "place") return <Eye className="size-3 shrink-0 text-[var(--accent,#f97316)]" />
   return <CircleDot className="text-muted-foreground size-2.5 shrink-0 fill-current" />
 }
 

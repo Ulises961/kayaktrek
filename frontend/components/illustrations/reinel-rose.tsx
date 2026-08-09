@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 // out from it and the rotation origin derives from the same four numbers —
 // a rose that spins about any other point reads as a broken layout. Deeper above
 // than below because only north carries a fleur-de-lys.
-const BOX = { left: 300, right: 300, above: 380, below: 225 }
+const BOX = { left: 300, right: 300, above: 420, below: 300 }
 const VIEW_BOX = `${-BOX.left} ${-BOX.above} ${BOX.left + BOX.right} ${BOX.above + BOX.below}`
 // `transform-box: view-box` measures from the viewBox's top-left corner, so the
 // hub sits at exactly the offsets the box was built from.

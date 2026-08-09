@@ -2,6 +2,8 @@
 id: foundation
 title: "Foundation: Infrastructure, Data Layer, Backend Patterns & Observability"
 abstract: Self-hosted stack (PostgreSQL/PostGIS, MinIO, RabbitMQ, Redis, Celery), UUID v7 keys, Alembic migrations, thin resource/service layer, structured JSON logging, and Logfire OTel plan.
+implementation: partial
+implementation_note: Logfire tracing shipped (M13 Part A); Sentry is still open — see the root CLAUDE.md observability checklist.
 status: accepted
 date: 2026-06-10
 deciders: []

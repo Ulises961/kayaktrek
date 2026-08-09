@@ -2,6 +2,8 @@
 id: mobile-offline
 title: "Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration"
 abstract: PWA + GPX meets read-only offline needs; M9 React Native with WatermelonDB sync triggers only when live-expedition mutation use case is validated. MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
+implementation: not-built
+implementation_note: No mobile/ workspace, no WatermelonDB or MapLibre dependency, no service worker. Design only, awaiting M9 — which M18 gates.
 status: accepted
 date: 2026-06-10
 deciders: []
@@ -9,6 +11,19 @@ tags: [mobile, offline, sync, gps]
 ---
 
 # Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration
+
+> **None of this is built.** `implementation: not-built` — there is no `mobile/` workspace, no
+> WatermelonDB or MapLibre dependency in any `package.json`, and no service worker or web app
+> manifest in `frontend/`. Everything below is design awaiting M9.
+>
+> This matters because the document also records, as a settled decision, that the **PWA-offline
+> tier ships first** (Service-Worker-cached web client, frozen route data, pre-downloaded tile
+> corridor) — and that read as done. `plans/M9.md` inherited it as a satisfied prerequisite;
+> M18's planning is what caught that nobody had built it. A responsive web client is the real
+> prerequisite and comes first (M18), then the Service Worker, then this.
+>
+> Treat every mechanism here as a proposal to be checked against the schema and the client as
+> they actually are when M9 starts, not as a description of anything running.
 
 This document covers the design of the React Native mobile client (M9) — why offline-first is non-negotiable for a maritime app, how the local and server databases are kept in sync, how conflicts are resolved, what gets synced and what doesn't, and how external GPS devices fit into the position-tracking model.
 

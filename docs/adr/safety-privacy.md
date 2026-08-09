@@ -2,6 +2,7 @@
 id: safety-privacy
 title: "Safety & Privacy: Float Plan, Medical Notes & Sharing"
 abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + ECIES E2E encryption for leader-visible copy, frozen snapshot sharing via opaque token with 30-day post-trip expiry.
+implementation: shipped
 status: accepted
 date: 2026-06-10
 deciders: []

@@ -2,6 +2,7 @@
 id: trip-lifecycle
 title: "Trip Lifecycle: State Machine, Collaboration, Visibility & GDPR"
 abstract: Forward-only trip state machine (building→happening→past→archived), leader/crew authority split, itinerary visibility independent of trip privacy, pause/resume, and GDPR erasure with 30-day grace period.
+implementation: shipped
 status: accepted
 date: 2026-06-10
 deciders: []
