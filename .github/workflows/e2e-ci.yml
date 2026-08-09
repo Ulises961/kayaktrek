@@ -15,6 +15,10 @@ on:
 env:
   CI_BACKEND_PORT: 5100
   CI_FRONTEND_PORT: 3100
+  # No SSE sidecar runs in this job (see the "Run E2E tests" step), but the origin
+  # is still required at build time: lib/api/config.ts refuses to bake an empty one
+  # into the bundle. This is a placeholder nothing connects to.
+  CI_SSE_PORT: 5101
 
 jobs:
   e2e:
@@ -31,6 +35,23 @@ jobs:
           - 5435:5432
         options: >-
           --health-cmd "pg_isready -U kayak"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # M17's per-device revocation denylist (ADR-035) lives in Redis db/4 and fails
+      # open — a Redis blip must never force-log-out every user on the platform. With
+      # no Redis at all that open failure is permanent, so a revoked device keeps
+      # working until its access token expires on its own, and 18-device-sessions'
+      # instant-revocation test cannot pass. Redis costs a few MB: the constrained
+      # envelope this job reproduces is about CPU and memory, not about which
+      # services exist.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6382:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -70,6 +91,10 @@ jobs:
           JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
           FRONTEND_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
           RATELIMIT_STORAGE_URI: memory://
+          # db/4 is the revocation denylist, db/1 the cache — same split as
+          # docker-compose.yml, so the app behaves here as it does in a real stack.
+          REVOCATION_REDIS_URL: redis://localhost:6382/4
+          CACHE_REDIS_URL: redis://localhost:6382/1
         run: |
           fuser -k "${CI_BACKEND_PORT}/tcp" 2>/dev/null || true
           setsid nohup uv run gunicorn \
@@ -99,16 +124,27 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile --loglevel=error
 
+      # NEXT_OUTPUT_STANDALONE=0 opts out of `output: "standalone"` (next.config.ts,
+      # added for the Docker deploy image). `next start` refuses to serve a standalone
+      # build, so without this the "Start frontend" step below dies. Both NEXT_PUBLIC_*
+      # origins are read at build time and lib/api/config.ts throws on an empty one in a
+      # production build, so both must be present here even though no sidecar runs.
       - name: Build frontend
         working-directory: frontend
         env:
           NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
+          NEXT_PUBLIC_SSE_URL: http://localhost:${{ env.CI_SSE_PORT }}
+          NEXT_OUTPUT_STANDALONE: "0"
         run: pnpm build
 
+      # NEXT_OUTPUT_STANDALONE is repeated here on purpose: `next start` re-reads
+      # next.config.ts, so without it the server refuses the build it was just handed.
       - name: Start frontend
         working-directory: frontend
         env:
           NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
+          NEXT_PUBLIC_SSE_URL: http://localhost:${{ env.CI_SSE_PORT }}
+          NEXT_OUTPUT_STANDALONE: "0"
           PORT: ${{ env.CI_FRONTEND_PORT }}
         run: |
           fuser -k "${CI_FRONTEND_PORT}/tcp" 2>/dev/null || true
@@ -127,15 +163,30 @@ jobs:
       - name: Wait for services
         run: npx --yes wait-on tcp:localhost:${{ env.CI_BACKEND_PORT }} http://localhost:${{ env.CI_FRONTEND_PORT }} --timeout 60000
 
+      # E2E_SKIP_LIVE excludes 15-live-expedition and 16-story-live-layer, which need
+      # Redis and the M8 SSE sidecar (ADR-033). This job deliberately boots postgres and
+      # a bare gunicorn only, to reproduce the free runner's resource envelope — see
+      # e2e/run-live-stack.sh, which brings up the full stack and is where those two are
+      # meant to run. The exclusion was always the intent (run-live-stack.sh's header
+      # says this mirror covers "every other spec") but was never implemented, so both
+      # specs failed here for want of infrastructure rather than for anything they test.
       - name: Run E2E tests
         working-directory: e2e
         env:
           E2E_BASE_URL: http://localhost:${{ env.CI_FRONTEND_PORT }}
           E2E_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
+          E2E_SKIP_LIVE: "1"
         run: npm test
 
+      # continue-on-error: the report is a diagnostic aid, so failing to store it must
+      # never turn a green suite red. It matters most under act, which is how this gate
+      # is actually run: act 0.2.89's artifact server rejects the request
+      # actions/upload-artifact@v7 sends ("unknown field \"mime_type\""), so the step
+      # cannot succeed locally at all. That went unnoticed while the reporter wrote no
+      # files — the step short-circuited on "No files were found" and passed vacuously.
       - name: Upload Playwright report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

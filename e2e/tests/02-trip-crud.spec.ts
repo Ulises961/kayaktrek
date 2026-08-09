@@ -63,6 +63,13 @@ test.describe("Trip CRUD", () => {
     await page.waitForURL(/\/trips\/[0-9a-f-]+$/)
     createdTripId = page.url().split("/trips/")[1]
 
+    // The crew tab is where travellers are listed. This used to assert on the trip
+    // root, where the only thing carrying the leader's name was the sidebar footer's
+    // profile row — so it passed on every page in the app, including ones with no
+    // traveller list at all, and kept passing no matter what the crew list did.
+    // Deleting that row (the account moved into the header's avatar menu) is what
+    // exposed it. Assert against the surface the test name claims.
+    await page.goto(`/trips/${createdTripId}/crew`)
     await expect(page.getByText(LEADER.name)).toBeVisible()
   })
 })

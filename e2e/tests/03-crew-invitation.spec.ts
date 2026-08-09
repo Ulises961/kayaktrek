@@ -1,7 +1,12 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
-import { apiClearGraph, apiMakeBuddies } from "../fixtures/connections"
+import {
+  apiClearGraph,
+  apiGetMe,
+  apiMakeBuddies,
+  apiSetProfilePublic,
+} from "../fixtures/connections"
 import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Crew invitation flow", () => {
@@ -20,6 +25,23 @@ test.describe("Crew invitation flow", () => {
     // an accepted connection.
     await apiClearGraph(request, leaderToken)
     await apiClearGraph(request, crewToken)
+
+    // A connection request resolves its target through ConnectionService's public
+    // visibility filter, which treats a private account as a missing one (a
+    // deliberate 404 with no existence oracle). Both profiles therefore have to be
+    // public before apiMakeBuddies, or the request 404s in setup.
+    //
+    // This ran green for a long time only because 12-connections leaves both
+    // profiles public and the database persists between runs — so a *previous*
+    // run's spec 12 was setting up this spec's precondition. Against a fresh
+    // database (the act mirror creates one per run) it could never have passed.
+    const [leaderMe, crewMe] = await Promise.all([
+      apiGetMe(request, leaderToken),
+      apiGetMe(request, crewToken),
+    ])
+    await apiSetProfilePublic(request, leaderToken, leaderMe.id, true)
+    await apiSetProfilePublic(request, crewToken, crewMe.id, true)
+
     await apiMakeBuddies(request, leaderToken, crewToken, CREW.username)
   })
 

@@ -6,7 +6,7 @@ from flask import jsonify
 from flask_limiter.errors import RateLimitExceeded
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError, NoResultFound
 from marshmallow import ValidationError
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, NotFound
 import logging
 
 from Api.database import db
@@ -101,10 +101,23 @@ def register_error_handlers(app):
 
     @app.errorhandler(404)
     def handle_404(error):
-        """Handle 404 Not Found errors."""
+        """Handle 404 Not Found errors.
+
+        Two different things arrive here: no route matched the URL, or a handler
+        called abort(404, description=...) because what it was asked for is absent,
+        private, or blocked. Only the first is about the endpoint, so answering both
+        with the endpoint wording reported every specific reason as a URL mistake —
+        a caller reads it and hunts for a typo that isn't there.
+
+        Werkzeug fills in its own generic description when a handler supplied none,
+        which is exactly how the two are told apart. That default is written for a
+        browser ("check your spelling"), so it is replaced rather than passed on.
+        """
+        described = error.description and error.description != NotFound.description
+        logger.info(f"HTTP exception: 404 - {error.description}")
         return jsonify({
             "error": "Not Found",
-            "message": "The requested endpoint does not exist"
+            "message": error.description if described else "The requested endpoint does not exist"
         }), 404
 
     @app.errorhandler(405)
