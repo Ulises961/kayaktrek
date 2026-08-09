@@ -10,7 +10,8 @@ vi.mock("@/lib/api/client", async () => {
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { getMe } from "../me"
+import { isRedirectError } from "@/lib/api/client"
+import { getMe, getViewer } from "../me"
 
 const cookieStore = { get: vi.fn() }
 
@@ -26,12 +27,37 @@ function withCookies(names: string[]) {
   )
 }
 
+const VALID_USER = {
+  id: "01952f1a-0000-7000-8000-00000000a001",
+  mail: "test@example.com",
+  username: "testuser",
+  name: "Test",
+  surname: "User",
+}
+
+/** Credentials that exist but cannot be refreshed — apiFetch answers by redirecting. */
+function withDeadSession() {
+  withCookies(["refresh_token"])
+  apiGet.mockImplementation(() => redirect("/login"))
+}
+
+/**
+ * Assert a rejection is Next's redirect signal aimed at /login, not merely "some error".
+ * A bare `rejects.toThrow()` here would also pass if the code crashed on a schema parse,
+ * which is the opposite of the behaviour under test.
+ */
+async function expectRedirectToLogin(promise: Promise<unknown>) {
+  const error = await promise.then(
+    () => null,
+    (thrown: unknown) => thrown,
+  )
+  expect(error, "expected a rejection, got a resolved value").not.toBeNull()
+  expect(isRedirectError(error)).toBe(true)
+  expect((error as { digest: string }).digest).toContain("/login")
+}
+
 describe("getMe", () => {
   it("returns null without calling the API when there are no auth cookies at all", async () => {
-    // Public pages (/explore, /routes/[id], /story/[token], public profiles) call getMe to
-    // personalise for whoever happens to be signed in. An anonymous visitor is a normal
-    // caller there, not a dead session — asking the API would 401, fail to refresh, and
-    // bounce a legitimate anonymous reader to /login.
     withCookies([])
 
     await expect(getMe()).resolves.toBeNull()
@@ -40,18 +66,11 @@ describe("getMe", () => {
 
   it("returns the user when authenticated and the API succeeds", async () => {
     withCookies(["access_token"])
-    const mockUser = {
-      id: "01952f1a-0000-7000-8000-00000000a001",
-      mail: "test@example.com",
-      username: "testuser",
-      name: "Test",
-      surname: "User",
-    }
-    apiGet.mockResolvedValue(mockUser)
+    apiGet.mockResolvedValue(VALID_USER)
 
     const result = await getMe()
     // Schema parsing may add defaults (e.g., unitPreference), so match the returned shape
-    expect(result).toMatchObject(mockUser)
+    expect(result).toMatchObject(VALID_USER)
     expect(result).not.toBeNull()
     expect(apiGet).toHaveBeenCalledWith("/api/user/me")
   })
@@ -65,11 +84,13 @@ describe("getMe", () => {
     expect(result).toBeNull()
   })
 
-  it("still lets a dead session redirect when credentials are present", async () => {
-    withCookies(["refresh_token"])
-    apiGet.mockImplementation(() => redirect("/login"))
+  it("redirects to /login when credentials are present but the session is dead", async () => {
+    // The (app) pages' contract: M17's instant revocation made "signed out" reachable in
+    // seconds, and a revoked device must land on the login screen rather than render an
+    // empty page that reads as a broken app.
+    withDeadSession()
 
-    await expect(getMe()).rejects.toThrow()
+    await expectRedirectToLogin(getMe())
   })
 
   it("returns null on an ordinary API failure", async () => {
@@ -77,5 +98,44 @@ describe("getMe", () => {
     apiGet.mockRejectedValue(new Error("500 from the API"))
 
     await expect(getMe()).resolves.toBeNull()
+  })
+})
+
+describe("getViewer", () => {
+  // The public-page contract: no auth state may decide whether the page renders. Every
+  // case below returns a value; none of them may throw a redirect.
+
+  it("returns null without calling the API for a fully anonymous visitor", async () => {
+    withCookies([])
+
+    await expect(getViewer()).resolves.toBeNull()
+    expect(apiGet).not.toHaveBeenCalled()
+  })
+
+  it("returns null instead of redirecting when the session is dead", async () => {
+    // The regression this exists to prevent. A stale cookie is not a claim to be signed
+    // in — it is the state every user is left in by the M17 deploy (pre-M17 refresh
+    // tokens carry no `sid`), by a revocation, and by a 30-day-expired refresh token.
+    // getMe() answers that with a redirect, which turns a public share link into a login
+    // wall for a reader who never asked to sign in.
+    withDeadSession()
+
+    await expect(getViewer()).resolves.toBeNull()
+  })
+
+  it("still personalises for a viewer who does have a live session", async () => {
+    // The reason public pages call this at all — dropping to null unconditionally would
+    // "fix" the redirect by making the page anonymous for everyone.
+    withCookies(["access_token"])
+    apiGet.mockResolvedValue(VALID_USER)
+
+    await expect(getViewer()).resolves.toMatchObject(VALID_USER)
+  })
+
+  it("returns null on an ordinary API failure", async () => {
+    withCookies(["access_token"])
+    apiGet.mockRejectedValue(new Error("500 from the API"))
+
+    await expect(getViewer()).resolves.toBeNull()
   })
 })

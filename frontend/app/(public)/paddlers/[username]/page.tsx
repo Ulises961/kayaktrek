@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { getPublicProfile } from "@/lib/public-profile/actions"
 import { getSession } from "@/lib/auth/session"
-import { getMe } from "@/lib/user/me"
+import { getViewer } from "@/lib/user/me"
 import { isCertExpired } from "@/lib/certifications/expiry"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { UserAvatar } from "@/components/common/user-avatar"
@@ -33,9 +33,10 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   const [profile, session] = await Promise.all([getPublicProfile(username), getSession()])
   if (!profile) notFound()
 
-  // The viewer's own unit preference, not the profile owner's — an anonymous
-  // visitor (no session) sees the app-wide default.
-  const viewer = session ? await getMe() : null
+  // The viewer's own unit preference, not the profile owner's — a visitor with no
+  // usable session sees the app-wide default. getViewer, not getMe: this page renders
+  // for anyone, so a stale cookie must degrade to the default rather than redirect.
+  const viewer = await getViewer()
   const viewerUnit = viewer?.unitPreference ?? DISTANCE_UNIT.NM
 
   const fullName = [profile.name, profile.surname].filter(Boolean).join(" ")

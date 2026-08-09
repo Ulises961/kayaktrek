@@ -5,7 +5,7 @@ import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { fetchPublicItineraryDetail, fetchItineraries } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { getSession } from "@/lib/auth/session"
-import { getMe } from "@/lib/user/me"
+import { getViewer } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { seasonOfDetail } from "@/lib/itinerary/season"
 
@@ -14,7 +14,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
   const [detail, session, me] = await Promise.all([
     fetchPublicItineraryDetail(id),
     getSession(),
-    getMe(),
+    getViewer(),
   ])
   if (!detail) notFound()
 

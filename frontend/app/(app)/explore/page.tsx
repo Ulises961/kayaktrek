@@ -1,6 +1,6 @@
 import { searchPublicItineraries, fetchItineraries } from "@/lib/itinerary/actions"
 import { getSession } from "@/lib/auth/session"
-import { getMe } from "@/lib/user/me"
+import { getViewer } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { ExploreDiscovery } from "@/components/explore/explore-discovery"
 import { PageHeading } from "@/components/common/page-heading"
@@ -10,7 +10,7 @@ export default async function ExplorePage() {
   const [initial, session, me] = await Promise.all([
     searchPublicItineraries({ perPage: 20 }),
     getSession(),
-    getMe(),
+    getViewer(),
   ])
 
   // The viewer's own routes get an "open" affordance instead of a duplicate-creating

@@ -5,7 +5,7 @@ import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { fetchStoryByToken } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { seasonOfDetail } from "@/lib/itinerary/season"
-import { getMe } from "@/lib/user/me"
+import { getViewer } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { TRIP_STATE } from "@/lib/dtos/trip"
 
@@ -17,7 +17,7 @@ import { TRIP_STATE } from "@/lib/dtos/trip"
 // rather than to /explore.
 export default async function StoryPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const [detail, me] = await Promise.all([fetchStoryByToken(token), getMe()])
+  const [detail, me] = await Promise.all([fetchStoryByToken(token), getViewer()])
   if (!detail) notFound()
 
   const route = extractRouteData(detail)

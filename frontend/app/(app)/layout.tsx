@@ -10,12 +10,17 @@ import { BreadcrumbProvider } from "@/components/common/breadcrumb-context"
 import { HeaderBreadcrumb } from "@/components/common/header-breadcrumb"
 import { BrandLockup } from "@/components/common/brand-lockup"
 import { Separator } from "@/components/ui/separator"
-import { getMe } from "@/lib/user/me"
+import { getViewer } from "@/lib/user/me"
 import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import React from "react"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, pendingRequests] = await Promise.all([getMe(), getPendingRequestsSummary()])
+  // getViewer, not getMe: `/explore` is anonymous-facing (M7c) and deliberately ungated in
+  // proxy.ts, yet it renders in this shell for the sidebar — so the shell must not be the
+  // thing that demands a session. Everything below already treats a null user as normal.
+  // Auth for the genuinely gated segments stays where it belongs, in proxy.ts, with each
+  // page's own authenticated fetch redirecting if a live token is revoked mid-session.
+  const [user, pendingRequests] = await Promise.all([getViewer(), getPendingRequestsSummary()])
   const hasKeypair = user?.hasKeypair ?? true
 
   return (
