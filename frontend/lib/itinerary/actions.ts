@@ -35,12 +35,10 @@ import type { BoundaryApplyPayload } from "./boundaries"
 const EMPTY_EXPLORE_PAGE: ExplorePage = { items: [], total: 0, page: 1, pages: 1 }
 
 export type ItineraryActionResult =
-  | { success: true; itineraryId: string }
-  | { success: false; error: string }
+  { success: true; itineraryId: string } | { success: false; error: string }
 
 export type ItineraryUpdateResult =
-  | { success: true; itinerary: Itinerary }
-  | { success: false; error: string }
+  { success: true; itinerary: Itinerary } | { success: false; error: string }
 
 export type PointActionResult = { success: true; point: Point } | { success: false; error: string }
 
@@ -51,12 +49,10 @@ export type DayActionResult = { success: true; day: Day } | { success: false; er
 export type DeleteActionResult = { success: true } | { success: false; error: string }
 
 export type ApplyBoundariesResult =
-  | { success: true; itinerary: Itinerary }
-  | { success: false; error: string }
+  { success: true; itinerary: Itinerary } | { success: false; error: string }
 
 export type CreateTripFromItineraryResult =
-  | { success: true; tripId: string }
-  | { success: false; error: string }
+  { success: true; tripId: string } | { success: false; error: string }
 
 export async function createItinerary(params: {
   tripId?: string | null

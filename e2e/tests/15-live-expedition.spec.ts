@@ -71,9 +71,12 @@ async function createHappeningTrip(
   return { tripId, itineraryId }
 }
 
-/** The pause/resume/abort controls live inside the trip identity card's "Details"
- * disclosure, which is collapsed on entry — clicking a hidden button just waits out the
- * timeout. A reload collapses it again, so call this after every reload-settled mutation. */
+/** Opens the trip identity card's "Details" disclosure.
+ *
+ * Pause/resume/abort no longer live in here — they sit above it, always visible, alongside
+ * the state-progression button. Kept because a reload collapses the disclosure and the
+ * assertions below still read what remains inside it (description, timeline, share/print),
+ * so call it after every reload-settled mutation. */
 async function openTripDetails(page: Page) {
   const trigger = page.getByRole("button", { name: "Details" })
   if ((await trigger.count()) > 0) await trigger.click()
@@ -162,9 +165,7 @@ test.describe("Live expedition — pause / resume / abort", () => {
       // Opened deliberately: with the disclosure shut, "not visible" holds for a leader
       // too, so the assertion would pass without proving anything about crew privileges.
       await openTripDetails(crewPage)
-      await expect(
-        crewPage.getByRole("button", { name: /pause expedition/i }),
-      ).not.toBeVisible()
+      await expect(crewPage.getByRole("button", { name: /pause expedition/i })).not.toBeVisible()
       await crewContext.close()
     } finally {
       await apiDeleteTrip(request, leaderToken, tripId)

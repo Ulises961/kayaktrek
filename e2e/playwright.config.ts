@@ -12,6 +12,11 @@ const API_URL = process.env.E2E_API_URL ?? "http://localhost:5000"
 // not silently lose coverage; the mirror opts out explicitly instead.
 const LIVE_SPECS = [/15-live-expedition\.spec\.ts/, /16-story-live-layer\.spec\.ts/]
 
+// M18's responsive specs, which run in the `mobile-320` project below rather than the
+// desktop one. Kept as one constant because both projects reference it — the mobile one
+// to claim these specs, the desktop one to disown them.
+const RESPONSIVE_SPECS = [/19-responsive\.spec\.ts/]
+
 export default defineConfig({
   testDir: "./tests",
   ...(process.env.E2E_SKIP_LIVE === "1" ? { testIgnore: LIVE_SPECS } : {}),
@@ -56,8 +61,31 @@ export default defineConfig({
     },
     {
       name: "chromium",
+      // The responsive specs own their viewports, so exclude them here rather than
+      // running every one of them twice at a size they did not ask for.
+      testIgnore: RESPONSIVE_SPECS,
       use: {
         ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/leader.json",
+      },
+      dependencies: ["setup"],
+    },
+    // M18's 320px floor. Scoped to the responsive specs on purpose: running all 66
+    // existing specs at a second viewport would roughly double a 4.8-minute run for no
+    // signal. It reuses the SAME storageState as chromium, so it costs zero extra
+    // logins — which matters, since a full suite already brushes /auth/login's
+    // 50-an-hour cap (root CLAUDE.md, E2E section).
+    //
+    // The viewport here is only a default: the canary sets its own per assertion, since
+    // it checks each route at both 320 and 640. What this project really supplies is a
+    // mobile *context* — touch, mobile user agent, device scale — so a layout that only
+    // breaks under `pointer: coarse` or a phone UA is reachable from a spec.
+    {
+      name: "mobile-320",
+      testMatch: RESPONSIVE_SPECS,
+      use: {
+        ...devices["Galaxy S9+"],
+        viewport: { width: 320, height: 640 },
         storageState: "e2e/.auth/leader.json",
       },
       dependencies: ["setup"],

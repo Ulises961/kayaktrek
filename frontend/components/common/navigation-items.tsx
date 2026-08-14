@@ -40,7 +40,11 @@ export function NavigationItems() {
             className={clsx(
               "3xl:h-12 3xl:[&>svg]:size-7 xl:h-10 2xl:h-11 xl:[&>svg]:size-5 2xl:[&>svg]:size-6",
               {
-                "bg-sky-100 text-blue-600 hover:bg-sky-100 hover:text-blue-600":
+                // Selected was `bg-sky-100 text-blue-600` — raw Tailwind literals, which
+                // is why it read as *nearly* the card hover without ever matching it. Both
+                // are `--accent` now, so "this is selected" and "this is hovered" are one
+                // tint by construction. Dark mode came free; the literals had none.
+                "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground":
                   pathname === item.url,
               },
             )}

@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { AnchorIcon, PencilIcon } from "lucide-react"
 import { upsertLogistics } from "@/lib/logistics/actions"
 import { LogisticsFieldsSchema, type LogisticsFields, type Logistics } from "@/lib/dtos/logistics"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -56,11 +55,11 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
           Edit contact
         </Button>
       </DialogTrigger>
-      <AccentDialogContent accent={palette.sunset500} icon={AnchorIcon} title="Edit Shore Contact">
+      <AccentDialogContent icon={AnchorIcon} title="Edit Shore Contact">
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
           {/* Shore contact */}
           <div className="flex flex-col gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 p-3 dark:border-amber-800/30 dark:bg-amber-950/20">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <FieldLabel htmlFor="shoreContactName">Shore contact name</FieldLabel>
                 <Input

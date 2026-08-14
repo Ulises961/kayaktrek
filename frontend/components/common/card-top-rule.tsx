@@ -9,12 +9,17 @@ import { cn } from "@/lib/utils"
  * top-0` inside a `relative overflow-hidden` card); unpositioned it renders as
  * a plain in-flow bar (the auth card's usage).
  */
-export function CardTopRule({ color, className }: { color?: string; className?: string }) {
+export function CardTopRule({
+  color,
+  className,
+  ...rest
+}: { color?: string; className?: string } & React.ComponentProps<"div">) {
   return (
     <div
       aria-hidden
       className={cn("chart-top-rule", className)}
       style={color ? { background: color } : undefined}
+      {...rest}
     />
   )
 }

@@ -11,6 +11,7 @@ import {
   resetCatalogToDefault,
 } from "@/lib/inventory/catalog-actions"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { Input } from "@/components/ui/input"
 import { ListRow } from "@/components/common/list-row"
 import {
@@ -164,7 +165,12 @@ export function CatalogKitSection({ items, categories }: CatalogKitSectionProps)
             </option>
           ))}
         </select>
-        <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isPending || !name.trim()}
+          className={ctaButtonClass}
+        >
           Add
         </Button>
       </form>

@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { UserMinusIcon } from "lucide-react"
 import { removeMember } from "@/lib/trips/actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,13 +37,19 @@ export function RemoveMemberButton({ tripId, userId, displayName }: RemoveMember
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
+        {/* Icon-only below `sm`. The crew row already carries an avatar, a name, a role
+            pill and this control; the word was what pushed it past a 320px viewport. The
+            accessible name is on the button, so the control is unchanged for a screen
+            reader either way. */}
         <Button
           variant="ghost"
           size="sm"
-          className="text-destructive hover:text-destructive"
+          aria-label={`Remove ${displayName}`}
+          className="text-destructive hover:text-destructive max-sm:size-8 max-sm:px-0"
           disabled={isPending}
         >
-          Remove
+          <UserMinusIcon className="size-4 sm:hidden" />
+          <span className="max-sm:sr-only">Remove</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

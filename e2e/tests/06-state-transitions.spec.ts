@@ -18,8 +18,14 @@ test.describe("Trip state transitions", () => {
     await apiDeleteTrip(request, leaderToken, tripId)
   })
 
-  /** The state-progression controls live inside the identity card's "Details" disclosure,
-   * which is collapsed on entry — a click on a hidden button just waits out the timeout.
+  /** Opens the identity card's "Details" disclosure, which still holds the description,
+   * the progression timeline, and share/print.
+   *
+   * The state-progression *buttons* no longer live in here — they sit above it, always
+   * visible, because burying "Begin expedition" behind a collapsed disclosure hid the most
+   * consequential control in the product. This is kept because the assertions below also
+   * read the timeline, and because a crew member's negative assertions have to be made
+   * with the disclosure open: "not visible" is true of a leader too while it is shut.
    *
    * Tolerant of the disclosure being absent entirely: it only renders when there is
    * something to put in it, which for a crew member on a bare trip can be nothing. */
@@ -44,13 +50,10 @@ test.describe("Trip state transitions", () => {
 
   test("leader advances happening → past via UI", async ({ page, request }) => {
     // Move to happening via API first
-    const res = await request.post(
-      `${API_URL}/api/v1/trip/${tripId}/state`,
-      {
-        headers: { Authorization: `Bearer ${leaderToken}` },
-        data: { state: "happening" },
-      }
-    )
+    const res = await request.post(`${API_URL}/api/v1/trip/${tripId}/state`, {
+      headers: { Authorization: `Bearer ${leaderToken}` },
+      data: { state: "happening" },
+    })
     expect(res.ok()).toBeTruthy()
 
     await page.goto(`/trips/${tripId}`)
@@ -59,7 +62,9 @@ test.describe("Trip state transitions", () => {
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
       reload: true,
     })
-    await expect(page.locator('[data-slot="state-badge"]').filter({ hasText: /past/i })).toBeVisible()
+    await expect(
+      page.locator('[data-slot="state-badge"]').filter({ hasText: /past/i }),
+    ).toBeVisible()
   })
 
   test("crew cannot transition state", async ({ browser, request }) => {

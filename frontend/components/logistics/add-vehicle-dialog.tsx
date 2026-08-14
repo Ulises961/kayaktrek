@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react"
 import { CarIcon, PlusIcon } from "lucide-react"
 import { createShuttleVehicle } from "@/lib/shuttle/actions"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
+import { ctaEchoClass } from "@/components/common/button-roles"
+import { cn } from "@/lib/utils"
 import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { VehicleForm } from "@/components/logistics/vehicle-form"
@@ -40,12 +41,12 @@ export function AddVehicleDialog({ tripId, members }: AddVehicleDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full sm:w-auto">
+        <Button variant="outline" size="sm" className={cn("w-full sm:w-auto", ctaEchoClass)}>
           <PlusIcon className="size-3.5" />
           Add vehicle
         </Button>
       </DialogTrigger>
-      <AccentDialogContent accent={palette.ocean500} icon={CarIcon} title="Add vehicle">
+      <AccentDialogContent icon={CarIcon} title="Add vehicle">
         <VehicleForm
           members={members}
           submitLabel="Add"

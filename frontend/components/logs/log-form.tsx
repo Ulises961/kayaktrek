@@ -89,7 +89,7 @@ export function LogForm({ log, unit = DISTANCE_UNIT.KM, onSuccess, onCancel }: L
         {errors.date && <p className="text-destructive text-sm">{errors.date.message}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="hours">Hours paddled</Label>
           <Input
@@ -151,7 +151,7 @@ export function LogForm({ log, unit = DISTANCE_UNIT.KM, onSuccess, onCancel }: L
 
       <div className="flex gap-3">
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : isEdit ? "Save changes" : "Add log"}
+          {isPending ? "Saving…" : isEdit ? "Save changes" : "Create log"}
         </Button>
         <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
           Cancel

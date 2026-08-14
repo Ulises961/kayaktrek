@@ -561,6 +561,97 @@ construction. Follow-ups are opportunistic, not scheduled: remaining forms with
 inline error paragraphs (`new-trip-dialog`, profile forms, `tidal-entry-form`)
 migrate to `FieldError` when next touched.
 
+## Responsive layout contract — 320px floor (M18)
+
+**Context.** The web client was written desktop-base with `md:` exceptions bolted on where
+someone noticed a break: 42 of 260 non-test components carried any breakpoint prefix at all.
+A PWA-offline tier (`mobile-offline.md`) is unbuildable on a client that does not survive a
+phone viewport, and every interaction problem M9's React Native client will hit exists here
+first, in a codebase with a 2400-test suite and a sub-minute feedback loop.
+
+**The floor is 320px** — iPhone SE (1st gen), and the narrowest viewport still worth
+supporting. This has one structural consequence that shapes everything else: Tailwind's
+smallest breakpoint is `sm: 640`, so **320 _is_ base**. There is no prefix below `sm` to hang
+phone styles on, which makes the work an inversion rather than an addition. Base styles are
+the 320 layout; `sm:`/`md:`/`lg:` layer the wider ones on top. A pass that only adds prefixes
+to desktop-base rules reproduces the same bugs in a different order.
+
+### Breakpoints — three, named so call sites stop inventing their own
+
+| Token | Width | What changes |
+|---|---|---|
+| base | 320–639 | Single column. Panes become sheets. Chrome minimal. |
+| `sm` | ≥640 | Two-column grids return. Larger phones / small tablets. |
+| `md` | ≥768 | Sidebar leaves sheet mode; builder returns to side-by-side panes. |
+| `lg` | ≥1024 | Wide grids, secondary columns. |
+
+`--breakpoint-3xl` (120rem) predates this and is unaffected.
+
+### rem is 1.125× — every px figure in a Tailwind class is 12.5% larger than it looks
+
+`html { font-size: 112.5% }` (`globals.css`), so Tailwind's rem-based scale does not render
+the px values its class names imply. This is not a footnote: M18's own plan computed its
+touch-target offender list on a 16px base and named a control at "40px" that actually renders
+at 45px and was never a problem.
+
+| Class | Reads as | Actually renders |
+|---|---|---|
+| `h-6` (`size="xs"`) | 24px | **27px** |
+| `h-8` / `size-8` (`size="sm"`) | 32px | **36px** |
+| `h-9` (Button default) | 36px | **40.5px** |
+| `h-10` / `size-10` | 40px | **45px** |
+
+Reason about physical size from this table, not from the class name.
+
+### Touch targets — expand the hit area, don't resize the control
+
+WCAG 2.2 **AA** (2.5.8) requires 24×24 CSS px; 44×44 is **AAA** (2.5.5) and Apple HIG. At 36px
+every button in the app already clears AA with margin, so raising 112 `size="sm"` buttons to
+45px would be a redesign of the app's density in the name of a AAA target.
+
+The rule instead: **icon-only controls get a 44px hit area on coarse pointers via a
+pseudo-element, and keep their visual size at every width.** The control still looks 36px; the
+thumb hits 44. Applied through the `touch-target` utility in `globals.css`, scoped to
+`@media (pointer: coarse)` so a mouse-driven layout is untouched.
+
+### Conventions this milestone fixed in place
+
+- **Dropping a label on a phone uses `sr-only sm:not-sr-only`, never `hidden sm:inline`.**
+  Both remove the word from the layout; only the first keeps it in the accessibility tree, so
+  the control is still named for a screen reader at 320. Used by the paddler row actions, the
+  GPX import button, and anything else that trades wording for width.
+- **Overlays clear Leaflet by band, not per-component.** Leaflet's panes run to 700 here (1000
+  by spec) and a map is not inside a stacking context that contains them, so every portalled
+  surface needs an explicit z-index: backdrops at 1100, content at 1101, app header at 1100.
+  Keyed on `data-slot` in `globals.css` rather than by editing `components/ui/*`, which
+  `pnpm shadcn add` regenerates. Note the one trap: the mobile nav drawer is a `SheetContent`
+  but `sidebar.tsx` overrides its `data-slot`, so it has to be named separately.
+- **Behaviour must not fork by device** — layout branches only, one component, one state
+  machine. The moment "mobile does something different" enters the logic, M9 inherits the fork.
+
+### Verification — Playwright, because Vitest structurally cannot
+
+jsdom has no layout engine: `getBoundingClientRect()` returns zeros, media queries never match,
+and Tailwind classes are inert strings. A unit test asserting `className` contains
+`sm:grid-cols-2` asserts that someone typed a string — precisely the "covered but unasserted"
+failure the M15 rubric exists to close (`foundation.md`, "Testing standards").
+
+Layout is therefore asserted in `e2e/tests/19-responsive.spec.ts`, under a `mobile-320`
+Playwright project that reuses the same `storageState` as the desktop one (a full suite run
+already brushes `/auth/login`'s 50-per-hour cap). Its core is the **overflow canary**: every
+route, at 320 and 640, must not scroll horizontally, reported with the innermost offending
+elements so a failure names its own cause.
+
+Two limits of the canary are worth stating, because both have already bitten:
+
+1. **It must assert it is on the route it asked for.** Its first full run came back 36/36 green
+   while measuring the login form thirteen times — an expired `storageState` had redirected
+   every authenticated route to a narrow centred card that cannot overflow.
+2. **It cannot see a cramped grid.** `grid-cols-N` is `repeat(N, minmax(0,1fr))`, so columns
+   shrink rather than overflow; a three-up grid at 320 is unreadable and canary-green. Nor can
+   it see the builder's failure, which is silent collapse of a `min-w-0 flex-1` map. Those need
+   their own assertions — placement measured against a sibling's box, or a minimum usable width.
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -584,3 +675,4 @@ migrate to `FieldError` when next touched.
 | Tile caching Layer 1 landed, narrowed to priority rows 1–2 only (M8 §D10) | ADR-033 | 2026-07-17 | `GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png`, `layer ∈ {osm, seamark}`; MinIO-cached via `StorageService`, 7-day upstream refresh, stale-serves-on-upstream-failure; unauthenticated, `600/min` per-IP; all four map surfaces (`public-map`, `map-core`, `landing-map`, `explore-discovery-map`) route through it, `{s}` subdomain dropped. Sentinel-2/titiler (row 3) and Mapbox HD (row 4) stay deferred — `<layer>` is their future seam. Landing hero's Esri Ocean base is unaffected (client-direct per Esri terms, was never proposed for this proxy). |
 | Builder mode architecture: real View/Edit segmented control; boundary editing becomes an explicitly-entered draft sub-state ("Save days"/"Discard"); "Add day" deferred until Save (M12 item 16) | — | 2026-07-09 | Fixed a real bug: immediate `Day` row creation on Add day meant Cancel left an orphaned row. Superseded by M14 below — the entry gate itself is removed, not the atomic-save behavior it introduced |
 | Flat edit surface: boundary draft becomes implicit (first gesture materializes it) and ID-anchored (`endPointId`, not frozen indices); Save/Discard persistent-disabled instead of appear/hide; Add-day moves to the last boundary handle only, new day takes all of the old last day's points (collapse-and-drag, not midpoint split); real-day deletion joins the draft (no server `Day` mutation before Save); point edits save live even mid-draft, Discard narrows to day-structure only (M14) | — | 2026-08-02 | Supersedes M12 item 16's entry gate while keeping its atomic-apply/no-premature-server-mutation guarantee, extended to day deletion too; `plans/M14-flat-itinerary-edit.md` |
+| Responsive contract: 320px floor, mobile-base inversion, three breakpoints (base/`sm`/`md`/`lg`); touch targets met by coarse-pointer hit-area expansion rather than visual resizing (AA 24px is the enforced floor, 44px the hit area); `sr-only sm:not-sr-only` for phone-dropped labels; overlay z-index band above Leaflet; layout asserted in Playwright's `mobile-320` project, never Vitest (M18) | — | 2026-08-10 | `plans/M18-responsive-web.md`. Records that `html` is 112.5%, so Tailwind rem classes render 1.125× their apparent px — the plan's own §6 offender list was computed on a 16px base and named a 45px control as a 40px problem. Canary caveats: it must assert its own pathname (a stale `storageState` produced a 36/36 false green), and it cannot see cramped `grid-cols-N` or the builder's silent map collapse |

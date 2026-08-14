@@ -79,9 +79,12 @@ export function ImportGpxButton() {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={onOpen}>
-        <UploadIcon className="mr-2 size-4" />
-        Import GPX
+      {/* Icon alone on a phone, where this sits beside the page heading and the
+          word costs room the heading needs; the label returns from `sm`. `sr-only`
+          rather than `hidden` keeps it in the accessibility tree at every width. */}
+      <Button variant="outline" size="sm" onClick={onOpen} aria-label="Import GPX">
+        <UploadIcon className="size-4" />
+        <span className="sr-only sm:not-sr-only">Import GPX</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

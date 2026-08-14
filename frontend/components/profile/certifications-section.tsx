@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ctaEchoClass } from "@/components/common/button-roles"
 import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { ListRow } from "@/components/common/list-row"
@@ -187,6 +188,7 @@ export function CertificationsSection({ initialCerts }: CertificationsSectionPro
           type="button"
           variant="outline"
           size="sm"
+          className={ctaEchoClass}
           onClick={() => {
             setFormError(null)
             setForm({ kind: "add" })

@@ -146,35 +146,53 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
         )}
       </div>
 
+      {/* The next state action stays out here, always visible. It was inside the Details
+          accordion, which is collapsed by default — so the single most consequential
+          control in the product ("Begin expedition": a plan becomes a live expedition, and
+          it cannot be undone) was two clicks deep and invisible until you went looking.
+          There is only ever one of these, so it costs a row rather than a block, which is
+          what let the accordion be both too bulky open and unnoticeable shut. Everything
+          occasional — share, print, abort, the description — stays folded below. */}
+      {canAdvanceState && trip.state && (
+        <div className="flex flex-col gap-3">
+          {/* The timeline travels with the buttons that move it. Splitting them left the
+              controls out here and "where the trip is" folded away, so you could advance a
+              trip without seeing what you were advancing it from. */}
+          <StateTimeline currentState={trip.state} />
+          <div className="flex flex-wrap items-center gap-2">
+            <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
+            <PauseControls trip={trip} isLeader={isLeader} />
+          </div>
+        </div>
+      )}
+
       {hasDetails && (
         <Accordion type="single" collapsible>
           <AccordionItem value="details" className="border-none">
-            <AccordionTrigger className="text-muted-foreground w-fit flex-none justify-start gap-1.5 py-1 text-sm font-medium hover:no-underline">
+            {/* Full width with the chevron pushed to the far end, so the row reads as a
+                control rather than a stray word. It was `w-fit` muted text at the same
+                weight as the body around it, which made the one way into share, print and
+                abort effectively invisible. */}
+            {/* `rounded-none` overrides the primitive's `rounded-md`: the radius
+                curves the ends of this row's `border-t`, so the rule dividing the
+                state controls from Details tapers off instead of meeting both
+                edges. */}
+            <AccordionTrigger className="text-foreground border-border w-full justify-between rounded-none border-t py-2 text-sm font-semibold hover:no-underline">
               Details
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-4 pt-1 pb-2">
-              {(trip.description || trip.difficulty) && (
+              {trip.description && (
                 <div className="flex flex-col gap-2">
-                  {trip.description && <p className="text-sm">{trip.description}</p>}
-                  {trip.difficulty && (
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Difficulty: </span>
-                      {TRIP_DIFFICULTY_LABELS[trip.difficulty]}
-                    </p>
-                  )}
+                  <span className={fieldLabelClass}>Description</span>
+                  <p className="text-sm">{trip.description}</p>
                 </div>
               )}
 
-              {canAdvanceState && trip.state && (
-                <>
-                  {(trip.description || trip.difficulty) && <Separator />}
-                  <div className="flex flex-col gap-3">
-                    <span className={fieldLabelClass}>Trip progression</span>
-                    <StateTimeline currentState={trip.state} />
-                    <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
-                    <PauseControls trip={trip} isLeader={isLeader} />
-                  </div>
-                </>
+              {trip.difficulty && (
+                <div className="flex flex-col gap-2">
+                  <span className={fieldLabelClass}>Difficulty</span>
+                  <p className="text-sm">{TRIP_DIFFICULTY_LABELS[trip.difficulty]}</p>
+                </div>
               )}
 
               {isLeader && (

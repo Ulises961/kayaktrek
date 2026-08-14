@@ -60,7 +60,7 @@ export function VehicleForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="col-span-2 flex flex-col gap-1.5">
           <FieldLabel htmlFor="vehicleDescription">Vehicle description</FieldLabel>
           <Input
@@ -151,7 +151,7 @@ export function VehicleForm({
             ))}
           </NativeSelect>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input placeholder="Driver name" disabled={isPending} {...register("driverName")} />
             <Input
               placeholder="Driver contact"

@@ -10,8 +10,7 @@ import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type ProfileActionResult = { success: true } | { success: false; error: string }
 export type AvatarActionResult =
-  | { success: true; avatarUrl: string | null }
-  | { success: false; error: string }
+  { success: true; avatarUrl: string | null } | { success: false; error: string }
 
 export async function updateProfile(fields: ProfileFormValues): Promise<ProfileActionResult> {
   const session = await getSession()
@@ -179,11 +178,9 @@ export async function requestAccountDeletion(): Promise<ProfileActionResult> {
 }
 
 export type ReAuthResult =
-  | { success: true; elevatedToken: string }
-  | { success: false; error: string }
+  { success: true; elevatedToken: string } | { success: false; error: string }
 export type MedicalNotesResult =
-  | { success: true; notes: string | null }
-  | { success: false; error: string }
+  { success: true; notes: string | null } | { success: false; error: string }
 
 export async function reAuth(password: string): Promise<ReAuthResult> {
   try {

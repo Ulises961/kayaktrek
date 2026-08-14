@@ -27,6 +27,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -62,7 +64,10 @@
 
   /* Soft tint variants */
   --color-primary-soft: var(--primary-soft);
-  --color-accent-soft: var(--accent-soft);
+  --color-cta-soft: var(--cta-soft);
+  --color-notice-bg: var(--notice-bg);
+  --color-notice-border: var(--notice-border);
+  --color-notice-ink: var(--notice-ink);
 
   /* Chart colors */
   --color-chart-1: var(--chart-1);
@@ -108,8 +113,19 @@
   --muted: oklch(0.965 0.006 90); /* warm light neutral */
   --muted-foreground: oklch(0.52 0.065 240); /* #2272b6 ocean-500 */
 
-  --accent: oklch(0.73 0.145 75); /* #d97706 sunset-500 */
-  --accent-foreground: oklch(0.155 0.04 245);
+  /* The call to action. Sunset, and deliberately rare — five buttons in the whole app
+     (`components/common/button-roles.ts`). It used to live in `--accent`, which is also
+     shadcn's hover-surface token, so every dropdown item, calendar cell and card hover
+     painted itself amber and the colour stopped meaning "do this". */
+  --cta: oklch(0.73 0.145 75); /* #d97706 sunset-500 */
+  --cta-foreground: oklch(0.155 0.04 245);
+
+  /* `--accent` is shadcn's own meaning again: the quiet surface a hovered or highlighted
+     row sits on. Same value as `--secondary`, which is what the itinerary cards already
+     hover to, so a hovered dropdown item and a hovered card are one tint by construction
+     rather than by two literals agreeing. */
+  --accent: oklch(0.928 0.038 215); /* #dbedf7 ocean-100 */
+  --accent-foreground: oklch(0.28 0.085 243); /* #1a3554 ocean-700 */
 
   --destructive: oklch(0.577 0.245 27.325);
 
@@ -146,13 +162,18 @@
   --sidebar-border: oklch(0.865 0.042 218);
   --sidebar-ring: oklch(0.52 0.065 240);
 
-  /* Trip state tokens */
+  /* Trip state tokens. `happening` sits on foam's hue (184), not a green of its own:
+     one concept, one colour. A trip under way is signalled by the state badge and by the
+     live controls at the same time — on the dashboard's active-expedition panel they are
+     inches apart — and two hues for that read as two different facts. The badge stays a
+     tint (light bg, dark ink) rather than the foam signal itself, so the hue says what it
+     is and the lightness says which job it is doing. */
   --state-draft-bg: oklch(0.921 0.006 248);
   --state-draft-fg: oklch(0.45 0.022 248);
   --state-planning-bg: oklch(0.924 0.07 240);
   --state-planning-fg: oklch(0.38 0.16 243);
-  --state-happening-bg: oklch(0.924 0.085 155);
-  --state-happening-fg: oklch(0.33 0.115 155);
+  --state-happening-bg: oklch(0.924 0.085 184);
+  --state-happening-fg: oklch(0.33 0.115 184);
   --state-past-bg: oklch(0.899 0.012 248);
   --state-past-fg: oklch(0.48 0.018 248);
 
@@ -182,7 +203,20 @@
 
   /* Soft tint variants — v1 baseline */
   --primary-soft: oklch(0.928 0.038 215);
-  --accent-soft: oklch(0.96 0.03 75);
+  --cta-soft: oklch(0.96 0.03 75);
+
+  /* The warm note in the state illustrations (StateVisual, Island) — the sun, the route
+     it lights. Its own token for the same reason the Reinel rose has `--rose-*`: artwork
+     must not paint from a role colour, or the role cannot be changed without redrawing
+     the pictures. It happens to be the sunset hue; that is a resemblance, not a link. */
+  --illus-accent: oklch(0.73 0.145 75);
+
+  /* Notice — a surface that needs the eye without being an error. Distinct from `--cta`,
+     which fills a button you press; this tints a panel you read. Aliased to the toast's
+     warning trio so a notice panel and a warning toast cannot drift apart. */
+  --notice-bg: var(--toast-warning-bg);
+  --notice-border: var(--toast-warning-border);
+  --notice-ink: var(--toast-warning-text);
 
   /* Reinel rose — the 404/500 artwork (components/illustrations/reinel-rose.tsx).
      Its own scale, so a change to --foreground/--primary/--accent can't collapse
@@ -223,8 +257,8 @@
   --auth-accent: oklch(0.43 0.165 243);
   --auth-accent-hover: oklch(0.38 0.165 243);
   --auth-accent-ink: oklch(0.985 0.008 220);
-  --auth-link: oklch(0.43 0.165 243);
-  --auth-link-hover: oklch(0.38 0.165 243);
+  --auth-link: oklch(0.52 0.13 62);
+  --auth-link-hover: oklch(0.44 0.12 62);
 
   /* Card shadows — blue-tinted depth */
   --card-shadow: 0 1px 3px oklch(0.43 0.165 243 / 0.08), 0 4px 12px oklch(0.43 0.165 243 / 0.06);
@@ -262,8 +296,11 @@
   --muted: oklch(0.19 0.044 247);
   --muted-foreground: oklch(0.73 0.06 225); /* #7ec4e4 ocean-300 */
 
-  --accent: oklch(0.76 0.155 80); /* #f59e0b sunset-400 */
-  --accent-foreground: oklch(0.155 0.04 245);
+  --cta: oklch(0.76 0.155 80); /* #f59e0b sunset-400 */
+  --cta-foreground: oklch(0.155 0.04 245);
+
+  --accent: oklch(0.265 0.068 243); /* #1a3554 ocean-700 */
+  --accent-foreground: oklch(0.985 0.008 220);
 
   --destructive: oklch(0.65 0.22 25);
 
@@ -287,8 +324,8 @@
   --auth-accent: oklch(0.52 0.15 243);
   --auth-accent-hover: oklch(0.58 0.15 243);
   --auth-accent-ink: oklch(0.98 0.008 220);
-  --auth-link: oklch(0.76 0.115 232);
-  --auth-link-hover: oklch(0.85 0.09 232);
+  --auth-link: oklch(0.78 0.12 72);
+  --auth-link-hover: oklch(0.86 0.1 75);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
@@ -309,8 +346,8 @@
   --state-draft-fg: oklch(0.67 0.018 248);
   --state-planning-bg: oklch(0.265 0.068 243);
   --state-planning-fg: oklch(0.7 0.12 225);
-  --state-happening-bg: oklch(0.245 0.08 155);
-  --state-happening-fg: oklch(0.72 0.14 155);
+  --state-happening-bg: oklch(0.245 0.08 184);
+  --state-happening-fg: oklch(0.72 0.14 184);
   --state-past-bg: oklch(0.245 0.016 248);
   --state-past-fg: oklch(0.56 0.014 248);
 
@@ -335,7 +372,8 @@
   --foam: oklch(0.6 0.12 184);
   --foam-soft: oklch(0.265 0.068 243);
   --primary-soft: oklch(0.265 0.068 243);
-  --accent-soft: oklch(0.265 0.04 75);
+  --cta-soft: oklch(0.265 0.04 75);
+  --illus-accent: oklch(0.76 0.155 80);
 
   /* Brand mark, inverted: on navy the line work carries the light, so the
      shaded halves become the brightest part of the star. North keeps its amber
@@ -550,6 +588,93 @@
  * the mood; a neat-line frame and a title cartouche are the chrome. Palette
  * and faces come from the maritime design system (tokens.ts / fonts).
  * ======================================================================== */
+/* ── Overlays above Leaflet ───────────────────────────────────────────────────
+   Leaflet's own panes run to z-index 1000 and a map is not inside a stacking
+   context that contains them, so anything the app floats over the page has to
+   clear 1000 or the map paints on top of it. shadcn ships these at z-50, which
+   is why the mobile nav drawer and dialogs disappeared behind a route thumbnail.
+
+   Done here rather than by editing components/ui/*: those are shadcn primitives,
+   regenerated by `pnpm shadcn add`, so a hand-edit is a change that silently
+   reverts. Unlayered so it beats the z-50 utility on the elements themselves. */
+[data-slot="sheet-overlay"],
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
+  z-index: 1100;
+}
+
+/* Content sits one above its own backdrop rather than level with it. Radix
+   renders the overlay first, so equal z-indices happen to paint in the right
+   order — but that is DOM order doing the work, and it is not worth relying on
+   for the element carrying every control the overlay exists to reveal.
+
+   The mobile nav drawer needs naming separately: it is a `SheetContent`, but
+   `sidebar.tsx` hands it its own `data-slot="sidebar"` and `sheet.tsx` spreads
+   `{...props}` after setting `data-slot="sheet-content"`, so the sidebar's value
+   wins and the selector above never matches it.
+
+   The list is every portalled primitive in components/ui — the six that render
+   through a Radix Portal at z-50 — not only the ones seen to break. A menu, a
+   popover or a tooltip has no backdrop of its own, so it needs the clearance for
+   a different reason: nothing else would lift it over the tiles. */
+[data-slot="sheet-content"],
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="popover-content"],
+[data-slot="tooltip-content"],
+[data-slot="sidebar"][data-mobile="true"] {
+  z-index: 1101;
+}
+
+/* ── Touch targets (M18 §6) ───────────────────────────────────────────────────
+   A 44px hit box on a touch device, without changing what anything looks like.
+   The pseudo-element is a child of the button, so a tap anywhere in it lands on
+   the button; it only ever *adds* reachable area, never removes any, which is
+   what lets this be one rule over every button instead of a class threaded
+   through twenty call sites (and every future one).
+
+   Sized in px on purpose. 44 is a physical-finger measurement — Apple HIG, and
+   WCAG 2.5.5 AAA — so it must not ride the 112.5% root scale the way a rem value
+   would. (WCAG 2.2 AA is 24px, which every button here already clears at 36px;
+   this closes the remaining gap to the stricter target.)
+
+   Coarse pointers only: on a mouse the visual box is the target, and expanding
+   it there would make adjacent controls fight over a few pixels for no gain.
+
+   Keyed on `data-size`, not `data-slot`: `button.tsx` writes `data-slot="button"`
+   before spreading `{...props}`, so every Radix `asChild` trigger overwrites it —
+   the account-menu button's slot reads `dropdown-menu-trigger`. No trigger passes
+   a `data-size`, so it survives. `.touch-target` is the escape hatch for a
+   tappable control that is not an icon-size Button.
+
+   Scoped to icon sizes rather than all buttons on purpose: a blanket rule would
+   also catch calendar day cells, which sit ~36px apart in a 7-column grid, and
+   overlapping 44px boxes there would hand a tap on one day's edge to the next. */
+@media (pointer: coarse) {
+  [data-size="icon"],
+  [data-size="icon-xs"],
+  [data-size="icon-sm"],
+  [data-size="icon-lg"],
+  .touch-target {
+    position: relative;
+  }
+  [data-size="icon"]::before,
+  [data-size="icon-xs"]::before,
+  [data-size="icon-sm"]::before,
+  [data-size="icon-lg"]::before,
+  .touch-target::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Plain (unlayered) rules so Lightning CSS always emits them and they win
    over the base `* { border }` reset. */
 /* ── Auth surfaces ────────────────────────────────────────────────────────
@@ -603,8 +728,11 @@
 .auth-btn {
   width: 100%;
   border-radius: 2px;
-  background-color: var(--auth-accent);
-  color: var(--auth-accent-ink);
+  /* Every auth page exists to produce one action, so its submit is the CTA — Sign in,
+     Create account, Send reset link alike. Splitting them would make two identical forms
+     differ by colour for no reason a reader could name. */
+  background-color: var(--cta);
+  color: var(--cta-foreground);
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -614,7 +742,7 @@
     transform 0.1s ease;
 }
 .auth-btn:hover {
-  background-color: var(--auth-accent-hover);
+  background-color: color-mix(in oklab, var(--cta) 90%, black);
 }
 .auth-btn:active {
   transform: scale(0.99);

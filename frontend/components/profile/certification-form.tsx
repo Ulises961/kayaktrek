@@ -70,7 +70,7 @@ export function CertificationForm({
           <p className="text-destructive text-xs">{errors.membershipNumber.message}</p>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="awardedAt">Awarded</Label>
           <Input id="awardedAt" type="date" disabled={isPending} {...register("awardedAt")} />

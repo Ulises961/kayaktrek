@@ -10,8 +10,7 @@ import {
 
 export type TravelDocumentActionResult = { success: true } | { success: false; error: string }
 export type TravelDocumentCreateResult =
-  | { success: true; document: TravelDocument }
-  | { success: false; error: string }
+  { success: true; document: TravelDocument } | { success: false; error: string }
 export type AttachmentUrlResult = { success: true; url: string } | { success: false; error: string }
 
 export async function getTravelDocuments(tripId: string): Promise<TravelDocument[]> {

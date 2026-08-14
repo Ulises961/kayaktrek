@@ -81,7 +81,7 @@ export function TidalDiamondForm({
             Enter the peak rate and stream directions; hourly rates are filled in by the rule of
             thirds (slack at HW/LW, peak mid-tide).
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="max-spring">Peak spring rate (kn)</FieldLabel>
               <Input

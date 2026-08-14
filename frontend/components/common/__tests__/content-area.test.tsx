@@ -29,21 +29,31 @@ describe("ContentArea", () => {
   it("caps the column width against the left margin by default", () => {
     const wrapper = renderArea()
     expect(wrapper).toHaveClass("max-w-2xl")
-    expect(wrapper).toHaveClass("p-6")
     // Left-aligned, so the page title starts at the same x in every mode.
     expect(wrapper).not.toHaveClass("mx-auto")
   })
 
-  it("drops the cap but keeps padding in wide mode", () => {
+  // M18: 320px is below Tailwind's smallest breakpoint, so the base value IS the
+  // phone value and the desktop one layers on at sm. This nests inside `main`'s own
+  // p-1/md:p-4, so at 320 the pair leaves 280px of content rather than 264px.
+  it("pads for the phone at base and steps up at sm, in column mode", () => {
+    const wrapper = renderArea()
+    expect(wrapper).toHaveClass("p-4")
+    expect(wrapper).toHaveClass("sm:p-6")
+  })
+
+  it("drops the cap but keeps the same padding step in wide mode", () => {
     const wrapper = renderArea("wide")
-    expect(wrapper).toHaveClass("p-6")
+    expect(wrapper).toHaveClass("p-4")
+    expect(wrapper).toHaveClass("sm:p-6")
     expect(wrapper).not.toHaveClass("max-w-2xl")
   })
 
-  it("drops padding and adds relative positioning in bleed mode", () => {
+  it("drops padding at every width and adds relative positioning in bleed mode", () => {
     const wrapper = renderArea("bleed")
     expect(wrapper).toHaveClass("relative")
-    expect(wrapper).not.toHaveClass("p-6")
+    expect(wrapper).not.toHaveClass("p-4")
+    expect(wrapper).not.toHaveClass("sm:p-6")
     expect(wrapper).not.toHaveClass("max-w-2xl")
   })
 

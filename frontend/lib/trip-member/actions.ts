@@ -8,11 +8,9 @@ import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 export type FloatPlanActionResult = { success: true } | { success: false; error: string }
 export type ShareMedicalNotesResult = { success: true } | { success: false; error: string }
 export type TripMedicalNotesResult =
-  | { success: true; notes: string | null }
-  | { success: false; error: string }
+  { success: true; notes: string | null } | { success: false; error: string }
 export type ReadMemberNotesResult =
-  | { success: true; medicalNotes: string }
-  | { success: false; error: string }
+  { success: true; medicalNotes: string } | { success: false; error: string }
 
 export async function getMyMembership(tripId: string): Promise<TripMember | null> {
   try {

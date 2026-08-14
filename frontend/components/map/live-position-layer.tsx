@@ -23,11 +23,19 @@ export function LivePositionLayer({ positions, now }: Props) {
             key={position.userId}
             center={[position.lat, position.lon]}
             radius={7}
+            // Foam is the live/motion role colour, so the thing that is literally live
+            // wears it. It used to be red600 — the destructive colour, the same hue as
+            // Abort expedition — which put a warning on a paddler doing nothing wrong.
+            //
+            // The ink ring is what makes that affordable. Red's advantage was separating
+            // from pale chart water by hue alone; a ring separates by value instead, and
+            // value survives both the blue of open water and the beige of the coast. So
+            // the fill is free to carry meaning while the ring carries the contrast.
             pathOptions={{
-              color: palette.red600,
-              fillColor: palette.red600,
+              color: palette.ocean900,
+              fillColor: palette.foam400,
               fillOpacity: stale ? 0.35 : 0.9,
-              opacity: stale ? 0.35 : 0.9,
+              opacity: stale ? 0.45 : 1,
               weight: 2,
             }}
           >

@@ -36,10 +36,10 @@ export function DeleteLogButton({ logId }: DeleteLogButtonProps) {
           variant="ghost"
           size="icon"
           aria-label="Delete log"
-          className="text-muted-foreground hover:text-destructive size-7 shrink-0"
+          className="text-muted-foreground hover:text-destructive size-8 shrink-0"
           disabled={isPending}
         >
-          <Trash2Icon className="size-3.5" />
+          <Trash2Icon className="size-4" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

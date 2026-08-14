@@ -79,7 +79,9 @@ export function StatsDashboard({ stats, unit = DISTANCE_UNIT.KM }: StatsDashboar
               <Icon className="size-3.5" />
               {label}
             </span>
-            <span className="text-xl font-semibold tabular-nums">{value}</span>
+            {/* `text-xl` is 1.25rem against a 112.5% root — ~22px, which is out of
+                proportion in a tile two-up on a 320px viewport. Full size from `sm`. */}
+            <span className="text-base font-semibold tabular-nums sm:text-xl">{value}</span>
           </div>
         ))}
       </div>

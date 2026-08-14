@@ -13,12 +13,10 @@ import {
 import { z } from "zod"
 
 export type PlaceCategoriesResult =
-  | { success: true; data: PlaceCategory[] }
-  | { success: false; error: string }
+  { success: true; data: PlaceCategory[] } | { success: false; error: string }
 
 export type PlacesResult =
-  | { success: true; data: PlaceWithOwnership[] }
-  | { success: false; error: string }
+  { success: true; data: PlaceWithOwnership[] } | { success: false; error: string }
 
 export type PlaceMutationResult = { success: true; data: Place } | { success: false; error: string }
 

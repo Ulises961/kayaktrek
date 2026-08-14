@@ -24,34 +24,27 @@ import { z } from "zod"
 export type SeaActionResult = { success: true; data: Sea } | { success: false; error: string }
 
 export type WeatherActionResult =
-  | { success: true; data: Weather }
-  | { success: false; error: string }
+  { success: true; data: Weather } | { success: false; error: string }
 
 export type TriggerWeatherResult =
-  | { success: true; taskId: string }
-  | { success: false; error: string }
+  { success: true; taskId: string } | { success: false; error: string }
 
 export type TidalGatesResult =
-  | { success: true; data: TidalGateWarning[] }
-  | { success: false; error: string }
+  { success: true; data: TidalGateWarning[] } | { success: false; error: string }
 
 export type TidalDiamondsResult =
-  | { success: true; data: TidalDiamond[] }
-  | { success: false; error: string }
+  { success: true; data: TidalDiamond[] } | { success: false; error: string }
 
 export type DiamondMutationResult =
-  | { success: true; data: TidalStation }
-  | { success: false; error: string }
+  { success: true; data: TidalStation } | { success: false; error: string }
 
 export type DiamondDeleteResult = { success: true } | { success: false; error: string }
 
 export type DiamondEditViewResult =
-  | { success: true; data: TidalDiamondEdit }
-  | { success: false; error: string }
+  { success: true; data: TidalDiamondEdit } | { success: false; error: string }
 
 export type VelocityGridResult =
-  | { success: true; data: VelocityGridData }
-  | { success: false; error: string }
+  { success: true; data: VelocityGridData } | { success: false; error: string }
 
 type SeaUpdateFields = Partial<
   Pick<

@@ -93,12 +93,17 @@ export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
             )
           }
         >
-          <UserPlusIcon className="size-4" /> Add buddy
+          {/* Icon-only on a phone: this sits at the end of a search-result row that
+              already carries a name and a handle, and the label was what pushed the row
+              past the viewport. The accessible name stays on the button either way. */}
+          <UserPlusIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Add buddy</span>
         </Button>
       )}
       {relationship === "pending_outgoing" && (
         <Button size="sm" variant="ghost" disabled>
-          <ClockIcon className="size-4" /> Pending
+          <ClockIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Pending</span>
         </Button>
       )}
       {relationship === "pending_incoming" && paddler.connectionId && (
@@ -112,12 +117,16 @@ export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
             )
           }
         >
-          <CheckIcon className="size-4" /> Accept
+          <CheckIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Accept</span>
         </Button>
       )}
       {relationship === "buddy" && (
-        <Button size="sm" variant="ghost" disabled>
-          <UsersIcon className="size-4" /> Buddies
+        // A disabled status marker rather than an action — so on a phone the icon alone
+        // carries it, and the word only earns its space once there is space.
+        <Button size="sm" variant="ghost" disabled aria-label="Already buddies">
+          <UsersIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Buddies</span>
         </Button>
       )}
 

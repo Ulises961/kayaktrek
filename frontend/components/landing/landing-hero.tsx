@@ -13,6 +13,7 @@ import {
 } from "./cartouche"
 import { ChartHeaderBar } from "@/components/common/chart-header"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { cn } from "@/lib/utils"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 
@@ -109,7 +110,7 @@ export function LandingHero({ routes = [] }: { routes?: RouteData[] }) {
                 A growing chart of paddled waters — add the one you know best.
               </CartoucheNote>
               <div className="mt-5 flex items-center gap-4">
-                <Button asChild size="sm" className={chartCta}>
+                <Button asChild size="sm" className={cn(chartCta, ctaButtonClass)}>
                   <Link href="/register">Sign up</Link>
                 </Button>
                 <Button asChild variant="link" size="sm" className={chartLink}>

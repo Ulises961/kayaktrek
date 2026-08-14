@@ -132,7 +132,7 @@ export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: Flo
   return (
     <div className="flex flex-col gap-6">
       {!isConfirmed && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950">
+        <div className="border-notice-border bg-notice-bg text-notice-ink rounded-md border px-4 py-3">
           <p className="text-sm text-amber-800 dark:text-amber-200">
             Review your float plan for this trip and save it to confirm.
           </p>

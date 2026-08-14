@@ -1,11 +1,10 @@
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CardTopRule } from "@/components/common/card-top-rule"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { StateBadge } from "@/components/common/state-badge"
 import { UsersIcon, CalendarIcon, ClockIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Trip, TripState } from "@/lib/dtos/trip"
+import type { Trip } from "@/lib/dtos/trip"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 
@@ -16,12 +15,6 @@ interface TripCardProps {
   route?: RouteData | null
 }
 
-const STATE_ACCENT: Record<TripState, string> = {
-  building: "var(--state-planning-fg)",
-  happening: "var(--state-happening-fg)",
-  past: "var(--state-past-fg)",
-}
-
 export function TripCard({ trip, hero = false, route = null }: TripCardProps) {
   const { id, destination, state, dateFrom, dateTo, travellers } = trip
   const crewCount = travellers?.length ?? 0
@@ -29,17 +22,20 @@ export function TripCard({ trip, hero = false, route = null }: TripCardProps) {
 
   return (
     <Link href={`/trips/${id}`}>
+      {/* One signal per fact. The card used to say its state three ways at once — a
+          state-coloured left border, the chart top rule, and the badge — with the rule
+          identical on every card, so a stripe carrying nothing sat at 90° to a stripe
+          carrying something. The badge says it in words; the border and the rule are gone.
+          A hero is marked by a foam ring rather than a filled ground: `--state-happening-bg`
+          is a *pill* tint, sized for a word on a badge, and stretched across a whole card it
+          turned the content's own background a colour. A ring says "this one" without
+          recolouring everything inside it. */}
       <Card
         className={cn(
           "relative isolate cursor-pointer gap-0 overflow-hidden py-0 transition-colors",
-          hero ? "border-l-[4px]" : "hover:bg-secondary/50 border-l-[3px]",
+          hero ? "ring-foam/70 ring-2" : "hover:bg-secondary/50",
         )}
-        style={{
-          borderLeftColor: state ? STATE_ACCENT[state] : undefined,
-          ...(hero ? { backgroundColor: "var(--state-happening-bg)" } : {}),
-        }}
       >
-        <CardTopRule className="absolute inset-x-0 top-0 z-[1002]" />
         {route && <RouteThumbnail route={route} className="h-24 sm:h-28" />}
         <CardHeader className="px-3 pt-3 pb-1.5">
           <div className="flex min-w-0 items-start justify-between gap-2">

@@ -2,8 +2,8 @@ import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
+import { liveMapHref } from "@/lib/trips/live"
 import { deriveMembership } from "@/lib/trips/membership"
-import { TRIP_STATE } from "@/lib/dtos/trip"
 import { TripIdentityHeader } from "@/components/trips/trip-identity-header"
 import { TripDetailNav } from "@/components/trips/trip-detail-nav"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,10 +25,9 @@ export default async function TripDetailLayout({
   const session = await getSession()
   const membership = deriveMembership(trip, session)
   const { isMember } = membership
-  const liveHref =
-    isMember && trip.state === TRIP_STATE.HAPPENING && trip.itinerary?.id
-      ? `/itinerary/${trip.itinerary.id}?navigate=1`
-      : undefined
+  // Membership is this layout's to decide; where "live" points is not — liveMapHref owns
+  // that, so the Live tab and the dashboard's panel cannot drift to different URLs.
+  const liveHref = isMember ? (liveMapHref(trip) ?? undefined) : undefined
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">

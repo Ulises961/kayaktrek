@@ -64,7 +64,9 @@ export function ItemRow({ item }: ItemRowProps) {
   return (
     <ListRow className="flex flex-col gap-1 px-2 py-1.5">
       <div className="flex items-center justify-between gap-3">
-        <span className={cn("text-sm font-medium", !owned && "text-muted-foreground")}>
+        {/* Smaller at base so the name, its category and the row's controls fit a 320px
+            row without wrapping; full size once there is width for it. */}
+        <span className={cn("text-xs font-medium sm:text-sm", !owned && "text-muted-foreground")}>
           {item.name}
         </span>
         <div className="flex items-center gap-2">

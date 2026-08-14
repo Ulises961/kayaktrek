@@ -98,7 +98,7 @@ export function FloatPlanShareSection({
   return (
     <div className="flex flex-col gap-3">
       {showInvalidatedBanner && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300/70 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
+        <div className="border-notice-border bg-notice-bg text-notice-ink flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm">
           <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
           <span className="flex-1">
             Previous link invalidated — re-send the new link to your shore contact.

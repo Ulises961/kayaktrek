@@ -35,7 +35,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 landing/auth headers, tinted from --background rather than
                 chart-paper so it unifies with the content below. Height is
                 --app-header-h, which the sidebar offset also reads. */}
-            <header className="chart-header-app sticky top-0 z-20 flex h-(--app-header-h) shrink-0 flex-row items-center gap-2 px-4">
+            {/* z-[1100], not z-20. Leaflet's own panes run to z-index 1000, and a map —
+                a route thumbnail on a trip card, the explore map — is not inside a
+                stacking context that contains them, so at z-20 the header was painted
+                *under* the map it was supposed to sit above. Same reason the frontend
+                CLAUDE.md requires z-[1001]+ for anything overlaid on a map; the app chrome
+                is overlaid on a map too, it just does not look like it. */}
+            <header className="chart-header-app sticky top-0 z-[1100] flex h-(--app-header-h) shrink-0 flex-row items-center gap-2 px-4">
               <SidebarTrigger className="md:hidden" />
               <Separator orientation="vertical" className="h-4 md:hidden" />
               {/* The mark lives here, not in the sidebar, which collapses to
@@ -46,7 +52,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 size={22}
                 wordmarkClassName="hidden text-sm md:inline"
               />
-              <div className="flex flex-1 items-center gap-3 ps-1">
+              {/* min-w-0 is load-bearing from `sm` up, where the trail renders: a flex
+                  item defaults to min-width:auto, so `flex-1` alone will not shrink this
+                  below its content and a longer trail shoves the trailing controls off the
+                  viewport — the responsive canary's first real red, on /settings,
+                  /settings/change-password and /profile/edit. Below `sm` this stays as the
+                  spacer that keeps requests, theme and account against the right edge. */}
+              <div className="flex min-w-0 flex-1 items-center gap-3 ps-1">
                 <HeaderBreadcrumb />
               </div>
               <RequestsMenu pendingRequests={pendingRequests} />

@@ -6,8 +6,8 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createTrip } from "@/lib/trips/actions"
 import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -59,12 +59,12 @@ export function NewTripDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button>
+        <Button className={ctaButtonClass}>
           <PlusIcon className="size-4" />
           New trip
         </Button>
       </DialogTrigger>
-      <AccentDialogContent accent={palette.ocean500} icon={KayakIcon} title="New trip">
+      <AccentDialogContent icon={KayakIcon} title="New trip">
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Input placeholder="Destination" disabled={isPending} {...register("destination")} />
@@ -83,7 +83,7 @@ export function NewTripDialog() {
               <p className="text-destructive text-xs">{errors.description.message}</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="dateFrom">From</Label>
               <Controller

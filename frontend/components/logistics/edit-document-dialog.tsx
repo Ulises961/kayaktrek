@@ -4,7 +4,6 @@ import { useState, useTransition } from "react"
 import { FileIcon } from "lucide-react"
 import { updateTravelDocument } from "@/lib/travel-documents/actions"
 import type { TravelDocument, TravelDocumentFields } from "@/lib/dtos/travel-document"
-import { palette } from "@/lib/tokens"
 import { Dialog } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { FieldLabel } from "@/components/common/form-field"
@@ -40,7 +39,7 @@ export function EditDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <AccentDialogContent accent={palette.foam400} icon={FileIcon} title="Edit document">
+      <AccentDialogContent icon={FileIcon} title="Edit document">
         <DocumentForm
           submitLabel="Save"
           isPending={isPending}

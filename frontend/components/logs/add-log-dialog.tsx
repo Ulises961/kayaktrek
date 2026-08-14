@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { NewspaperIcon, PlusIcon } from "lucide-react"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { LogForm } from "@/components/logs/log-form"
@@ -15,12 +15,12 @@ export function AddLogDialog({ unit }: { unit?: DistanceUnit }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" className={ctaButtonClass}>
           <PlusIcon className="size-4" />
-          Add log
+          New log
         </Button>
       </DialogTrigger>
-      <AccentDialogContent accent={palette.foam400} icon={NewspaperIcon} title="Add log">
+      <AccentDialogContent icon={NewspaperIcon} title="New log">
         <LogForm unit={unit} onSuccess={() => setOpen(false)} onCancel={() => setOpen(false)} />
       </AccentDialogContent>
     </Dialog>

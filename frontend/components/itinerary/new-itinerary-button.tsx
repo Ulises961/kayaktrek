@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,7 @@ export function NewItineraryButton() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)} className={ctaButtonClass}>
         <PlusIcon className="size-4" />
         <span className="hidden sm:inline">New itinerary</span>
       </Button>

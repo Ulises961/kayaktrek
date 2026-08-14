@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ChevronDownIcon, ChevronUpIcon, MapIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
+import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { ListRow } from "@/components/common/list-row"
 import { createItinerary } from "@/lib/itinerary/actions"
@@ -204,7 +206,7 @@ export function ItineraryTab({
             size="sm"
             disabled={isPending || !name.trim()}
             onClick={handleCreate}
-            className="shrink-0"
+            className={cn("shrink-0", ctaButtonClass)}
           >
             <MapIcon className="size-4" />
             Create itinerary

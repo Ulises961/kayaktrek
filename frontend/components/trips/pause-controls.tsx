@@ -7,7 +7,6 @@ import { toast } from "sonner"
 import { pauseTrip, resumeTrip, abortTrip } from "@/lib/trips/actions"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 import { formatDayDate } from "@/lib/utils/date"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -107,7 +106,7 @@ export function PauseControls({ trip, isLeader }: PauseControlsProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-accent/40 bg-accent/10 rounded-md border px-3 py-2 text-sm">
+      <div className="border-notice-border bg-notice-bg text-notice-ink rounded-md border px-3 py-2 text-sm font-medium">
         Expedition paused since {formatDayDate(trip.pausedAt)}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -118,7 +117,7 @@ export function PauseControls({ trip, isLeader }: PauseControlsProps) {
               Resume
             </Button>
           </DialogTrigger>
-          <AccentDialogContent accent={palette.sunset500} icon={PlayIcon} title="Resume expedition">
+          <AccentDialogContent icon={PlayIcon} title="Resume expedition">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="resumeDate">Resume date</Label>

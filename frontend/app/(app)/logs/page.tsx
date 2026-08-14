@@ -34,26 +34,28 @@ export default async function LogsPage() {
       </div>
 
       {stats.logCount > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="flex flex-col gap-0.5 rounded-lg border p-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-0.5 rounded-lg border p-3 sm:p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <ClockIcon className="size-3.5" /> Hours
             </span>
-            <span className="text-xl font-semibold">{stats.totalHours.toFixed(1)}</span>
+            <span className="text-base font-semibold sm:text-xl">
+              {stats.totalHours.toFixed(1)}
+            </span>
           </div>
-          <div className="flex flex-col gap-0.5 rounded-lg border p-4">
+          <div className="flex flex-col gap-0.5 rounded-lg border p-3 sm:p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <RouteIcon className="size-3.5" /> Distance
             </span>
-            <span className="text-xl font-semibold">
+            <span className="text-base font-semibold sm:text-xl">
               {stats.totalDistance > 0 ? `${displayDistance.toFixed(1)} ${unit}` : "—"}
             </span>
           </div>
-          <div className="flex flex-col gap-0.5 rounded-lg border p-4">
+          <div className="flex flex-col gap-0.5 rounded-lg border p-3 sm:p-4">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs tracking-wide uppercase">
               <WavesIcon className="size-3.5" /> Typical sea
             </span>
-            <span className="text-xl font-semibold">
+            <span className="text-base font-semibold sm:text-xl">
               {typicalSea != null ? `B${typicalSea} · ${beaufortLabel(typicalSea)}` : "—"}
             </span>
           </div>

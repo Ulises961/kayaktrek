@@ -7,6 +7,7 @@ import type { Item } from "@/lib/dtos/item"
 import type { ItemCategory } from "@/lib/dtos/item-category"
 import { createItem } from "@/lib/inventory/actions"
 import { ItemRow } from "@/components/inventory/item-row"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { SectionLabel } from "@/components/common/section-label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -98,7 +99,12 @@ export function GearCloset({ items, categories }: GearClosetProps) {
             </option>
           ))}
         </select>
-        <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isPending || !name.trim()}
+          className={ctaButtonClass}
+        >
           Add
         </Button>
       </form>
@@ -156,7 +162,9 @@ function FilterChip({
       onClick={onClick}
       className={cn(
         "rounded-full border px-3 py-1 text-xs transition-colors",
-        active ? "bg-sky-100 text-blue-600" : "text-muted-foreground hover:bg-muted",
+        // "This filter is on" is the same statement a selected nav item makes, so it
+        // takes the same token rather than a raw sky/blue pair with no dark mode.
+        active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted",
       )}
     >
       {children}

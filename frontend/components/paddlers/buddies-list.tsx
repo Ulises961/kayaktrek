@@ -142,6 +142,10 @@ function ConnectionRow({
         {error && <p className="text-destructive mt-0.5 text-xs">{error}</p>}
       </div>
 
+      {/* Every row-end action here drops its wording on a phone and keeps its icon,
+          the same way the search results do — the row already carries a name and a
+          handle, and these labels are what push it against the viewport. `sr-only`
+          rather than `hidden`, so the button keeps its accessible name at 320. */}
       {variant === "incoming" && (
         <div className="flex gap-1.5">
           <Button
@@ -149,7 +153,8 @@ function ConnectionRow({
             disabled={pending}
             onClick={() => run(() => acceptConnection(connectionId))}
           >
-            <CheckIcon className="size-4" /> Accept
+            <CheckIcon className="size-4" />
+            <span className="sr-only sm:not-sr-only">Accept</span>
           </Button>
           <Button
             size="sm"
@@ -157,7 +162,8 @@ function ConnectionRow({
             disabled={pending}
             onClick={() => run(() => removeConnection(connectionId))}
           >
-            <XIcon className="size-4" /> Decline
+            <XIcon className="size-4" />
+            <span className="sr-only sm:not-sr-only">Decline</span>
           </Button>
         </div>
       )}
@@ -168,7 +174,8 @@ function ConnectionRow({
           disabled={pending}
           onClick={() => run(() => removeConnection(connectionId))}
         >
-          <XIcon className="size-4" /> Cancel
+          <XIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Cancel</span>
         </Button>
       )}
       {variant === "buddy" && (
@@ -178,7 +185,8 @@ function ConnectionRow({
           disabled={pending}
           onClick={() => run(() => removeConnection(connectionId))}
         >
-          <UserMinusIcon className="size-4" /> Unfriend
+          <UserMinusIcon className="size-4" />
+          <span className="sr-only sm:not-sr-only">Unfriend</span>
         </Button>
       )}
     </ListRow>

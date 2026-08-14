@@ -6,11 +6,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ctaEchoClass } from "@/components/common/button-roles"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { CardTopRule } from "@/components/common/card-top-rule"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { ListFilterPopover } from "@/components/common/list-filter-popover"
 import { cn } from "@/lib/utils"
@@ -239,8 +239,10 @@ export function ExploreDiscovery({
                     aria-pressed={seasons.includes(season)}
                     className={cn(
                       "rounded-full border px-2.5 py-0.5 text-xs capitalize transition-colors",
+                      // An engaged filter is structure, not a raw Tailwind sky — it says
+                      // "this is on", the same thing a selected nav item says.
                       seasons.includes(season)
-                        ? "border-sky-500 bg-sky-500 text-white"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border text-muted-foreground hover:bg-accent",
                     )}
                   >
@@ -330,13 +332,16 @@ export function ExploreDiscovery({
             items.map((item) => (
               <Card
                 key={item.id}
+                // Selected is a filled tint, not a ring. A ring wrapped the card and ran
+                // into the chart rule across its top, and it was `ring-sky-400` — a raw
+                // Tailwind literal, which is why selected never quite matched the hover
+                // beside it. Both now come from the same token, one step apart.
                 className={cn(
                   "relative isolate shrink-0 gap-0 overflow-hidden rounded-lg py-0 transition-colors",
-                  selectedId === item.id ? "ring-2 ring-sky-400" : "hover:bg-accent",
+                  selectedId === item.id ? "bg-accent" : "hover:bg-accent/60",
                 )}
                 onMouseEnter={() => select(item.id)}
               >
-                <CardTopRule className="absolute inset-x-0 top-0 z-[1002]" />
                 {item.previewPositions.length > 1 && (
                   <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
                 )}
@@ -381,14 +386,26 @@ export function ExploreDiscovery({
                   )}
                   {owned.has(item.id) ? (
                     // The viewer authored this route — open the original, don't clone it.
-                    <Button asChild size="sm" variant="outline" className="h-7 w-full text-xs">
+                    // No amber, and that is the rule working rather than an oversight:
+                    // opening something you already have brings nothing into existence.
+                    //
+                    // It does need its own hover, though. The default outline hover is
+                    // `bg-accent`, which is exactly the surface a *selected* card already
+                    // sits on — so on the card the pointer is over, the button dissolved
+                    // into its own background. Structure ink instead, legible on both.
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="hover:border-primary hover:text-primary h-7 w-full text-xs hover:bg-transparent"
+                    >
                       <Link href={`/itinerary/${item.id}`}>Open your route</Link>
                     </Button>
                   ) : (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 w-full text-xs"
+                      className={cn("h-7 w-full text-xs", ctaEchoClass)}
                       disabled={isForking}
                       onClick={() => handleFork(item.id)}
                     >

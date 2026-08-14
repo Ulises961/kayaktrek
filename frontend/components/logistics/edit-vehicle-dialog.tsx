@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react"
 import { CarIcon } from "lucide-react"
 import { updateShuttleVehicle } from "@/lib/shuttle/actions"
-import { palette } from "@/lib/tokens"
 import { Dialog } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { VehicleForm } from "@/components/logistics/vehicle-form"
@@ -41,7 +40,7 @@ export function EditVehicleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <AccentDialogContent accent={palette.ocean500} icon={CarIcon} title="Edit vehicle">
+      <AccentDialogContent icon={CarIcon} title="Edit vehicle">
         <VehicleForm
           members={members}
           submitLabel="Save"

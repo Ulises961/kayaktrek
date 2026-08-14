@@ -7,8 +7,9 @@ import {
   uploadTravelDocumentAttachment,
 } from "@/lib/travel-documents/actions"
 import type { TravelDocumentFields } from "@/lib/dtos/travel-document"
-import { palette } from "@/lib/tokens"
 import { Button } from "@/components/ui/button"
+import { ctaEchoClass } from "@/components/common/button-roles"
+import { cn } from "@/lib/utils"
 import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { FieldLabel } from "@/components/common/form-field"
@@ -112,12 +113,12 @@ export function AddDocumentDialog({ tripId }: AddDocumentDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="w-full sm:w-auto">
+        <Button variant="outline" size="sm" className={cn("w-full sm:w-auto", ctaEchoClass)}>
           <PlusIcon className="size-3.5" />
           Add document
         </Button>
       </DialogTrigger>
-      <AccentDialogContent accent={palette.foam400} icon={FileIcon} title="Add travel document">
+      <AccentDialogContent icon={FileIcon} title="Add travel document">
         <DocumentForm
           submitLabel="Add"
           isPending={isPending}

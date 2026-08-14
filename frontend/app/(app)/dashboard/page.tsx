@@ -7,6 +7,9 @@ import { getMe } from "@/lib/user/me"
 import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import { buildPendingRequestRows } from "@/lib/requests/pending"
 import { StateBadge } from "@/components/common/state-badge"
+import { ctaButtonClass } from "@/components/common/button-roles"
+import { cn } from "@/lib/utils"
+import { ActiveExpeditionCard } from "@/components/dashboard/active-expedition-card"
 import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { ListRow } from "@/components/common/list-row"
 import { PageHeading } from "@/components/common/page-heading"
@@ -137,9 +140,17 @@ export default async function DashboardPage() {
           <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
             {happening.length > 0 ? "Active expedition" : "Upcoming"}
           </h2>
-          {heroTrips.map((trip, i) => (
-            <HeroTrip key={trip.id} trip={trip} route={heroRoutes[i]} />
-          ))}
+          {heroTrips.map((trip, i) =>
+            // A trip that is actually under way gets the live panel — progress, the day's
+            // conditions, crew, and the way into position sharing. Everything else keeps
+            // the route-thumbnail card, which is the right shape for a plan rather than
+            // an expedition in progress.
+            trip.state === TRIP_STATE.HAPPENING ? (
+              <ActiveExpeditionCard key={trip.id} trip={trip} route={heroRoutes[i]} />
+            ) : (
+              <HeroTrip key={trip.id} trip={trip} route={heroRoutes[i]} />
+            ),
+          )}
           {trips.length > heroTrips.length && (
             <Link href="/trips" className="text-primary py-1 text-center text-sm hover:underline">
               View all {trips.length} trips →
@@ -153,7 +164,7 @@ export default async function DashboardPage() {
           description="Plan a new expedition or explore public routes for inspiration."
           action={
             <>
-              <Button asChild size="sm" className="w-full sm:w-auto">
+              <Button asChild size="sm" className={cn("w-full sm:w-auto", ctaButtonClass)}>
                 <Link href="/trips">
                   <PlusIcon className="mr-1.5 size-4" />
                   New trip

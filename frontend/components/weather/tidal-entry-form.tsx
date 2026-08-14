@@ -158,7 +158,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
       {/* Quick entry */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="flex flex-col gap-1">
           <Label htmlFor="highTide" className="text-xs">
             High water
@@ -219,7 +219,7 @@ export function TidalEntryForm({ dayId, sea, isLeader, onSaved }: TidalEntryForm
             {...register("referencePortName")}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="baseHighTide" className="text-xs">
               Std HW time

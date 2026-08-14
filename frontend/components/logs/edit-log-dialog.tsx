@@ -1,7 +1,6 @@
 "use client"
 
 import { NewspaperIcon } from "lucide-react"
-import { palette } from "@/lib/tokens"
 import { Dialog } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { LogForm } from "@/components/logs/log-form"
@@ -18,7 +17,7 @@ interface EditLogDialogProps {
 export function EditLogDialog({ log, unit, open, onOpenChange }: EditLogDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <AccentDialogContent accent={palette.foam400} icon={NewspaperIcon} title="Edit log">
+      <AccentDialogContent icon={NewspaperIcon} title="Edit log">
         <LogForm
           log={log}
           unit={unit}

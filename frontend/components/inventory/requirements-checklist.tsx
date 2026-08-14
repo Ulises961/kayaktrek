@@ -14,6 +14,7 @@ import {
   type InventoryActionResult,
 } from "@/lib/inventory/actions"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { Input } from "@/components/ui/input"
 import { ListRow } from "@/components/common/list-row"
 import { SectionLabel } from "@/components/common/section-label"
@@ -153,7 +154,12 @@ export function RequirementsChecklist({
             disabled={isPending}
             className="sm:max-w-[10rem]"
           />
-          <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={isPending || !name.trim()}
+            className={ctaButtonClass}
+          >
             Add
           </Button>
         </form>

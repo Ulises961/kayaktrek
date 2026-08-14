@@ -85,7 +85,7 @@ function Compass({ cx, cy, r = 26 }: { cx: number; cy: number; r?: number }) {
       {/* North needle — triangle pointing toward north tick */}
       <path
         d={`M${cx} ${cy - r + 5} L${cx - 3.5} ${cy + 3} L${cx + 3.5} ${cy + 3} Z`}
-        fill="var(--accent)"
+        fill="var(--illus-accent)"
         opacity="0.65"
       />
     </g>
@@ -98,12 +98,12 @@ function Waypoint({ cx, cy, pulse }: { cx: number; cy: number; pulse?: boolean }
   return (
     <g>
       {pulse && (
-        <circle cx={cx} cy={cy} r={8} stroke="var(--accent)" strokeWidth="1" fill="none">
+        <circle cx={cx} cy={cy} r={8} stroke="var(--illus-accent)" strokeWidth="1" fill="none">
           <animate attributeName="r" values="7;18;7" dur="2.4s" repeatCount="indefinite" />
           <animate attributeName="opacity" values="0.4;0;0.4" dur="2.4s" repeatCount="indefinite" />
         </circle>
       )}
-      <circle cx={cx} cy={cy} r={4} fill="var(--accent)" opacity={0.85} />
+      <circle cx={cx} cy={cy} r={4} fill="var(--illus-accent)" opacity={0.85} />
     </g>
   )
 }
@@ -114,7 +114,7 @@ function Route({ solid, opacity = 0.45 }: { solid?: boolean; opacity?: number })
   return (
     <path
       d={ROUTE}
-      stroke={solid ? "var(--accent)" : "var(--muted-foreground)"}
+      stroke={solid ? "var(--illus-accent)" : "var(--muted-foreground)"}
       strokeWidth="1.5"
       strokeDasharray={dash}
       fill="none"
@@ -126,7 +126,7 @@ function Route({ solid, opacity = 0.45 }: { solid?: boolean; opacity?: number })
 // Node that follows ROUTE using native SVG SMIL — no Framer, no offset-path.
 function TrackingNode() {
   return (
-    <circle r={4.5} fill="var(--accent)" opacity={0.9}>
+    <circle r={4.5} fill="var(--illus-accent)" opacity={0.9}>
       <animateMotion
         dur="2.8s"
         repeatCount="indefinite"
@@ -150,7 +150,7 @@ function Paddle({ cy = 178, opacity = 0.45 }: { cy?: number; opacity?: number })
         y1={cy}
         x2="370"
         y2={cy}
-        stroke="var(--accent)"
+        stroke="var(--illus-accent)"
         strokeWidth="2"
         strokeLinecap="round"
       />
@@ -160,7 +160,7 @@ function Paddle({ cy = 178, opacity = 0.45 }: { cy?: number; opacity?: number })
         cy={cy}
         rx="24"
         ry="10"
-        fill="var(--accent)"
+        fill="var(--illus-accent)"
         transform={`rotate(-10, 92, ${cy})`}
       />
       {/* Left blade highlight */}
@@ -181,7 +181,7 @@ function Paddle({ cy = 178, opacity = 0.45 }: { cy?: number; opacity?: number })
         cy={cy}
         rx="24"
         ry="10"
-        fill="var(--accent)"
+        fill="var(--illus-accent)"
         transform={`rotate(10, 388, ${cy})`}
       />
       {/* Right blade highlight */}
@@ -250,8 +250,8 @@ function SuccessScene() {
     <>
       <Compass cx={68} cy={86} r={22} />
       {/* Sun — destination reached, clear day */}
-      <circle cx={410} cy={88} r={38} fill="var(--accent)" opacity="0.12" />
-      <circle cx={410} cy={88} r={22} fill="var(--accent)" opacity="0.40" />
+      <circle cx={410} cy={88} r={38} fill="var(--illus-accent)" opacity="0.12" />
+      <circle cx={410} cy={88} r={22} fill="var(--illus-accent)" opacity="0.40" />
       <Horizon />
       <Sea />
       <Route solid opacity={0.52} />
@@ -265,11 +265,11 @@ function SuccessScene() {
         y1="180"
         x2="408"
         y2="150"
-        stroke="var(--accent)"
+        stroke="var(--illus-accent)"
         strokeWidth="1.5"
         opacity="0.65"
       />
-      <path d="M 408 150 L 430 158 L 408 166 Z" fill="var(--accent)" opacity="0.65" />
+      <path d="M 408 150 L 430 158 L 408 166 Z" fill="var(--illus-accent)" opacity="0.65" />
     </>
   )
 }

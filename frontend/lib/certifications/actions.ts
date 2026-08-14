@@ -9,8 +9,7 @@ const CERTS_PATH = "/api/user/me/certifications"
 
 export type CertActionResult = { success: true } | { success: false; error: string }
 export type CertListResult =
-  | { success: true; certifications: Certification[] }
-  | { success: false; error: string }
+  { success: true; certifications: Certification[] } | { success: false; error: string }
 
 // Add/update/delete are gated by an elevated token (re-auth) on the backend —
 // the caller obtains one via reAuth() and passes it through the 5-minute window.

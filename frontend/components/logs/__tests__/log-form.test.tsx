@@ -30,7 +30,7 @@ describe("LogForm — distance unit", () => {
   it("submits a km-denominated distance unchanged when unit is km", async () => {
     render(<LogForm unit={DISTANCE_UNIT.KM} onSuccess={noop} onCancel={noop} />)
     await userEvent.type(screen.getByLabelText(/distance/i), "18.5")
-    await userEvent.click(screen.getByRole("button", { name: /add log/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create log/i }))
     await waitFor(() => expect(createLog).toHaveBeenCalled())
     expect(vi.mocked(createLog).mock.calls[0][0].distance).toBeCloseTo(18.5)
   })
@@ -38,7 +38,7 @@ describe("LogForm — distance unit", () => {
   it("converts an nm-entered distance to km before submitting", async () => {
     render(<LogForm unit={DISTANCE_UNIT.NM} onSuccess={noop} onCancel={noop} />)
     await userEvent.type(screen.getByLabelText(/distance/i), "10")
-    await userEvent.click(screen.getByRole("button", { name: /add log/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create log/i }))
     await waitFor(() => expect(createLog).toHaveBeenCalled())
     expect(vi.mocked(createLog).mock.calls[0][0].distance).toBeCloseTo(18.52)
   })
@@ -54,7 +54,7 @@ describe("LogForm — dialog callbacks", () => {
   it("calls onSuccess after a successful submit", async () => {
     const onSuccess = vi.fn()
     render(<LogForm onSuccess={onSuccess} onCancel={noop} />)
-    await userEvent.click(screen.getByRole("button", { name: /add log/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create log/i }))
     await waitFor(() => expect(onSuccess).toHaveBeenCalled())
   })
 
@@ -71,7 +71,7 @@ describe("LogForm — dialog callbacks", () => {
       error: "Log date is in the future",
     })
     render(<LogForm onSuccess={noop} onCancel={noop} />)
-    await userEvent.click(screen.getByRole("button", { name: /add log/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create log/i }))
     await waitFor(() => expect(screen.getByText("Log date is in the future")).toBeInTheDocument())
   })
 })

@@ -94,8 +94,10 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
         <Link href={`/itinerary/${itinerary.id}`} className="block p-4">
           <div className="flex items-start justify-between gap-2">
             <h2 className="truncate font-medium">{itinerary.name || "Unnamed itinerary"}</h2>
+            {/* "Public" is a fact about the route, like a trip's state — so it takes the
+                state-badge tokens rather than its own sky pair. */}
             {itinerary.isPublic && (
-              <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900 dark:text-sky-300">
+              <span className="bg-state-planning-bg text-state-planning-fg shrink-0 rounded-full px-2 py-0.5 text-xs font-medium">
                 Public
               </span>
             )}

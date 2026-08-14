@@ -277,7 +277,7 @@ export default function DesignPage() {
           <div className="flex flex-col gap-1.5">
             <Label>CTA — sunset accent</Label>
             <div className="flex gap-2">
-              <Button className="bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent)]/90">
+              <Button className="bg-[var(--cta)] text-[var(--cta-foreground)] hover:bg-[var(--cta)]/90">
                 Start expedition
               </Button>
             </div>

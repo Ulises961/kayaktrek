@@ -133,7 +133,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
           <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <UserIcon className="size-4" /> Identity
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="name">First name</Label>
               <Input id="name" disabled={isPending} {...register("name")} />
@@ -192,7 +192,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
           <p className="text-muted-foreground -mt-2 text-xs">
             These pre-fill your float plan whenever you join a trip.
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="vesselMake">Make</Label>
               <Input
@@ -212,7 +212,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
               />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="vesselLengthCm">Length (cm)</Label>
               <Input
@@ -254,7 +254,7 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
           <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <ShieldAlertIcon className="size-4" /> Emergency contact
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="emergencyContactName">Name</Label>
               <Input

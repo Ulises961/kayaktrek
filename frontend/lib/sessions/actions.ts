@@ -9,8 +9,7 @@ const SESSIONS_PATH = "/api/sessions"
 
 export type SessionActionResult = { success: true } | { success: false; error: string }
 export type SessionListResult =
-  | { success: true; sessions: Session[] }
-  | { success: false; error: string }
+  { success: true; sessions: Session[] } | { success: false; error: string }
 
 export async function listSessions(): Promise<SessionListResult> {
   try {

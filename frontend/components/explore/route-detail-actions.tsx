@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
 import { forkItinerary } from "@/lib/itinerary/actions"
 
 type Props = {
@@ -42,7 +43,7 @@ export function RouteDetailActions({ itineraryId, isAuthenticated, isOwner }: Pr
   }
 
   return (
-    <Button onClick={handleFork} disabled={isPending}>
+    <Button onClick={handleFork} disabled={isPending} className={ctaButtonClass}>
       {isAuthenticated ? "Use this route" : "Log in to use this route"}
     </Button>
   )
