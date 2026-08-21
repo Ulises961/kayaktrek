@@ -7,6 +7,73 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.2.0] - 2026-08-21
+
+The web client now works on a phone. Everything else here is a fix.
+
+### Added
+
+- **The whole app down to a 320px viewport.** Every screen was built desktop-first and is now
+  built the other way round: single column at phone width, wider layouts layered on top. Forms
+  and card grids stack, content surfaces reflow, and icon-only controls get a 44px touch area on
+  a touch device without changing size on a desktop. A check on every route, at 320 and 640,
+  keeps it that way.
+- **The itinerary planner on a phone.** Day strip above, full-bleed map, and a bottom sheet you
+  can drag up to see more of the route list or push down to see more of the map. Selecting a
+  point opens its detail as a segment of that same sheet rather than a second panel fighting for
+  the same edge. From tablet width up, the side-by-side panes are unchanged.
+- **Map controls in fixed corners at every width** — annotate top-right, layers bottom-right,
+  zoom bottom-left, scale bar bottom-centre — so nothing moves as you resize the window.
+- **A collapsible route panel on shared links.** `/routes/…` and `/story/…` put the route detail
+  on a right-hand panel that opens with the page and folds away to reveal the map, the same
+  control in the same place on a phone as on a desktop.
+- **Brand mark and a darker chart surface** in dark mode, plus one owner for page spacing so
+  gutters stop varying between pages.
+
+### Fixed
+
+- **A shared route or story link showed a login page** to anyone whose browser still held an
+  expired session cookie — the exact people most likely to open one.
+- **The navigation drawer was unusable below tablet width**: it painted underneath its own
+  backdrop, so on a phone there was no navigation at all. Menus, dialogs and tooltips also
+  painted underneath the map on any page with one.
+- **Shared route and story pages rendered no map at all at phone width** — the detail panel took
+  the full viewport and left the map zero pixels wide.
+- **Tapping the map did nothing in parts of the planner.** Two invisible control wrappers were as
+  large as the menus they had closed, and swallowed taps on the map and on "Close day".
+- **Selecting a point could scroll the map away from it** on a phone; the map now centres on what
+  you tapped.
+- **Failed saves no longer look like successful ones.** A dozen places updated the screen before
+  checking whether the server had accepted the change — a renamed point, a reordered route, a
+  deleted certification — and several more swallowed the error entirely. They now report failure
+  and leave the data as it is.
+- **Deleting an itinerary or a day left its points behind** in the database, and a failed day-
+  boundary save left the days it had already created.
+- **Editing another account's field could bypass the password-change safeguards** on a profile
+  update — see Security.
+- **Deleting your account removed a preserved trip's route.** Where a departed leader's trip is
+  kept for the remaining crew, the itinerary is now kept with it.
+- **Some errors returned a server error instead of "not found" or "conflict"**, on route points
+  and on activity logs, so the app showed a blank failure instead of the reason.
+- **A paused expedition could still be transitioned** through the generic state endpoint,
+  bypassing the check the dedicated one makes.
+- **One trip's failure no longer cancels the rest of a batch.** The unattended jobs that raise
+  missed-checkpoint alerts and generate end-of-day logs now isolate each trip and each member.
+- **Changing your password now clears the medical-notes re-entry state** the same way a password
+  reset already did, instead of leaving the prompt stuck on.
+
+### Security
+
+- A profile update could change another field *and* a password in one request, skipping the
+  current-password check, the session revocation and the medical-notes key re-encryption that
+  the password-change endpoint performs. It now rejects that shape.
+- `cryptography` 49.0.0 → 50.0.0, clearing PYSEC-2026-3552.
+
+### Deploy notes
+
+- No migration, no new environment variables, no manual step. `migrate` has nothing to apply.
+- Sessions are unaffected — nobody is logged out by this upgrade.
+
 ## [0.1.0] - 2026-08-02
 
 First tagged release. The app had already been deployed once (2026-07-31) from an untagged
