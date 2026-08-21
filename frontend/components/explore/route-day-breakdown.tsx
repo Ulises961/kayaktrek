@@ -14,11 +14,14 @@ export function RouteDayBreakdown({
   if (days.length === 0) return null
 
   return (
-    <div className="border-border flex flex-col gap-1 border-t pt-3">
-      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+    // Sized by what the panel has left rather than by a fixed cap. `min-h-0` is what
+    // lets the list be the part that gives way when the panel is short — without it
+    // a flex item refuses to shrink below its content and the scroll never engages.
+    <div className="border-border flex min-h-0 flex-col gap-1 border-t pt-3">
+      <p className="text-muted-foreground shrink-0 text-xs font-medium tracking-wide uppercase">
         Daily breakdown
       </p>
-      <ul className="divide-border/50 max-h-40 divide-y overflow-y-auto">
+      <ul className="divide-border/50 min-h-0 divide-y overflow-y-auto">
         {days.map((day) => (
           <li
             key={day.dayNumber}

@@ -1,6 +1,7 @@
 "use client"
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { MapContainer, TileLayer, Polyline, Circle, useMap, useMapEvents } from "react-leaflet"
+import type { ControlPosition } from "leaflet"
 import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
@@ -13,6 +14,7 @@ import { splitRingIcon } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { Graticule, ScaleBar, ForecastCellShell, type ForecastCellLayer } from "./chart"
+import { useIsBelowBreakpoint } from "@/hooks/use-mobile"
 import { discCell, maskGridToDisc } from "@/lib/landing/ambient-wind"
 import { LayersControl } from "./layers-control"
 import { TidalDiamondMarker } from "./tidal-diamond-marker"
@@ -20,6 +22,7 @@ import { TidalDiamondForm } from "./tidal-diamond-form"
 import { PlaceMarker } from "./place-marker"
 import { PlaceForm } from "./place-form"
 import { MapAddControl } from "./map-add-control"
+import { ResizeHandler } from "./resize-handler"
 import { LivePositionLayer } from "./live-position-layer"
 import type { LivePosition } from "@/lib/dtos/live-position"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -136,6 +139,16 @@ const GLOBAL_WIND_OPTIONS = {
   particleMultiplier: 0.002,
 }
 
+// Tailwind's `lg`. The chart furniture keys off this rather than `md`: the panes
+// return beside the map at `md` and take 414px of it, so the map column at a 768
+// viewport is 264px — narrower than the 311px the same map gets on a phone.
+const LG_BREAKPOINT = 1024
+
+// Driven through the existing control's `setPosition` rather than
+// `zoomControl={false}` plus a replacement, because react-leaflet reads that prop
+// once at construction.
+const BOTTOM_LEFT: ControlPosition = "bottomleft"
+
 type ValidPoint = Point & { latitude: number; longitude: number }
 
 type DragState = { id: string; lat: number; lng: number }
@@ -187,6 +200,34 @@ function buildSegments(
 
 // ── FlyToController ───────────────────────────────────────────────────────────
 
+/**
+ * How many pixels of the map's bottom edge are hidden behind the point summary.
+ *
+ * Measured from the element rather than assumed, because the same card lives in
+ * two places: floating over the map from `md`, and as a segment of the bottom
+ * sheet below it at base — where it is a sibling of the map and covers none of
+ * it. `offsetParent` is null for a `display:none` element, which is how the
+ * hidden one of the pair is skipped.
+ */
+function coveredMapHeight(container: HTMLElement): number {
+  let covered = 0
+  for (const el of document.querySelectorAll<HTMLElement>('[data-testid="point-detail-sheet"]')) {
+    // `offsetParent` is null for a `display:none` element, which is how the hidden
+    // one of the pair is skipped. Requiring that it also contains the map is what
+    // separates the two: the floating card is absolutely positioned inside the same
+    // box as the map, while the segment's nearest positioned ancestor is the sheet,
+    // which the map is not inside.
+    const anchor = el.offsetParent
+    if (!anchor || !anchor.contains(container)) continue
+    // `offsetHeight`, not `getBoundingClientRect`: the card enters on a
+    // `slide-in-from-bottom` animation and this runs inside that window, so its
+    // transformed box is still below where it settles and reads as covering nothing.
+    // Layout height ignores the transform.
+    covered = Math.max(covered, el.offsetHeight)
+  }
+  return Math.min(covered, container.clientHeight)
+}
+
 function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | undefined }) {
   const map = useMap()
   const prevIdRef = useRef<string | null>(null)
@@ -200,12 +241,23 @@ function FlyToController({ flyToPoint }: { flyToPoint: FlyToTarget | null | unde
     prevIdRef.current = flyToPoint.id
 
     const zoom = 13
-    // Offset the target so the point centres in the visible area above the 55vh
-    // point-detail sheet rather than at the geometric centre of the viewport.
-    const px = map.project([flyToPoint.lat, flyToPoint.lng], zoom)
-    const sheetOffset = window.innerHeight * 0.275
-    const offsetLatLng = map.unproject([px.x, px.y + sheetOffset] as [number, number], zoom)
-    map.flyTo(offsetLatLng, zoom, { animate: true, duration: 0.6 })
+    // Centre the point in the part of the map still visible under the summary
+    // card, by shifting the map's centre down half of whatever the card covers.
+    //
+    // This used to offset by 27.5% of `window.innerHeight` — a figure about the
+    // window rather than about the map, and one that only looked right because on
+    // a desktop the map is most of the window. At 320 the map is ~209px tall
+    // inside a 700px window, so it pushed the target nearly a full map-height off
+    // and the point landed somewhere else entirely.
+    const container = map.getContainer()
+    const shift = coveredMapHeight(container) / 2
+    const target: [number, number] = [flyToPoint.lat, flyToPoint.lng]
+    if (shift < 1) {
+      map.flyTo(target, zoom, { animate: true, duration: 0.6 })
+      return
+    }
+    const px = map.project(target, zoom)
+    map.flyTo(map.unproject([px.x, px.y + shift], zoom), zoom, { animate: true, duration: 0.6 })
   }, [flyToPoint, map])
 
   return null
@@ -237,19 +289,16 @@ function FitBoundsController({ points }: { points: ValidPoint[] }) {
   return null
 }
 
-// ── ResizeHandler ─────────────────────────────────────────────────────────────
+// ── ZoomCorner ────────────────────────────────────────────────────────────────
 
-// The map now shares horizontal space with the side panels (DayRail / drawer) as
-// flex siblings rather than being covered by them. When a panel opens or closes,
-// or the viewport changes, the map container width changes — Leaflet must be told
-// to recompute its size or it renders grey tiles and misplaced markers.
-function ResizeHandler() {
+// Leaflet defaults the zoom control to the top-left. It lives in the bottom-left
+// here instead, at every width — paired with the layers toggle bottom-right and
+// the Annotate FAB top-right, so a control is in the same corner on a phone as on
+// a desktop and there is nothing to re-find when the window changes size.
+function ZoomCorner() {
   const map = useMap()
   useEffect(() => {
-    const container = map.getContainer()
-    const observer = new ResizeObserver(() => map.invalidateSize({ animate: false }))
-    observer.observe(container)
-    return () => observer.disconnect()
+    map.zoomControl?.setPosition(BOTTOM_LEFT)
   }, [map])
   return null
 }
@@ -370,6 +419,8 @@ export default function MapCore({
   onMarkerClick,
   livePositions = [],
 }: MapCoreProps) {
+  // Drives the chart-furniture branch below.
+  const isCompactMap = useIsBelowBreakpoint(LG_BREAKPOINT)
   const [dragState, setDragState] = useState<DragState | null>(null)
 
   const [windData, setWindData] = useState<VelocityGridData | null>(null)
@@ -701,7 +752,10 @@ export default function MapCore({
         (!viewMode || placing || placingPlace) && "[&_.leaflet-container]:cursor-crosshair",
       )}
     >
-      <MapContainer center={[43, 13]} zoom={9} className="h-full w-full" zoomControl>
+      {/* `builder-map` is the hook for the bottom-left zoom rule in globals.css,
+          which has to be unlayered to beat Leaflet's own stylesheet. */}
+      <MapContainer center={[43, 13]} zoom={9} className="builder-map h-full w-full" zoomControl>
+        <ZoomCorner />
         <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
         {/* OpenSeaMap seamark overlay — transparent nautical chart tiles (buoys, beacons,
             depth/seamark data) layered over the OSM base. Default-on: go/no-go relevant
@@ -709,12 +763,25 @@ export default function MapCore({
         <TileLayer attribution={SEAMARK_ATTRIBUTION} url={SEAMARK_TILE_URL} />
 
         {/* Nautical-chart furniture — a real lat/lon graticule and a scale bar,
-            reused from the landing chart (M5b). Always on: an operational chart.
-            The grid runs edge-to-edge, underneath the top control row (zoom
-            control, Overlays toggle, the "+ Add" disclosure) — it should read
-            as genuinely part of the map surface, not visibly inset from it. */}
-        <Graticule />
-        <ScaleBar />
+            reused from the landing chart (M5b). The grid runs edge-to-edge,
+            underneath the top control row (zoom control, Overlays toggle, the
+            "+ Add" disclosure) — it should read as genuinely part of the map
+            surface, not visibly inset from it.
+
+            From `md` only (M18 §4). On a phone the map is roughly 311×209 with
+            the day sheet open, and a full-width scale bar plus a degree mesh
+            spend a real share of it on decoration: the graticule's labels and
+            the bar's ruler cost more of the chart than they explain at that
+            size. This is the one branch here that cannot be a CSS class —
+            these render into Leaflet's own panes, not into our tree, so there
+            is nothing for a `md:` prefix to attach to. Presentation only: no
+            state and no interaction differs by width. */}
+        {!isCompactMap && (
+          <>
+            <Graticule />
+            <ScaleBar placement="bottom-center" />
+          </>
+        )}
 
         {!viewMode && !placing && !placingPlace && <MapEvents onMapClick={onMapClick} />}
         {placing && <DiamondPlacer onPlace={handlePlace} />}

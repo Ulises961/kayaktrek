@@ -47,7 +47,18 @@ function scaleBarHtml(px: number, meters: number): string {
   </div>`
 }
 
-export function ScaleBar() {
+/**
+ * `placement`:
+ * - `"chart"` (default) — the landing chart's own corners, where the cartouche
+ *   dictates what is free.
+ * - `"bottom-center"` — the itinerary builder, whose four corners are all spoken
+ *   for (zoom bottom-left, layers bottom-right, Annotate top-right). Leaflet has
+ *   no bottom-centre corner and the bottom-left one now holds the zoom control,
+ *   so centring that container would drag zoom along with it. This variant is
+ *   therefore appended to the map container itself, which is the positioning
+ *   context every Leaflet corner is placed against anyway.
+ */
+export function ScaleBar({ placement = "chart" }: { placement?: "chart" | "bottom-center" } = {}) {
   const map = useMap()
   useEffect(() => {
     // On desktop the cartouche sits bottom-left, so bottom-right is clear. On
@@ -63,6 +74,22 @@ export function ScaleBar() {
       el.innerHTML = scaleBarHtml(meters / mpp, meters)
     }
     const mount = () => {
+      if (placement === "bottom-center") {
+        el = L.DomUtil.create("div")
+        // `bottom: 2rem` clears the attribution strip; pointer-events off so a
+        // decoration across the middle of the bottom edge never eats a map click.
+        Object.assign(el.style, {
+          position: "absolute",
+          left: "50%",
+          bottom: "2rem",
+          transform: "translateX(-50%)",
+          zIndex: "1000",
+          pointerEvents: "none",
+        })
+        map.getContainer().appendChild(el)
+        render()
+        return
+      }
       const desktop = mq.matches
       control = new L.Control({ position: desktop ? "bottomright" : "topright" })
       control.onAdd = () => {
@@ -73,9 +100,16 @@ export function ScaleBar() {
       }
       control.addTo(map)
     }
-    const remount = () => {
+    const teardown = () => {
       control?.remove()
+      control = null
+      // The bottom-centre variant is not a Leaflet control, so it has to take
+      // itself off the map container.
+      el?.remove()
       el = null
+    }
+    const remount = () => {
+      teardown()
       mount()
     }
     mount()
@@ -84,8 +118,8 @@ export function ScaleBar() {
     return () => {
       mq.removeEventListener("change", remount)
       map.off("zoomend moveend", render)
-      control?.remove()
+      teardown()
     }
-  }, [map])
+  }, [map, placement])
   return null
 }

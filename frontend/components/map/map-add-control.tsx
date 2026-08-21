@@ -58,21 +58,40 @@ export function MapAddControl({
   }
 
   return (
-    <div className="absolute top-2 left-1/2 z-[1001] -translate-x-1/2" data-testid="add-control">
+    // Top-right at every width. Centred, it split the top row in two and left
+    // Navigate's status chip nowhere to sit; against the corner the chip gets one
+    // uninterrupted run of the row. The layers toggle vacated the opposite corner
+    // for it, so neither control changes place by breakpoint.
+    //
+    // `items-*` is not cosmetic: the wrapper is as wide as its 180px panel, not the
+    // button, so without it the button sits at the panel's left edge — the same
+    // defect that put the Overlays button in the middle of the map.
+    //
+    // `pointer-events-none` on the wrapper, restored on the two children: this box
+    // is as tall as the closed panel (~198px) and sits at z-[1001] over the map, and
+    // a transparent div still hit-tests. It was swallowing taps on whatever lay
+    // beneath it — Navigate's Close day button, and map clicks in Edit mode.
+    <div
+      className="pointer-events-none absolute top-2 right-2 z-[1001] flex flex-col items-end gap-1"
+      data-testid="add-control"
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         data-testid="add-button"
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-all",
+          "pointer-events-auto flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-all",
           open
             ? "bg-card text-foreground ring-primary/50"
             : "bg-card/85 text-foreground ring-border/40",
         )}
       >
         <Plus className="size-3.5" aria-hidden />
-        Annotate
+        {/* Icon-only on a phone, where the map is the whole page and this pill sat
+            across a third of it. `sr-only`, not `hidden`, so the control keeps its
+            name — it is the only thing identifying what the "+" adds. */}
+        <span className="sr-only sm:not-sr-only">Annotate</span>
         <ChevronDown
           className={cn("size-3 transition-transform", open && "rotate-180")}
           aria-hidden
@@ -83,8 +102,10 @@ export function MapAddControl({
         data-testid="add-panel"
         style={{ visibility: open ? "visible" : "hidden" }}
         className={cn(
-          "bg-card ring-border/30 mt-1 w-40 overflow-hidden rounded-md shadow-lg ring-1 transition-all duration-150",
-          open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0",
+          "bg-card ring-border/30 w-40 overflow-hidden rounded-md shadow-lg ring-1 transition-all duration-150",
+          open
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-1 opacity-0",
         )}
       >
         <div className="divide-border/20 flex flex-col divide-y">

@@ -41,6 +41,31 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
+// jsdom does not implement matchMedia. Anything that branches on a breakpoint in
+// JS rather than in CSS calls it — `useIsMobile` (the map's chart furniture and
+// the sidebar), the landing hero/map, the chart scale bar.
+//
+// `matches: false` is the deliberate default: jsdom's window is 1024px wide, so
+// "does not match a mobile query" is the answer consistent with the layout every
+// other assertion in the suite is written against. A test that wants the narrow
+// branch should override this for itself rather than change the default.
+//
+// Note this only reaches components that read a media query in JS. Layout that
+// lives in CSS is untestable here at any width — jsdom has no layout engine, so
+// breakpoint behaviour is asserted in Playwright (`e2e/tests/19-responsive.spec.ts`).
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}
+
 // jsdom does not implement ResizeObserver. The map's ResizeHandler observes its
 // container to call Leaflet's invalidateSize() when the side panels resize it.
 if (typeof globalThis.ResizeObserver === "undefined") {

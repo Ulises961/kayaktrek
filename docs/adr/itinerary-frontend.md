@@ -54,17 +54,18 @@ Trip name, dates, difficulty, description, state badge, trip progression indicat
 
 ### Tabbed checklist — five tabs
 
-| Tab | Content |
-|-----|---------|
-| **Itinerary** | Stats summary + "Open itinerary →" link (default open tab) |
-| **Crew** | Crew list + pending invitations + inline metadata editor |
-| **Float Plan** | Float plan leader view (leader-only tab) |
-| **Logistics** | Accordion: Shore Contact · Travel Documents · Shuttle |
-| **Gear** | Inventory and gear (M6) |
+| Tab            | Content                                                    |
+| -------------- | ---------------------------------------------------------- |
+| **Itinerary**  | Stats summary + "Open itinerary →" link (default open tab) |
+| **Crew**       | Crew list + pending invitations + inline metadata editor   |
+| **Float Plan** | Float plan leader view (leader-only tab)                   |
+| **Logistics**  | Accordion: Shore Contact · Travel Documents · Shuttle      |
+| **Gear**       | Inventory and gear (M6)                                    |
 
 Tab state is persisted in the URL as `?tab=<name>` so links are shareable and browser back/forward works correctly.
 
 **Itinerary tab content** (not an embedded map):
+
 ```
 14 days · 180 nm · ~6h avg/day · 8 stops
 May 31 → Jun 13
@@ -90,6 +91,7 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 `/itinerary/[id]` serves both planning and happening contexts via two modes on the same page. There is no separate "day plan" route.
 
 **View mode** (default on entry):
+
 - Full-bleed map with day colours.
 - Slim vertical day rail (left edge, ~112 px). Each entry shows: day number, date, Bft pill
   (derived from `wind_speed_10m` in the day's `Weather` record), point count. Bft colour
@@ -105,6 +107,7 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 - During `past`: edit mode locked; drawer tabs are read-only.
 
 **Edit mode** (leader-only during `building` and `happening`):
+
 - The full M4b builder: PointListPane, drag-boundary editor, point dropping.
 - Entry: `[Edit]` button in the top bar.
 - Boundary dividers are always draggable in Edit mode — see "Flat edit surface" (M14)
@@ -115,11 +118,11 @@ An embedded map on the trip detail tab signals "interact here" — the wrong aff
 **Header states — PointListPane** (superseded by M14 — see "Flat edit surface" below;
 kept here only as the original M4c framing referenced by the decision log):
 
-| Condition | Header |
-|-----------|--------|
-| `days.length === 0` | `[+ Add day]` only |
+| Condition                    | Header                   |
+| ---------------------------- | ------------------------ |
+| `days.length === 0`          | `[+ Add day]` only       |
 | `days.length > 0`, view mode | `[Edit]` · `[+ Add day]` |
-| Edit mode active | `[Apply]` · `[Cancel]` |
+| Edit mode active             | `[Apply]` · `[Cancel]`   |
 
 Delete-day lives on each BoundaryDivider in edit mode (generalised from "delete last" to
 "delete by dayId"). **Day 1 is the permanent anchor**: it renders as a static header at
@@ -174,6 +177,7 @@ sheet (see "Point detail" above).
 **Forecast** — read-only data, leader-triggered fetch. Populated from the day's `Weather`
 and `Sea` records via the shared `useDayConditions` hook (`lib/weather/use-day-conditions.ts`,
 also used by the trip-detail conditions section).
+
 - Wind & atmosphere: wind speed/direction, temperature, cloud cover, precipitation.
 - Sea state: wave height/period/direction, swell height, ocean current.
 - Hour slider in the drawer header controls the time slice for the map velocity overlays
@@ -185,10 +189,11 @@ also used by the trip-detail conditions section).
   day rail re-reads its Bft pills.
 
 **Tides** — mixed editable/read-only.
-- *Parameters* (editable): data source toggle (tide atlas from nearest station / manual),
+
+- _Parameters_ (editable): data source toggle (tide atlas from nearest station / manual),
   HW time, HW height (m), springs–neaps coefficient (0–1 slider). Changes `PATCH`
   to `/api/day/:id/sea`.
-- *Tidal gates* (read-only, calculated): fetched from `GET /api/day/:id/tidal-gates`.
+- _Tidal gates_ (read-only, calculated): fetched from `GET /api/day/:id/tidal-gates`.
   Each gate shows passage name, slack time, and offset from HW in human-readable form.
   Re-fetched after each parameter save.
 
@@ -227,10 +232,10 @@ Unassigned points render as grey markers. As points are bracketed into numbered 
 
 A boundary point (the end of Day N / start of Day N+1) belongs to Day N and is **not** duplicated. Day N+1 references it via two nullable FKs:
 
-| Column | Type | Notes |
-|--------|------|-------|
+| Column           | Type                      | Notes                        |
+| ---------------- | ------------------------- | ---------------------------- |
 | `start_point_id` | `UUID NULL FK → point.id` | First point of the day's leg |
-| `end_point_id` | `UUID NULL FK → point.id` | Last point of the day's leg |
+| `end_point_id`   | `UUID NULL FK → point.id` | Last point of the day's leg  |
 
 All point data (coordinates, notes, images, type) lives exactly once in the `point` table. The FKs are pure references.
 
@@ -306,17 +311,18 @@ M12 (item 16, 2026-07-09) formalized boundary editing as an **explicitly-entered
 sub-state**: a leader had to press "Edit days" before any divider became draggable, then
 "Save days" or "Discard" to leave it — fixing a real bug (Add day created a real `Day` row
 immediately, so Cancel left an orphaned row the user never confirmed) but at the cost of a
-mode nested inside Edit mode. Living with it, the user rejected the *interaction gate*
+mode nested inside Edit mode. Living with it, the user rejected the _interaction gate_
 itself: nudging one boundary by one point cost Edit → Edit days → drag → Save days → back.
 M14 (2026-08-01/02) flattens this to a single edit surface while keeping the part of M12's
 fix that mattered — atomic, server-side-nothing-happens-before-Save boundary commits.
 
 **Rejected alternatives** (discussed and dismissed before settling on the design below):
-- *Literal tool palette* (point tool / day tool, click to arm): tools are modes too, just
+
+- _Literal tool palette_ (point tool / day tool, click to arm): tools are modes too, just
   spatial instead of temporal — trades "which level am I in?" for "which tool is armed?"
   and loses the builder's best property, zero armed tools (tap map = add point, tap
   marker = select).
-- *Live per-gesture boundary commit* (no Save/Discard at all): loses Discard entirely and
+- _Live per-gesture boundary commit_ (no Save/Discard at all): loses Discard entirely and
   would churn stop/position type promotions into the DB on every drag sweep.
 
 **Implicit draft, ID-anchored.** Boundary dividers are always interactive in Edit mode —
@@ -334,7 +340,7 @@ immediately, live, even while a boundary draft is dirty**. `apply-boundaries` (t
 atomic batch endpoint) and its all-or-nothing backend transaction are unchanged.
 
 **Add-day moves onto the last boundary handle.** Each `BoundaryDivider` is visually the
-header of the day *below* it; the plus-icon add-day button therefore renders on the
+header of the day _below_ it; the plus-icon add-day button therefore renders on the
 **last divider only** (the Day 1 static header carries it when exactly one day exists; a
 slim bootstrap row carries it when zero days exist) — one unambiguous append point at the
 bottom of the sequence, never on an earlier handle. Clicking it hands the new day N+1
@@ -349,11 +355,11 @@ server-side (`itinerary_service.py` boundary-apply loop) — both paths pre-exis
 A zero-length day anchored at a stop is, incidentally, a natural rest-day
 representation — noted as a free side effect, not implemented as a feature here.
 
-**Real-day deletion joins the draft.** Previously, deleting a *real* day was immediate and
+**Real-day deletion joins the draft.** Previously, deleting a _real_ day was immediate and
 non-discardable while every other draft edit reverted on Discard — an inconsistency. M14
 folds day deletion (real or draft-only) into the draft; a real day's row is only actually
 deleted server-side inside Save, symmetric with how draft-day rows were already only
-*created* inside Save. This extends M12's orphan-leak invariant from "no day creation
+_created_ inside Save. This extends M12's orphan-leak invariant from "no day creation
 before Save" to **no server-side `Day` mutation of any kind before Save**.
 
 **Discard narrows to day-structure.** Because point edits now save live during a dirty
@@ -403,17 +409,18 @@ Two distinct cache layers serve different purposes and must not be conflated:
 **Layer 1 — Server tile proxy (MinIO)**: tiles fetched from OSM (and rendered from Sentinel-2 COGs via titiler) are cached in MinIO and served from our own origin. This eliminates OSM direct-request dependency (OSM terms require high-traffic apps to use a CDN or own tile server), enables future server-side thumbnail generation, and feeds the device download for offline use.
 
 **Layer 2 — Device tile cache (client-local)**:
+
 - Web (PWA): Service Worker + Cache API. User triggers "Download for offline" before departure. Tiles for the route corridor bounding box at zoom levels 8–15 are cached. Best-effort; storage limits and eviction are not guaranteed.
 - Mobile M9 (React Native): device filesystem cache, explicitly downloaded and managed by the app via MapLibre's offline region API. More reliable; user-controlled. Tile source is our MinIO proxy — same origin as web.
 
 **Tile sources — priority order**:
 
-| Priority | Layer | Source | Access model | Resolution | Who |
-|----------|-------|--------|--------------|------------|-----|
-| 1 | Base map | OpenStreetMap | Cached in MinIO via nginx/Flask proxy | — | All users |
-| 2 | **Nautical charts (OpenSeaMap)** | OpenSeaMap tile overlay | Free transparent XYZ overlay on OSM; cached in MinIO | — | All users |
-| 3 | Satellite | Sentinel-2 L2A (Copernicus/ESA via AWS Open Data) | Rendered by titiler sidecar; cached in MinIO | 10 m | All users |
-| 4 | Satellite HD | Mapbox Satellite | Direct client↔Mapbox fetch; no server cache | < 1 m | Premium users |
+| Priority | Layer                            | Source                                            | Access model                                         | Resolution | Who           |
+| -------- | -------------------------------- | ------------------------------------------------- | ---------------------------------------------------- | ---------- | ------------- |
+| 1        | Base map                         | OpenStreetMap                                     | Cached in MinIO via nginx/Flask proxy                | —          | All users     |
+| 2        | **Nautical charts (OpenSeaMap)** | OpenSeaMap tile overlay                           | Free transparent XYZ overlay on OSM; cached in MinIO | —          | All users     |
+| 3        | Satellite                        | Sentinel-2 L2A (Copernicus/ESA via AWS Open Data) | Rendered by titiler sidecar; cached in MinIO         | 10 m       | All users     |
+| 4        | Satellite HD                     | Mapbox Satellite                                  | Direct client↔Mapbox fetch; no server cache          | < 1 m      | Premium users |
 
 **OpenSeaMap is the highest-priority addition after the base map.** Sea kayak planning depends on seamark data — buoys, rocks, depth contours, tidal diamonds, restricted areas — that OSM base tiles do not provide. OpenSeaMap is a free, community-maintained nautical chart overlay served as a standard XYZ tile URL (`https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png`). Zero infrastructure cost; a single transparent overlay layer in react-leaflet. This must land before the Sentinel-2 or Mapbox integrations, which serve secondary use cases (coastline imagery and sub-metre inspection respectively).
 
@@ -438,7 +445,7 @@ arrow, a rate label, the speed colour ramp, and a faint user-configurable radius
 
 **Entry UX**: any trip member can drop a diamond pin on the sea and enter its data in a popup, with
 **simple** (peak rate + flood/ebb direction, expanded across the cycle by the rule of thirds) and
-**advanced** (full atlas hour table) modes. Persisted as a trip-scoped `TidalStation`, *not* a route
+**advanced** (full atlas hour table) modes. Persisted as a trip-scoped `TidalStation`, _not_ a route
 `Point` — the route linked list stays clean and existing tidal-gate proximity logic picks user
 diamonds up automatically. Forms follow the react-hook-form + zod + `lib/dtos` pattern.
 
@@ -451,7 +458,7 @@ an empty state (not a form) when no tidal data exists.
 Distance/time between points was first surfaced as a per-segment label on every consecutive pair
 (map tooltips while planning; route tab + point sheet in view mode). That is mechanically honest but
 noisy: a detailed route has many `position` points, and a position is **geometry, not a destination**
-— its only job is to bend the polyline round a headland or through a channel. You never *arrive* at
+— its only job is to bend the polyline round a headland or through a channel. You never _arrive_ at
 one.
 
 **Decision: a leg runs stop-to-stop; intervening positions aggregate into the leg total.** A `stop`
@@ -578,12 +585,12 @@ to desktop-base rules reproduces the same bugs in a different order.
 
 ### Breakpoints — three, named so call sites stop inventing their own
 
-| Token | Width | What changes |
-|---|---|---|
-| base | 320–639 | Single column. Panes become sheets. Chrome minimal. |
-| `sm` | ≥640 | Two-column grids return. Larger phones / small tablets. |
-| `md` | ≥768 | Sidebar leaves sheet mode; builder returns to side-by-side panes. |
-| `lg` | ≥1024 | Wide grids, secondary columns. |
+| Token | Width   | What changes                                                      |
+| ----- | ------- | ----------------------------------------------------------------- |
+| base  | 320–639 | Single column. Panes become sheets. Chrome minimal.               |
+| `sm`  | ≥640    | Two-column grids return. Larger phones / small tablets.           |
+| `md`  | ≥768    | Sidebar leaves sheet mode; builder returns to side-by-side panes. |
+| `lg`  | ≥1024   | Wide grids, secondary columns.                                    |
 
 `--breakpoint-3xl` (120rem) predates this and is unaffected.
 
@@ -594,12 +601,12 @@ the px values its class names imply. This is not a footnote: M18's own plan comp
 touch-target offender list on a 16px base and named a control at "40px" that actually renders
 at 45px and was never a problem.
 
-| Class | Reads as | Actually renders |
-|---|---|---|
-| `h-6` (`size="xs"`) | 24px | **27px** |
-| `h-8` / `size-8` (`size="sm"`) | 32px | **36px** |
-| `h-9` (Button default) | 36px | **40.5px** |
-| `h-10` / `size-10` | 40px | **45px** |
+| Class                          | Reads as | Actually renders |
+| ------------------------------ | -------- | ---------------- |
+| `h-6` (`size="xs"`)            | 24px     | **27px**         |
+| `h-8` / `size-8` (`size="sm"`) | 32px     | **36px**         |
+| `h-9` (Button default)         | 36px     | **40.5px**       |
+| `h-10` / `size-10`             | 40px     | **45px**         |
 
 Reason about physical size from this table, not from the class name.
 
@@ -629,6 +636,78 @@ thumb hits 44. Applied through the `touch-target` utility in `globals.css`, scop
 - **Behaviour must not fork by device** — layout branches only, one component, one state
   machine. The moment "mobile does something different" enters the logic, M9 inherits the fork.
 
+### The map's own layout is not the page's layout (M18 §4/§5)
+
+Two rules that look like breakpoint choices but are not:
+
+- **The builder's map chrome keys off `lg`, the surrounding panes off `md`.** At `md` the panes
+  return beside the map and take 414px of it, so the map column at a 768 viewport is **264px** —
+  narrower than the 311px the same map gets on a phone. Anything sized to the map (chart
+  furniture, the point summary's tiles) must therefore not un-compact at `md`.
+- **Anything sized by its container, not the viewport, uses a container query.** The point
+  summary card is 311px inside the base bottom sheet and 264px in the map column at 768; a
+  viewport breakpoint reads those two backwards. `@container` + `@sm:` (already in the codebase
+  via shadcn's `card.tsx`) is the tool.
+
+**Map controls sit in fixed corners at every width** — Annotate top-right, layers bottom-right,
+zoom bottom-left, scale bar bottom-centre. A control that changes corner by breakpoint is one the
+user has to re-find; pinning them also removed every branch from that layout.
+
+Three traps this phase hit, all invisible at desktop widths:
+
+- **A floating control's wrapper is as wide as its hidden panel.** Both map disclosures size to
+  their closed menu (180×213, 198×209) and sit at `z-[1001]` over the map. A transparent div
+  still hit-tests, so they swallowed taps on whatever lay under them. Wrappers get
+  `pointer-events-none`, the button and panel `pointer-events-auto`.
+- **`leaflet.css` is imported unlayered, so it beats any Tailwind utility** regardless of
+  specificity — unlayered always wins over `@layer utilities`. Overrides of Leaflet's own rules
+  belong in `globals.css` outside a layer, not in a class on the map.
+- **`react-leaflet` reads `zoomControl` once at construction.** Repositioning is
+  `map.zoomControl.setPosition()`; a prop cannot answer to a viewport that changes.
+
+### One panel, one edge — the public map pages (M18 §5)
+
+`/routes/[id]` and `/story/[token]` put the route detail on a **collapsible right-hand panel at
+every width** (`components/explore/public-route-shell.tsx`): same edge, same control, open on
+arrival, on a phone and on a desktop alike. The panel does not become a different thing at 320 —
+only how it takes its space changes, because it must. The panel is 432px, so docking it at 320
+is the zero-width map again: below `md` it lies over a full-bleed map, and from `md` it is a flex
+sibling whose collapse hands the width back to the map rather than merely uncovering it.
+
+Behaviour identical at both ends is what makes the state trivial: one boolean, defaulted open, no
+viewport read anywhere in the component. A default that varied by breakpoint would have to come
+from CSS rather than a measured initial state — `useIsBelowBreakpoint` cannot know the width
+until after mount, so seeding React state from it renders the phone default wrong for one frame.
+
+This does not reverse M12 §B/2.6 ("the card floated over the route it was meant to frame"),
+which is about the docked width — and still docks. A panel with a visible control to move it
+aside is a different thing from a card that covers the route with no way out.
+
+**A full-height panel makes fixed content caps visible.** The daily breakdown carried a
+`max-h-40` scroll box (180px) that read as sensible inside a 55%-tall bottom pane and as wasted
+space inside a full-height panel — most of a tall viewport left empty below a scrolling list.
+Height inside a panel like this belongs to flex, not to a cap: the list is a shrinkable item
+(`min-h-0`) in a `min-h-0 flex-1` column, so it takes what is left and is the part that gives way
+when there is not enough. `min-h-0` is load-bearing in both places — a flex item defaults to
+`min-height: auto` and refuses to shrink below its content, which is what keeps a nested scroll
+from ever engaging.
+
+One mechanic worth reusing: **the control rides on the panel's edge, inside the panel's own
+positioned box.** That is what keeps it on screen when the panel is translated off it, and what
+parks it at the map's right edge when the panel is collapsed at `md` — one element, no second
+position to maintain. It must sit outside the `inert` subtree, or collapsing the panel makes the
+only way back unfocusable too.
+
+**A map whose width can change needs `ResizeHandler`** (`components/map/resize-handler.tsx`,
+shared by `map-core.tsx` and `public-map.tsx`). Leaflet only listens to the window, so a panel
+opening or collapsing beside it leaves the strip it gained grey. `PublicMap` had gone without one
+for as long as nothing could change its width.
+
+**When CSS genuinely cannot express the branch, use `useIsBelowBreakpoint(px)`**
+(`hooks/use-mobile.ts`; `useIsMobile()` is the 768 case). That is for deciding whether to
+_render_ something — Leaflet layers mount into Leaflet's panes, not our tree, so no `lg:` prefix
+can reach them. Everything else stays a breakpoint class.
+
 ### Verification — Playwright, because Vitest structurally cannot
 
 jsdom has no layout engine: `getBoundingClientRect()` returns zeros, media queries never match,
@@ -654,25 +733,27 @@ Two limits of the canary are worth stating, because both have already bitten:
 
 ## Decision log
 
-| Decision | Original ADR | Date | Notes |
-|----------|-------------|------|-------|
-| Map-first itinerary building (Leaflet) | ADR-006 | 2025-01-01 | Backend SDK-agnostic; web uses react-leaflet; mobile uses MapLibre React Native (see `mobile-offline.md`) |
-| Next.js App Router + server actions | ADR-008 | 2025-01-01 | httpOnly cookies require server layer |
-| Trip detail tabbed layout | ADR-020 | 2026-05-11 | Partially superseded by ADR-027 on tab content |
-| Route-first model, Day 0 staging, hover-slide (M4) | ADR-024 | 2026-05-19 | Hover-slide superseded by drag handles in ADR-026 |
-| Unified sidebar, drag boundaries, first-class itinerary (M4b) | ADR-026 | 2026-05-25 | Supersedes ADR-024 §3 (mode-toggle), §4-sidebar, §9 (drop popover) |
-| Trip detail structure, view/edit modes, tile caching (M4b) | ADR-027 | 2026-05-26 | Partially supersedes ADR-020 on tab content and ordering |
-| OpenSeaMap nautical overlay — first-class layer, priority over Sentinel-2 | — | 2026-06-15 | Free XYZ transparent overlay; zero infra; must land before titiler/Sentinel-2 pipeline; Sentinel-2 deferred until beta validates need |
-| Planning flow redesign: always-visible boundaries, header states, midpoint handle placement (M4c) | — | 2026-06-15 | Supersedes ADR-026/027 on boundary-edit entry UX and PointListPane header; delete-day moves to BoundaryDivider |
-| Viewing mode: day rail + feature drawer, Route/Forecast/Tides tabs, point detail modal (M4c) | — | 2026-06-15 | Supersedes ADR-027 on view-mode layout; DayStrip and DayDetailPanel removed |
-| App-wide date UI: shared `DatePicker` (shadcn Popover+Calendar) for editing, `d MMM yyyy` (`formatDayDate`) for display; boundary handle styled as draggable Day 1 header; Day 1 is the permanent anchor; day rail shows all numbered days with placeholders, empty days greyed/disabled (M4c) | — | 2026-06-16 | Replaces native `<input type=date>` (locale mm/dd/yyyy) and interim DD/MM/YYYY text input; drag confined to grip so inline picker works |
-| View-mode weather fetch (`useDayConditions` hook, Forecast-tab fetch/refresh, `conditionsVersion` rail refresh); point detail = summary bottom sheet → full detail modal; wireframe layout parity (M4c §6–§8) | — | 2026-06-17 | Weather no longer fetchable only from edit/top-bar; `PointDetailSheet` reworked from all-in-one to tiles; matches `ItineraryLayoutWireframe` |
-| Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d) | — | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass |
-| Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar | — | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists |
-| `Point.interest` removed from the route model; POIs become standalone map annotations | — | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position` |
-| M4e landed: `interest` gone from `PointType`; `Place` marker layer (day-independent, toggleable) + drop-a-pin; place/diamond add-actions unified in a top-centre `MapAddControl` "+ Add" disclosure | — | 2026-06-21 | Type selectors and icon legend now `stop`/`position` only; star icon removed; see `features.md` decision log for the `Place`/`PlaceCategory` entity |
-| Shared form primitives (`form-field.tsx`, `AccentDialogContent`) + one-form-per-create/edit-pair convention | ADR-032 | 2026-07-03 | Component abstraction review; `VehicleForm`/`DocumentForm` join the `PlaceForm` pattern; accent colors from `lib/tokens` palette; sheet/modal merge and generic form-builder rejected; findings in `plans/component-abstraction-review.md` |
-| Tile caching Layer 1 landed, narrowed to priority rows 1–2 only (M8 §D10) | ADR-033 | 2026-07-17 | `GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png`, `layer ∈ {osm, seamark}`; MinIO-cached via `StorageService`, 7-day upstream refresh, stale-serves-on-upstream-failure; unauthenticated, `600/min` per-IP; all four map surfaces (`public-map`, `map-core`, `landing-map`, `explore-discovery-map`) route through it, `{s}` subdomain dropped. Sentinel-2/titiler (row 3) and Mapbox HD (row 4) stay deferred — `<layer>` is their future seam. Landing hero's Esri Ocean base is unaffected (client-direct per Esri terms, was never proposed for this proxy). |
-| Builder mode architecture: real View/Edit segmented control; boundary editing becomes an explicitly-entered draft sub-state ("Save days"/"Discard"); "Add day" deferred until Save (M12 item 16) | — | 2026-07-09 | Fixed a real bug: immediate `Day` row creation on Add day meant Cancel left an orphaned row. Superseded by M14 below — the entry gate itself is removed, not the atomic-save behavior it introduced |
-| Flat edit surface: boundary draft becomes implicit (first gesture materializes it) and ID-anchored (`endPointId`, not frozen indices); Save/Discard persistent-disabled instead of appear/hide; Add-day moves to the last boundary handle only, new day takes all of the old last day's points (collapse-and-drag, not midpoint split); real-day deletion joins the draft (no server `Day` mutation before Save); point edits save live even mid-draft, Discard narrows to day-structure only (M14) | — | 2026-08-02 | Supersedes M12 item 16's entry gate while keeping its atomic-apply/no-premature-server-mutation guarantee, extended to day deletion too; `plans/M14-flat-itinerary-edit.md` |
-| Responsive contract: 320px floor, mobile-base inversion, three breakpoints (base/`sm`/`md`/`lg`); touch targets met by coarse-pointer hit-area expansion rather than visual resizing (AA 24px is the enforced floor, 44px the hit area); `sr-only sm:not-sr-only` for phone-dropped labels; overlay z-index band above Leaflet; layout asserted in Playwright's `mobile-320` project, never Vitest (M18) | — | 2026-08-10 | `plans/M18-responsive-web.md`. Records that `html` is 112.5%, so Tailwind rem classes render 1.125× their apparent px — the plan's own §6 offender list was computed on a 16px base and named a 45px control as a 40px problem. Canary caveats: it must assert its own pathname (a stale `storageState` produced a 36/36 false green), and it cannot see cramped `grid-cols-N` or the builder's silent map collapse |
+| Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Original ADR | Date       | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Map-first itinerary building (Leaflet)                                                                                                                                                                                                                                                                                                                                                                                                                                                              | ADR-006      | 2025-01-01 | Backend SDK-agnostic; web uses react-leaflet; mobile uses MapLibre React Native (see `mobile-offline.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Next.js App Router + server actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | ADR-008      | 2025-01-01 | httpOnly cookies require server layer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Trip detail tabbed layout                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | ADR-020      | 2026-05-11 | Partially superseded by ADR-027 on tab content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Route-first model, Day 0 staging, hover-slide (M4)                                                                                                                                                                                                                                                                                                                                                                                                                                                  | ADR-024      | 2026-05-19 | Hover-slide superseded by drag handles in ADR-026                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Unified sidebar, drag boundaries, first-class itinerary (M4b)                                                                                                                                                                                                                                                                                                                                                                                                                                       | ADR-026      | 2026-05-25 | Supersedes ADR-024 §3 (mode-toggle), §4-sidebar, §9 (drop popover)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Trip detail structure, view/edit modes, tile caching (M4b)                                                                                                                                                                                                                                                                                                                                                                                                                                          | ADR-027      | 2026-05-26 | Partially supersedes ADR-020 on tab content and ordering                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| OpenSeaMap nautical overlay — first-class layer, priority over Sentinel-2                                                                                                                                                                                                                                                                                                                                                                                                                           | —            | 2026-06-15 | Free XYZ transparent overlay; zero infra; must land before titiler/Sentinel-2 pipeline; Sentinel-2 deferred until beta validates need                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Planning flow redesign: always-visible boundaries, header states, midpoint handle placement (M4c)                                                                                                                                                                                                                                                                                                                                                                                                   | —            | 2026-06-15 | Supersedes ADR-026/027 on boundary-edit entry UX and PointListPane header; delete-day moves to BoundaryDivider                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Viewing mode: day rail + feature drawer, Route/Forecast/Tides tabs, point detail modal (M4c)                                                                                                                                                                                                                                                                                                                                                                                                        | —            | 2026-06-15 | Supersedes ADR-027 on view-mode layout; DayStrip and DayDetailPanel removed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| App-wide date UI: shared `DatePicker` (shadcn Popover+Calendar) for editing, `d MMM yyyy` (`formatDayDate`) for display; boundary handle styled as draggable Day 1 header; Day 1 is the permanent anchor; day rail shows all numbered days with placeholders, empty days greyed/disabled (M4c)                                                                                                                                                                                                      | —            | 2026-06-16 | Replaces native `<input type=date>` (locale mm/dd/yyyy) and interim DD/MM/YYYY text input; drag confined to grip so inline picker works                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| View-mode weather fetch (`useDayConditions` hook, Forecast-tab fetch/refresh, `conditionsVersion` rail refresh); point detail = summary bottom sheet → full detail modal; wireframe layout parity (M4c §6–§8)                                                                                                                                                                                                                                                                                       | —            | 2026-06-17 | Weather no longer fetchable only from edit/top-bar; `PointDetailSheet` reworked from all-in-one to tiles; matches `ItineraryLayoutWireframe`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Tidal diamonds: drop-a-pin manual entry (trip-scoped `TidalStation`), chart ◇ markers replace the stream particle layer, simple/advanced entry, Tides tab keeps day-level height only (M4d)                                                                                                                                                                                                                                                                                                         | —            | 2026-06-18 | See `features.md §6a`; radius user-configurable (~500 m default); panel layout siblings + carousel/slider sync also landed this pass                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Paddle-time legs anchored stop-to-stop; positions aggregate as pass-through geometry; route tab lists stops only; ETA at `avgSpeedKnots`, wording mirrors top bar                                                                                                                                                                                                                                                                                                                                   | —            | 2026-06-20 | Replaces per-segment legs; a `stop` is any deliberately-marked point; collapses to day total when no mid-day stop exists                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `Point.interest` removed from the route model; POIs become standalone map annotations                                                                                                                                                                                                                                                                                                                                                                                                               | —            | 2026-06-20 | Route-model side only; full entity design in `features.md` (Map Annotations); linked list / `pointOrder` carry only `stop`/`position`                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| M4e landed: `interest` gone from `PointType`; `Place` marker layer (day-independent, toggleable) + drop-a-pin; place/diamond add-actions unified in a top-centre `MapAddControl` "+ Add" disclosure                                                                                                                                                                                                                                                                                                 | —            | 2026-06-21 | Type selectors and icon legend now `stop`/`position` only; star icon removed; see `features.md` decision log for the `Place`/`PlaceCategory` entity                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Shared form primitives (`form-field.tsx`, `AccentDialogContent`) + one-form-per-create/edit-pair convention                                                                                                                                                                                                                                                                                                                                                                                         | ADR-032      | 2026-07-03 | Component abstraction review; `VehicleForm`/`DocumentForm` join the `PlaceForm` pattern; accent colors from `lib/tokens` palette; sheet/modal merge and generic form-builder rejected; findings in `plans/component-abstraction-review.md`                                                                                                                                                                                                                                                                                                                  |
+| Tile caching Layer 1 landed, narrowed to priority rows 1–2 only (M8 §D10)                                                                                                                                                                                                                                                                                                                                                                                                                           | ADR-033      | 2026-07-17 | `GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png`, `layer ∈ {osm, seamark}`; MinIO-cached via `StorageService`, 7-day upstream refresh, stale-serves-on-upstream-failure; unauthenticated, `600/min` per-IP; all four map surfaces (`public-map`, `map-core`, `landing-map`, `explore-discovery-map`) route through it, `{s}` subdomain dropped. Sentinel-2/titiler (row 3) and Mapbox HD (row 4) stay deferred — `<layer>` is their future seam. Landing hero's Esri Ocean base is unaffected (client-direct per Esri terms, was never proposed for this proxy). |
+| Builder mode architecture: real View/Edit segmented control; boundary editing becomes an explicitly-entered draft sub-state ("Save days"/"Discard"); "Add day" deferred until Save (M12 item 16)                                                                                                                                                                                                                                                                                                    | —            | 2026-07-09 | Fixed a real bug: immediate `Day` row creation on Add day meant Cancel left an orphaned row. Superseded by M14 below — the entry gate itself is removed, not the atomic-save behavior it introduced                                                                                                                                                                                                                                                                                                                                                         |
+| Flat edit surface: boundary draft becomes implicit (first gesture materializes it) and ID-anchored (`endPointId`, not frozen indices); Save/Discard persistent-disabled instead of appear/hide; Add-day moves to the last boundary handle only, new day takes all of the old last day's points (collapse-and-drag, not midpoint split); real-day deletion joins the draft (no server `Day` mutation before Save); point edits save live even mid-draft, Discard narrows to day-structure only (M14) | —            | 2026-08-02 | Supersedes M12 item 16's entry gate while keeping its atomic-apply/no-premature-server-mutation guarantee, extended to day deletion too; `plans/M14-flat-itinerary-edit.md`                                                                                                                                                                                                                                                                                                                                                                                 |
+| Responsive contract: 320px floor, mobile-base inversion, three breakpoints (base/`sm`/`md`/`lg`); touch targets met by coarse-pointer hit-area expansion rather than visual resizing (AA 24px is the enforced floor, 44px the hit area); `sr-only sm:not-sr-only` for phone-dropped labels; overlay z-index band above Leaflet; layout asserted in Playwright's `mobile-320` project, never Vitest (M18)                                                                                            | —            | 2026-08-10 | `plans/M18-responsive-web.md`. Records that `html` is 112.5%, so Tailwind rem classes render 1.125× their apparent px — the plan's own §6 offender list was computed on a 16px base and named a 45px control as a 40px problem. Canary caveats: it must assert its own pathname (a stale `storageState` produced a 36/36 false green), and it cannot see cramped `grid-cols-N` or the builder's silent map collapse                                                                                                                                         |
+| M18 §4/§5: builder reshaped to day strip · full-bleed map · draggable bottom sheet below `md`; point summary is a segment of that sheet at base and floats over the map from `md` (one sheet, not two on one edge); map chrome pinned to fixed corners at every width; chart furniture and other map-sized rules key off `lg`, not `md`; public share pages stack the same way                                                                                                                      | —            | 2026-08-14 | `plans/M18-responsive-web.md`. The map column is **264px at a 768 viewport** — narrower than on a phone — which is why map-sized rules cannot use `md`. Six bugs found, none predicted: control wrappers sized by their hidden panels swallowed taps; `FlyToController` offset by a share of `window.innerHeight`; a Tailwind utility lost to unlayered `leaflet.css`; the drawer kept its scroll across tabs; `PointListPane` read `innerWidth` once at mount; `/routes/[id]` and `/story/[token]` rendered no map at 320                                  |
+| M18 §5 addendum: the public route/story detail is a collapsible right-hand panel at every width — open on arrival everywhere, overlaying a full-bleed map below `md` and docked from `md` — so the control, the edge and the default are the same on a phone and a desktop, and the component needs no viewport read at all                                                                                                                                                                         | —            | 2026-08-21 | `components/explore/public-route-shell.tsx`; `ResizeHandler` extracted to `components/map/resize-handler.tsx` so `PublicMap` remeasures when the dock collapses                                                                                                                                                                                                                                                                                                                                                                                             |

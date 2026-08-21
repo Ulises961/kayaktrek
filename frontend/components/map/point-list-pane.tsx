@@ -28,6 +28,7 @@ import { useSaveStatus } from "@/hooks/use-save-status"
 import { PointRow } from "./point-row"
 import { BoundaryDivider } from "./boundary-divider"
 import { ExtendTripRangeFooter } from "./extend-trip-range-footer"
+import { MapBottomSheet } from "./map-bottom-sheet"
 import type { DaySlice, DraftBoundary } from "@/lib/itinerary/boundaries"
 import type { PointType } from "@/lib/dtos/point"
 
@@ -112,9 +113,12 @@ export function PointListPane() {
     tripDateTo,
   } = useMapBuilder()
 
-  const [collapsed, setCollapsed] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 768,
-  )
+  // Starts open at every width. It used to default to collapsed below 768 because
+  // an expanded pane there left the map no room — below `md` the pane is now a
+  // bottom sheet and takes none of the map's width, so the reason is gone. The
+  // width was also read once at mount and never again, so a rotation left the
+  // pane in whichever state the other orientation had wanted.
+  const [collapsed, setCollapsed] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   const dayNumberById = new Map(state.days.map((d) => [d.id, d.dayNumber]))
@@ -362,22 +366,22 @@ export function PointListPane() {
 
   if (collapsed) {
     return (
-      <div className="bg-background/95 border-border z-[1001] flex w-10 shrink-0 flex-col items-center overflow-hidden border-l">
-        <div className="border-border flex w-full shrink-0 items-center justify-center border-b px-0 py-2">
+      // A full-width bar under the map at base, a narrow vertical rail beside it
+      // from `md` — the collapsed form of the same sheet/pane below.
+      <div className="bg-background/95 border-border z-[1001] flex w-full shrink-0 flex-row items-center gap-2 overflow-hidden border-t px-3 py-1.5 md:w-10 md:flex-col md:gap-0 md:border-t-0 md:border-l md:px-0 md:py-0">
+        <div className="border-border flex shrink-0 items-center justify-center md:w-full md:border-b md:px-0 md:py-2">
           <button
             type="button"
             onClick={() => setCollapsed(false)}
             aria-label="Expand points panel"
-            className="text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+            className="text-muted-foreground hover:text-foreground touch-target flex items-center justify-center transition-colors"
           >
             <PanelRightOpenIcon className="size-4" />
           </button>
         </div>
         <div className="flex flex-1 items-center justify-center overflow-hidden">
-          <span
-            className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase select-none"
-            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-          >
+          {/* Reading down the rail from `md`; along the bar at base. */}
+          <span className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase select-none md:rotate-180 md:[writing-mode:vertical-rl]">
             Points
           </span>
         </div>
@@ -386,9 +390,9 @@ export function PointListPane() {
   }
 
   return (
-    <div
-      data-testid="point-list-pane"
-      className="bg-background/95 border-border z-[1001] flex w-56 shrink-0 flex-col overflow-hidden border-l sm:w-64"
+    <MapBottomSheet
+      testId="point-list-pane"
+      className="bg-background/95 border-border z-[1001] overflow-hidden rounded-t-xl border-t md:w-64 md:rounded-none md:border-t-0 md:border-l"
     >
       {/* Header */}
       <div className="border-border flex shrink-0 items-center gap-2 border-b px-3 py-2">
@@ -396,7 +400,7 @@ export function PointListPane() {
           type="button"
           onClick={() => setCollapsed(true)}
           aria-label="Collapse panel"
-          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+          className="text-muted-foreground hover:text-foreground touch-target shrink-0 transition-colors"
         >
           <PanelRightCloseIcon className="size-4" />
         </button>
@@ -443,9 +447,12 @@ export function PointListPane() {
             return (
               <div
                 data-testid="day-1-header"
-                className="border-border bg-muted/30 flex items-center gap-1.5 border-b px-3 py-1 text-xs font-medium select-none"
+                // Wraps as a row rather than inside a label: at 311px the date
+                // picker leaves the day number and the leg too little to sit on one
+                // line, and without this they break mid-phrase ("Day" / "1").
+                className="border-border bg-muted/30 flex flex-wrap items-center gap-x-1.5 border-b px-3 py-1 text-xs font-medium select-none"
               >
-                <span>Day 1</span>
+                <span className="whitespace-nowrap">Day 1</span>
                 <span className="text-muted-foreground">·</span>
                 <DatePicker
                   value={s0.date ?? ""}
@@ -464,7 +471,7 @@ export function PointListPane() {
                   className="h-6 w-auto border-none bg-transparent px-1 text-xs shadow-none"
                 />
                 <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">
+                <span className="text-muted-foreground whitespace-nowrap">
                   {legLabel(getSliceDistance(s0), avgSpeedKnots, distanceUnit)}
                 </span>
                 {dayCount === 1 && (
@@ -548,6 +555,6 @@ export function PointListPane() {
           )
         })}
       </div>
-    </div>
+    </MapBottomSheet>
   )
 }

@@ -43,7 +43,10 @@ export function CloseDayButton({ tripId }: CloseDayButtonProps) {
             className="rounded-full shadow"
           >
             <CalendarCheckIcon className="size-3.5" />
-            Close day
+            {/* Icon-only on a phone so the status chip, this and the Annotate FAB
+                share one row over a ~311px map. `sr-only`, not `hidden`: this
+                triggers an irreversible action and must keep its name. */}
+            <span className="sr-only sm:not-sr-only">Close day</span>
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>

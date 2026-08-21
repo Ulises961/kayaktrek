@@ -1,4 +1,14 @@
 import { test, expect, type Page } from "@playwright/test"
+import { API_URL } from "../playwright.config"
+import { LEADER } from "../fixtures/auth"
+import { apiGetAccessToken, apiDeleteTrip, apiTransitionState } from "../fixtures/trips"
+import {
+  apiSeedEditableItinerary,
+  apiSeedPublicItinerary,
+  apiDeleteItinerary,
+  type EditablePointSpec,
+  type SeededRoute,
+} from "../fixtures/itinerary"
 
 // M18 §1 — the responsive canary.
 //
@@ -354,6 +364,619 @@ test.describe("Overlays over a map", () => {
 
     await menu.getByRole("menuitem", { name: "Profile" }).click()
     await expect(page).toHaveURL(/\/profile$/)
+  })
+})
+
+test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
+  // The canary above covers only routes with no id in them. These five need a
+  // seeded trip, a public itinerary, two share tokens and an opted-in public
+  // profile, which is why they were left out of §1 and had never been measured at
+  // any width. Two of them turned out to be broken in exactly the way the canary
+  // cannot see — see the map-size assertions below.
+  let leaderToken: string
+  let seeded: SeededRoute
+  let storyToken: string
+  let planToken: string
+  let username: string
+  let userId: string
+  let wasProfilePublic: boolean
+
+  test.beforeAll(async ({ request }) => {
+    leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
+
+    seeded = await apiSeedPublicItinerary(request, leaderToken, {
+      name: `E2E Responsive Public ${Date.now()}`,
+      totalMiles: 6,
+      days: [
+        {
+          dayNumber: 1,
+          date: "2026-07-15",
+          points: [
+            { latitude: 48.4, longitude: -123.35, name: "Launch beach", type: "stop" },
+            { latitude: 48.45, longitude: -123.3, name: "Overnight camp", type: "stop" },
+          ],
+        },
+      ],
+    })
+
+    const story = await request.post(
+      `${API_URL}/api/v1/itinerary/${seeded.itineraryId}/story-share`,
+      { headers: { Authorization: `Bearer ${leaderToken}` } },
+    )
+    expect(story.ok(), "could not mint a story share token").toBeTruthy()
+    storyToken = (await story.json()).storyShareToken
+
+    const plan = await request.post(`${API_URL}/api/v1/logistics/${seeded.tripId}/share`, {
+      headers: { Authorization: `Bearer ${leaderToken}` },
+    })
+    expect(plan.ok(), "could not mint a float-plan share token").toBeTruthy()
+    planToken = (await plan.json()).shareToken
+
+    // /paddlers/<username> renders an empty shell unless the profile is opted in.
+    const me = await request.get(`${API_URL}/api/v1/user/me`, {
+      headers: { Authorization: `Bearer ${leaderToken}` },
+    })
+    const account = await me.json()
+    username = account.username
+    userId = account.id
+    wasProfilePublic = !!account.profileIsPublic
+    await request.patch(`${API_URL}/api/v1/user/${userId}`, {
+      headers: { Authorization: `Bearer ${leaderToken}` },
+      data: { profileIsPublic: true },
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    // Guarded so a failed beforeAll surfaces its own error rather than a cleanup one.
+    if (seeded?.itineraryId) await apiDeleteItinerary(request, leaderToken, seeded.itineraryId)
+    if (seeded?.tripId) await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    // LEADER is shared with every other spec in the suite, and profile visibility is
+    // account state rather than per-trip fixture data — left flipped it would follow
+    // them into runs that never asked for it.
+    if (userId && !wasProfilePublic) {
+      await request.patch(`${API_URL}/api/v1/user/${userId}`, {
+        headers: { Authorization: `Bearer ${leaderToken}` },
+        data: { profileIsPublic: false },
+      })
+    }
+  })
+
+  test.describe("anonymous", () => {
+    test.use({ storageState: { cookies: [], origins: [] } })
+
+    test("the four share surfaces do not scroll horizontally", async ({ page }) => {
+      for (const route of [
+        `/routes/${seeded.itineraryId}`,
+        `/story/${storyToken}`,
+        `/float-plan/${planToken}`,
+        `/paddlers/${username}`,
+      ]) {
+        for (const width of WIDTHS) {
+          await expectNoHorizontalScroll(page, route, width)
+        }
+      }
+    })
+
+    test("the shared route and story pages keep their map at 320", async ({ page }) => {
+      // Both pages lay the map and the detail panel as flex siblings. The panel is
+      // `w-full shrink-0` until its breakpoint, so as a row it took the whole
+      // viewport and the map — `min-w-0 flex-1` — collapsed to zero width. Nothing
+      // overflowed, so every assertion in the test above passed on a route page
+      // with no route on it. Same failure shape as the builder's (§4).
+      for (const route of [`/routes/${seeded.itineraryId}`, `/story/${storyToken}`]) {
+        await page.setViewportSize({ width: 320, height: 700 })
+        await page.goto(route)
+        await page.waitForLoadState("networkidle")
+        expect(new URL(page.url()).pathname).toBe(route)
+
+        const map = page.locator(".leaflet-container").first()
+        await expect(map).toBeVisible()
+        const box = (await map.boundingBox())!
+        expect(
+          Math.round(box.width),
+          `${route}: the map is ${Math.round(box.width)}px wide — the detail panel has taken the viewport.`,
+        ).toBeGreaterThanOrEqual(280)
+        expect(
+          Math.round(box.height),
+          `${route}: the map is only ${Math.round(box.height)}px tall.`,
+        ).toBeGreaterThanOrEqual(180)
+      }
+    })
+
+    test("opens the route panel over a full-bleed map at 320, and slides it away on request", async ({
+      page,
+    }) => {
+      // The panel is a right-hand panel at every width — the same control on the
+      // same edge on a phone as on a desktop, open on arrival at both. At 320 it
+      // cannot dock (it is wider than the viewport on its own), so it lies over a
+      // full-bleed map instead of taking the map's width away.
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/story/${storyToken}`)
+      await page.waitForLoadState("networkidle")
+
+      const drawer = page.getByTestId("route-detail-drawer")
+      const toggle = page.getByTestId("route-detail-toggle")
+      const map = page.locator(".leaflet-container").first()
+      await expect(map).toBeVisible()
+
+      const open = (await drawer.boundingBox())!
+      expect(Math.round(open.x + open.width), "the panel should sit flush to the right edge").toBe(
+        320,
+      )
+      expect(
+        Math.round(open.width),
+        `the panel is ${Math.round(open.width)}px of a 320px viewport — it should leave the map showing.`,
+      ).toBeLessThan(320)
+      // It overlays rather than squeezing, so the map keeps every pixel either way.
+      expect(Math.round((await map.boundingBox())!.width)).toBe(320)
+
+      // The toggle rides on the panel's left edge, which is what advertises the map
+      // underneath — and what keeps the control on screen once the panel is not.
+      const handle = (await toggle.boundingBox())!
+      expect(handle.x).toBeGreaterThanOrEqual(0)
+      expect(Math.round(handle.x + handle.width)).toBeLessThanOrEqual(320)
+
+      // Polled on the settled edge rather than on "has it started moving": the
+      // slide is a 200ms transition, and a first reading past 320 is mid-gesture.
+      await toggle.click()
+      await expect
+        .poll(async () => Math.round((await drawer.boundingBox())!.x), {
+          message: "the panel never settled off the right edge",
+        })
+        .toBe(320)
+
+      const parked = (await toggle.boundingBox())!
+      expect(
+        Math.round(parked.x + parked.width),
+        "the toggle left the viewport with the panel it collapsed",
+      ).toBeLessThanOrEqual(320)
+    })
+
+    test("gives the daily breakdown the panel's leftover height on a tall viewport", async ({
+      page,
+      request,
+    }) => {
+      // The list used to be capped at a fixed `max-h-40` (180px, since rem is
+      // 1.125×) with its own scrollbar. On a viewport taller than it is wide —
+      // a browser's phone emulation, or a phone in a tall aspect — that left the
+      // list scrolling inside a small box with most of the panel empty below it.
+      // It is now sized by what the panel has left.
+      const CAPPED_HEIGHT = 180
+      const many = await apiSeedPublicItinerary(request, leaderToken, {
+        name: `E2E Responsive Days ${Date.now()}`,
+        totalMiles: 30,
+        days: Array.from({ length: 10 }, (_, index) => ({
+          dayNumber: index + 1,
+          date: `2026-07-${String(index + 10).padStart(2, "0")}`,
+          points: [
+            { latitude: 48 + index / 10, longitude: -123.3, name: `Camp ${index}`, type: "stop" },
+          ],
+        })),
+      })
+      try {
+        await page.setViewportSize({ width: 390, height: 1200 })
+        await page.goto(`/routes/${many.itineraryId}`)
+        await page.waitForLoadState("networkidle")
+
+        const panel = page.getByTestId("route-detail-panel")
+        const list = panel.getByRole("list").first()
+        const listBox = (await list.boundingBox())!
+        const panelBox = (await panel.boundingBox())!
+
+        expect(
+          Math.round(listBox.height),
+          `the breakdown is ${Math.round(listBox.height)}px tall in a ${Math.round(panelBox.height)}px ` +
+            `panel — it is still on the fixed cap with the rest of the panel empty.`,
+        ).toBeGreaterThan(CAPPED_HEIGHT)
+        // Within the panel, not spilling past it — the growth has to come out of
+        // the space that was going to waste, not out of the panel's bounds.
+        expect(Math.round(listBox.y + listBox.height)).toBeLessThanOrEqual(
+          Math.round(panelBox.y + panelBox.height) + 1,
+        )
+      } finally {
+        await apiDeleteItinerary(request, leaderToken, many.itineraryId)
+        await apiDeleteTrip(request, leaderToken, many.tripId)
+      }
+    })
+
+    test("docks the panel beside the map at md, and hands the width back when collapsed", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1024, height: 700 })
+      await page.goto(`/routes/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+
+      const drawer = page.getByTestId("route-detail-drawer")
+      const toggle = page.getByTestId("route-detail-toggle")
+      const map = page.locator(".leaflet-container").first()
+
+      const docked = (await drawer.boundingBox())!
+      const beside = (await map.boundingBox())!
+      expect(Math.round(docked.width), "the panel is collapsed by default at md").toBeGreaterThan(0)
+      expect(
+        beside.x + beside.width,
+        `the map runs to x=${Math.round(beside.x + beside.width)} but the panel starts at ` +
+          `${Math.round(docked.x)} — it is covering the route it describes.`,
+      ).toBeLessThanOrEqual(docked.x + 1)
+
+      // The toggle sits over the map here. Leaflet's panes reach z-index 1000 and a
+      // map makes no stacking context to contain them, so a control floated over it
+      // without clearance is visible and dead — twice already in this milestone.
+      const reached = await toggle.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        return !!top && (top === el || el.contains(top))
+      })
+      expect(reached, "a click at the centre of the toggle lands on the tiles").toBe(true)
+
+      await toggle.click()
+      // Collapsing gives the space to the map rather than merely hiding the panel.
+      await expect.poll(async () => Math.round((await map.boundingBox())!.width)).toBe(1024)
+
+      const handle = (await toggle.boundingBox())!
+      expect(
+        Math.round(handle.x + handle.width),
+        "the toggle left the viewport with the panel it collapsed",
+      ).toBeLessThanOrEqual(1024)
+    })
+  })
+
+  test("the printable float plan does not scroll horizontally", async ({ page }) => {
+    // Authenticated, and deliberately outside the trip-detail tab layout (M8), so
+    // it is the one print surface with a shell of its own.
+    for (const width of WIDTHS) {
+      await expectNoHorizontalScroll(page, `/trips/float-plan/${seeded.tripId}`, width)
+    }
+  })
+})
+
+test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
+  // The builder is the one surface the canary above structurally cannot judge.
+  // It failed by *collapse*, not overflow: DayRail (126px) and FeatureDrawer
+  // (288px) were flex siblings of the map at every width, and since the map is
+  // `min-w-0 flex-1` it shrank to exactly 0px wide rather than pushing the page
+  // past the viewport. Every assertion in the file above passed on a page whose
+  // entire reason to exist had disappeared. So these measure boxes instead.
+  //
+  // A 3-point, 2-day route is the smallest seed that exercises all of it: two
+  // day-rail entries to scroll between, and a Route list with a leg on it.
+  const POINTS: EditablePointSpec[] = [
+    { latitude: 44.0, longitude: 8.9, type: "stop", name: "Launch" },
+    { latitude: 44.02, longitude: 8.92, type: "stop", name: "Turn" },
+    { latitude: 44.04, longitude: 8.94, type: "stop", name: "Camp" },
+  ]
+  const DAY_END_INDICES = [1, 2]
+
+  let leaderToken: string
+
+  test.beforeAll(async ({ request }) => {
+    leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
+  })
+
+  // The map's own width and height, which is what "map-first" actually means
+  // here. A floor rather than an exact figure: the point is that the map is a
+  // usable surface, not that it is any particular size.
+  const MIN_MAP_WIDTH = 280
+  const MIN_MAP_HEIGHT = 180
+
+  async function boxOf(page: Page, testId: string) {
+    const box = await page.getByTestId(testId).boundingBox()
+    if (!box) throw new Error(`${testId} is not laid out`)
+    return box
+  }
+
+  test("keeps a usable map with the day sheet open, and stacks strip · map · sheet", async ({
+    page,
+    request,
+  }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Builder ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+      expect(new URL(page.url()).pathname).toBe(`/itinerary/${seeded.itineraryId}`)
+
+      const map = page.locator(".leaflet-container")
+      await expect(map).toBeVisible()
+
+      // Open the day sheet. This is the exact state that used to leave the map at
+      // zero width: rail + drawer together were 414px against a 320px viewport.
+      await page.getByTestId("day-rail-entry").first().click()
+      await expect(page.getByTestId("feature-drawer")).toBeVisible()
+
+      const mapBox = (await map.boundingBox())!
+      expect(
+        Math.round(mapBox.width),
+        `map is ${Math.round(mapBox.width)}px wide with the day sheet open — ` +
+          `the panes are taking the viewport back.`,
+      ).toBeGreaterThanOrEqual(MIN_MAP_WIDTH)
+      expect(
+        Math.round(mapBox.height),
+        `map is only ${Math.round(mapBox.height)}px tall — the sheet's height cap is not holding.`,
+      ).toBeGreaterThanOrEqual(MIN_MAP_HEIGHT)
+
+      // Stacked, in order. Measured against each other rather than against
+      // absolute coordinates, which would only restate the viewport size.
+      const strip = await boxOf(page, "day-rail")
+      const sheet = await boxOf(page, "feature-drawer")
+      expect(strip.y + strip.height, "the day strip should sit above the map").toBeLessThanOrEqual(
+        mapBox.y + 1,
+      )
+      expect(mapBox.y + mapBox.height, "the day sheet should sit below the map").toBeLessThanOrEqual(
+        sheet.y + 1,
+      )
+      // Both span the column: a stacked pane that kept a fixed width would leave
+      // a dead gutter beside it and still satisfy the ordering above.
+      expect(Math.round(strip.width)).toBe(Math.round(mapBox.width))
+      expect(Math.round(sheet.width)).toBe(Math.round(mapBox.width))
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("drags the sheet up to the day strip, and does not carry that height to md", async ({
+    page,
+    request,
+  }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Sheet Drag ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+
+      await page.getByTestId("day-rail-entry").first().click()
+      await expect(page.getByTestId("feature-drawer")).toBeVisible()
+
+      const strip = await boxOf(page, "day-rail")
+      const atRest = await boxOf(page, "feature-drawer")
+
+      // A pointer-capture gesture, so it is driven with raw mouse events and moved
+      // in steps — a single jump delivers one pointermove, which is not a drag.
+      const handle = page.getByTestId("sheet-resize-handle")
+      const grip = (await handle.boundingBox())!
+      const fromY = grip.y + grip.height / 2
+      // Aim above the strip on purpose: the ceiling has to be the clamp's doing,
+      // not the gesture stopping in the right place by arrangement.
+      const toY = strip.y - 100
+      await page.mouse.move(grip.x + grip.width / 2, fromY)
+      await page.mouse.down()
+      for (let i = 1; i <= 12; i++) {
+        await page.mouse.move(grip.x + grip.width / 2, fromY + ((toY - fromY) * i) / 12)
+      }
+      await page.mouse.up()
+
+      const expanded = await boxOf(page, "feature-drawer")
+      expect(
+        expanded.height,
+        `the sheet did not grow: ${Math.round(atRest.height)}px before, ${Math.round(expanded.height)}px after`,
+      ).toBeGreaterThan(atRest.height)
+      expect(
+        Math.round(expanded.y),
+        `the sheet stopped at y=${Math.round(expanded.y)} but the strip ends at ` +
+          `${Math.round(strip.y + strip.height)} — it should reach the strip and no further.`,
+      ).toBe(Math.round(strip.y + strip.height))
+
+      // The dragged height is published as a custom property consumed by a base-only
+      // class, precisely so it cannot follow the pane into the side-by-side layout.
+      // An inline `height` would have beaten `md:h-auto` and survived here.
+      await page.setViewportSize({ width: 768, height: 700 })
+      const map = await boxOf(page, "map-column")
+      const sidePane = await boxOf(page, "feature-drawer")
+      expect(
+        Math.round(sidePane.height),
+        `the drawer is ${Math.round(sidePane.height)}px tall at md but the map column is ` +
+          `${Math.round(map.height)}px — the dragged height leaked past the breakpoint.`,
+      ).toBe(Math.round(map.height))
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("returns to side-by-side panes at md", async ({ page, request }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Builder MD ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 768, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+
+      await page.getByTestId("day-rail-entry").first().click()
+      await expect(page.getByTestId("feature-drawer")).toBeVisible()
+
+      const mapBox = (await page.locator(".leaflet-container").boundingBox())!
+      const strip = await boxOf(page, "day-rail")
+      const sheet = await boxOf(page, "feature-drawer")
+
+      // The `md` half of the same contract, asserted because a one-sided fix is
+      // indistinguishable from a broken one until you check the other side.
+      expect(strip.x + strip.width, "the day rail should sit left of the map").toBeLessThanOrEqual(
+        mapBox.x + 1,
+      )
+      expect(mapBox.x + mapBox.width, "the drawer should sit right of the map").toBeLessThanOrEqual(
+        sheet.x + 1,
+      )
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("shows the point summary as a segment of the sheet at 320, floating at md", async ({
+    page,
+    request,
+  }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Point ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+
+      await page.getByTestId("day-rail-entry").first().click()
+      const sheet = page.getByTestId("feature-drawer")
+      await expect(sheet).toBeVisible()
+
+      // No Point segment until there is a point to show.
+      const pointTab = sheet.getByRole("button", { name: "Point" })
+      await expect(pointTab).toHaveCount(0)
+
+      await page.getByTestId("route-waypoint").last().click()
+      await expect(pointTab).toBeVisible()
+
+      // The card is inside the sheet, not floating over the map — that is the
+      // whole "one sheet, segmented" decision, and it is a containment claim, so
+      // it is asserted by containment rather than by coordinates.
+      const inSheet = sheet.getByTestId("point-detail-sheet")
+      await expect(inSheet).toBeVisible()
+      await expect(page.getByTestId("map-column").getByTestId("point-detail-sheet")).toBeHidden()
+
+      // And at md it is the other way round: the floating card is over the map,
+      // and the sheet has no Point segment at all. Both cards are in the DOM at
+      // both widths — one of the two is always display:none — so each assertion
+      // has to name which one it means by where it lives.
+      await page.setViewportSize({ width: 768, height: 700 })
+      await expect(pointTab).toBeHidden()
+      await expect(inSheet).toBeHidden()
+      await expect(page.getByTestId("map-column").getByTestId("point-detail-sheet")).toBeVisible()
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("shares one top row between Navigate's chip and the Annotate FAB at 320", async ({
+    page,
+    request,
+  }) => {
+    // Every floating control used to open at the top edge, and at 320 they piled
+    // up: the chip ran under the Annotate pill, which painted over the middle of
+    // its text, and dropping the chip to a band of its own cost a second row over
+    // a ~209px map. They now share one row. Navigate only exists while a trip is
+    // happening.
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Navigate ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await apiTransitionState(request, leaderToken, seeded.tripId, "happening")
+
+      await page.setViewportSize({ width: 320, height: 700 })
+      // Not networkidle: Navigate holds an SSE connection open, so this page is
+      // never idle by design and waiting for it times out.
+      await page.goto(`/itinerary/${seeded.itineraryId}?navigate=1`)
+      const chrome = page.getByTestId("navigate-chrome")
+      await expect(chrome).toBeVisible()
+
+      const chromeBox = (await chrome.boundingBox())!
+      const fab = (await page.getByTestId("add-button").boundingBox())!
+
+      // Same row: their vertical spans overlap. Asserted as overlap rather than
+      // equal `y`, since the chip and the FAB are different heights.
+      const sharesRow = chromeBox.y < fab.y + fab.height && fab.y < chromeBox.y + chromeBox.height
+      expect(
+        sharesRow,
+        `chip y=${Math.round(chromeBox.y)}..${Math.round(chromeBox.y + chromeBox.height)} vs ` +
+          `FAB y=${Math.round(fab.y)}..${Math.round(fab.y + fab.height)} — separate rows.`,
+      ).toBe(true)
+
+      // Side by side rather than layered: the chip must stop before the FAB starts.
+      expect(
+        chromeBox.x + chromeBox.width,
+        `the chip runs to x=${Math.round(chromeBox.x + chromeBox.width)} but the FAB starts at ` +
+          `${Math.round(fab.x)} — it is underneath the FAB again.`,
+      ).toBeLessThanOrEqual(fab.x)
+
+      // Below the day strip, which is what §4's plan asked to verify.
+      const strip = await boxOf(page, "day-rail")
+      expect(chromeBox.y).toBeGreaterThanOrEqual(strip.y + strip.height)
+
+      // Reachable, not merely on screen. The Annotate wrapper is as tall as its
+      // closed panel and sits at z-[1001] over the map; a transparent div still
+      // hit-tests, so it swallowed every tap on Close day while leaving it fully
+      // visible. Playwright's own actionability check would pass a covered button
+      // if the cover were an ancestor, so the topmost element is read directly.
+      const closeDay = page.getByRole("button", { name: "Close day" })
+      const reached = await closeDay.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        return !!top && (top === el || el.contains(top))
+      })
+      expect(reached, "a tap at the centre of Close day lands on something else").toBe(true)
+
+      // And the consequence, which is what actually matters.
+      await closeDay.click()
+      await expect(page.getByRole("alertdialog")).toBeVisible()
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("spreads the map's controls to opposite corners at 320", async ({ page, request }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Controls ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+      await page.getByTestId("day-rail-entry").first().click()
+      await expect(page.getByTestId("feature-drawer")).toBeVisible()
+
+      const map = (await page.locator(".leaflet-container").boundingBox())!
+      const zoom = (await page.locator(".leaflet-control-zoom").boundingBox())!
+      const layers = (await page.getByTestId("layers-button").boundingBox())!
+      const fab = (await page.getByTestId("add-button").boundingBox())!
+      const credits = (await page.locator(".leaflet-control-attribution").boundingBox())!
+
+      // Each toggle is tucked into a corner rather than adrift in the middle. This
+      // is the real regression guard: each wrapper is as wide as its hidden panel
+      // (180px and 198px), so without an explicit cross-axis alignment the button
+      // renders at the wrapper's leading edge — which put Overlays at x≈109 on a
+      // 311px map, on top of the Annotate pill.
+      const rightGap = (box: { x: number; width: number }) =>
+        map.x + map.width - (box.x + box.width)
+      expect(rightGap(fab), `the add FAB is ${Math.round(rightGap(fab))}px from the right edge`)
+        .toBeLessThan(20)
+      expect(rightGap(layers), `layers is ${Math.round(rightGap(layers))}px from the right edge`)
+        .toBeLessThan(20)
+      expect(zoom.x - map.x, "zoom is not against the left edge").toBeLessThan(20)
+
+      // Top and bottom, not all in one band — the distribution itself. Compared on
+      // each control's centre, not its top edge: the zoom stack is 64px tall, so at
+      // 320 its top sits a few px above the midpoint while the control as a whole is
+      // plainly in the bottom half.
+      const midpoint = map.y + map.height / 2
+      const centreY = (box: { y: number; height: number }) => box.y + box.height / 2
+      expect(centreY(fab), "the add FAB should be in the map's top half").toBeLessThan(midpoint)
+      expect(centreY(layers), "layers should be in the map's bottom half").toBeGreaterThan(midpoint)
+      expect(centreY(zoom), "zoom should be in the map's bottom half").toBeGreaterThan(midpoint)
+
+      // And both bottom controls clear the credits. Leaflet's own stylesheet is
+      // imported unlayered, so it beats any Tailwind utility no matter how
+      // specific — the zoom offset has to be an unlayered rule in globals.css, and
+      // a class on the map would silently do nothing.
+      expect(
+        Math.max(zoom.y + zoom.height, layers.y + layers.height),
+        `a bottom control runs past y=${Math.round(credits.y)}, where the credits start.`,
+      ).toBeLessThanOrEqual(credits.y)
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
   })
 })
 

@@ -117,13 +117,23 @@ export function MapBuilder({
   })
 
   const navigateStatusLabel =
-    positionWatch.status === "denied"
-      ? "Location denied"
-      : positionWatch.status === "unsupported"
-        ? "Location unavailable"
-        : positionWatch.status === "sending"
-          ? `Sharing position · ${liveStream.positions.length} crew live`
-          : "Acquiring location…"
+    positionWatch.status === "denied" ? (
+      "Location denied"
+    ) : positionWatch.status === "unsupported" ? (
+      "Location unavailable"
+    ) : positionWatch.status === "sending" ? (
+      // Shortened on a phone to "Sharing · N live", where this chip and
+      // CloseDayButton share one row over a ~311px map and the full sentence took
+      // the whole width on its own. The dropped words are `sr-only` rather than
+      // removed, so the status announced is the same sentence at every width.
+      <>
+        Sharing<span className="sr-only sm:not-sr-only"> position</span> ·{" "}
+        {liveStream.positions.length}
+        <span className="sr-only sm:not-sr-only"> crew</span> live
+      </>
+    ) : (
+      "Acquiring location…"
+    )
 
   // Persist the cruising speed only after the user stops dragging the slider.
   const debouncedSaveSpeed = useMemo(
@@ -340,12 +350,28 @@ export function MapBuilder({
           onToggleNavigate={handleToggleNavigate}
         />
         {/* Panels are layout siblings of the map, not overlays — they push the map
-            narrower instead of covering it, so no information is hidden. */}
-        <div className="absolute top-[100px] right-0 bottom-0 left-0 flex md:top-12">
+            narrower instead of covering it, so no information is hidden.
+            From `md` they sit beside it; below `md` they stack around it instead
+            (day strip · full-bleed map · bottom sheet). Side-by-side does not
+            survive a phone: DayRail is 126px and FeatureDrawer 288px — 414px of
+            chrome against a 320px viewport — and because the map is
+            `min-w-0 flex-1` it collapses to zero width rather than overflowing,
+            so the page looks clean and has no map on it. A layout branch only:
+            same components, same state, at every width. */}
+        <div className="absolute top-[100px] right-0 bottom-0 left-0 flex flex-col md:top-12 md:flex-row">
           {viewMode && <DayRail />}
-          <div className="relative min-w-0 flex-1">
+          <div data-testid="map-column" className="relative min-h-0 min-w-0 flex-1">
             {navigateMode && (
-              <div className="absolute top-3 left-3 z-[1001] flex items-center gap-2">
+              // Shares the map's top row with the Annotate FAB at base rather than
+              // taking a band of its own — two rows of chrome over a ~209px map is
+              // most of the map. `right-16` reserves the FAB's corner (58px plus its
+              // margins); the chip and CloseDayButton are both compact at this width,
+              // so all three fit the row. The zoom stack that used to sit here is
+              // hidden at base, which is what freed the space.
+              <div
+                data-testid="navigate-chrome"
+                className="absolute top-3 right-16 left-3 z-[1001] flex flex-wrap items-center gap-2 lg:right-auto lg:flex-nowrap"
+              >
                 <div className="bg-primary text-primary-foreground rounded-full px-3 py-1 text-xs font-semibold shadow">
                   {navigateStatusLabel}
                 </div>

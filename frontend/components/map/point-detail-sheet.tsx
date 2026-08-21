@@ -38,7 +38,26 @@ function legDistance(
   }
 }
 
-export function PointDetailSheet() {
+/**
+ * The selected point's summary card: type, name, leg, notes and image count,
+ * opening the full detail modal when tapped.
+ *
+ * It has two homes, because the bottom edge of the map is only free on one of
+ * them. From `md` it floats over the map as `PointDetailSheet` below. At base
+ * that edge belongs to the day sheet, so `FeatureDrawer` renders this same card
+ * as a segment of it instead — one sheet, not two competing for the same edge.
+ * Only one of the two is ever displayed (each is gated by a breakpoint class),
+ * so each owning its own modal state is not a conflict.
+ */
+export function PointSummary({
+  className,
+  showHandle = false,
+}: {
+  className?: string
+  // The floating variant is its own sheet and needs its own grab handle; the
+  // segment sits inside a sheet that already has one at its top edge.
+  showHandle?: boolean
+}) {
   const {
     state,
     selectedPointId,
@@ -81,12 +100,13 @@ export function PointDetailSheet() {
             setModalOpen(true)
           }
         }}
-        className="border-border bg-background/20 hover:bg-background animate-in slide-in-from-bottom absolute inset-x-0 bottom-0 z-[1002] rounded-t-xl border-t text-left shadow-2xl backdrop-blur-sm transition-colors duration-250"
+        className={cn("@container text-left transition-colors duration-250", className)}
       >
-        {/* drag handle */}
-        <div className="flex justify-center pt-2 pb-1">
-          <div className="bg-border h-1 w-8 rounded-full" />
-        </div>
+        {showHandle && (
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="bg-border h-1 w-8 rounded-full" />
+          </div>
+        )}
 
         {/* header */}
         <div className="flex items-start justify-between px-4 pb-2">
@@ -106,14 +126,18 @@ export function PointDetailSheet() {
               e.stopPropagation()
               setSelectedPointId(null)
             }}
-            className="text-muted-foreground hover:text-foreground mt-0.5 shrink-0 transition-colors"
+            className="text-muted-foreground hover:text-foreground touch-target mt-0.5 shrink-0 transition-colors"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        {/* tiles — presentational; the whole sheet (this included) opens the modal. */}
-        <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+        {/* tiles — presentational; the whole sheet (this included) opens the modal.
+            Columns come from a container query, not a breakpoint: this card is as
+            wide as whatever holds it, and that is the map column at `md` — 264px at
+            a 768 viewport, narrower than the same card gets inside the bottom sheet
+            at 320. A viewport breakpoint would read those two the wrong way round. */}
+        <div className="grid grid-cols-2 gap-2 px-4 pb-4 @sm:grid-cols-3">
           <div className="bg-muted/40 rounded-lg px-2.5 py-2">
             <p className="text-muted-foreground mb-0.5 text-[9px] font-bold tracking-wider uppercase">
               {leg ? `Avg speed ${avgSpeedKnots} kn` : "Leg"}
@@ -162,5 +186,19 @@ export function PointDetailSheet() {
         <PointDetailModal point={point} canEdit={canEdit} onClose={() => setModalOpen(false)} />
       )}
     </>
+  )
+}
+
+/**
+ * The summary floating over the bottom of the map. From `md` only — at base the
+ * map's bottom edge is where the day sheet lives, and stacking a second sheet on
+ * it would put two grab handles on the same edge.
+ */
+export function PointDetailSheet() {
+  return (
+    <PointSummary
+      showHandle
+      className="border-border bg-background/20 hover:bg-background animate-in slide-in-from-bottom absolute inset-x-0 bottom-0 z-[1002] hidden rounded-t-xl border-t shadow-2xl backdrop-blur-sm md:block"
+    />
   )
 }

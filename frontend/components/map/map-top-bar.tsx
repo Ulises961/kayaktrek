@@ -158,7 +158,11 @@ export function MapTopBar({
     <div className="bg-surface-2/95 absolute top-0 right-0 left-0 z-[1001] flex flex-col backdrop-blur-sm">
       {/* ── Row 1: always visible ── */}
       <div className="flex h-12 items-center gap-3 px-3 md:px-4">
-        <div className="flex-1" />
+        {/* Below `sm` the header breadcrumb is not rendered and the day rail's own
+            header is dropped, so this row is the only place the trip is named. It
+            doubles as the spacer that holds the mode control to the right edge. */}
+        <p className="min-w-0 flex-1 truncate text-sm font-medium sm:hidden">{tripName}</p>
+        <div className="hidden flex-1 sm:block" />
 
         {/* Desktop stats strip — hidden on mobile */}
         <div

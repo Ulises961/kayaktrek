@@ -56,7 +56,7 @@ export function LogCard({
               matches the action buttons' height, so the two columns start on one line
               instead of the buttons hanging below the text. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs sm:min-h-8 sm:gap-4 sm:text-sm">
-            <span className="flex min-w-[90px] items-center gap-1.5 font-medium">
+            <span className="flex items-center gap-1.5 font-medium">
               <CalendarIcon className="text-muted-foreground size-4 shrink-0" />
               {date ? formatDayDate(date) : <span className="text-muted-foreground">No date</span>}
             </span>

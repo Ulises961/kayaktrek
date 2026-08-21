@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { SidebarProvider } from "../../ui/sidebar"
 
@@ -9,16 +9,8 @@ vi.mock("next/navigation", () => ({
 
 import { NavigationItems } from "../navigation-items"
 
-beforeAll(() => {
-  if (!window.matchMedia) {
-    window.matchMedia = ((query: string) => ({
-      matches: false,
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    })) as unknown as typeof window.matchMedia
-  }
-})
+// The local matchMedia stub this file used to carry now lives in vitest.setup.ts,
+// where every component that branches on a breakpoint can reach it.
 
 describe("NavigationItems", () => {
   it("labels the paddler-connections nav item 'Paddlers', matching the page it links to", () => {

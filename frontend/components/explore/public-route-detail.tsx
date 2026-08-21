@@ -24,16 +24,15 @@ type Props = {
   unit?: DistanceUnit
 }
 
-// The docked side-panel layout shared by the discoverable route detail
+// The right-hand detail panel shared by the discoverable route detail
 // (`/routes/[id]`, gated on Itinerary.is_public) and the unlisted story share
 // (`/story/[token]`) — the content a visitor sees is identical either way; only the
 // fetch and the offered actions (fork/open, discoverable-only) differ between the
 // two pages.
 //
-// Renders as a flex sibling of the map, not an overlay on top of it — the caller
-// owns the `flex h-screen w-full` wrapper and lays the map in a `flex-1` column
-// beside this panel (M12 §B/2.6 — the card used to float over the route it was
-// meant to frame).
+// Fills whatever slot `PublicRouteShell` gives it: a docked column from `md`, an
+// overlay that slides in from the right below it. This is content only — the shell
+// owns the width, the open state and the toggle.
 export function PublicRouteDetail({
   route,
   season,
@@ -50,7 +49,7 @@ export function PublicRouteDetail({
   return (
     <div
       data-testid="route-detail-panel"
-      className="border-border bg-background flex h-full w-full shrink-0 flex-col overflow-y-auto border-l sm:w-96"
+      className="border-border bg-background flex h-full w-full flex-col overflow-y-auto border-l"
     >
       {/* Brand strip. This panel IS the chrome on /routes/[id] and /story/[token]
           — both are full-height map splits with no room for a header bar above
@@ -59,7 +58,10 @@ export function PublicRouteDetail({
         <BrandLockup size={20} wordmarkClassName="text-sm" />
       </div>
 
-      <div className="flex flex-col gap-4 p-5">
+      {/* `min-h-0 flex-1` hands the day list whatever height is left instead of
+          leaving it stranded above empty panel — on a viewport taller than it is
+          wide, that is most of the panel. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
         <BackLink href={backHref} label={backLabel} />
 
         <div className="flex items-start justify-between gap-3">

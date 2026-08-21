@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import MapLoader from "@/components/map/map-loader"
 import { LiveStoryMap } from "@/components/story/live-story-map"
 import { PublicRouteDetail } from "@/components/explore/public-route-detail"
+import { PublicRouteShell } from "@/components/explore/public-route-shell"
 import { fetchStoryByToken } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { seasonOfDetail } from "@/lib/itinerary/season"
@@ -25,10 +26,11 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
   const isLive = detail.tripState === TRIP_STATE.HAPPENING
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      <div className="relative min-w-0 flex-1">
-        {isLive ? <LiveStoryMap token={token} routes={[route]} /> : <MapLoader routes={[route]} />}
-      </div>
+    <PublicRouteShell
+      map={
+        isLive ? <LiveStoryMap token={token} routes={[route]} /> : <MapLoader routes={[route]} />
+      }
+    >
       <PublicRouteDetail
         route={route}
         season={season}
@@ -38,6 +40,6 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
         backLabel="Home"
         unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
       />
-    </div>
+    </PublicRouteShell>
   )
 }

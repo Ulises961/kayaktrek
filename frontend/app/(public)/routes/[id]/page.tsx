@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import MapLoader from "@/components/map/map-loader"
 import { RouteDetailActions } from "@/components/explore/route-detail-actions"
 import { PublicRouteDetail } from "@/components/explore/public-route-detail"
+import { PublicRouteShell } from "@/components/explore/public-route-shell"
 import { fetchPublicItineraryDetail, fetchItineraries } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
 import { getSession } from "@/lib/auth/session"
@@ -29,10 +30,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
   const season = seasonOfDetail(detail)
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      <div className="relative min-w-0 flex-1">
-        <MapLoader routes={[route]} />
-      </div>
+    <PublicRouteShell map={<MapLoader routes={[route]} />}>
       <PublicRouteDetail
         route={route}
         season={season}
@@ -48,6 +46,6 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
         }
         unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
       />
-    </div>
+    </PublicRouteShell>
   )
 }

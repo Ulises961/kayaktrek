@@ -435,7 +435,14 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
-    expect(screen.getByText("Sharing position · 2 crew live")).toBeInTheDocument()
+    // The chip drops "position" and "crew" on a phone, so the sentence is split
+    // across `sr-only` spans rather than being one text node. Asserted on the
+    // element's text content, which is what a screen reader reads and is therefore
+    // the thing that must stay whole at every width — `getByText` would only prove
+    // the label happens to be unsplit today.
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent(
+      "Sharing position · 2 crew live",
+    )
     expect(screen.getByTestId("map-core")).toHaveAttribute("data-live-position-count", "2")
   })
 

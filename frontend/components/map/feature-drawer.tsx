@@ -1,10 +1,11 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   X,
   Anchor,
   CircleDot,
   ChevronRight,
+  MapPin,
   Navigation,
   Cloud,
   Waves,
@@ -23,8 +24,10 @@ import { SeaGrid } from "@/components/weather/sea-grid"
 import { TidalEntryForm } from "@/components/weather/tidal-entry-form"
 import { RuleOfTwelfthsTable } from "@/components/weather/rule-of-twelfths-table"
 import { TidalGateWarnings } from "@/components/weather/tidal-gate-warnings"
+import { PointSummary } from "./point-detail-sheet"
+import { MapBottomSheet } from "./map-bottom-sheet"
 
-type Tab = "route" | "forecast" | "tides"
+type Tab = "route" | "forecast" | "tides" | "point"
 
 const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
   { id: "route", label: "Route", Icon: Navigation },
@@ -42,6 +45,7 @@ export function FeatureDrawer() {
     state,
     selectedDayId,
     setSelectedDayId,
+    selectedPointId,
     setSelectedPointId,
     selectedHour,
     setSelectedHour,
@@ -53,6 +57,21 @@ export function FeatureDrawer() {
   } = useMapBuilder()
 
   const [tab, setTab] = useState<Tab>("route")
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0
+  }, [tab])
+
+  // Selecting a point moves the sheet to its segment (render-time adjust, same
+  // shape as the day reset below). At `md` the "point" tab has no button and its
+  // content is the route list, so the drawer there behaves exactly as it did
+  // before — the point floats over the map instead. One state, two layouts.
+  const [prevPointId, setPrevPointId] = useState(selectedPointId)
+  if (selectedPointId !== prevPointId) {
+    setPrevPointId(selectedPointId)
+    if (selectedPointId) setTab("point")
+  }
   const { weather, sea, gates, isRefreshing, refresh, setSea } = useDayConditions(
     selectedDayId,
     bumpConditions,
@@ -118,9 +137,9 @@ export function FeatureDrawer() {
   const hasForecast = !!weather?.weatherStates?.length || !!sea?.seaStates?.length
 
   return (
-    <div
-      data-testid="feature-drawer"
-      className="border-border bg-background/95 z-[1001] flex w-64 shrink-0 flex-col border-l backdrop-blur-sm"
+    <MapBottomSheet
+      testId="feature-drawer"
+      className="border-border bg-background/95 z-[1001] rounded-t-xl border-t backdrop-blur-sm md:w-64 md:rounded-none md:border-t-0 md:border-l"
     >
       {/* Header */}
       <div className="border-border flex shrink-0 items-start justify-between border-b px-3 py-2">
@@ -134,7 +153,7 @@ export function FeatureDrawer() {
           type="button"
           aria-label="Close"
           onClick={() => setSelectedDayId(null)}
-          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+          className="text-muted-foreground hover:text-foreground touch-target shrink-0 transition-colors"
         >
           <X className="size-4" />
         </button>
@@ -152,18 +171,46 @@ export function FeatureDrawer() {
               tab === id
                 ? "border-primary text-primary border-b-2"
                 : "text-muted-foreground hover:text-foreground",
+              // From `md` the point segment shows the route list, so Route is the
+              // tab that is actually selected there and has to look like it.
+              id === "route" &&
+                tab === "point" &&
+                "md:border-primary md:text-primary md:border-b-2",
             )}
           >
             <Icon className="size-3.5" aria-hidden />
             {label}
           </button>
         ))}
+        {/* The point segment. Base only, and only while a point is selected —
+            from `md` the same card floats over the map as PointDetailSheet. */}
+        {selectedPointId && (
+          <button
+            type="button"
+            onClick={() => setTab("point")}
+            className={cn(
+              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[9px] font-bold tracking-wider uppercase transition-colors md:hidden",
+              tab === "point"
+                ? "border-primary text-primary border-b-2"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MapPin className="size-3.5" aria-hidden />
+            Point
+          </button>
+        )}
       </div>
 
-      {/* Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "route" && (
-          <>
+      {/* Content. The scroll position is reset on every tab change: the pane is one
+          scroller shared by all four segments, so without this a tab lands wherever
+          the previous one was scrolled to — clicking a waypoint low in the Route
+          list and landing on the Point segment with its heading already off the top.
+          Invisible from `md`, where the pane is tall enough never to scroll. */}
+      <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto">
+        {/* `point` is a base-only segment, so from `md` this slot falls back to the
+            route list — the tab can outlive a resize, its button cannot. */}
+        {(tab === "route" || tab === "point") && (
+          <div className={cn(tab === "point" && "hidden md:block")}>
             {stops.length === 0 ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-xs">
                 No waypoints for this day.
@@ -237,7 +284,17 @@ export function FeatureDrawer() {
                 })}
               </>
             )}
-          </>
+          </div>
+        )}
+
+        {/* pt-3 because the card carries no top padding of its own: floating over the
+            map its grab handle provides that, and there is no handle here. Matches
+            the Forecast and Tides panes; only Route sits flush, and that is a
+            full-width subheader band rather than content. */}
+        {tab === "point" && (
+          <div className="pt-3 md:hidden">
+            <PointSummary />
+          </div>
         )}
 
         {tab === "forecast" && (
@@ -326,6 +383,6 @@ export function FeatureDrawer() {
           </div>
         )}
       </div>
-    </div>
+    </MapBottomSheet>
   )
 }

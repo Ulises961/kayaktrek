@@ -6,6 +6,7 @@ import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RouteDayLayers } from "@/components/map/route-day-layers"
+import { ResizeHandler } from "@/components/map/resize-handler"
 import { OSM_TILE_URL, OSM_ATTRIBUTION } from "@/lib/map/tiles"
 import { LivePositionLayer } from "@/components/map/live-position-layer"
 import type { LivePosition } from "@/lib/dtos/live-position"
@@ -34,6 +35,7 @@ export default function PublicMap({ routes = [], livePositions = [] }: Props) {
   return (
     <MapContainer center={[43, 13]} zoom={5} className="h-full w-full" zoomControl={false}>
       <FitToRoutes routes={routes} />
+      <ResizeHandler />
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
       <RouteDayLayers routes={routes} />
       <LivePositionLayer positions={livePositions} />

@@ -116,7 +116,7 @@ describe("PublicRouteDetail", () => {
     expect(link).toHaveAttribute("href", "/")
   })
 
-  it("docks as a side panel, not an overlay positioned over the map", () => {
+  it("fills the slot it is given rather than positioning itself over the map", () => {
     render(
       <PublicRouteDetail
         route={route()}
@@ -125,8 +125,12 @@ describe("PublicRouteDetail", () => {
         backLabel="All routes"
       />,
     )
+    // PublicRouteShell owns where this sits and how wide it is — docked beside the
+    // map from `md`, sliding over it below. A position of its own here would fight
+    // that, and used to float the card over the route it frames (M12 §B/2.6).
     const panel = screen.getByTestId("route-detail-panel")
-    expect(panel.className).not.toMatch(/absolute/)
+    expect(panel.className).not.toMatch(/absolute|fixed/)
+    expect(panel.className).toMatch(/h-full/)
   })
 
   it("renders the actions slot", () => {

@@ -59,7 +59,8 @@ function DayRailEntry({
       disabled={isEmpty}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs transition-colors",
+        // Fixed-width card in the base strip, full-width row in the `md` rail.
+        "flex w-24 shrink-0 flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors md:w-full md:py-2",
         isEmpty && "cursor-default opacity-50",
         isActive
           ? "bg-primary text-primary-foreground shadow-sm"
@@ -95,10 +96,13 @@ function DayRailEntry({
           </span>
         )}
       </div>
+      {/* Point count is the least actionable of the four lines, and at base each
+          line it costs comes straight off the map's height. Kept from `md`, where
+          the rail has a column of its own to spend. */}
       {!isEmpty && (
         <span
           className={cn(
-            "text-[10px]",
+            "hidden text-[10px] md:inline",
             isActive ? "text-primary-foreground/60" : "text-muted-foreground",
           )}
         >
@@ -120,7 +124,7 @@ function RestGapEntry({ gaps }: { gaps: RestGap[] }) {
   return (
     <div
       data-testid="rest-gap-entry"
-      className="text-muted-foreground flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs"
+      className="text-muted-foreground flex w-20 shrink-0 flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs md:w-full"
     >
       <span className="font-semibold italic">Rest</span>
       <span className="text-[10px]">{label}</span>
@@ -157,10 +161,14 @@ export function DayRail() {
   return (
     <div
       data-testid="day-rail"
-      className="border-border bg-background/90 z-[1001] flex w-28 shrink-0 flex-col overflow-y-auto border-r backdrop-blur-sm"
+      // A horizontal strip above the map at base, the vertical rail beside it from
+      // `md`. Same component and same selection state — only the axis changes.
+      className="border-border bg-background/90 z-[1001] flex w-full shrink-0 flex-row overflow-x-auto border-b backdrop-blur-sm md:w-28 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:border-r md:border-b-0"
     >
-      {/* Strip header */}
-      <div className="border-border/40 shrink-0 border-b px-2.5 py-2.5">
+      {/* Strip header. Dropped at base, where it would spend a third of the strip's
+          width on a name the top bar already carries below `sm` and the header
+          breadcrumb carries from `sm`. */}
+      <div className="border-border/40 hidden shrink-0 border-b px-2.5 py-2.5 md:block">
         <p className="text-muted-foreground truncate text-[9px] font-bold tracking-widest uppercase">
           {tripName || "Itinerary"}
         </p>
@@ -170,9 +178,11 @@ export function DayRail() {
       </div>
 
       {numberedDays.length === 0 ? (
-        <p className="text-muted-foreground px-2.5 py-4 text-center text-[10px]">No days planned</p>
+        <p className="text-muted-foreground w-full px-2.5 py-4 text-center text-[10px]">
+          No days planned
+        </p>
       ) : (
-        <div className="flex flex-col gap-0.5 p-1.5">
+        <div className="flex flex-row gap-1 p-1.5 md:flex-col md:gap-0.5">
           {numberedDays.map((day) => {
             const gaps = gapsByAfterDayNumber.get(day.dayNumber)
             return (

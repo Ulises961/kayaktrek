@@ -75,28 +75,52 @@ export function LayersControl({
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="absolute top-2 right-2 z-[1001]" data-testid="velocity-controls">
+    // Bottom-right at every width. It used to sit top-right and only drop on a
+    // phone, but a control that changes corner by breakpoint is a thing the user
+    // has to relocate; pinning it here instead frees the top row for the Annotate
+    // FAB at every width and needs no branch at all.
+    // `bottom-10` clears the Leaflet attribution, a full-width 38px strip at 320.
+    //
+    // `items-end` is not cosmetic: this wrapper is as wide as its widest child, and
+    // that is the 198px panel, not the button. Without it the button sat at the
+    // wrapper's left edge — at 320 that put it at x≈109, in the middle of the map
+    // and on top of the Annotate pill, rather than at the right margin it asks for.
+    //
+    // flex-col-reverse puts the panel above the button, so an upward-opening menu
+    // stays on the map instead of running off the bottom edge.
+    //
+    // `pointer-events-none` on the wrapper, restored on the two children: this box
+    // is as tall as the closed panel and sits at z-[1001] over the map, and a
+    // transparent div still hit-tests, so it was swallowing taps beneath it.
+    <div
+      className="pointer-events-none absolute right-2 bottom-10 z-[1001] flex flex-col-reverse items-end gap-1"
+      data-testid="velocity-controls"
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         data-testid="layers-button"
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-all",
+          "pointer-events-auto flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold shadow-md ring-1 backdrop-blur-sm transition-all",
           open
             ? "bg-card text-foreground ring-primary/50"
             : "bg-card/85 text-foreground ring-border/40",
         )}
       >
         <Layers className="size-3.5" aria-hidden />
-        Overlays
+        {/* Icon-only on a phone, like the Annotate disclosure it pairs with across
+            the map's top row. `sr-only`, not `hidden`, so the button keeps a name. */}
+        <span className="sr-only sm:not-sr-only">Overlays</span>
       </button>
 
       <div
         data-testid="layers-panel"
         style={{ visibility: open ? "visible" : "hidden" }}
         className={cn(
-          "bg-card ring-border/30 mt-1 w-44 overflow-hidden rounded-md shadow-lg ring-1 transition-all duration-150",
-          open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0",
+          "bg-card ring-border/30 w-44 overflow-hidden rounded-md shadow-lg ring-1 transition-all duration-150",
+          open
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-1 opacity-0",
         )}
       >
         <div className="border-border/30 border-b px-3 py-1.5">

@@ -675,6 +675,30 @@
   }
 }
 
+/* ── Builder map: bottom-left zoom on a phone ─────────────────────────────
+   The zoom control moves to the bottom-left corner below `md` (map-core.tsx,
+   `ZoomCorner`), where Leaflet's attribution already sits — at 320 the credits
+   wrap to a full-width ~38px strip, so the corner is occupied.
+
+   Unlayered on purpose, and this is the whole reason the rule lives here rather
+   than as a Tailwind class on the map: `leaflet/dist/leaflet.css` is imported
+   unlayered, and an unlayered rule beats ANY `@layer utilities` rule no matter
+   how specific. A `[&_.leaflet-bottom_.leaflet-control-zoom]:mb-10` utility was
+   tried first and silently lost to Leaflet's own
+   `.leaflet-bottom .leaflet-control { margin-bottom: 10px }`.
+
+   The control is also lifted over the credits rather than only pushed clear of
+   them: the attribution strip is full width, so at some zoom levels and locales
+   it is two lines rather than one and no fixed margin clears every case. */
+.builder-map .leaflet-bottom.leaflet-left {
+  z-index: 1000;
+}
+/* 2.5rem = 45px, matching the `bottom-10` on the layers toggle in the opposite
+   corner so the two sit on one baseline. */
+.builder-map .leaflet-bottom .leaflet-control-zoom {
+  margin-bottom: 2.5rem;
+}
+
 /* Plain (unlayered) rules so Lightning CSS always emits them and they win
    over the base `* { border }` reset. */
 /* ── Auth surfaces ────────────────────────────────────────────────────────

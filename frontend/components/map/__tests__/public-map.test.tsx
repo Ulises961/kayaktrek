@@ -3,9 +3,11 @@ import { render } from "@testing-library/react"
 import React from "react"
 import type { RouteData, RouteDaySegment } from "@/lib/itinerary/public-routes"
 
-const { fitBounds, latLngBounds } = vi.hoisted(() => ({
+const { fitBounds, latLngBounds, invalidateSize, mapContainer } = vi.hoisted(() => ({
   fitBounds: vi.fn(),
+  invalidateSize: vi.fn(),
   latLngBounds: vi.fn((positions: [number, number][]) => ({ __mockBounds: positions })),
+  mapContainer: { __mockContainer: true },
 }))
 
 vi.mock("leaflet/dist/leaflet.css", () => ({}))
@@ -16,8 +18,25 @@ vi.mock("react-leaflet", () => ({
     <div data-testid="map-container">{children}</div>
   ),
   TileLayer: () => null,
-  useMap: vi.fn(() => ({ fitBounds })),
+  useMap: vi.fn(() => ({ fitBounds, invalidateSize, getContainer: () => mapContainer })),
 }))
+
+// Captures what the ResizeHandler observes and the callback it registers, so the
+// resize can be fired without a layout engine.
+const observed: unknown[] = []
+let onResize: (() => void) | null = null
+globalThis.ResizeObserver = class {
+  constructor(callback: () => void) {
+    onResize = callback
+  }
+  observe(target: unknown) {
+    observed.push(target)
+  }
+  unobserve() {}
+  disconnect() {
+    onResize = null
+  }
+} as unknown as typeof ResizeObserver
 
 const { RouteDayLayers } = vi.hoisted(() => ({ RouteDayLayers: vi.fn(() => null) }))
 vi.mock("@/components/map/route-day-layers", () => ({ RouteDayLayers }))
@@ -60,6 +79,8 @@ function route(overrides: Partial<RouteData> = {}): RouteData {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  observed.length = 0
+  onResize = null
 })
 
 const LIVE_POSITION: LivePosition = {
@@ -134,5 +155,19 @@ describe("PublicMap fit-to-route", () => {
   it("does not fit when there are no positions", () => {
     render(<PublicMap routes={[route({ positions: [], days: [] })]} />)
     expect(fitBounds).not.toHaveBeenCalled()
+  })
+})
+
+describe("PublicMap resize handling", () => {
+  it("tells Leaflet to remeasure when its container is resized", () => {
+    render(<PublicMap routes={[route()]} />)
+
+    // The public pages dock the route panel beside this map and collapse it on a
+    // toggle, which changes the map's width with no window resize behind it.
+    // Leaflet only watches the window, so without this the strip it just gained
+    // stays grey.
+    expect(observed).toEqual([mapContainer])
+    onResize!()
+    expect(invalidateSize).toHaveBeenCalledWith({ animate: false })
   })
 })
