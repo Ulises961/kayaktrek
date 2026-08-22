@@ -7,6 +7,7 @@ from Models.invitation import Invitation
 from Models.itinerary import Itinerary
 from Models.user import User
 from Services.itinerary_service import ItineraryService
+from Services.Utils.point_ordering import walk_linked_list
 from Api.database import db as _db
 import json
 
@@ -512,3 +513,63 @@ def test_remove_nonmember_returns_404(client, auth_headers, outsider_headers):
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+def test_nested_create_chains_points_in_payload_order(client, auth_headers):
+    """A nested itinerary's point array order must become the route's next_id chain.
+
+    TripSchema builds nested days/points straight from the payload, bypassing
+    ItineraryService — and nothing used to write the array's order into the
+    linked list. Every point then landed as a disconnected head, so readers
+    (walk_linked_list, and compute_total_miles through it) fell back to sorting
+    by str(id). UUIDv7 makes that creation order only while the timestamp
+    prefixes differ; points written in the same millisecond — which is what a
+    single nested create does — tie there and sort by their random bits.
+
+    So the bug was not that the order was wrong, but that it was *undefined*:
+    the same payload produced different distances run to run. Asserting the
+    chain rather than a resulting distance is what pins it, because a distance
+    assertion passes whenever the coin lands the right way up.
+    """
+    itinerary = {
+        "isPublic": True,
+        "totalMiles": 0,
+        "days": [
+            {
+                "dayNumber": 1,
+                "date": "2026-07-15",
+                "points": [
+                    {"latitude": 48.40, "longitude": -123.35, "name": "Launch", "type": "stop"},
+                    {"latitude": 48.45, "longitude": -123.30, "name": "Waypoint", "type": "position"},
+                    {"latitude": 48.50, "longitude": -123.25, "name": "Camp", "type": "stop"},
+                ],
+            }
+        ],
+    }
+    response = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        json={"inventory": {}, "itinerary": itinerary},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    itinerary_id = UUID(json.loads(response.data)["itinerary"]["id"])
+
+    day = (
+        _db.session.query(Day)
+        .filter_by(itinerary_id=itinerary_id, day_number=1)
+        .one()
+    )
+    by_name = {point.name: point for point in day.points}
+    assert set(by_name) == {"Launch", "Waypoint", "Camp"}
+
+    assert by_name["Launch"].next_id == by_name["Waypoint"].id
+    assert by_name["Waypoint"].next_id == by_name["Camp"].id
+    assert by_name["Camp"].next_id is None, "the last point terminates the chain"
+
+    # And the chain is what the readers actually walk.
+    assert walk_linked_list(list(day.points)) == [
+        str(by_name["Launch"].id),
+        str(by_name["Waypoint"].id),
+        str(by_name["Camp"].id),
+    ]
+

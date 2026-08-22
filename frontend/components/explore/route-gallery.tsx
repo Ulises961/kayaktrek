@@ -1,37 +1,5 @@
 "use client"
-import type { RouteData } from "@/lib/itinerary/public-routes"
-
-export type RoutePhoto = {
-  url: string
-  /** What the photo shows. Falls back to the point's own name and day. */
-  label: string
-  pointId: string | null
-}
-
-/**
- * Every opted-in photo on the route, flattened in day-then-route order.
- *
- * Flat and single-source on purpose (M19 §4): one strip for the itinerary, no
- * grouping headings, because the caption says what a heading would and says it per
- * photo. Where a photo is comes from clicking it — the map pans to its point.
- */
-export function routePhotos(route: RouteData): RoutePhoto[] {
-  const photos: RoutePhoto[] = []
-  for (const day of route.days) {
-    for (const point of day.points) {
-      for (const image of point.images) {
-        photos.push({
-          url: image.url,
-          // Most authors will not caption. Anonymous is the thing to avoid, so the
-          // point's own name carries it, and the day number when it has no name.
-          label: image.caption || point.name || `Day ${day.dayNumber}`,
-          pointId: point.id,
-        })
-      }
-    }
-  }
-  return photos
-}
+import type { RoutePhoto } from "@/lib/itinerary/public-routes"
 
 export type RouteGalleryProps = {
   photos: RoutePhoto[]

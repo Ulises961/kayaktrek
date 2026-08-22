@@ -1,9 +1,22 @@
 import { APIRequestContext } from "@playwright/test"
 import { API_URL } from "../playwright.config"
 
-// Module-level cache: one login call per user per worker process.
-// Access tokens live 15 min — well within a full test run.
-const _tokenCache = new Map<string, string>()
+// Module-level cache: one login call per user per worker process, re-issued
+// before the token it holds expires.
+//
+// Access tokens live 15 minutes (ACCESS_TOKEN_LIFETIME, Services/session_service.py).
+// This cache used to hand one out forever on the premise that 15 minutes was
+// "well within a full test run" — true when the suite was 66 tests and ran in
+// under 5, false now that it is 128 and runs past 20. Past the 15-minute mark
+// every seed call made with a cached token 401s, and because seeding happens in
+// beforeAll, the whole spec file dies rather than one assertion.
+//
+// Re-login at 10 minutes rather than at expiry: the margin covers a seed that
+// starts just under the line, and /auth/login's budget (10/min, 50/hour —
+// Resources/authentication_resource.py) is nowhere near threatened by a couple
+// of extra logins per user per hour.
+const TOKEN_MAX_AGE_MS = 10 * 60 * 1000
+const _tokenCache = new Map<string, { token: string; issuedAt: number }>()
 
 export async function apiCreateTrip(
   request: APIRequestContext,
@@ -89,12 +102,13 @@ export async function apiGetAccessToken(
   mail: string,
   pwd: string,
 ): Promise<string> {
-  if (_tokenCache.has(mail)) return _tokenCache.get(mail)!
+  const cached = _tokenCache.get(mail)
+  if (cached && Date.now() - cached.issuedAt < TOKEN_MAX_AGE_MS) return cached.token
   const res = await request.post(`${API_URL}/api/v1/auth/login`, {
     data: { mail, pwd },
   })
   if (!res.ok()) throw new Error(`login failed for ${mail}: ${res.status()}`)
   const body = await res.json()
-  _tokenCache.set(mail, body.access_token)
+  _tokenCache.set(mail, { token: body.access_token, issuedAt: Date.now() })
   return body.access_token
 }

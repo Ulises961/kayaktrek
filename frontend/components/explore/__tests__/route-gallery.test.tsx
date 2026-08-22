@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { RouteGallery, routePhotos } from "../route-gallery"
+import { RouteGallery } from "../route-gallery"
+import { routePhotos } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { POINT_TYPE } from "@/lib/dtos/point"
 

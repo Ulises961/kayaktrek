@@ -19,7 +19,7 @@ from Models.itinerary import Itinerary
 from Models.day import Day
 from Models.trip_requirement import TripRequirement
 from Services.Utils.route_distance import compute_total_miles
-from Services.Utils.point_ordering import walk_linked_list
+from Services.Utils.point_ordering import chain_in_order, walk_linked_list
 from Services.Utils.timezone_utils import resolve_timezone
 from Api.seed import DEFAULT_TRIP_REQUIREMENTS, seed_member_packing
 from Services.catalog_item_service import CatalogItemService
@@ -213,6 +213,18 @@ class TripService:
         # is reconciled.
         if trip.itinerary is not None:
             ItineraryService.ensure_staging_day(trip.itinerary)
+            # That same bypass means nothing writes the payload's point order into
+            # the next_id chain either. The array a client posts *is* the route's
+            # order, but without a chain every point is a disconnected head and
+            # readers fall back to sorting by UUID — which is creation order only
+            # until two points share a millisecond, after which their random bits
+            # decide. A route's distance and its drawn line were undefined.
+            #
+            # Unconditional: PointSchema makes next_id dump_only, so the array
+            # order is the only order a nested payload can express.
+            db.session.flush()
+            for day in trip.itinerary.days:
+                chain_in_order(list(day.points or []))
 
         # Every trip owns exactly one inventory, pre-populated with a leader-owned
         # default requirement set so the gear checklist never starts empty. The trip
