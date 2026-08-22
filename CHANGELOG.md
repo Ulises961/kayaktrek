@@ -7,6 +7,25 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.4.1] - 2026-08-23
+
+A hotfix: the 0.4.0 frontend image could not start.
+
+### Fixed
+
+- **The 0.4.0 frontend image died on startup and restarted forever.** The build left out part
+  of a package the server needs on its very first module load, so the container never served a
+  request. `0.4.0` cannot be deployed; use this. Nothing about the application itself changed
+  between the two.
+
+### Deploy notes
+
+- **Frontend image only.** The backend image is rebuilt and republished by the tag, but its
+  code is identical to `0.4.1`'s predecessor. No migration, no environment variables, no
+  forced logout.
+- If you are on `0.4.0`, this is the upgrade. If you rolled back to `0.3.0`, upgrading here
+  brings the `0.4.0` changes with it — see that entry for its migration note.
+
 ## [0.4.0] - 2026-08-23
 
 Routes you clone are editable again, points can go in the middle of a route, and the map
