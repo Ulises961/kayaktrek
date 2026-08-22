@@ -7,6 +7,50 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.4.0] - 2026-08-23
+
+Routes you clone are editable again, points can go in the middle of a route, and the map
+tells you how far you have paddled to any point you ask about.
+
+### Added
+
+- **Drop a point in the middle of a route.** Tap a leg between two points and the new point
+  goes there, rather than at the end of the route where every new point used to land. This
+  works while a day-boundary edit is still unsaved — the boundaries follow the insert.
+- **Any point will tell you its distance.** Click a waypoint and it reports how far you have
+  paddled since the last stop, on the map and on its row in the planner's point list — the row
+  that carries the control for turning it into a stop, which is the decision the figure is for.
+  Stops still carry their leg permanently, as before.
+
+### Fixed
+
+- **A cloned route could not be edited at all.** Cloning a shared route — including the demo
+  route on the landing page, the most likely first thing anyone clones — produced a route that
+  silently swallowed every point you dropped on it and every day boundary you tried to save. No
+  error, no message, nothing in the console: the clicks simply did nothing. Routes already in
+  this state are repaired by the upgrade.
+- **The first point of each day showed no distance.** The stretch paddled from the previous
+  night's stop into the next day was missing from every per-point reading, so a day's first
+  point looked like a starting point you had not travelled to. It now reports that crossing,
+  and a day's running total starts where the day's paddling actually starts — matching the
+  day total shown on the boundary, which the two used to disagree about.
+- **The shuttle vehicle form was unusable on a phone.** "Seats available" collapsed to a sliver
+  while "Kayak spots" took the whole row, leaving both labels and both numbers unreadable at
+  narrow widths.
+- **Leaving a page with a map on it could throw an error onto the page.** Navigating away
+  while the wind overlay was still starting up left two callbacks pointing at a map that no
+  longer existed. Most visible on the landing chart, and most likely on a slow machine.
+
+### Deploy notes
+
+- **One migration, data-only**, run automatically by the `migrate` service. It repairs routes
+  that are missing their internal staging day — the cause of the un-editable clone above. It
+  adds no columns, drops nothing, and re-running it changes nothing.
+- The demo route seeded on an existing database keeps the internal shape it was created with;
+  seeding skips a route that already exists. The migration makes it editable, so re-seeding is
+  optional — delete and re-run `flask seed` only if you want it rebuilt.
+- No new environment variables, and no forced logout.
+
 ## [0.3.0] - 2026-08-22
 
 Shared routes now say something about themselves, and the page that shows them works again.
