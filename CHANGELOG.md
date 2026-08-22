@@ -7,6 +7,54 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.3.0] - 2026-08-22
+
+Shared routes now say something about themselves, and the page that shows them works again.
+
+### Added
+
+- **A pitch and a grade on every shared route.** A route can carry a short description of what
+  it is and a difficulty grade, both written when you publish it — asked for and saved in the
+  same step, so a route is never listed with nothing describing it. They show on the discovery
+  cards (clamped to two lines) and in full on the route's own page, and the grade is now one of
+  the filters you can search the library by.
+- **Captions on photos.** A photo can say what it shows, and that caption is what a screen
+  reader announces instead of the upload's filename.
+- **The places you marked are published with the route.** Launches, water, hazards, camps and
+  viewpoints you pinned while planning now appear to anyone you share the route with, grouped
+  by kind, each with its own glyph and note. Publishing a place is deliberate and separate:
+  dropping a pin never publishes it, you turn it public afterwards.
+- **A photo strip on the route page.** Every opted-in photo in one gallery; clicking one pans
+  the map to where it was taken. Previously a photo could only be found by clicking its marker.
+
+### Fixed
+
+- **Shared route and story pages returned a server error to everyone.** `/routes/…` and
+  `/story/…` failed to render at all — for the author and for anyone following a link. Anyone
+  who opened a shared link since the previous release saw an error page.
+- **A route's point order could come out wrong.** A route created with its points sent all at
+  once stored no order at all, and the app then guessed one — differently on different reads,
+  so the same route could report two different distances and draw two different lines. Order is
+  now recorded when the route is created. Routes built point-by-point on the map were never
+  affected; a route already stored without an order keeps whatever it has until it is edited.
+- **Taps were being lost in the itinerary planner on a phone.** The map's credit line was a
+  full-width strip across the bottom of the map, swallowing every tap in it — and a tap that
+  landed on the licence link navigated away, taking an unsaved day draft with it. It is now a
+  small badge that opens the credits on tap. Separately, dragging a day boundary auto-scrolled
+  the list out from under your finger, because the scroll zone was a fixed size that covered
+  more than half the list on a phone; it now scales with the list.
+
+### Deploy notes
+
+- **Two migrations, both additive**, run automatically by the `migrate` service. One adds the
+  description and difficulty columns to itineraries; the other adds the photo caption column.
+  Nothing is dropped and no data is rewritten.
+- The first migration also **renames the Postgres enum type** `tripdifficultytype` to
+  `difficultytype` in place, since the grade is now shared between trips and routes. `migrate`
+  only ever runs `alembic upgrade head` — rolling back the images restores the code but not the
+  schema, so roll forward rather than back.
+- No new environment variables, and no forced logout.
+
 ## [0.2.0] - 2026-08-21
 
 The web client now works on a phone. Everything else here is a fix.
