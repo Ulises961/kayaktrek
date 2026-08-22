@@ -64,16 +64,21 @@ export function TripsSection({
   const [page, setPage] = useState(initial.page)
   const [pages, setPages] = useState(initial.pages)
   const [total, setTotal] = useState(initial.total)
+  const [syncedInitial, setSyncedInitial] = useState(initial)
   const [sort, setSort] = useState<TripSort>(defaultSort)
   const [isPending, startTransition] = useTransition()
   const latestRequest = useRef(0)
 
-  useEffect(() => {
+  // Same prop-resync as LogsList: a child mutation revalidates the page and
+  // hands this already-mounted section a fresh `initial`. Adjusted during render
+  // so no stale frame is committed first.
+  if (initial !== syncedInitial) {
+    setSyncedInitial(initial)
     setItems(initial.items)
     setPage(initial.page)
     setPages(initial.pages)
     setTotal(initial.total)
-  }, [initial])
+  }
 
   // `onEmptyChange` is a fresh closure from the parent on every render (it
   // captures which state bucket it's reporting for) — only `total` actually

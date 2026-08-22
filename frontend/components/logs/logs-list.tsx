@@ -41,6 +41,7 @@ export function LogsList({ initial, kind, currentUserId, unit }: LogsListProps) 
   const [items, setItems] = useState<Log[]>(initial.items)
   const [page, setPage] = useState(initial.page)
   const [pages, setPages] = useState(initial.pages)
+  const [syncedInitial, setSyncedInitial] = useState(initial)
   const [sort, setSort] = useState<LogSort>(LOG_SORT.NEWEST)
   const [seaRange, setSeaRange] = useState<[number, number]>([SEA_MIN, SEA_MAX])
   const [minDistance, setMinDistance] = useState("")
@@ -70,12 +71,15 @@ export function LogsList({ initial, kind, currentUserId, unit }: LogsListProps) 
   // then re-renders this already-mounted component with a fresh `initial` object.
   // `items`/`page`/`pages` are local state seeded from `initial` (needed for sort
   // refetch + load-more accumulation below), so they don't pick that up on their
-  // own — resync whenever `initial` itself changes.
-  useEffect(() => {
+  // own — resync whenever `initial` itself changes. Adjusted during render rather
+  // than from an effect: React re-runs this component before committing, so the
+  // list never paints one frame of stale rows.
+  if (initial !== syncedInitial) {
+    setSyncedInitial(initial)
     setItems(initial.items)
     setPage(initial.page)
     setPages(initial.pages)
-  }, [initial])
+  }
 
   // Refetch page 1 whenever sort or a severity/distance filter changes. Skip the
   // very first run — the server already provided `initial`. A request id

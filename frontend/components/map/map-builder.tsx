@@ -66,23 +66,18 @@ export function MapBuilder({
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
   const [selectedHour, setSelectedHour] = useState(12)
   const [conditionsVersion, setConditionsVersion] = useState(0)
-  const [navigateMode, setNavigateMode] = useState(false)
+  // Honors the `?navigate=1` deep link once, at mount — as a state initializer
+  // rather than an effect, so a user who explicitly turns Navigate off is never
+  // fought by a later re-run.
+  const searchParams = useSearchParams()
+  const [navigateMode, setNavigateMode] = useState(
+    () => showNavigate && searchParams.get("navigate") === "1",
+  )
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
 
   const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
 
   // ── Navigate mode (M8) ──────────────────────────────────────────────────
-
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    if (showNavigate && searchParams.get("navigate") === "1") {
-      setNavigateMode(true)
-      setViewMode(true)
-    }
-    // Deliberately mount-only (honors the deep link once) — re-running on every
-    // searchParams change would fight a user who explicitly turns Navigate off.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showNavigate])
 
   const handleToggleNavigate = useCallback(() => {
     setNavigateMode((prev) => {
@@ -98,16 +93,16 @@ export function MapBuilder({
   )
 
   useEffect(() => {
-    if (!navigateMode || !tripId) {
-      setStreamUrl(null)
-      return
-    }
+    if (!navigateMode || !tripId) return
     let cancelled = false
     mintStreamUrl().then((url) => {
       if (!cancelled) setStreamUrl(url)
     })
+    // Leaving Navigate drops the ticket on the way out rather than on the next
+    // run, so a stale one is never held while the stream is closed.
     return () => {
       cancelled = true
+      setStreamUrl(null)
     }
   }, [navigateMode, tripId, mintStreamUrl])
 

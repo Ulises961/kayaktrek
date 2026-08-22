@@ -93,6 +93,11 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // Embla is an external store: subscribing tells us about *later* selections,
+    // so the current one has to be read once on attach. That read is the
+    // synchronous setState the rule flags, and there is no earlier point to do
+    // it — the api object only exists after the carousel mounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

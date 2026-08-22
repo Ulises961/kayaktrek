@@ -582,10 +582,10 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50–90% for visual variety. Stable across re-renders via useRef.
-  // eslint-disable-next-line react-hooks/purity
-  const widthRef = React.useRef(`${Math.floor(Math.random() * 40) + 50}%`)
-  const width = widthRef.current
+  // Random width between 50–90% for visual variety. Picked once per mount via a
+  // lazy state initializer — a ref would hold the same value but reading
+  // `.current` during render is what `react-hooks/refs` (rightly) objects to.
+  const [width] = React.useState(() => `${Math.floor(Math.random() * 40) + 50}%`)
 
   return (
     <div
