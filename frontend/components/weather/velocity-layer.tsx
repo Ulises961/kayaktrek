@@ -11,9 +11,20 @@ import type { VelocityLayerProps } from "@/lib/types/ui"
 // coalesces rapid consecutive zooms — each gesture re-hides and re-arms the timer.
 const SETTLE_MS = 320
 
+// leaflet-velocity's internals, as far as we have to reach into them. The
+// canvas layer is the plugin's own L.CanvasLayer instance: `_frame` is the
+// pending requestAnimFrame handle for its next draw, and `_onLayerDidMove` is
+// the method its deferred reposition lands in. Both are needed at teardown, see
+// the cleanup below.
+type CanvasLayerHandle = {
+  _canvas?: HTMLCanvasElement
+  _frame?: number | null
+  _onLayerDidMove?: () => void
+}
+
 type VelocityLayerHandle = L.Layer & {
   setOptions?: (options: Record<string, unknown>) => void
-  _canvasLayer?: { _canvas?: HTMLCanvasElement }
+  _canvasLayer?: CanvasLayerHandle
 }
 
 export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
@@ -99,8 +110,33 @@ export function VelocityLayer({ data, options = {} }: VelocityLayerProps) {
       cancelled = true
       cancelAnimationFrame(rafId)
       detach?.()
-      if (layerRef.current) {
-        map.removeLayer(layerRef.current)
+      const attached = layerRef.current
+      if (attached) {
+        map.removeLayer(attached)
+
+        // leaflet-velocity's canvas layer schedules two calls in onAdd that
+        // dereference `this._map`, and its onRemove cancels neither:
+        //   • needRedraw() → requestAnimFrame(drawLayer) → this._map.getSize()
+        //   • setTimeout(…, 0) → _onLayerDidMove() → containerPointToLayerPoint()
+        // Leaflet nulls `_map` the moment the layer is removed, so a map torn
+        // down inside either window throws an uncaught TypeError onto the page
+        // (both were observed on the landing chart when navigating away from it
+        // on a slow machine — the windows are a frame and a macrotask wide, so
+        // only a starved CPU loses the race).
+        //
+        // This runs AFTER removeLayer on purpose: onRemove does
+        // `map.off(this.getEvents(), this)`, which rebuilds its handler object
+        // from these same properties, so stubbing first would leave the real
+        // listeners attached.
+        const canvasLayer = attached._canvasLayer
+        if (canvasLayer) {
+          if (canvasLayer._frame != null) {
+            L.Util.cancelAnimFrame(canvasLayer._frame)
+            canvasLayer._frame = null
+          }
+          canvasLayer._onLayerDidMove = () => {}
+        }
+
         layerRef.current = null
       }
     }
