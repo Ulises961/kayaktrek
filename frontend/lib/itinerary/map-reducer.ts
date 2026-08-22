@@ -17,7 +17,10 @@ export type MapState = {
 }
 
 export type MapAction =
-  | { type: "POINT_ADD"; point: Point }
+  // `afterId` inserts the point directly after that id in pointOrder — a point
+  // dropped on a leg. Omitted, the point is appended, which is what a click on
+  // open water means.
+  | { type: "POINT_ADD"; point: Point; afterId?: string }
   | { type: "POINT_CONFIRM"; tempId: string; point: Point }
   | { type: "POINT_ROLLBACK"; id: string }
   | { type: "POINT_UPDATE"; id: string; fields: Partial<Point> }
@@ -46,12 +49,19 @@ export type MapAction =
 
 export function mapReducer(state: MapState, action: MapAction): MapState {
   switch (action.type) {
-    case "POINT_ADD":
-      return {
-        ...state,
-        points: [...state.points, action.point],
-        pointOrder: action.point.id ? [...state.pointOrder, action.point.id] : state.pointOrder,
-      }
+    case "POINT_ADD": {
+      if (!action.point.id) return { ...state, points: [...state.points, action.point] }
+      const at = action.afterId ? state.pointOrder.indexOf(action.afterId) : -1
+      const pointOrder =
+        at === -1
+          ? [...state.pointOrder, action.point.id]
+          : [
+              ...state.pointOrder.slice(0, at + 1),
+              action.point.id,
+              ...state.pointOrder.slice(at + 1),
+            ]
+      return { ...state, points: [...state.points, action.point], pointOrder }
+    }
 
     case "POINT_CONFIRM":
       return {

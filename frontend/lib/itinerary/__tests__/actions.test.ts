@@ -42,10 +42,12 @@ import {
   deletePoint,
   deleteItinerary,
   createDay,
+  ensureStagingDay,
   updateDay,
   deleteDay,
   assignPointsToDay,
   applyBoundaries,
+  setPointOrder,
   forkItinerary,
   importGpx,
   generateStoryShare,
@@ -237,6 +239,22 @@ describe("fetchItineraries", () => {
 })
 
 describe("createPoint", () => {
+  it("passes afterPointId through so the server splices instead of appending", async () => {
+    mockApiPost.mockResolvedValue(POINT_RESPONSE)
+    await createPoint(DAY_ID, {
+      type: "position",
+      latitude: 44,
+      longitude: 8,
+      afterPointId: POINT_ID,
+    })
+    expect(mockApiPost).toHaveBeenCalledWith("/api/point/create", {
+      dayId: DAY_ID,
+      type: "position",
+      latitude: 44,
+      longitude: 8,
+      afterPointId: POINT_ID,
+    })
+  })
   it("posts to /api/point/create with dayId and fields", async () => {
     mockApiPost.mockResolvedValue(POINT_RESPONSE)
     await createPoint(DAY_ID, { type: "position", latitude: 44.5, longitude: 14.2 })
@@ -365,6 +383,39 @@ describe("deleteItinerary", () => {
   })
 })
 
+describe("setPointOrder", () => {
+  it("posts the whole order to the itinerary's point-order endpoint", async () => {
+    mockApiPost.mockResolvedValue({ order: [POINT_ID] })
+    await setPointOrder(ITINERARY_ID, [POINT_ID, DAY_ID])
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}/point-order`, {
+      order: [POINT_ID, DAY_ID],
+    })
+  })
+
+  it("returns success without a payload — the client already holds the order it sent", async () => {
+    mockApiPost.mockResolvedValue({ order: [POINT_ID] })
+    expect(await setPointOrder(ITINERARY_ID, [POINT_ID])).toEqual({ success: true })
+  })
+
+  it("surfaces a stale-order conflict as a failure the caller can report", async () => {
+    // The server answers 409 rather than orphaning the points a stale list left
+    // out; apiPost turns that into a thrown Error.
+    mockApiPost.mockRejectedValue(new Error("Conflict"))
+    expect(await setPointOrder(ITINERARY_ID, [POINT_ID])).toEqual({
+      success: false,
+      error: "Conflict",
+    })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    expect(await setPointOrder(ITINERARY_ID, [POINT_ID])).toEqual({
+      success: false,
+      error: "Failed to save the route order.",
+    })
+  })
+})
+
 describe("createDay", () => {
   it("posts to /api/day/create with itineraryId and dayNumber", async () => {
     mockApiPost.mockResolvedValue(DAY_RESPONSE)
@@ -391,6 +442,40 @@ describe("createDay", () => {
     mockApiPost.mockRejectedValue("oops")
     const result = await createDay(ITINERARY_ID_2, 1)
     expect(result).toEqual({ success: false, error: "Failed to create day." })
+  })
+})
+
+describe("ensureStagingDay", () => {
+  const DAY_ZERO_RESPONSE = { id: DAY_ID_2, dayNumber: 0, itineraryId: ITINERARY_ID_2 }
+
+  it("posts to the itinerary's staging-day endpoint", async () => {
+    mockApiPost.mockResolvedValue(DAY_ZERO_RESPONSE)
+    await ensureStagingDay(ITINERARY_ID_2)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID_2}/staging-day`, {})
+  })
+
+  it("returns success with the parsed Day 0", async () => {
+    mockApiPost.mockResolvedValue(DAY_ZERO_RESPONSE)
+    const result = await ensureStagingDay(ITINERARY_ID_2)
+    expect(result).toMatchObject({
+      success: true,
+      day: expect.objectContaining({ id: DAY_ID_2, dayNumber: 0 }),
+    })
+  })
+
+  it("returns error on API failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("Server Error"))
+    const result = await ensureStagingDay(ITINERARY_ID_2)
+    expect(result).toEqual({ success: false, error: "Server Error" })
+  })
+
+  it("returns generic error for non-Error throws", async () => {
+    mockApiPost.mockRejectedValue("oops")
+    const result = await ensureStagingDay(ITINERARY_ID_2)
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to prepare the itinerary for editing.",
+    })
   })
 })
 

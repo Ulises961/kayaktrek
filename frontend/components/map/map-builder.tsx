@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
 import { useContentLayout } from "@/hooks/use-content-layout"
 import { usePositionWatch } from "@/hooks/use-position-watch"
@@ -10,13 +11,20 @@ import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
+import type { Day } from "@/lib/dtos/day"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import type { DraftBoundary } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
-import { createPoint, updatePoint, updateItinerary } from "@/lib/itinerary/actions"
+import {
+  createPoint,
+  updatePoint,
+  updateItinerary,
+  ensureStagingDay,
+  setPointOrder,
+} from "@/lib/itinerary/actions"
 import { getStreamTicket } from "@/lib/live/actions"
 import { setUnitPreference } from "@/lib/profile/actions"
 import { debounce } from "@/lib/utils/debounce"
@@ -140,7 +148,12 @@ export function MapBuilder({
   )
   useEffect(() => debouncedSaveSpeed.cancel, [debouncedSaveSpeed])
 
-  const day0 = itinerary.days?.find((d) => d.dayNumber === 0)
+  // Held in state, not derived, because an itinerary can arrive without one: the
+  // staging day is provisioned on demand and the map has to pick it up mid-session
+  // (it carries the day colour every staged point renders in).
+  const [day0, setDay0] = useState<Day | null>(
+    () => itinerary.days?.find((d) => d.dayNumber === 0) ?? null,
+  )
   const day0Id = day0?.id ?? null
   const allPoints = itinerary.days?.flatMap((d) => d.points ?? []) ?? []
   const numberedDays = itinerary.days?.filter((d) => d.dayNumber > 0) ?? []
@@ -172,8 +185,23 @@ export function MapBuilder({
 
   // ── handlers ─────────────────────────────────────────────────────────────
 
+  // Every path that stages a point resolves the day through here. Reading day0Id
+  // directly and bailing when it's null is how a cloned itinerary silently refused
+  // every point the user dropped and every day boundary they saved.
+  const resolveDay0Id = useCallback(async (): Promise<string | null> => {
+    if (day0Id) return day0Id
+    const result = await ensureStagingDay(itinerary.id ?? "")
+    if (!result.success) {
+      toast.error(result.error)
+      return null
+    }
+    setDay0(result.day)
+    return result.day.id ?? null
+  }, [day0Id, itinerary.id])
+
   const handleMapClick = async (lat: number, lng: number) => {
-    if (!day0Id) return
+    const stagingDayId = await resolveDay0Id()
+    if (!stagingDayId) return
     const tempId = `tmp-${Date.now()}`
 
     // Collapse any expanded point row so the newly added point is the only focus.
@@ -181,19 +209,85 @@ export function MapBuilder({
 
     dispatch({
       type: "POINT_ADD",
-      point: { id: tempId, type: "position", latitude: lat, longitude: lng, dayId: day0Id },
+      point: { id: tempId, type: "position", latitude: lat, longitude: lng, dayId: stagingDayId },
     })
     dispatch({ type: "SET_PENDING", id: tempId })
     dispatch({ type: "SAVING_START" })
 
-    const result = await createPoint(day0Id, { type: "position", latitude: lat, longitude: lng })
+    const result = await createPoint(stagingDayId, {
+      type: "position",
+      latitude: lat,
+      longitude: lng,
+    })
     dispatch({ type: "SAVING_END" })
 
     if (result.success) {
-      dispatch({ type: "POINT_CONFIRM", tempId, point: { ...result.point, dayId: day0Id } })
+      dispatch({ type: "POINT_CONFIRM", tempId, point: { ...result.point, dayId: stagingDayId } })
     } else {
       dispatch({ type: "POINT_ROLLBACK", id: tempId })
     }
+  }
+
+  // Dropping a point on a leg. The insert is expressed twice on purpose: the
+  // create carries `afterPointId` so a single insert is correct in one round trip,
+  // and the whole order is then re-sent so `pointOrder` — the client's canonical
+  // route order — is what the server holds. Without the first, a failed second
+  // would leave the point silently appended to the end of the route.
+  const handleLegClick = async (afterPointId: string, lat: number, lng: number) => {
+    const predecessorIdx = state.pointOrder.indexOf(afterPointId)
+    if (predecessorIdx === -1) return
+
+    // The successor's day, not the predecessor's: a point inserted immediately
+    // after a boundary stop belongs to the day the stop opens, since the stop
+    // itself is owned by the day that ends there. Mid-day the two agree.
+    const successorId = state.pointOrder[predecessorIdx + 1]
+    const successor = successorId ? state.points.find((p) => p.id === successorId) : undefined
+    const predecessor = state.points.find((p) => p.id === afterPointId)
+    const dayId = successor?.dayId ?? predecessor?.dayId ?? (await resolveDay0Id())
+    if (!dayId) return
+
+    const tempId = `tmp-${Date.now()}`
+    setSelectedPointId(null)
+
+    dispatch({
+      type: "POINT_ADD",
+      afterId: afterPointId,
+      point: { id: tempId, type: "position", latitude: lat, longitude: lng, dayId },
+    })
+    dispatch({ type: "SET_PENDING", id: tempId })
+    dispatch({ type: "SAVING_START" })
+
+    const result = await createPoint(dayId, {
+      type: "position",
+      latitude: lat,
+      longitude: lng,
+      afterPointId,
+    })
+    dispatch({ type: "SAVING_END" })
+
+    if (!result.success) {
+      dispatch({ type: "POINT_ROLLBACK", id: tempId })
+      toast.error(result.error)
+      return
+    }
+    dispatch({ type: "POINT_CONFIRM", tempId, point: { ...result.point, dayId } })
+
+    // Only now that the real id exists — an order carrying a temp id is a set the
+    // server cannot match, and it would answer 409 for a reason of our own making.
+    const savedId = result.point.id
+    if (!savedId) return
+    const order = [
+      ...state.pointOrder.slice(0, predecessorIdx + 1),
+      savedId,
+      ...state.pointOrder.slice(predecessorIdx + 1),
+    ]
+    dispatch({ type: "SAVING_START" })
+    const ordered = await setPointOrder(itinerary.id ?? "", order)
+    dispatch({ type: "SAVING_END" })
+    // The point is already spliced server-side by `afterPointId`, so a failure
+    // here costs nothing but the reconciliation — the route on screen is the route
+    // that was saved. Worth saying out loud rather than swallowing.
+    if (!ordered.success) toast.error(ordered.error)
   }
 
   const handleMarkerDragEnd = useCallback(
@@ -285,6 +379,7 @@ export function MapBuilder({
       avgSpeedKnots,
       setAvgSpeedKnots,
       day0Id,
+      resolveDay0Id,
       viewMode,
       setViewMode,
       selectedDayId,
@@ -312,6 +407,7 @@ export function MapBuilder({
       handleDistanceUnitChange,
       avgSpeedKnots,
       day0Id,
+      resolveDay0Id,
       viewMode,
       selectedDayId,
       selectedPointId,
@@ -379,6 +475,7 @@ export function MapBuilder({
               distanceUnit={distanceUnit}
               viewMode={viewMode}
               selectedDayId={selectedDayId}
+              selectedPointId={selectedPointId}
               selectedHour={selectedHour}
               flyToPoint={flyToPoint}
               itineraryId={itinerary.id ?? ""}
@@ -388,6 +485,7 @@ export function MapBuilder({
               onMarkerDragEnd={handleMarkerDragEnd}
               onMarkerDragMove={handleMarkerDragMove}
               onMarkerClick={handleMarkerClick}
+              onLegClick={handleLegClick}
               avgSpeedKnots={avgSpeedKnots}
               livePositions={navigateMode ? liveStream.positions : []}
             />

@@ -88,6 +88,28 @@ class PointService:
             point.geo = None
 
     @staticmethod
+    def _splice_after(point: Point, after_point_id: str, itinerary: Itinerary | None) -> None:
+        """Link `point` into the chain directly after `after_point_id`.
+
+        The predecessor must belong to the same itinerary (or, for a point on a
+        dayless itinerary, the same day) — splicing across routes would braid two
+        chains together and leave both unwalkable.
+        """
+        predecessor = db.session.query(Point).filter_by(id=UUID(after_point_id)).first()
+        if predecessor is None:
+            raise ValueError(f"Point {after_point_id} not found")
+
+        if itinerary is not None:
+            predecessor_day = db.session.query(Day).filter_by(id=predecessor.day_id).first()
+            if predecessor_day is None or predecessor_day.itinerary_id != itinerary.id:
+                raise ValueError("afterPointId belongs to a different itinerary")
+        elif predecessor.day_id != point.day_id:
+            raise ValueError("afterPointId belongs to a different day")
+
+        point.next_id = predecessor.next_id
+        predecessor.next_id = point.id
+
+    @staticmethod
     def create_point(point_data: dict) -> Point:
         """
         Create a new point.
@@ -115,6 +137,19 @@ class PointService:
         PointService._sync_geo(point)
         db.session.add(point)
         db.session.flush()  # assign point.id before querying for the tail
+
+        # Splice in after a named predecessor, when the caller asked for one — a
+        # point dropped on a leg belongs between the two points it was dropped
+        # between, not at the end of the route. PointSchema declares next_id
+        # dump_only and Meta.unknown = EXCLUDE, so the id is read from the raw
+        # payload rather than the loaded model.
+        after_point_id = point_data.get("afterPointId")
+        if after_point_id:
+            PointService._splice_after(point, str(after_point_id), itinerary)
+            db.session.commit()
+            db.session.refresh(point)
+            logger.info(f"Point {point.id} created after {after_point_id}")
+            return point
 
         # Append to the tail of the ITINERARY-WIDE chain (not day-scoped).
         # apply_boundaries moves points from day 0 into numbered days; a day-scoped

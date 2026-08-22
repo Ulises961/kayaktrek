@@ -1,3 +1,40 @@
+export type DayGroup<T> = {
+  /** The point the day is paddled *from* — the previous point in route order,
+   * which for every day after the first is the overnight stop the previous day
+   * owns. Null for the day that opens the route. */
+  seed: T | null
+  own: T[]
+}
+
+/**
+ * Split a route (already in `pointOrder`) into per-day groups, each carrying the
+ * point it is paddled from.
+ *
+ * Single-owner storage puts the shared overnight stop on the day that *ends*
+ * there, so a day's own points start one point after it. Grouping by `dayId`
+ * alone therefore loses the crossing leg entirely — the first point of every day
+ * looks like a fresh start with nothing behind it. The seed is that missing
+ * point, and it is deliberately "the previous point in route order" rather than
+ * "the previous day's end point" so the Day 0 staging tail gets one too: the
+ * route's growing tip is then measured from the last real stop, not from
+ * whichever staged point happens to come first.
+ *
+ * A day whose points are not contiguous in the order (nothing produces that
+ * today) seeds from the point before its first appearance.
+ */
+export function dayRouteGroups<T extends { dayId?: string | null }>(
+  ordered: T[],
+): Map<string | null, DayGroup<T>> {
+  const groups = new Map<string | null, DayGroup<T>>()
+  ordered.forEach((point, index) => {
+    const key = point.dayId ?? null
+    const group = groups.get(key)
+    if (group) group.own.push(point)
+    else groups.set(key, { seed: index > 0 ? ordered[index - 1] : null, own: [point] })
+  })
+  return groups
+}
+
 export type DayLike = {
   startPointId?: string | null
   endPointId?: string | null

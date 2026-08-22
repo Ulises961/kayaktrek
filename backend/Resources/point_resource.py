@@ -37,7 +37,10 @@ def create_point():
       summary: Add a route point to a day
       description: >
         Appended to the tail of the itinerary-wide point chain (linked via
-        `next_id`), not just the day's own points.
+        `next_id`), not just the day's own points. Pass `afterPointId` to splice
+        the new point in directly after an existing one instead — a point dropped
+        on a leg belongs between the two it was dropped between. The predecessor
+        must belong to the same itinerary.
       requestBody:
         content:
           application/json:

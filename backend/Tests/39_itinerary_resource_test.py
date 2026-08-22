@@ -4,6 +4,7 @@ from io import BytesIO
 import pytest
 
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
+from Resources.day_resource import DAY_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 
@@ -95,6 +96,62 @@ def test_update_validation_error_returns_400(client, auth_headers, itinerary):
     r = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary['id']}",
                      json={"avgSpeedKnots": 0.1}, headers=auth_headers)
     assert r.status_code == 400
+
+
+# ── POST /<id>/staging-day ────────────────────────────────────────────────────
+
+def test_provision_staging_day_returns_the_existing_day_zero(client, auth_headers, itinerary):
+    """Idempotent: an itinerary created the normal way already has a Day 0, and
+    asking for one hands back that same row rather than a second."""
+    first = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/staging-day",
+                        headers=auth_headers)
+    assert first.status_code == 200
+    assert first.json["dayNumber"] == 0
+
+    second = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/staging-day",
+                         headers=auth_headers)
+    assert second.status_code == 200
+    assert second.json["id"] == first.json["id"]
+
+    days = client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}", headers=auth_headers).json["days"]
+    assert len([d for d in days if d["dayNumber"] == 0]) == 1
+
+
+def test_provision_staging_day_recreates_a_missing_day_zero(client, auth_headers, itinerary):
+    """The builder's repair path: without a Day 0 the map silently refuses every
+    dropped point, so it asks for one rather than returning from the click handler."""
+    day0_id = next(
+        d["id"]
+        for d in client.get(f"{ITINERARY_ENDPOINT}/{itinerary['id']}",
+                            headers=auth_headers).json["days"]
+        if d["dayNumber"] == 0
+    )
+    assert client.delete(f"{DAY_ENDPOINT}/{day0_id}", headers=auth_headers).status_code in (200, 204)
+
+    restored = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/staging-day",
+                           headers=auth_headers)
+    assert restored.status_code == 200
+    assert restored.json["dayNumber"] == 0
+    assert restored.json["id"] != day0_id  # genuinely a new row, not the deleted one
+
+    # And a point can be dropped into it — the whole reason it has to exist.
+    created = client.post(f"{POINT_ENDPOINT}/create", headers=auth_headers,
+                          json={"dayId": restored.json["id"], "type": "position",
+                                "latitude": 44.2, "longitude": 8.7})
+    assert created.status_code == 201
+
+
+def test_provision_staging_day_for_other_users_itinerary_returns_403(
+    client, auth_headers_2, itinerary
+):
+    r = client.post(f"{ITINERARY_ENDPOINT}/{itinerary['id']}/staging-day",
+                    headers=auth_headers_2)
+    assert r.status_code == 403
+
+
+def test_provision_staging_day_nonexistent_returns_404(client, auth_headers):
+    r = client.post(f"{ITINERARY_ENDPOINT}/{_FAKE_UUID}/staging-day", headers=auth_headers)
+    assert r.status_code == 404
 
 
 # ── POST /<id>/fork ───────────────────────────────────────────────────────────
@@ -213,3 +270,114 @@ def test_apply_boundaries_bad_point_returns_400(client, auth_headers, itinerary)
                                           "endPointId": _FAKE_UUID, "date": None}],
                           "points": []})
     assert r.status_code == 400
+
+
+# ── POST /<id>/point-order ────────────────────────────────────────────────────
+
+@pytest.fixture(scope="function")
+def route_of_three(client, auth_headers, itinerary):
+    """Three points on one itinerary, in creation order, with their day 0 id."""
+    day0_id = next(d["id"] for d in itinerary["days"] if d["dayNumber"] == 0)
+    created = []
+    for latitude in (44.0, 44.1, 44.2):
+        response = client.post(
+            f"{POINT_ENDPOINT}/create",
+            headers=auth_headers,
+            json={"dayId": day0_id, "type": "position",
+                  "latitude": latitude, "longitude": 8.5},
+        )
+        assert response.status_code == 201
+        created.append(response.json)
+    return {"itinerary_id": itinerary["id"], "points": created}
+
+
+def _chain_ids(client, auth_headers, points):
+    """Walk the persisted next_id chain from its head and return the id order."""
+    by_id = {}
+    for point in points:
+        fetched = client.get(f"{POINT_ENDPOINT}/{point['id']}", headers=auth_headers)
+        assert fetched.status_code == 200
+        by_id[point["id"]] = fetched.json
+    referenced = {p["nextId"] for p in by_id.values() if p["nextId"]}
+    heads = [pid for pid in by_id if pid not in referenced]
+    assert len(heads) == 1, "the route is not a single chain"
+    order, current = [], heads[0]
+    while current:
+        order.append(current)
+        current = by_id[current]["nextId"]
+    return order
+
+
+def test_point_order_rewrites_the_chain(client, auth_headers, route_of_three):
+    """pointOrder has been the frontend's canonical route order since M4b with no
+    verb to send it back — points could only ever be appended to the tail."""
+    [first, second, third] = route_of_three["points"]
+    reversed_ids = [third["id"], second["id"], first["id"]]
+
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers,
+        json={"order": reversed_ids},
+    )
+    assert response.status_code == 200
+    assert response.json["order"] == reversed_ids
+    assert _chain_ids(client, auth_headers, route_of_three["points"]) == reversed_ids
+
+
+def test_point_order_leaves_the_route_alone_when_the_set_does_not_match(
+    client, auth_headers, route_of_three
+):
+    """A stale order is a 409, not a partial apply: re-chaining it would orphan the
+    points it left out, and an orphan's position is decided by a UUID tie-break."""
+    [first, second, third] = route_of_three["points"]
+    before = _chain_ids(client, auth_headers, route_of_three["points"])
+
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers,
+        json={"order": [third["id"], first["id"]]},  # `second` dropped
+    )
+    assert response.status_code == 409
+    assert _chain_ids(client, auth_headers, route_of_three["points"]) == before
+
+
+def test_point_order_rejects_an_unknown_id(client, auth_headers, route_of_three):
+    ids = [p["id"] for p in route_of_three["points"]]
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers,
+        json={"order": ids[:2] + [_FAKE_UUID]},
+    )
+    assert response.status_code == 409
+
+
+def test_point_order_rejects_a_duplicated_id(client, auth_headers, route_of_three):
+    """Same length, same membership, but one point named twice — a chain built from
+    it would loop."""
+    [first, second, _third] = route_of_three["points"]
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers,
+        json={"order": [first["id"], second["id"], first["id"]]},
+    )
+    assert response.status_code == 409
+
+
+def test_point_order_requires_a_list(client, auth_headers, itinerary):
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{itinerary['id']}/point-order",
+        headers=auth_headers,
+        json={"order": "not-a-list"},
+    )
+    assert response.status_code == 400
+
+
+def test_point_order_for_other_users_itinerary_returns_403(
+    client, auth_headers_2, route_of_three
+):
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers_2,
+        json={"order": [p["id"] for p in route_of_three["points"]]},
+    )
+    assert response.status_code == 403

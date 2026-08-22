@@ -1,12 +1,14 @@
 "use client"
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { MapContainer, TileLayer, Polyline, Circle, useMap, useMapEvents } from "react-leaflet"
-import type { ControlPosition } from "leaflet"
+import L from "leaflet"
+import type { ControlPosition, LeafletMouseEvent } from "leaflet"
 import "leaflet/dist/leaflet.css"
 import type { Point } from "@/lib/dtos/point"
 import type { Day } from "@/lib/dtos/day"
 import { PointMarker } from "./point-marker"
-import { routeLegs, legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
+import { dayRouteLegs, legLabel, type DistanceUnit } from "@/lib/itinerary/distance"
+import { dayRouteGroups } from "@/lib/itinerary/day-points"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { buildBoundaryColorMap, resolveLegDayNumber } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
@@ -75,6 +77,10 @@ export type MapCoreProps = {
   avgSpeedKnots?: number
   viewMode?: boolean
   selectedDayId?: string | null
+  // The point whose leg the map is currently answering for. A stop states its leg
+  // unasked; a pass-through position states it only when the user asks, which is
+  // what clicking it means.
+  selectedPointId?: string | null
   selectedHour?: number
   flyToPoint?: FlyToTarget | null
   // Itinerary that user-created tidal diamonds are scoped to. Required for the
@@ -90,6 +96,9 @@ export type MapCoreProps = {
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
+  // Dropping a point on a leg — the gesture for inserting mid-route. Absent in
+  // view mode and on the public map, where the legs are not editable.
+  onLegClick?: (afterPointId: string, lat: number, lng: number) => void
   // Crew positions broadcast during Navigate mode (M8). Absent/empty outside a
   // happening trip — MapBuilder only ever populates this while navigateMode is on.
   livePositions?: LivePosition[]
@@ -159,6 +168,9 @@ type Segment = {
   positions: [[number, number], [number, number]]
   color: string
   dayNum: number
+  // The point this leg leaves from — the predecessor a point dropped on this leg
+  // is spliced in after. Null when the leg starts at an unsaved point.
+  afterId: string | null
 }
 
 function resolvePosition(
@@ -188,6 +200,7 @@ function buildSegments(
     )
     segments.push({
       key: `${ordered[i].id ?? i}-${ordered[i + 1].id ?? i + 1}`,
+      afterId: ordered[i].id ?? null,
       positions: [
         [a.latitude, a.longitude],
         [b.latitude, b.longitude],
@@ -409,6 +422,7 @@ export default function MapCore({
   avgSpeedKnots = 2.5,
   viewMode = false,
   selectedDayId = null,
+  selectedPointId = null,
   selectedHour = 12,
   flyToPoint = null,
   itineraryId,
@@ -418,6 +432,7 @@ export default function MapCore({
   onMarkerDragEnd,
   onMarkerDragMove,
   onMarkerClick,
+  onLegClick,
   livePositions = [],
 }: MapCoreProps) {
   // Drives the chart-furniture branch below.
@@ -703,21 +718,31 @@ export default function MapCore({
 
   // On-map distance labels (decided in docs/adr/itinerary-frontend.md): each stop —
   // and, while planning, the route's growing tip — carries its leg from the previous
-  // stop, the stretch paddled to reach it, so the stops read as steps. routeLegs
-  // already treats the last point of a day as an anchor, so the tip is labelled with
-  // the in-progress stretch from the last stop (not a cumulative total). Viewing
+  // stop, the stretch paddled to reach it, so the stops read as steps. Viewing
   // scopes to the selected day for a clean overview; planning labels every day since
   // you're building the whole route.
+  //
+  // A pass-through position gets the same figure, but only while it is the selected
+  // point: labelling every position permanently is the noise stop-to-stop legs exist
+  // to remove, yet "how far is it to here?" is exactly the question behind promoting
+  // one to a stop. Clicking it asks; this answers.
+  //
+  // Legs are walked per day *seeded from the previous point in route order*
+  // (dayRouteGroups), so the first point of a day reports the crossing from the
+  // overnight stop the previous day owns rather than nothing at all.
   const stopLabelById = new Map<string, string>()
   const labelDayIds = viewMode
     ? selectedDayId != null
       ? [selectedDayId]
       : []
     : Array.from(new Set(validPoints.map((p) => p.dayId ?? null)))
+  const dayGroups = dayRouteGroups(validPoints)
   for (const dayId of labelDayIds) {
-    const dayPoints = validPoints.filter((p) => (p.dayId ?? null) === dayId)
-    for (const leg of routeLegs(dayPoints)) {
-      if (leg.isStart || !leg.isAnchor || !leg.point.id) continue
+    const group = dayGroups.get(dayId)
+    if (!group) continue
+    for (const leg of dayRouteLegs(group.seed, group.own)) {
+      if (leg.isStart || !leg.point.id) continue
+      if (!leg.isAnchor && leg.point.id !== selectedPointId) continue
       stopLabelById.set(leg.point.id, legLabel(leg.legNm, avgSpeedKnots, distanceUnit))
     }
   }
@@ -807,6 +832,32 @@ export default function MapCore({
             />
           )
         })}
+
+        {/* Leg hit targets, edit mode only. The drawn line is 2.5px, which is not a
+            finger, so each leg carries a wide near-transparent twin that takes the
+            tap. Leaflet's `visibleStroke` pointer-events would hit-test a fully
+            transparent stroke too, but 0.01 keeps that from depending on it. */}
+        {!viewMode &&
+          onLegClick &&
+          segments.map((seg) =>
+            seg.afterId ? (
+              <Polyline
+                key={`insert-${seg.key}`}
+                positions={seg.positions}
+                pathOptions={{ color: seg.color, weight: 18, opacity: 0.01 }}
+                interactive
+                eventHandlers={{
+                  click: (e: LeafletMouseEvent) => {
+                    // Leaflet bubbles a path click up to the map, which in edit mode
+                    // appends a point to the end of the route — the opposite of what
+                    // was asked for.
+                    L.DomEvent.stopPropagation(e)
+                    onLegClick(seg.afterId!, e.latlng.lat, e.latlng.lng)
+                  },
+                }}
+              />
+            ) : null,
+          )}
 
         {validPoints.map((point) => (
           <ConnectedMarker

@@ -13,7 +13,8 @@ import {
   latestDatedSliceDate,
 } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
-import { totalDistanceNm, legLabel } from "@/lib/itinerary/distance"
+import { totalDistanceNm, legLabel, dayRouteLegs } from "@/lib/itinerary/distance"
+import { dayRouteGroups } from "@/lib/itinerary/day-points"
 import {
   createDay,
   deleteDay,
@@ -106,6 +107,7 @@ export function PointListPane() {
     avgSpeedKnots,
     itineraryId,
     day0Id,
+    resolveDay0Id,
     selectedPointId,
     setSelectedPointId,
     tripId,
@@ -138,6 +140,25 @@ export function PointListPane() {
   const dayCount = activeSlices?.length ?? 0
 
   const renderList = buildRenderList(state.pointOrder, activeSlices)
+
+  // Leg from the previous stop to each point, keyed by point id. Walked per day and
+  // seeded from the previous point in route order (dayRouteGroups), so the first
+  // point of a day reports the crossing from the overnight stop rather than nothing.
+  // Every point gets one, positions included — the figure is what tells you a
+  // position is worth promoting to a stop, and the promote control is on this row.
+  const legTextById = useMemo(() => {
+    const ordered = state.pointOrder
+      .map((id) => state.points.find((p) => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => p != null)
+    const labels = new Map<string, string>()
+    for (const group of dayRouteGroups(ordered).values()) {
+      for (const leg of dayRouteLegs(group.seed, group.own)) {
+        if (leg.isStart || !leg.point.id) continue
+        labels.set(leg.point.id, legLabel(leg.legNm, avgSpeedKnots, distanceUnit))
+      }
+    }
+    return labels
+  }, [state.pointOrder, state.points, avgSpeedKnots, distanceUnit])
 
   function getSliceDistance(slice: DaySlice): number {
     const ownedStart = slice.startIdx // includes the shared boundary stop
@@ -284,7 +305,12 @@ export function PointListPane() {
   )
 
   const handleSaveDays = useCallback(async () => {
-    if (!draft || !day0Id) return
+    if (!draft) return
+    // Unassigned points are parked back in Day 0 by BOUNDARIES_APPLY, so the save
+    // needs one to exist. Bailing when it didn't is how Save days became a button
+    // that did nothing at all on a cloned itinerary.
+    const stagingDayId = await resolveDay0Id()
+    if (!stagingDayId) return
     const snapshot = state
     const removedIds = removedRealDayIds
 
@@ -320,7 +346,7 @@ export function PointListPane() {
       type: "BOUNDARIES_APPLY",
       slices: resolvedSlices,
       pointUpdates: payload.points,
-      day0Id,
+      day0Id: stagingDayId,
     })
     setDraft(null)
     setRemovedRealDayIds([])
@@ -346,7 +372,7 @@ export function PointListPane() {
     }
   }, [
     draft,
-    day0Id,
+    resolveDay0Id,
     state,
     removedRealDayIds,
     dispatch,
@@ -509,6 +535,7 @@ export function PointListPane() {
                   onExpand={handleExpand}
                   isBoundary={isBoundary}
                   dayColor={dayColor}
+                  legText={point.id ? (legTextById.get(point.id) ?? null) : null}
                   onTypeChange={(type) => point.id && handleTypeChange(point.id, type)}
                   onNameBlur={(name) => point.id && handleNameBlur(point.id, name)}
                   saveStatus={isExpanded ? nameSaveStatus : "idle"}

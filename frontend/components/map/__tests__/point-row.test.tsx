@@ -250,3 +250,56 @@ describe("PointRow — boundary point", () => {
     expect(screen.queryByRole("button", { name: /position/i })).not.toBeInTheDocument()
   })
 })
+
+describe("PointRow — the leg since the last stop", () => {
+  it("shows it while expanded, beside the control that promotes the point to a stop", () => {
+    render(
+      <PointRow
+        point={pt("a")}
+        index={3}
+        isExpanded
+        onExpand={vi.fn()}
+        isBoundary={false}
+        dayColor="#888"
+        legText="3.2 nm · 1h 17min"
+        onTypeChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId("point-row-leg")).toHaveTextContent(
+      "3.2 nm · 1h 17min from the last stop",
+    )
+    // The reason the figure is here at all: it is what makes promoting this
+    // position to a stop the obvious next move.
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument()
+  })
+
+  it("renders nothing for the point that opens the route", () => {
+    render(
+      <PointRow
+        point={pt("a")}
+        index={1}
+        isExpanded
+        onExpand={vi.fn()}
+        isBoundary={false}
+        dayColor="#888"
+        legText={null}
+      />,
+    )
+    expect(screen.queryByTestId("point-row-leg")).not.toBeInTheDocument()
+  })
+
+  it("stays out of the collapsed row, which is a one-line index and name", () => {
+    render(
+      <PointRow
+        point={pt("a")}
+        index={3}
+        isExpanded={false}
+        onExpand={vi.fn()}
+        isBoundary={false}
+        dayColor="#888"
+        legText="3.2 nm · 1h 17min"
+      />,
+    )
+    expect(screen.queryByTestId("point-row-leg")).not.toBeInTheDocument()
+  })
+})

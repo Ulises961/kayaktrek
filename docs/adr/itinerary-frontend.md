@@ -731,6 +731,115 @@ Two limits of the canary are worth stating, because both have already bitten:
    it see the builder's failure, which is silent collapse of a `min-w-0 flex-1` map. Those need
    their own assertions — placement measured against a sibling's box, or a minimum usable width.
 
+## Day 0 is an invariant, so enforce it (M20 §1)
+
+`ensure_staging_day`'s docstring already stated the rule — "An itinerary without one cannot
+accept a point at all, so every path that creates an Itinerary must run through here" — and two
+paths did not: `fork_itinerary` (deep-copies `source.days` verbatim) and `seed_demo_itinerary`
+(builds days 1..N directly). The second fed the first, because the demo route is the one public
+route on the landing and explore pages, so "Use this route" produced an itinerary that silently
+refused every point and every day save.
+
+**Silently** is the part that matters. `handleMapClick` and `handleSaveDays` both opened with a
+bare `if (!day0Id) return`. No toast, no console line, no network request — a guard written for
+an impossible state, which then happened. 22 of 35 itineraries in the dev database had no Day 0.
+
+Three rules follow, and they generalise past this bug:
+
+1. **A documented invariant needs a single enforcing function, and every creation path calls it.**
+   The docstring was right and was not enough; `fork_itinerary` and the seed each rebuilt an
+   itinerary by hand.
+2. **A guard against an "impossible" state must say something.** Where the state is recoverable,
+   recover: the builder now creates the missing Day 0 on demand rather than returning from the
+   click handler. Where it is not, tell the user. Returning `undefined` from an event handler is
+   how a broken route looks like a broken app.
+3. **A model fix without a backfill is half a fix.** Rows already written stay broken; the
+   migration repairs them.
+
+The seed additionally gave each day its own `start_point_id`/`end_point_id` with no shared
+boundary stop and chained points only *within* a day, contradicting the shared-overnight-stop
+model the entire builder is written against (see "start_point_id / end_point_id on Day"). Seeded
+data is not a fixture — it is the first route most users will ever clone, and it has to obey the
+same model as user-authored data.
+
+## Leg attribution across a day boundary (M20 §2)
+
+"Paddle-time legs" (below) settled that a leg runs stop-to-stop. It did not settle what happens
+at a day boundary, and the answer that fell out was wrong: **the first point of every day showed
+no distance at all**, and the paddle from the overnight stop into the next day was dropped from
+the per-point readout entirely.
+
+The cause is an interaction between two correct decisions. The shared overnight stop belongs to
+the *previous* day, so a per-day point list begins one point late; `routeLegs` then marks its
+index 0 as `isStart` with `legNm = 0`, and the consumer bails on `isStart`.
+
+**Decision: seed each day's leg walk with the previous point in `pointOrder`.** The seed is
+supplied to the walk and dropped from its results — it lands at `i === 0`, becomes the anchor the
+running count resets at, and the first real point of the day gets a genuine inbound leg measured
+from the overnight stop. Deliberately phrased as *the previous point in `pointOrder`*, not *the
+previous day's end point*, so the Day 0 staging tail is covered by the same rule; otherwise the
+route's growing tip while planning measures from Day 0's first point rather than from the last
+real stop.
+
+This also reconciles two figures that disagreed. `getSliceDistance` computes a day's total
+*including* the crossing leg (`ownedStart = slice.startIdx`, the shared boundary stop); the
+per-point `cumulativeNm` started at the day's first owned point. The day header's total and the
+per-point running total differed by exactly the crossing leg. They now agree.
+
+Surfacing rule, decided with it: **permanent on-map labels stay stops-only** — labelling every
+pass-through position is the noise the original leg decision existed to remove — but **any point
+answers on demand**, via a click-triggered tooltip and the expanded `PointRow`. The asymmetry is
+the point: a stop is a destination and states its leg unasked; a position is geometry and states
+it when questioned. The question is asked in Edit mode, because that is where the waypoint→stop
+toggle lives, and Edit mode was the one mode withholding the number.
+
+## Client-authoritative route order (M20 §4)
+
+`pointOrder` has been the frontend's canonical route order since M4b ("maintained independently
+of the `next` linked list… `next` links are backend state that may lag"). What was never built is
+a way to send it back: `next_id` is `dump_only` on both point schemas, and `create_point` appends
+to the itinerary-wide tail unconditionally. The client could reorder a route on screen and had no
+verb for it.
+
+M14 had already done the hard half without it being noticed. `DraftBoundary` anchors on
+`endPointId` and `resolveDraft` resolves IDs to indices *at render time, every render*, so a
+point appearing mid-`pointOrder` mid-draft shifts every boundary correctly with no extra work.
+The missing piece was never client draft state — it was the channel.
+
+**Decision: two complementary writes, both live.**
+
+- `afterPointId` on point create splices into the `next_id` chain server-side, so a single insert
+  is correct in one round trip.
+- `POST /api/v1/itinerary/<id>/point-order` re-chains the whole route from a client-supplied id
+  list via `chain_in_order`, and fires right after an insert resolves.
+
+They overlap on purpose: the first is the fast path, the second is the reconciliation that makes
+`pointOrder` authoritative rather than merely canonical-on-screen. Without the first, a failed
+second leaves a route persisted wrong in a way no one can see.
+
+Saving order live sits on the right side of the M14 line — order is a property of *points*, and
+point edits already save live mid-draft; only boundaries are drafted. This does not reintroduce
+edit-within-edit.
+
+**Rejected: deferring point creation until Save.** It reverses M14's explicit "point edits save
+live mid-draft", and temp ids that boundaries cannot reference server-side force a single batch
+save-route endpoint (create + update + delete + order + boundaries in one transaction). M9's
+offline mutation queue wants exactly that endpoint; build it there, where it pays for itself
+twice.
+
+**The mismatch contract is strict: 409, not a merge.** If the submitted id set does not equal the
+itinerary's point set, re-chaining orphans rows — the same `walk_linked_list` head-sort fallback
+PR #119 paid to fix, where UUIDv7 ties let the random bits decide a route's shape. Route editing
+is a single-editor surface (only the leader edits), so a conflict is rare and a refetch is cheap;
+a silent merge is how a route ends up quietly wrong. For the same reason the client must never
+submit an order containing a temp id: create resolves, the id is swapped, *then* the order is
+sent.
+
+The gesture is **tap the leg in Edit mode** — it works on a phone, adds no chrome, and the click
+latlng *is* the new point's position. M4c's midpoint handle (whose `segmentMidpoint` had survived
+as dead code, imported by nothing but its own test) clutters a dense route at 320px; an "insert
+after" row control supplies no coordinates.
+
 ## Decision log
 
 | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Original ADR | Date       | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -757,3 +866,6 @@ Two limits of the canary are worth stating, because both have already bitten:
 | Responsive contract: 320px floor, mobile-base inversion, three breakpoints (base/`sm`/`md`/`lg`); touch targets met by coarse-pointer hit-area expansion rather than visual resizing (AA 24px is the enforced floor, 44px the hit area); `sr-only sm:not-sr-only` for phone-dropped labels; overlay z-index band above Leaflet; layout asserted in Playwright's `mobile-320` project, never Vitest (M18)                                                                                            | —            | 2026-08-10 | `plans/M18-responsive-web.md`. Records that `html` is 112.5%, so Tailwind rem classes render 1.125× their apparent px — the plan's own §6 offender list was computed on a 16px base and named a 45px control as a 40px problem. Canary caveats: it must assert its own pathname (a stale `storageState` produced a 36/36 false green), and it cannot see cramped `grid-cols-N` or the builder's silent map collapse                                                                                                                                         |
 | M18 §4/§5: builder reshaped to day strip · full-bleed map · draggable bottom sheet below `md`; point summary is a segment of that sheet at base and floats over the map from `md` (one sheet, not two on one edge); map chrome pinned to fixed corners at every width; chart furniture and other map-sized rules key off `lg`, not `md`; public share pages stack the same way                                                                                                                      | —            | 2026-08-14 | `plans/M18-responsive-web.md`. The map column is **264px at a 768 viewport** — narrower than on a phone — which is why map-sized rules cannot use `md`. Six bugs found, none predicted: control wrappers sized by their hidden panels swallowed taps; `FlyToController` offset by a share of `window.innerHeight`; a Tailwind utility lost to unlayered `leaflet.css`; the drawer kept its scroll across tabs; `PointListPane` read `innerWidth` once at mount; `/routes/[id]` and `/story/[token]` rendered no map at 320                                  |
 | M18 §5 addendum: the public route/story detail is a collapsible right-hand panel at every width — open on arrival everywhere, overlaying a full-bleed map below `md` and docked from `md` — so the control, the edge and the default are the same on a phone and a desktop, and the component needs no viewport read at all                                                                                                                                                                         | —            | 2026-08-21 | `components/explore/public-route-shell.tsx`; `ResizeHandler` extracted to `components/map/resize-handler.tsx` so `PublicMap` remeasures when the dock collapses                                                                                                                                                                                                                                                                                                                                                                                             |
+| Day 0 enforced rather than assumed: `fork_itinerary` and the demo seed both create one, existing rows are backfilled, and the builder self-heals instead of returning from the click handler; seeded routes obey the shared-boundary-stop model like user data (M20 §1)                                                                                                                                                                                                                             | —            | 2026-08-22 | `plans/M20-route-editing.md`. 22 of 35 dev-DB itineraries had no Day 0; cloning the landing page's demo route produced one that silently refused every point and every day save. Two `if (!day0Id) return` guards, no toast, no request                                                                                                                                                                                    |
+| Leg attribution seeds each day's walk with the previous point in `pointOrder`, so the first point of a day reports the crossing leg from the overnight stop; permanent map labels stay stops-only while any point answers on click and in the expanded `PointRow` (M20 §2)                                                                                                                                                                                                                          | —            | 2026-08-22 | `plans/M20-route-editing.md`. The first point of every day previously showed nothing at all. Also reconciles `getSliceDistance` (includes the crossing leg) with per-point `cumulativeNm` (did not) — the two disagreed by exactly that leg                                                                                                                                                                                |
+| Route order becomes client-authoritative: `afterPointId` splices a created point into the chain, `POST /itinerary/<id>/point-order` re-chains the whole route from `pointOrder`, both written live; mismatched id sets 409 rather than merging; insert gesture is tap-the-leg in Edit mode (M20 §4)                                                                                                                                                                                                  | —            | 2026-08-22 | `plans/M20-route-editing.md`. M14's ID-anchored draft had already made mid-draft insertion safe; the missing piece was a verb for order, not client state. Deferring point creation to Save rejected — that batch endpoint belongs to M9's offline queue                                                                                                                                                                    |

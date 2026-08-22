@@ -30,6 +30,11 @@ export type MapBuilderContextValue = {
   avgSpeedKnots: number
   setAvgSpeedKnots: (v: number) => void
   day0Id: string | null
+  /** Day 0's id, provisioning one first if this itinerary somehow has none.
+   * Resolves null when the repair fails (the user has been told). Every path that
+   * needs the staging area goes through here rather than reading `day0Id` and
+   * silently doing nothing when it's absent. */
+  resolveDay0Id: () => Promise<string | null>
   viewMode: boolean
   setViewMode: (v: boolean) => void
   selectedDayId: string | null

@@ -129,6 +129,74 @@ def test_fork_public_itinerary(public_itinerary_with_points, id_2):
         db.session.commit()
 
 
+def test_fork_gets_a_staging_day_even_when_the_source_has_none(
+    public_itinerary_with_points, id_2
+):
+    """A fork is a route the user is expected to edit, and every dropped point
+    stages into Day 0 first. The deep copy reproduces the source exactly, so a
+    source with no Day 0 used to hand back a fork that silently refused every new
+    point and every day-boundary save."""
+    source_id = public_itinerary_with_points["itinerary_id"]
+
+    # Reproduce a hand-built itinerary (the demo seed, a pre-fix fork) that never ran
+    # through ensure_staging_day: the route lives in numbered days and there is no
+    # staging day at all. The points move first — Day.points cascades, so deleting
+    # Day 0 out from under them would take the route with it.
+    source_day0 = (
+        db.session.query(Day)
+        .filter_by(itinerary_id=UUID(source_id), day_number=0)
+        .one()
+    )
+    day_one = Day(day_number=1, itinerary_id=UUID(source_id), date=None)
+    db.session.add(day_one)
+    db.session.flush()
+    staged = db.session.query(Point).filter_by(day_id=source_day0.id).all()
+    assert len(staged) == 2
+    for point in staged:
+        point.day_id = day_one.id
+    db.session.flush()
+    db.session.delete(source_day0)
+    db.session.commit()
+
+    fork = ItineraryService.fork_itinerary(source_id, id_2)
+    try:
+        day_zeros = (
+            db.session.query(Day).filter_by(itinerary_id=fork.id, day_number=0).all()
+        )
+        assert len(day_zeros) == 1
+        # The staging day is empty — it stages what the user drops next, and must
+        # not have swallowed any of the copied route.
+        assert not day_zeros[0].points
+        assert len([p for day in fork.days for p in (day.points or [])]) == 2
+    finally:
+        db.session.delete(fork)
+        db.session.commit()
+
+
+def test_fork_does_not_duplicate_an_existing_staging_day(
+    public_itinerary_with_points, id_2
+):
+    """ensure_staging_day runs after the day copy, so a source that already carries
+    a Day 0 yields exactly one — not the copied row plus a freshly created one."""
+    source_id = public_itinerary_with_points["itinerary_id"]
+    assert (
+        db.session.query(Day)
+        .filter_by(itinerary_id=UUID(source_id), day_number=0)
+        .count()
+        == 1
+    )
+
+    fork = ItineraryService.fork_itinerary(source_id, id_2)
+    try:
+        assert (
+            db.session.query(Day).filter_by(itinerary_id=fork.id, day_number=0).count()
+            == 1
+        )
+    finally:
+        db.session.delete(fork)
+        db.session.commit()
+
+
 def test_fork_private_itinerary_raises(itinerary_with_a_point, id):
     itin_id = itinerary_with_a_point["itinerary_id"]
     with pytest.raises(PermissionError, match="Only public itineraries can be forked"):

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { walkDayRoutePoints } from "../day-points"
+import { walkDayRoutePoints, dayRouteGroups } from "../day-points"
 
 type P = { id: string; nextId?: string | null }
 
@@ -110,5 +110,36 @@ describe("walkDayRoutePoints", () => {
   it("returns an empty array when fallbackPoints is empty and there is no boundary metadata", () => {
     const result = walkDayRoutePoints({ startPointId: null, endPointId: null }, pointsMap([]), [])
     expect(result).toEqual([])
+  })
+})
+
+describe("dayRouteGroups", () => {
+  const pt = (id: string, dayId: string | null) => ({ id, dayId })
+
+  it("carries the previous point in route order as each day's seed", () => {
+    // Single-owner storage: the overnight stop shared by day 1 and day 2 belongs to
+    // day 1, so day 2's own points begin after it. Without the seed the crossing
+    // from that stop into day 2 is not measured by anything.
+    const groups = dayRouteGroups([pt("a", "d1"), pt("b", "d1"), pt("c", "d2"), pt("d", "d2")])
+
+    expect(groups.get("d1")!.seed).toBeNull()
+    expect(groups.get("d1")!.own.map((p) => p.id)).toEqual(["a", "b"])
+    expect(groups.get("d2")!.seed!.id).toBe("b")
+    expect(groups.get("d2")!.own.map((p) => p.id)).toEqual(["c", "d"])
+  })
+
+  it("gives the staging tail a seed too, so the route's growing tip is measured from the last real stop", () => {
+    const groups = dayRouteGroups([pt("a", "d1"), pt("b", "d1"), pt("c", null)])
+    expect(groups.get(null)!.seed!.id).toBe("b")
+    expect(groups.get(null)!.own.map((p) => p.id)).toEqual(["c"])
+  })
+
+  it("keys an undefined dayId the same as null", () => {
+    const groups = dayRouteGroups([{ id: "a" }, { id: "b", dayId: null }])
+    expect(groups.get(null)!.own.map((p) => p.id)).toEqual(["a", "b"])
+  })
+
+  it("returns an empty map for an empty route", () => {
+    expect(dayRouteGroups([]).size).toBe(0)
   })
 })

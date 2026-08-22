@@ -42,11 +42,14 @@ function CapacityDots({
       <span className="text-muted-foreground w-12 shrink-0 text-[10px] font-semibold tracking-[0.08em] uppercase">
         {label}
       </span>
-      <div className="flex gap-0.5">
+      {/* One dot per seat, so a full van's row is as wide as its capacity. Wrapping
+          keeps it inside a 320px card, and `shrink-0` keeps the dots round rather
+          than letting flex squash them into ovals to fit. */}
+      <div className="flex min-w-0 flex-wrap gap-0.5">
         {Array.from({ length: total }).map((_, i) => (
           <div
             key={i}
-            className={`size-2 rounded-full ${i < capped ? "bg-primary" : "bg-border"}`}
+            className={`size-2 shrink-0 rounded-full ${i < capped ? "bg-primary" : "bg-border"}`}
           />
         ))}
       </div>

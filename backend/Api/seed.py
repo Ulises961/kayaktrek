@@ -13,6 +13,8 @@ from Models.place_category import PlaceCategory
 from Models.itinerary import Itinerary
 from Models.day import Day
 from Models.point import Point, PointType
+from Services.itinerary_service import ItineraryService
+from Services.Utils.point_ordering import chain_in_order
 
 logger = logging.getLogger(__name__)
 
@@ -228,12 +230,14 @@ def seed_place_categories() -> None:
 
 
 # Ownerless public demo passage drawn on the landing chart. A real three-day
-# Costa Brava route (Roses → Cap de Creus → Port de la Selva): each day is an
-# ordered list of (latitude, longitude, name, type). The route is continuous —
-# a day begins where the previous one ended, so overnight stops are never
-# duplicated across day boundaries. First/last point of each day is the overnight
-# stop; the rest are waypoints. The landing derives its ambient sea/forecast
-# animation client-side from this geometry, so the points are all it needs.
+# Costa Brava route (Roses → Cap de Creus → Port de la Selva): each entry lists the
+# points that day **owns**, as (latitude, longitude, name, type). The route is
+# continuous — a day begins where the previous one ended, so an overnight stop is
+# owned by the day that ends there and merely referenced by the next day's
+# start_point_id, never duplicated. Each day's last point is therefore its overnight
+# stop; its first owned point is the one after the previous day's stop. The landing
+# derives its ambient sea/forecast animation client-side from this geometry, so the
+# points are all it needs.
 DEMO_ITINERARY_NAME = "Costa Brava — Roses to Cap de Creus"
 DEMO_ITINERARY_ROUTE: list[tuple[int, list[tuple[float, float, str | None, str]]]] = [
     (1, [
@@ -289,6 +293,14 @@ def seed_demo_itinerary() -> None:
     db.session.add(itinerary)
     db.session.flush()
 
+    # Day 0 is the staging area every dropped point lands in. A seeded route is the
+    # first thing most users clone, and a clone with no Day 0 silently refuses every
+    # edit — so it goes through the same enforcing function every other creation
+    # path does, rather than being hand-built here.
+    ItineraryService.ensure_staging_day(itinerary)
+
+    built: list[tuple[Day, list[Point]]] = []
+    route: list[Point] = []
     for day_number, point_specs in DEMO_ITINERARY_ROUTE:
         day = Day(day_number=day_number, itinerary_id=itinerary.id, date=None)
         db.session.add(day)
@@ -306,13 +318,26 @@ def seed_demo_itinerary() -> None:
             )
             db.session.add(point)
             day_points.append(point)
-        db.session.flush()  # assign point ids before chaining the linked list
+        built.append((day, day_points))
+        route.extend(day_points)
 
-        # Chain the day's points into the route linked list and mark its endpoints.
-        for current_point, next_point in zip(day_points, day_points[1:]):
-            current_point.next_id = next_point.id
-        day.start_point_id = day_points[0].id
+    db.session.flush()  # assign point ids before chaining the linked list
+
+    # One chain for the whole route, not one per day. Chaining per day leaves every
+    # day's first point an unreferenced head, and walk_linked_list then orders those
+    # heads by str(id) — UUIDv7 ties on the millisecond let the random bits decide
+    # which day the route starts with.
+    chain_in_order(route)
+
+    # A day begins where the previous one ended: the overnight stop belongs to the
+    # day that ends there and is referenced, never duplicated, by the next day's
+    # start_point_id (docs/adr/itinerary-frontend.md). Day 1 starts at its own first
+    # point because nothing precedes it.
+    previous_end: Point | None = None
+    for day, day_points in built:
+        day.start_point_id = (previous_end or day_points[0]).id
         day.end_point_id = day_points[-1].id
+        previous_end = day_points[-1]
 
     db.session.commit()
     logger.info("demo_itinerary_seeded", extra={"itinerary_id": str(itinerary.id)})

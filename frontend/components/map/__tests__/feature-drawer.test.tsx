@@ -88,6 +88,7 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
     day0Id: "day-0",
+    resolveDay0Id: vi.fn(async () => "day-0"),
     viewMode: true,
     setViewMode: vi.fn(),
     selectedDayId: null,

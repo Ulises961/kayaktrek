@@ -11,11 +11,12 @@ from Schemas.itinerary_schema import (
     ItineraryPublicSchema,
     ItineraryExploreItemSchema,
 )
+from Schemas.day_schema import DaySchema
 from Api.database import db
 from Api.limiter import limiter
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
-from Services.itinerary_service import ItineraryService
+from Services.itinerary_service import ItineraryService, PointOrderMismatchError
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +400,86 @@ def generate_story_share(id: str):
     try:
         itinerary = ItineraryService.generate_story_share(id, g.current_user_id)
         return jsonify(ItinerarySchema().dump(itinerary)), HTTPStatus.OK
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
+
+
+@itinerary_api.route("/<string:id>/point-order", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('itinerary')
+def set_point_order(id: str):
+    """POST /api/itinerary/<id>/point-order — Rewrite the route's order.
+    ---
+    post:
+      summary: Set the route's point order
+      description: >
+        Rewrites the `next_id` chain to follow the submitted id list, which must be
+        exactly the itinerary's own points — no more and no fewer. A mismatch is a
+        409 rather than a partial apply: re-chaining a stale list would orphan the
+        points it left out, and an orphaned point's position is decided by a UUID
+        tie-break rather than by the route.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        200:
+          description: The order that was applied
+        400:
+          description: order missing or not a list of ids
+        409:
+          description: The submitted order is not a permutation of the itinerary's points
+    """
+    body = request.get_json(silent=True)
+    order = body.get("order") if isinstance(body, dict) else None
+    if not isinstance(order, list) or not all(isinstance(item, str) for item in order):
+        abort(HTTPStatus.BAD_REQUEST, description="order must be a list of point ids")
+
+    try:
+        applied = ItineraryService.set_point_order(id, order)
+        return jsonify({"order": applied}), HTTPStatus.OK
+    except PointOrderMismatchError as e:
+        db.session.rollback()
+        abort(HTTPStatus.CONFLICT, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+
+
+@itinerary_api.route("/<string:id>/staging-day", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner('itinerary')
+def provision_staging_day(id: str):
+    """POST /api/itinerary/<id>/staging-day — Return Day 0, creating it if absent.
+    ---
+    post:
+      summary: Ensure the itinerary has its Day 0 staging area
+      description: >
+        Day 0 is the staging day every newly dropped route point is assigned to
+        before a day boundary owns it, and every path that creates an itinerary is
+        supposed to leave one behind. This is the builder's repair path for an
+        itinerary that somehow has none — without it the map silently refuses every
+        point. Idempotent: returns the existing Day 0 unchanged.
+      responses:
+        200:
+          description: The itinerary's Day 0
+          content:
+            application/json:
+              schema: DaySchema
+        404:
+          description: Itinerary not found
+    """
+    try:
+        day = ItineraryService.provision_staging_day(id)
+        return jsonify(DaySchema().dump(day)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
 

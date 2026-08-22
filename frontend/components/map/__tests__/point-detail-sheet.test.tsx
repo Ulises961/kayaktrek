@@ -8,6 +8,7 @@ import type { MapState } from "@/lib/itinerary/map-reducer"
 import type { Point } from "@/lib/dtos/point"
 
 import { PointDetailSheet } from "../point-detail-sheet"
+import { haversineNm, legLabel, formatDistance } from "@/lib/itinerary/distance"
 
 const DAY1_ID = "day-1"
 const ITIN_ID = "itin-1"
@@ -52,6 +53,7 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
     day0Id: "day-0",
+    resolveDay0Id: vi.fn(async () => "day-0"),
     viewMode: true,
     setViewMode: vi.fn(),
     selectedDayId: DAY1_ID,
@@ -123,6 +125,63 @@ describe("PointDetailSheet — content", () => {
   it("shows an 'Add…' notes affordance when editable and no notes", () => {
     renderWithCtx(makeCtx({ selectedPointId: "p2" }))
     expect(screen.getByText("Add…")).toBeInTheDocument()
+  })
+})
+
+describe("PointDetailSheet — the first point of a day", () => {
+  // The overnight stop belongs to the day that *ends* there, so day 2's own points
+  // begin after it. Grouping by dayId alone made day 2's first point look like a
+  // fresh start, and the crossing from the stop was reported by nothing at all —
+  // the tile read "Start" on a point you had paddled to.
+  const DAY2_ID = "day-2"
+  const overnight = pt("p2", { type: "stop", latitude: 43.5, longitude: 14.5678 })
+  const dayTwoFirst = pt("p3", { type: "position", latitude: 44.0, dayId: DAY2_ID })
+
+  const twoDayCtx = (overrides: Partial<MapBuilderContextValue> = {}) =>
+    makeCtx({
+      state: {
+        points: [
+          pt("p1", { type: "stop", latitude: 43.0, longitude: 14.5678 }),
+          overnight,
+          dayTwoFirst,
+        ],
+        pointOrder: ["p1", "p2", "p3"],
+        pendingPointId: null,
+        pendingPointName: null,
+        savingCount: 0,
+        days: [],
+      },
+      selectedDayId: DAY2_ID,
+      ...overrides,
+    })
+
+  it("reports the crossing from the previous day's overnight stop", () => {
+    renderWithCtx(twoDayCtx({ selectedPointId: "p3" }))
+
+    const crossing = haversineNm(
+      { latitude: 43.5, longitude: 14.5678 },
+      { latitude: 44.0, longitude: 14.5678 },
+    )
+    expect(screen.getByText(legLabel(crossing, 2.5, "nm"))).toBeInTheDocument()
+    expect(screen.queryByText("Start")).not.toBeInTheDocument()
+  })
+
+  it("counts the day's total from that stop, matching the day's own distance", () => {
+    // The boundary divider has always totalled a day *including* the crossing leg
+    // (getSliceDistance starts at the shared stop). The per-point running total
+    // used to start one point later, so the two disagreed by exactly this leg.
+    renderWithCtx(twoDayCtx({ selectedPointId: "p3" }))
+
+    const crossing = haversineNm(
+      { latitude: 43.5, longitude: 14.5678 },
+      { latitude: 44.0, longitude: 14.5678 },
+    )
+    expect(screen.getByText(`${formatDistance(crossing, "nm")} nm total`)).toBeInTheDocument()
+  })
+
+  it("still reads Start for the point that opens the whole route", () => {
+    renderWithCtx(twoDayCtx({ selectedPointId: "p1", selectedDayId: DAY1_ID }))
+    expect(screen.getByText("Start")).toBeInTheDocument()
   })
 })
 

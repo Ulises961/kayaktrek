@@ -1,7 +1,12 @@
 import { test, expect, type Page } from "@playwright/test"
 import { API_URL } from "../playwright.config"
 import { LEADER } from "../fixtures/auth"
-import { apiGetAccessToken, apiDeleteTrip, apiTransitionState } from "../fixtures/trips"
+import {
+  apiGetAccessToken,
+  apiCreateTrip,
+  apiDeleteTrip,
+  apiTransitionState,
+} from "../fixtures/trips"
 import {
   apiSeedEditableItinerary,
   apiSeedPublicItinerary,
@@ -41,7 +46,10 @@ import {
 async function touchDrag(page: Page, x: number, fromY: number, toY: number, steps = 14) {
   const cdp = await page.context().newCDPSession(page)
   const at = (y: number) => [{ x, y, radiusX: 10, radiusY: 10, force: 1 }]
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(fromY) })
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: at(fromY),
+  })
   for (let i = 1; i <= steps; i++) {
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
@@ -49,7 +57,10 @@ async function touchDrag(page: Page, x: number, fromY: number, toY: number, step
     })
     await page.waitForTimeout(16)
   }
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  })
   await cdp.detach()
 }
 
@@ -411,8 +422,18 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
           dayNumber: 1,
           date: "2026-07-15",
           points: [
-            { latitude: 48.4, longitude: -123.35, name: "Launch beach", type: "stop" },
-            { latitude: 48.45, longitude: -123.3, name: "Overnight camp", type: "stop" },
+            {
+              latitude: 48.4,
+              longitude: -123.35,
+              name: "Launch beach",
+              type: "stop",
+            },
+            {
+              latitude: 48.45,
+              longitude: -123.3,
+              name: "Overnight camp",
+              type: "stop",
+            },
           ],
         },
       ],
@@ -568,7 +589,12 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
           dayNumber: index + 1,
           date: `2026-07-${String(index + 10).padStart(2, "0")}`,
           points: [
-            { latitude: 48 + index / 10, longitude: -123.3, name: `Camp ${index}`, type: "stop" },
+            {
+              latitude: 48 + index / 10,
+              longitude: -123.3,
+              name: `Camp ${index}`,
+              type: "stop",
+            },
           ],
         })),
       })
@@ -1148,5 +1174,69 @@ test.describe("Responsive — the mobile nav drawer", () => {
     // that `router.push`, not links — `navigation-items.tsx`.
     await drawer.getByRole("button", { name: "Trips" }).click()
     await expect(page).toHaveURL(/\/trips$/)
+  })
+})
+
+test.describe("Responsive — the shuttle vehicle form (M20 §3)", () => {
+  // The canary structurally cannot see this one. A `grid-cols-1` whose children ask
+  // for `col-span-2` makes CSS add an implicit second column, and implicit columns
+  // are `auto`-sized — so Seats and Kayak spots sat side by side at 320 with Seats
+  // squeezed to nothing by the number input's max-content width. Columns shrink;
+  // they do not overflow, so the page scrolled no wider than it should and the
+  // whole thing was canary-green. It has to be measured.
+  let leaderToken: string
+  let tripId: string
+
+  test.beforeAll(async ({ request }) => {
+    leaderToken = await apiGetAccessToken(request, LEADER.mail, LEADER.pwd)
+    const trip = await apiCreateTrip(request, leaderToken, {
+      destination: `E2E Responsive Shuttle ${Date.now()}`,
+    })
+    tripId = trip.id
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (tripId) await apiDeleteTrip(request, leaderToken, tripId)
+  })
+
+  test("stacks the seats and kayak-spot fields at 320, side by side from sm", async ({ page }) => {
+    await page.goto(`/trips/${tripId}/logistics`)
+    await page.waitForLoadState("networkidle")
+    // Shuttle is one item of a `type="multiple"` accordion with nothing open by
+    // default, so its Add vehicle button is not in the DOM until the section is.
+    await page.getByRole("button", { name: /^Shuttle/ }).click()
+    await page.getByRole("button", { name: "Add vehicle" }).click()
+
+    const dialog = page.getByRole("dialog", { name: "Add vehicle" })
+    const seats = dialog.getByLabel("Seats available")
+    const kayaks = dialog.getByLabel("Kayak spots")
+    await expect(seats).toBeVisible()
+
+    const boxes = async () => {
+      const [seatsBox, kayaksBox] = await Promise.all([seats.boundingBox(), kayaks.boundingBox()])
+      if (!seatsBox || !kayaksBox) throw new Error("the vehicle form is not laid out")
+      return { seatsBox, kayaksBox }
+    }
+
+    const { seatsBox, kayaksBox } = await boxes()
+    // Stacked, and each field wide enough to read the number typed into it. The
+    // failure was not subtle — Seats collapsed to a sliver while Kayak spots took
+    // the row — so a generous floor still catches it.
+    expect(
+      kayaksBox.y >= seatsBox.y + seatsBox.height,
+      `at 320 kayak spots should sit below seats — seats y=${Math.round(seatsBox.y)} h=${Math.round(seatsBox.height)}, kayaks y=${Math.round(kayaksBox.y)}`,
+    ).toBe(true)
+    expect(
+      seatsBox.width,
+      `at 320 the seats field collapsed to ${Math.round(seatsBox.width)}px`,
+    ).toBeGreaterThan(150)
+
+    await page.setViewportSize({ width: 640, height: 900 })
+    const wide = await boxes()
+    const seatsMiddle = wide.seatsBox.y + wide.seatsBox.height / 2
+    expect(
+      seatsMiddle > wide.kayaksBox.y && seatsMiddle < wide.kayaksBox.y + wide.kayaksBox.height,
+      `from sm the two fields should share a row — seats y=${Math.round(wide.seatsBox.y)}, kayaks y=${Math.round(wide.kayaksBox.y)}`,
+    ).toBe(true)
   })
 })

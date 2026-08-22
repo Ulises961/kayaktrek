@@ -60,8 +60,13 @@ export function VehicleForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
+      {/* `col-span-1` at base is load-bearing, not noise: a child spanning 2 columns
+          in a 1-column grid makes CSS add an implicit second one, and implicit
+          columns are `auto`-sized rather than `1fr`. Seats and Kayak spots then sat
+          side by side at 320px with Seats squeezed to nothing by the number input's
+          max-content width. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="col-span-2 flex flex-col gap-1.5">
+        <div className="col-span-1 flex flex-col gap-1.5 sm:col-span-2">
           <FieldLabel htmlFor="vehicleDescription">Vehicle description</FieldLabel>
           <Input
             id="vehicleDescription"
@@ -71,7 +76,7 @@ export function VehicleForm({
           />
           <FieldError message={errors.vehicleDescription?.message} />
         </div>
-        <div className="col-span-2 flex flex-col gap-1.5">
+        <div className="col-span-1 flex flex-col gap-1.5 sm:col-span-2">
           <FieldLabel htmlFor="pickupPoint">Pickup point</FieldLabel>
           <Input
             id="pickupPoint"

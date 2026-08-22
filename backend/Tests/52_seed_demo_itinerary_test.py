@@ -20,6 +20,24 @@ def _demo_itinerary() -> Itinerary:
     )
 
 
+def _numbered_days(itinerary: Itinerary) -> list[Day]:
+    return (
+        db.session.query(Day)
+        .filter(Day.itinerary_id == itinerary.id, Day.day_number > 0)
+        .order_by(Day.day_number)
+        .all()
+    )
+
+
+def _all_points(itinerary: Itinerary) -> list[Point]:
+    return (
+        db.session.query(Point)
+        .join(Day, Point.day_id == Day.id)
+        .filter(Day.itinerary_id == itinerary.id)
+        .all()
+    )
+
+
 def test_seed_creates_ownerless_public_itinerary(app):
     seed_demo_itinerary()
 
@@ -32,73 +50,103 @@ def test_seed_creates_ownerless_public_itinerary(app):
     assert float(itinerary.total_miles) == pytest.approx(18)
 
 
-def test_seed_creates_three_days_with_chained_points(app):
+def test_seed_creates_the_day_zero_staging_area(app):
+    """The demo route is the first thing most users clone, and a clone with no Day 0
+    silently refuses every new point and every day-boundary save in the builder."""
     seed_demo_itinerary()
     itinerary = _demo_itinerary()
 
-    days = (
-        db.session.query(Day)
-        .filter_by(itinerary_id=itinerary.id)
-        .order_by(Day.day_number)
-        .all()
+    day_zeros = (
+        db.session.query(Day).filter_by(itinerary_id=itinerary.id, day_number=0).all()
     )
-    assert [day.day_number for day in days] == [1, 2, 3]
+    assert len(day_zeros) == 1
+    # Staging only — the seeded route is fully bracketed into numbered days.
+    assert not day_zeros[0].points
 
-    for day, (_, point_specs) in zip(days, DEMO_ITINERARY_ROUTE):
-        points = db.session.query(Point).filter_by(day_id=day.id).all()
-        assert len(points) == len(point_specs)
-        # Endpoints recorded, and the day has at least one overnight stop.
-        assert day.start_point_id is not None
-        assert day.end_point_id is not None
-        assert any(point.type == PointType.STOP for point in points)
 
-        # The day's points form a single chain: exactly one head (referenced by
-        # nobody) and one tail (no next), the rest linked through next_id.
-        ids = {point.id for point in points}
-        referenced = {point.next_id for point in points if point.next_id is not None}
-        assert referenced <= ids  # chain never points outside the day
-        heads = ids - referenced
-        tails = {point.id for point in points if point.next_id is None}
-        assert len(heads) == 1
-        assert len(tails) == 1
+def test_seed_creates_three_numbered_days(app):
+    seed_demo_itinerary()
+    itinerary = _demo_itinerary()
+
+    assert [day.day_number for day in _numbered_days(itinerary)] == [1, 2, 3]
+
+
+def test_seed_chains_the_whole_route_not_one_chain_per_day(app):
+    """Chaining per day leaves each day's first point an unreferenced head, and
+    walk_linked_list then orders those heads by str(id) — UUIDv7 ties on the
+    millisecond let the random bits decide which day the route starts with. One
+    chain across the whole route means exactly one head and one tail."""
+    seed_demo_itinerary()
+    itinerary = _demo_itinerary()
+
+    points = _all_points(itinerary)
+    ids = {point.id for point in points}
+    referenced = {point.next_id for point in points if point.next_id is not None}
+
+    assert referenced <= ids  # the chain never points outside the itinerary
+    assert len(ids - referenced) == 1  # exactly one head
+    assert len([p for p in points if p.next_id is None]) == 1  # exactly one tail
 
 
 def test_seed_points_are_ordered_and_match_the_route_data(app):
-    """The structural chain check above (single head/tail) can't catch a
-    swapped lat/lng, a scrambled linking order, or a name/type dropped along
-    the way — walk the actual chain and compare it to DEMO_ITINERARY_ROUTE
-    element-for-element."""
+    """The structural chain check above can't catch a swapped lat/lng, a scrambled
+    linking order, or a name/type dropped along the way — walk the actual chain and
+    compare it to DEMO_ITINERARY_ROUTE element-for-element."""
     seed_demo_itinerary()
     itinerary = _demo_itinerary()
 
-    days = (
-        db.session.query(Day)
-        .filter_by(itinerary_id=itinerary.id)
-        .order_by(Day.day_number)
-        .all()
-    )
+    points_by_id = {point.id: point for point in _all_points(itinerary)}
+    referenced = {p.next_id for p in points_by_id.values() if p.next_id is not None}
+    (head_id,) = set(points_by_id) - referenced
 
+    ordered: list[Point] = []
+    current = points_by_id[head_id]
+    seen: set = set()
+    while current is not None and current.id not in seen:
+        ordered.append(current)
+        seen.add(current.id)
+        current = points_by_id.get(current.next_id)
+
+    expected = [spec for _, point_specs in DEMO_ITINERARY_ROUTE for spec in point_specs]
+    assert len(ordered) == len(expected)
+    for point, (lat, lon, name, point_type) in zip(ordered, expected):
+        assert float(point.latitude) == pytest.approx(lat)
+        assert float(point.longitude) == pytest.approx(lon)
+        assert point.name == name
+        assert point.type == PointType(point_type)
+
+
+def test_seed_days_share_their_boundary_stop(app):
+    """A day begins where the previous one ended: the overnight stop is owned by the
+    day that ends there and referenced — never duplicated — by the next day's
+    start_point_id (docs/adr/itinerary-frontend.md). The seed used to give each day
+    its own unshared start, so a clone of it rendered its boundaries wrong."""
+    seed_demo_itinerary()
+    itinerary = _demo_itinerary()
+
+    days = _numbered_days(itinerary)
+    owned = {
+        day.id: db.session.query(Point).filter_by(day_id=day.id).all() for day in days
+    }
+
+    previous_end = None
     for day, (_, point_specs) in zip(days, DEMO_ITINERARY_ROUTE):
-        points_by_id = {p.id: p for p in db.session.query(Point).filter_by(day_id=day.id).all()}
-        assert day.start_point_id in points_by_id
-        assert day.end_point_id in points_by_id
+        day_points = owned[day.id]
+        assert len(day_points) == len(point_specs)
+        assert day.end_point_id is not None
+        # The end point is one of the day's own — ownership sits with the day that
+        # ends there.
+        assert day.end_point_id in {point.id for point in day_points}
 
-        ordered = []
-        current = points_by_id[day.start_point_id]
-        seen: set = set()
-        while current is not None and current.id not in seen:
-            ordered.append(current)
-            seen.add(current.id)
-            current = points_by_id.get(current.next_id)
+        if previous_end is None:
+            assert day.start_point_id in {point.id for point in day_points}
+        else:
+            assert day.start_point_id == previous_end
+        previous_end = day.end_point_id
 
-        assert len(ordered) == len(point_specs)
-        assert ordered[-1].id == day.end_point_id
-
-        for point, (lat, lon, name, point_type) in zip(ordered, point_specs):
-            assert float(point.latitude) == pytest.approx(lat)
-            assert float(point.longitude) == pytest.approx(lon)
-            assert point.name == name
-            assert point.type == PointType(point_type)
+    # Every shared boundary is a stop, which is what the builder auto-stamps them as.
+    for day in days[:-1]:
+        assert db.session.get(Point, day.end_point_id).type == PointType.STOP
 
 
 def test_seed_is_idempotent(app):

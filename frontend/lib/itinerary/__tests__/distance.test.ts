@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest"
 import {
   haversineNm,
   totalDistanceNm,
-  segmentMidpoint,
   toKm,
   toNm,
   formatDistance,
@@ -10,6 +9,7 @@ import {
   formatTime,
   legLabel,
   routeLegs,
+  dayRouteLegs,
 } from "../distance"
 
 describe("haversineNm", () => {
@@ -48,16 +48,6 @@ describe("totalDistanceNm", () => {
     const c = { latitude: 2, longitude: 0 }
     const expected = haversineNm(a, b) + haversineNm(b, c)
     expect(totalDistanceNm([a, b, c])).toBeCloseTo(expected, 10)
-  })
-})
-
-describe("segmentMidpoint", () => {
-  it("returns the midpoint between two lat/lng pairs", () => {
-    const a = { latitude: 44, longitude: 14 }
-    const b = { latitude: 46, longitude: 16 }
-    const mid = segmentMidpoint(a, b)
-    expect(mid.latitude).toBeCloseTo(45)
-    expect(mid.longitude).toBeCloseTo(15)
   })
 })
 
@@ -162,5 +152,57 @@ describe("routeLegs", () => {
       at(1.0, "stop", "c"),
     ])
     expect(legs.map((l) => l.point.id)).toEqual(["a", "c"])
+  })
+})
+
+describe("dayRouteLegs", () => {
+  // Points along a meridian (lon 0); each 0.5° latitude step ≈ 30 nm.
+  const at = (lat: number, type: string, id: string) => ({ id, latitude: lat, longitude: 0, type })
+
+  it("measures the day's first point from the stop it was paddled from", () => {
+    // The overnight stop (the seed) belongs to the previous day. Before this, the
+    // first point of a day reported nothing at all — leg 0 and isStart true — and
+    // the crossing was dropped from every per-point readout.
+    const legs = dayRouteLegs(at(0, "stop", "overnight"), [
+      at(0.5, "position", "a"),
+      at(1.0, "stop", "b"),
+    ])
+
+    expect(legs.map((l) => l.point.id)).toEqual(["a", "b"])
+    expect(legs[0].isStart).toBe(false)
+    expect(legs[0].legNm).toBeCloseTo(30, 0)
+    // Cumulative starts at the overnight stop, so it agrees with the day total the
+    // boundary divider shows (which has always included the crossing leg).
+    expect(legs[1].cumulativeNm).toBeCloseTo(60, 0)
+  })
+
+  it("falls back to a plain walk for the first day, which has nothing before it", () => {
+    const legs = dayRouteLegs(null, [at(0, "stop", "a"), at(0.5, "stop", "b")])
+    expect(legs.map((l) => l.point.id)).toEqual(["a", "b"])
+    expect(legs[0].isStart).toBe(true)
+    expect(legs[0].legNm).toBe(0)
+  })
+
+  it("ignores a seed with no coordinates rather than dropping the day's first point", () => {
+    const unplaced: {
+      id: string
+      latitude: number | null
+      longitude: number | null
+      type: string
+    } = { id: "seed", latitude: null, longitude: null, type: "stop" }
+    const legs = dayRouteLegs(unplaced, [at(0, "stop", "a"), at(0.5, "stop", "b")])
+    expect(legs.map((l) => l.point.id)).toEqual(["a", "b"])
+    expect(legs[0].isStart).toBe(true)
+  })
+
+  it("still anchors on stops within the day", () => {
+    const legs = dayRouteLegs(at(0, "stop", "overnight"), [
+      at(0.5, "position", "a"),
+      at(1.0, "stop", "b"),
+      at(1.5, "position", "c"),
+    ])
+    expect(legs.filter((l) => l.isAnchor).map((l) => l.point.id)).toEqual(["b", "c"])
+    // "c" is the day's last point, so it is an anchor and reports its leg from "b".
+    expect(legs.find((l) => l.point.id === "c")!.legNm).toBeCloseTo(30, 0)
   })
 })

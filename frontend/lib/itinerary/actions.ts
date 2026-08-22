@@ -118,7 +118,14 @@ export async function fetchItineraries(): Promise<Itinerary[]> {
 
 export async function createPoint(
   dayId: string,
-  fields: { type: PointType; latitude: number; longitude: number },
+  fields: {
+    type: PointType
+    latitude: number
+    longitude: number
+    // Splice the new point into the route directly after this one instead of
+    // appending it to the tail — a point dropped on a leg.
+    afterPointId?: string
+  },
 ): Promise<PointActionResult> {
   try {
     const raw = await apiPost<unknown>("/api/point/create", { dayId, ...fields })
@@ -250,6 +257,28 @@ export async function createDay(itineraryId: string, dayNumber: number): Promise
   }
 }
 
+/**
+ * Return the itinerary's Day 0 staging area, creating it if it has none.
+ *
+ * Day 0 is where every newly dropped point lands before a boundary owns it, and
+ * `/api/day/create` cannot make one — `day_number` is validated 1..365 because Day 0
+ * is internal. Every creation path is supposed to leave one behind; this is the
+ * builder's repair path for one that didn't. Idempotent.
+ */
+export async function ensureStagingDay(itineraryId: string): Promise<DayActionResult> {
+  try {
+    const raw = await apiPost<unknown>(`/api/itinerary/${itineraryId}/staging-day`, {})
+    const day = DaySchema.parse(raw)
+    return { success: true, day }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to prepare the itinerary for editing.",
+    }
+  }
+}
+
 export async function updateDay(
   id: string,
   fields: Partial<Pick<Day, "date" | "dayNumber" | "startPointId" | "endPointId">>,
@@ -271,6 +300,31 @@ export async function deleteDay(id: string): Promise<DeleteActionResult> {
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to delete day." }
+  }
+}
+
+export type PointOrderResult = { success: true } | { success: false; error: string }
+
+/**
+ * Persist the route's order — the `next_id` chain follows the submitted ids.
+ *
+ * `pointOrder` is the client's canonical route order; this is the only way to
+ * send it back. The submitted ids must be exactly the itinerary's points, or the
+ * server answers 409 rather than orphaning the ones left out.
+ */
+export async function setPointOrder(
+  itineraryId: string,
+  order: string[],
+): Promise<PointOrderResult> {
+  try {
+    await apiPost<unknown>(`/api/itinerary/${itineraryId}/point-order`, { order })
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to save the route order.",
+    }
   }
 }
 

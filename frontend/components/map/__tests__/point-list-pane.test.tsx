@@ -13,6 +13,7 @@ import {
 } from "@/lib/itinerary/boundaries"
 import type { DraftBoundary } from "@/lib/itinerary/boundaries"
 import type { Point } from "@/lib/dtos/point"
+import { haversineNm, legLabel } from "@/lib/itinerary/distance"
 import type { Day } from "@/lib/dtos/day"
 
 vi.mock("@/lib/itinerary/actions", () => ({
@@ -99,6 +100,7 @@ function makeCtx(overrides: Partial<MapBuilderContextValue> = {}): MapBuilderCon
     avgSpeedKnots: 2.5,
     setAvgSpeedKnots: vi.fn(),
     day0Id: DAY0_ID,
+    resolveDay0Id: vi.fn(async () => DAY0_ID),
     viewMode: false,
     setViewMode: vi.fn(),
     selectedDayId: null,
@@ -425,6 +427,85 @@ describe("PointListPane — Save/Discard availability", () => {
 })
 
 // ─── deferred day creation (draft-only days) ─────────────────────────────────
+
+describe("PointListPane — the leg on an expanded row", () => {
+  // Edit mode was the one mode that withheld the figure, and it is the mode where
+  // you act on it: the waypoint→stop toggle lives on this row. The point summary
+  // card that already showed it renders in View mode only.
+  const placed = (id: string, latitude: number, type: Point["type"], dayId: string): Point => ({
+    id,
+    type,
+    latitude,
+    longitude: 14,
+    dayId,
+  })
+
+  const legState = {
+    points: [
+      placed("p1", 43.0, "stop", DAY1_ID),
+      placed("p2", 43.5, "position", DAY1_ID),
+      placed("p3", 44.0, "stop", DAY1_ID),
+    ],
+    pointOrder: POINT_ORDER,
+    pendingPointId: null,
+    pendingPointName: null,
+    savingCount: 0,
+    days: [day(DAY1_ID, 1, { startPointId: "p1", endPointId: "p3" })],
+  }
+
+  it("shows the distance from the last stop on the expanded position", () => {
+    renderWithCtx(makeCtx({ state: legState, selectedPointId: "p2" }))
+
+    const expected = legLabel(
+      haversineNm({ latitude: 43.0, longitude: 14 }, { latitude: 43.5, longitude: 14 }),
+      2.5,
+      "nm",
+    )
+    expect(screen.getByTestId("point-row-leg")).toHaveTextContent(expected)
+  })
+
+  it("shows nothing for the point that opens the route", () => {
+    renderWithCtx(makeCtx({ state: legState, selectedPointId: "p1" }))
+    expect(screen.queryByTestId("point-row-leg")).not.toBeInTheDocument()
+  })
+})
+
+describe("PointListPane — an itinerary that arrived without its Day 0", () => {
+  // BOUNDARIES_APPLY parks unassigned points back in Day 0, so a save needs one.
+  // Reading day0Id and bailing when it was null made Save days a button that did
+  // nothing at all on a clone of a hand-built route — no request, no message.
+  const draft: DraftBoundary[] = [{ dayId: DAY1_ID, dayNumber: 1, endPointId: null, date: null }]
+
+  it("provisions the staging day and applies the boundaries into it", async () => {
+    const dispatch = vi.fn()
+    const resolveDay0Id = vi.fn(async () => "healed-day-0")
+    renderWithCtx(makeCtx({ draft, dispatch, day0Id: null, resolveDay0Id }))
+
+    await userEvent.click(screen.getByRole("button", { name: /save days/i }))
+
+    expect(resolveDay0Id).toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "BOUNDARIES_APPLY", day0Id: "healed-day-0" }),
+    )
+    expect(actions.applyBoundaries).toHaveBeenCalledWith(ITIN_ID, expect.any(Object))
+  })
+
+  it("saves nothing when the staging day cannot be provisioned, and keeps the draft", async () => {
+    const dispatch = vi.fn()
+    const setDraft = vi.fn()
+    const resolveDay0Id = vi.fn(async () => null)
+    renderWithCtx(makeCtx({ draft, dispatch, setDraft, day0Id: null, resolveDay0Id }))
+
+    await userEvent.click(screen.getByRole("button", { name: /save days/i }))
+
+    expect(actions.applyBoundaries).not.toHaveBeenCalled()
+    expect(actions.createDay).not.toHaveBeenCalled()
+    // The user's unsaved boundary work survives — clearing it would lose the edit
+    // as well as the save.
+    expect(setDraft).not.toHaveBeenCalledWith(null)
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: "BOUNDARIES_APPLY" }))
+  })
+})
 
 describe("PointListPane — deferred day creation", () => {
   it("Save days creates a real Day for a draft-only day before applying boundaries", async () => {

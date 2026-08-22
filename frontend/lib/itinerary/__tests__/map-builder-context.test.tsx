@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { renderHook } from "@testing-library/react"
 import { createElement } from "react"
 import { MapBuilderContext, useMapBuilder } from "../map-builder-context"
@@ -33,6 +33,7 @@ const MOCK_CTX: MapBuilderContextValue = {
   avgSpeedKnots: 2.5,
   setAvgSpeedKnots: () => {},
   day0Id: null,
+  resolveDay0Id: vi.fn(async () => null),
   viewMode: true,
   setViewMode: () => {},
   selectedDayId: null,

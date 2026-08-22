@@ -13,6 +13,9 @@ export type PointRowProps = {
   onExpand: (id: string) => void
   isBoundary: boolean
   dayColor: string
+  // Distance and time from the previous stop to this point, shown while expanded.
+  // Absent for the point that opens the route, which has no inbound leg.
+  legText?: string | null
   onTypeChange?: (type: PointType) => void
   onNameBlur?: (name: string) => void
   saveStatus?: SaveStatus
@@ -35,6 +38,7 @@ export function PointRow({
   onExpand,
   isBoundary,
   dayColor,
+  legText = null,
   onTypeChange,
   onNameBlur,
   saveStatus = "idle",
@@ -87,6 +91,15 @@ export function PointRow({
           </span>
         )}
       </button>
+
+      {/* The leg sits directly above the type toggle because it is the reason to
+          reach for it: a long stretch since the last stop is what makes a position
+          worth promoting to one. */}
+      {legText && (
+        <p data-testid="point-row-leg" className="text-muted-foreground text-xs">
+          {legText} <span className="text-muted-foreground/70">from the last stop</span>
+        </p>
+      )}
 
       {!isBoundary && onTypeChange && (
         <div className="flex gap-1">

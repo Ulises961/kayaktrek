@@ -22,7 +22,7 @@ from Models.trip import Trip
 from Models.user import User
 from Schemas.day_schema import DaySchema
 from Schemas.itinerary_schema import ItinerarySchema, ItineraryUpdateSchema
-from Services.Utils.point_ordering import walk_linked_list
+from Services.Utils.point_ordering import chain_in_order, walk_linked_list
 from Services.Utils.rdp import rdp_simplify
 from Services.Utils.route_distance import compute_total_miles
 from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
@@ -32,6 +32,18 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SPEED = 2.5
 _GPX_IMPORT_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 _GPX_DEFAULT_EPSILON = 0.0001  # degrees (~11 m)
+
+
+class PointOrderMismatchError(Exception):
+    """The submitted route order is not a permutation of the itinerary's points.
+
+    A 409, not a 400: the request is well-formed, it is the client's picture of the
+    route that has gone stale. Re-chaining anyway would orphan whatever it left out
+    — and an orphaned point falls back to `walk_linked_list`'s head sort, where
+    UUIDv7 ties on the millisecond let the random bits decide the route's shape.
+    The client refetches and resubmits; route editing is single-editor (only the
+    leader), so this is rare by construction.
+    """
 
 
 class ItineraryService:
@@ -432,6 +444,20 @@ class ItineraryService:
         return day0
 
     @staticmethod
+    def provision_staging_day(itinerary_id: str) -> Day:
+        """Return the itinerary's Day 0, committing a new one if it has none.
+
+        The transactional sibling of ensure_staging_day, for callers that own no
+        wider transaction. This is the repair path: every creation path is supposed
+        to leave a Day 0 behind, and when one doesn't, the builder has no staging
+        area and silently refuses every point the user drops. Idempotent.
+        """
+        itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
+        day0 = ItineraryService.ensure_staging_day(itinerary)
+        db.session.commit()
+        return day0
+
+    @staticmethod
     def create_itinerary(itinerary_data: dict, user_id: str) -> Itinerary:
         """Create a new itinerary.
 
@@ -513,6 +539,50 @@ class ItineraryService:
             raise
 
     # ------------------------------------------------------------------ #
+    # Route order                                                           #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def itinerary_points(itinerary_id: str) -> List[Point]:
+        """Every route point in the itinerary, staging day included."""
+        return (
+            db.session.query(Point)
+            .join(Day, Point.day_id == Day.id)
+            .filter(Day.itinerary_id == UUID(itinerary_id))
+            .all()
+        )
+
+    @staticmethod
+    def set_point_order(itinerary_id: str, order: List[str]) -> List[str]:
+        """Rewrite the route's `next_id` chain to follow the given id order.
+
+        `pointOrder` has been the frontend's canonical route order since M4b, with
+        no verb to send it back — points could only ever be appended to the tail.
+        This is that verb, and it is deliberately general rather than
+        insert-specific: reordering is the same operation.
+
+        The submitted ids must be exactly the itinerary's own points, no more and
+        no fewer (see PointOrderMismatchError).
+        """
+        points = ItineraryService.itinerary_points(itinerary_id)
+        by_id = {str(point.id): point for point in points}
+
+        submitted = [str(point_id) for point_id in order]
+        if len(set(submitted)) != len(submitted) or set(submitted) != set(by_id):
+            raise PointOrderMismatchError(
+                "The submitted order does not match the itinerary's points"
+            )
+
+        chain_in_order([by_id[point_id] for point_id in submitted])
+        db.session.commit()
+
+        logger.info(
+            "itinerary_point_order_set",
+            extra={"itinerary_id": itinerary_id, "point_count": len(submitted)},
+        )
+        return submitted
+
+    # ------------------------------------------------------------------ #
     # Fork                                                                  #
     # ------------------------------------------------------------------ #
 
@@ -589,6 +659,13 @@ class ItineraryService:
                 new_day.start_point_id = old_to_new_point[str(old_day.start_point_id)].id
             if old_day.end_point_id and str(old_day.end_point_id) in old_to_new_point:
                 new_day.end_point_id = old_to_new_point[str(old_day.end_point_id)].id
+
+        # The copy above reproduces the source's days exactly — including the
+        # absence of a Day 0, if the source never had one. A fork is a route the
+        # user is expected to edit, and without the staging day every dropped point
+        # has nowhere to land. Run it after the copy so a source that *did* carry a
+        # Day 0 doesn't end up with two.
+        ItineraryService.ensure_staging_day(fork)
 
         db.session.commit()
         db.session.refresh(fork)

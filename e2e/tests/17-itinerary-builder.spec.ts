@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Locator } from "@playwright/test"
+import { API_URL } from "../playwright.config"
 import { LEADER } from "../fixtures/auth"
 import { apiGetAccessToken, apiDeleteTrip } from "../fixtures/trips"
 import {
@@ -373,6 +374,111 @@ test.describe("Itinerary builder — Edit mode (M14 flat draft surface)", () => 
       await page.reload()
       await enterEdit(page)
       await expect(page.getByTestId("point-row")).toHaveCount(6)
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  // M20 §4 — a point dropped on a leg goes between the two points it was dropped
+  // between. Before this, create could only append: next_id was dump_only on both
+  // point schemas and create_point always took the itinerary-wide tail.
+  test("dropping a point on a leg inserts it there, not at the end of the route", async ({
+    page,
+    request,
+  }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Builder Insert On Leg ${Date.now()}`,
+      points: BUILDER_POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await gotoAndEnterEdit(page, seeded.itineraryId)
+      await expect(page.getByTestId("point-row")).toHaveCount(5)
+
+      // The leg is only reachable through the map, so its position has to be read
+      // off the rendered markers rather than computed from lat/lng — the midpoint
+      // between the first two markers lies on the first leg's hit line.
+      const markers = page.locator(".leaflet-marker-icon")
+      const [first, second] = await Promise.all([
+        markers.nth(0).boundingBox(),
+        markers.nth(1).boundingBox(),
+      ])
+      if (!first || !second) throw new Error("route markers are not on the map")
+      await page.mouse.click(
+        (first.x + first.width / 2 + second.x + second.width / 2) / 2,
+        (first.y + first.height / 2 + second.y + second.height / 2) / 2,
+      )
+
+      await expect(page.getByTestId("point-row")).toHaveCount(6)
+      // The clinching assertion: an appended point would be the last row. "Camp"
+      // still being last is what says it was spliced in.
+      await expect(page.getByTestId("point-row").nth(5)).toContainText("Camp")
+      await expect(page.getByTestId("point-row").nth(1)).not.toContainText("Turn")
+
+      await expect
+        .poll(
+          async () => {
+            const itinerary = await apiGetItinerary(request, leaderToken, seeded.itineraryId)
+            return itinerary.days.flatMap((d) => d.points).length
+          },
+          { timeout: 20_000, message: "waiting for the inserted point to persist" },
+        )
+        .toBe(6)
+
+      // And it survives a round trip — the chain the server holds is the one the
+      // list was showing, not creation order.
+      await page.reload()
+      await enterEdit(page)
+      await expect(page.getByTestId("point-row")).toHaveCount(6)
+      await expect(page.getByTestId("point-row").nth(5)).toContainText("Camp")
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  // M20 §1 — an itinerary with no Day 0 used to swallow every dropped point and
+  // every day save, with no toast, no console line and no request. A clone of a
+  // hand-built route arrived exactly like this.
+  test("an itinerary with no staging day heals itself instead of swallowing the point", async ({
+    page,
+    request,
+  }) => {
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Builder No Staging Day ${Date.now()}`,
+      points: BUILDER_POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      // Boundaries are already applied, so Day 0 is empty and dropping it takes no
+      // route points with it — the shape a fork of a hand-built route arrived in.
+      const before = await apiGetItinerary(request, leaderToken, seeded.itineraryId)
+      const dayZero = before.days.find((d) => d.dayNumber === 0)
+      expect(dayZero, "the seeded itinerary should have a Day 0 to remove").toBeTruthy()
+      const removed = await request.delete(`${API_URL}/api/v1/day/${dayZero!.id}`, {
+        headers: { Authorization: `Bearer ${leaderToken}` },
+      })
+      expect(removed.ok()).toBeTruthy()
+
+      await gotoAndEnterEdit(page, seeded.itineraryId)
+      await expect(page.getByTestId("point-row")).toHaveCount(5)
+
+      const mapBox = await page.locator(".leaflet-container").boundingBox()
+      if (!mapBox) throw new Error("map container not found")
+      await page.mouse.click(mapBox.x + mapBox.width * 0.5, mapBox.y + mapBox.height * 0.85)
+
+      await expect(page.getByTestId("point-row")).toHaveCount(6)
+      await expect
+        .poll(
+          async () => {
+            const itinerary = await apiGetItinerary(request, leaderToken, seeded.itineraryId)
+            return {
+              points: itinerary.days.flatMap((d) => d.points).length,
+              stagingDays: itinerary.days.filter((d) => d.dayNumber === 0).length,
+            }
+          },
+          { timeout: 20_000, message: "waiting for the staging day and the point" },
+        )
+        .toEqual({ points: 6, stagingDays: 1 })
     } finally {
       await apiDeleteTrip(request, leaderToken, seeded.tripId)
     }

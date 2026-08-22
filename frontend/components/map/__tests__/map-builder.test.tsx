@@ -28,6 +28,9 @@ const {
   mockCloseDay: vi.fn().mockResolvedValue({ success: true }),
 }))
 
+const { mockToastError } = vi.hoisted(() => ({ mockToastError: vi.fn() }))
+vi.mock("sonner", () => ({ toast: { error: mockToastError } }))
+
 vi.mock("@/hooks/use-collapse-sidebar", () => ({
   useCollapseSidebar: mockUseCollapseSidebar,
 }))
@@ -64,6 +67,7 @@ vi.mock("next/dynamic", () => ({
       onMarkerClick?: (pointId: string) => void
       onMapClick?: (lat: number, lng: number) => void
       onMarkerDragEnd?: (pointId: string, lat: number, lng: number) => void
+      onLegClick?: (afterPointId: string, lat: number, lng: number) => void
       livePositions?: unknown[]
     }) {
       return (
@@ -77,6 +81,7 @@ vi.mock("next/dynamic", () => ({
           <button onClick={() => props.onMarkerDragEnd?.("p1", 45, 15)}>
             simulate-marker-drag-end
           </button>
+          <button onClick={() => props.onLegClick?.("p1", 44.2, 14.2)}>simulate-leg-click</button>
         </div>
       )
     },
@@ -113,6 +118,8 @@ vi.mock("@/lib/itinerary/actions", () => ({
   updateDay: vi.fn().mockResolvedValue({ success: true }),
   deleteDay: vi.fn().mockResolvedValue({ success: true }),
   createPoint: vi.fn().mockResolvedValue({ success: false }),
+  ensureStagingDay: vi.fn().mockResolvedValue({ success: false, error: "no staging day" }),
+  setPointOrder: vi.fn().mockResolvedValue({ success: true }),
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
   deletePoint: vi.fn().mockResolvedValue({ success: true }),
   assignPointsToDay: vi.fn().mockResolvedValue({ success: true }),
@@ -126,7 +133,7 @@ vi.mock("@/lib/profile/actions", () => ({
 import { MapBuilder } from "../map-builder"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { setUnitPreference } from "@/lib/profile/actions"
-import { createPoint, updatePoint } from "@/lib/itinerary/actions"
+import { createPoint, updatePoint, ensureStagingDay, setPointOrder } from "@/lib/itinerary/actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000030"
@@ -330,6 +337,189 @@ describe("MapBuilder — dropping a point on the map", () => {
 
     await waitFor(() => expect(createPoint).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByTestId("map-core-points")).toHaveTextContent("[]"))
+  })
+})
+
+describe("MapBuilder — an itinerary that arrived without its Day 0", () => {
+  // A clone of a hand-built route used to reach the builder with no staging day, and
+  // every map click returned from the handler without a request, a toast, or a marker.
+  const withoutDay0: Itinerary = { ...ITINERARY, days: [] }
+
+  it("provisions the staging day and drops the point into it", async () => {
+    vi.mocked(ensureStagingDay).mockResolvedValueOnce({
+      success: true,
+      day: { id: "healed-day-0", dayNumber: 0, points: [] },
+    })
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "healed-day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withoutDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() => expect(ensureStagingDay).toHaveBeenCalledWith(ITINERARY_ID))
+    expect(createPoint).toHaveBeenCalledWith("healed-day-0", {
+      type: "position",
+      latitude: 44.5,
+      longitude: 14.5,
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"id":"confirmed-1"/),
+    )
+  })
+
+  it("provisions it once, not on every click", async () => {
+    vi.mocked(ensureStagingDay).mockResolvedValueOnce({
+      success: true,
+      day: { id: "healed-day-0", dayNumber: 0, points: [] },
+    })
+    vi.mocked(createPoint).mockResolvedValue({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "healed-day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withoutDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() => expect(createPoint).toHaveBeenCalledTimes(1))
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() => expect(createPoint).toHaveBeenCalledTimes(2))
+
+    expect(ensureStagingDay).toHaveBeenCalledTimes(1)
+  })
+
+  it("tells the user and adds nothing when the staging day cannot be provisioned", async () => {
+    vi.mocked(ensureStagingDay).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to prepare the itinerary for editing.",
+    })
+    render(<MapBuilder itinerary={withoutDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Failed to prepare the itinerary for editing."),
+    )
+    expect(createPoint).not.toHaveBeenCalled()
+    // No optimistic marker left stranded on the map either.
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent("[]")
+  })
+})
+
+describe("MapBuilder — dropping a point on a leg", () => {
+  // Points could only ever be appended to the tail: create had no way to express a
+  // position in the chain, and `pointOrder` — the client's canonical order since
+  // M4b — had no verb to send it back.
+  const withRoute: Itinerary = {
+    ...ITINERARY,
+    days: [
+      {
+        dayNumber: 0,
+        id: "day-0",
+        points: [
+          { id: "p1", type: "stop", latitude: 44, longitude: 14, dayId: "day-0" },
+          { id: "p2", type: "stop", latitude: 45, longitude: 15, dayId: "day-0" },
+        ],
+      },
+    ],
+  }
+
+  const inserted = {
+    id: "inserted-1",
+    type: "position" as const,
+    latitude: 44.2,
+    longitude: 14.2,
+    dayId: "day-0",
+  }
+
+  it("splices the point between the two it was dropped between, on the map and on the server", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({ success: true, point: inserted })
+    render(<MapBuilder itinerary={withRoute} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-leg-click"))
+
+    await waitFor(() => expect(createPoint).toHaveBeenCalled())
+    expect(createPoint).toHaveBeenCalledWith("day-0", {
+      type: "position",
+      latitude: 44.2,
+      longitude: 14.2,
+      afterPointId: "p1",
+    })
+
+    // The rendered route is the one that matters: between p1 and p2, not appended.
+    await waitFor(() => {
+      const ids = JSON.parse(screen.getByTestId("map-core-points").textContent!).map(
+        (p: { id: string }) => p.id,
+      )
+      expect(ids).toEqual(["p1", "inserted-1", "p2"])
+    })
+  })
+
+  it("sends the whole order once the real id exists, never with the temp one", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({ success: true, point: inserted })
+    render(<MapBuilder itinerary={withRoute} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-leg-click"))
+
+    await waitFor(() =>
+      expect(setPointOrder).toHaveBeenCalledWith(ITINERARY_ID, ["p1", "inserted-1", "p2"]),
+    )
+    // An order carrying a temp id is a set the server cannot match — it would 409
+    // for a reason of our own making.
+    for (const [, order] of vi.mocked(setPointOrder).mock.calls) {
+      expect(order.some((id) => id.startsWith("tmp-"))).toBe(false)
+    }
+  })
+
+  it("rolls the insert off the map and says why when the create fails", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to create point.",
+    })
+    render(<MapBuilder itinerary={withRoute} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-leg-click"))
+
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Failed to create point."))
+    const ids = JSON.parse(screen.getByTestId("map-core-points").textContent!).map(
+      (p: { id: string }) => p.id,
+    )
+    expect(ids).toEqual(["p1", "p2"])
+    // Nothing to reconcile — the point was never created.
+    expect(setPointOrder).not.toHaveBeenCalled()
+  })
+
+  it("keeps the point and reports the failure when only the order save fails", async () => {
+    // `afterPointId` already put the point in the right place server-side, so the
+    // route on screen is the route that was saved — rolling it back would be a lie.
+    vi.mocked(createPoint).mockResolvedValueOnce({ success: true, point: inserted })
+    vi.mocked(setPointOrder).mockResolvedValueOnce({
+      success: false,
+      error: "Failed to save the route order.",
+    })
+    render(<MapBuilder itinerary={withRoute} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-leg-click"))
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Failed to save the route order."),
+    )
+    const ids = JSON.parse(screen.getByTestId("map-core-points").textContent!).map(
+      (p: { id: string }) => p.id,
+    )
+    expect(ids).toEqual(["p1", "inserted-1", "p2"])
   })
 })
 

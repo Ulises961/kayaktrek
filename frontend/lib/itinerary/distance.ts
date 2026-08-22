@@ -30,16 +30,6 @@ export function totalDistanceNm(points: { latitude: number; longitude: number }[
   return total
 }
 
-export function segmentMidpoint(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-): { latitude: number; longitude: number } {
-  return {
-    latitude: (a.latitude + b.latitude) / 2,
-    longitude: (a.longitude + b.longitude) / 2,
-  }
-}
-
 export function toKm(nm: number): number {
   return nm * 1.852
 }
@@ -120,4 +110,23 @@ export function routeLegs<T extends DayPoint>(dayPoints: T[]): RouteLeg<T>[] {
     if (isAnchor) running = 0 // reset after emitting so an anchor reports its full leg
   }
   return legs
+}
+
+/**
+ * `routeLegs` for one day, measured from the point the day is paddled from.
+ *
+ * `seed` (see `dayRouteGroups`) is walked as the day's opening anchor and then
+ * dropped from the result: it belongs to the previous day and already reported
+ * its own leg there. What it buys is the day's first point reporting the crossing
+ * from the overnight stop rather than `isStart` with a leg of zero, and a
+ * `cumulativeNm` that starts where the day's paddling actually started — the same
+ * figure `getSliceDistance` totals for the day.
+ *
+ * A seed without coordinates is ignored; it can contribute no distance and
+ * dropping it blindly would take the day's first point with it.
+ */
+export function dayRouteLegs<T extends DayPoint>(seed: T | null, dayPoints: T[]): RouteLeg<T>[] {
+  const usable = seed != null && seed.latitude != null && seed.longitude != null
+  if (!usable) return routeLegs(dayPoints)
+  return routeLegs([seed, ...dayPoints]).filter((leg) => leg.point !== seed)
 }

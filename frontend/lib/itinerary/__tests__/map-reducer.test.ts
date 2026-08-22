@@ -44,6 +44,22 @@ describe("POINT_ADD", () => {
     const next = mapReducer(BASE, { type: "POINT_ADD", point: pt("ddd") })
     expect(next.pointOrder).toEqual(["aaa", "bbb", "ccc", "ddd"])
   })
+
+  it("inserts directly after afterId — a point dropped on a leg", () => {
+    const next = mapReducer(BASE, { type: "POINT_ADD", point: pt("ddd"), afterId: "aaa" })
+    expect(next.pointOrder).toEqual(["aaa", "ddd", "bbb", "ccc"])
+  })
+
+  it("inserts after the tail without losing the point", () => {
+    const next = mapReducer(BASE, { type: "POINT_ADD", point: pt("ddd"), afterId: "ccc" })
+    expect(next.pointOrder).toEqual(["aaa", "bbb", "ccc", "ddd"])
+  })
+
+  it("falls back to appending when afterId is not in the route", () => {
+    const next = mapReducer(BASE, { type: "POINT_ADD", point: pt("ddd"), afterId: "gone" })
+    expect(next.pointOrder).toEqual(["aaa", "bbb", "ccc", "ddd"])
+    expect(next.points.map((p) => p.id)).toContain("ddd")
+  })
 })
 
 describe("POINT_CONFIRM", () => {
