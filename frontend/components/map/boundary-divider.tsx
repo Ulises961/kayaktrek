@@ -35,7 +35,19 @@ type RowSnapshot = {
   dividerMidY: number
 }
 
-const SCROLL_ZONE = 48
+// Edge bands that auto-scroll the list while a boundary is dragged over them.
+// Proportional, because a fixed size is a fraction of the container and the
+// container is not a fixed size: the point pane is ~656px tall on a desktop but
+// 171px inside the bottom sheet at 320, where a flat 48px per edge claimed 96px
+// — 56% of the list — and the last day's boundary sits inside the bottom band
+// before the drag even starts, so the list ran away under the finger. The
+// desktop figure is kept as the ceiling, so nothing changes above ~640px.
+const SCROLL_ZONE_MAX = 48
+const SCROLL_ZONE_RATIO = 0.15
+
+function scrollZone(containerHeight: number): number {
+  return Math.min(SCROLL_ZONE_MAX, containerHeight * SCROLL_ZONE_RATIO)
+}
 
 export function BoundaryDivider({
   boundary,
@@ -104,13 +116,14 @@ export function BoundaryDivider({
 
     // Auto-scroll when pointer is near the container edges.
     const containerRect = scrollEl.getBoundingClientRect()
+    const zone = scrollZone(containerRect.height)
     const distFromTop = e.clientY - containerRect.top
     const distFromBottom = containerRect.bottom - e.clientY
-    if (distFromTop < SCROLL_ZONE) {
-      scrollEl.scrollBy({ top: -Math.max(1, (SCROLL_ZONE - distFromTop) / 2), behavior: "instant" })
-    } else if (distFromBottom < SCROLL_ZONE) {
+    if (distFromTop < zone) {
+      scrollEl.scrollBy({ top: -Math.max(1, (zone - distFromTop) / 2), behavior: "instant" })
+    } else if (distFromBottom < zone) {
       scrollEl.scrollBy({
-        top: Math.max(1, (SCROLL_ZONE - distFromBottom) / 2),
+        top: Math.max(1, (zone - distFromBottom) / 2),
         behavior: "instant",
       })
     }

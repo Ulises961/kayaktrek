@@ -111,11 +111,56 @@ describe("ItineraryCard — public toggle", () => {
     expect(screen.getByRole("button", { name: /make private/i })).toBeInTheDocument()
   })
 
-  it("calls updateItinerary with isPublic toggled to true", async () => {
+  it("asks for the pitch instead of publishing straight away (M19 §1)", async () => {
     mockUpdateItinerary.mockResolvedValue({ success: true })
     render(<ItineraryCard itinerary={BASE} />)
     await userEvent.click(screen.getByRole("button", { name: /make public/i }))
-    expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, { isPublic: true })
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument()
+    // Nothing is published until the author submits — the click alone must not
+    // make the route public with no description on it.
+    expect(mockUpdateItinerary).not.toHaveBeenCalled()
+  })
+
+  it("publishes with the pitch when the dialog is submitted", async () => {
+    mockUpdateItinerary.mockResolvedValue({ success: true })
+    render(<ItineraryCard itinerary={BASE} />)
+    await userEvent.click(screen.getByRole("button", { name: /make public/i }))
+    await userEvent.type(await screen.findByLabelText(/description/i), "Two sheltered days.")
+    await userEvent.click(screen.getByRole("button", { name: /^publish$/i }))
+
+    await waitFor(() =>
+      expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, {
+        description: "Two sheltered days.",
+        difficulty: null,
+        isPublic: true,
+      }),
+    )
+    expect(mockRefresh).toHaveBeenCalled()
+  })
+
+  it("lets an already-public route's pitch be edited without republishing", async () => {
+    mockUpdateItinerary.mockResolvedValue({ success: true })
+    render(<ItineraryCard itinerary={{ ...BASE, isPublic: true, description: "Old pitch." }} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit pitch/i }))
+
+    const field = await screen.findByLabelText(/description/i)
+    expect(field).toHaveValue("Old pitch.")
+    await userEvent.clear(field)
+    await userEvent.type(field, "Better pitch.")
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
+
+    await waitFor(() =>
+      expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, {
+        description: "Better pitch.",
+        difficulty: null,
+      }),
+    )
+  })
+
+  it("offers no pitch editing while the route is private", () => {
+    render(<ItineraryCard itinerary={BASE} />)
+    expect(screen.queryByRole("button", { name: /edit pitch/i })).not.toBeInTheDocument()
   })
 
   it("calls updateItinerary with isPublic toggled to false", async () => {
@@ -125,17 +170,17 @@ describe("ItineraryCard — public toggle", () => {
     expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, { isPublic: false })
   })
 
-  it("calls router.refresh after toggle", async () => {
+  it("calls router.refresh after unpublishing", async () => {
     mockUpdateItinerary.mockResolvedValue({ success: true })
-    render(<ItineraryCard itinerary={BASE} />)
-    await userEvent.click(screen.getByRole("button", { name: /make public/i }))
+    render(<ItineraryCard itinerary={{ ...BASE, isPublic: true }} />)
+    await userEvent.click(screen.getByRole("button", { name: /make private/i }))
     expect(mockRefresh).toHaveBeenCalled()
   })
 
-  it("shows an error toast and does not refresh when the toggle fails", async () => {
+  it("shows an error toast and does not refresh when unpublishing fails", async () => {
     mockUpdateItinerary.mockResolvedValue({ success: false, error: "Could not update itinerary." })
-    render(<ItineraryCard itinerary={BASE} />)
-    await userEvent.click(screen.getByRole("button", { name: /make public/i }))
+    render(<ItineraryCard itinerary={{ ...BASE, isPublic: true }} />)
+    await userEvent.click(screen.getByRole("button", { name: /make private/i }))
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Could not update itinerary."))
     expect(mockRefresh).not.toHaveBeenCalled()
   })

@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Fields a create/PATCH may set on a Place.
 _MUTABLE = ("location", "category_id", "label", "note")
+# Visibility is editable but not creatable: a place always starts PRIVATE (see
+# create) and is published deliberately afterwards, never by the same call that
+# drops the pin. Kept out of _MUTABLE so create's **data splat cannot pick it up.
+_MUTABLE_ON_UPDATE = _MUTABLE + ("visibility",)
 
 
 class PlaceService:
@@ -92,7 +96,7 @@ class PlaceService:
     def update(place_id: str, user_id: str, data: dict) -> Place:
         place = PlaceService.get_by_id(place_id)
         PlaceService._assert_creator(place, user_id)
-        for key in _MUTABLE:
+        for key in _MUTABLE_ON_UPDATE:
             if key in data:
                 setattr(place, key, data[key])
         db.session.commit()

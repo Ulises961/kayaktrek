@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { ExploreDiscovery } from "../explore-discovery"
 import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { ExploreItem, ExplorePage } from "@/lib/dtos/itinerary"
+import { DIFFICULTY, DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 
 const mockSearch = vi.mocked(searchPublicItineraries)
 const mockFork = vi.mocked(forkItinerary)
@@ -36,6 +37,8 @@ function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
     previewPositions: [],
     createdFromId: null,
     originalAuthor: null,
+    description: null,
+    difficulty: null,
     ...overrides,
   }
 }
@@ -47,6 +50,58 @@ function page(items: ExploreItem[], overrides: Partial<ExplorePage> = {}): Explo
 beforeEach(() => {
   vi.clearAllMocks()
   mockSearch.mockResolvedValue(page([]))
+})
+
+describe("ExploreDiscovery — the route's pitch and grade (M19)", () => {
+  it("shows the pitch on the card", () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item({ description: "Sheltered coast hop with a shingle put-in." })])}
+        isAuthenticated
+        ownedIds={[]}
+      />,
+    )
+    expect(screen.getByText("Sheltered coast hop with a shingle put-in.")).toBeInTheDocument()
+  })
+
+  it("shows the grade by its label", () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item({ difficulty: DIFFICULTY.DEMANDING })])}
+        isAuthenticated
+        ownedIds={[]}
+      />,
+    )
+    expect(screen.getByText(DIFFICULTY_LABELS[DIFFICULTY.DEMANDING])).toBeInTheDocument()
+  })
+
+  it("renders an ungraded, unpitched route without empty furniture", () => {
+    const { container } = render(
+      <ExploreDiscovery initial={page([item()])} isAuthenticated ownedIds={[]} />,
+    )
+    // No stray empty paragraph where the pitch would be — a blank line under every
+    // card is worse than none, and most routes will have neither field set.
+    expect(container.querySelector("[data-testid='route-pitch']")).toBeNull()
+    for (const label of Object.values(DIFFICULTY_LABELS)) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
+  it("clamps the pitch rather than hiding it on a narrow card", () => {
+    render(
+      <ExploreDiscovery
+        initial={page([item({ description: "A very long pitch. ".repeat(40) })])}
+        isAuthenticated
+        ownedIds={[]}
+      />,
+    )
+    const pitch = screen.getByTestId("route-pitch")
+    // Clamped, never `hidden sm:block`: 320 is the browsing context where a
+    // scannable pitch matters most (M19 decision 9). jsdom has no layout engine, so
+    // this asserts the mechanism chosen, and 19-responsive.spec.ts measures the result.
+    expect(pitch.className).toContain("line-clamp-2")
+    expect(pitch.className).not.toContain("hidden")
+  })
 })
 
 describe("ExploreDiscovery — search failure", () => {

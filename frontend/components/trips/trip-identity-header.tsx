@@ -23,11 +23,11 @@ import { SuccessorPicker } from "@/components/trips/successor-picker"
 import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Membership } from "@/lib/trips/membership"
+import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import {
   TRIP_STATE,
   TRIP_STATES,
   TRIP_STATE_LABELS,
-  TRIP_DIFFICULTY_LABELS,
   type Trip,
   type TripState,
 } from "@/lib/dtos/trip"
@@ -191,7 +191,7 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
               {trip.difficulty && (
                 <div className="flex flex-col gap-2">
                   <span className={fieldLabelClass}>Difficulty</span>
-                  <p className="text-sm">{TRIP_DIFFICULTY_LABELS[trip.difficulty]}</p>
+                  <p className="text-sm">{DIFFICULTY_LABELS[trip.difficulty]}</p>
                 </div>
               )}
 

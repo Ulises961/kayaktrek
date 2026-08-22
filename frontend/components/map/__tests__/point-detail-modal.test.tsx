@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement } from "react"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
@@ -10,6 +10,7 @@ import type { Point } from "@/lib/dtos/point"
 vi.mock("@/lib/itinerary/actions", () => ({
   updatePoint: vi.fn().mockResolvedValue({ success: true }),
   setImagePublic: vi.fn(),
+  setImageCaption: vi.fn(),
   uploadPointImage: vi.fn(),
   deletePointImage: vi.fn(),
 }))
@@ -109,9 +110,96 @@ describe("PointDetailModal", () => {
   it("renders a private photo to the owner via its returned location, not just once made public", () => {
     // POINT.images[0] ("i1") is isPublic: false — the backend still returns a usable
     // (presigned) location for it, and the carousel must not gate the <img> on isPublic.
+    // Found by position, not by filename: alt text is the caption or "Photo N", since
+    // a filename read aloud by a screen reader is noise, not a description (M19 §2).
     renderModal(POINT)
-    const img = screen.getByAltText("one") as HTMLImageElement
+    const img = screen.getByAltText("Photo 1") as HTMLImageElement
     expect(img.src).toBe(POINT.images![0].location)
+  })
+
+  it("uses the caption as alt text when the author wrote one", () => {
+    const captioned = {
+      ...POINT,
+      images: [{ ...POINT.images![0], caption: "Shingle beach at low water" }],
+    }
+    renderModal(captioned)
+    expect(screen.getByAltText("Shingle beach at low water")).toBeInTheDocument()
+  })
+
+  it("saves a caption on blur and puts the returned image into state", async () => {
+    const returned = { ...POINT.images![0], caption: "Parking above the slipway" }
+    vi.mocked(actions.setImageCaption).mockResolvedValue({ success: true, image: returned })
+    renderModal(POINT)
+
+    const field = screen.getByLabelText(/photo caption/i)
+    await userEvent.type(field, "Parking above the slipway")
+    await userEvent.tab()
+
+    await waitFor(() =>
+      expect(actions.setImageCaption).toHaveBeenCalledWith(
+        POINT.id,
+        POINT.images![0].id,
+        "Parking above the slipway",
+      ),
+    )
+    // The dispatched image is the one the server returned, not the draft string —
+    // the same "check the result before updating state" shape M15 closed elsewhere.
+    await waitFor(() =>
+      expect(baseCtx.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "POINT_UPDATE",
+          fields: { images: [returned, POINT.images![1]] },
+        }),
+      ),
+    )
+  })
+
+  it("clears the caption by sending null when the field is emptied", async () => {
+    const captioned = {
+      ...POINT,
+      images: [{ ...POINT.images![0], caption: "Old caption" }, POINT.images![1]],
+    }
+    vi.mocked(actions.setImageCaption).mockResolvedValue({
+      success: true,
+      image: { ...captioned.images[0], caption: null },
+    })
+    renderModal(captioned)
+
+    await userEvent.clear(screen.getByLabelText(/photo caption/i))
+    await userEvent.tab()
+
+    await waitFor(() =>
+      expect(actions.setImageCaption).toHaveBeenCalledWith(POINT.id, POINT.images![0].id, null),
+    )
+  })
+
+  it("does not update state when the caption save fails", async () => {
+    vi.mocked(actions.setImageCaption).mockResolvedValue({ success: false, error: "too long" })
+    renderModal(POINT)
+
+    await userEvent.type(screen.getByLabelText(/photo caption/i), "Something")
+    await userEvent.tab()
+
+    await waitFor(() => expect(actions.setImageCaption).toHaveBeenCalled())
+    expect(baseCtx.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ fields: expect.objectContaining({ images: expect.anything() }) }),
+    )
+  })
+
+  it("swaps the caption field's contents when the carousel moves to another photo", async () => {
+    const captioned = {
+      ...POINT,
+      images: [
+        { ...POINT.images![0], caption: "First photo" },
+        { ...POINT.images![1], caption: "Second photo" },
+      ],
+    }
+    renderModal(captioned)
+    expect(screen.getByLabelText(/photo caption/i)).toHaveValue("First photo")
+
+    await userEvent.click(screen.getByRole("button", { name: /next photo/i }))
+    // Carrying photo one's caption onto photo two would silently mislabel it.
+    expect(screen.getByLabelText(/photo caption/i)).toHaveValue("Second photo")
   })
 
   it("advances the carousel with the next button", async () => {

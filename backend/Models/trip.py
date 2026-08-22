@@ -7,6 +7,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Models.base_model import BaseModel
+from Models.difficulty import DifficultyType, difficulty_enum
 
 if TYPE_CHECKING:
     from Models.itinerary import Itinerary
@@ -24,13 +25,6 @@ class TripStateType(enum.Enum):
     HAPPENING = "happening"
     PAST = "past"
     ARCHIVED = "archived"
-
-
-class TripDifficultyType(enum.Enum):
-    EASY = "easy"
-    MODERATE = "moderate"
-    DEMANDING = "demanding"
-    EXPERT = "expert"
 
 
 class TripOutcomeType(enum.Enum):
@@ -98,9 +92,10 @@ class Trip(BaseModel):
     # TripSchema.pending_travellers uses this attribute — keeps serialisation unchanged.
     pending_travellers = association_proxy("invitations", "user")
 
-    difficulty: Mapped[Optional[TripDifficultyType]] = mapped_column(
-        Enum(TripDifficultyType, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=True,
+    # The leader's subjective call for this crew on this date. Distinct from
+    # Itinerary.difficulty, which rates the route itself and is what /explore filters on.
+    difficulty: Mapped[Optional[DifficultyType]] = mapped_column(
+        difficulty_enum, nullable=True
     )
     state: Mapped[TripStateType] = mapped_column(
         Enum(TripStateType, values_callable=lambda obj: [e.value for e in obj]),

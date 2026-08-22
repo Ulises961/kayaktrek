@@ -267,8 +267,12 @@ def test_explore_item_carries_no_trip_data(client, make_itinerary):
     item = _items(client.get(EXPLORE))[0]
     assert "tripId" not in item
     assert "userId" not in item
+    # `description` and `difficulty` (M19 §1) are Itinerary's own columns, not reads
+    # through to the Trip's two same-named fields — see the leak guard in
+    # Tests/76_m19_itinerary_content_test.py, which asserts a trip's grade never
+    # reaches this row.
     assert set(item) <= {
-        "id", "name", "totalMiles", "dayCount", "season",
+        "id", "name", "description", "difficulty", "totalMiles", "dayCount", "season",
         "centroidLat", "centroidLng", "createdFromId", "originalAuthor",
         "previewPositions",
     }

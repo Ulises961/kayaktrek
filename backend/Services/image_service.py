@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.exc import NoResultFound
@@ -184,4 +184,29 @@ class ImageService:
         db.session.refresh(image)
 
         logger.info("image_visibility_changed", extra={"image_id": image.id, "is_public": is_public})
+        return image
+
+    @staticmethod
+    def set_caption(image_id: str, caption: Optional[str]) -> Image:
+        """
+        Set or clear what a photo shows. Separate from set_public because a caption
+        never touches storage — visibility moves the object between bucket prefixes,
+        this only writes a column.
+
+        Args:
+            image_id: The ID of the image to update
+            caption: The new caption, or None to clear it
+
+        Returns:
+            The updated Image object
+
+        Raises:
+            NoResultFound: If the image does not exist
+        """
+        image = ImageService.get_image_by_id(image_id)
+        image.caption = caption
+        db.session.commit()
+        db.session.refresh(image)
+
+        logger.info("image_caption_set", extra={"image_id": image.id})
         return image

@@ -3,7 +3,7 @@ import { seasonOfDetail } from "../season"
 import type { PublicItineraryDetail } from "@/lib/dtos/itinerary"
 
 function detail(days: PublicItineraryDetail["days"]): PublicItineraryDetail {
-  return { id: "x", name: "n", days }
+  return { id: "x", name: "n", days, places: [] }
 }
 
 describe("seasonOfDetail", () => {

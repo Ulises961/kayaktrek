@@ -74,7 +74,9 @@ export async function createItinerary(params: {
 
 export async function updateItinerary(
   id: string,
-  fields: Partial<Pick<Itinerary, "name" | "isPublic" | "avgSpeedKnots" | "tripId">>,
+  fields: Partial<
+    Pick<Itinerary, "name" | "description" | "difficulty" | "isPublic" | "avgSpeedKnots" | "tripId">
+  >,
 ): Promise<ItineraryUpdateResult> {
   try {
     const raw = await apiPatch<unknown>(`/api/itinerary/${id}`, fields)
@@ -165,6 +167,27 @@ export async function setImagePublic(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Failed to update image visibility.",
+    }
+  }
+}
+
+// Set or clear what a photo shows (M19 §2). Sends only `caption` — the endpoint
+// applies just the fields present, so including isPublic here would let captioning
+// a photo silently change whether it is published.
+export async function setImageCaption(
+  pointId: string,
+  imageId: string,
+  caption: string | null,
+): Promise<ImageActionResult> {
+  try {
+    const raw = await apiPatch<unknown>(`/api/point/${pointId}/images/${imageId}`, { caption })
+    const image = ImageSchema.parse(raw)
+    return { success: true, image }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update the caption.",
     }
   }
 }

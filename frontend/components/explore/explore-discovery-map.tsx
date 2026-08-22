@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css"
 import type { ExploreItem, ExploreBounds } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RouteDayLayers } from "@/components/map/route-day-layers"
+import { MapCredits } from "@/components/map/map-credits"
 import { OSM_TILE_URL, OSM_ATTRIBUTION } from "@/lib/map/tiles"
 
 type Props = {
@@ -87,6 +88,7 @@ export default function ExploreDiscoveryMap({
   return (
     <MapContainer center={center} zoom={5} className="h-full w-full" zoomControl={false}>
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
+      <MapCredits />
       <BoundsWatcher enabled={boundsEnabled} onChange={onBoundsChange} />
       <SelectionFlyTo selectedId={selectedId} selectedRoute={selectedRoute} items={items} />
       {located.map((item) => {

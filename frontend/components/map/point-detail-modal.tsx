@@ -17,6 +17,7 @@ import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import {
   updatePoint,
   setImagePublic,
+  setImageCaption,
   uploadPointImage,
   deletePointImage,
 } from "@/lib/itinerary/actions"
@@ -62,6 +63,7 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   const [draftNotes, setDraftNotes] = useState(point.notes ?? "")
   const { run: runNameSave } = useSaveStatus()
   const { status: notesSaveStatus, run: runNotesSave } = useSaveStatus()
+  const { status: captionSaveStatus, run: runCaptionSave } = useSaveStatus()
 
   const coords = coordLabel(point)
   const displayName = point.name || coords || "Waypoint"
@@ -143,6 +145,29 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   const prev = () => setImageIdx((i) => (i - 1 + images.length) % images.length)
   const next = () => setImageIdx((i) => (i + 1) % images.length)
   const current = images[imageIdx]
+
+  // Takes the value rather than reading draft state: the field is keyed on the image
+  // id and left uncontrolled, so paging the carousel remounts it with that photo's
+  // own caption instead of carrying the previous photo's text onto the next one.
+  const flushCaption = useCallback(
+    async (value: string) => {
+      const trimmed = value.trim()
+      if (!current?.id || trimmed === (current.caption ?? "")) return
+      try {
+        await runCaptionSave(async () => {
+          const result = await setImageCaption(point.id!, current.id!, trimmed || null)
+          if (!result.success) throw new Error(result.error)
+          const updatedImages = (point.images ?? []).map((img) =>
+            img.id === current.id ? result.image : img,
+          )
+          dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
+        })
+      } catch {
+        // Status already reverted to idle by runCaptionSave.
+      }
+    },
+    [current, point.id, point.images, dispatch, runCaptionSave],
+  )
 
   const handleToggleVisibility = useCallback(async () => {
     if (!current?.id) return
@@ -254,7 +279,8 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={current?.location ?? ""}
-                alt={current?.name ?? `Photo ${imageIdx + 1}`}
+                // The caption describes the photo; the filename only names the file.
+                alt={current?.caption || `Photo ${imageIdx + 1}`}
                 className="h-full w-full object-cover"
               />
               <span className="absolute right-2 bottom-2 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-white/90 backdrop-blur-sm">
@@ -342,6 +368,35 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
             </div>
           )}
         </div>
+
+        {/* Caption — what this photo shows. The public gallery is flat, with no
+            grouping headings, so this is the only thing naming a photo there. */}
+        {current && (
+          <div className="border-border/50 flex items-center gap-2 border-b px-4 py-2">
+            {canEdit ? (
+              <>
+                <input
+                  key={current.id}
+                  aria-label="Photo caption"
+                  defaultValue={current.caption ?? ""}
+                  onBlur={(e) => void flushCaption(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      e.preventDefault()
+                      void flushCaption(e.currentTarget.value)
+                    }
+                  }}
+                  maxLength={300}
+                  placeholder="What does this photo show?"
+                  className="placeholder:text-muted-foreground/60 min-w-0 flex-1 bg-transparent text-xs outline-none"
+                />
+                <SaveStatusLine status={captionSaveStatus} />
+              </>
+            ) : (
+              current.caption && <p className="text-muted-foreground text-xs">{current.caption}</p>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         <div className="flex min-h-0 flex-1 flex-col px-4 py-3">

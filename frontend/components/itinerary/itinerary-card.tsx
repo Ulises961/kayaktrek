@@ -3,9 +3,10 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
-import { DownloadIcon, GlobeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { DownloadIcon, GlobeIcon, LockIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { updateItinerary, createTripFromItinerary, deleteItinerary } from "@/lib/itinerary/actions"
 import { StoryShareButton } from "@/components/itinerary/story-share-button"
+import { ItineraryPitchDialog } from "@/components/itinerary/itinerary-pitch-dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -41,20 +42,32 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
   const [isCreatingTrip, startCreateTransition] = useTransition()
   const [isDeleting, startDeleteTransition] = useTransition()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showPitchDialog, setShowPitchDialog] = useState(false)
   const [tripName, setTripName] = useState("")
 
   const numberedDays = (itinerary.days ?? []).filter((d) => d.dayNumber > 0)
 
+  // Publishing asks for the pitch first and sends both in one request, so a route is
+  // never briefly listed with nothing describing it. Unpublishing has nothing to ask.
   function handleTogglePublic(e: React.MouseEvent) {
     e.preventDefault()
+    if (!itinerary.isPublic) {
+      setShowPitchDialog(true)
+      return
+    }
     startTransition(async () => {
-      const result = await updateItinerary(itinerary.id ?? "", { isPublic: !itinerary.isPublic })
+      const result = await updateItinerary(itinerary.id ?? "", { isPublic: false })
       if (!result.success) {
         toast.error(result.error)
         return
       }
       router.refresh()
     })
+  }
+
+  function handleOpenPitchDialog(e: React.MouseEvent) {
+    e.preventDefault()
+    setShowPitchDialog(true)
   }
 
   function handleOpenCreateDialog(e: React.MouseEvent) {
@@ -133,6 +146,18 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
               </>
             )}
           </button>
+          {itinerary.isPublic && (
+            <>
+              <span className="text-border select-none">·</span>
+              <button
+                onClick={handleOpenPitchDialog}
+                className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
+              >
+                <PencilIcon className="size-3" />
+                <span>Edit pitch</span>
+              </button>
+            </>
+          )}
           <span className="text-border select-none">·</span>
           <a
             href={`/itinerary/${itinerary.id}/export`}
@@ -190,6 +215,16 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
           )}
         </div>
       </Card>
+
+      <ItineraryPitchDialog
+        itineraryId={itinerary.id ?? ""}
+        open={showPitchDialog}
+        onOpenChange={setShowPitchDialog}
+        description={itinerary.description}
+        difficulty={itinerary.difficulty}
+        publishOnSave={!itinerary.isPublic}
+        onSaved={() => router.refresh()}
+      />
 
       <Dialog
         open={showCreateDialog}

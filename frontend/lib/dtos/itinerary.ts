@@ -1,9 +1,15 @@
 import { z } from "zod"
 import { DaysSchema } from "./day"
+import { DIFFICULTIES } from "./difficulty"
+import { noHtmlTags } from "../validators"
 
 export const ItinerarySchema = z.object({
   id: z.uuidv7().optional(),
   name: z.string().nullish(),
+  // The route's public pitch and grade (M19 §1). Both describe the paddling, not the
+  // trip — the public shape carries no Trip data, so they cannot live there.
+  description: z.string().nullish(),
+  difficulty: z.enum(DIFFICULTIES).nullish(),
   isPublic: z.boolean().nullish(),
   avgSpeedKnots: z.number().nullish(),
   totalMiles: z.number().nullish(),
@@ -20,6 +26,19 @@ export const ItinerarySchema = z.object({
 export type Itinerary = z.infer<typeof ItinerarySchema>
 export const ItinerariesSchema = z.array(ItinerarySchema)
 
+// The authoring form's shape — the route's pitch and grade. Mirrors the backend's
+// own limits (2000 chars, markup stripped in the schema layer) so the author is told
+// before the round trip rather than by a 400.
+export const ItineraryPitchSchema = z.object({
+  description: z
+    .string()
+    .max(2000, "Description must be at most 2000 characters.")
+    .refine(noHtmlTags.check, noHtmlTags.message)
+    .optional(),
+  difficulty: z.enum(DIFFICULTIES).or(z.literal("")).optional(),
+})
+export type ItineraryPitch = z.infer<typeof ItineraryPitchSchema>
+
 export const PublicItinerarySchema = z.object({
   id: z.string().optional(),
   name: z.string().nullish(),
@@ -29,9 +48,12 @@ export const PublicItinerarySchema = z.object({
 export type PublicItinerary = z.infer<typeof PublicItinerarySchema>
 export const PublicItinerariesSchema = z.array(PublicItinerarySchema)
 
-// Photo-level opt-in (M7d) — only images the owner explicitly made public.
+// Photo-level opt-in (M7d) — only images the owner explicitly made public. The
+// caption (M19 §2) is what names a photo in the flat gallery, which has no grouping
+// headings to do that job; the upload filename never reaches this shape.
 export const PublicImageSchema = z.object({
   url: z.string(),
+  caption: z.string().nullish(),
 })
 export type PublicImage = z.infer<typeof PublicImageSchema>
 
@@ -65,15 +87,37 @@ export const OriginalAuthorSchema = z.object({
 })
 export type OriginalAuthor = z.infer<typeof OriginalAuthorSchema>
 
+// A place published with its itinerary (M19 §4) — glyph, label and note, and never
+// the author or the visibility flag. Not the deferred community gazetteer: these
+// belong to one route and travel with it.
+export const PublicPlaceSchema = z.object({
+  id: z.string().optional(),
+  label: z.string(),
+  note: z.string().nullish(),
+  location: z.object({
+    type: z.literal("Point"),
+    coordinates: z.tuple([z.number(), z.number()]),
+  }),
+  category: z.object({
+    slug: z.string(),
+    name: z.string(),
+    icon: z.string().nullish(),
+  }),
+})
+export type PublicPlace = z.infer<typeof PublicPlaceSchema>
+
 export const PublicItineraryDetailSchema = z.object({
   id: z.string().optional(),
   name: z.string().nullish(),
+  description: z.string().nullish(),
+  difficulty: z.enum(DIFFICULTIES).nullish(),
   isPublic: z.boolean().nullish(),
   totalMiles: z.number().nullish(),
   avgSpeedKnots: z.number().nullish(),
   createdFromId: z.string().nullish(),
   originalAuthor: OriginalAuthorSchema.nullish(),
   days: z.array(PublicDaySchema).default([]),
+  places: z.array(PublicPlaceSchema).default([]),
   // Parent trip's lifecycle state (M7d) — read-only, reserved as the seam a future
   // M8 live-position feature attaches to while `happening`.
   tripState: z.string().nullish(),
@@ -85,6 +129,10 @@ export type PublicItineraryDetail = z.infer<typeof PublicItineraryDetailSchema>
 export const ExploreItemSchema = z.object({
   id: z.string(),
   name: z.string().nullish(),
+  // Clamped on the card rather than hidden below `sm` — 320 is the browsing context
+  // where a scannable pitch matters most (M19 decision 9).
+  description: z.string().nullish(),
+  difficulty: z.enum(DIFFICULTIES).nullish(),
   totalMiles: z.number().nullish(),
   dayCount: z.number().default(0),
   season: z.string().nullish(),

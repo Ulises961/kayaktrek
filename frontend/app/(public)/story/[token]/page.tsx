@@ -34,6 +34,7 @@ export default async function StoryPage({ params }: { params: Promise<{ token: s
       <PublicRouteDetail
         route={route}
         season={season}
+        places={detail.places}
         author={detail.originalAuthor}
         tripState={detail.tripState}
         backHref="/"

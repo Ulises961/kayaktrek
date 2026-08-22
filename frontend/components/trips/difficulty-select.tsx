@@ -1,26 +1,19 @@
 "use client"
 
 import { useTransition } from "react"
-import { TRIP_DIFFICULTIES, type TripDifficulty } from "@/lib/dtos/trip"
+import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/lib/dtos/difficulty"
 import { updateTrip } from "@/lib/trips/actions"
-
-const labels: Record<TripDifficulty, string> = {
-  easy: "Easy",
-  moderate: "Moderate",
-  demanding: "Demanding",
-  expert: "Expert",
-}
 
 interface DifficultySelectProps {
   tripId: string
-  value: TripDifficulty | null | undefined
+  value: Difficulty | null | undefined
 }
 
 export function DifficultySelect({ tripId, value }: DifficultySelectProps) {
   const [isPending, startTransition] = useTransition()
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const next = e.target.value as TripDifficulty | ""
+    const next = e.target.value as Difficulty | ""
     startTransition(async () => {
       await updateTrip(tripId, { difficulty: next || null })
     })
@@ -34,9 +27,9 @@ export function DifficultySelect({ tripId, value }: DifficultySelectProps) {
       className="border-input bg-background focus:ring-ring rounded-[3px] border px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase focus:ring-1 focus:outline-none disabled:opacity-50"
     >
       <option value="">No difficulty</option>
-      {TRIP_DIFFICULTIES.map((d) => (
-        <option key={d} value={d}>
-          {labels[d]}
+      {DIFFICULTIES.map((difficulty) => (
+        <option key={difficulty} value={difficulty}>
+          {DIFFICULTY_LABELS[difficulty]}
         </option>
       ))}
     </select>

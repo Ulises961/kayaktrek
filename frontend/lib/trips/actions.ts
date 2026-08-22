@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { apiGet, apiPost, apiPatch, apiDelete, isRedirectError } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
+import { type Difficulty } from "@/lib/dtos/difficulty"
 import {
   TripPageSchema,
   type Trip,
-  type TripDifficulty,
   type TripPage,
   type TripSort,
   type TripState,
@@ -23,7 +23,7 @@ const EMPTY_TRIP_PAGE: TripPage = { items: [], total: 0, page: 1, pages: 1 }
 export type TripListFilters = {
   state?: TripState
   sort?: TripSort
-  difficulty?: TripDifficulty
+  difficulty?: Difficulty
   minMiles?: number
   maxMiles?: number
   page?: number

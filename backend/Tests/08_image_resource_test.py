@@ -218,6 +218,124 @@ def test_toggle_image_visibility_nonexistent_returns_404(client, auth_headers, p
 
 
 # ============================================================================
+# PATCH caption (M19 §2)
+# ============================================================================
+
+def test_set_caption(client, auth_headers, point):
+    """A caption says what the photo shows; Image.name stays the upload filename."""
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+
+    with patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        response = client.patch(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+            json={"caption": "Parking above the slipway"},
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    assert response.json["caption"] == "Parking above the slipway"
+    assert response.json["name"] == "photo.jpg"
+
+
+def test_caption_can_be_cleared(client, auth_headers, point):
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+    url = f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}"
+
+    with patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        client.patch(url, json={"caption": "Something"}, headers=auth_headers)
+        response = client.patch(url, json={"caption": None}, headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json["caption"] is None
+
+
+def test_caption_and_visibility_apply_in_one_request(client, auth_headers, point, app):
+    """Both fields in one body — a caption change must not silently drop the toggle."""
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+
+    with patch("Services.image_service.StorageService.move", return_value=_MOCK_URL), \
+         patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        response = client.patch(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+            json={"caption": "Shingle beach at low water", "isPublic": True},
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    assert response.json["caption"] == "Shingle beach at low water"
+    assert response.json["isPublic"] is True
+
+    with app.app_context():
+        stored = _db.session.get(Image, UUID(image_id))
+        assert stored.caption == "Shingle beach at low water"
+        assert stored.is_public is True
+
+
+def test_caption_over_300_chars_returns_400(client, auth_headers, point):
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+        json={"caption": "x" * 301},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_caption_is_stripped_of_markup(client, auth_headers, point):
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+
+    with patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        response = client.patch(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+            json={"caption": "  <b>Slipway</b> at Cala Verde  "},
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    stored = response.json["caption"]
+    assert "<" not in stored and ">" not in stored
+    assert stored == "Slipway at Cala Verde"
+
+
+def test_public_shape_carries_the_caption_but_never_the_filename(
+    client, auth_headers, point, itinerary
+):
+    """The gallery needs the caption; Image.name is upload metadata the author never
+    wrote and can carry a real name or a location, so it stays private."""
+    upload = _upload_image(client, auth_headers, point["id"])
+    image_id = json.loads(upload.data)["id"]
+
+    with patch("Services.image_service.StorageService.move", return_value=_MOCK_URL), \
+         patch("Schemas.image_schema.StorageService.presigned_url", return_value=_MOCK_PRESIGNED_URL):
+        client.patch(
+            f"{POINT_ENDPOINT}/{point['id']}/images/{image_id}",
+            json={"caption": "Parking above the slipway", "isPublic": True},
+            headers=auth_headers,
+        )
+    client.patch(
+        f"/api/v1/itinerary/{itinerary['id']}",
+        json={"isPublic": True},
+        headers=auth_headers,
+    )
+
+    # Anonymous — no credentials at all.
+    response = client.get(f"/api/v1/itinerary/{itinerary['id']}/public")
+    assert response.status_code == 200
+    images = [
+        image
+        for day in response.json["days"]
+        for pt in day["points"]
+        for image in pt["images"]
+    ]
+    assert len(images) == 1
+    assert images[0]["caption"] == "Parking above the slipway"
+    assert "name" not in images[0]
+    assert set(images[0]) == {"url", "caption"}
+
+
+# ============================================================================
 # DELETE /api/point/<id>/images/<image_id>
 # ============================================================================
 

@@ -3,16 +3,23 @@ import Link from "next/link"
 import { BackLink } from "@/components/common/back-link"
 import { BrandLockup } from "@/components/common/brand-lockup"
 import { SeasonBadge } from "@/components/explore/season-badge"
+import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
 import { daySummariesFromRoute } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
-import type { OriginalAuthor } from "@/lib/dtos/itinerary"
+import { RoutePlaces } from "@/components/explore/route-places"
+import { RouteGallery, routePhotos } from "@/components/explore/route-gallery"
+import type { OriginalAuthor, PublicPlace } from "@/lib/dtos/itinerary"
 import { TRIP_STATE } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 
 type Props = {
   route: RouteData
   season: string | null
+  // The author's published places (M19 §4). A separate prop rather than a RouteData
+  // field: RouteData is also built from explore listing rows and the landing chart,
+  // neither of which has places, and this way they cannot silently arrive undefined.
+  places?: PublicPlace[]
   author?: OriginalAuthor | null
   // Parent trip's lifecycle state (M7d) — `past`/`archived` frame the same content as
   // history rather than an in-progress plan; `building`/`happening` show it as-is.
@@ -36,6 +43,7 @@ type Props = {
 export function PublicRouteDetail({
   route,
   season,
+  places = [],
   author,
   tripState,
   backHref,
@@ -72,6 +80,7 @@ export function PublicRouteDetail({
                 Past
               </span>
             )}
+            <DifficultyBadge difficulty={route.difficulty} />
             <SeasonBadge season={season} />
           </div>
         </div>
@@ -87,7 +96,16 @@ export function PublicRouteDetail({
             </span>
           )}
         </div>
+        {route.description && (
+          // Unclamped, unlike the listing card: this is the page someone opened in
+          // order to read it.
+          <p data-testid="route-pitch" className="text-sm leading-relaxed">
+            {route.description}
+          </p>
+        )}
         <RouteDayBreakdown days={daySummaries} unit={unit} />
+        <RoutePlaces places={places} />
+        <RouteGallery photos={routePhotos(route)} />
         {author && (
           <p className="text-muted-foreground text-sm">
             Cloned from{" "}

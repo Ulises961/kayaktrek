@@ -258,3 +258,81 @@ def test_crew_member_cannot_edit_or_delete_creators_place(
     assert client.delete(f"{PLACE_BASE}/{place_id}", headers=crew).status_code == 403
     # Creator still can.
     assert client.delete(f"{PLACE_BASE}/{place_id}", headers=leader).status_code == 200
+
+
+# ── publishing a place with its itinerary (M19 §4) ───────────────────────────
+
+def test_place_starts_private_and_can_be_published(
+    client, auth_headers, itinerary, place_category_ids
+):
+    """The visibility flag shipped in M4e and nothing could ever set it — a place was
+    created PRIVATE and had no path to PUBLIC. PlaceUpdateSchema now accepts it."""
+    created = _create(client, auth_headers, itinerary, place_category_ids)
+    assert created.status_code == 201
+    assert created.get_json()["visibility"] == "private"
+
+    place_id = created.get_json()["id"]
+    published = client.patch(
+        f"{PLACE_BASE}/{place_id}",
+        json={"visibility": "public"},
+        headers=auth_headers,
+    )
+    assert published.status_code == 200
+    assert published.get_json()["visibility"] == "public"
+
+
+def test_create_cannot_publish_in_the_same_call(
+    client, auth_headers, itinerary, place_category_ids
+):
+    """Dropping a pin never publishes it — publishing is a second, deliberate act."""
+    created = _create(
+        client, auth_headers, itinerary, place_category_ids, visibility="public"
+    )
+    assert created.status_code == 201
+    assert created.get_json()["visibility"] == "private"
+
+
+def test_public_itinerary_carries_only_its_public_places(
+    client, auth_headers, itinerary, place_category_ids
+):
+    public = _create(
+        client, auth_headers, itinerary, place_category_ids, label="Slipway at Cala Verde"
+    ).get_json()
+    private = _create(
+        client, auth_headers, itinerary, place_category_ids, label="Where we hid the beer"
+    ).get_json()
+    client.patch(
+        f"{PLACE_BASE}/{public['id']}", json={"visibility": "public"}, headers=auth_headers
+    )
+    client.patch(
+        f"/api/v1/itinerary/{itinerary['id']}", json={"isPublic": True}, headers=auth_headers
+    )
+
+    # Anonymous — no credentials at all.
+    response = client.get(f"/api/v1/itinerary/{itinerary['id']}/public")
+    assert response.status_code == 200
+    labels = [place["label"] for place in response.get_json()["places"]]
+    assert labels == ["Slipway at Cala Verde"]
+    assert private["label"] not in labels
+
+
+def test_public_place_shape_withholds_author_and_visibility(
+    client, auth_headers, itinerary, place_category_ids
+):
+    """created_by_user_id would identify a user on an anonymous surface; visibility is
+    an authoring detail. The glyph a reader needs comes from the nested category."""
+    place = _create(client, auth_headers, itinerary, place_category_ids).get_json()
+    client.patch(
+        f"{PLACE_BASE}/{place['id']}", json={"visibility": "public"}, headers=auth_headers
+    )
+    client.patch(
+        f"/api/v1/itinerary/{itinerary['id']}", json={"isPublic": True}, headers=auth_headers
+    )
+
+    dumped = client.get(f"/api/v1/itinerary/{itinerary['id']}/public").get_json()["places"][0]
+    # No created/updated either: PlacePublicSchema declares only what a reader needs,
+    # and unlike PlaceSchema it does not opt the timestamps back in.
+    assert set(dumped) == {"id", "location", "category", "label", "note"}
+    assert dumped["category"]["slug"] == "freshwater"
+    assert "createdByUserId" not in dumped
+    assert "visibility" not in dumped

@@ -3,14 +3,8 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { ListFilterPopover } from "@/components/common/list-filter-popover"
-import {
-  TRIP_DIFFICULTIES,
-  TRIP_DIFFICULTY_LABELS,
-  TRIP_STATE,
-  TRIP_SORT,
-  type TripDifficulty,
-  type TripPage,
-} from "@/lib/dtos/trip"
+import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/lib/dtos/difficulty"
+import { TRIP_STATE, TRIP_SORT, type TripPage } from "@/lib/dtos/trip"
 import { TripsSection, PLANNING_SORT_OPTIONS } from "./trips-section"
 import { EmptyState } from "@/components/common/empty-state"
 
@@ -31,7 +25,7 @@ function toNumber(value: string): number | undefined {
 // filter change refetches page 1 of every section, same as changing a
 // section's own sort.
 export function TripsBoard({ initialHappening, initialPlanning, initialPast }: TripsBoardProps) {
-  const [difficulty, setDifficulty] = useState<TripDifficulty | "">("")
+  const [difficulty, setDifficulty] = useState<Difficulty | "">("")
   const [minMiles, setMinMiles] = useState("")
   const [maxMiles, setMaxMiles] = useState("")
   const [emptyByState, setEmptyByState] = useState<Record<string, boolean>>({})
@@ -69,14 +63,14 @@ export function TripsBoard({ initialHappening, initialPlanning, initialPast }: T
             <span className="text-muted-foreground">Difficulty</span>
             <select
               value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as TripDifficulty | "")}
+              onChange={(e) => setDifficulty(e.target.value as Difficulty | "")}
               aria-label="Filter by difficulty"
               className="border-input bg-background h-9 rounded-md border px-3 text-sm"
             >
               <option value="">Any</option>
-              {TRIP_DIFFICULTIES.map((d) => (
+              {DIFFICULTIES.map((d) => (
                 <option key={d} value={d}>
-                  {TRIP_DIFFICULTY_LABELS[d]}
+                  {DIFFICULTY_LABELS[d]}
                 </option>
               ))}
             </select>

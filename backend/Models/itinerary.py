@@ -1,9 +1,10 @@
 from datetime import datetime
-from sqlalchemy import UUID, Boolean, DateTime, Numeric, ForeignKey, String, Float
+from sqlalchemy import UUID, Boolean, DateTime, Numeric, ForeignKey, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
 from Models.base_model import BaseModel
+from Models.difficulty import DifficultyType, difficulty_enum
 
 if TYPE_CHECKING:
     from Models.day import Day
@@ -11,6 +12,17 @@ if TYPE_CHECKING:
 
 class Itinerary(BaseModel):
     name: Mapped[str] = mapped_column(String(255), nullable=False, default='')
+    # The route's public pitch. Lives here and not on Trip because the public shape
+    # reads Itinerary with no trip data attached (ADR-012/026), so anything on Trip
+    # cannot be published. Seeded from Trip.description on create and from the source
+    # route on fork — a one-time copy, not a synced link.
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # How hard the route is: exposure, crossings, tidal races. Route-intrinsic, so it
+    # is publishable and drives the /explore difficulty filter. Trip.difficulty is a
+    # different judgement — the leader's call for one crew on one date.
+    difficulty: Mapped[Optional[DifficultyType]] = mapped_column(
+        difficulty_enum, nullable=True
+    )
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     avg_speed_knots: Mapped[float] = mapped_column(Float, nullable=False, default=2.5)
     total_miles: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)

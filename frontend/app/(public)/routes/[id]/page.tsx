@@ -34,6 +34,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
       <PublicRouteDetail
         route={route}
         season={season}
+        places={detail.places}
         author={detail.originalAuthor}
         tripState={detail.tripState}
         // /explore is cookie-gated (proxy.ts); an anonymous visitor following that

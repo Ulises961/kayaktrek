@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet"
+import { MapCredits } from "@/components/map/map-credits"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { ringIcon } from "@/components/map/ring-icon"
@@ -202,6 +203,7 @@ export function LandingMap({
         attribution={isHero ? ESRI_ATTRIB : OSM_ATTRIBUTION}
       />
       <TileLayer url={SEAMARK_TILE_URL} attribution={SEAMARK_ATTRIBUTION} />
+      <MapCredits />
       {/* Graticule + forecast cell + scale bar are the loud instruments — hero only.
           A banner thumbnail is a small linked-through strip, same "noise, not
           attribution" rationale as the credit line above: a grid overlay on a

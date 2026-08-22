@@ -1,7 +1,7 @@
 import bleach
 from marshmallow import fields, pre_load, validates, ValidationError
 
-from Models.place import Place
+from Models.place import Place, PlaceVisibility
 from Schemas.base_schema import BaseSchema
 from Schemas.geometry_field import GeometryField
 from Schemas.place_category_schema import PlaceCategorySchema
@@ -49,6 +49,23 @@ class PlaceSchema(BaseSchema):
         model = Place
 
 
+class PlacePublicSchema(BaseSchema):
+    """Place fields safe for unauthenticated exposure (M19 §4).
+
+    Only places whose own visibility is PUBLIC *and* which belong to a public
+    itinerary are ever dumped through this — the service applies both filters.
+    `created_by_user_id` and `visibility` are withheld: the first identifies a user
+    on an anonymous surface, the second is an authoring detail no reader needs.
+    """
+    location = GeometryField(dump_only=True)
+    category = fields.Nested(PlaceCategorySchema, dump_only=True)
+    label = fields.String(dump_only=True)
+    note = fields.String(dump_only=True, allow_none=True)
+
+    class Meta(BaseSchema.Meta):
+        model = Place
+
+
 class PlaceUpdateSchema(BaseSchema):
     """Validates a PATCH body — only whitelisted fields are accepted, all optional.
     Returns a dict (no model instantiation); the service applies the changes."""
@@ -57,6 +74,9 @@ class PlaceUpdateSchema(BaseSchema):
     category_id = fields.UUID(required=False)
     label = fields.String(required=False)
     note = fields.String(allow_none=True, required=False)
+    # Publishing a place with its itinerary (M19 §4). Load-only and absent from the
+    # create schema: a place always starts private and is published deliberately.
+    visibility = fields.Enum(PlaceVisibility, by_value=True, required=False)
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):

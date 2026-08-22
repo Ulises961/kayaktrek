@@ -4,13 +4,8 @@ import { useTransition } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { updateTrip } from "@/lib/trips/actions"
-import {
-  TRIP_DIFFICULTIES,
-  TRIP_DIFFICULTY_LABELS,
-  TripFieldsSchema,
-  type Trip,
-  type TripFields,
-} from "@/lib/dtos/trip"
+import { DIFFICULTIES, DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
+import { TripFieldsSchema, type Trip, type TripFields } from "@/lib/dtos/trip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -115,9 +110,9 @@ export function EditTripForm({ trip, onSuccess, onCancel }: EditTripFormProps) {
           {...register("difficulty")}
         >
           <option value="">Not set</option>
-          {TRIP_DIFFICULTIES.map((d) => (
+          {DIFFICULTIES.map((d) => (
             <option key={d} value={d}>
-              {TRIP_DIFFICULTY_LABELS[d]}
+              {DIFFICULTY_LABELS[d]}
             </option>
           ))}
         </select>

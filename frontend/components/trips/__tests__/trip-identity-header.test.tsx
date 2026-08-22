@@ -16,7 +16,8 @@ vi.mock("@/lib/trips/actions", () => ({
 }))
 
 import { TripIdentityHeader } from "../trip-identity-header"
-import { TRIP_DIFFICULTY_LABELS, type Trip } from "@/lib/dtos/trip"
+import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
+import { type Trip } from "@/lib/dtos/trip"
 import type { Membership } from "@/lib/trips/membership"
 
 const TRIP: Trip = {
@@ -133,7 +134,7 @@ describe("TripIdentityHeader", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     await openDetails()
     expect(screen.getByText("A coastal paddle")).toBeInTheDocument()
-    expect(screen.getByText(TRIP_DIFFICULTY_LABELS[TRIP.difficulty!])).toBeInTheDocument()
+    expect(screen.getByText(DIFFICULTY_LABELS[TRIP.difficulty!])).toBeInTheDocument()
     // Labelled the same way as the action sub-sections below them, so every block
     // inside Details is introduced rather than only some.
     expect(screen.getByText("Description")).toBeInTheDocument()

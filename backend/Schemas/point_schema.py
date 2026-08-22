@@ -105,4 +105,10 @@ class PointPublicSchema(BaseSchema):
     images = fields.Method("get_public_images", dump_only=True)
 
     def get_public_images(self, point: Point) -> list:
-        return [{"url": image.location} for image in point.images if image.is_public]
+        # url + caption only. The filename (Image.name) stays private: it is upload
+        # metadata the author never wrote and can carry a real name or a location.
+        return [
+            {"url": image.location, "caption": image.caption}
+            for image in point.images
+            if image.is_public
+        ]

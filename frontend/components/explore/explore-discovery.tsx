@@ -30,6 +30,7 @@ import type {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import { SeasonBadge } from "./season-badge"
+import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { EmptyState } from "@/components/common/empty-state"
 
 const ExploreDiscoveryMap = dynamic(() => import("./explore-discovery-map"), { ssr: false })
@@ -353,7 +354,10 @@ export function ExploreDiscovery({
                     >
                       {item.name ?? "Untitled"}
                     </Link>
-                    <SeasonBadge season={item.season} />
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <DifficultyBadge difficulty={item.difficulty} />
+                      <SeasonBadge season={item.season} />
+                    </div>
                   </div>
                   <div className="text-muted-foreground flex gap-3 text-xs">
                     {item.totalMiles != null && (
@@ -367,6 +371,16 @@ export function ExploreDiscovery({
                       </span>
                     )}
                   </div>
+                  {item.description && (
+                    // Clamped, not hidden below `sm` — a phone is where the library is
+                    // browsed, and unbounded prose is the real problem, not the width.
+                    <p
+                      data-testid="route-pitch"
+                      className="text-muted-foreground line-clamp-2 text-xs"
+                    >
+                      {item.description}
+                    </p>
+                  )}
                   {item.originalAuthor && (
                     <p className="text-muted-foreground text-xs">
                       Cloned from{" "}

@@ -145,6 +145,7 @@ def get_explore():
         max_lat=args.get("maxLat", type=float),
         max_lng=args.get("maxLng", type=float),
         seasons=args.getlist("season"),
+        difficulties=args.getlist("difficulty"),
         min_miles=args.get("minMiles", type=float),
         max_miles=args.get("maxMiles", type=float),
         min_days=args.get("minDays", type=int),

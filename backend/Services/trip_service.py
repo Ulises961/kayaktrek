@@ -10,7 +10,8 @@ from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
-from Models.trip import Trip, TripStateType, TripDifficultyType, TripOutcomeType
+from Models.difficulty import DifficultyType
+from Models.trip import Trip, TripStateType, TripOutcomeType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.invitation import Invitation
 from Models.inventory import Inventory
@@ -124,7 +125,7 @@ class TripService:
         if state:
             query = query.filter(Trip.state == TripStateType(state))
         if difficulty:
-            query = query.filter(Trip.difficulty == TripDifficultyType(difficulty))
+            query = query.filter(Trip.difficulty == DifficultyType(difficulty))
 
         order: Any
         if sort == "soonest":

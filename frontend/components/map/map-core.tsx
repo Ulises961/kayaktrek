@@ -23,6 +23,7 @@ import { PlaceMarker } from "./place-marker"
 import { PlaceForm } from "./place-form"
 import { MapAddControl } from "./map-add-control"
 import { ResizeHandler } from "./resize-handler"
+import { MapCredits } from "./map-credits"
 import { LivePositionLayer } from "./live-position-layer"
 import type { LivePosition } from "@/lib/dtos/live-position"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -787,6 +788,7 @@ export default function MapCore({
         {placing && <DiamondPlacer onPlace={handlePlace} />}
         {placingPlace && <DiamondPlacer onPlace={handlePlaceDrop} />}
         <ResizeHandler />
+        <MapCredits />
         <FitBoundsController points={validPoints} />
         <FlyToController flyToPoint={flyToPoint} />
 

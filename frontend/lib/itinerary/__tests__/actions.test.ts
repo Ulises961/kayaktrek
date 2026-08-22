@@ -31,6 +31,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
+import { DIFFICULTY } from "@/lib/dtos/difficulty"
 import {
   createItinerary,
   updateItinerary,
@@ -49,6 +50,7 @@ import {
   importGpx,
   generateStoryShare,
   setImagePublic,
+  setImageCaption,
   uploadPointImage,
   deletePointImage,
   searchPublicItineraries,
@@ -149,6 +151,35 @@ describe("updateItinerary", () => {
     mockApiPatch.mockResolvedValue(UPDATED)
     const result = await updateItinerary(ITINERARY_ID, { name: "Renamed Route" })
     expect(result).toEqual({ success: true, itinerary: UPDATED })
+  })
+
+  it("patches the route's own pitch and grade (M19 §1)", async () => {
+    const graded = {
+      id: ITINERARY_ID,
+      description: "Sheltered coast hop, two easy days.",
+      difficulty: DIFFICULTY.MODERATE,
+    }
+    mockApiPatch.mockResolvedValue(graded)
+    const result = await updateItinerary(ITINERARY_ID, {
+      description: "Sheltered coast hop, two easy days.",
+      difficulty: DIFFICULTY.MODERATE,
+    })
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/itinerary/${ITINERARY_ID}`, {
+      description: "Sheltered coast hop, two easy days.",
+      difficulty: DIFFICULTY.MODERATE,
+    })
+    // Parsed through ItinerarySchema, so the two new fields must survive the round
+    // trip — an unlisted key would be stripped and the caller would see it vanish.
+    expect(result).toEqual({ success: true, itinerary: graded })
+  })
+
+  it("clears the pitch and grade when they are sent as null", async () => {
+    mockApiPatch.mockResolvedValue({ id: ITINERARY_ID, description: null, difficulty: null })
+    const result = await updateItinerary(ITINERARY_ID, { description: null, difficulty: null })
+    expect(result).toEqual({
+      success: true,
+      itinerary: { id: ITINERARY_ID, description: null, difficulty: null },
+    })
   })
 
   it("revalidates /itinerary on success", async () => {
@@ -667,6 +698,42 @@ describe("setImagePublic", () => {
     mockApiPatch.mockRejectedValue(new Error("nope"))
     const result = await setImagePublic(POINT_ID, IMAGE_ID, false)
     expect(result).toEqual({ success: false, error: "nope" })
+  })
+})
+
+describe("setImageCaption (M19 §2)", () => {
+  const CAPTIONED = {
+    id: IMAGE_ID,
+    size: 1000,
+    name: "cove.jpg",
+    location: "https://example.com/cove.jpg",
+    isPublic: true,
+    caption: "Parking above the slipway",
+  }
+
+  it("patches only the caption, leaving visibility untouched", async () => {
+    mockApiPatch.mockResolvedValue(CAPTIONED)
+    const result = await setImageCaption(POINT_ID, IMAGE_ID, "Parking above the slipway")
+    // No isPublic key at all: the endpoint applies only the fields present, so
+    // sending one would make captioning a photo silently republish it.
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`, {
+      caption: "Parking above the slipway",
+    })
+    expect(result).toEqual({ success: true, image: CAPTIONED })
+  })
+
+  it("clears the caption with null", async () => {
+    mockApiPatch.mockResolvedValue({ ...CAPTIONED, caption: null })
+    await setImageCaption(POINT_ID, IMAGE_ID, null)
+    expect(mockApiPatch).toHaveBeenCalledWith(`/api/point/${POINT_ID}/images/${IMAGE_ID}`, {
+      caption: null,
+    })
+  })
+
+  it("returns the failure shape when the API rejects", async () => {
+    mockApiPatch.mockRejectedValue(new Error("too long"))
+    const result = await setImageCaption(POINT_ID, IMAGE_ID, "x")
+    expect(result).toEqual({ success: false, error: "too long" })
   })
 
   it("returns a generic error for non-Error throws", async () => {

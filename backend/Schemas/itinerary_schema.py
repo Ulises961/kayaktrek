@@ -4,8 +4,11 @@ from flask import g
 from marshmallow import fields, post_dump, post_load, pre_load, validates, ValidationError
 import bleach
 from Api.database import db
+from Models.difficulty import DifficultyType
 from Models.itinerary import Itinerary
+from Models.place import Place, PlaceVisibility
 from Models.trip import Trip
+from Schemas.place_schema import PlacePublicSchema
 from Schemas.base_schema import BaseSchema
 from Schemas.day_schema import DaySchema, DayPublicSchema
 from Services.Utils.route_distance import compute_total_miles
@@ -14,6 +17,10 @@ from Services.Utils.route_distance import compute_total_miles
 class ItinerarySchema(BaseSchema):
     # name is load_default=None; the service resolves it from trip.destination when absent
     name = fields.String(load_default=None, allow_none=True)
+    description = fields.String(load_default=None, allow_none=True)
+    difficulty = fields.Enum(
+        DifficultyType, by_value=True, allow_none=True, load_default=None
+    )
     is_public = fields.Boolean(load_default=False)
     avg_speed_knots = fields.Float(load_default=2.5)
     # Derived on read (see Services.Utils.route_distance) — the stored column is never
@@ -40,14 +47,20 @@ class ItinerarySchema(BaseSchema):
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
-        if 'name' in data and data['name'] is not None:
-            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+        for key in ('name', 'description'):
+            if key in data and data[key] is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
         return data
 
     @validates('name')
     def validate_name(self, value, **kwargs):
         if value is not None and len(value) > 255:
             raise ValidationError("Name cannot exceed 255 characters")
+
+    @validates('description')
+    def validate_description(self, value, **kwargs):
+        if value is not None and len(value) > 2000:
+            raise ValidationError("Description cannot exceed 2000 characters")
 
     @validates('avg_speed_knots')
     def validate_avg_speed_knots(self, value, **kwargs):
@@ -73,20 +86,28 @@ class ItineraryUpdateSchema(BaseSchema):
     All fields optional. Returns a validated plain dict for the service layer.
     """
     name = fields.String(allow_none=True)
+    description = fields.String(allow_none=True)
+    difficulty = fields.Enum(DifficultyType, by_value=True, allow_none=True)
     is_public = fields.Boolean()
     avg_speed_knots = fields.Float()
     trip_id = fields.UUID(allow_none=True)
 
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
-        if 'name' in data and data['name'] is not None:
-            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+        for key in ('name', 'description'):
+            if key in data and data[key] is not None:
+                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
         return data
 
     @validates('name')
     def validate_name(self, value, **kwargs):
         if value is not None and len(value) > 255:
             raise ValidationError("Name cannot exceed 255 characters")
+
+    @validates('description')
+    def validate_description(self, value, **kwargs):
+        if value is not None and len(value) > 2000:
+            raise ValidationError("Description cannot exceed 2000 characters")
 
     @validates('avg_speed_knots')
     def validate_avg_speed_knots(self, value, **kwargs):
@@ -116,6 +137,11 @@ class ItineraryExploreItemSchema(BaseSchema):
     derived from the route's own points/dates; no Trip data is present.
     """
     name = fields.String(dump_only=True)
+    # Clamped, not hidden, on the card (M19 decision 9) — the frontend line-clamps it.
+    description = fields.String(dump_only=True, allow_none=True)
+    # Plain string, not fields.Enum: this schema is fed snake_case dicts, so the
+    # service emits difficulty.value the same way it emits `season`.
+    difficulty = fields.String(dump_only=True, allow_none=True)
     total_miles = fields.Float(dump_only=True, allow_none=True)
     day_count = fields.Integer(dump_only=True)
     season = fields.String(dump_only=True, allow_none=True)
@@ -144,6 +170,10 @@ class ItineraryPublicSchema(BaseSchema):
     while `happening`.
     """
     name = fields.String(dump_only=True)
+    description = fields.String(dump_only=True, allow_none=True)
+    difficulty = fields.Enum(
+        DifficultyType, by_value=True, dump_only=True, allow_none=True
+    )
     is_public = fields.Boolean(dump_only=True)
     avg_speed_knots = fields.Float(dump_only=True)
     total_miles = fields.Method("get_total_miles", dump_only=True)
@@ -152,7 +182,28 @@ class ItineraryPublicSchema(BaseSchema):
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
+    # Only the author's own PUBLIC places (M19 §4). This is not the deferred community
+    # gazetteer: these belong to one itinerary and are published with it, so there is
+    # no shared object, no dedup and no moderation queue.
+    places = fields.Method("get_public_places", dump_only=True)
     trip_state = fields.Method("get_trip_state", dump_only=True)
+
+    def get_public_places(self, itinerary: Itinerary) -> list:
+        # Queried rather than reached through a relationship: Place.itinerary_id
+        # already carries ondelete="CASCADE", and adding an ORM relationship without
+        # passive_deletes would have SQLAlchemy null the children before deleting the
+        # parent — the asymmetric-cascade shape M16 found three real bugs in. Same
+        # session-query approach get_trip_state already uses here.
+        places = (
+            db.session.query(Place)
+            .filter(
+                Place.itinerary_id == itinerary.id,
+                Place.visibility == PlaceVisibility.PUBLIC,
+            )
+            .order_by(Place.created)
+            .all()
+        )
+        return PlacePublicSchema(many=True).dump(places)
 
     def get_total_miles(self, itinerary: Itinerary) -> float:
         return compute_total_miles(itinerary.days or [])

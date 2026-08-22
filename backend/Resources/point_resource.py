@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, jsonify, request
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
-from Schemas.image_schema import ImageSchema
+from Schemas.image_schema import ImageSchema, ImageUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.point_service import PointService
@@ -271,11 +271,12 @@ def upload_image(id: str):
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def update_image_visibility(id: str, image_id: str):
+def update_image(id: str, image_id: str):
     """
-    PATCH /api/point/<id>/images/<image_id> — toggle an image's public/private visibility.
+    PATCH /api/point/<id>/images/<image_id> — update an image's visibility, its
+    caption, or both. Only the fields present in the body are applied.
 
-    Body: { "isPublic": bool }
+    Body: { "isPublic"?: bool, "caption"?: str | null }
 
     Args:
         id: Point ID the image is attached to
@@ -285,20 +286,23 @@ def update_image_visibility(id: str, image_id: str):
         200 with the updated image object
 
     Raises:
-        400: If isPublic is missing or not a boolean
+        400: If neither field is present, isPublic is not a boolean, or the caption
+             fails validation
         404: If the image does not exist
     ---
     patch:
-      summary: Toggle an image's public/private visibility
+      summary: Update an image's visibility and/or caption
       requestBody:
         content:
           application/json:
             schema:
               type: object
-              required: [isPublic]
               properties:
                 isPublic:
                   type: boolean
+                caption:
+                  type: string
+                  nullable: true
       responses:
         200:
           description: The updated image
@@ -306,18 +310,29 @@ def update_image_visibility(id: str, image_id: str):
             application/json:
               schema: ImageSchema
         400:
-          description: isPublic is missing or not a boolean
+          description: Neither field present, isPublic not a boolean, or caption too long
         404:
           description: Image not found
     """
     body = request.get_json() or {}
-    is_public = body.get("isPublic")
-    if not isinstance(is_public, bool):
+    has_visibility = "isPublic" in body
+    has_caption = "caption" in body
+    if not (has_visibility or has_caption):
+        abort(HTTPStatus.BAD_REQUEST, description="Provide isPublic or caption")
+    if has_visibility and not isinstance(body["isPublic"], bool):
         abort(HTTPStatus.BAD_REQUEST, description="isPublic must be a boolean")
 
     try:
-        image = ImageService.set_public(image_id, is_public)
+        image = ImageService.get_image_by_id(image_id)
+        if has_caption:
+            validated = ImageUpdateSchema().load({"caption": body["caption"]})
+            image = ImageService.set_caption(image_id, validated.get("caption"))
+        if has_visibility:
+            image = ImageService.set_public(image_id, body["isPublic"])
         return jsonify(ImageSchema().dump(image)), HTTPStatus.OK
+
+    except ValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e.messages))
 
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))

@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from Api.database import db
 from Models.day import Day
+from Models.difficulty import DifficultyType, VALID_DIFFICULTIES
 from Models.itinerary import Itinerary
 from Models.point import Point, PointType
 from Models.trip import Trip
@@ -34,7 +35,9 @@ _GPX_DEFAULT_EPSILON = 0.0001  # degrees (~11 m)
 
 
 class ItineraryService:
-    _MUTABLE_FIELDS = frozenset({"name", "is_public", "avg_speed_knots", "trip_id"})
+    _MUTABLE_FIELDS = frozenset(
+        {"name", "description", "difficulty", "is_public", "avg_speed_knots", "trip_id"}
+    )
 
     # ------------------------------------------------------------------ #
     # Read                                                                  #
@@ -110,6 +113,7 @@ class ItineraryService:
         max_lat: Optional[float] = None,
         max_lng: Optional[float] = None,
         seasons: Optional[List[str]] = None,
+        difficulties: Optional[List[str]] = None,
         min_miles: Optional[float] = None,
         max_miles: Optional[float] = None,
         min_days: Optional[int] = None,
@@ -152,6 +156,16 @@ class ItineraryService:
 
         if name and name.strip():
             base = base.filter(Itinerary.name.ilike(f"%{name.strip()}%"))
+        if difficulties:
+            # Unknown values are dropped rather than 400ing — the same tolerance the
+            # season facet applies, so a stale bookmark still returns a usable page.
+            selected = [
+                DifficultyType(value)
+                for value in difficulties
+                if value in VALID_DIFFICULTIES
+            ]
+            if selected:
+                base = base.filter(Itinerary.difficulty.in_(selected))
         if min_days is not None:
             base = base.filter(day_count_sq >= min_days)
         if max_days is not None:
@@ -327,6 +341,12 @@ class ItineraryService:
                 {
                     "id": str(itinerary.id),
                     "name": itinerary.name,
+                    "description": itinerary.description,
+                    "difficulty": (
+                        itinerary.difficulty.value
+                        if itinerary.difficulty is not None
+                        else None
+                    ),
                     "total_miles": ItineraryService.compute_total_miles(itinerary),
                     "day_count": len(numbered),
                     "season": season,
@@ -421,15 +441,24 @@ class ItineraryService:
         """
         trip_id = itinerary_data.get("tripId")
         raw_name = (itinerary_data.get("name") or "").strip()
+        raw_description = (itinerary_data.get("description") or "").strip()
+
+        trip: Optional[Trip] = None
+        if trip_id and not (raw_name and raw_description):
+            trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+            if not trip:
+                raise NoResultFound(f"Trip {trip_id} not found")
 
         if not raw_name:
-            if trip_id:
-                trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
-                if not trip:
-                    raise NoResultFound(f"Trip {trip_id} not found")
+            if trip is not None:
                 itinerary_data = {**itinerary_data, "name": (trip.destination or "").strip()}
             else:
                 raise ValueError("name is required for standalone itineraries")
+
+        # Seed the route's public pitch from the trip's brief, once, at creation. A
+        # copy and not a link: editing either afterwards leaves the other alone.
+        if not raw_description and trip is not None and trip.description:
+            itinerary_data = {**itinerary_data, "description": trip.description}
 
         itinerary = ItinerarySchema().load(itinerary_data)
         db.session.add(itinerary)
@@ -500,6 +529,10 @@ class ItineraryService:
 
         fork = Itinerary(
             name=source.name,
+            # Route-describing fields travel with the route; the fork's own trip (if it
+            # ever gets one) keeps its separate brief.
+            description=source.description,
+            difficulty=source.difficulty,
             is_public=False,
             avg_speed_knots=source.avg_speed_knots,
             user_id=UUID(user_id),

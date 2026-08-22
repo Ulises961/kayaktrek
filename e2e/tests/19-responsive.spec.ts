@@ -34,6 +34,25 @@ import {
 //   page body must not scroll, not that nothing may ever be wider than the
 //   viewport. The offender walk below skips anything living inside one.
 
+// Playwright's touchscreen can tap but not drag, so a touch drag goes through CDP.
+// Worth the ceremony: `.click()` dispatches MOUSE events even in a touch-enabled
+// project, so every assertion in this file before 2026-08-21 was made with a
+// mouse — and both bugs the tests below cover only appear under a real finger.
+async function touchDrag(page: Page, x: number, fromY: number, toY: number, steps = 14) {
+  const cdp = await page.context().newCDPSession(page)
+  const at = (y: number) => [{ x, y, radiusX: 10, radiusY: 10, force: 1 }]
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(fromY) })
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: at(fromY + ((toY - fromY) * i) / steps),
+    })
+    await page.waitForTimeout(16)
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+  await cdp.detach()
+}
+
 const WIDTHS = [320, 640] as const
 
 // Static routes only — anything needing a seeded trip/itinerary id belongs in the
@@ -706,9 +725,10 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
       expect(strip.y + strip.height, "the day strip should sit above the map").toBeLessThanOrEqual(
         mapBox.y + 1,
       )
-      expect(mapBox.y + mapBox.height, "the day sheet should sit below the map").toBeLessThanOrEqual(
-        sheet.y + 1,
-      )
+      expect(
+        mapBox.y + mapBox.height,
+        "the day sheet should sit below the map",
+      ).toBeLessThanOrEqual(sheet.y + 1)
       // Both span the column: a stacked pane that kept a fixed width would leave
       // a dead gutter beside it and still satisfy the ordering above.
       expect(Math.round(strip.width)).toBe(Math.round(mapBox.width))
@@ -924,6 +944,108 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
     }
   })
 
+  test("keeps the map's bottom edge tappable, with the credits behind a badge", async ({
+    page,
+    request,
+  }) => {
+    // Leaflet sizes its credit line to the space available, so at 320 it wrapped
+    // into a 311×38 strip across a 288px-tall map — 13% of the map, edge to edge.
+    // Every tap there missed the map, and one landing on the OpenStreetMap link
+    // navigated out of the builder, taking an unsaved day draft with it. Only
+    // reachable with a real finger: `.click()` is a mouse event even here.
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Credits ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+      await page.getByRole("button", { name: "Edit", exact: true }).tap()
+      await expect(page.getByTestId("point-list-pane")).toBeVisible()
+
+      const credits = page.locator(".leaflet-control-attribution")
+      const badge = (await credits.boundingBox())!
+      const map = (await page.locator(".leaflet-container").boundingBox())!
+      expect(
+        Math.round(badge.width),
+        `the credit line is ${Math.round(badge.width)}px of a ${Math.round(map.width)}px map — ` +
+          `it is a strip again, and the map's bottom edge is dead to taps.`,
+      ).toBeLessThan(map.width / 2)
+
+      // The licence is still one tap away, which is the whole reason it may be
+      // collapsed rather than removed.
+      await credits.tap()
+      await expect(credits).toHaveAttribute("aria-expanded", "true")
+      await expect(credits.getByRole("link", { name: /OpenStreetMap/i })).toBeVisible()
+      // Closed by a tap elsewhere, not by tapping it again: opened, the line is
+      // wall-to-wall links and its own centre is the OpenStreetMap link, so a
+      // second tap on it leaves the app. That is what this test caught first.
+      await page.touchscreen.tap(map.x + map.width / 2, map.y + 60)
+      await expect(credits).toHaveAttribute("aria-expanded", "false")
+
+      // And a tap where the strip used to be now reaches the map and drops a pin.
+      const markers = page.locator(".leaflet-marker-pane .leaflet-marker-icon")
+      const before = await markers.count()
+      await page.touchscreen.tap(map.x + map.width / 2, map.y + map.height - 19)
+      await expect(markers).toHaveCount(before + 1)
+      expect(new URL(page.url()).pathname, "the tap navigated out of the builder").toBe(
+        `/itinerary/${seeded.itineraryId}`,
+      )
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
+  test("drags a day boundary with a finger without the list running away", async ({
+    page,
+    request,
+  }) => {
+    // Dragging a boundary is the only gesture that arms "Save days". The drag
+    // auto-scrolls the list near its edges, and that band was a flat 48px — of a
+    // pane 656px tall on a desktop but 171px in the bottom sheet at 320, where it
+    // claimed 56% of the list and the last boundary starts inside it. The list
+    // scrolled out from under the finger and the day could never be saved.
+    const seeded = await apiSeedEditableItinerary(request, leaderToken, {
+      destination: `E2E Responsive Boundary ${Date.now()}`,
+      points: POINTS,
+      dayEndIndices: DAY_END_INDICES,
+    })
+    try {
+      await page.setViewportSize({ width: 320, height: 700 })
+      await page.goto(`/itinerary/${seeded.itineraryId}`)
+      await page.waitForLoadState("networkidle")
+      await page.getByRole("button", { name: "Edit", exact: true }).tap()
+      await expect(page.getByTestId("point-list-pane")).toBeVisible()
+
+      const save = page.getByRole("button", { name: "Save days" })
+      await expect(save, "Save days should start disabled, with no draft yet").toBeDisabled()
+
+      const grip = page.getByTestId("boundary-grip").first()
+      await grip.scrollIntoViewIfNeeded()
+      const box = (await grip.boundingBox())!
+      const scrollTopOf = () =>
+        page.evaluate(
+          () =>
+            (document.querySelector('[data-point-list="true"]') as HTMLElement | null)?.scrollTop ??
+            0,
+        )
+      const scrollBefore = await scrollTopOf()
+
+      await touchDrag(page, box.x + box.width / 2, box.y + box.height / 2, box.y - 60)
+
+      await expect(save, "the drag did not register as a day-boundary change").toBeEnabled()
+      const drift = Math.abs((await scrollTopOf()) - scrollBefore)
+      expect(
+        drift,
+        `the list scrolled ${drift}px during the drag — the row is moving out from under the finger.`,
+      ).toBeLessThan(40)
+    } finally {
+      await apiDeleteTrip(request, leaderToken, seeded.tripId)
+    }
+  })
+
   test("spreads the map's controls to opposite corners at 320", async ({ page, request }) => {
     const seeded = await apiSeedEditableItinerary(request, leaderToken, {
       destination: `E2E Responsive Controls ${Date.now()}`,
@@ -950,10 +1072,14 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
       // 311px map, on top of the Annotate pill.
       const rightGap = (box: { x: number; width: number }) =>
         map.x + map.width - (box.x + box.width)
-      expect(rightGap(fab), `the add FAB is ${Math.round(rightGap(fab))}px from the right edge`)
-        .toBeLessThan(20)
-      expect(rightGap(layers), `layers is ${Math.round(rightGap(layers))}px from the right edge`)
-        .toBeLessThan(20)
+      expect(
+        rightGap(fab),
+        `the add FAB is ${Math.round(rightGap(fab))}px from the right edge`,
+      ).toBeLessThan(20)
+      expect(
+        rightGap(layers),
+        `layers is ${Math.round(rightGap(layers))}px from the right edge`,
+      ).toBeLessThan(20)
       expect(zoom.x - map.x, "zoom is not against the left edge").toBeLessThan(20)
 
       // Top and bottom, not all in one band — the distribution itself. Compared on

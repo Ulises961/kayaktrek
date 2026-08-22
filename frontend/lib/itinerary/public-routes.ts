@@ -1,4 +1,5 @@
 import type { Itinerary, PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
+import type { Difficulty } from "@/lib/dtos/difficulty"
 import { POINT_TYPE, type PointType } from "@/lib/dtos/point"
 import { totalDistanceNm } from "@/lib/itinerary/distance"
 import { getDayColor } from "@/lib/itinerary/colors"
@@ -16,7 +17,7 @@ export type RoutePoint = {
   lon: number
   type: PointType
   name: string | null
-  images: { url: string }[]
+  images: { url: string; caption?: string | null }[]
   // The point's 1-based ordinal position across the *whole* route (e.g. 3 of 14),
   // regardless of which day it falls in — computed once via the same
   // `numberByOrder` the authenticated builder (map-core.tsx) uses on its own full
@@ -39,6 +40,10 @@ export type RouteDaySegment = {
 export type RouteData = {
   id: string
   name: string
+  // The route's own pitch and grade (M19 §1). Optional because the thumbnail and
+  // landing-chart consumers build a RouteData from a listing row and have neither.
+  description?: string | null
+  difficulty?: Difficulty | null
   // Flattened across all days — kept for consumers that only need overall extent
   // (landing chart framing, forecast cell, thumbnails), not day colour.
   positions: [number, number][]
@@ -69,12 +74,14 @@ type ChainPoint = {
   longitude?: number | null
   type?: string | null
   name?: string | null
-  images?: { url?: string | null; location?: string | null }[] | null
+  images?: { url?: string | null; location?: string | null; caption?: string | null }[] | null
 }
 
 type RouteSource = {
   id?: string | null
   name?: string | null
+  description?: string | null
+  difficulty?: Difficulty | null
   totalMiles?: number | null
   days: {
     dayNumber: number
@@ -135,10 +142,11 @@ function toRoutePoint(
     lon: p.longitude,
     type: p.type === POINT_TYPE.STOP ? POINT_TYPE.STOP : POINT_TYPE.POSITION,
     name: p.name ?? null,
+    // Caption travels with the url: the flat gallery has no grouping headings, so it
+    // is the only thing naming a photo there (M19 §2).
     images: (p.images ?? [])
-      .map((img) => img.url ?? img.location ?? null)
-      .filter((url): url is string => !!url)
-      .map((url) => ({ url })),
+      .map((img) => ({ url: img.url ?? img.location ?? null, caption: img.caption ?? null }))
+      .filter((img): img is { url: string; caption: string | null } => !!img.url),
     pointNumber,
   }
 }
@@ -204,6 +212,8 @@ function buildRouteData(src: RouteSource): RouteData {
   return {
     id: src.id ?? "",
     name: src.name ?? "Untitled",
+    description: src.description ?? null,
+    difficulty: src.difficulty ?? null,
     positions,
     points,
     days,
@@ -219,6 +229,8 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
   return buildRouteData({
     id: itinerary.id,
     name: itinerary.name,
+    description: itinerary.description,
+    difficulty: itinerary.difficulty,
     totalMiles: itinerary.totalMiles,
     days: itinerary.days.map((d) => ({
       dayNumber: d.dayNumber,
@@ -236,6 +248,8 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
   return buildRouteData({
     id: itinerary.id,
     name: itinerary.name,
+    description: itinerary.description,
+    difficulty: itinerary.difficulty,
     totalMiles: itinerary.totalMiles,
     days: (itinerary.days ?? []).map((d) => ({
       dayNumber: d.dayNumber,

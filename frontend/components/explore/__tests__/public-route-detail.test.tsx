@@ -5,6 +5,7 @@ import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import type { OriginalAuthor } from "@/lib/dtos/itinerary"
 import { TRIP_STATE } from "@/lib/dtos/trip"
+import { DIFFICULTY, DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 
 function route(overrides: Partial<RouteData> = {}): RouteData {
   return {
@@ -26,6 +27,42 @@ function route(overrides: Partial<RouteData> = {}): RouteData {
     ...overrides,
   }
 }
+
+describe("PublicRouteDetail — the route's pitch and grade (M19)", () => {
+  function renderDetail(overrides: Partial<RouteData> = {}) {
+    render(
+      <PublicRouteDetail
+        route={route(overrides)}
+        season="summer"
+        backHref="/explore"
+        backLabel="All routes"
+      />,
+    )
+  }
+
+  it("renders the pitch in full — the sidebar is where it pays off", () => {
+    const pitch =
+      "Launches from a shingle beach with parking above the slipway. The headland " +
+      "runs hard on the ebb, so cross north of it or wait for slack."
+    renderDetail({ description: pitch })
+    expect(screen.getByText(pitch)).toBeInTheDocument()
+    // Clamped on the listing card, not here: this is the page you opened to read it.
+    expect(screen.getByText(pitch).className).not.toContain("line-clamp")
+  })
+
+  it("renders the grade by its label", () => {
+    renderDetail({ difficulty: DIFFICULTY.EXPERT })
+    expect(screen.getByText(DIFFICULTY_LABELS[DIFFICULTY.EXPERT])).toBeInTheDocument()
+  })
+
+  it("renders neither when the route carries neither", () => {
+    renderDetail()
+    expect(screen.queryByTestId("route-pitch")).not.toBeInTheDocument()
+    for (const label of Object.values(DIFFICULTY_LABELS)) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+})
 
 describe("PublicRouteDetail", () => {
   it("renders the route name, distance and day count", () => {

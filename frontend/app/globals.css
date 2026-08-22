@@ -675,10 +675,59 @@
   }
 }
 
+/* ── Map credits: a badge on a phone, the full line from `md` ─────────────
+   Leaflet sizes its attribution to the space available, so at 320 the credit
+   wraps into a full-width strip — measured at 311×38 over a 288px-tall builder
+   map, 13% of the map, edge to edge. Every tap in that band misses the map, so
+   no point can be dropped there, and one landing on the OpenStreetMap link
+   navigates out of the builder and takes an unsaved day draft with it.
+
+   Collapsed, the credit is a badge one tap from the full text (state and
+   semantics come from `MapCredits`, components/map/map-credits.tsx), which is
+   what the tile licences ask for while giving the map its bottom edge back.
+
+   Both halves of the hiding matter, and the first attempt shipped only one.
+   `font-size: 0` collapses the bare text nodes ("©", "contributors") that no
+   selector can reach; `display: none` on the element children removes the
+   links' hit boxes. With only `font-size: 0` a link is still a 0×0 box, and a
+   centred flex container puts it exactly where a tap lands — the badge opened
+   openstreetmap.org instead of itself. Unlayered for the same reason as
+   everything else in this section. */
+@media (max-width: 767px) {
+  .leaflet-control-attribution.credits-collapsible {
+    border-radius: 9999px;
+    transition: none;
+  }
+  .leaflet-control-attribution.credits-collapsible:not(.credits-open) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+  .leaflet-control-attribution.credits-collapsible:not(.credits-open) > * {
+    display: none;
+  }
+  .leaflet-control-attribution.credits-collapsible:not(.credits-open)::after {
+    content: "i";
+    font-family: var(--font-sans, ui-sans-serif), serif;
+    font-size: 13px;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .leaflet-control-attribution.credits-collapsible.credits-open {
+    max-width: calc(100% - 2rem);
+  }
+}
+
 /* ── Builder map: bottom-left zoom on a phone ─────────────────────────────
    The zoom control moves to the bottom-left corner below `md` (map-core.tsx,
-   `ZoomCorner`), where Leaflet's attribution already sits — at 320 the credits
-   wrap to a full-width ~38px strip, so the corner is occupied.
+   `ZoomCorner`), where Leaflet's attribution already sits — collapsed to the
+   badge above, but still that corner's neighbour.
 
    Unlayered on purpose, and this is the whole reason the rule lives here rather
    than as a Tailwind class on the map: `leaflet/dist/leaflet.css` is imported
@@ -688,8 +737,8 @@
    `.leaflet-bottom .leaflet-control { margin-bottom: 10px }`.
 
    The control is also lifted over the credits rather than only pushed clear of
-   them: the attribution strip is full width, so at some zoom levels and locales
-   it is two lines rather than one and no fixed margin clears every case. */
+   them: opened, the credit line is as tall as its text needs, so no fixed
+   margin clears every zoom level and locale. */
 .builder-map .leaflet-bottom.leaflet-left {
   z-index: 1000;
 }

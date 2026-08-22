@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { DIFFICULTIES } from "./difficulty"
 import { TravellerSchema } from "./user"
 import { TripMemberSchema } from "./trip-member"
 import { InventorySchema } from "./inventory"
@@ -35,23 +36,13 @@ export const TRIP_SORT = {
 } as const
 export type TripSort = (typeof TRIP_SORT)[keyof typeof TRIP_SORT]
 
-export const TRIP_DIFFICULTIES = ["easy", "moderate", "demanding", "expert"] as const
-export type TripDifficulty = (typeof TRIP_DIFFICULTIES)[number]
-
 export const TRIP_OUTCOMES = ["completed", "interrupted"] as const
 export type TripOutcome = (typeof TRIP_OUTCOMES)[number]
-
-export const TRIP_DIFFICULTY_LABELS: Record<TripDifficulty, string> = {
-  easy: "Easy",
-  moderate: "Moderate",
-  demanding: "Demanding",
-  expert: "Expert",
-}
 
 export const TripSchema = z.object({
   id: z.uuidv7().optional(),
   state: z.enum(TRIP_STATES).nullish(),
-  difficulty: z.enum(TRIP_DIFFICULTIES).nullish(),
+  difficulty: z.enum(DIFFICULTIES).nullish(),
   description: z.string().nullish(),
   destination: z.string().nullish(),
   dateFrom: z.string().nullish(),
@@ -88,7 +79,7 @@ export const TripFieldsSchema = z
       .optional(),
     dateFrom: isoDateField,
     dateTo: isoDateField,
-    difficulty: z.enum(TRIP_DIFFICULTIES).nullish(),
+    difficulty: z.enum(DIFFICULTIES).nullish(),
   })
   .refine(
     (d) => {

@@ -10,13 +10,13 @@ function point(
   latitude: number,
   longitude: number,
   nextId?: string,
-  images: { url: string }[] = [],
+  images: PublicPoint["images"] = [],
 ): PublicPoint {
   return { id, latitude, longitude, type: "position", nextId, images }
 }
 
 function detail(days: PublicItineraryDetail["days"]): PublicItineraryDetail {
-  return { id: "it-1", name: "Route", isPublic: true, totalMiles: 0, days }
+  return { id: "it-1", name: "Route", isPublic: true, totalMiles: 0, days, places: [] }
 }
 
 describe("daySummariesFromRoute", () => {
@@ -111,7 +111,19 @@ describe("extractRouteData — day segments", () => {
   it("carries opted-in photo URLs on each point", () => {
     const withPhoto = point("a", 44.0, 8.5, undefined, [{ url: "https://example.com/a.jpg" }])
     const route = extractRouteData(detail([{ dayNumber: 1, points: [withPhoto] }]))
-    expect(route.days[0].points[0].images).toEqual([{ url: "https://example.com/a.jpg" }])
+    // caption rides along with the url (M19 §2) — null here because this fixture
+    // has none, and the gallery falls back to the point's name for that case.
+    expect(route.days[0].points[0].images).toEqual([
+      { url: "https://example.com/a.jpg", caption: null },
+    ])
+  })
+
+  it("carries a photo's caption through to the route data", () => {
+    const withCaption = point("a", 44.0, 8.5, undefined, [
+      { url: "https://example.com/a.jpg", caption: "Parking above the slipway" },
+    ])
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [withCaption] }]))
+    expect(route.days[0].points[0].images[0].caption).toBe("Parking above the slipway")
   })
 
   it("still returns the flattened positions/points for non-day-aware consumers", () => {
