@@ -18,6 +18,19 @@ const nextConfig: NextConfig = {
   // public/ without an extra copy step. e2e/run-live-stack.sh serves the app with
   // `next start`, so it opts out — the harness exercises the app, not the packaging.
   ...(process.env.NEXT_OUTPUT_STANDALONE === "0" ? {} : { output: "standalone" as const }),
+  // The tracer resolves @swc/helpers through its `require` export condition and copies only
+  // the two `cjs/*.cjs` files it lands on, but Next's own require-hook resolves the same
+  // specifiers through the `import` condition at runtime and asks for `esm/*.js`. The
+  // standalone server then dies on its first module load with MODULE_NOT_FOUND — the whole
+  // image restart-loops, and nothing in the build says a word about it. Ship the package
+  // whole rather than the half the tracer picked.
+  //
+  // The pnpm store path is matched with a version wildcard so a bump doesn't silently stop
+  // matching; `outputFileTracingIncludes` accepts a glob and quietly includes nothing when it
+  // matches nothing, which is exactly how this class of breakage goes unnoticed.
+  outputFileTracingIncludes: {
+    "**/*": ["./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*"],
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },
