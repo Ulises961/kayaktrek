@@ -1,9 +1,9 @@
 ---
 id: mobile-offline
 title: "Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration"
-abstract: PWA + GPX meets read-only offline needs; M9 React Native with WatermelonDB sync triggers only when live-expedition mutation use case is validated. MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
+abstract: The mobile app IS the product (2026-08-23) — PWA tier declined outright, M9 React Native with WatermelonDB sync proceeds without waiting for a validated mutation use case, distributed through official stores (Play first). Expo managed + EAS, MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
 implementation: not-built
-implementation_note: No mobile/ workspace, no WatermelonDB or MapLibre dependency, no service worker. Design only, awaiting M9 — which M18 gates.
+implementation_note: No mobile/ workspace, no WatermelonDB or MapLibre dependency. The service worker is now declined rather than pending. Design only, awaiting M9 — whose gates (M8, M13) are both cleared as of 2026-08-23, making it next.
 status: accepted
 date: 2026-06-10
 deciders: []
@@ -283,7 +283,7 @@ These are not optional design work — M9 coding must not begin until each is an
 
 2. **Sync down protocol detail**: the `last_synced_at` per-trip-per-device mechanism is referenced above but not fully specified. Define: what the server endpoint looks like, what the device sends, how partial syncs are handled, and how to detect deleted server-side entities.
 
-3. **Expo managed vs bare workflow**: iOS background location and Bluetooth (Tier 1) may require capabilities unavailable in Expo's managed workflow. Evaluate before committing.
+3. ~~**Expo managed vs bare workflow**~~ — **answered 2026-08-23: Expo managed with config plugins, built through EAS.** Decided on two grounds rather than the usual merits. First, the target is a store listing and the dev box is Linux-only: an iOS store build needs macOS or a cloud builder, and EAS Build is that. Second, the objection this item was raised over no longer holds — `expo-location` covers background tracking and `react-native-ble-plx` ships a config plugin, so M9f Tier 1 does not force bare; the dev-client escape hatch remains if something exotic appears.
 
 4. **Offline tile management UX**: bounding box strategy (route corridor + N km margin vs user-drawn box), zoom levels, storage estimate display, download progress, eviction policy.
 
@@ -302,3 +302,5 @@ These are not optional design work — M9 coding must not begin until each is an
 | Map SDK: MapLibre React Native | Supersedes ADR-015 §"Map SDK: Mapbox Native" | 2026-06-10 | Open-source Mapbox fork; MIT license; works with our own tile server (MinIO + titiler); no usage fees |
 | Weather/sea data included in offline cache | Amends ADR-015 §"What is synced" | 2026-06-10 | Read-only; full row replaced when server `updated_at` is newer; "forecast as of" label in UI |
 | Mobile phasing — PWA-offline first, M9 sync when live-expedition use case justifies it | — | 2026-06-15 | "Bring the plan along" met by PWA + GPX + PDF float plan; M9 native app triggered by first real need to mutate/track at sea |
+| **Superseded** — PWA-offline tier declined outright; the mobile app *is* the product | supersedes the 2026-06-15 row above | 2026-08-23 | The 2026-06-15 phasing assumed a PWA would cheaply meet "bring the plan along" before native work started. It was never built, and the call now is that it never should be: nobody plans an expedition from a phone browser, and fewer still install a PWA, so the tier would have been a Service Worker built to be discarded the moment M9c landed. M9a's "open decision: PWA gap" closes as **declined**, not deferred. Note the honest cost: until M9c ships, reading the plan at sea has no in-product answer — GPX export onto a handheld and the PDF float plan are the interim, and both already exist |
+| Distribution — official store channels from the start, Play before App Store | — | 2026-08-23 | Sideloaded APKs were considered and rejected. The app asks a stranger to trust it with route plans, live position and E2E-encrypted medical notes; "download this APK and enable unknown sources" is precisely the friction and the trust signal it cannot afford against an established market. Play first at €25 one-time (versus Apple's yearly fee) with a closed test; App Store follows once the Android beta shows the product is worth the recurring cost. The gating cost of Play is **calendar, not money** — closed-testing tenure, background-location permission review, the Data safety declaration (precise location *and* health data, the latter E2E encrypted, which must be described accurately), and in-app account deletion plus a web-accessible deletion URL. All are free, all are slow, all can be started before the app is finished |
