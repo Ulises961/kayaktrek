@@ -3,7 +3,10 @@ import json
 
 import jwt
 import pytest
+from opentelemetry.instrumentation.utils import is_instrumentation_enabled
+from sqlalchemy import event
 
+from Api.database import db
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.live_resource import LIVE_ENDPOINT
@@ -107,6 +110,50 @@ def test_stream_events_heartbeat_on_timeout(app, client, trip_with_user2_as_crew
         events = list(LiveStreamService.stream_events(trip["id"], pubsub=fake_pubsub, max_ticks=1))
 
     assert events[-1] == ": hb\n\n"
+
+
+def test_stream_events_liveness_query_is_not_traced(app, client, trip_with_user2_as_crew, monkeypatch):
+    """The per-tick liveness re-query must run with OTel instrumentation suppressed.
+
+    It fires once per tick — and a tick is every heartbeat *and* every relayed
+    position — per open connection, for the connection's whole lifetime. Traced,
+    a single day-long Navigate session bills thousands of identical `SELECT trip`
+    spans against the Logfire record budget, and none of them says anything the
+    sse_connection span's tick_count doesn't. Excluding the route from Flask
+    auto-instrumentation (Api/observability.py) does not cover this: it only drops
+    the per-request span, and these are SQLAlchemy spans emitted underneath it.
+
+    Asserted through the same `before_cursor_execute` hook the SQLAlchemy
+    instrumentation itself uses, and via its own `is_instrumentation_enabled()`
+    gate — so this measures whether a span would really have been recorded, not
+    whether a particular context key happens to be set.
+    """
+    trip = trip_with_user2_as_crew["trip"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    _promote_to_happening(client, leader_headers, trip["id"])
+    monkeypatch.setattr(live_position_service, "live_redis", lambda: _NoopRedis())
+
+    traced_by_statement = []
+
+    def record_instrumentation_state(conn, cursor, statement, parameters, context, executemany):
+        traced_by_statement.append((statement, is_instrumentation_enabled()))
+
+    with app.app_context():
+        event.listen(db.engine, "before_cursor_execute", record_instrumentation_state)
+        try:
+            fake_pubsub = _FakePubSub([None, None, None])
+            list(LiveStreamService.stream_events(trip["id"], pubsub=fake_pubsub, max_ticks=3))
+        finally:
+            event.remove(db.engine, "before_cursor_execute", record_instrumentation_state)
+
+    liveness_queries = [
+        traced for statement, traced in traced_by_statement
+        if statement.lstrip().upper().startswith("SELECT") and "FROM trip" in statement
+    ]
+
+    # One per tick — if this is ever 0 the assertion below would pass vacuously.
+    assert len(liveness_queries) == 3
+    assert not any(liveness_queries)
 
 
 def test_stream_events_ends_when_trip_flips_to_past_mid_stream(app, client, trip_with_user2_as_crew, monkeypatch):

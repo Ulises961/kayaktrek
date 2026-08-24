@@ -37,15 +37,23 @@ def _resolve_service_name() -> str:
 #   - The SSE stream routes: LiveStreamService.stream_events re-queries the
 #     Trip on every heartbeat tick (every 15s, per open connection, for the
 #     connection's entire lifetime) — auto-instrumented, that's one unbounded
-#     SQLAlchemy span per tick per viewer. Excluded from Flask's per-request
-#     span here; _sse_connection_span (below) replaces it with exactly one
-#     manual span per connection instead (A.2).
-# excluded_urls takes OTel's comma-separated regex-per-entry format.
+#     SQLAlchemy span per tick per viewer. Excluding the route here only removes
+#     the per-request Flask span, which a stream produces one of anyway; the
+#     per-tick SQLAlchemy spans are killed at their source instead, by the
+#     logfire.suppress_instrumentation() around that query in stream_events.
+#     Both are needed: this exclusion is what lets the manual
+#     logfire.span("sse_connection") be the connection's only top-level span
+#     (A.2), and the suppression is what stops it accumulating children.
+# excluded_urls takes OTel's comma-separated regex-per-entry format, matched with
+# an unanchored re.search against the full request URL — hence the explicit
+# `(\?|$)` on the stream routes, without which the pattern also swallows the
+# once-per-connection POST .../stream-ticket, which we do want traced. The query
+# string is part of that URL, so the crew stream's own `?ticket=` must still match.
 _EXCLUDED_URL_PATTERNS = ",".join([
     r"/api/v1/tiles/.*",
     r"/api/v1/health",
-    r"/api/v1/live/trip/[^/]+/stream",
-    r"/api/v1/live/story/[^/]+/stream",
+    r"/api/v1/live/trip/[^/]+/stream(\?|$)",
+    r"/api/v1/live/story/[^/]+/stream(\?|$)",
 ])
 
 
