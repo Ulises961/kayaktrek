@@ -193,8 +193,21 @@ restore it.
    `AGE-SECRET-KEY-1…` line goes in your password manager, and nowhere else. Consider
    printing it: it is one line, and you need it exactly once, on the worst day.
 
-2. **Create the B2 bucket and an application key** scoped to it, with **write but not
-   delete**. Put the key id, key, and bucket name in `.env`.
+2. **Create the B2 bucket and an application key scoped to that bucket only**, with
+   **listFiles, readFiles and writeFiles — but not deleteFiles**. Put the key id, key and
+   bucket name in `.env`, along with `BACKUP_B2_ENDPOINT`: the bucket's **S3-compatible**
+   endpoint (`https://s3.<region>.backblazeb2.com`, shown on the bucket's page).
+
+   `readFiles` and `listFiles` are needed even though this only ever uploads — rclone checks
+   the destination before writing, verifies the size afterwards, and the restore path reads.
+   Withholding `deleteFiles` is the one that matters: it is what stops a compromised box
+   erasing the backup history.
+
+   The scripts use B2's **S3 API**, not rclone's native `b2` backend. The native backend
+   always checks the bucket exists and creates it if not, with no way to turn that off
+   (`--s3-no-check-bucket` exists; `--b2-no-check-bucket` does not) — and a bucket-scoped key
+   cannot create buckets, so every upload fails with a 401 reading *"failed to create
+   bucket"*, naming a permission that was withheld on purpose.
 
 3. **Add a lifecycle rule** on the bucket to expire files after your retention window
    (30 days is a reasonable start). This is what prunes old dumps.

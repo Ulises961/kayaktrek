@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-for var in BACKUP_B2_KEY_ID BACKUP_B2_APPLICATION_KEY BACKUP_B2_BUCKET BACKUP_AGE_IDENTITY_FILE; do
+for var in BACKUP_B2_ENDPOINT BACKUP_B2_KEY_ID BACKUP_B2_APPLICATION_KEY BACKUP_B2_BUCKET BACKUP_AGE_IDENTITY_FILE; do
     if [ -z "${!var:-}" ]; then
         echo "ERROR: $var is not set" >&2
         [ "$var" = "BACKUP_AGE_IDENTITY_FILE" ] && \
@@ -59,9 +59,20 @@ for tool in age rclone docker; do
     command -v "$tool" >/dev/null 2>&1 || { echo "ERROR: '$tool' is not installed" >&2; exit 2; }
 done
 
-export RCLONE_CONFIG_B2_TYPE=b2
-export RCLONE_CONFIG_B2_ACCOUNT="$BACKUP_B2_KEY_ID"
-export RCLONE_CONFIG_B2_KEY="$BACKUP_B2_APPLICATION_KEY"
+# B2's S3-compatible API, not rclone's native `b2` backend. The native one always checks
+# the bucket exists and creates it if not, and has no way to turn that off — there is no
+# `--b2-no-check-bucket`, only `--s3-no-check-bucket`. An application key scoped to a single
+# bucket cannot create buckets, so every upload failed with a 401 whose message ("failed to
+# create bucket") pointed at a permission we deliberately withheld. Choosing the native
+# backend for "first-class lifecycle support and simpler credentials" was the wrong trade:
+# it is incompatible with the narrow credential that is the point of the design.
+export RCLONE_CONFIG_B2_TYPE=s3
+export RCLONE_CONFIG_B2_PROVIDER=Other
+export RCLONE_CONFIG_B2_ENDPOINT="$BACKUP_B2_ENDPOINT"
+export RCLONE_CONFIG_B2_ACCESS_KEY_ID="$BACKUP_B2_KEY_ID"
+export RCLONE_CONFIG_B2_SECRET_ACCESS_KEY="$BACKUP_B2_APPLICATION_KEY"
+# Never try to create or stat the bucket — the key cannot, and does not need to.
+export RCLONE_S3_NO_CHECK_BUCKET=true
 
 readonly REMOTE_DIR="B2:${BACKUP_B2_BUCKET}/postgres"
 

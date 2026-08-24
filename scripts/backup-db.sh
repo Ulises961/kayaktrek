@@ -49,6 +49,7 @@ require_var() {
 }
 
 require_var BACKUP_AGE_RECIPIENT
+require_var BACKUP_B2_ENDPOINT
 require_var BACKUP_B2_KEY_ID
 require_var BACKUP_B2_APPLICATION_KEY
 require_var BACKUP_B2_BUCKET
@@ -64,9 +65,20 @@ done
 # No rclone.conf on disk: one place for these secrets (.env) rather than two. B2's own
 # backend rather than its S3-compatible one — first-class support for lifecycle rules,
 # and simpler credentials.
-export RCLONE_CONFIG_B2_TYPE=b2
-export RCLONE_CONFIG_B2_ACCOUNT="$BACKUP_B2_KEY_ID"
-export RCLONE_CONFIG_B2_KEY="$BACKUP_B2_APPLICATION_KEY"
+# B2's S3-compatible API, not rclone's native `b2` backend. The native one always checks
+# the bucket exists and creates it if not, and has no way to turn that off — there is no
+# `--b2-no-check-bucket`, only `--s3-no-check-bucket`. An application key scoped to a single
+# bucket cannot create buckets, so every upload failed with a 401 whose message ("failed to
+# create bucket") pointed at a permission we deliberately withheld. Choosing the native
+# backend for "first-class lifecycle support and simpler credentials" was the wrong trade:
+# it is incompatible with the narrow credential that is the point of the design.
+export RCLONE_CONFIG_B2_TYPE=s3
+export RCLONE_CONFIG_B2_PROVIDER=Other
+export RCLONE_CONFIG_B2_ENDPOINT="$BACKUP_B2_ENDPOINT"
+export RCLONE_CONFIG_B2_ACCESS_KEY_ID="$BACKUP_B2_KEY_ID"
+export RCLONE_CONFIG_B2_SECRET_ACCESS_KEY="$BACKUP_B2_APPLICATION_KEY"
+# Never try to create or stat the bucket — the key cannot, and does not need to.
+export RCLONE_S3_NO_CHECK_BUCKET=true
 
 readonly STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
 readonly REMOTE_NAME="kayak-${STAMP}.sql.gz.age"
@@ -103,7 +115,7 @@ log "encrypted dump is ${LOCAL_SIZE} bytes"
 
 # --- upload ------------------------------------------------------------------------
 log "uploading to ${REMOTE_PATH}"
-rclone copyto "$LOCAL_FILE" "$REMOTE_PATH" --b2-hard-delete=false
+rclone copyto "$LOCAL_FILE" "$REMOTE_PATH"
 
 # --- verify the remote object, rather than trusting the exit code ------------------
 REMOTE_SIZE=$(rclone size "$REMOTE_PATH" --json | sed -n 's/.*"bytes":\([0-9]*\).*/\1/p')
