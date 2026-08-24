@@ -147,3 +147,64 @@ class TestBases:
         assert "//point-images" not in migration._rebuild(
             "http://old/kayak/point-images/x.jpg", bases
         )
+
+
+class TestProductionGuard:
+    """The migration rewrites live URLs, so running it on fallback defaults would point
+    every avatar and route photo at a host that never served them.
+
+    That is not hypothetical: `docker-compose.prod.yml`'s `migrate` service was passed no
+    STORAGE_* variables at all, so the first production run would have done exactly this.
+    Compose is fixed; this guard is what stops the omission recurring silently.
+    """
+
+    @pytest.mark.parametrize("mode", ["production", "staging"])
+    def test_deployed_modes_refuse_to_run_without_storage_config(self, monkeypatch, mode):
+        monkeypatch.setenv("CONFIG_MODE", mode)
+        monkeypatch.delenv("STORAGE_PUBLIC_URL", raising=False)
+        monkeypatch.delenv("STORAGE_BUCKET", raising=False)
+
+        with pytest.raises(RuntimeError, match="STORAGE_PUBLIC_URL"):
+            migration._bases()
+
+    def test_an_empty_string_counts_as_unset(self, monkeypatch):
+        """Compose writes `VAR: ${VAR:-}` as an empty string, so a presence check on the
+        key alone would wave through a completely unconfigured deploy."""
+        monkeypatch.setenv("CONFIG_MODE", "production")
+        monkeypatch.setenv("STORAGE_PUBLIC_URL", "")
+        monkeypatch.setenv("STORAGE_BUCKET", "")
+
+        with pytest.raises(RuntimeError):
+            migration._bases()
+
+    def test_deployed_mode_with_storage_configured_proceeds(self, monkeypatch):
+        monkeypatch.setenv("CONFIG_MODE", "production")
+        monkeypatch.setenv("STORAGE_PUBLIC_URL", "https://acct.r2.cloudflarestorage.com")
+        monkeypatch.setenv("STORAGE_BUCKET", "kayak")
+        monkeypatch.setenv("STORAGE_BUCKET_PUBLIC", "kayaktrek-prod-public")
+        monkeypatch.setenv("STORAGE_BUCKET_PRIVATE", "kayaktrek-prod-private")
+        monkeypatch.setenv("STORAGE_PUBLIC_BASE_URL", "https://cdn.kayaktrek.app")
+
+        bases = migration._bases()
+
+        assert bases["public"] == "https://cdn.kayaktrek.app"
+        assert bases["private"] == "https://acct.r2.cloudflarestorage.com/kayaktrek-prod-private"
+
+    @pytest.mark.parametrize("mode", ["development", "testing", None])
+    def test_local_modes_still_run_on_defaults(self, monkeypatch, mode):
+        """In dev and CI the defaults ARE correct — they are the local MinIO — so the
+        guard must not fire there, or every developer's `alembic upgrade head` breaks."""
+        if mode is None:
+            monkeypatch.delenv("CONFIG_MODE", raising=False)
+        else:
+            monkeypatch.setenv("CONFIG_MODE", mode)
+        for name in ("STORAGE_PUBLIC_URL", "STORAGE_BUCKET", "STORAGE_BUCKET_PUBLIC",
+                     "STORAGE_BUCKET_PRIVATE", "STORAGE_PUBLIC_BASE_URL"):
+            monkeypatch.delenv(name, raising=False)
+
+        bases = migration._bases()
+
+        assert bases == {
+            "public": "http://localhost:9000/kayak",
+            "private": "http://localhost:9000/kayak",
+        }

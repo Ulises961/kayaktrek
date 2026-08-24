@@ -64,17 +64,53 @@ _PREFIX_ROLES = [
 
 
 def _bases() -> dict[str, str]:
-    """Public and private URL bases, derived exactly as StorageService derives them."""
-    bucket = os.environ.get("STORAGE_BUCKET", "kayak")
-    public_bucket = os.environ.get("STORAGE_BUCKET_PUBLIC", bucket)
-    private_bucket = os.environ.get("STORAGE_BUCKET_PRIVATE", bucket)
-    public_url = os.environ.get("STORAGE_PUBLIC_URL", "http://localhost:9000").rstrip("/")
-    public_base = os.environ.get("STORAGE_PUBLIC_BASE_URL", "").rstrip("/")
+    """Public and private URL bases, derived exactly as StorageService derives them.
+
+    `or` rather than get() defaults, matching the service: docker-compose writes
+    `VAR: ${VAR:-}` as an empty string rather than an absent key, so a default would
+    never fire.
+    """
+    _require_storage_env()
+
+    bucket = os.environ.get("STORAGE_BUCKET") or "kayak"
+    public_bucket = os.environ.get("STORAGE_BUCKET_PUBLIC") or bucket
+    private_bucket = os.environ.get("STORAGE_BUCKET_PRIVATE") or bucket
+    public_url = (os.environ.get("STORAGE_PUBLIC_URL") or "http://localhost:9000").rstrip("/")
+    public_base = (os.environ.get("STORAGE_PUBLIC_BASE_URL") or "").rstrip("/")
 
     return {
         "public": public_base or f"{public_url}/{public_bucket}",
         "private": f"{public_url}/{private_bucket}",
     }
+
+
+def _require_storage_env() -> None:
+    """Refuse to run on fallback defaults in a deployed environment.
+
+    This migration rewrites live URLs, so the cost of running it with the wrong bases is
+    every avatar and route photo pointing at a host that never served them. That is exactly
+    what would have happened the first time: the `migrate` service in
+    `docker-compose.prod.yml` was passed no STORAGE_* variables at all, so the defaults
+    below would have silently won.
+
+    In development and testing the defaults ARE correct (that is the local MinIO), so the
+    guard is scoped to deployed config modes rather than applied unconditionally.
+    """
+    config_mode = (os.environ.get("CONFIG_MODE") or "development").lower()
+    if config_mode not in ("production", "staging"):
+        return
+
+    missing = [
+        name for name in ("STORAGE_PUBLIC_URL", "STORAGE_BUCKET")
+        if not os.environ.get(name)
+    ]
+    if missing:
+        raise RuntimeError(
+            f"CONFIG_MODE={config_mode} but {', '.join(missing)} is unset. This migration "
+            "rewrites every stored object URL against the configured storage base; running "
+            "it on the local-MinIO defaults would point them all at a dead host. Pass the "
+            "STORAGE_* environment to whichever service runs alembic."
+        )
 
 
 def _rebuild(url: str, bases: dict[str, str]) -> str | None:

@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 # through the backend so the one-time download token can be enforced — hence a
 # read path (`download_export`) exists for them.
 
-_ENDPOINT = os.environ.get("STORAGE_ENDPOINT", "http://localhost:9000")
-_PUBLIC_URL = os.environ.get("STORAGE_PUBLIC_URL", "http://localhost:9000")
-_ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY", "kayak")
+_ENDPOINT = os.environ.get("STORAGE_ENDPOINT") or "http://localhost:9000"
+_PUBLIC_URL = os.environ.get("STORAGE_PUBLIC_URL") or "http://localhost:9000"
+_ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY") or "kayak"
 _SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY", "")
-_BUCKET = os.environ.get("STORAGE_BUCKET", "kayak")
+_BUCKET = os.environ.get("STORAGE_BUCKET") or "kayak"
 
 # Two buckets, not one. MinIO scopes anonymous read by *prefix* (`minio-init` runs
 # `mc anonymous set download` over avatars/ and point-images/ only); Cloudflare R2 scopes
@@ -34,14 +34,17 @@ _BUCKET = os.environ.get("STORAGE_BUCKET", "kayak")
 # Both default to STORAGE_BUCKET, so a single-bucket MinIO — local dev, CI, and production
 # until the migration runs — behaves exactly as it did before. The split is switched on by
 # setting these two vars, not by a code change.
-_PUBLIC_BUCKET = os.environ.get("STORAGE_BUCKET_PUBLIC", _BUCKET)
-_PRIVATE_BUCKET = os.environ.get("STORAGE_BUCKET_PRIVATE", _BUCKET)
+# `or` rather than a get() default: docker-compose writes `VAR: ${VAR:-}` as an *empty
+# string*, not an absent key, so a get() default would never fire and both roles would
+# resolve to "" — every object written to a nameless bucket.
+_PUBLIC_BUCKET = os.environ.get("STORAGE_BUCKET_PUBLIC") or _BUCKET
+_PRIVATE_BUCKET = os.environ.get("STORAGE_BUCKET_PRIVATE") or _BUCKET
 
 # Base URL for objects a browser fetches directly. Configured whole rather than assembled
 # from host + bucket, because the two backends disagree on shape: MinIO is path-style
 # (`host/bucket/key`) while an R2 custom domain maps to a bucket at its own root
 # (`cdn.example.com/key`, no bucket segment). Empty means "derive the MinIO shape".
-_PUBLIC_BASE_URL = os.environ.get("STORAGE_PUBLIC_BASE_URL", "")
+_PUBLIC_BASE_URL = os.environ.get("STORAGE_PUBLIC_BASE_URL") or ""
 
 # Prefix for GDPR data-export blobs. Deliberately excluded from the public-read policy
 # provisioned by minio-init (private) — exports are streamed through the backend behind

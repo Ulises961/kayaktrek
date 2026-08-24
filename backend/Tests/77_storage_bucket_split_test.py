@@ -10,12 +10,16 @@ The split is switched on by STORAGE_BUCKET_PUBLIC/STORAGE_BUCKET_PRIVATE. With n
 set, both resolve to STORAGE_BUCKET and every call behaves exactly as it did on a
 single-bucket MinIO, which is what local dev and CI still run.
 """
+import importlib.util
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 import pytest
 
+import Resources.user_resource as user_resource
 import Services.storage_service as storage_service
+import Services.user_service as user_service
 from Services.storage_service import StorageService
 
 # > MIN_SIZE (512 bytes), valid JPEG magic bytes so `magic.from_buffer` resolves to image/jpeg.
@@ -196,3 +200,81 @@ def test_endpoint_override_is_read_at_call_time_not_bound_at_definition(monkeypa
     client = storage_service._client()
 
     assert urlparse(client.meta.endpoint_url).netloc == "patched-host:9000"
+
+
+def _reimport_storage_service():
+    """Import a throwaway copy of the module, so its env-read constants are recomputed
+    under the current environment without touching the live one.
+
+    Deliberately not `importlib.reload`. Reload re-executes the module *in place*, which
+    rebinds `StorageService` and `StorageValidationError` to brand-new class objects —
+    while the three resources and four services that did
+    `from Services.storage_service import ...` at import time keep the originals. The
+    `except StorageValidationError` in `user_resource.upload_avatar` then no longer
+    catches the error the service raises, and the request 500s instead of returning 400.
+    That poisons the whole worker process, so it surfaced as an apparently unrelated test
+    in another file failing, and only when xdist happened to schedule that file after
+    this one.
+
+    The copy is never registered in `sys.modules`, so nothing else can pick it up.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "_storage_service_fresh", Path(storage_service.__file__)
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestEmptyStringEnvIsTreatedAsUnset:
+    """docker-compose writes `VAR: ${VAR:-}` as an empty string, not an absent key.
+
+    A `get(name, default)` would therefore never fire its default and both bucket roles
+    would resolve to `""` — every object written to a nameless bucket. The service reads
+    these with `or`, which is what these tests pin.
+    """
+
+    def test_empty_bucket_split_vars_fall_back_to_the_single_bucket(self, monkeypatch):
+        monkeypatch.setenv("STORAGE_BUCKET", "kayak")
+        monkeypatch.setenv("STORAGE_BUCKET_PUBLIC", "")
+        monkeypatch.setenv("STORAGE_BUCKET_PRIVATE", "")
+        fresh = _reimport_storage_service()
+
+        assert fresh._PUBLIC_BUCKET == "kayak"
+        assert fresh._PRIVATE_BUCKET == "kayak"
+
+    def test_empty_endpoint_vars_fall_back_to_the_local_defaults(self, monkeypatch):
+        for name in ("STORAGE_ENDPOINT", "STORAGE_PUBLIC_URL", "STORAGE_ACCESS_KEY"):
+            monkeypatch.setenv(name, "")
+        fresh = _reimport_storage_service()
+
+        assert fresh._ENDPOINT == "http://localhost:9000"
+        assert fresh._PUBLIC_URL == "http://localhost:9000"
+        assert fresh._ACCESS_KEY == "kayak"
+
+    def test_an_empty_cdn_base_does_not_produce_a_leading_slash_url(self, monkeypatch):
+        """`"" or ""` must fall through to the path-style base, not build `/avatars/k.jpg`."""
+        monkeypatch.setenv("STORAGE_BUCKET", "kayak")
+        monkeypatch.setenv("STORAGE_PUBLIC_BASE_URL", "")
+        monkeypatch.setenv("STORAGE_PUBLIC_URL", "http://localhost:9000")
+        fresh = _reimport_storage_service()
+
+        fake_client = MagicMock()
+        with patch.object(fresh, "_client", return_value=fake_client):
+            url = fresh.StorageService.upload(_FAKE_JPEG, "k.jpg", "avatar")
+
+        assert url == "http://localhost:9000/kayak/avatars/k.jpg"
+
+    def test_the_live_module_keeps_its_identity(self):
+        """The guard on the above: re-importing must leave the live module alone.
+
+        `except StorageValidationError` in the resources is an identity check against the
+        class object they imported at startup, so a helper that mutated the live module
+        would silently turn every storage validation error in the process into a 500.
+        """
+        fresh = _reimport_storage_service()
+
+        assert fresh is not storage_service
+        assert fresh.StorageValidationError is not storage_service.StorageValidationError
+        assert user_resource.StorageValidationError is storage_service.StorageValidationError
+        assert user_service.StorageService is storage_service.StorageService
