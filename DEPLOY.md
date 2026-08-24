@@ -101,111 +101,66 @@ pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunne
 browser or container-lifecycle UI reachable from the internet is not an acceptable mistake to be
 one DNS record away from.
 
-## Secrets (SOPS)
+## Deploying configuration to the box
 
-The production `.env` used to be copied to the box by hand. It then drifted: the local copy
-gained variables the server had never heard of, nothing could show the difference, and the
-first symptom was a container refusing to start on a variable name that meant nothing on its
-own. That is the failure this replaces.
-
-`secrets/env.prod.sops` is the encrypted production environment, committed to the repo. The
-server gets it with `git pull` like any other file, so there is only ever one copy.
-
-**Only values are encrypted — variable names stay readable.** A `git diff` therefore shows
-which variables were added or removed without exposing any of them, which is what makes the
-drift visible in review instead of at 3am.
-
-> **The deploy key is not the backup key.** This key's private half *must* live on the server,
-> because that is where decryption happens. The backup key's private half must *never* be
-> there — that is the whole property that makes `scripts/backup-db.sh` worth having. Generate
-> two keypairs and keep them apart.
-
-### One-time setup
-
-1. **Generate the deploy keypair** on your dev machine:
-   ```bash
-   age-keygen -o deploy-key.txt
-   ```
-   Put the `age1…` public key in `.sops.yaml`, replacing the placeholder. Put the private
-   half in your password manager.
-
-2. **Install the private key on BOTH machines**, where sops looks for it by default:
-   ```bash
-   mkdir -p ~/.config/sops/age && chmod 700 ~/.config/sops/age
-   $EDITOR ~/.config/sops/age/keys.txt      # paste the AGE-SECRET-KEY-1... line
-   chmod 600 ~/.config/sops/age/keys.txt
-   ```
-   The server needs it to deploy. **Your dev machine needs it to edit** — `sops
-   secrets/env.prod.sops` decrypts into your editor and re-encrypts on save, so without
-   the key there you can only ever re-encrypt from scratch, never change one variable.
-   Without it, `sops --decrypt` fails with *"identity did not match any of the
-   recipients"*, which reads like a wrong-key problem rather than a missing-key one.
-
-   This costs nothing in exposure: the dev machine already holds `.env.prod` in plaintext,
-   so holding the key that decrypts its ciphertext gives an attacker nothing extra. **That
-   reasoning is specific to the deploy key** — it does not extend to the backup key, whose
-   entire value is living nowhere near the data it protects.
-
-3. **Install sops** on both machines — your dev box encrypts, the server decrypts. It is
-   not in Ubuntu's repositories (`apt-cache search sops` finds only the unrelated
-   `orca-sops`), but the project ships a `.deb`, which is preferable to dropping a loose
-   binary in `/usr/local/bin` since apt then knows how to remove it:
-   ```bash
-   VER=$(curl -s https://api.github.com/repos/getsops/sops/releases/latest \
-         | grep -oP '"tag_name":\s*"\Kv[0-9.]+')
-   curl -sSLo /tmp/sops.deb \
-     "https://github.com/getsops/sops/releases/download/${VER}/sops_${VER#v}_amd64.deb"
-   sudo dpkg -i /tmp/sops.deb && rm /tmp/sops.deb
-   ```
-   `age` and `rclone`, by contrast, *are* in apt (`sudo apt install age rclone`);
-   `age-keygen` ships inside the `age` package.
-
-4. **Encrypt the current `.env`** from your dev machine and commit it:
-   ```bash
-   ./scripts/env-encrypt.sh          # reads .env, writes secrets/env.prod.sops
-   git add secrets/env.prod.sops && git commit -m "chore: encrypted production env"
-   ```
-
-### Changing a variable
+The server runs prebuilt images from GHCR — nothing is built there — but it still needs a
+handful of files from this repo: the compose file, the backup scripts, the nginx config,
+and a `.env`. `scripts/deploy-sync.sh` pushes that whole set over SSH from your machine.
 
 ```bash
-sops secrets/env.prod.sops     # opens decrypted in $EDITOR, re-encrypts on save
-git commit -am "chore: <what changed>"
-git push
+DEPLOY_HOST=user@box ./scripts/deploy-sync.sh --dry-run   # show what would change
+DEPLOY_HOST=user@box ./scripts/deploy-sync.sh             # push it
 ```
 
-Then on the server, as part of deploying:
+`DEPLOY_PATH` sets the target directory (default `kayak`), `DEPLOY_ENV_FILE` the local env
+file (default `.env.prod`, landing as `.env` with mode 600).
+
+**Why a script rather than copying files across.** Hand-copying caused two outages on
+2026-08-24: a `docker-compose.prod.yml` that predated the R2 wiring, so `migrate` ran with
+no `STORAGE_*` environment and refused (correctly) to rewrite every stored object URL
+against a dead host; and a `.env` that predated `STORAGE_SECRET_KEY` becoming required, so
+the stack would not start. Neither was hard to fix. Both were invisible until something
+crashed, because nothing could answer *"is what is on the box what is in the repo?"*.
+
+Pushing the whole set every time means a subset cannot go stale. The remaining failure mode
+is forgetting to run it — one thing to remember, rather than a judgement per file per
+release. The dry run prints what it is about to correct, which is worth reading after a
+quiet week.
+
+**nginx is deliberately not synced.** `nginx/kayak-expedition-planner.conf.template` is a
+template whose every `server_name` and certificate path reads `kayak.example.com`. Installing
+it means substituting the real domain first:
 
 ```bash
-git pull
-./scripts/env-decrypt.sh       # writes .env, reports which variable NAMES changed
-docker compose -f docker-compose.prod.yml up -d
+sed 's/kayak\.example\.com/<real-domain>/g' nginx/kayak-expedition-planner.conf.template \
+  | sudo tee /etc/nginx/sites-available/kayak-expedition-planner.conf
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`env-decrypt.sh` keeps the previous `.env` as `.env.bak` and refuses to overwrite a working
-one with a decrypt that produced almost nothing.
+Copying it *unsubstituted* over a live config replaces a working one with placeholders —
+which happened on 2026-08-24, from a deploy script that both synced this file and printed a
+`sudo cp` of it into `sites-available`. The failure is quiet at first: `nginx -t` fails on
+the missing certificate directory, so the reload is refused and the running process keeps
+serving the old config until something restarts it. The `.template` suffix now makes the
+plain `cp` impossible, and host-level config needing substitution and root is out of the
+automated push entirely. It changes about once a year.
 
-### If an existing server `.env` predates this
+**Adding a file the server needs?** Put it in the `FILES` array in the script. A file that
+is not in that list is a file that will drift.
 
-Two variables became **required** in `docker-compose.prod.yml` and are not in any `.env`
-copied before 2026-08-23, so compose will refuse to start until they exist:
+**Nothing here is encrypted at rest, deliberately.** SSH encrypts it in transit and it lands
+on a machine you control — there is no third party in the path, so there is nothing to
+protect it from. The database dumps *are* encrypted (see Backups below) because those go to
+Backblaze. That difference — where the data ends up — is the whole rule.
 
-- `STORAGE_SECRET_KEY` — previously derived from `MINIO_ROOT_PASSWORD`
-- `STORAGE_ACCESS_KEY` — previously derived from `MINIO_ROOT_USER`
+A SOPS-encrypted env committed to the repo was built and then removed on 2026-08-24: it
+solved the same drift problem, but only because the server had a checkout to pull it into.
+Once the sync script delivers the file directly, the encryption guarded nothing and cost a
+keypair to manage. See `docs/adr/foundation.md`.
 
-To stay on MinIO, set them to those same two values. To cut over to R2, set them to the R2
-credentials along with `STORAGE_ENDPOINT`, `STORAGE_BUCKET_PUBLIC`, `STORAGE_BUCKET_PRIVATE`
-and `STORAGE_PUBLIC_BASE_URL`. See `.env.prod.example`.
-
-### When this moves to DigitalOcean
-
-Revisit, but not necessarily replace. SOPS keeps working unchanged on a droplet — the model
-is "encrypted file in the repo, private key on the box", and a droplet is just a different
-box. What changes is that a **CI/CD pipeline holding secrets** (M9's mobile builds, or
-automated deploys) is one of the triggers in the root `CLAUDE.md` Secrets Management section
-for moving to a real secrets manager: at that point the key has to be given to a runner, and
-Doppler or Infisical earn their cost. Until a machine that is not yours needs to decrypt,
-SOPS is the right size.
+**`.env.prod` now exists only on your dev machine.** Nothing else holds a copy, so put it in
+your password manager — losing `JWT_SECRET_KEY` logs out every user, and the rest is not
+reconstructable from memory during an outage.
 
 ## Backups
 
@@ -313,7 +268,7 @@ migrations did before relying on this.
 ## Status (2026-07-31 — first real deploy)
 
 Live end-to-end for the first time: `kayaktrek.app` (frontend, bare apex — see
-`nginx/kayak-expedition-planner.conf`'s header comment for why there's no `app.` subdomain),
+`nginx/kayak-expedition-planner.conf.template`'s header comment for why there's no `app.` subdomain),
 `api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` (MinIO S3 API, correctly
 denying anonymous root-listing while serving `avatars/`/`point-images/` public-read) all resolve
 through Cloudflare → `cloudflared` Tunnel → host nginx (TLS via certbot-dns-cloudflare,

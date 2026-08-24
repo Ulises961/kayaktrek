@@ -1,5 +1,16 @@
 # nginx server blocks for the Kayak Expedition Planner (ADR-034).
 #
+# THIS IS A TEMPLATE. Every server_name and cert path below says `kayak.example.com`, which
+# is not a real host. Copying this file over a live config replaces a working one with
+# placeholders — `nginx -t` then fails on the missing certificate directory, so a reload is
+# refused and the running process keeps serving the old config until something restarts it.
+# That happened on 2026-08-24, via a deploy script that both synced this file and printed a
+# `sudo cp` of it into sites-available. The `.template` suffix exists so the same mistake
+# cannot be made by copying: the installed file has a different name.
+#
+# It is deliberately NOT part of `scripts/deploy-sync.sh`. Installing it is a sighted,
+# once-a-year operation needing substitution and root.
+#
 # Install: substitute the real domain for the kayak.example.com placeholder below (one
 # global find-replace covers every server_name and the cert path, since the cert
 # directory is also named after the apex host — see the certbot command further down),
