@@ -7,6 +7,61 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.5.0] - 2026-08-24
+
+Production object storage can now be Cloudflare R2 instead of the self-hosted MinIO. Nothing
+changes for anyone using the app; this is entirely about where photos and documents live.
+
+### Changed
+
+- **Object storage is configurable per environment, and understands two buckets.** Production
+  can point at Cloudflare R2 — a public bucket behind a CDN domain for avatars and public route
+  photos, a private one for documents, private photos, data exports and cached tiles. Local
+  development and CI are untouched: with the two new bucket variables unset, everything falls
+  back to the single MinIO bucket exactly as before. The split exists because MinIO scopes
+  anonymous read by *prefix* while R2 scopes it by *bucket*, so keeping the same access
+  boundary means keeping the two kinds of object apart.
+- **Development and end-to-end test mail goes to a local sink.** The dev stack now sends to a
+  `mailpit` container (web UI on `http://localhost:8025`) rather than the real relay, so the
+  test suite cannot post mail to the addresses it invents.
+
+### Fixed
+
+- **The production stack ignored its own storage settings.** `docker-compose.prod.yml`
+  hardcoded the storage endpoint to the local MinIO and took the credentials from the MinIO
+  root user, so R2 values placed in `.env` were read by nothing at all.
+- **The database migration would have pointed every stored image at a dead host.** The
+  `migrate` service was passed no storage variables, and the URL-rebuild migration reads them
+  to work out what to rewrite avatars and route photos against. It would have silently used
+  the local-MinIO defaults. The migration now refuses to run on fallback defaults in
+  production or staging rather than guessing.
+- **Empty environment variables are treated as unset.** Compose renders an unconfigured
+  variable as an empty string rather than omitting it, so the fallbacks never fired — both
+  bucket roles would have resolved to `""` and every object would have been written to a
+  nameless bucket.
+
+### Deploy notes
+
+- **New required variables: `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY`.** These replace
+  `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` as the source of the application's storage
+  credentials. Compose now refuses to start without `STORAGE_SECRET_KEY` and
+  `STORAGE_PUBLIC_URL`, so **a box that upgrades without setting them will fail to come up** —
+  including one staying on MinIO, where the values are simply the MinIO ones. `MINIO_ROOT_*`
+  are still needed by MinIO itself.
+- **Optional, for R2:** `STORAGE_ENDPOINT`, `STORAGE_BUCKET_PUBLIC`, `STORAGE_BUCKET_PRIVATE`,
+  `STORAGE_PUBLIC_BASE_URL`. Leave all four unset to stay on single-bucket MinIO.
+  `backend/.env.example` maps each one to what the Cloudflare console shows you, including the
+  trap that the S3 API endpoint is account-level and not per-bucket.
+- **Migration `d4e8b03c1f27` rewrites stored URLs in place** (`users.avatar_url`,
+  `image.location`) against whatever storage the environment currently points at. It is
+  idempotent and runs in both directions, but it only rewrites *addresses* — **it does not move
+  any objects**. Moving a populated deployment to R2 means copying the objects across first
+  (`rclone`/`mc mirror`), or every existing photo 404s. On an empty deployment there is nothing
+  to copy.
+- Rollback restores code but not schema — `migrate` only ever runs `alembic upgrade head`. To
+  go back to MinIO, point the storage variables at it and run the migration's down leg, which
+  renormalises to that base the same way.
+
 ## [0.4.1] - 2026-08-23
 
 A hotfix: the 0.4.0 frontend image could not start.
