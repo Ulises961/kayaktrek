@@ -59,6 +59,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local SMTP sink. Everything the dev/e2e stack sends lands here and goes no further
+  # — nothing leaves the machine. Added because the e2e suite registers users, resets
+  # passwords and fires shore-contact alerts at addresses like `e2e-...@example.com`,
+  # and CONFIG_MODE=development does NOT suppress sending (only TestingConfig does, and
+  # that is the unit-test path). Every run was therefore posting real mail to fake
+  # recipients through the configured relay, generating bounce notifications and — the
+  # part that actually matters — accumulating hard bounces against the sending domain's
+  # reputation, which is how a transactional relay account gets throttled or suspended.
+  #
+  # Web UI at http://localhost:8025 shows the rendered HTML of each template, which is
+  # also the only convenient way to eyeball an email during local development.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kayak_mailpit
+    ports:
+      - "127.0.0.1:1025:1025"  # SMTP
+      - "127.0.0.1:8025:8025"  # Web UI + HTTP API → http://localhost:8025
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:latest
     container_name: kayak_minio
@@ -146,10 +169,13 @@ services:
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
-      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
+      # is that a real relay host sitting in .env for production cannot leak into the dev
+      # or e2e stack and start posting mail to fake test recipients. Same reasoning as
+      # STORAGE_ENDPOINT being pinned to the local MinIO below. To exercise a real relay,
+      # do it against the deployed box, not here.
+      MAIL_SERVER: mailpit
+      MAIL_PORT: 1025
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000
@@ -165,6 +191,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -202,10 +230,13 @@ services:
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
-      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
+      # is that a real relay host sitting in .env for production cannot leak into the dev
+      # or e2e stack and start posting mail to fake test recipients. Same reasoning as
+      # STORAGE_ENDPOINT being pinned to the local MinIO below. To exercise a real relay,
+      # do it against the deployed box, not here.
+      MAIL_SERVER: mailpit
+      MAIL_PORT: 1025
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000
@@ -221,6 +252,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -256,10 +289,13 @@ services:
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
-      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
+      # is that a real relay host sitting in .env for production cannot leak into the dev
+      # or e2e stack and start posting mail to fake test recipients. Same reasoning as
+      # STORAGE_ENDPOINT being pinned to the local MinIO below. To exercise a real relay,
+      # do it against the deployed box, not here.
+      MAIL_SERVER: mailpit
+      MAIL_PORT: 1025
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000
@@ -268,6 +304,8 @@ services:
       STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
     depends_on:
+      mailpit:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       rabbitmq:
@@ -298,10 +336,13 @@ services:
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
-      MAIL_SERVER: ${MAIL_SERVER:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
+      # is that a real relay host sitting in .env for production cannot leak into the dev
+      # or e2e stack and start posting mail to fake test recipients. Same reasoning as
+      # STORAGE_ENDPOINT being pinned to the local MinIO below. To exercise a real relay,
+      # do it against the deployed box, not here.
+      MAIL_SERVER: mailpit
+      MAIL_PORT: 1025
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
@@ -311,6 +352,8 @@ services:
       STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
     depends_on:
+      mailpit:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       rabbitmq:
