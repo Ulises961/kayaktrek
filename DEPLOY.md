@@ -101,6 +101,91 @@ pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunne
 browser or container-lifecycle UI reachable from the internet is not an acceptable mistake to be
 one DNS record away from.
 
+## Backups
+
+`scripts/backup-db.sh` dumps Postgres, compresses, encrypts to an `age` public key and
+uploads to Backblaze B2. `scripts/restore-db.sh` brings one back — into a **scratch**
+database by default, so rehearsing is easy and destroying the live one is not.
+
+Two properties drive the whole design, and both are worth preserving if you change it:
+
+- **The box holds only the age _public_ key.** It can write backups it cannot itself read,
+  so a compromised server does not hand over the backup history with it. The private key
+  lives in your password manager and is fetched only for an actual restore. *Not* in GNOME
+  Keyring or any other keyring on this machine — that key would die with the box whose
+  death is the reason the backups exist.
+- **The B2 credential can write but not delete.** Retention is a bucket lifecycle rule,
+  applied server-side, so no script ever needs delete rights and a compromised box cannot
+  erase history. This is why there is no pruning code in `backup-db.sh`.
+
+B2 rather than R2 because once objects live in R2, Cloudflare holds primary data — a dump
+beside them means one account suspension takes out both the data and the ability to
+restore it.
+
+### One-time setup
+
+1. **Generate the keypair**, somewhere other than the server:
+   ```bash
+   age-keygen -o kayak-backup-key.txt
+   ```
+   The `age1…` public key goes in `.env` as `BACKUP_AGE_RECIPIENT`. The file's
+   `AGE-SECRET-KEY-1…` line goes in your password manager, and nowhere else. Consider
+   printing it: it is one line, and you need it exactly once, on the worst day.
+
+2. **Create the B2 bucket and an application key** scoped to it, with **write but not
+   delete**. Put the key id, key, and bucket name in `.env`.
+
+3. **Add a lifecycle rule** on the bucket to expire files after your retention window
+   (30 days is a reasonable start). This is what prunes old dumps.
+
+4. **Install the two tools** on the box:
+   ```bash
+   sudo apt install age rclone
+   ```
+
+5. **Schedule it** from the host's cron — not Celery beat. A backup that depends on the
+   application stack being healthy is exactly the backup you cannot take on the day the
+   application stack is not healthy:
+   ```
+   17 3 * * *  cd /path/to/kayak-expedition-planner && ./scripts/backup-db.sh >> /var/log/kayak-backup.log 2>&1
+   ```
+   Cron mails failures to the local user, which is the only alerting this has until the
+   Observability checklist's alerting item is done.
+
+### Rehearsing a restore
+
+**Do this once when you set it up, and after any change to either script.** A backup you
+have never restored is not a backup — it is a file-copying job you hope is a backup.
+
+```bash
+BACKUP_AGE_IDENTITY_FILE=/tmp/kayak-backup-key.txt ./scripts/restore-db.sh
+shred -u /tmp/kayak-backup-key.txt      # put the key back where it belongs
+```
+
+It downloads the newest backup, decrypts it, loads it into `kayak_restore_check`, and
+reports the row count in `users` — a load that "succeeds" but produces no rows is the
+failure this is looking for. Drop the scratch database when you are satisfied.
+
+### Real recovery
+
+```bash
+BACKUP_AGE_IDENTITY_FILE=/tmp/key.txt ./scripts/restore-db.sh --into-live <backup-name>
+```
+
+It requires you to type the live database name before it does anything.
+
+### What is not backed up
+
+**Objects** — avatars, route photos, documents — are not in these dumps. They live in R2
+with object versioning, which covers hardware failure and an accidental delete but **not**
+account-level loss (Cloudflare suspension, billing lapse, a credential compromise used to
+delete). That is a recorded, deliberate risk acceptance: photos are regrettable to lose,
+the database is fatal. See `docs/adr/foundation.md`. When photo volume makes it worth it,
+add a periodic `rclone` copy R2 → B2; R2 charges no egress, so it is free to run.
+
+**`.env` itself** is not backed up either, and holds `JWT_SECRET_KEY` — losing it logs out
+every user. It belongs in your password manager.
+
 ## Rolling back
 
 Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:
