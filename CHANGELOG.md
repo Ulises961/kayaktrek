@@ -7,6 +7,54 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.5.1] - 2026-08-24
+
+Makes the Cloudflare R2 support from `0.5.0` actually work, and stops live expeditions
+quietly burning the observability budget. Adds encrypted offsite database backups and moves
+the production environment file out of hand-copying and into the repo, encrypted.
+
+### Added
+
+- **Encrypted offsite database backups.** `scripts/backup-db.sh` dumps the database,
+  encrypts it, and uploads it to Backblaze B2; `scripts/restore-db.sh` brings one back —
+  into a scratch database by default, so rehearsing a restore is easy and destroying the
+  live one is not. The server holds only the encryption *public* key, so it writes backups
+  it cannot itself read, and the storage credential can write but not delete. Setup is a
+  one-time operator task; see `DEPLOY.md`.
+- **The production environment file is now encrypted in the repo** (SOPS + age) instead of
+  copied to the box by hand. The server gets it with `git pull`, so the two can no longer
+  silently disagree — which had already happened, and surfaced only as a container refusing
+  to start. Variable names stay readable in the diff; values do not.
+
+### Fixed
+
+- **Uploads and private downloads failed against Cloudflare R2.** A storage region was
+  hardcoded to a value R2 rejects, so every image upload and every permit or document
+  download errored out. MinIO ignores the setting, which is why it survived until the first
+  R2 request. Nothing was lost — the requests simply failed.
+- **A live expedition cost thousands of redundant tracing records.** The guardrail meant to
+  cap that had been removing the wrong thing since it was written, and the loop turns on
+  every position relayed as well as every heartbeat, so an active trip traced harder than an
+  idle one. A connection now costs one record however long it lasts.
+- **The share-link ticket request was not traced at all**, having been swallowed by an
+  over-broad exclusion pattern intended only for the stream itself.
+
+### Deploy notes
+
+- **`STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are now required.** They were previously
+  derived from the MinIO credentials, so an `.env` copied before this release will make the
+  stack refuse to start. To stay on MinIO, set them to the MinIO user and password. To move
+  to R2, set them to the R2 credentials along with `STORAGE_ENDPOINT`,
+  `STORAGE_BUCKET_PUBLIC`, `STORAGE_BUCKET_PRIVATE` and `STORAGE_PUBLIC_BASE_URL`.
+- **`STORAGE_REGION` is new and optional**, defaulting to a value R2 accepts. Only set it if
+  a provider needs a specific region.
+- **The migration that rewrites stored object URLs needs the `STORAGE_*` environment**, and
+  refuses to run without it rather than pointing every avatar and photo at a dead host. It
+  runs once; the compose file passes what it needs, so `git pull` before `docker compose up`.
+- **Moving objects to R2 is not automatic.** Copy them across *before* the migration runs,
+  or the URLs will point at a bucket that does not have them yet. Procedure in `DEPLOY.md`.
+- No forced logout, no destructive migration.
+
 ## [0.5.0] - 2026-08-24
 
 Production object storage can now be Cloudflare R2 instead of the self-hosted MinIO. Nothing
