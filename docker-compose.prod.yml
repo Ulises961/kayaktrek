@@ -164,7 +164,12 @@ services:
       # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-kayak}
+      # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
+      # default would let a box start with the wrong access key and fail to authenticate at
+      # runtime instead of at boot — a silent misconfiguration is worse than a refusal.
+      # Production does not get guessy defaults for credentials; docker-compose.yml keeps
+      # the local-MinIO convenience.
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
       # Two-bucket split (R2). Unset = both fall back to STORAGE_BUCKET, i.e. MinIO
@@ -226,7 +231,12 @@ services:
       # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-kayak}
+      # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
+      # default would let a box start with the wrong access key and fail to authenticate at
+      # runtime instead of at boot — a silent misconfiguration is worse than a refusal.
+      # Production does not get guessy defaults for credentials; docker-compose.yml keeps
+      # the local-MinIO convenience.
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
       # Two-bucket split (R2). Unset = both fall back to STORAGE_BUCKET, i.e. MinIO
@@ -286,7 +296,12 @@ services:
       # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-kayak}
+      # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
+      # default would let a box start with the wrong access key and fail to authenticate at
+      # runtime instead of at boot — a silent misconfiguration is worse than a refusal.
+      # Production does not get guessy defaults for credentials; docker-compose.yml keeps
+      # the local-MinIO convenience.
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
       # Two-bucket split (R2). Unset = both fall back to STORAGE_BUCKET, i.e. MinIO
@@ -331,7 +346,12 @@ services:
       # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-kayak}
+      # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
+      # default would let a box start with the wrong access key and fail to authenticate at
+      # runtime instead of at boot — a silent misconfiguration is worse than a refusal.
+      # Production does not get guessy defaults for credentials; docker-compose.yml keeps
+      # the local-MinIO convenience.
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
       # Two-bucket split (R2). Unset = both fall back to STORAGE_BUCKET, i.e. MinIO

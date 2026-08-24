@@ -101,6 +101,112 @@ pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunne
 browser or container-lifecycle UI reachable from the internet is not an acceptable mistake to be
 one DNS record away from.
 
+## Secrets (SOPS)
+
+The production `.env` used to be copied to the box by hand. It then drifted: the local copy
+gained variables the server had never heard of, nothing could show the difference, and the
+first symptom was a container refusing to start on a variable name that meant nothing on its
+own. That is the failure this replaces.
+
+`secrets/env.prod.sops` is the encrypted production environment, committed to the repo. The
+server gets it with `git pull` like any other file, so there is only ever one copy.
+
+**Only values are encrypted — variable names stay readable.** A `git diff` therefore shows
+which variables were added or removed without exposing any of them, which is what makes the
+drift visible in review instead of at 3am.
+
+> **The deploy key is not the backup key.** This key's private half *must* live on the server,
+> because that is where decryption happens. The backup key's private half must *never* be
+> there — that is the whole property that makes `scripts/backup-db.sh` worth having. Generate
+> two keypairs and keep them apart.
+
+### One-time setup
+
+1. **Generate the deploy keypair** on your dev machine:
+   ```bash
+   age-keygen -o deploy-key.txt
+   ```
+   Put the `age1…` public key in `.sops.yaml`, replacing the placeholder. Put the private
+   half in your password manager.
+
+2. **Install the private key on BOTH machines**, where sops looks for it by default:
+   ```bash
+   mkdir -p ~/.config/sops/age && chmod 700 ~/.config/sops/age
+   $EDITOR ~/.config/sops/age/keys.txt      # paste the AGE-SECRET-KEY-1... line
+   chmod 600 ~/.config/sops/age/keys.txt
+   ```
+   The server needs it to deploy. **Your dev machine needs it to edit** — `sops
+   secrets/env.prod.sops` decrypts into your editor and re-encrypts on save, so without
+   the key there you can only ever re-encrypt from scratch, never change one variable.
+   Without it, `sops --decrypt` fails with *"identity did not match any of the
+   recipients"*, which reads like a wrong-key problem rather than a missing-key one.
+
+   This costs nothing in exposure: the dev machine already holds `.env.prod` in plaintext,
+   so holding the key that decrypts its ciphertext gives an attacker nothing extra. **That
+   reasoning is specific to the deploy key** — it does not extend to the backup key, whose
+   entire value is living nowhere near the data it protects.
+
+3. **Install sops** on both machines — your dev box encrypts, the server decrypts. It is
+   not in Ubuntu's repositories (`apt-cache search sops` finds only the unrelated
+   `orca-sops`), but the project ships a `.deb`, which is preferable to dropping a loose
+   binary in `/usr/local/bin` since apt then knows how to remove it:
+   ```bash
+   VER=$(curl -s https://api.github.com/repos/getsops/sops/releases/latest \
+         | grep -oP '"tag_name":\s*"\Kv[0-9.]+')
+   curl -sSLo /tmp/sops.deb \
+     "https://github.com/getsops/sops/releases/download/${VER}/sops_${VER#v}_amd64.deb"
+   sudo dpkg -i /tmp/sops.deb && rm /tmp/sops.deb
+   ```
+   `age` and `rclone`, by contrast, *are* in apt (`sudo apt install age rclone`);
+   `age-keygen` ships inside the `age` package.
+
+4. **Encrypt the current `.env`** from your dev machine and commit it:
+   ```bash
+   ./scripts/env-encrypt.sh          # reads .env, writes secrets/env.prod.sops
+   git add secrets/env.prod.sops && git commit -m "chore: encrypted production env"
+   ```
+
+### Changing a variable
+
+```bash
+sops secrets/env.prod.sops     # opens decrypted in $EDITOR, re-encrypts on save
+git commit -am "chore: <what changed>"
+git push
+```
+
+Then on the server, as part of deploying:
+
+```bash
+git pull
+./scripts/env-decrypt.sh       # writes .env, reports which variable NAMES changed
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`env-decrypt.sh` keeps the previous `.env` as `.env.bak` and refuses to overwrite a working
+one with a decrypt that produced almost nothing.
+
+### If an existing server `.env` predates this
+
+Two variables became **required** in `docker-compose.prod.yml` and are not in any `.env`
+copied before 2026-08-23, so compose will refuse to start until they exist:
+
+- `STORAGE_SECRET_KEY` — previously derived from `MINIO_ROOT_PASSWORD`
+- `STORAGE_ACCESS_KEY` — previously derived from `MINIO_ROOT_USER`
+
+To stay on MinIO, set them to those same two values. To cut over to R2, set them to the R2
+credentials along with `STORAGE_ENDPOINT`, `STORAGE_BUCKET_PUBLIC`, `STORAGE_BUCKET_PRIVATE`
+and `STORAGE_PUBLIC_BASE_URL`. See `.env.prod.example`.
+
+### When this moves to DigitalOcean
+
+Revisit, but not necessarily replace. SOPS keeps working unchanged on a droplet — the model
+is "encrypted file in the repo, private key on the box", and a droplet is just a different
+box. What changes is that a **CI/CD pipeline holding secrets** (M9's mobile builds, or
+automated deploys) is one of the triggers in the root `CLAUDE.md` Secrets Management section
+for moving to a real secrets manager: at that point the key has to be given to a runner, and
+Doppler or Infisical earn their cost. Until a machine that is not yours needs to decrypt,
+SOPS is the right size.
+
 ## Backups
 
 `scripts/backup-db.sh` dumps Postgres, compresses, encrypts to an `age` public key and

@@ -1,0 +1,22 @@
+# SOPS configuration — how `sops` decides which key to encrypt a file with.
+#
+# Why this exists: the production .env was copied to the server by hand once and then
+# drifted, so the local and deployed copies silently disagreed until a container crashed
+# on a variable the server had never heard of. There is no way to *see* that drift — no
+# diff, no error, until something breaks and points at a symptom rather than the cause.
+#
+# With the file encrypted in the repo, the server gets it with `git pull` like any other
+# file and there is only ever one copy. The keys stay in plaintext in the encrypted file
+# (only values are encrypted), so `git diff` shows which variables were added or removed
+# without exposing any of them — the drift becomes visible in review.
+#
+# IMPORTANT: the age key named here MUST NOT be the backup key from scripts/backup-db.sh.
+# This key's private half has to live on the server, because that is where decryption
+# happens at deploy time. The backup key's private half must never be on the server —
+# that is the entire property making it worth having (the box writes backups it cannot
+# itself read). One key for both jobs silently destroys the backup design.
+creation_rules:
+  - path_regex: secrets/.*\.sops$
+    # Replace with the PUBLIC key of the deploy keypair (age1...). Generate it with
+    # `age-keygen`; see DEPLOY.md "Secrets (SOPS)".
+    age: age1m8a9sd9ac2wm68vufwke9t9ga3qp5thfxjrp5y5zxyt3jwdt4fjqpfx5d2
