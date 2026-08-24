@@ -278,3 +278,41 @@ class TestEmptyStringEnvIsTreatedAsUnset:
         assert fresh.StorageValidationError is not storage_service.StorageValidationError
         assert user_resource.StorageValidationError is storage_service.StorageValidationError
         assert user_service.StorageService is storage_service.StorageService
+
+
+class TestRegion:
+    """R2 validates the SigV4 region against a fixed list and rejects anything else with
+    InvalidRegionName — failing every PutObject and every presigned URL.
+
+    A real production break: the region was hardcoded to `eu-south-1`, which MinIO accepts
+    (nothing pins MINIO_REGION), so it went unnoticed until the first upload against R2.
+
+    Uses `_reimport_storage_service()` for the same reason everything else in this file
+    does — see its docstring above.
+    """
+
+    def test_default_region_is_one_r2_accepts(self, monkeypatch):
+        monkeypatch.delenv("STORAGE_REGION", raising=False)
+        fresh = _reimport_storage_service()
+
+        assert fresh._REGION in {"wnam", "enam", "weur", "eeur", "apac", "oc", "auto"}
+
+    def test_the_region_reaches_the_boto3_client(self, monkeypatch):
+        """Asserting the module constant alone would pass even if the client ignored it —
+        which is exactly the shape of the original bug, where a hardcoded literal sat in
+        the client call and no configuration could reach it.
+
+        Patches the live module rather than reimporting, because the assertion is about
+        `_client()` reading `_REGION` at call time, not about how `_REGION` is resolved.
+        """
+        monkeypatch.setattr(storage_service, "_REGION", "weur")
+
+        client = storage_service._client()
+
+        assert client.meta.region_name == "weur"
+
+    def test_an_empty_region_falls_back_rather_than_signing_with_nothing(self, monkeypatch):
+        monkeypatch.setenv("STORAGE_REGION", "")
+        fresh = _reimport_storage_service()
+
+        assert fresh._REGION == "auto"

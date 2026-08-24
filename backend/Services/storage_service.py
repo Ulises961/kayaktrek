@@ -26,6 +26,15 @@ _ACCESS_KEY = os.environ.get("STORAGE_ACCESS_KEY") or "kayak"
 _SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY", "")
 _BUCKET = os.environ.get("STORAGE_BUCKET") or "kayak"
 
+# SigV4 requires a region in the signing scope even when the backend has no concept of
+# regions. MinIO accepts anything here (nothing pins MINIO_REGION in either compose file),
+# which is why a hardcoded `eu-south-1` went unnoticed for as long as MinIO was the only
+# backend. R2 validates it against a fixed list — wnam, enam, weur, eeur, apac, oc, auto —
+# and rejects everything else with InvalidRegionName, failing every PutObject and every
+# presigned URL. `auto` is R2's own answer and is equally fine for MinIO, so it is the
+# default rather than something each deployment has to remember to set.
+_REGION = os.environ.get("STORAGE_REGION") or "auto"
+
 # Two buckets, not one. MinIO scopes anonymous read by *prefix* (`minio-init` runs
 # `mc anonymous set download` over avatars/ and point-images/ only); Cloudflare R2 scopes
 # it by *bucket*. So directly-fetchable objects and presigned-only objects have to live in
@@ -145,7 +154,7 @@ def _client(endpoint: str | None = None):
         aws_access_key_id=_ACCESS_KEY,
         aws_secret_access_key=_SECRET_KEY,
         config=Config(signature_version="s3v4"),
-        region_name="eu-south-1",
+        region_name=_REGION,
     )
 
 
