@@ -7,6 +7,42 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.5.2] - 2026-08-25
+
+Photo uploads tell you they are working, and the tracing budget stops being spent on
+health checks. Mostly operator-facing: backups now reach Backblaze, and the server's
+configuration is pushed from one place instead of copied by hand.
+
+### Fixed
+
+- **Uploading a photo looked like the app had frozen.** The upload ran with no spinner and
+  no disabled control, so on a slow connection there was nothing to say it was working.
+  Both upload buttons now show progress, and a failed upload, delete or visibility change
+  says so instead of silently doing nothing.
+- **Health checks were the largest source of tracing records in the deployment** — polled
+  every ten seconds by two processes, and excluded in a way that removed the cheap half of
+  the cost while leaving the expensive half unparented. Roughly 17,000 records a day, well
+  ahead of live-expedition streaming.
+- **Database backups could not reach Backblaze.** Every upload failed with an
+  authorisation error naming a permission that was deliberately withheld.
+
+### Changed
+
+- **Server configuration is pushed from one place** (`scripts/deploy-sync.sh`) rather than
+  copied by hand. Hand-copying had already caused two outages in a day, both invisible
+  until something crashed. The whole set goes every time, so no single file can go stale.
+- **Storage connections are reused** instead of rebuilt per request, removing a handshake
+  to Cloudflare from every upload.
+
+### Deploy notes
+
+- **The nginx config in the repo is now `.conf.template`** and is deliberately excluded
+  from the config push. It contains placeholder domains; copying it over a live config
+  replaces a working one. Install it by substituting the real domain — see `DEPLOY.md`.
+- **Backups need `BACKUP_B2_ENDPOINT`** (the bucket's S3-compatible endpoint) and a key
+  with read **and** write, not write alone.
+- Nothing else new is required. No forced logout, no destructive migration.
+
 ## [0.5.1] - 2026-08-24
 
 Makes the Cloudflare R2 support from `0.5.0` actually work, and stops live expeditions
