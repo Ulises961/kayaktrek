@@ -2,9 +2,12 @@ import logging
 
 import logfire
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.util.http import parse_excluded_urls
 
 from Api.observability import _EXCLUDED_URL_PATTERNS
+from Resources.item_category_resource import ITEM_CATEGORY_ENDPOINT
 
 
 def test_logfire_logging_handler_is_capped_at_info(app):
@@ -56,3 +59,61 @@ def test_only_high_volume_low_value_routes_are_excluded_from_tracing(url, expect
     excluded_urls = parse_excluded_urls(_EXCLUDED_URL_PATTERNS)
 
     assert excluded_urls.url_disabled(url) is expected_excluded
+
+
+class _RecordingSpanProcessor(SpanProcessor):
+    """Collects finished spans, but only while armed.
+
+    Attached to the process-wide tracer provider, which has no removal API — the arm
+    flag is what keeps it from accumulating every span of every other test in this
+    xdist worker for the rest of the session.
+    """
+
+    def __init__(self):
+        self.spans = []
+        self.recording = False
+
+    def on_end(self, span):
+        if self.recording:
+            self.spans.append(span)
+
+
+@pytest.fixture(scope="module")
+def span_recorder(app):
+    recorder = _RecordingSpanProcessor()
+    trace.get_tracer_provider().add_span_processor(recorder)
+    return recorder
+
+
+@pytest.fixture
+def recorded_spans(span_recorder):
+    span_recorder.spans.clear()
+    span_recorder.recording = True
+    yield span_recorder.spans
+    span_recorder.recording = False
+
+
+def test_health_check_emits_no_telemetry(client, recorded_spans):
+    """The single highest-volume route in the deployment: both the backend and the SSE
+    sidecar poll it every 10s, forever. Excluding it from Flask auto-tracing was never
+    enough on its own — the DB ping underneath produced a SQLAlchemy span that outlived
+    the exclusion and, having lost its parent to it, arrived as a top-level trace. This
+    asserts the whole request is silent, which is the property the exclusion list claims
+    and could not deliver by itself.
+    """
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
+    assert [span.name for span in recorded_spans] == []
+
+
+def test_an_unexcluded_route_still_emits_telemetry(client, recorded_spans):
+    """Positive control for the test above: if the recorder were mis-wired, or Flask/
+    SQLAlchemy instrumentation silently stopped being installed, "no spans" would pass
+    for the wrong reason on every excluded route at once.
+    """
+    response = client.get(ITEM_CATEGORY_ENDPOINT)
+
+    assert response.status_code == 200
+    assert len(recorded_spans) > 0

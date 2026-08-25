@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+import logfire
 import requests
 
 from Services.storage_service import StorageService
@@ -57,12 +58,19 @@ class TileService:
     def _fetch_upstream(layer: str, z: int, x: int, y: int) -> bytes:
         url = _LAYER_UPSTREAM[layer].format(z=z, x=x, y=y)
         try:
-            response = requests.get(
-                url,
-                headers={"User-Agent": USER_AGENT},
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
+            # Suppressed for the same reason `/api/v1/tiles/*` is excluded from Flask
+            # auto-tracing (Api/observability.py) — a single map view bursts 30-60 tile
+            # requests — which on its own only removed the Flask span and left this
+            # `requests` one to arrive unparented. Nothing is lost: a cache miss is
+            # uninteresting, and a *failed* fetch is reported by the warning below,
+            # which still reaches Logfire via LogfireLoggingHandler.
+            with logfire.suppress_instrumentation():
+                response = requests.get(
+                    url,
+                    headers={"User-Agent": USER_AGENT},
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
         except requests.RequestException as e:
             logger.warning("tile_upstream_failed", extra={"layer": layer, "z": z, "x": x, "y": y, "error": str(e)})
             raise ValueError("upstream_unavailable")

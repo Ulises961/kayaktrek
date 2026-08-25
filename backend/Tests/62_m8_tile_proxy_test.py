@@ -1,6 +1,8 @@
 """M8 phase 2 (D10) — GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png tile proxy."""
 from datetime import datetime, timedelta, timezone
 
+from opentelemetry.instrumentation.utils import is_instrumentation_enabled
+
 import Services.tile_service as tile_service
 from Services.tile_service import TileService
 
@@ -139,3 +141,32 @@ def test_get_tile_route_upstream_failure_is_502(client, monkeypatch):
     r = client.get("/api/v1/tiles/osm/3/4/2.png")
 
     assert r.status_code == 502
+
+
+def test_upstream_fetch_is_not_traced(monkeypatch):
+    """A single map view bursts 30-60 tile requests, which is why `/api/v1/tiles/*` is
+    in Api/observability.py's exclusion list. That list only drops the Flask span, so
+    the upstream fetch — auto-instrumented by `logfire.instrument_requests()` — went on
+    being recorded, and with its parent excluded it arrived unparented. Nothing is lost
+    by suppressing it: a cache miss is uninteresting, and a *failed* fetch is reported
+    by `tile_upstream_failed`, a log line rather than a span.
+
+    Asserted through `is_instrumentation_enabled()`, the gate the requests instrumentor
+    itself checks, since monkeypatching `requests.get` replaces the very function the
+    instrumentation wraps — a span-counting test here would pass without the fix.
+    """
+    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
+    monkeypatch.setattr(
+        tile_service.StorageService, "put_object", lambda key, data, content_type: None
+    )
+    traced_at_fetch = []
+
+    def record_instrumentation_state(url, headers, timeout):
+        traced_at_fetch.append(is_instrumentation_enabled())
+        return _FakeResponse(b"fresh-bytes")
+
+    monkeypatch.setattr(tile_service.requests, "get", record_instrumentation_state)
+
+    TileService.get_tile("osm", 3, 4, 2)
+
+    assert traced_at_fetch == [False]
