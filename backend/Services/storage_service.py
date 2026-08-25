@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Literal
 
 import boto3
+from functools import lru_cache
 import magic
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -144,18 +145,37 @@ def _url_for(kind: FileKind, key: str) -> str:
     return f"{_base_url(_KIND_ROLES[kind])}/{key}"
 
 
+@lru_cache(maxsize=8)
+def _build_client(endpoint: str, access_key: str, secret_key: str, region: str):
+    """One client per endpoint, reused.
+
+    A fresh boto3 client per operation costs a TLS handshake on every upload. Against a
+    MinIO on the same Docker network that was free; against R2 it is a round trip to
+    Cloudflare added to a request that is already slow because it is store-and-forward over
+    a residential uplink. botocore clients are thread-safe for calls, so sharing one is
+    safe under gunicorn's sync workers.
+
+    Every value the client captures is part of the cache key, not just the endpoint —
+    keying on the endpoint alone would hand back a client built with the previous region or
+    credentials, so a test monkeypatching `_REGION` would assert against a client that never
+    saw it. That is the same trap the region test was written to catch one level up.
+    `_client()` resolves the globals and passes them in, so this function reads none.
+    """
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        config=Config(signature_version="s3v4"),
+        region_name=region,
+    )
+
+
 def _client(endpoint: str | None = None):
     # `endpoint or _ENDPOINT` rather than a default argument: a default is bound once at
     # definition time, so `monkeypatch.setattr(storage_service, "_ENDPOINT", ...)` in a
     # test would set a value this function never reads.
-    return boto3.client(
-        "s3",
-        endpoint_url=endpoint or _ENDPOINT,
-        aws_access_key_id=_ACCESS_KEY,
-        aws_secret_access_key=_SECRET_KEY,
-        config=Config(signature_version="s3v4"),
-        region_name=_REGION,
-    )
+    return _build_client(endpoint or _ENDPOINT, _ACCESS_KEY, _SECRET_KEY, _REGION)
 
 
 # Only avatars and public point images are directly accessible. documents/,

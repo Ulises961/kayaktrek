@@ -9,9 +9,11 @@ import {
   ImageIcon,
   Anchor,
   CircleDot,
+  Loader2,
   Plus,
   Trash2,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import {
@@ -172,7 +174,10 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   const handleToggleVisibility = useCallback(async () => {
     if (!current?.id) return
     const result = await setImagePublic(point.id!, current.id, !current.isPublic)
-    if (!result.success) return
+    if (!result.success) {
+      toast.error(result.error ?? "Could not change the photo's visibility.")
+      return
+    }
     const updatedImages = (point.images ?? []).map((img) =>
       img.id === current.id ? result.image : img,
     )
@@ -181,6 +186,11 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Uploads travel browser -> backend -> R2, and the request does not return until the
+  // object is in Cloudflare — over a residential uplink that is seconds, not milliseconds.
+  // Without this the modal simply sat there and read as frozen.
+  const [isUploading, setIsUploading] = useState(false)
+
   const handleFileChange = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
@@ -188,11 +198,19 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
       if (!file) return
       const formData = new FormData()
       formData.append("file", file)
-      const result = await uploadPointImage(point.id!, formData)
-      if (!result.success) return
-      const updatedImages = [...(point.images ?? []), result.image]
-      dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
-      setImageIdx(updatedImages.length - 1)
+      setIsUploading(true)
+      try {
+        const result = await uploadPointImage(point.id!, formData)
+        if (!result.success) {
+          toast.error(result.error ?? "Could not upload the photo.")
+          return
+        }
+        const updatedImages = [...(point.images ?? []), result.image]
+        dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
+        setImageIdx(updatedImages.length - 1)
+      } finally {
+        setIsUploading(false)
+      }
     },
     [point.id, point.images, dispatch],
   )
@@ -200,7 +218,10 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
   const handleDeletePhoto = useCallback(async () => {
     if (!current?.id) return
     const result = await deletePointImage(point.id!, current.id)
-    if (!result.success) return
+    if (!result.success) {
+      toast.error(result.error ?? "Could not delete the photo.")
+      return
+    }
     const updatedImages = (point.images ?? []).filter((img) => img.id !== current.id)
     dispatch({ type: "POINT_UPDATE", id: point.id!, fields: { images: updatedImages } })
     setImageIdx((i) => Math.min(i, Math.max(updatedImages.length - 1, 0)))
@@ -300,11 +321,16 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
               {canEdit && (
                 <button
                   type="button"
-                  aria-label="Add photo"
+                  aria-label={isUploading ? "Uploading photo" : "Add photo"}
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute top-2 right-2 rounded-full bg-black/40 p-1 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/60"
+                  disabled={isUploading}
+                  className="absolute top-2 right-2 rounded-full bg-black/40 p-1 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/60 disabled:opacity-60"
                 >
-                  <Plus className="size-3" />
+                  {isUploading ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Plus className="size-3" />
+                  )}
                 </button>
               )}
               {canEdit && (
@@ -356,10 +382,15 @@ export function PointDetailModal({ point, canEdit, onClose }: PointDetailModalPr
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-muted-foreground/40 hover:text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-2 transition-colors"
+              disabled={isUploading}
+              className="text-muted-foreground/40 hover:text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-2 transition-colors disabled:opacity-60"
             >
-              <ImageIcon className="size-7" />
-              <p className="text-[10px]">Add a photo</p>
+              {isUploading ? (
+                <Loader2 className="size-7 animate-spin" />
+              ) : (
+                <ImageIcon className="size-7" />
+              )}
+              <p className="text-[10px]">{isUploading ? "Uploading…" : "Add a photo"}</p>
             </button>
           ) : (
             <div className="text-muted-foreground/40 flex h-full flex-col items-center justify-center gap-2">
