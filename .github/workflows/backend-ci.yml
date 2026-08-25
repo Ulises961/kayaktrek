@@ -29,7 +29,18 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Self-hosted: minutes on an own-machine runner are unmetered, and this suite is ~6.7
+    # minutes a run — the single largest consumer of the GitHub-hosted allowance. Nothing
+    # else about the pipeline changes: same steps, same service containers, same gate.
+    #
+    # Matched by label rather than by runner name, so a second machine can be added for
+    # availability without editing this file.
+    #
+    # The trade is that a job queues, rather than fails, when no runner is online — a PR
+    # check sits pending indefinitely instead of going red. That is why the runner should be
+    # installed as a systemd service (`sudo ./svc.sh install && sudo ./svc.sh start`) rather
+    # than started by hand.
+    runs-on: [self-hosted, linux, x64]
 
     services:
       postgres:

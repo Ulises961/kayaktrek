@@ -23,7 +23,9 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # See backend-ci.yml for the reasoning. ~6.5 minutes a run; the two together are ~86% of
+    # the GitHub-hosted spend.
+    runs-on: [self-hosted, linux, x64]
 
     defaults:
       run:
