@@ -15,6 +15,12 @@ on:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
 
+# See backend-ci.yml for the reasoning. Separate group name so the two workflows cancel
+# independently — a frontend-only push should not cancel a backend run on the same ref.
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   validate:
     runs-on: ubuntu-latest

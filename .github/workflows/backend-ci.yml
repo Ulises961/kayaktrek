@@ -15,6 +15,18 @@ on:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
 
+# Cancel a run the moment a newer commit supersedes it. Without this, pushing three times to
+# a PR runs three full suites to completion and only the last one's result is ever read — at
+# ~7 minutes each that is most of the spend on a branch being iterated on.
+#
+# Grouped per ref, so runs on different PRs never cancel each other. `master` is deliberately
+# excluded from cancellation (see the `!= 'refs/heads/master'` guard): a push to master is the
+# gate for a commit that is already merged, and cancelling it would leave that commit with no
+# result at all.
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
