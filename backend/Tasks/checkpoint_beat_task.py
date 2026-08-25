@@ -19,7 +19,25 @@ from Services.Utils.timezone_utils import trip_today
 
 logger = logging.getLogger(__name__)
 
-CHECKPOINT_ALERT_HOURS = int(os.getenv("CHECKPOINT_ALERT_HOURS", "6"))
+DEFAULT_CHECKPOINT_ALERT_HOURS = 6
+
+
+def _alert_threshold() -> timedelta:
+    """How stale a trip's last position ping must be before its shore contact is
+    emailed — and the cooldown before re-alerting the same trip.
+
+    Read per call rather than at import: at module level the value is fixed when the
+    worker process starts, so changing it needs a worker restart rather than a
+    redeploy, and no test can vary it without importlib.reload (which rebinds this
+    module's exception classes and breaks `except` elsewhere in the same worker).
+
+    Note this is a threshold, not a schedule. How often the task runs is
+    Api/celery_app.py's beat_schedule (hourly), and beat carries no configuration in
+    the message it publishes — so this must be set on the *worker*, the only process
+    that ever executes a task body.
+    """
+    hours = int(os.getenv("CHECKPOINT_ALERT_HOURS", str(DEFAULT_CHECKPOINT_ALERT_HOURS)))
+    return timedelta(hours=hours)
 
 
 @celery_app.task(name="Tasks.checkpoint_beat_task.check_missed_checkpoints", bind=True)
@@ -28,14 +46,14 @@ def check_missed_checkpoints(self, request_id: Optional[str] = None) -> None:
     expected a checkpoint. Runs hourly (see Api/celery_app.py beat_schedule).
 
     A trip is alerted when, on today's Day, its most recent position ping is
-    older than CHECKPOINT_ALERT_HOURS — and it hasn't already been alerted
+    older than the CHECKPOINT_ALERT_HOURS threshold — and it hasn't already been alerted
     within that same window. Paused trips, trips with no Day scheduled for
     today, and trips that have never sent a position ping (never opted into
     live sharing) are skipped.
     """
     now = datetime.now(timezone.utc)
     run_date = now.date()
-    threshold = timedelta(hours=CHECKPOINT_ALERT_HOURS)
+    threshold = _alert_threshold()
 
     trips = (
         db.session.query(Trip)

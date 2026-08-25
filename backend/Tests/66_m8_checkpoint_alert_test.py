@@ -11,7 +11,11 @@ from Models.logistics import Logistics
 from Models.position_ping import PositionPing
 from Models.trip import Trip, TripStateType
 from Models.trip_member import MemberRoleType, TripMember
-from Tasks.checkpoint_beat_task import CHECKPOINT_ALERT_HOURS, check_missed_checkpoints
+from Tasks.checkpoint_beat_task import (
+    DEFAULT_CHECKPOINT_ALERT_HOURS,
+    _alert_threshold,
+    check_missed_checkpoints,
+)
 
 _DESTINATION = "M8 Checkpoint Test Cove"
 
@@ -92,7 +96,7 @@ def _cleanup(app):
 
 def test_fires_on_stale_ping(app, user_1):
     trip_id = _build_trip(user_1)
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -119,7 +123,7 @@ def test_fires_on_stale_ping(app, user_1):
 
 def test_skips_paused_trip(app, user_1):
     trip_id = _build_trip(user_1, paused=True)
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -130,7 +134,7 @@ def test_skips_paused_trip(app, user_1):
 
 def test_skips_no_day_today(app, user_1):
     trip_id = _build_trip(user_1, day_today=False)
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -160,7 +164,7 @@ def test_skips_fresh_ping(app, user_1):
 
 def test_skips_recently_alerted_trip(app, user_1):
     trip_id = _build_trip(user_1, last_alert_at=datetime.now(timezone.utc) - timedelta(hours=2))
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -171,7 +175,7 @@ def test_skips_recently_alerted_trip(app, user_1):
 
 def test_missing_shore_email_warns_without_crash(app, user_1):
     trip_id = _build_trip(user_1, shore_email=None)
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -188,7 +192,7 @@ def test_mail_failure_is_not_swallowed_and_leaves_trip_unmarked_for_retry(app, u
     otherwise a mail outage would permanently silence its checkpoint alert
     instead of retrying on the next hourly beat tick."""
     trip_id = _build_trip(user_1)
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(trip_id, user_1, stale)
 
     with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
@@ -211,7 +215,7 @@ def test_mail_failure_for_one_trip_does_not_block_alerts_for_others_in_the_batch
     ok_destination = f"{_DESTINATION} B"
     failing_trip_id = _build_trip(user_1, destination=failing_destination, share_token="tok-fail")
     ok_trip_id = _build_trip(user_1, destination=ok_destination, share_token="tok-ok")
-    stale = datetime.now(timezone.utc) - timedelta(hours=CHECKPOINT_ALERT_HOURS + 1)
+    stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
     _add_ping(failing_trip_id, user_1, stale)
     _add_ping(ok_trip_id, user_1, stale)
 
@@ -229,3 +233,41 @@ def test_mail_failure_for_one_trip_does_not_block_alerts_for_others_in_the_batch
 
     failing_trip = _db.session.get(Trip, failing_trip_id)
     assert failing_trip.last_checkpoint_alert_at is None
+
+
+def test_alert_threshold_reads_the_environment_per_call(monkeypatch):
+    """The threshold has to be readable at call time, not frozen at import.
+
+    At module level it was fixed when the worker process started, so changing it took a
+    worker restart rather than a redeploy — and no test could vary it without
+    importlib.reload, which rebinds this module's exception classes and breaks `except`
+    elsewhere in the same worker.
+    """
+    monkeypatch.delenv("CHECKPOINT_ALERT_HOURS", raising=False)
+    assert _alert_threshold() == timedelta(hours=DEFAULT_CHECKPOINT_ALERT_HOURS)
+
+    monkeypatch.setenv("CHECKPOINT_ALERT_HOURS", "2")
+    assert _alert_threshold() == timedelta(hours=2)
+
+
+def test_env_override_changes_when_a_trip_is_alerted(app, user_1, monkeypatch):
+    """End-to-end proof the knob is wired to behaviour, not just parsed.
+
+    A ping 3 hours old is quiet enough to alert at a 2-hour threshold and not at the
+    6-hour default — so this fails in both directions if the value stops reaching
+    `check_missed_checkpoints`. Worth asserting because the var spent its whole life
+    set on the `beat` service, which only publishes the message; the worker executes
+    the body and reads the environment, so the value never crossed the queue.
+    """
+    trip_id = _build_trip(user_1)
+    _add_ping(trip_id, user_1, datetime.now(timezone.utc) - timedelta(hours=3))
+
+    monkeypatch.setenv("CHECKPOINT_ALERT_HOURS", "6")
+    with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
+        check_missed_checkpoints.run()
+    assert mock_send.call_count == 0
+
+    monkeypatch.setenv("CHECKPOINT_ALERT_HOURS", "2")
+    with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
+        check_missed_checkpoints.run()
+    assert mock_send.call_count == 1

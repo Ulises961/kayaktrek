@@ -290,6 +290,7 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
       # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
       # Now every value comes from the environment, defaulting to the local MinIO — so an
@@ -339,7 +340,6 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
-      CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
       # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
       # Now every value comes from the environment, defaulting to the local MinIO — so an
