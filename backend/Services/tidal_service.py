@@ -4,7 +4,6 @@ from datetime import datetime, time, timedelta
 from typing import Optional
 
 import numpy as np
-from global_land_mask import globe
 
 from geoalchemy2 import Geography
 from geoalchemy2.functions import ST_DWithin
@@ -17,6 +16,7 @@ from Models.itinerary import Itinerary
 from Models.sea import Sea
 from Models.tidal_station import TidalStation
 from Models.tidal_stream_entry import TidalStreamEntry
+from Services.Utils import land_mask
 from Services.Utils.geo_utils import haversine_nm
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def _build_uniform_velocity_grid(
         cell_lats = lat_max - np.arange(ny) * dy
         cell_lons = lon_min + np.arange(nx) * dx
         lat_grid, lon_grid = np.meshgrid(cell_lats, cell_lons, indexing="ij")
-        is_land = globe.is_land(lat_grid, lon_grid).ravel()
+        is_land = land_mask.is_land(lat_grid, lon_grid).ravel()
         for index in np.flatnonzero(is_land):
             eastward[index] = None
             northward[index] = None

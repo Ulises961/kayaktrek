@@ -28,6 +28,19 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 RUN useradd -m appuser
+
+# Cache directories for the decompressed land mask (Services/Utils/land_mask.py) and the
+# proxied map tiles (Services/tile_cache.py), created here rather than at runtime for an
+# ownership reason: a named volume mounted over a path that exists in the image inherits
+# that path's ownership, while one mounted over a path that does not is created root-owned
+# — and this process runs as appuser, so the first write would fail. Creating them empty
+# and appuser-owned is what makes those volumes writable.
+# Not VOLUME instructions: whether either is persisted is the compose file's decision, and
+# an unmounted container must still work — the land mask re-decompresses (~2s, once per
+# start) and the tile cache simply starts cold.
+RUN mkdir -p /var/cache/kayak/land-mask /var/cache/kayak/tiles \
+    && chown -R appuser:appuser /var/cache/kayak
+
 USER appuser
 
 WORKDIR /app

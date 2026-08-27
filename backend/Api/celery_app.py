@@ -44,6 +44,7 @@ celery_app = Celery(
         "Tasks.checkpoint_beat_task",
         "Tasks.expedition_log_task",
         "Tasks.session_cleanup_task",
+        "Tasks.tile_cache_task",
     ],
 )
 
@@ -81,6 +82,12 @@ celery_app.conf.update(
         "session-cleanup": {
             "task": "Tasks.session_cleanup_task.purge_dead_sessions",
             "schedule": crontab(minute=45, hour=3),
+        },
+        # 04:15 rather than alongside the others: this one walks the whole tile cache and
+        # the nightly pg_dump is the other big disk consumer, so they are kept apart.
+        "tile-cache-prune": {
+            "task": "Tasks.tile_cache_task.prune_tile_cache",
+            "schedule": crontab(minute=15, hour=4),
         },
     },
 )

@@ -110,5 +110,13 @@ cat <<EOF
 Next, on the box:
     cd ${REMOTE_PATH}
     KAYAK_IMAGE_TAG=vX.Y.Z docker compose -f docker-compose.prod.yml pull
-    KAYAK_IMAGE_TAG=vX.Y.Z docker compose -f docker-compose.prod.yml up -d
+    KAYAK_IMAGE_TAG=vX.Y.Z docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+--remove-orphans matters whenever a service is deleted from the compose file: without it
+\`up -d\` starts and updates what the file names and silently leaves anything it no longer
+names still running. That is the same class of drift this script exists to prevent — the
+file on the box would be current while the box itself was not. It bit on the MinIO removal
+(kayak_minio and kayak_minio_init would have kept running against a bind mount nothing
+reads any more), and it is the correct default here in any case, because this script pushes
+the whole deploy set every time and the compose file is the source of truth for what runs.
 EOF

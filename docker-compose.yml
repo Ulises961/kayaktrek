@@ -1,8 +1,20 @@
+# Memory limits mirror docker-compose.prod.yml service for service, and the reasoning for
+# each number lives there. They are here rather than only in prod on purpose: a cap that has
+# never run is a guess, and this is the only stack where finding out it was set too low costs
+# nothing. If something gets OOM-killed locally under ordinary work, that is the production
+# number being wrong — fix it in both files.
+#
+# The dev box has far more RAM than the target droplet, so without these, local "it's fine"
+# tells you nothing about the box that has 4 GiB.
 services:
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: kayak_rabbitmq
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     ports:
       # M11 §4: was the only infra service bound to 0.0.0.0 — the management UI was a
       # listening console on any network the host is attached to.
@@ -20,6 +32,10 @@ services:
   postgres:
     image: postgis/postgis:16-3.4-alpine
     container_name: kayak_postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -37,14 +53,24 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kayak_redis
+    deploy:
+      resources:
+        limits:
+          memory: 384M
     # Was running on unconfigured image defaults: maxmemory 0 (unbounded growth) +
     # maxmemory-policy noeviction (once a cap IS hit, Redis rejects writes outright,
     # across rate limiter/cache/Celery results at once) + periodic RDB snapshotting
-    # (disk I/O the foundation ADR's pub/sub design explicitly wants to avoid). All three
+    # (disk I/O the foundation ADR's pub/sub design explicitly wants to avoid). All the
     # workloads sharing this instance are disposable — limiter counters reset harmlessly,
-    # cache entries just get refetched, Celery results are for short-lived checkable jobs —
-    # so graceful LRU eviction with persistence off is a strict improvement over the
-    # defaults, not a tradeoff. Site evaluation follow-up, 2026-07-04.
+    # cache entries just get refetched, Celery results are for short-lived checkable jobs,
+    # live positions are pub/sub with no stored keys at all — so graceful LRU eviction with
+    # persistence off is a strict improvement over the defaults, not a tradeoff. Site
+    # evaluation follow-up, 2026-07-04.
+    #
+    # "All disposable" held when that was written and stopped holding when M17 put the
+    # revoked-session denylist on /4 — see the redis-auth service below for why that moved
+    # off this instance. Anything added here must be disposable under LRU eviction, or it
+    # belongs on its own instance too.
     command: >
       redis-server
       --maxmemory 256mb
@@ -53,6 +79,54 @@ services:
       --appendonly no
     ports:
       - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # The revoked-session denylist (M17 / ADR-035) gets its own Redis, and the reason is
+  # eviction policy, not load. The shared instance above runs `allkeys-lru`, and Redis
+  # applies maxmemory and eviction **instance-wide, across every logical DB** — so under
+  # memory pressure it would pick victims from the denylist just as readily as from the
+  # cache.
+  #
+  # Worse, it would pick them *first*. LRU ranks by last access, and a denylist key is
+  # written once at sign-out and then read only if that revoked device presents its token
+  # again — which, for a device someone has just signed out, is usually never. Limiter and
+  # cache keys are touched constantly and stay hot. So the one key whose loss has a security
+  # consequence is reliably the coldest thing in the instance.
+  #
+  # And the consequence is silent: SessionService.is_revoked fails open, so an evicted key
+  # reads as "not revoked" and a signed-out device's access token starts working again for
+  # the rest of its 15-minute life. No error, no log, nothing to notice.
+  #
+  # No eviction policy fixes this — the denylist is write-once/read-rarely by construction,
+  # so allkeys-lru, allkeys-lfu and volatile-ttl all rank it first. Isolation is the fix.
+  # Here `noeviction` is correct rather than dangerous: keys are ~40 bytes with a 15-minute
+  # TTL, so 64mb is orders of magnitude more than a realistic revocation burst needs and the
+  # policy never fires. If it somehow did, a failed write is already handled — logged, with
+  # the session row still revoked, so refresh is dead either way.
+  #
+  # Deliberately not persisted, matching the instance above: a restart drops the denylist and
+  # recently-revoked-but-unexpired tokens work again for <=15 minutes. That is the same
+  # degradation the fail-open read path already accepts, and AOF fsync is the disk I/O
+  # ADR-016's Redis design exists to avoid. Noted so it stays a decision, not an oversight.
+  redis-auth:
+    image: redis:7-alpine
+    container_name: kayak_redis_auth
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    command: >
+      redis-server
+      --maxmemory 64mb
+      --maxmemory-policy noeviction
+      --save ""
+      --appendonly no
+    ports:
+      - "127.0.0.1:6381:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -73,6 +147,11 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     container_name: kayak_mailpit
+    # Dev/e2e only — no prod counterpart. Keeps every message it receives in memory.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     ports:
       - "127.0.0.1:1025:1025"  # SMTP
       - "127.0.0.1:8025:8025"  # Web UI + HTTP API → http://localhost:8025
@@ -85,6 +164,10 @@ services:
   minio:
     image: minio/minio:latest
     container_name: kayak_minio
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     command: server /data --console-address ":9001"
     ports:
       - "127.0.0.1:9000:9000"
@@ -103,6 +186,10 @@ services:
   minio-init:
     image: minio/minio:latest
     container_name: kayak_minio_init
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     # Bucket + public-read policy provisioning lives here, not in the app at request time
     # (M11 §4) — avatars/ and point-images/ are public-read (stable, cacheable URLs);
     # documents/ and point-images-private/ stay private, served only via
@@ -128,6 +215,17 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_migrate
+    # Same budget as `backend`, not the smaller one a one-shot job looks like it deserves:
+    # `flask seed` calls createApp(), so this container pays the full app-factory cost —
+    # every blueprint, every model, and apispec resolving the whole OpenAPI spec — on top
+    # of alembic. Measured: 512M OOM-kills it (exit 137) part-way through the factory,
+    # after alembic has already committed. That failure mode is worth naming, because a
+    # migrate container that dies *after* upgrading the schema but *before* seeding leaves
+    # the stack half-initialised and the compose run reports only "exit 137".
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     # Seeding moved here from app-factory time (M11 §4) — it used to run inside createApp(),
     # which every gunicorn worker AND the migrate/Celery processes call, racing identical
     # inserts at cold start. `flask seed` is idempotent and runs exactly once, after the
@@ -151,9 +249,37 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_backend
+    # gunicorn master + 2 sync workers. Measured idle 281 MiB, and it stays there under
+    # marine-field requests now that Services/Utils/land_mask.py mmaps the land mask instead
+    # of resident-loading it — a 24x24 grid touches ~2 MB of reclaimable page cache. This
+    # cap briefly had to be 2560M to cover the ~890 MiB per-worker spike that replaced.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     ports:
       - "127.0.0.1:5000:5000"
     environment:
+      # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
+      # tile bytes through Flask, so the browser never fetches them from R2 and every cache
+      # *hit* was paying a WAN round trip for nothing.
+      TILE_CACHE_DIR: /var/cache/kayak/tiles
+      # A blast-radius control, not a cost control: this filesystem is shared with Postgres,
+      # and a full disk stops it writing WAL. Being stingy is counterproductive — eviction
+      # pressure pushes load back onto OpenStreetMap's tile servers. 0 disables the cap.
+      #
+      # The free-space floor is 2 GiB here against production's 10 GiB, and this is the one
+      # place a dev/prod divergence is right rather than sloppy. The memory limits are
+      # matched deliberately, because a cap that has never run is a guess. A *disk* floor is
+      # not like that: it is calibrated against the host's free space, and a dev machine's
+      # has nothing to do with the droplet's. A floor above local free space makes the
+      # nightly sweep empty the whole cache every night and free nothing worth having, so
+      # local map work would re-fetch every tile from OpenStreetMap forever.
+      TILE_CACHE_MAX_BYTES: ${TILE_CACHE_MAX_BYTES:-5368709120}
+      TILE_CACHE_MIN_FREE_BYTES: ${TILE_CACHE_MIN_FREE_BYTES:-2147483648}
+      # Points land_mask.py at the mounted volume so the ~890 MiB decompression is paid
+      # once ever, not once per container start. Unset it and the module uses a temp dir.
+      LAND_MASK_CACHE_DIR: /var/cache/kayak/land-mask
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
@@ -161,7 +287,16 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded, deliberately NOT ${REVOCATION_REDIS_URL:-...}, for the same reason as
+      # MAIL_SERVER and STORAGE_ENDPOINT above: `:-` substitutes only when the var is
+      # *unset*, so a stale REVOCATION_REDIS_URL in .env silently wins and puts the denylist
+      # straight back on the LRU-evicting instance. That is not hypothetical — it is exactly
+      # what happened on the first run of this change, and the symptom is nothing at all:
+      # the stack comes up healthy and the key quietly lands in the wrong place.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       # setup_logfire() (Api/observability.py) reads this unconditionally on every
@@ -190,11 +325,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      redis-auth:
+        condition: service_healthy
       minio:
         condition: service_healthy
       mailpit:
         condition: service_healthy
     volumes:
+      - tile_cache:/var/cache/kayak/tiles
+      - land_mask_cache:/var/cache/kayak/land-mask
       - ./backend:/app
       - /app/.venv
     healthcheck:
@@ -211,6 +350,12 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_sse
+    # Measured idle: 154 MiB. Headroom is for concurrent SSE connections, not for the land
+    # mask — this role never builds a velocity grid.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     ports:
       - "127.0.0.1:5001:5000"
     environment:
@@ -222,7 +367,16 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded, deliberately NOT ${REVOCATION_REDIS_URL:-...}, for the same reason as
+      # MAIL_SERVER and STORAGE_ENDPOINT above: `:-` substitutes only when the var is
+      # *unset*, so a stale REVOCATION_REDIS_URL in .env silently wins and puts the denylist
+      # straight back on the LRU-evicting instance. That is not hypothetical — it is exactly
+      # what happened on the first run of this change, and the symptom is nothing at all:
+      # the stack comes up healthy and the key quietly lands in the wrong place.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       # setup_logfire() (Api/observability.py) reads this unconditionally on every
@@ -250,6 +404,8 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-auth:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -272,8 +428,43 @@ services:
       context: ./backend
       target: runtime
     container_name: kayak_worker
-    command: celery -A celery_worker worker --loglevel=info
+    # Measured idle: 242 MiB, for the master plus 2 forked children.
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+    # --concurrency pinned, not left to Celery's default. That default is the host's CPU
+    # count, so the number of forked child processes — and with it the container's whole
+    # memory footprint — changes when the hardware does. A droplet resized for CPU
+    # headroom would silently double this and spend the RAM the resize was meant to free;
+    # an 8-core dev box already runs 4x what production will. Every task here is I/O-bound
+    # (SMTP, OpenMeteo, S3, Postgres), so concurrency tracks how many can be in flight, not
+    # how many cores are free — 2 is the value being sized for, on every machine.
+    #
+    # --max-tasks-per-child recycles a child after N tasks. Long-lived Celery workers
+    # accumulate memory across tasks; this bounds that without needing to find the leak.
+    command: celery -A celery_worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=100
     environment:
+      # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
+      # tile bytes through Flask, so the browser never fetches them from R2 and every cache
+      # *hit* was paying a WAN round trip for nothing.
+      TILE_CACHE_DIR: /var/cache/kayak/tiles
+      # A blast-radius control, not a cost control: this filesystem is shared with Postgres,
+      # and a full disk stops it writing WAL. Being stingy is counterproductive — eviction
+      # pressure pushes load back onto OpenStreetMap's tile servers. 0 disables the cap.
+      #
+      # The free-space floor is 2 GiB here against production's 10 GiB, and this is the one
+      # place a dev/prod divergence is right rather than sloppy. The memory limits are
+      # matched deliberately, because a cap that has never run is a guess. A *disk* floor is
+      # not like that: it is calibrated against the host's free space, and a dev machine's
+      # has nothing to do with the droplet's. A floor above local free space makes the
+      # nightly sweep empty the whole cache every night and free nothing worth having, so
+      # local map work would re-fetch every tile from OpenStreetMap forever.
+      TILE_CACHE_MAX_BYTES: ${TILE_CACHE_MAX_BYTES:-5368709120}
+      TILE_CACHE_MIN_FREE_BYTES: ${TILE_CACHE_MIN_FREE_BYTES:-2147483648}
+      # Points land_mask.py at the mounted volume so the ~890 MiB decompression is paid
+      # once ever, not once per container start. Unset it and the module uses a temp dir.
+      LAND_MASK_CACHE_DIR: /var/cache/kayak/land-mask
       CONFIG_MODE: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_dev}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
@@ -281,7 +472,16 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded, deliberately NOT ${REVOCATION_REDIS_URL:-...}, for the same reason as
+      # MAIL_SERVER and STORAGE_ENDPOINT above: `:-` substitutes only when the var is
+      # *unset*, so a stale REVOCATION_REDIS_URL in .env silently wins and puts the denylist
+      # straight back on the LRU-evicting instance. That is not hypothetical — it is exactly
+      # what happened on the first run of this change, and the symptom is nothing at all:
+      # the stack comes up healthy and the key quietly lands in the wrong place.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       # setup_logfire() (Api/observability.py) reads this unconditionally on every
@@ -311,12 +511,23 @@ services:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - tile_cache:/var/cache/kayak/tiles
+      # Persists Services/Utils/land_mask.py's decompressed land mask (~890 MiB) across
+      # restarts. Without it every container start re-streams it out of the package .npz.
+      - land_mask_cache:/var/cache/kayak/land-mask
 
   beat:
     build:
       context: ./backend
       target: runtime
     container_name: kayak_beat
+    # Measured idle: 140 MiB. It was 1,031 MiB before the lazy import — a process that only
+    # enqueues tasks on a timer was carrying the entire global land mask.
+    deploy:
+      resources:
+        limits:
+          memory: 320M
     # --schedule points at /tmp — /app is owned by root (WORKDIR predates the
     # Dockerfile's `useradd`/COPY --chown), so appuser can't create the
     # persistent schedule DB file there.
@@ -329,7 +540,16 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded, deliberately NOT ${REVOCATION_REDIS_URL:-...}, for the same reason as
+      # MAIL_SERVER and STORAGE_ENDPOINT above: `:-` substitutes only when the var is
+      # *unset*, so a stale REVOCATION_REDIS_URL in .env silently wins and puts the denylist
+      # straight back on the LRU-evicting instance. That is not hypothetical — it is exactly
+      # what happened on the first run of this change, and the symptom is nothing at all:
+      # the stack comes up healthy and the key quietly lands in the wrong place.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       # setup_logfire() (Api/observability.py) reads this unconditionally on every
@@ -361,3 +581,9 @@ services:
 
 volumes:
   postgres_data:
+  tile_cache:
+  land_mask_cache:
+
+networks:
+  default:
+    name: kayak_net

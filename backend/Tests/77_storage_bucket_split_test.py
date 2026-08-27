@@ -66,12 +66,9 @@ def test_exports_go_to_the_private_bucket(split_buckets):
     assert fake_client.put_object.call_args.kwargs["Bucket"] == "kayak-private"
 
 
-def test_cached_tiles_go_to_the_private_bucket(split_buckets):
-    fake_client = MagicMock()
-    with patch("Services.storage_service._client", return_value=fake_client):
-        StorageService.put_object("tiles/osm/3/4/2.png", b"\x89PNG", "image/png")
-
-    assert fake_client.put_object.call_args.kwargs["Bucket"] == "kayak-private"
+# A test asserting cached tiles land in the private bucket used to sit here. Tiles are no
+# longer in the object store at all — they are on local disk (Services/tile_cache.py), so
+# there is no bucket for them to go to. Coverage moved to Tests/62_m8_tile_proxy_test.py.
 
 
 def test_public_url_has_no_bucket_segment_when_a_cdn_domain_is_set(split_buckets):

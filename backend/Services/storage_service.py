@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 from typing import Literal
 
 import boto3
@@ -192,12 +191,11 @@ def _client(endpoint: str | None = None):
 # The runtime credential only needs object CRUD, not bucket-policy-write, and a
 # bucket-existence check no longer costs an extra round-trip on every upload.
 #
-# The tile cache (get_object_with_age/put_object) sits in the private bucket because it is
-# read back through the tile proxy rather than fetched directly. Worth revisiting: it is
-# the highest-volume object in the store and the only one whose latency a user feels on
-# every pan, so serving it from a public bucket on the CDN domain — or leaving it on a
-# local MinIO — may beat a round trip out to R2 and back. Left alone here deliberately:
-# this change is meant to be behaviour-preserving.
+# The tile cache used to live here too, in the private bucket. It does not any more — see
+# Services/tile_cache.py. The short version: the proxy reads tile bytes into Flask and
+# re-serves them, so the browser never fetches them from the object store and R2's free
+# egress bought nothing, while every cache *hit* paid a WAN round trip. Tiles are also the
+# only objects here with no durability requirement at all.
 
 
 class StorageValidationError(ValueError):
@@ -350,26 +348,3 @@ class StorageService:
             logger.info("Deleted export %s", object_key)
         except ClientError as e:
             logger.warning("Could not delete export %s: %s", object_key, e)
-
-    # -- Generic object access (M8 tile cache) ---------------------------------
-    # No kind/prefix indirection: callers pass the full key (e.g. `tiles/osm/3/4/2.png`).
-
-    @staticmethod
-    def get_object_with_age(key: str) -> tuple[bytes, datetime] | None:
-        """Return (bytes, last_modified) for a raw object key, or None if absent."""
-        client = _client()
-        try:
-            obj = client.get_object(Bucket=_PRIVATE_BUCKET, Key=key)
-            return obj["Body"].read(), obj["LastModified"]
-        except ClientError as e:
-            if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
-                return None
-            raise
-
-    @staticmethod
-    def put_object(key: str, data: bytes, content_type: str) -> None:
-        """Store a raw object at an arbitrary key. No MIME/size validation —
-        the caller (e.g. the tile proxy) already trusts the upstream source."""
-        client = _client()
-        client.put_object(Bucket=_PRIVATE_BUCKET, Key=key, Body=data, ContentType=content_type)
-        logger.info("Uploaded object %s (%d bytes, %s)", key, len(data), content_type)

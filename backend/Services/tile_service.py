@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import logfire
 import requests
 
-from Services.storage_service import StorageService
+from Services import tile_cache
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ _LAYER_UPSTREAM = {
 class TileService:
     @staticmethod
     def get_tile(layer: str, z: int, x: int, y: int) -> tuple[bytes, str]:
-        """Return (png bytes, content_type) for a map tile, serving from the
-        MinIO cache when fresh and re-fetching from upstream otherwise.
+        """Return (png bytes, content_type) for a map tile, serving from the local
+        disk cache when fresh and re-fetching from upstream otherwise.
 
         Raises ValueError on an invalid layer or out-of-range coordinates.
         """
@@ -34,9 +34,7 @@ class TileService:
         if not (0 <= x < max_index and 0 <= y < max_index):
             raise ValueError("invalid_coords")
 
-        key = f"tiles/{layer}/{z}/{x}/{y}.png"
-
-        cached = StorageService.get_object_with_age(key)
+        cached = tile_cache.get(layer, z, x, y)
         if cached is not None:
             data, last_modified = cached
             if datetime.now(timezone.utc) - last_modified < FRESHNESS:
@@ -51,7 +49,7 @@ class TileService:
                 return cached[0], "image/png"
             raise
 
-        StorageService.put_object(key, data, "image/png")
+        tile_cache.put(layer, z, x, y, data)
         return data, "image/png"
 
     @staticmethod

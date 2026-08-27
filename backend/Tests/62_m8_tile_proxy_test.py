@@ -1,10 +1,34 @@
 """M8 phase 2 (D10) — GET /api/v1/tiles/<layer>/<z>/<x>/<y>.png tile proxy."""
+import os
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from opentelemetry.instrumentation.utils import is_instrumentation_enabled
 
+import Services.tile_cache as tile_cache
 import Services.tile_service as tile_service
 from Services.tile_service import TileService
+
+
+@pytest.fixture(autouse=True)
+def isolated_tile_cache(tmp_path, monkeypatch):
+    """Point the real on-disk cache at a temp dir for every test in this file.
+
+    These tests used to monkeypatch StorageService.get_object_with_age/put_object, which
+    could only ever confirm what the author already believed about the cache. The cache is
+    now a directory, so driving the real one costs nothing and covers the parts a stub
+    cannot: the write-then-rename, the mtime that freshness reads, and eviction ordering.
+    """
+    monkeypatch.setattr(tile_cache, "_CACHE_DIR", tmp_path / "tiles")
+
+
+def _cache_tile(layer, z, x, y, data, age=None):
+    """Write a tile directly into the cache, optionally backdated to a given age."""
+    tile_cache.put(layer, z, x, y, data)
+    if age is not None:
+        path = tile_cache._tile_path(layer, z, x, y)
+        stamp = (datetime.now(timezone.utc) - age).timestamp()
+        os.utime(path, (stamp, stamp))
 
 
 class _FakeResponse:
@@ -37,10 +61,7 @@ def test_out_of_range_coords_raise(monkeypatch):
 
 
 def test_cache_hit_skips_upstream(monkeypatch):
-    fresh = datetime.now(timezone.utc) - timedelta(days=1)
-    monkeypatch.setattr(
-        tile_service.StorageService, "get_object_with_age", lambda key: (b"cached-bytes", fresh)
-    )
+    _cache_tile("osm", 3, 4, 2, b"cached-bytes", age=timedelta(days=1))
 
     def _fail_if_called(*args, **kwargs):
         raise AssertionError("upstream should not be called on a fresh cache hit")
@@ -53,13 +74,6 @@ def test_cache_hit_skips_upstream(monkeypatch):
 
 
 def test_cache_miss_fetches_and_stores(monkeypatch):
-    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
-    stored = {}
-    monkeypatch.setattr(
-        tile_service.StorageService,
-        "put_object",
-        lambda key, data, content_type: stored.update(key=key, data=data, content_type=content_type),
-    )
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"fresh-bytes")
     )
@@ -68,25 +82,26 @@ def test_cache_miss_fetches_and_stores(monkeypatch):
 
     assert data == b"fresh-bytes"
     assert content_type == "image/png"
-    assert stored == {"key": "tiles/osm/3/4/2.png", "data": b"fresh-bytes", "content_type": "image/png"}
+    # Written where a later request will find it, and nowhere else.
+    assert tile_cache._tile_path("osm", 3, 4, 2).read_bytes() == b"fresh-bytes"
+    assert tile_cache.get("osm", 3, 4, 2)[0] == b"fresh-bytes"
+    assert list(tile_cache._CACHE_DIR.rglob("*.tmp")) == [], "temp file left behind"
 
 
 def test_stale_cache_is_refreshed_from_upstream(monkeypatch):
-    stale = datetime.now(timezone.utc) - timedelta(days=8)
-    monkeypatch.setattr(
-        tile_service.StorageService, "get_object_with_age", lambda key: (b"old-bytes", stale)
-    )
-    monkeypatch.setattr(tile_service.StorageService, "put_object", lambda key, data, content_type: None)
+    _cache_tile("seamark", 3, 4, 2, b"old-bytes", age=timedelta(days=8))
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"new-bytes")
     )
 
     data, _ = TileService.get_tile("seamark", 3, 4, 2)
     assert data == b"new-bytes"
+    # The refetch must also rewrite the cache — that reset mtime is what makes mtime usable
+    # as an approximate LRU signal for eviction.
+    assert tile_cache.get("seamark", 3, 4, 2)[0] == b"new-bytes"
 
 
 def test_upstream_failure_with_no_cache_raises_upstream_unavailable(monkeypatch):
-    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"", status=502)
     )
@@ -99,10 +114,7 @@ def test_upstream_failure_with_no_cache_raises_upstream_unavailable(monkeypatch)
 
 
 def test_upstream_failure_with_stale_cache_serves_stale(monkeypatch):
-    stale = datetime.now(timezone.utc) - timedelta(days=8)
-    monkeypatch.setattr(
-        tile_service.StorageService, "get_object_with_age", lambda key: (b"stale-bytes", stale)
-    )
+    _cache_tile("osm", 3, 4, 2, b"stale-bytes", age=timedelta(days=8))
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"", status=502)
     )
@@ -113,8 +125,6 @@ def test_upstream_failure_with_stale_cache_serves_stale(monkeypatch):
 
 
 def test_get_tile_route_no_auth_required(client, monkeypatch):
-    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
-    monkeypatch.setattr(tile_service.StorageService, "put_object", lambda key, data, content_type: None)
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"png-bytes")
     )
@@ -133,7 +143,6 @@ def test_get_tile_route_invalid_layer_is_404(client):
 
 
 def test_get_tile_route_upstream_failure_is_502(client, monkeypatch):
-    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"", status=502)
     )
@@ -155,10 +164,6 @@ def test_upstream_fetch_is_not_traced(monkeypatch):
     itself checks, since monkeypatching `requests.get` replaces the very function the
     instrumentation wraps — a span-counting test here would pass without the fix.
     """
-    monkeypatch.setattr(tile_service.StorageService, "get_object_with_age", lambda key: None)
-    monkeypatch.setattr(
-        tile_service.StorageService, "put_object", lambda key, data, content_type: None
-    )
     traced_at_fetch = []
 
     def record_instrumentation_state(url, headers, timeout):

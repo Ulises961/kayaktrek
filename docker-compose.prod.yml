@@ -1,8 +1,32 @@
+# Memory limits — every service is capped. Nothing here was, so a single leaking process
+# could take the whole box down with it, and on a one-box deployment "the whole box" includes
+# Postgres. These are *runaway catchers*, not budgets: each is set well above the service's
+# expected steady state, so normal traffic never touches them and only a process that has
+# genuinely lost control gets killed. Consequence worth stating plainly: the limits sum to
+# more than the host's RAM on purpose. They stop one container eating everything; they do not
+# stop every container growing at once, which is what the free-RAM headroom is for.
+#
+# Written as `deploy.resources.limits` (the Compose Spec form) rather than the legacy
+# `mem_limit`. Both were verified to actually apply under `docker compose` v5 in non-swarm
+# mode — `deploy:` reads as swarm-only, and a limit that silently does nothing is worse than
+# no limit, because you think you are covered.
+#
+# CPU limits are deliberately absent. Memory is the failure mode here — an OOM takes the box,
+# while CPU contention just makes things slow, and a `cpus:` cap set too low on a 2-vCPU
+# droplet would throttle normal work to prevent a problem that has not happened.
 services:
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: kayak_rabbitmq
+    # Also fixes something beyond the cap: RabbitMQ's own vm_memory_high_watermark defaults
+    # to 0.4 of what it believes total memory to be, and an uncapped container believes that
+    # is the *host's* RAM. It reads the cgroup limit when one exists, so setting this makes
+    # RabbitMQ start blocking publishers at 0.4 x 512M rather than 0.4 x the whole droplet.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
     ports:
       - "127.0.0.1:5672:5672"
@@ -21,6 +45,14 @@ services:
   postgres:
     image: postgis/postgis:16-3.4-alpine
     container_name: kayak_postgres
+    # The most generous cap in the file, and deliberately so: this is the one container
+    # whose death is unrecoverable rather than merely disruptive. 1G is several times the
+    # expected footprint (128M shared_buffers plus per-connection overhead), so it only
+    # fires on something genuinely pathological.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
@@ -40,6 +72,18 @@ services:
     image: redis:7-alpine
     container_name: kayak_redis
     restart: unless-stopped
+    # 384M against redis's own 256mb maxmemory below — the gap is allocator fragmentation
+    # and copy-on-write, which is why the container cap has to sit above the internal one
+    # rather than match it.
+    #
+    # Everything on this instance must be disposable under LRU eviction: limiter counters,
+    # cached weather, Celery results, and live-position pub/sub (which stores no keys at
+    # all). The revoked-session denylist used to be here on /4 and is not any more — see
+    # the redis-auth service below.
+    deploy:
+      resources:
+        limits:
+          memory: 384M
     command: >
       redis-server
       --maxmemory 256mb
@@ -64,47 +108,68 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: kayak_minio
+  # The revoked-session denylist (M17 / ADR-035) gets its own Redis, and the reason is
+  # eviction policy, not load. The shared instance above runs `allkeys-lru`, and Redis
+  # applies maxmemory and eviction **instance-wide, across every logical DB** — so under
+  # memory pressure it would pick victims from the denylist just as readily as from the
+  # cache.
+  #
+  # Worse, it would pick them *first*. LRU ranks by last access, and a denylist key is
+  # written once at sign-out and then read only if that revoked device presents its token
+  # again — which, for a device someone has just signed out, is usually never. Limiter and
+  # cache keys are touched constantly and stay hot. So the one key whose loss has a security
+  # consequence is reliably the coldest thing in the instance.
+  #
+  # And the consequence is silent: SessionService.is_revoked fails open, so an evicted key
+  # reads as "not revoked" and a signed-out device's access token starts working again for
+  # the rest of its 15-minute life. No error, no log, nothing to notice.
+  #
+  # No eviction policy fixes this — the denylist is write-once/read-rarely by construction,
+  # so allkeys-lru, allkeys-lfu and volatile-ttl all rank it first. Isolation is the fix.
+  # Here `noeviction` is correct rather than dangerous: keys are ~40 bytes with a 15-minute
+  # TTL, so 64mb is orders of magnitude more than a realistic revocation burst needs and the
+  # policy never fires. If it somehow did, a failed write is already handled — logged, with
+  # the session row still revoked, so refresh is dead either way.
+  #
+  # Deliberately not persisted, matching the instance above: a restart drops the denylist and
+  # recently-revoked-but-unexpired tokens work again for <=15 minutes. That is the same
+  # degradation the fail-open read path already accepts, and AOF fsync is the disk I/O
+  # ADR-016's Redis design exists to avoid. Noted so it stays a decision, not an oversight.
+  redis-auth:
+    image: redis:7-alpine
+    container_name: kayak_redis_auth
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    command: >
+      redis-server
+      --maxmemory 64mb
+      --maxmemory-policy noeviction
+      --save ""
+      --appendonly no
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kayak}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
-    volumes:
-      - ./storage/minio:/data
+      - "127.0.0.1:6383:6379"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  minio-init:
-    image: minio/minio:latest
-    container_name: kayak_minio_init
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-        mc mb --ignore-existing local/$$STORAGE_BUCKET &&
-        mc anonymous set download local/$$STORAGE_BUCKET/avatars &&
-        mc anonymous set download local/$$STORAGE_BUCKET/point-images
-      "
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kayak}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-kayak}
-    depends_on:
-      minio:
-        condition: service_healthy
-    restart: "no"
-
   migrate:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_migrate
+    # Same budget as `backend`'s idle figure, not the smaller one a one-shot job looks like
+    # it deserves: `flask seed` calls createApp(), so this pays the full app-factory cost —
+    # every blueprint and model, plus apispec resolving the whole OpenAPI spec — on top of
+    # alembic. 512M OOM-killed it (exit 137) part-way through the factory, *after* alembic
+    # had already committed, leaving the schema upgraded but unseeded and reporting only
+    # "exit 137". Worth over-provisioning to keep that failure out of a deploy.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     command: sh -c "alembic upgrade head && flask seed"
     environment:
       CONFIG_MODE: ${CONFIG_MODE:-production}
@@ -132,15 +197,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      redis-auth:
+        condition: service_healthy
     restart: "no"
 
   backend:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_backend
     restart: unless-stopped
+    # gunicorn master + 2 sync workers (entrypoint.sh). Measured idle 281 MiB, and it stays
+    # there under marine-field requests now that Services/Utils/land_mask.py mmaps the land
+    # mask instead of resident-loading it — a 24x24 grid touches ~2 MB of reclaimable page
+    # cache. This cap briefly had to be 2560M to cover the ~890 MiB per-worker spike that
+    # replaced.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     ports:
       - "127.0.0.1:5000:5000"
     environment:
+      # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
+      # tile bytes through Flask, so the browser never fetches them from R2 and every cache
+      # *hit* was paying a WAN round trip for nothing.
+      TILE_CACHE_DIR: /var/cache/kayak/tiles
+      # A blast-radius control, not a cost control: this filesystem is shared with Postgres,
+      # and a full disk stops it writing WAL. Being stingy is counterproductive — eviction
+      # pressure pushes load back onto OpenStreetMap's tile servers. 0 disables the cap.
+      TILE_CACHE_MAX_BYTES: ${TILE_CACHE_MAX_BYTES:-5368709120}
+      TILE_CACHE_MIN_FREE_BYTES: ${TILE_CACHE_MIN_FREE_BYTES:-10737418240}
+      # Points land_mask.py at the mounted volume so the ~890 MiB decompression is paid
+      # once ever, not once per container start. Unset it and the module uses a temp dir.
+      LAND_MASK_CACHE_DIR: /var/cache/kayak/land-mask
       CONFIG_MODE: ${CONFIG_MODE:-production}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
@@ -148,7 +236,19 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded rather than ${REVOCATION_REDIS_URL:-...}, breaking this file's usual
+      # env-driven pattern on purpose. `:-` substitutes only when the var is *unset*, so any
+      # REVOCATION_REDIS_URL left in .env silently wins — and this one is not a free
+      # deployment choice: the target must be an instance that does not evict, or the
+      # denylist gets dropped under memory pressure and signed-out devices come back to life
+      # for the rest of their 15-minute token. The dev stack demonstrated exactly that
+      # failure, and it presents as nothing at all: healthy containers, key in the wrong
+      # place. Pointing this at an external/managed Redis later is a one-line change here,
+      # which is reviewable in a way an .env override is not.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -158,11 +258,10 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
-      # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
-      # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
-      # Now every value comes from the environment, defaulting to the local MinIO — so an
-      # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+      # Required, with no fallback: MinIO is no longer in this file, so there is nothing
+      # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
+      # silently point at a service that does not exist.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?STORAGE_ENDPOINT is required}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
       # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
       # default would let a box start with the wrong access key and fail to authenticate at
@@ -191,7 +290,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      redis-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
@@ -199,11 +298,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    volumes:
+      - tile_cache:/var/cache/kayak/tiles
+      # Persists Services/Utils/land_mask.py's decompressed land mask (~890 MiB) across
+      # restarts. Without it every container start re-streams it out of the package .npz.
+      - land_mask_cache:/var/cache/kayak/land-mask
 
   sse:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_sse
     restart: unless-stopped
+    # One gevent worker holding up to 200 concurrent connections. Greenlets are cheap
+    # individually, but this is the container whose footprint scales with *viewers* rather
+    # than with request rate, so it gets its own headroom.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     ports:
       - "127.0.0.1:5001:5000"
     environment:
@@ -215,7 +326,19 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded rather than ${REVOCATION_REDIS_URL:-...}, breaking this file's usual
+      # env-driven pattern on purpose. `:-` substitutes only when the var is *unset*, so any
+      # REVOCATION_REDIS_URL left in .env silently wins — and this one is not a free
+      # deployment choice: the target must be an instance that does not evict, or the
+      # denylist gets dropped under memory pressure and signed-out devices come back to life
+      # for the rest of their 15-minute token. The dev stack demonstrated exactly that
+      # failure, and it presents as nothing at all: healthy containers, key in the wrong
+      # place. Pointing this at an external/managed Redis later is a one-line change here,
+      # which is reviewable in a way an .env override is not.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -225,11 +348,10 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
-      # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
-      # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
-      # Now every value comes from the environment, defaulting to the local MinIO — so an
-      # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+      # Required, with no fallback: MinIO is no longer in this file, so there is nothing
+      # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
+      # silently point at a service that does not exist.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?STORAGE_ENDPOINT is required}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
       # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
       # default would let a box start with the wrong access key and fail to authenticate at
@@ -258,7 +380,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      redis-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
@@ -271,8 +393,34 @@ services:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_worker
     restart: unless-stopped
-    command: celery -A celery_worker worker --loglevel=info
+    # Measured idle: 242 MiB, for the master plus 2 forked children.
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+    # --concurrency pinned, not left to Celery's default. That default is the host's CPU
+    # count, so the number of forked child processes — and with it the container's whole
+    # memory footprint — changes when the hardware does. Resizing the box for CPU headroom
+    # would silently double this and spend the RAM the resize was meant to free. Every task
+    # here is I/O-bound (SMTP, OpenMeteo, S3, Postgres), so concurrency tracks how many can
+    # be in flight, not how many cores are free — 2 is the value being sized for.
+    #
+    # --max-tasks-per-child recycles a child after N tasks. Long-lived Celery workers
+    # accumulate memory across tasks; this bounds that without needing to find the leak.
+    command: celery -A celery_worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=100
     environment:
+      # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
+      # tile bytes through Flask, so the browser never fetches them from R2 and every cache
+      # *hit* was paying a WAN round trip for nothing.
+      TILE_CACHE_DIR: /var/cache/kayak/tiles
+      # A blast-radius control, not a cost control: this filesystem is shared with Postgres,
+      # and a full disk stops it writing WAL. Being stingy is counterproductive — eviction
+      # pressure pushes load back onto OpenStreetMap's tile servers. 0 disables the cap.
+      TILE_CACHE_MAX_BYTES: ${TILE_CACHE_MAX_BYTES:-5368709120}
+      TILE_CACHE_MIN_FREE_BYTES: ${TILE_CACHE_MIN_FREE_BYTES:-10737418240}
+      # Points land_mask.py at the mounted volume so the ~890 MiB decompression is paid
+      # once ever, not once per container start. Unset it and the module uses a temp dir.
+      LAND_MASK_CACHE_DIR: /var/cache/kayak/land-mask
       CONFIG_MODE: ${CONFIG_MODE:-production}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/
@@ -280,7 +428,19 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded rather than ${REVOCATION_REDIS_URL:-...}, breaking this file's usual
+      # env-driven pattern on purpose. `:-` substitutes only when the var is *unset*, so any
+      # REVOCATION_REDIS_URL left in .env silently wins — and this one is not a free
+      # deployment choice: the target must be an instance that does not evict, or the
+      # denylist gets dropped under memory pressure and signed-out devices come back to life
+      # for the rest of their 15-minute token. The dev stack demonstrated exactly that
+      # failure, and it presents as nothing at all: healthy containers, key in the wrong
+      # place. Pointing this at an external/managed Redis later is a one-line change here,
+      # which is reviewable in a way an .env override is not.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -291,11 +451,10 @@ services:
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
-      # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
-      # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
-      # Now every value comes from the environment, defaulting to the local MinIO — so an
-      # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+      # Required, with no fallback: MinIO is no longer in this file, so there is nothing
+      # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
+      # silently point at a service that does not exist.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?STORAGE_ENDPOINT is required}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
       # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
       # default would let a box start with the wrong access key and fail to authenticate at
@@ -316,11 +475,23 @@ services:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - tile_cache:/var/cache/kayak/tiles
+      # Persists Services/Utils/land_mask.py's decompressed land mask (~890 MiB) across
+      # restarts. Without it every container start re-streams it out of the package .npz.
+      - land_mask_cache:/var/cache/kayak/land-mask
 
   beat:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_beat
     restart: unless-stopped
+    # Single process that only ever enqueues — the tasks themselves run in the worker.
+    # Measured idle: 140 MiB. It was 1,031 MiB before tidal_service.py's import was made
+    # lazy — a timer process was carrying the entire global land mask.
+    deploy:
+      resources:
+        limits:
+          memory: 320M
     command: celery -A celery_worker beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     environment:
       CONFIG_MODE: ${CONFIG_MODE:-production}
@@ -330,7 +501,19 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      REVOCATION_REDIS_URL: ${REVOCATION_REDIS_URL:-redis://redis:6379/4}
+      # Its own instance, not a DB on the shared one — see the redis-auth service for why.
+      # DB 0 because a single-purpose instance has no other tenants to number around.
+      #
+      # Hardcoded rather than ${REVOCATION_REDIS_URL:-...}, breaking this file's usual
+      # env-driven pattern on purpose. `:-` substitutes only when the var is *unset*, so any
+      # REVOCATION_REDIS_URL left in .env silently wins — and this one is not a free
+      # deployment choice: the target must be an instance that does not evict, or the
+      # denylist gets dropped under memory pressure and signed-out devices come back to life
+      # for the rest of their 15-minute token. The dev stack demonstrated exactly that
+      # failure, and it presents as nothing at all: healthy containers, key in the wrong
+      # place. Pointing this at an external/managed Redis later is a one-line change here,
+      # which is reviewable in a way an .env override is not.
+      REVOCATION_REDIS_URL: redis://redis-auth:6379/0
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
@@ -340,11 +523,10 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
-      # STORAGE_ENDPOINT was hardcoded to http://minio:9000 and the credentials were wired
-      # to MINIO_ROOT_USER/PASSWORD, so setting the STORAGE_* vars in .env did nothing.
-      # Now every value comes from the environment, defaulting to the local MinIO — so an
-      # unconfigured box still comes up on MinIO, and R2 is reached by setting the vars.
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+      # Required, with no fallback: MinIO is no longer in this file, so there is nothing
+      # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
+      # silently point at a service that does not exist.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?STORAGE_ENDPOINT is required}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:?STORAGE_PUBLIC_URL is required}
       # Required, not defaulted. This used to be ${MINIO_ROOT_USER:-kayak}; a bare `kayak`
       # default would let a box start with the wrong access key and fail to authenticate at
@@ -372,6 +554,10 @@ services:
   frontend:
     image: ghcr.io/ulises961/kayak-expedition-planner-frontend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_frontend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
     ports:
       # Host 3300, not 3000 — 3000 is already taken by another app on this box. The
@@ -387,6 +573,8 @@ services:
 
 volumes:
   postgres_data:
+  tile_cache:
+  land_mask_cache:
   rabbitmq_data:
 
 networks:
