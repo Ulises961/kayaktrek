@@ -85,7 +85,12 @@ describe("MedicalNotesSection — reset prompt", () => {
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     // Done only appears once the save transition has exited. See vitest.setup.ts.
     await userEvent.click(await screen.findByRole("button", { name: /done/i }))
-    expect(screen.queryByText(/reset your password/i)).toBeNull()
+    // Waited, not asserted synchronously: the prompt is gated on `hasNotes`, which the save
+    // sets inside a transition, so a synchronous read can land before that has committed.
+    // It passed locally and failed on a loaded CI runner, where the suite takes about four
+    // times as long. `waitFor` cannot mask a real failure here — a prompt that never clears
+    // still times out.
+    await waitFor(() => expect(screen.queryByText(/reset your password/i)).toBeNull())
   })
 })
 
