@@ -112,3 +112,52 @@ export async function apiGetAccessToken(
   _tokenCache.set(mail, { token: body.access_token, issuedAt: Date.now() })
   return body.access_token
 }
+
+/**
+ * Fill in a trip's shore contact.
+ *
+ * The float plan renders each field through a `FieldRow` that returns null for an
+ * empty value, so a trip seeded without this has a float plan with no rows on it —
+ * which is a page that cannot demonstrate anything about how those rows lay out.
+ * An email address is the payload that matters: it has no break opportunity, so it
+ * is what forces a narrow row to either wrap or overflow.
+ */
+export async function apiSetShoreContact(
+  request: APIRequestContext,
+  accessToken: string,
+  tripId: string,
+  contact: {
+    shoreContactName: string
+    shoreContactEmail: string
+    shoreContactPhone?: string
+    shoreContactRelationship?: string
+  },
+): Promise<void> {
+  const res = await request.put(`${API_URL}/api/v1/logistics/${tripId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    data: contact,
+  })
+  if (!res.ok()) throw new Error(`setShoreContact failed: ${res.status()} ${await res.text()}`)
+}
+
+/**
+ * Give a user vessel details, which is what makes the float plan's crew manifest
+ * render its `VesselBlock` rows rather than a single "no vessel info" line.
+ */
+export async function apiSetVessel(
+  request: APIRequestContext,
+  accessToken: string,
+  userId: string,
+  vessel: {
+    vesselMake?: string
+    vesselModel?: string
+    vesselLengthCm?: number
+    vesselColorPrimary?: string
+  },
+): Promise<void> {
+  const res = await request.patch(`${API_URL}/api/v1/user/${userId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    data: vessel,
+  })
+  if (!res.ok()) throw new Error(`setVessel failed: ${res.status()} ${await res.text()}`)
+}

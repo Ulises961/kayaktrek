@@ -99,7 +99,10 @@ export function ImportGpxButton() {
                 id="gpx-file"
                 type="file"
                 accept=".gpx"
-                className="file:bg-muted file:text-foreground hover:file:bg-muted/80 cursor-pointer text-sm file:mr-3 file:rounded file:border-0 file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                // `w-full min-w-0` because a file input sizes itself from its button plus
+                // the chosen filename, and that intrinsic width is not bounded by its
+                // container — a long filename pushes it past the dialog at 320.
+                className="file:bg-muted file:text-foreground hover:file:bg-muted/80 w-full min-w-0 cursor-pointer text-sm file:mr-3 file:rounded file:border-0 file:px-3 file:py-1.5 file:text-sm file:font-medium"
                 {...register("file")}
               />
               {errors.file && (

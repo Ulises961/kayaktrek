@@ -25,9 +25,14 @@ import { formatVesselLength, formatPaddlerName } from "@/lib/user/format"
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-base">
-      <span className="text-muted-foreground w-36 shrink-0">{label}</span>
-      <span className="font-medium">{value}</span>
+    // Stacked at base, side by side from sm. `w-36` is 9rem against a 112.5% root, so the
+    // label reserves 162px — most of the ~275px a 320px viewport leaves once the shell and
+    // this section's padding are taken out, which is not enough for a vessel make and model
+    // beside it. `min-w-0` + `break-words` on the value because an email address has no
+    // break opportunity and would otherwise set the row's width itself.
+    <div className="flex flex-col gap-0.5 text-base sm:flex-row sm:gap-2">
+      <span className="text-muted-foreground sm:w-36 sm:shrink-0">{label}</span>
+      <span className="min-w-0 font-medium break-words">{value}</span>
     </div>
   )
 }
@@ -88,15 +93,22 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
 
   return (
     <div className="border-border flex flex-col gap-4 rounded-lg border p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <UserIcon className="text-muted-foreground size-4 shrink-0" />
-          <span className="text-lg font-semibold">{fullName}</span>
-          {member.user.mail && (
-            <span className="text-muted-foreground text-sm">{member.user.mail}</span>
-          )}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <UserIcon className="text-muted-foreground mt-1.5 size-4 shrink-0" />
+          {/* Name and address stack at base and sit on one line from sm. An email has no
+              break opportunity, so beside a name and a role pill at 320 it is the element
+              that decides the row's width. */}
+          <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+            <span className="text-lg font-semibold">{fullName}</span>
+            {member.user.mail && (
+              <span className="text-muted-foreground min-w-0 text-sm break-words">
+                {member.user.mail}
+              </span>
+            )}
+          </div>
         </div>
-        <span className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-xs font-semibold tracking-widest uppercase">
+        <span className="text-muted-foreground bg-muted shrink-0 rounded px-2 py-0.5 text-xs font-semibold tracking-widest uppercase">
           {member.role}
         </span>
       </div>

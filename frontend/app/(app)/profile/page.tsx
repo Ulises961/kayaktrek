@@ -45,38 +45,47 @@ export default async function ProfilePage() {
   return (
     <>
       {/* Header */}
-      <div className="flex items-start gap-5">
-        <UserAvatar
-          name={user.name}
-          surname={user.surname}
-          imageUrl={user.avatarUrl}
-          size="lg"
-          className="!size-16"
-        />
-        <div className="min-w-0 flex-1">
-          <PageHeading className="truncate">
-            {[user.name, user.surname].filter(Boolean).join(" ")}
-          </PageHeading>
-          <p className="text-muted-foreground text-sm">@{user.username}</p>
-          {user.homeLocation && (
-            <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
-              <MapPinIcon className="size-3.5 shrink-0" />
-              {user.homeLocation}
-            </p>
-          )}
-          {user.phone && (
-            <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
-              <PhoneIcon className="size-3.5 shrink-0" />
-              {user.phone}
-            </p>
-          )}
-          {user.bio && <p className="mt-2 text-sm whitespace-pre-line">{user.bio}</p>}
+      {/* The avatar sits above the identity block at base and beside it from sm. At 320 the
+          72px avatar, its gap and the edit button leave the name, handle and contact lines
+          about 84px between them — a column too narrow for any of them. */}
+      <div className="flex items-start gap-3 sm:gap-5">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
+          <UserAvatar
+            name={user.name}
+            surname={user.surname}
+            imageUrl={user.avatarUrl}
+            size="lg"
+            className="!size-16 shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <PageHeading className="truncate">
+              {[user.name, user.surname].filter(Boolean).join(" ")}
+            </PageHeading>
+            <p className="text-muted-foreground text-sm">@{user.username}</p>
+            {user.homeLocation && (
+              <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
+                <MapPinIcon className="size-3.5 shrink-0" />
+                {user.homeLocation}
+              </p>
+            )}
+            {user.phone && (
+              <p className="text-muted-foreground mt-1 flex items-center gap-1 text-sm">
+                <PhoneIcon className="size-3.5 shrink-0" />
+                {user.phone}
+              </p>
+            )}
+            {user.bio && <p className="mt-2 text-sm whitespace-pre-line">{user.bio}</p>}
+          </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button asChild variant="outline" size="sm">
+          {/* Icon alone at base, where the label costs room the name and contact lines
+              need; `sr-only` rather than `hidden` keeps the control named at every width,
+              and the explicit aria-label makes that name independent of how the
+              accessible-name algorithm joins the icon and the span. */}
+          <Button asChild variant="outline" size="sm" aria-label="Edit profile">
             <Link href="/profile/edit">
               <PencilIcon className="size-4" />
-              Edit profile
+              <span className="sr-only sm:not-sr-only">Edit profile</span>
             </Link>
           </Button>
         </div>

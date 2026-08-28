@@ -31,22 +31,29 @@ export function PublicProfileToggle({ username, initialIsPublic }: PublicProfile
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
+      {/* The switch pairs with its own short label on one row; the explanation takes the
+          full width beneath. Sharing a row with the switch left that two-sentence
+          description about 165px of the ~219px this card has at 320, which wraps it to
+          eight or so lines. The switch stays next to the label rather than moving below
+          the text, because a control separated from the words naming it stops reading as
+          the thing those words describe. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-4">
           <Label htmlFor="public-profile" className="text-sm font-medium">
             Public profile
           </Label>
-          <p className="text-muted-foreground text-sm">
-            Share a privacy-safe page — your name, bio, certifications and paddling stats. Never
-            your contact details, vessel, emergency contact, or medical notes.
-          </p>
+          <Switch
+            id="public-profile"
+            className="shrink-0"
+            checked={isPublic}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+          />
         </div>
-        <Switch
-          id="public-profile"
-          checked={isPublic}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-        />
+        <p className="text-muted-foreground text-sm">
+          Share a privacy-safe page — your name, bio, certifications and paddling stats. Never your
+          contact details, vessel, emergency contact, or medical notes.
+        </p>
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}
       {isPublic && (

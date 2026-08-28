@@ -113,7 +113,11 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
             your float plans.
           </div>
         )}
-        <div className="flex items-center justify-between gap-4">
+        {/* The copy takes a row of its own and the button sits under it at base. Side by
+            side these compete for a card that is only a couple of hundred pixels wide on a
+            phone, and the description here is a full sentence about what to record — it is
+            the part that should get the width. They share a row again from sm. */}
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           {hasNotes ? (
             <p className="text-muted-foreground text-sm">
               Notes stored — encrypted on your account.

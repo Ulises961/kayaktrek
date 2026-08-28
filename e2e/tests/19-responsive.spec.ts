@@ -6,7 +6,10 @@ import {
   apiCreateTrip,
   apiDeleteTrip,
   apiTransitionState,
+  apiSetShoreContact,
+  apiSetVessel,
 } from "../fixtures/trips"
+import { apiCreateLog, apiClearLogs } from "../fixtures/connections"
 import {
   apiSeedEditableItinerary,
   apiSeedPublicItinerary,
@@ -34,10 +37,15 @@ import {
 //   the viewport and the map, being `min-w-0 flex-1`, shrinks to nothing rather
 //   than pushing the page wide. Nothing here would catch it. §4 adds an explicit
 //   "the map has a usable width" assertion instead.
-// - It does not police overflow *inside* a scroll container. A wide table or a
-//   nav strip in its own `overflow-x: auto` is correct — the rule is that the
-//   page body must not scroll, not that nothing may ever be wider than the
-//   viewport. The offender walk below skips anything living inside one.
+// - It does not police overflow *inside* a scroll container nested below the
+//   measured root. A wide table or a nav strip in its own `overflow-x: auto` is
+//   correct — the rule is that the page's scrolling root must not scroll
+//   sideways, not that nothing may ever be wider than the viewport. The offender
+//   walk below skips anything living inside a nested scroller.
+//
+// On authenticated routes the measured root is `main`, not the document, because
+// the `(app)` shell gives `main` `overflow-auto` for its vertical scroll and that
+// covers both axes — see `measureOverflow`.
 
 // Playwright's touchscreen can tap but not drag, so a touch drag goes through CDP.
 // Worth the ceremony: `.click()` dispatches MOUSE events even in a touch-enabled
@@ -89,23 +97,40 @@ const AUTHENTICATED_ROUTES = [
 type Offender = { tag: string; cls: string; width: number; right: number }
 
 /**
- * Page-level horizontal overflow, plus the innermost elements responsible for it.
+ * Horizontal overflow of the page's scrolling root, plus the innermost elements
+ * responsible for it.
+ *
+ * The scrolling root is `main` when the app shell is present, and the document
+ * otherwise. That distinction is the whole assertion on authenticated routes:
+ * `app/(app)/layout.tsx` gives `main` `overflow-auto` so the content area scrolls
+ * under a fixed sidebar, and `overflow-auto` sets *both* axes — so content wider
+ * than the viewport scrolls `main` and leaves `documentElement.scrollWidth` equal
+ * to its `clientWidth`. Measuring the document alone therefore cannot fail on any
+ * `(app)` route, whatever the page does.
+ *
+ * `main` is named explicitly rather than inferred from computed style, because a
+ * deliberate horizontal scroller (a wide table, a nav strip) reports the same
+ * `overflow-x: auto` and those are legitimate. The rule is that the shell's own
+ * content area must never scroll sideways; anything nested inside its own
+ * scroller still may.
  *
  * The offender list is what makes a failure actionable: `scrollWidth` alone says
  * "something is too wide", which is the same information for all 20 routes. The
  * walk keeps only elements that contain no other offender (a parent is wide
- * *because* its child is) and skips anything inside a scroll container.
+ * *because* its child is) and skips anything inside a scroll container nested
+ * below the root.
  */
 async function measureOverflow(page: Page): Promise<{ overflow: number; offenders: Offender[] }> {
   return page.evaluate(() => {
-    const doc = document.documentElement
-    const overflow = doc.scrollWidth - doc.clientWidth
+    const shell = document.querySelector("main")
+    const root: Element = shell ?? document.documentElement
+    const overflow = root.scrollWidth - root.clientWidth
     if (overflow <= 0) return { overflow, offenders: [] }
 
-    const limit = doc.clientWidth
+    const limit = root.getBoundingClientRect().right
     const insideScroller = (el: Element): boolean => {
       let node = el.parentElement
-      while (node && node !== document.body) {
+      while (node && node !== document.body && node !== root) {
         const overflowX = getComputedStyle(node).overflowX
         if (overflowX === "auto" || overflowX === "scroll" || overflowX === "hidden") return true
         node = node.parentElement
@@ -666,12 +691,228 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
     })
   })
 
-  test("the printable float plan does not scroll horizontally", async ({ page }) => {
+  test("the printable float plan does not scroll horizontally", async ({ page, request }) => {
     // Authenticated, and deliberately outside the trip-detail tab layout (M8), so
     // it is the one print surface with a shell of its own.
+    //
+    // Seeded with a shore contact and vessel details first, because every row on
+    // this page comes from a `FieldRow` that renders nothing for an empty value.
+    // Against a bare trip the page has a heading and no rows, and asserting that
+    // *that* fits in 320px measures nothing about the layout under test.
+    await apiSetShoreContact(request, leaderToken, seeded.tripId, {
+      shoreContactName: "Marguerite Vandersteen",
+      shoreContactEmail: "marguerite.vandersteen@harbourwatch.example.com",
+      shoreContactPhone: "+39 011 555 0142",
+      shoreContactRelationship: "Harbour master",
+    })
+    await apiSetVessel(request, leaderToken, userId, {
+      vesselMake: "Valley Sea Kayaks",
+      vesselModel: "Nordkapp Forti RM",
+      vesselLengthCm: 545,
+      vesselColorPrimary: "Fluorescent orange",
+    })
+
     for (const width of WIDTHS) {
       await expectNoHorizontalScroll(page, `/trips/float-plan/${seeded.tripId}`, width)
     }
+
+    // Overflow is not this page's failure mode, which is why the check above passed
+    // while the page was unusable. Its rows put a fixed-width label beside a value in a
+    // flex row, so a value too wide for the space left over *wraps* — the row keeps its
+    // width, the page never scrolls, and the value renders as a ragged column a few
+    // characters across. The canary cannot see that by construction (M18 §2), so assert
+    // the value has room instead: stacked under its label at 320, beside it from sm.
+    await page.setViewportSize({ width: 320, height: 640 })
+    await page.goto(`/trips/float-plan/${seeded.tripId}`)
+    await page.waitForLoadState("networkidle")
+
+    const email = page.getByText("marguerite.vandersteen@harbourwatch.example.com")
+    await expect(email).toBeVisible()
+    const stacked = (await email.boundingBox())!
+    expect(
+      Math.round(stacked.width),
+      `the shore contact's email column is only ${Math.round(stacked.width)}px wide at 320`,
+    ).toBeGreaterThan(200)
+
+    await page.setViewportSize({ width: 640, height: 640 })
+    const label = page.getByText("Email", { exact: true }).first()
+    const labelBox = (await label.boundingBox())!
+    const valueBox = (await email.boundingBox())!
+    expect(
+      Math.round(valueBox.x),
+      "the value should sit beside its label from sm, not under it",
+    ).toBeGreaterThan(Math.round(labelBox.x))
+
+    // The crew manifest's own header is measured by box, not by scroll width, and that
+    // is not a stylistic choice. Each section is a Radix Collapsible, whose content
+    // clips on screen — the print stylesheet resets it with `overflow: visible
+    // !important` for exactly that reason. Clipped content does not extend any
+    // ancestor's scrollWidth, so a member row that runs past the card edge is invisible
+    // to the overflow canary *and* cut off on screen. A bounding box still reports the
+    // element's real layout, clipped or not.
+    await page.setViewportSize({ width: 320, height: 640 })
+    await page.goto(`/trips/float-plan/${seeded.tripId}`)
+    await page.waitForLoadState("networkidle")
+
+    const memberMail = page.getByText(LEADER.mail, { exact: true }).first()
+    await expect(memberMail).toBeVisible()
+    const mailBox = (await memberMail.boundingBox())!
+    expect(
+      Math.round(mailBox.x + mailBox.width),
+      `the crew member's email reaches ${Math.round(mailBox.x + mailBox.width)}px at a 320px viewport`,
+    ).toBeLessThanOrEqual(320)
+
+    // And it stacked rather than merely wrapped: the address sits below the name at base.
+    const name = page.getByText("E2E Leader", { exact: true }).first()
+    const nameBox = (await name.boundingBox())!
+    expect(
+      Math.round(mailBox.y),
+      "the email should sit under the name at 320, not beside it",
+    ).toBeGreaterThan(Math.round(nameBox.y))
+  })
+
+  test("keeps the account card's email row inside the viewport at 320", async ({ page }) => {
+    // /settings is already in the canary's route list, so this is not about the page
+    // overflowing — it is about the one row whose content cannot wrap. An email
+    // address has no break opportunity, and it sits in a flex row opposite a button
+    // that must keep its full width, so the row is where a narrow viewport shows.
+    await page.setViewportSize({ width: 320, height: 640 })
+    await page.goto("/settings")
+    await page.waitForLoadState("networkidle")
+
+    const email = page.getByText(LEADER.mail, { exact: false }).first()
+    const button = page.getByRole("button", { name: "Change email" })
+    await expect(email).toBeVisible()
+    await expect(button).toBeVisible()
+
+    // Measured by box rather than by page overflow, because a Card can clip its own
+    // content: a control that runs past the card edge is cut off on screen without ever
+    // widening anything the overflow canary reads.
+    //
+    // CardContent is px-6, which is 27px a side at the 112.5% root — so of a 320px
+    // viewport these controls have about 257px, and the ones checked here each wanted
+    // close to all of it. ("Download my data" and "Sign out everywhere" measure ~182px
+    // and ~204px, so they are not in this list.)
+    const controls = [
+      ["the current email", email],
+      ["the Change email button", button],
+      ["the Change password button", page.getByRole("link", { name: "Change password" })],
+      ["the account deletion button", page.getByRole("button", { name: /deletion/i })],
+    ] as const
+
+    for (const [label, locator] of controls) {
+      await expect(locator).toBeVisible()
+      const box = (await locator.boundingBox())!
+      expect(
+        Math.round(box.x + box.width),
+        `${label} reaches ${Math.round(box.x + box.width)}px at a 320px viewport`,
+      ).toBeLessThanOrEqual(320)
+    }
+
+    // The deletion control drops a word at base and keeps its full name for a screen
+    // reader — `sr-only`, not `hidden`, so this must stay true rather than the label
+    // simply being shortened.
+    await expect(page.getByRole("button", { name: "Request account deletion" })).toBeVisible()
+  })
+
+  test("keeps the profile stat tiles uniform and the month bars readable at 320", async ({
+    page,
+    request,
+  }) => {
+    // Stats only render with logs behind them — without one the page shows an EmptyState,
+    // and measuring that proves nothing about the dashboard.
+    await apiClearLogs(request, leaderToken)
+    await apiCreateLog(request, leaderToken, { tripId: seeded.tripId, distance: 24, hours: 5 })
+    await apiCreateLog(request, leaderToken, {
+      tripId: seeded.tripId,
+      date: "2026-05-11",
+      distance: 8,
+      hours: 2,
+    })
+
+    await page.setViewportSize({ width: 320, height: 640 })
+    await page.goto("/profile")
+    await page.waitForLoadState("networkidle")
+
+    // Every tile in a `grid-cols-2` row stretches to the tallest, so one label wrapping to
+    // a second line pads the tile beside it with empty space. Uniform heights are the
+    // assertion; "Endorsements" is the longest label and the one that wrapped.
+    const tiles = page.locator("div.bg-muted\\/40.rounded-lg")
+    const count = await tiles.count()
+    expect(count, "no stat tiles rendered — did the seeded logs land?").toBeGreaterThan(1)
+
+    const heights: number[] = []
+    for (let i = 0; i < count; i++)
+      heights.push(Math.round((await tiles.nth(i).boundingBox())!.height))
+    expect(
+      new Set(heights).size,
+      `stat tiles have uneven heights (${heights.join(", ")}) — a label is wrapping`,
+    ).toBe(1)
+
+    // Both chart lists put fixed-width columns and their gaps against a flex-1 bar. If
+    // those take the row the bar is left with a few pixels and the chart stops being a
+    // comparison at all, so every bar has to keep a width you can read a length off.
+    //
+    // Every bar, not the first: the first match is the Sea conditions list, whose columns
+    // are sized differently from the month rows below it. Measuring one and calling it
+    // "the chart" is how the narrower of the two went unnoticed.
+    const bars = page.locator("ul li span.bg-muted.h-2")
+    const barCount = await bars.count()
+    expect(barCount, "no chart bars rendered").toBeGreaterThan(0)
+
+    for (let i = 0; i < barCount; i++) {
+      const box = (await bars.nth(i).boundingBox())!
+      expect(
+        Math.round(box.width),
+        `chart bar ${i + 1} of ${barCount} is only ${Math.round(box.width)}px wide at 320`,
+      ).toBeGreaterThan(60)
+    }
+
+    // The avatar sits above the name rather than stealing width from it.
+    const avatar = page.locator("[data-slot='avatar']").first()
+    const heading = page.getByRole("heading", { level: 1 }).first()
+    const avatarBox = (await avatar.boundingBox())!
+    const headingBox = (await heading.boundingBox())!
+    expect(
+      Math.round(headingBox.y),
+      "the name should sit below the avatar at 320, not beside it",
+    ).toBeGreaterThanOrEqual(Math.round(avatarBox.y + avatarBox.height))
+
+    // And the edit control is down to its icon while keeping its name.
+    const edit = page.getByRole("link", { name: "Edit profile" })
+    await expect(edit).toBeVisible()
+    const editBox = (await edit.boundingBox())!
+    expect(
+      Math.round(editBox.width),
+      `the edit control is ${Math.round(editBox.width)}px wide — the label has not collapsed`,
+    ).toBeLessThan(60)
+  })
+
+  test("keeps the Import GPX dialog inside the viewport at 320", async ({ page }) => {
+    // The existing GPX test measures the trigger's label and never opens anything.
+    // The dialog is its own layout problem: a native file input sizes itself from
+    // its button plus the chosen filename and does not shrink to its container.
+    await page.setViewportSize({ width: 320, height: 640 })
+    await page.goto("/itinerary")
+    await page.waitForLoadState("networkidle")
+
+    await page.getByRole("button", { name: "Import GPX" }).click()
+    const dialog = page.getByRole("dialog")
+    await expect(dialog).toBeVisible()
+
+    const box = (await dialog.boundingBox())!
+    expect(
+      Math.round(box.x + box.width),
+      `the dialog reaches ${Math.round(box.x + box.width)}px at a 320px viewport`,
+    ).toBeLessThanOrEqual(320)
+
+    // The file input is the widest thing in it and the part that does not shrink.
+    const file = dialog.locator('input[type="file"]')
+    const fileBox = (await file.boundingBox())!
+    expect(
+      Math.round(fileBox.x + fileBox.width),
+      `the file input reaches ${Math.round(fileBox.x + fileBox.width)}px, past the dialog's ${Math.round(box.x + box.width)}px`,
+    ).toBeLessThanOrEqual(Math.round(box.x + box.width))
   })
 })
 
@@ -924,7 +1165,22 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
       // never idle by design and waiting for it times out.
       await page.goto(`/itinerary/${seeded.itineraryId}?navigate=1`)
       const chrome = page.getByTestId("navigate-chrome")
+
+      // Settle before measuring, in two steps, because this is a layout assertion and an
+      // unsettled layout is not the one under test.
+      //
+      // `toHaveCount(1)` first: while the geolocation permission resolves, the chip's
+      // subtree is briefly present twice — both copies hidden, the DOM settling to one.
+      // `toBeVisible()` on its own throws a strict-mode violation in that window instead of
+      // waiting through it, which is what made this test fail. Nothing renders twice on
+      // screen; a failure snapshot taken after the fact contains exactly one chip.
+      await expect(chrome).toHaveCount(1)
       await expect(chrome).toBeVisible()
+
+      // Then wait out the pre-resolution label. "Acquiring location…" is wider than the
+      // "Location denied"/"Location unavailable"/"Sharing…" it settles into, so measuring
+      // during it measures a chip that is about to change width.
+      await expect(chrome).not.toContainText("Acquiring location")
 
       const chromeBox = (await chrome.boundingBox())!
       const fab = (await page.getByTestId("add-button").boundingBox())!

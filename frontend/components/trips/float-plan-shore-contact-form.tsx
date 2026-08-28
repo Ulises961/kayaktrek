@@ -27,9 +27,12 @@ interface ShoreContactFormProps {
 function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-base">
-      <span className="text-muted-foreground w-28 shrink-0">{label}</span>
-      <span className="font-medium">{value}</span>
+    // Stacked at base, side by side from sm — same reasoning as the crew manifest's row.
+    // The shore contact's email is the value that forces it: no break opportunity, so it
+    // needs the full row width at 320 rather than what is left beside a fixed label.
+    <div className="flex flex-col gap-0.5 text-base sm:flex-row sm:gap-2">
+      <span className="text-muted-foreground sm:w-28 sm:shrink-0">{label}</span>
+      <span className="min-w-0 font-medium break-words">{value}</span>
     </div>
   )
 }

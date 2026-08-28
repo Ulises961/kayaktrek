@@ -35,8 +35,16 @@ export function DeleteAccountButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="sm">
-          Request account deletion
+        {/* "Request deletion" at base, the full phrase from sm. This sits inside the
+            danger-zone box's own p-4 as well as the card's px-6, which leaves 221px at 320
+            — less than the full label needs.
+            `sr-only` rather than `hidden` keeps the dropped word in the accessibility tree,
+            and the explicit aria-label is what makes the name reliable: the accessible-name
+            algorithm trims each element's text before joining, so a space living inside the
+            span is discarded and the name computes as "Requestaccount deletion". Same
+            pairing as ImportGpxButton. */}
+        <Button variant="destructive" size="sm" aria-label="Request account deletion">
+          Request<span className="sr-only sm:not-sr-only"> account</span> deletion
         </Button>
       </DialogTrigger>
       <DialogContent>

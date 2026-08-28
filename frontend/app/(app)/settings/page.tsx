@@ -59,7 +59,11 @@ export default async function SettingsPage() {
           <Separator />
           <PhoneSection initialPhone={user.phone} />
           <Separator />
-          <div className="flex items-center justify-between gap-4">
+          {/* Stacked at base, matching the sign-out-everywhere block in the Security card
+              below. `CardContent` is px-6, which is 27px a side at the 112.5% root, so a
+              320px viewport leaves 257px — the label and this button together need all of
+              it. */}
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <p className="text-sm">Password</p>
             <Button asChild variant="outline" size="sm">
               <Link href="/settings/change-password">

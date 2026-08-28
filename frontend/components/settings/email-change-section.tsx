@@ -76,9 +76,12 @@ export function EmailChangeSection({ currentMail, pendingMail }: EmailChangeSect
 
   if (phase === "idle") {
     return (
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm">
-          Current email: <span className="font-medium">{currentMail}</span>
+      // Stacked at base so the address gets the row's full width. An email has no break
+      // opportunity, so as a flex child it sets its own min-content width and cannot give
+      // ground to the button beside it, which keeps its label.
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <p className="min-w-0 text-sm">
+          Current email: <span className="font-medium break-words">{currentMail}</span>
         </p>
         <Button
           type="button"
