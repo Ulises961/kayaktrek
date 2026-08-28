@@ -6,7 +6,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.util.http import parse_excluded_urls
 
-from Api.observability import _EXCLUDED_URL_PATTERNS
+from Api.observability import _EXCLUDED_URL_PATTERNS, setup_logfire
 from Resources.item_category_resource import ITEM_CATEGORY_ENDPOINT
 
 
@@ -117,3 +117,63 @@ def test_an_unexcluded_route_still_emits_telemetry(client, recorded_spans):
 
     assert response.status_code == 200
     assert len(recorded_spans) > 0
+
+
+def _stub_logfire(monkeypatch) -> dict:
+    """Neutralise every side effect of setup_logfire except the configure() call.
+
+    Real instrumentation would double-instrument the session-scoped app, and the real
+    LogfireLoggingHandler would be left attached to the root logger for every test that
+    runs after this one.
+    """
+    captured: dict = {}
+    monkeypatch.setattr(logfire, "configure", lambda **kwargs: captured.update(kwargs))
+    for name in (
+        "instrument_flask",
+        "instrument_sqlalchemy",
+        "instrument_celery",
+        "instrument_requests",
+    ):
+        monkeypatch.setattr(logfire, name, lambda *a, **k: None)
+    monkeypatch.setattr(logfire, "LogfireLoggingHandler", lambda *a, **k: logging.NullHandler())
+    return captured
+
+
+def test_testing_mode_never_sends_telemetry(app, monkeypatch):
+    """A token in the ambient environment must not turn a test run into real traffic.
+
+    `send_to_logfire="if-token-present"` was the only guard, and "present" was decided
+    by the environment. Not the shell, though — Api/config.py calls load_dotenv() at
+    import and pytest imports it, so the token that dev and production run from is
+    present in every local test run on every machine, unavoidably. That had pytest
+    shipping spans, metrics and log records to the production Logfire project, seen as
+    POST logfire-eu.pydantic.dev/v1/metrics -> 200 mid-suite. CI escaped only because it
+    has no .env to find.
+
+    So the assertion is specifically that a *plausible token being present* changes
+    nothing under testing. Note this test cannot be written as "assert no network call
+    happened": with no token in the environment that passes vacuously, which is the shape
+    the original bug hid behind.
+    """
+    monkeypatch.setenv("LOGFIRE_TOKEN", "pylf_v1_eu_0000000000000000000000000000")
+    captured = _stub_logfire(monkeypatch)
+
+    setup_logfire(app, "testing")
+
+    assert captured["send_to_logfire"] is False
+
+
+@pytest.mark.parametrize("config_mode", ["development", "staging", "production"])
+def test_other_modes_still_defer_to_the_token(app, monkeypatch, config_mode):
+    """Positive control. The guard must be testing-only.
+
+    Without this, `send_to_logfire=False` unconditionally would satisfy the test above
+    and silently disable observability everywhere — including production, where nothing
+    would fail and nobody would notice until a trace was wanted.
+    """
+    monkeypatch.setenv("LOGFIRE_TOKEN", "pylf_v1_eu_0000000000000000000000000000")
+    captured = _stub_logfire(monkeypatch)
+
+    setup_logfire(app, config_mode)
+
+    assert captured["send_to_logfire"] == "if-token-present"

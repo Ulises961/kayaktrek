@@ -63,15 +63,35 @@ def setup_logfire(app: Flask, config_mode: str) -> None:
     tile proxy's upstream fetch).
 
     Safe to call unconditionally in every environment: without LOGFIRE_TOKEN set
-    (CI, tests, a dev machine that hasn't configured one), send_to_logfire=
+    (CI, a dev machine that hasn't configured one), send_to_logfire=
     "if-token-present" makes this a no-op rather than prompting or erroring.
     console=False since spans would otherwise duplicate the JsonFormatter
     stdout stream in an incompatible format. Note this only configures the
     SDK — `docker-compose.yml` must also propagate LOGFIRE_TOKEN into each
     container's environment, or a real token set locally never reaches it.
+
+    **Testing never sends, whatever the environment says.** "if-token-present" was
+    not enough, and the reason is worth stating precisely, because the obvious
+    guess is wrong. It is not that a developer exported LOGFIRE_TOKEN in their
+    shell — it is that `Api/config.py` calls `load_dotenv()` at import, and pytest
+    imports it like everything else. So the token in the `.env` that dev and
+    production run from is present in every local test run, on every machine, with
+    no way to avoid it by keeping a clean shell. Observed as
+    `POST logfire-eu.pydantic.dev/v1/metrics -> 200` mid-suite.
+
+    The cost is a 10M-record/month free-tier hard stop being spent on synthetic
+    traffic, that traffic landing in the same project real traffic does, and a
+    network round trip in the export path of every run. CI was never affected only
+    because CI has no `.env` to find — an accident of environment, not a guarantee.
+    The old docstring listed "tests" among the safe cases on exactly that accident.
+    Now the code guarantees it.
     """
     logfire.configure(
-        send_to_logfire="if-token-present",
+        # Not `if-token-present` under testing — see the docstring. This is the whole
+        # guard, and it is deliberately keyed on the config mode the app was built
+        # with rather than on an env var, so it cannot be switched off by the same
+        # kind of ambient environment that caused the leak.
+        send_to_logfire=False if config_mode == "testing" else "if-token-present",
         service_name=_resolve_service_name(),
         environment=config_mode,
         console=False,

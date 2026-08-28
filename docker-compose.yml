@@ -303,6 +303,11 @@ services:
       # createApp() call — unset here, it silently no-ops (send_to_logfire=
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
+      # Passed through rather than pinned empty (unlike MAIL_SERVER below) because tracing
+      # a dev stack is a thing you may actually want. The two paths where it is never
+      # wanted are closed at their own layer instead: unit tests by observability.py
+      # refusing to send under config_mode "testing", and the e2e suite by
+      # e2e/run-live-stack.sh exporting this empty before it brings the stack up.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
       # is that a real relay host sitting in .env for production cannot leak into the dev
@@ -383,6 +388,11 @@ services:
       # createApp() call — unset here, it silently no-ops (send_to_logfire=
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
+      # Passed through rather than pinned empty (unlike MAIL_SERVER below) because tracing
+      # a dev stack is a thing you may actually want. The two paths where it is never
+      # wanted are closed at their own layer instead: unit tests by observability.py
+      # refusing to send under config_mode "testing", and the e2e suite by
+      # e2e/run-live-stack.sh exporting this empty before it brings the stack up.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
       # is that a real relay host sitting in .env for production cannot leak into the dev
@@ -488,6 +498,11 @@ services:
       # createApp() call — unset here, it silently no-ops (send_to_logfire=
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
+      # Passed through rather than pinned empty (unlike MAIL_SERVER below) because tracing
+      # a dev stack is a thing you may actually want. The two paths where it is never
+      # wanted are closed at their own layer instead: unit tests by observability.py
+      # refusing to send under config_mode "testing", and the e2e suite by
+      # e2e/run-live-stack.sh exporting this empty before it brings the stack up.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
       # is that a real relay host sitting in .env for production cannot leak into the dev
@@ -556,6 +571,11 @@ services:
       # createApp() call — unset here, it silently no-ops (send_to_logfire=
       # "if-token-present"), so a real LOGFIRE_TOKEN in your shell/.env never actually
       # reaches any container without this line, even though the app "worked" either way.
+      # Passed through rather than pinned empty (unlike MAIL_SERVER below) because tracing
+      # a dev stack is a thing you may actually want. The two paths where it is never
+      # wanted are closed at their own layer instead: unit tests by observability.py
+      # refusing to send under config_mode "testing", and the e2e suite by
+      # e2e/run-live-stack.sh exporting this empty before it brings the stack up.
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
       # Hardcoded to the local sink, deliberately NOT ${MAIL_SERVER:-...}: the whole point
       # is that a real relay host sitting in .env for production cannot leak into the dev

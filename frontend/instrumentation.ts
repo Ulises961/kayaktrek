@@ -2,9 +2,15 @@ import { API_URL, SSE_URL } from "@/lib/api/config"
 
 // M13 §A.3 — server-side distributed tracing (ADR-009). Mirrors the backend's
 // Api/observability.py: unset LOGFIRE_TOKEN is a clean no-op (no exporter registered,
-// no network calls), so this is safe in CI/tests/dev machines that haven't configured
-// one. Browser-side RUM is explicitly out of scope (plans/M13-observability-logfire.md
-// A.3) — no client bundle weight added for it.
+// no network calls). Browser-side RUM is explicitly out of scope
+// (plans/M13-observability-logfire.md A.3) — no client bundle weight added for it.
+//
+// "Unset" is a claim about the environment, not a guarantee this file makes. A developer
+// with LOGFIRE_TOKEN exported in their shell profile has it inherited by anything they
+// launch, which is how the backend ended up shipping spans from local test runs. The
+// server-side equivalent here is the e2e suite's `next start`; that is closed in
+// e2e/run-live-stack.sh, which exports the token empty before building. Vitest never
+// calls register(), so unit tests were never a path.
 //
 // Dynamic imports keep the Node-only OTel exporter out of the edge runtime bundle —
 // `register()` also runs under `NEXT_RUNTIME=edge` (proxy.ts), which can't load it.

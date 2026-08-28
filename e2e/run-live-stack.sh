@@ -41,6 +41,28 @@ FRONTEND_PORT=3002
 # export the real e2e port before `docker compose up` so backend/sse pick it up.
 export FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
 
+# No telemetry from an e2e run. Exported empty before `docker compose up` so the four
+# backend containers come up without it, and before the frontend build/start below so
+# instrumentation.ts's register() returns early too.
+#
+# Same reasoning as MAIL_SERVER being pinned to the local mailpit sink in
+# docker-compose.yml: something real sitting in .env for production must not be reachable
+# from the e2e suite. Mail got that treatment; telemetry did not, and a full suite was
+# shipping synthetic spans, metrics and log records into the production Logfire project —
+# against a free tier with a 10M-record/month hard stop. Note the token arrives via
+# `${LOGFIRE_TOKEN}` in docker-compose.yml, which compose resolves from the same root
+# .env; exporting it empty here wins because an exported variable takes precedence over
+# the .env file.
+#
+# The unit-test path is closed separately and more strongly, in Api/observability.py:
+# testing mode refuses to send whatever the environment says. It cannot be done that way
+# here, because an e2e stack is deliberately a *production-mode* build.
+#
+# Side effect worth knowing: this stack is the same one `docker compose up` gives you for
+# normal dev and is left running afterwards, so a dev stack that follows an e2e run has no
+# tracing until the next `docker compose up` with the token present.
+export LOGFIRE_TOKEN=""
+
 echo ">>> Bringing up the full docker-compose stack (postgres, redis, rabbitmq, minio, backend, sse, worker, beat)..."
 # Not `--wait`: minio-init/migrate are one-shot containers that exit 0 on
 # success, but `--wait` treats any exited container as a failure regardless
