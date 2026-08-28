@@ -12,8 +12,13 @@ class Config:
     MAIL_USE_TLS = True
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
-    # Must match MAIL_USERNAME when using Gmail SMTP — Gmail rejects mismatched senders.
+    # Falls back to MAIL_USERNAME because Gmail SMTP rejects a sender that doesn't match the
+    # authenticated account. Production relays through Brevo, where the two differ by design:
+    # the username is an SMTP credential, the sender is an address on the authenticated domain.
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER") or os.getenv("MAIL_USERNAME")
+    # Rendered in every email footer when set, omitted entirely when not. Left unset by default:
+    # publishing a postal address is a trader-identity decision (DSA), not a template default.
+    MAIL_POSTAL_ADDRESS = os.getenv("MAIL_POSTAL_ADDRESS", "")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
     CACHE_TYPE = "RedisCache"
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours

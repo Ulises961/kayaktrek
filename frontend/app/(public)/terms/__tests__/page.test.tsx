@@ -15,9 +15,6 @@ describe("TermsPage", () => {
 
   it("links back to the app from the header", () => {
     render(<TermsPage />)
-    expect(screen.getByRole("link", { name: /kayak expedition planner/i })).toHaveAttribute(
-      "href",
-      "/",
-    )
+    expect(screen.getByRole("link", { name: /kayaktrek/i })).toHaveAttribute("href", "/")
   })
 })

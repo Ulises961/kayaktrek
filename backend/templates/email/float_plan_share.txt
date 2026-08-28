@@ -11,4 +11,6 @@ View float plan:
 {{ float_plan_url }}
 
 ---
-Kayak Planner · Need help? Contact support at {{ support_email }}
+Kayaktrek · sea-kayak expedition planner
+{{ site_url }} · {{ support_email }}{% if postal_address %}
+{{ postal_address }}{% endif %}

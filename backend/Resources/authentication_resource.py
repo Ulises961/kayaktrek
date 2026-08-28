@@ -322,15 +322,13 @@ def resend_deletion_cancel():
         if result:
             raw_token, user_name = result
             frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-            support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
             cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
             send_template_email(
                 data["mail"],
-                "Your Kayak Planner account deletion request",
+                "Your Kayaktrek account deletion request",
                 "deletion_request",
                 name=user_name,
                 cancel_url=cancel_url,
-                support_email=support_email,
             )
         # Always return 200 — do not reveal whether the account exists
         return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK

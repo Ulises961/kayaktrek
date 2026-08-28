@@ -144,6 +144,27 @@ def _url_for(kind: FileKind, key: str) -> str:
     return f"{_base_url(_KIND_ROLES[kind])}/{key}"
 
 
+def public_asset_url(key: str) -> str:
+    """
+    Absolute URL for a static asset served straight from the public bucket, or "" when
+    there is no CDN base configured.
+
+    Unlike `_url_for`, this is for objects that are not user uploads and have no
+    `FileKind` — currently just the brand mark that transactional email embeds, under
+    `brand/`.
+
+    The empty return is the point. R2 scopes anonymous read per *bucket*, so `brand/`
+    is readable there for free; MinIO scopes it per *prefix* and `brand/` is not in the
+    policy minio-init provisions, so the same URL would resolve and then 403. Returning
+    "" without a CDN base means a local/MinIO environment renders no image at all rather
+    than a broken one — the same "omit rather than fake" rule the mail footer follows for
+    an unset sender.
+    """
+    if not _PUBLIC_BASE_URL:
+        return ""
+    return f"{_base_url('public')}/{key}"
+
+
 @lru_cache(maxsize=8)
 def _build_client(endpoint: str, access_key: str, secret_key: str, region: str):
     """One client per endpoint, reused.

@@ -7,7 +7,12 @@ adding its notice in the same change.
 ## "CC0 Compass Rose" — the brand mark
 
 The mark in every header lockup and in the browser tab: `frontend/components/common/brand-mark.tsx`,
-`frontend/app/icon.svg`, and the rasterised `frontend/app/favicon.ico`.
+`frontend/app/icon.svg`, and the rasterised `frontend/app/favicon.ico`. Also
+`docs/brand/mail-mark-96.png`, the transactional-email raster — generated from `icon.svg` by
+`scripts/build-mail-mark.sh` and uploaded to the public bucket under `brand/`. It bakes in the
+mark's *dark* colourway, because the email header band is navy regardless of the reader's theme.
+CC0 means this raster carries no notice of its own; it is listed here only so the tree and this
+file stay in step.
 
 Two modifications to the original: the enclosing ring and the fleur-de-lys crown are dropped, and
 every fill is rebound to our own `--mark-*` tokens. Only the 24 point paths are used, under the

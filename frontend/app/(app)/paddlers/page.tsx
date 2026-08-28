@@ -6,7 +6,7 @@ import { PaddlersHub } from "@/components/paddlers/paddlers-hub"
 import { PageHeading } from "@/components/common/page-heading"
 
 export const metadata = {
-  title: "Paddlers — Kayak Expedition Planner",
+  title: "Paddlers",
 }
 
 export default async function PaddlersPage({

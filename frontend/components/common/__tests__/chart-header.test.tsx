@@ -5,7 +5,7 @@ import { ChartHeaderBar } from "../chart-header"
 describe("ChartHeaderBar", () => {
   it("renders the wordmark linking to home", () => {
     render(<ChartHeaderBar />)
-    const link = screen.getByRole("link", { name: /kayak expedition planner/i })
+    const link = screen.getByRole("link", { name: /kayaktrek/i })
     expect(link).toHaveAttribute("href", "/")
   })
 

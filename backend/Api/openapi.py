@@ -93,7 +93,7 @@ def _build_spec(app: Flask) -> APISpec:
     entry rather than being skipped.
     """
     spec = APISpec(
-        title="Kayak Expedition Planner API",
+        title="Kayaktrek API",
         version=package_version("kayak-expedition-planner"),
         openapi_version="3.0.3",
         plugins=[FlaskPlugin(), MarshmallowPlugin()],
@@ -183,6 +183,6 @@ def setup_openapi(app: Flask) -> None:
     swagger_ui_blueprint = get_swaggerui_blueprint(
         DOCS_URL_PREFIX,
         OPENAPI_SPEC_ENDPOINT,
-        config={"app_name": "Kayak Expedition Planner API"},
+        config={"app_name": "Kayaktrek API"},
     )
     app.register_blueprint(swagger_ui_blueprint, url_prefix=DOCS_URL_PREFIX)

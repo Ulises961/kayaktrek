@@ -1,6 +1,6 @@
 Hi {{ name }},
 
-Someone tried to create a Kayak Planner account using your email address, but an account already
+Someone tried to create a Kayaktrek account using your email address, but an account already
 exists for it. If that was you, just log in — no new account was created.
 
 Log in to your account:
@@ -13,4 +13,6 @@ If you did not attempt to register, you can safely ignore this email — your ac
 changed.
 
 ---
-Kayak Planner · Need help? Contact support at {{ support_email }}
+Kayaktrek · sea-kayak expedition planner
+{{ site_url }} · {{ support_email }}{% if postal_address %}
+{{ postal_address }}{% endif %}

@@ -145,6 +145,5 @@ def _send_checkpoint_alert(trip: Trip, today_day: Day, now: datetime) -> None:
         date_label=date_label,
         crew=crew,
         float_plan_url=f"{frontend_url}/float-plan/{logistics.share_token}",
-        support_email="support@kayakplanner.app",
     )
     logger.info("checkpoint_alert_sent", extra={"trip_id": str(trip.id)})

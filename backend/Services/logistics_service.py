@@ -257,6 +257,5 @@ class LogisticsService:
             destination=trip.destination or "kayak expedition",
             date_label=date_label,
             float_plan_url=float_plan_url,
-            support_email="support@kayakplanner.app",
         )
         logger.info("float_plan_share_email_sent", extra={"trip_id": trip_id, "user_id": user_id})

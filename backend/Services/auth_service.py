@@ -193,15 +193,13 @@ class AuthService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.RESET)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         reset_url = f"{frontend_url}/reset-password?token={raw_token}"
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
             user.mail,
-            "Reset your Kayak Planner password",
+            "Reset your Kayaktrek password",
             "password_reset",
             name=user.name,
             reset_url=reset_url,
-            support_email=support_email,
         )
 
     @staticmethod
@@ -382,28 +380,24 @@ class AuthService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.VERIFICATION)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         verify_url = f"{frontend_url}/verify?token={raw_token}"
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
             user.mail,
-            "Verify your Kayak Planner account",
+            "Verify your Kayaktrek account",
             "account_verification",
             name=user.name,
             verify_url=verify_url,
-            support_email=support_email,
         )
 
     @staticmethod
     def _send_medical_notes_cleared_email(user: User) -> None:
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
         send_template_email(
             user.mail,
-            "Your Kayak Planner medical notes were removed",
+            "Your Kayaktrek medical notes were removed",
             "medical_notes_cleared",
             name=user.name,
             profile_url=f"{frontend_url}/profile",
-            support_email=support_email,
         )
 
     @staticmethod
@@ -411,41 +405,35 @@ class AuthService:
         raw_token = AuthService._create_token(user.id, AuthTokenType.EMAIL_CHANGE)
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         confirm_url = f"{frontend_url}/verify-email-change?token={raw_token}"
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
             new_mail,
-            "Confirm your new Kayak Planner email address",
+            "Confirm your new Kayaktrek email address",
             "email_change_confirm",
             name=user.name,
             confirm_url=confirm_url,
-            support_email=support_email,
         )
 
     @staticmethod
     def _send_email_changed_notice(user: User, old_mail: str) -> None:
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
         send_template_email(
             old_mail,
-            "Your Kayak Planner email address was changed",
+            "Your Kayaktrek email address was changed",
             "email_change_notice",
             name=user.name,
             new_mail=user.mail,
             forgot_url=f"{frontend_url}/forgot-password",
-            support_email=support_email,
         )
 
     @staticmethod
     def _send_already_registered_email(user: User) -> None:
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
         send_template_email(
             user.mail,
-            "Someone tried to register with your Kayak Planner email",
+            "Someone tried to register with your Kayaktrek email",
             "account_already_registered",
             name=user.name,
             login_url=f"{frontend_url}/login",
             forgot_url=f"{frontend_url}/forgot-password",
-            support_email=support_email,
         )

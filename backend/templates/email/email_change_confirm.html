@@ -1,17 +1,17 @@
 {% extends "email/base.html" %}
 
-{% block subject %}Confirm your new Kayak Planner email address{% endblock %}
+{% block subject %}Confirm your new Kayaktrek email address{% endblock %}
 
 {% block body %}
 <p style="margin:0 0 16px;font-size:16px;color:#1e293b;">Hi {{ name }},</p>
 <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
-  A request was made to change the email on your Kayak Planner account to this address. Click the
+  A request was made to change the email on your Kayaktrek account to this address. Click the
   button below to confirm.
 </p>
 
 <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
   <tr>
-    <td style="background-color:#0c4a6e;border-radius:6px;">
+    <td style="background-color:#1a5c9a;border-radius:6px;">
       <a href="{{ confirm_url }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
         Confirm new email
       </a>

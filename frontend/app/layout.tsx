@@ -24,8 +24,14 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Kayak Expedition Planner",
-  description: "Plan, crew, and navigate your kayak expedition",
+  // `template` appends the name to every page title, so a page sets only its own
+  // subject and the brand lives here alone — the metadata counterpart to
+  // `BrandLockup` owning the wordmark.
+  title: {
+    default: "Kayaktrek — sea-kayak expedition planner",
+    template: "%s · Kayaktrek",
+  },
+  description: "Plan, crew, and navigate your sea-kayak expedition",
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

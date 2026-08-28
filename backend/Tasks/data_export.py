@@ -44,15 +44,13 @@ def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
 
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
         download_url = f"{frontend_url}/download-export/{raw_token}"
-        support_email = current_app.config.get("MAIL_DEFAULT_SENDER", "support@kayakplanner.app")
 
         send_template_email(
             user.mail,
-            "Your Kayak Planner data export is ready",
+            "Your Kayaktrek data export is ready",
             "data_export_ready",
             name=user.name,
             download_url=download_url,
-            support_email=support_email,
         )
 
         logger.info("task_completed", extra={"task_id": self.request.id, "user_id": user_id})

@@ -1,6 +1,6 @@
 Hi {{ name }},
 
-A request was made to change the email on your Kayak Planner account to this address.
+A request was made to change the email on your Kayaktrek account to this address.
 
 Confirm this change:
 {{ confirm_url }}
@@ -9,4 +9,6 @@ This link expires in 1 hour. If you didn't request this, you can safely ignore t
 nothing changes on your account until the link above is clicked.
 
 ---
-Kayak Planner · Need help? Contact support at {{ support_email }}
+Kayaktrek · sea-kayak expedition planner
+{{ site_url }} · {{ support_email }}{% if postal_address %}
+{{ postal_address }}{% endif %}

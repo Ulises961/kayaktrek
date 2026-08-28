@@ -1,6 +1,6 @@
 {% extends "email/base.html" %}
 
-{% block subject %}Your Kayak Planner data export is ready{% endblock %}
+{% block subject %}Your Kayaktrek data export is ready{% endblock %}
 
 {% block body %}
 <p style="margin:0 0 16px;font-size:16px;color:#1e293b;">Hi {{ name }},</p>
@@ -11,7 +11,7 @@
 
 <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
   <tr>
-    <td style="background-color:#0c4a6e;border-radius:6px;">
+    <td style="background-color:#1a5c9a;border-radius:6px;">
       <a href="{{ download_url }}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
         Download my data
       </a>

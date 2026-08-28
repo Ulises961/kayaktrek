@@ -3,7 +3,7 @@ import { ChartHeaderBar } from "@/components/common/chart-header"
 import { PageHeading } from "@/components/common/page-heading"
 
 export const metadata = {
-  title: "Terms of Use — Kayak Expedition Planner",
+  title: "Terms of Use",
 }
 
 interface SectionProps {
@@ -41,18 +41,17 @@ export default function TermsPage() {
 
         <Section title="1. Acceptance of these terms">
           <p>
-            By creating an account or otherwise using Kayak Expedition Planner (&ldquo;the
-            Service&rdquo;), you agree to these Terms of Use. If you do not agree, do not use the
-            Service.
+            By creating an account or otherwise using Kayaktrek (&ldquo;the Service&rdquo;), you
+            agree to these Terms of Use. If you do not agree, do not use the Service.
           </p>
         </Section>
 
         <Section title="2. What the service is">
           <p>
-            Kayak Expedition Planner is a trip-planning tool for sea kayaking: route and itinerary
-            building, weather and tidal forecasts, gear checklists, crew coordination, and — while a
-            trip is underway — optional live position sharing between crew members and a designated
-            shore contact.
+            Kayaktrek is a trip-planning tool for sea kayaking: route and itinerary building,
+            weather and tidal forecasts, gear checklists, crew coordination, and — while a trip is
+            underway — optional live position sharing between crew members and a designated shore
+            contact.
           </p>
         </Section>
 

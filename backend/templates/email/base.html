@@ -3,20 +3,58 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block subject %}Kayak Planner{% endblock %}</title>
+  <title>{% block subject %}Kayaktrek{% endblock %}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f4f7f9;font-family:Arial,Helvetica,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7f9;padding:40px 0;">
+{#
+  Colours here are the light-mode semantic tokens from frontend/lib/tokens.ts, inlined as
+  hex because email has no custom properties and no stylesheet to import:
+
+    #f7f4ec  palette.chartPaper  page ground — the warm chart paper the whole product sits on
+    #122540  palette.ocean800    header band, the chart's navy ink
+    #1a5c9a  lightTokens.primary call-to-action buttons
+
+  The neutral prose greys already match palette.slate*, so they are left as they are.
+  The font stack stays a system one on purpose: Gmail strips @font-face, so DM Sans and
+  Fraunces cannot be relied on here and a failed web font is worse than an honest fallback.
+#}
+<body style="margin:0;padding:0;background-color:#f7f4ec;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f4ec;padding:40px 0;">
     <tr>
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#0c4a6e;padding:32px 40px;">
-              <p style="margin:0;font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">
-                🛶 Kayak Planner
-              </p>
+            <td style="background-color:#122540;padding:32px 40px;">
+              {# Mark + wordmark. The mark is a raster because Gmail strips <svg>, with the
+                   dark colourway baked in because this band is navy whatever the reader's
+                   theme is (scripts/build-mail-mark.sh). It is served from the public bucket
+                   and is absent entirely when no CDN base is configured.
+
+                   Two constraints this markup is shaped by:
+                   - Remote images are blocked by default in many clients, so the wordmark is
+                     live text beside the image and never part of it. Blocked images cost the
+                     mark, not the name.
+                   - alt is empty on purpose: the wordmark next to it already says Kayaktrek,
+                     and a matching alt would make a screen reader announce it twice.
+
+                   A table rather than flex/inline-block — Outlook's Word renderer supports
+                   neither, and this is the one row that must not break. #}
+              <table cellpadding="0" cellspacing="0" border="0" role="presentation">
+                <tr>
+                  {% if logo_url %}
+                  <td style="padding-right:14px;vertical-align:middle;line-height:0;">
+                    <img src="{{ logo_url }}" width="40" height="40" alt=""
+                         style="display:block;border:0;outline:none;text-decoration:none;" />
+                  </td>
+                  {% endif %}
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">
+                      Kayaktrek
+                    </p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -30,9 +68,21 @@
           <!-- Footer -->
           <tr>
             <td style="background-color:#f8fafc;padding:24px 40px;border-top:1px solid #e2e8f0;">
-              <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;">
-                Kayak Planner &nbsp;·&nbsp;
-                <a href="mailto:{{ support_email }}" style="color:#94a3b8;">{{ support_email }}</a>
+              {# Sender identity. The descriptor earns its place here: a recipient who does
+                   not yet recognise the name still learns what sent them this. A reachable
+                   sender is also what separates transactional mail from spam, to a filter and
+                   to a person — and once trader identification applies (DSA), the postal line
+                   is a disclosure rather than a nicety. Every value comes from
+                   mail_service._identity_context(); each is omitted rather than faked when
+                   unset, so the footer is never confidently wrong. #}
+              <p style="margin:0 0 6px;font-size:12px;color:#94a3b8;text-align:center;">
+                <strong style="color:#64748b;">Kayaktrek</strong> &nbsp;·&nbsp; sea-kayak expedition planner
+              </p>
+              <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;line-height:1.6;">
+                {% if site_url %}<a href="{{ site_url }}" style="color:#94a3b8;">{{ site_url }}</a>{% endif %}
+                {% if site_url and support_email %} &nbsp;·&nbsp; {% endif %}
+                {% if support_email %}<a href="mailto:{{ support_email }}" style="color:#94a3b8;">{{ support_email }}</a>{% endif %}
+                {% if postal_address %}<br />{{ postal_address }}{% endif %}
               </p>
             </td>
           </tr>
