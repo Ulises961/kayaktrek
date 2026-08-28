@@ -478,17 +478,30 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
     planToken = (await plan.json()).shareToken
 
     // /paddlers/<username> renders an empty shell unless the profile is opted in.
+    // Both calls check their status. Neither did, and that hid a real failure: when
+    // /user/me answers with an error body, `account.id` is undefined, the PATCH below goes
+    // to /user/undefined, and the ownership check rejects it as someone else's record —
+    // silently, because nothing read the response. The tests that then depend on `userId`
+    // fail much later with a 403 that points at the wrong thing entirely.
     const me = await request.get(`${API_URL}/api/v1/user/me`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
     })
+    if (!me.ok()) throw new Error(`GET /user/me failed: ${me.status()} ${await me.text()}`)
     const account = await me.json()
     username = account.username
     userId = account.id
     wasProfilePublic = !!account.profileIsPublic
-    await request.patch(`${API_URL}/api/v1/user/${userId}`, {
+    if (!userId) throw new Error(`/user/me returned no id: ${JSON.stringify(account)}`)
+
+    const madePublic = await request.patch(`${API_URL}/api/v1/user/${userId}`, {
       headers: { Authorization: `Bearer ${leaderToken}` },
       data: { profileIsPublic: true },
     })
+    if (!madePublic.ok()) {
+      throw new Error(
+        `making the profile public failed: ${madePublic.status()} ${await madePublic.text()}`,
+      )
+    }
   })
 
   test.afterAll(async ({ request }) => {
@@ -1174,13 +1187,15 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
       // `toBeVisible()` on its own throws a strict-mode violation in that window instead of
       // waiting through it, which is what made this test fail. Nothing renders twice on
       // screen; a failure snapshot taken after the fact contains exactly one chip.
+      // Wait on `.first()` — a non-strict locator — until the chip shows a *terminal*
+      // status. Ordering matters and the first attempt at this got it wrong: waiting for
+      // the count to settle first still raced, because the second copy appears while the
+      // status is being committed, i.e. after the count has momentarily been 1. Waiting
+      // for the settled text is what actually outlasts the transition; the count and
+      // visibility checks then hold.
+      await expect(chrome.first()).toContainText(/Location denied|Location unavailable|Sharing/)
       await expect(chrome).toHaveCount(1)
       await expect(chrome).toBeVisible()
-
-      // Then wait out the pre-resolution label. "Acquiring location…" is wider than the
-      // "Location denied"/"Location unavailable"/"Sharing…" it settles into, so measuring
-      // during it measures a chip that is about to change width.
-      await expect(chrome).not.toContainText("Acquiring location")
 
       const chromeBox = (await chrome.boundingBox())!
       const fab = (await page.getByTestId("add-button").boundingBox())!
