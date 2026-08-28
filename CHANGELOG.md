@@ -7,6 +7,86 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.6.0] - 2026-08-28
+
+The app has a name. Kayaktrek replaces the four different names the product was using across
+the web UI, its email and the live domain. Underneath, the deployment lost about 4.5 GB of
+memory it never needed, map tiles stopped taking a round trip to Cloudflare and back before
+the server could answer, and the phone layout was fixed in the places people actually hit.
+
+### Added
+
+- **Every container now has a memory limit.** Previously none did, so a single process
+  losing control could take the whole machine down with it — and on a one-box deployment
+  that includes the database.
+
+### Changed
+
+- **The product is called Kayaktrek**, on every user-visible surface: the app's wordmark and
+  page titles, and all 38 email strings and 9 subject lines, which had been using a third
+  name again. "Sea-kayak expedition planner" stays as a descriptor where it earns its place.
+- **Map tiles are served from the server's own disk** instead of the object store. A cached
+  tile now answers in about 4 ms rather than ~210 ms, because serving one no longer meant a
+  round trip out to Cloudflare and back before the server could reply.
+- **The deployment uses about 4.5 GB less memory.** A geography library was unpacking a
+  900 MB global land/sea map into memory in every one of the four backend processes at
+  startup — including the two that never consult it — to answer questions about 576 points.
+  It is now read from disk on demand. Idle memory across the whole stack went from 5.5 GB to
+  under 1 GB.
+
+### Fixed
+
+- **Missed-checkpoint alerts and shared float plans told people to write to an email address
+  that does not exist.** The support address was hardcoded to a domain nobody owns, in every
+  environment — so a shore contact who replied to a safety alert reached nothing.
+- **Running the test suite sent telemetry to the production monitoring project.** Test traffic
+  landed in the same place real traffic does and spent the monthly record allowance on
+  synthetic data. It reached there without anyone configuring it to: the application loads
+  `.env` when it is imported, and the test suite imports the application, so the production
+  credential was present in every local run regardless of how clean the shell was.
+- **The printable float plan was unusable on a phone.** Crew emails and vessel details ran
+  off the edge of the card or were squeezed into a column a few characters wide.
+- **Settings controls ran off the edge on a phone** — the current email address, and the
+  change-password and account-deletion buttons.
+- **The Import GPX dialog** could be pushed past the screen edge by a long filename.
+- **The profile page's cards** at phone width: stat tiles left half empty by a wrapping
+  label, distance-by-month bars squeezed to under 10 pixels, and the avatar crowding the
+  name and contact details into an 84-pixel column.
+
+### Security
+
+- **Signing a device out could silently stop taking effect.** The revoked-session list
+  shared a Redis instance with caches and rate-limit counters, and that instance evicts
+  whatever was used least recently under memory pressure — which is exactly what a
+  revocation entry is, since it is written once at sign-out and then usually never read
+  again. Evicting one let a signed-out device keep working for the remainder of its
+  15-minute token. The revocation list now has an instance of its own that cannot evict.
+
+### Deploy notes
+
+- **Bring the stack up with `--remove-orphans`.** This release adds a container and removes
+  two, and `docker compose up -d` on its own will leave the removed ones running:
+  `KAYAK_IMAGE_TAG=v0.6.0 docker compose -f docker-compose.prod.yml up -d --remove-orphans`
+- **New container: `redis-auth`**, holding the revoked-session list. It must be up before
+  the backend and SSE containers; `depends_on` orders that, but only once the container
+  exists.
+- **`REVOCATION_REDIS_URL` can be deleted from `.env`.** It is now set in the compose file
+  and any value left in `.env` is ignored. This is deliberate: the setting is not a free
+  choice — it must point at an instance that does not evict — and a stale `.env` value
+  silently winning is how the problem above would come back.
+- **MinIO is gone from production** (it stays for local development). Object storage has
+  been on Cloudflare R2 since 26 August and the tile cache no longer uses a bucket, so
+  nothing was left for it to serve. Its data directory on the box is untouched by the
+  removal.
+- **`STORAGE_ENDPOINT` is now required** in production. It used to fall back to the local
+  MinIO, which no longer exists — an unset value now refuses to start rather than pointing
+  at a hostname that does not resolve.
+- **Two new volumes** are created automatically: `tile_cache` and `land_mask_cache`. The
+  first marine-forecast request after the upgrade spends about two seconds unpacking the
+  land map into its cache, once.
+- Optional cleanup: the `tiles/` prefix in the private R2 bucket is dead data now and can be
+  deleted.
+
 ## [0.5.2] - 2026-08-25
 
 Photo uploads tell you they are working, and the tracing budget stops being spent on
