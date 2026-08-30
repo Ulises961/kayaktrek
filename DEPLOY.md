@@ -96,10 +96,44 @@ docker compose -f docker-compose.monitoring.yml pull
 docker compose -f docker-compose.monitoring.yml up -d
 ```
 
+**Brought up in production on 2026-08-28.** Not `--remove-orphans` — both compose files share a
+directory with no explicit `-p` project name, so Compose labels the *other* file's containers
+"orphans" of this one's view; that's a label artifact, not something to clean up, and passing
+`--remove-orphans` here would actually stop the running app stack.
+
 All on `127.0.0.1` only, same rule as everything else here: Portainer `:9002`, Glances `:61208`,
-pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunnel domain — a DB
-browser or container-lifecycle UI reachable from the internet is not an acceptable mistake to be
-one DNS record away from.
+pgweb `:8081`, Uptime Kuma `:3001`. None of these are ever routed through the public Cloudflare
+Tunnel domain — a DB browser or container-lifecycle UI reachable from the internet is not an
+acceptable mistake to be one DNS record away from. Reach them from your own machine with one
+tunnel:
+
+```bash
+ssh -L 3001:127.0.0.1:3001 -L 9002:127.0.0.1:9002 -L 61208:127.0.0.1:61208 -L 8081:127.0.0.1:8081 <box>
+```
+
+### Uptime Kuma — what to actually configure
+
+Portainer, Glances and pgweb are pull tools: they answer when you go look, and cannot tell you
+anything is wrong on their own. Uptime Kuma is the one push tool in this set, and it is the one
+that matters for the root `CLAUDE.md` alerting checklist item (second in that item's cost order,
+after a Logfire error-rate alert).
+
+This is deliberately not scripted — first-run admin signup and typing an SMTP password into the
+notification form are both account/credential steps, done once by a human in the web UI:
+
+1. First visit creates the admin account.
+2. **Settings → Notifications → Setup Notification → SMTP**, using the same relay already
+   configured for the app (`MAIL_SERVER`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/
+   `MAIL_DEFAULT_SENDER`, `backend/.env.example`) — one more consumer of the existing Brevo
+   relay, not a second one to provision.
+3. Add these monitors, each with that notification attached:
+
+   | Name | Type | Target | Why |
+   |---|---|---|---|
+   | App — public | HTTP | `https://<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. |
+   | App — local | HTTP | `http://127.0.0.1:5000/api/v1/health` | If only the public one goes red, it's the tunnel, not the app — this pair is the diagnosis. |
+   | RabbitMQ | TCP | `127.0.0.1:5672` | ADR-034's original reason for this container: a silent RabbitMQ death would take the missed-checkpoint shore-contact alert down with it, invisibly. |
+   | Backup heartbeat | Push | (Kuma generates the URL) | Set as `BACKUP_HEARTBEAT_URL` in `.env` — `scripts/backup-db.sh` pings it only on success, so this alerts on *silence*, the actual failure mode of a scheduled job (see "Offsite backups" above). |
 
 ## Deploying configuration to the box
 
@@ -392,10 +426,10 @@ a real production domain before:
    time, manifesting as a 522. Deleting it and re-running the route command fixed it.
 
 **Still open, not blockers to the current live state:**
-- **Uptime Kuma monitor configuration** — the compose service exists
-  (`docker-compose.monitoring.yml`); the actual monitors (health-endpoint checks + a notification
-  channel) still need setting up in its web UI, closing the "silent failure" gap ADR-034 flagged
-  for the home-hosted RabbitMQ path.
+- **Uptime Kuma monitor configuration** — the stack is up (2026-08-28); the monitors and
+  notification channel themselves are an account/credential step done once by a human in the
+  web UI, not scriptable. Exact monitor list and notification setup: "Monitoring / admin
+  tooling" above.
 - **Carried over from `CLAUDE.md`'s pre-production checklist**: Sentry error alerting, and
   revisiting `.env`-file secrets management now that a staging-shaped server is genuinely
   provisioned (the condition `CLAUDE.md` already names for that revisit).
