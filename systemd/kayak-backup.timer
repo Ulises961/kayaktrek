@@ -1,0 +1,30 @@
+# Schedule for kayak-backup.service. No placeholders — install as-is.
+#
+# A systemd timer rather than a cron line, and the reason is specific to this box rather
+# than a style preference: it runs `autosuspend`, and cron has no concept of a missed run.
+# A crontab entry at 03:17 on a machine that is suspended at 03:17 does not fire and does
+# not catch up — and produces no output, so not even cron's mail-on-failure tells you.
+# The result is a backup job that looks configured and silently never runs, which is worse
+# than no backup job at all because it reads as done.
+#
+# Persistent=true is the whole point: systemd records the last trigger on disk and fires
+# on the next wake if the window was missed.
+#
+# Deliberately NOT WakeSystem=true — waking the box nightly to take a backup defeats
+# autosuspend, and running shortly after the next natural wake is the right trade for a
+# home box. On a DigitalOcean droplet (ADR-034) nothing suspends and this simply behaves
+# as an ordinary nightly timer; the unit moves across unchanged, which is why no cron
+# container is needed there.
+
+[Unit]
+Description=Nightly Kayak encrypted offsite database backup
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+# Spread the load a little, and avoid every box in a future fleet hitting B2 at once.
+RandomizedDelaySec=10m
+Unit=kayak-backup.service
+
+[Install]
+WantedBy=timers.target

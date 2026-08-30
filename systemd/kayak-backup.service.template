@@ -1,0 +1,55 @@
+# Nightly encrypted offsite database backup — the unit half.
+#
+# A template, like nginx/kayak-expedition-planner.conf.template, and for the same reason:
+# it needs per-box substitution and root to install, so it is deliberately NOT in
+# scripts/deploy-sync.sh's file set. Substitute the two placeholders, install once, and
+# leave it alone. See DEPLOY.md.
+#
+#   sudo cp systemd/kayak-backup.service.template /etc/systemd/system/kayak-backup.service
+#   sudo cp systemd/kayak-backup.timer            /etc/systemd/system/kayak-backup.timer
+#   sudo -e /etc/systemd/system/kayak-backup.service     # fill in __USER__ and __REPO_DIR__
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now kayak-backup.timer
+#
+# Note it is the TIMER that gets enabled, never this unit — it has no [Install] section
+# on purpose. Enabling the service itself would run a backup at every boot.
+#
+# Verify: `systemctl list-timers kayak-backup`, and `sudo systemctl start
+# kayak-backup.service` for a real run on demand.
+
+[Unit]
+Description=Kayak encrypted offsite database backup
+Documentation=file://__REPO_DIR__/DEPLOY.md
+# The script talks to the postgres container, so Docker has to be up. On a
+# Persistent=true catch-up run this unit can start seconds after boot, before the stack
+# is actually serving — hence Restart=on-failure below rather than ordering alone.
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+# Rate limiting lives on the unit, not the service, since systemd 229.
+StartLimitBurst=5
+StartLimitIntervalSec=900
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/scripts/backup-db.sh
+
+# Set explicitly rather than inherited. A systemd service gets a minimal PATH that does
+# NOT include ~/.local/bin, ~/go/bin or /snap/bin — and `age` and `rclone` are commonly
+# installed into exactly those. The script checks for its tools and exits with
+# "ERROR: 'age' is not installed", which is actively misleading when age is installed and
+# merely invisible. Install the tools system-wide, and keep this line as the belt to that
+# braces. Check with: systemctl show -p Environment kayak-backup.service
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# A catch-up run after a wake may find postgres still starting. Retry rather than wait
+# for tomorrow; five attempts 90s apart covers a cold stack coming up.
+Restart=on-failure
+RestartSec=90
+
+# The dump is piped straight into age and never lands unencrypted, but a private /tmp
+# costs nothing and bounds the blast radius of the mktemp working directory.
+PrivateTmp=true
+NoNewPrivileges=true

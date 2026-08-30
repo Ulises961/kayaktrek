@@ -26,7 +26,7 @@ readonly REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
 
 readonly HOST="${DEPLOY_HOST:-}"
-readonly REMOTE_PATH="${DEPLOY_PATH:-kayak}"
+readonly REMOTE_PATH="${DEPLOY_PATH:-~/docker-containers/kayak-planner}"
 readonly ENV_SOURCE="${DEPLOY_ENV_FILE:-.env.prod}"
 
 DRY_RUN=0
@@ -55,6 +55,15 @@ readonly FILES=(
 # Host-level config that needs substitution and root does not belong in an automated push;
 # it changes about once a year and is a deliberate, sighted operation when it does. See
 # DEPLOY.md.
+#
+# `systemd/` is excluded on exactly the same grounds: kayak-backup.service.template carries
+# __USER__/__REPO_DIR__ placeholders, lands in /etc/systemd/system/, and needs a
+# daemon-reload to take effect. Syncing it would reintroduce the nginx mistake in a place
+# where the damage is quieter — a clobbered unit does not fail the push, it just stops
+# taking backups.
+#
+# The rule this leaves behind: what this script pushes is what the containers read. What
+# root installs once, by hand, stays out.
 
 for f in "${FILES[@]}"; do
     [ -f "$f" ] || { echo "ERROR: $f is missing from the repo" >&2; exit 1; }

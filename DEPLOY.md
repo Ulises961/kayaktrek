@@ -212,19 +212,61 @@ restore it.
 3. **Add a lifecycle rule** on the bucket to expire files after your retention window
    (30 days is a reasonable start). This is what prunes old dumps.
 
-4. **Install the two tools** on the box:
+4. **Install the two tools system-wide** on the box:
    ```bash
    sudo apt install age rclone
    ```
 
-5. **Schedule it** from the host's cron — not Celery beat. A backup that depends on the
-   application stack being healthy is exactly the backup you cannot take on the day the
-   application stack is not healthy:
+   **System-wide matters.** A scheduled job runs with a minimal `PATH` that excludes
+   `~/.local/bin`, `~/go/bin` and `/snap/bin` — which is exactly where a `go install`, a
+   `cargo install` or a snap puts these. The scripts check for their tools and abort with
+   `ERROR: 'age' is not installed`, which is misleading when age *is* installed and merely
+   invisible to the scheduler. Confirm with the scheduler's view, not your shell's:
+   ```bash
+   env -i /bin/sh -c 'command -v age; command -v rclone'   # must print both paths
    ```
-   17 3 * * *  cd /path/to/kayak-expedition-planner && ./scripts/backup-db.sh >> /var/log/kayak-backup.log 2>&1
+   The unit in step 5 also pins `PATH` explicitly, as a second line of defence.
+
+5. **Schedule it with a systemd timer** — from the host, not Celery beat. A backup that
+   depends on the application stack being healthy is exactly the backup you cannot take on
+   the day the application stack is not healthy.
+
+   ```bash
+   sudo cp systemd/kayak-backup.service.template /etc/systemd/system/kayak-backup.service
+   sudo cp systemd/kayak-backup.timer            /etc/systemd/system/kayak-backup.timer
+   sudo -e /etc/systemd/system/kayak-backup.service   # fill in __USER__ and __REPO_DIR__
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now kayak-backup.timer
+   systemctl list-timers kayak-backup                 # confirm the next run
+   sudo systemctl start kayak-backup.service          # run one now, on demand
    ```
-   Cron mails failures to the local user, which is the only alerting this has until the
-   Observability checklist's alerting item is done.
+
+   **A cron line will not work on this box, and will not tell you so.** The machine runs
+   `autosuspend`; cron has no concept of a missed run, so an entry at 03:17 on a suspended
+   machine does not fire and does not catch up. It also produces no output, so cron's
+   mail-on-failure never triggers either — the job reads as configured and silently never
+   runs. `Persistent=true` on the timer is the fix: systemd records the last trigger and
+   fires on the next wake.
+
+   Enable the **timer**, never the service — the unit has no `[Install]` section on purpose,
+   because enabling it would take a backup at every boot.
+
+   **Failure visibility.** Output goes to the journal (`journalctl -u kayak-backup`), which
+   nobody reads, and the job's real failure mode is *never running at all* — which produces
+   no output anywhere. Set `BACKUP_HEARTBEAT_URL` in `.env` to a push-monitor URL and the
+   script pings it only on success, so a missed run, a suspended box and a broken `PATH` all
+   surface the same way: as silence where a ping was expected. `uptime-kuma` is already in
+   `docker-compose.monitoring.yml` and supports push monitors; set the expected interval to
+   about 25 hours. Until then this has no alerting at all — see the Observability checklist.
+
+   On a DigitalOcean droplet (ADR-034) all of this moves across **unchanged**: a droplet is
+   an ordinary Linux host with systemd, so there is no cron container to build. Only two
+   things change — nothing suspends, so `Persistent=true` becomes belt-and-braces rather
+   than load-bearing; and if you take DO Managed Postgres instead of the container, the
+   `docker compose exec postgres pg_dump` line becomes a `pg_dump` against the connection
+   string. Note that DO's own managed backups do **not** replace this one: they live inside
+   DO, so one suspended account takes the database and its backups together. Keeping the
+   dump at a different provider is the entire point of the design.
 
 ### Rehearsing a restore
 
@@ -232,21 +274,49 @@ restore it.
 have never restored is not a backup — it is a file-copying job you hope is a backup.
 
 ```bash
-BACKUP_AGE_IDENTITY_FILE=/tmp/kayak-backup-key.txt ./scripts/restore-db.sh
-shred -u /tmp/kayak-backup-key.txt      # put the key back where it belongs
+BACKUP_AGE_IDENTITY_FILE=<(pw-cli get kayak-backup-age-key) ./scripts/restore-db.sh
 ```
+
+That is a bash process substitution: the private key travels down a file descriptor and
+never touches a filesystem, so there is nothing to clean up afterwards. Prefer this over
+writing the key to a file and deleting it — `shred` cannot reliably erase anything on a
+journaling filesystem or on flash, and `/tmp` on this box is ext4-on-SSD, so the delete-
+after pattern this used to recommend gives less assurance than it looks like. If you must
+use a file, put it on `/dev/shm` (tmpfs), where a plain `rm` is genuinely sufficient.
 
 It downloads the newest backup, decrypts it, loads it into `kayak_restore_check`, and
 reports the row count in `users` — a load that "succeeds" but produces no rows is the
-failure this is looking for. Drop the scratch database when you are satisfied.
+failure this is looking for. Drop the scratch database when you are satisfied. Use
+`./scripts/restore-db.sh --list` to see backup names, and pass one explicitly to rehearse
+a specific one rather than always the newest.
 
 ### Real recovery
 
+First, find the exact backup you want — this needs only the B2 credentials, not the
+private key:
+
 ```bash
-BACKUP_AGE_IDENTITY_FILE=/tmp/key.txt ./scripts/restore-db.sh --into-live <backup-name>
+./scripts/restore-db.sh --list
 ```
 
-It requires you to type the live database name before it does anything.
+That prints real B2 object keys, e.g. `kayak-2026-08-24T151700Z.sql.gz.age`. Then:
+
+```bash
+BACKUP_AGE_IDENTITY_FILE=<(pw-cli get kayak-backup-age-key) \
+    ./scripts/restore-db.sh --into-live kayak-2026-08-24T151700Z.sql.gz.age
+```
+
+**That argument is the backup name from `--list`, never the database name** — the two
+can look interchangeable under pressure, since the confirmation prompt right after this
+also asks you to type the database name, for a different reason. Get it backwards and the
+script now rejects it immediately, before asking you to confirm anything destructive
+(closed after a real incident where a database name was passed here: the restore silently
+failed to find anything to load — decrypt errored on a file that had never downloaded —
+having already asked for, and received, the DROP confirmation for a request that was
+never going to succeed. The live database was never touched, because the DROP itself
+only runs after a successful decrypt, but the sequence should never have gotten that far).
+
+It requires you to type the live database name before it does anything destructive.
 
 ### What is not backed up
 
