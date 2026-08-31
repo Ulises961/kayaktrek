@@ -1,0 +1,55 @@
+{
+  "_comment": "Cross-language test vectors for the medical-notes crypto scheme (M22). Generated from backend/Services/crypto_service.py, which produced every ciphertext already in the database. Both the Python and TypeScript suites assert against this file; it is the contract that stops the two implementations drifting silently, where the failure mode is unreadable health data. Regenerate with backend/Tests/fixtures/generate_vectors.py.",
+  "kdf": {
+    "algorithm": "PBKDF2-HMAC-SHA256",
+    "iterations": 600000,
+    "key_length": 32
+  },
+  "aead": {
+    "algorithm": "AES-GCM",
+    "nonce_length": 12,
+    "aad": null
+  },
+  "ecies": {
+    "curve": "X25519",
+    "kdf": "HKDF-SHA256",
+    "hkdf_salt": null,
+    "hkdf_info": "float-plan-medical"
+  },
+  "symmetric": [
+    {
+      "password": "correct horse battery staple",
+      "salt": "AAAAAAAAAAAAAAAAAAAAAA==",
+      "nonce": "AQEBAQEBAQEBAQEB",
+      "plaintext": "Penicillin allergy",
+      "ciphertext": "2iNG6NT7fd4NbxxqJjf1IZyZmCr/oPW8G7r2kOssw7tuOg==",
+      "derived_key": "BGDu7H3fi1+R8gN7PiqySPfF2I2+yrtQpCaeUY8ZSM0="
+    },
+    {
+      "password": "p\u00e4ssw\u00f6rd w\u00edth \u00fcnicode",
+      "salt": "AAECAwQFBgcICQoLDA0ODw==",
+      "nonce": "AAECAwQFBgcICQoL",
+      "plaintext": "Asthma \u2014 blue inhaler in deck bag",
+      "ciphertext": "hNL3dPkRhmgrYmHYDB7u3R9CcS+LDydxfMql/sYzljxrZrLMDbcXjW6OVBadCqm/tfIv",
+      "derived_key": "HsQj6jLPk7fYtVmN4u+/EcfmdryvH883aB4oB08iSck="
+    },
+    {
+      "password": "x",
+      "salt": "/////////////////////w==",
+      "nonce": "f39/f39/f39/f39/",
+      "plaintext": "",
+      "ciphertext": "RryckImqARbw/lM9geepYQ==",
+      "derived_key": "pwsXqdpqvnzozkn4iXFca65EnL+1JW58xaQ1GTjYsOs="
+    }
+  ],
+  "ecies_vector": {
+    "recipient_private_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "recipient_public_key": "j0DFrbaPJWJK5bIU6nZ6bslNgp09e14a0bpvPiE4KF8=",
+    "ephemeral_private_key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+    "ephemeral_public_key": "NYBy1jZYgNGu6jKa35EhODhR7SGijjt16WXQ0s0WYlQ=",
+    "nonce": "AgICAgICAgICAgIC",
+    "plaintext": "Type 1 diabetic. Glucagon in red drybag.",
+    "ciphertext": "irK9eW9L40BEIPmXlkTnV2aPwA5SG064UZr9N8JEBTWeVMiWsYbdPBui2YDqYz2TfE4jwDkfiT4=",
+    "derived_key": "dOt0aN5gBcpWfa8+w3FlV4dTbOouPULfal3f5aqCUC4="
+  }
+}

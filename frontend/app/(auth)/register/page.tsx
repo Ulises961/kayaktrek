@@ -156,6 +156,10 @@ export default function RegisterPage() {
         By creating an account, you agree to our{" "}
         <Link href="/terms" className="auth-link">
           Terms of Use
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="auth-link">
+          Privacy Policy
         </Link>
         .
       </p>

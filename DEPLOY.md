@@ -202,6 +202,116 @@ keypair to manage. See `docs/adr/foundation.md`.
 your password manager — losing `JWT_SECRET_KEY` logs out every user, and the rest is not
 reconstructable from memory during an outage.
 
+## Mail — two providers, two directions
+
+Outbound and inbound are separate systems and neither can do the other's job. Worth stating
+plainly, because "why not put it all in one place" is the obvious question and the answer is a
+product limitation rather than a preference.
+
+| Direction | Provider | Why not the other one |
+|---|---|---|
+| **Outbound** — app → any user (verification, password reset, invitations, shore-contact alerts) | **Brevo**, SMTP relay that Flask-Mail points at | Cloudflare has no transactional relay. Its Workers `send_email` binding may only send to addresses pre-verified on the account, which cannot serve an app that mails people it has never seen |
+| **Inbound** — `privacy@` and friends → a real mailbox | **Cloudflare Email Routing**, free | Brevo is a sending relay; it does not host mailboxes |
+
+ADR-016 already recorded the outbound half as the one acknowledged exception to the self-hosted
+rule, because IP reputation cannot be self-generated. The split also puts the two in different
+failure domains: a Brevo outage stops the app mailing users, but a data subject can still reach
+`privacy@`, which the privacy policy names as the route for GDPR requests.
+
+### DNS inventory
+
+Six things live at the apex and they belong to three different systems. Deleting the wrong one
+is quiet — mail keeps flowing until a receiver decides otherwise.
+
+| Record | Belongs to | Purpose |
+|---|---|---|
+| `MX route{1,2,3}.mx.cloudflare.net` | Cloudflare | inbound routing. **Must be the only MX records** — Email Routing refuses to activate alongside any other |
+| `TXT v=spf1 include:spf.brevo.com include:_spf.mx.cloudflare.net ~all` | both | authorises Brevo to send *and* Cloudflare to forward |
+| `CNAME brevo1._domainkey`, `brevo2._domainkey` | Brevo | DKIM signing for outbound |
+| `TXT cf2024-1._domainkey` | Cloudflare | DKIM for forwarded mail |
+| `TXT brevo-code:…` | Brevo | domain ownership verification — Brevo stops sending without it |
+| `TXT _dmarc` (`p=none`, rua to both) | both | reporting only; not enforcing |
+
+**Exactly one `v=spf1` record, always.** RFC 7208 makes multiple SPF records a *permanent error*,
+and a receiver hitting one stops evaluating SPF for every sender — so adding a second to
+"authorise one more thing" silently disables the whole mechanism. Merge includes into the single
+record instead. Cloudflare's Email Routing wizard offers to add its own SPF line; take the include
+and edit the existing record rather than accepting a second.
+
+This was wrong from the Brevo migration until 2026-08-31: the record carried only Namecheap's
+forwarder, so every message the app sent failed SPF and passed DMARC on DKIM alignment alone.
+Delivery worked, which is exactly why it went unnoticed for months.
+
+### Changing any of it
+
+Verify from outside, not from the dashboard:
+
+```bash
+dig +short MX  kayaktrek.app @1.1.1.1
+dig +short TXT kayaktrek.app @1.1.1.1 | grep -c 'v=spf1'   # must print 1
+dig +short TXT _dmarc.kayaktrek.app @1.1.1.1
+```
+
+Order matters when moving inbound providers: create and verify the destination address *first*,
+then swap MX. Mail bounces in the window between the old MX being deleted and the new ones
+propagating, and there is no queue to catch it.
+
+### Aliases
+
+`privacy@` is named in the privacy policy as the route for GDPR requests and must stay deliverable
+for as long as the policy is published — letting it lapse is a compliance failure, not a broken
+link. Keep `support@` separate rather than folding it in: a data subject request carries a
+statutory one-month deadline where a how-do-I question does not, and Play's store listing requires
+a support address of its own.
+
+**Live as of 2026-08-31**, both forwarding to the operator's mailbox:
+
+| Address | Role |
+|---|---|
+| `privacy@kayaktrek.app` | named in the privacy policy; GDPR requests |
+| `support@kayaktrek.app` | user-facing help; the address Play's store listing requires |
+| `no-reply@kayaktrek.app` | `MAIL_DEFAULT_SENDER` — outbound app mail only, not a mailbox |
+
+Verified by SMTP probe against `route1.mx.cloudflare.net` rather than by trusting the dashboard —
+both accepted with `250`, and a made-up address on the same domain got `550 Address does not
+exist`. That third check is the one that matters: without it a catch-all rule would look identical
+to working routing. `RCPT TO` then `RSET` tests acceptance without delivering anything:
+
+```bash
+python3 - <<'EOF'
+import smtplib
+s = smtplib.SMTP("route1.mx.cloudflare.net", 25, timeout=12)
+s.ehlo("kayaktrek.app")
+for addr in ["privacy@kayaktrek.app", "nope@kayaktrek.app"]:
+    s.mail("postmaster@kayaktrek.app")
+    print(addr, s.rcpt(addr))
+    s.rset()
+s.quit()
+EOF
+```
+
+Acceptance at the MX is not delivery — Cloudflare accepts at the edge and forwards afterwards, so
+an unverified destination or a spam filter still fails silently downstream. Send a real message
+before depending on either address.
+
+**Replying needs one extra step**, easily missed. Email Routing forwards *to* a personal mailbox,
+so a reply leaves as the personal address unless Gmail is told otherwise. **Gmail → Settings →
+Accounts → Send mail as → Add another email address**, then in the second popup:
+
+| Field | Value |
+|---|---|
+| SMTP server | `smtp-relay.brevo.com` |
+| Port | `587` |
+| Secured connection | **TLS** — not SSL; pairing SSL with 587 fails opaquely |
+| Username | the Brevo SMTP login (`MAIL_USERNAME` on the box) |
+| Password | the Brevo **SMTP key**, not the Brevo account password |
+
+Then set the radio in that same block to **"Reply from the same address the message was sent
+to"**. Adding the alias alone does nothing without it — replies keep going out as the personal
+address, which is the whole thing this exists to prevent.
+
+Replies then carry the same SPF and DKIM as the app's own mail.
+
 ## Backups
 
 `scripts/backup-db.sh` dumps Postgres, compresses, encrypts to an `age` public key and

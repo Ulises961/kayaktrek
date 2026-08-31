@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import Link from "next/link"
 import { ChartHeaderBar } from "@/components/common/chart-header"
 import { PageHeading } from "@/components/common/page-heading"
 
@@ -17,6 +18,13 @@ interface SectionProps {
 // navigation" disclaimers. Not a substitute for actual legal review before a real launch
 // — "Governing law" below in particular is a placeholder for the operator's real
 // jurisdiction, not a researched legal conclusion.
+//
+// §8 deliberately does not describe how anything is encrypted; it points at the privacy
+// policy instead. It used to claim medical notes were "end-to-end encrypted and only ever
+// decryptable by your trip leader", which was false on both halves — the encryption runs
+// server-side (`Services/crypto_service.py`), so plaintext and password both reach the
+// backend, and the owner can decrypt too. Two documents describing one mechanism is how
+// that survived; one of them owning it is the fix.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">
@@ -36,7 +44,7 @@ export default function TermsPage() {
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
         <div className="flex flex-col gap-1">
           <PageHeading>Terms of Use</PageHeading>
-          <p className="text-muted-foreground text-xs">Last updated 31 July 2026</p>
+          <p className="text-muted-foreground text-xs">Last updated 31 August 2026</p>
         </div>
 
         <Section title="1. Acceptance of these terms">
@@ -116,11 +124,13 @@ export default function TermsPage() {
 
         <Section title="8. Your data">
           <p>
-            We process your personal data to provide the Service, as described at the point each
-            piece of data is collected in the app (for example, medical information you optionally
-            add to a float plan is end-to-end encrypted and only ever decryptable by your trip
-            leader). You can export or request deletion of your account and its data from your
-            profile settings at any time.
+            We process your personal data to provide the Service. What is collected, why, who it
+            reaches, and how long it is kept are set out in the{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:no-underline">
+              Privacy Policy
+            </Link>
+            . You can export or request deletion of your account and its data from your profile
+            settings at any time.
           </p>
         </Section>
 
