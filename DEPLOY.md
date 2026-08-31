@@ -270,7 +270,7 @@ a support address of its own.
 |---|---|
 | `privacy@kayaktrek.app` | named in the privacy policy; GDPR requests |
 | `support@kayaktrek.app` | user-facing help; the address Play's store listing requires |
-| `no-reply@kayaktrek.app` | `MAIL_DEFAULT_SENDER` — outbound app mail only, not a mailbox |
+| `no-reply@kayaktrek.app` | `MAIL_DEFAULT_SENDER` — outbound app mail only, not a mailbox. Set as `Kayaktrek <no-reply@kayaktrek.app>` (2026-08-31): a bare address in the From line is the shape both spam filters and cautious humans dislike, on a product that asks for medical notes. The display part must not be quoted in `.env`, or the quotes reach the header |
 
 Verified by SMTP probe against `route1.mx.cloudflare.net` rather than by trusting the dashboard —
 both accepted with `250`, and a made-up address on the same domain got `550 Address does not
@@ -289,6 +289,11 @@ for addr in ["privacy@kayaktrek.app", "nope@kayaktrek.app"]:
 s.quit()
 EOF
 ```
+
+**Changing `MAIL_*` needs a container recreate, not a restart.** Compose passes environment at
+container *creation*, so `docker compose restart` picks up nothing — `up -d` recreates whatever
+changed. And edit `.env.prod` on the dev machine, never `.env` on the box: the next
+`deploy-sync.sh` overwrites the box's copy, which is the drift that script exists to prevent.
 
 Acceptance at the MX is not delivery — Cloudflare accepts at the edge and forwards afterwards, so
 an unverified destination or a spam filter still fails silently downstream. Send a real message
