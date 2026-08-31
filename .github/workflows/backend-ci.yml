@@ -51,3 +51,21 @@ jobs:
     with:
       runs-on-json: '["self-hosted","linux","x64"]'
     secrets: inherit
+
+  # A workflow run's own conclusion is the worst of every job in it, so a spent-minutes
+  # failure on test-hosted paints the whole run red even after test-fallback recovers it.
+  # This job is the one status worth looking at: green if either runner actually passed.
+  # Self-hosted, not hosted: once GitHub-hosted minutes are exhausted for the cycle, a
+  # hosted runner can't be relied on to even pick up this trivial check.
+  test-result:
+    needs: [test-hosted, test-fallback]
+    if: always()
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Require at least one runner to have passed
+        run: |
+          if [ "${{ needs.test-hosted.result }}" = "success" ] || [ "${{ needs.test-fallback.result }}" = "success" ]; then
+            exit 0
+          fi
+          echo "Neither the hosted nor the self-hosted run passed."
+          exit 1

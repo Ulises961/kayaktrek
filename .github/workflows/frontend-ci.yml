@@ -36,3 +36,17 @@ jobs:
     uses: ./.github/workflows/_frontend-validate-run.yml
     with:
       runs-on-json: '["self-hosted","linux","x64"]'
+
+  # See backend-ci.yml's test-result for why this exists and why it's self-hosted.
+  validate-result:
+    needs: [validate-hosted, validate-fallback]
+    if: always()
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Require at least one runner to have passed
+        run: |
+          if [ "${{ needs.validate-hosted.result }}" = "success" ] || [ "${{ needs.validate-fallback.result }}" = "success" ]; then
+            exit 0
+          fi
+          echo "Neither the hosted nor the self-hosted run passed."
+          exit 1
