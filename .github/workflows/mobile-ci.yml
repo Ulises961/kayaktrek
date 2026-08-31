@@ -1,0 +1,104 @@
+name: Mobile CI
+
+# Gate only, same convention as backend-ci.yml/frontend-ci.yml — this workflow produces no
+# store build. A real app binary is an EAS Build (M9h), which needs credentials and (for
+# iOS) a cloud builder this workflow doesn't have.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "mobile/**"
+      - "frontend/lib/tokens.ts"
+      - "frontend/lib/dtos/**"
+      - ".github/workflows/mobile-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "mobile/**"
+      - "frontend/lib/tokens.ts"
+      - "frontend/lib/dtos/**"
+      - ".github/workflows/mobile-ci.yml"
+
+# See backend-ci.yml for the reasoning. Separate group name so the three workflows cancel
+# independently.
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  validate:
+    # See backend-ci.yml for the reasoning (self-hosted, unmetered minutes).
+    runs-on: [self-hosted, linux, x64]
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm before setup-node, deliberately: setup-node's `cache: pnpm` shells out to
+      # `pnpm store path` to find what to cache, so pnpm has to already be on PATH.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            mobile/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+
+      # pnpm, not npm — this workspace was scaffolded by `create-expo-app`, which defaults
+      # to npm, and that default was never a decision. One package manager across the repo
+      # is worth more than Expo's default. `mobile/.npmrc` sets `node-linker=hoisted`
+      # because Metro resolves modules by walking real directories and several native
+      # modules resolve peers by path; pnpm's symlinked layout breaks both in ways that
+      # surface as bundling errors rather than install failures.
+      - name: Install mobile dependencies
+        run: pnpm install --frozen-lockfile --loglevel=error
+
+      # `mobile/` imports `../frontend/lib/tokens.ts` and `../frontend/lib/dtos/*` directly
+      # over Metro's watchFolders (metro.config.js) rather than through any workspace
+      # tooling — plans/M9.md item 11 / plans/M9a.md WP5. Those files' own dependencies
+      # (zod) have to actually be on disk for typecheck/lint/test/export to resolve them,
+      # so the frontend workspace needs installing too, even though this job never runs
+      # any frontend script.
+      - name: Install frontend dependencies (for the shared lib/ modules mobile imports)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile --loglevel=error
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test:run
+
+      # tokens.ts is the cross-platform source of truth (see that file's own header
+      # comment); theme.generated.css is a committed, generated CSS mirror of it (see
+      # scripts/generate-theme-css.js's header for why it's generated CSS and not a
+      # Tailwind `@config` JS reference). Catches the same class of drift
+      # `alembic check` catches for the backend: a token changed without regenerating
+      # what ships.
+      - name: Check generated theme CSS is up to date
+        run: |
+          pnpm run generate:theme
+          git diff --exit-code -- theme.generated.css
+
+      # `tsc`/eslint/jest all pass on a Metro bundle that cannot actually build — this
+      # export step is what caught a real one during this workspace's scaffolding
+      # (global.css's `@config` directive silently breaking native bundling, invisible
+      # to every other check above). `--platform android` needs no native toolchain;
+      # this only runs Metro, not a Gradle/Xcode build.
+      - name: Bundle smoke test (Metro export, no native build)
+        run: pnpm exec expo export --platform android
+        env:
+          EXPO_NO_TELEMETRY: "1"

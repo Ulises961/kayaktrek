@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "nativewind/theme.css";
+
+/* Design tokens generated from ../frontend/lib/tokens.ts (see scripts/generate-theme-css.js
+ * and that file's own header) — deliberately a generated CSS `@theme` block and not
+ * Tailwind's `@config "./tailwind.config.js"` JS-config directive: Expo's built-in web-CSS
+ * transform, which react-native-css's Metro transformer runs even for native platforms,
+ * processes this file through lightningcss directly and does not resolve `@config`
+ * ("Unknown at rule: @config" -> a hard bundling error). Generating plain CSS sidesteps
+ * that pipeline gap while keeping tokens.ts as the one source of truth. */
+@import "./theme.generated.css";

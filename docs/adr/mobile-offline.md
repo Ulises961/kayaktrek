@@ -19,8 +19,12 @@ tags: [mobile, offline, sync, gps]
 > This matters because the document also records, as a settled decision, that the **PWA-offline
 > tier ships first** (Service-Worker-cached web client, frozen route data, pre-downloaded tile
 > corridor) — and that read as done. `plans/M9.md` inherited it as a satisfied prerequisite;
-> M18's planning is what caught that nobody had built it. A responsive web client is the real
-> prerequisite and comes first (M18), then the Service Worker, then this.
+> M18's planning is what caught that nobody had built it.
+>
+> **That tier was then declined outright on 2026-08-23** (see the decision log), so the sequencing
+> in the paragraph above is dead: there is no Service Worker step between M18 and this. Every
+> mention of the PWA in the phasing section below survives as history, not as a plan. M18 shipped;
+> M9 is next.
 >
 > Treat every mechanism here as a proposal to be checked against the schema and the client as
 > they actually are when M9 starts, not as a description of anything running.
@@ -44,7 +48,7 @@ A paddler wants to view their finalized route, day structure, conditions, and fl
 These solve "bring the plan along" with zero native app work. Build them first.
 
 **2. Create, track, and log while on the water (M9 scope)**
-A paddler wants to check in at waypoints, adjust the route mid-expedition, track real-time position, and auto-generate expedition logs. These require **mutations at sea** — data created on the device that must survive lost connectivity and sync when reconnected. This is the use case that justifies WatermelonDB, RabbitMQ mutation queues, and the full sync protocol.
+A paddler wants to check in at waypoints, adjust the route mid-expedition, track real-time position, and auto-generate expedition logs. These require **mutations at sea** — data created on the device that must survive lost connectivity and sync when reconnected. This is the use case that justifies WatermelonDB, a device-side mutation queue, and the full sync protocol.
 
 **Trigger for building M9**: a real user (or Ulises on a real trip) tries to *create or edit data on the water* and the PWA falls short. Not before. "I wanted to check in at a waypoint while offshore" or "I rerouted a day mid-expedition" are the signals. The plan-reading need is already met by the time that signal arrives.
 
@@ -67,7 +71,7 @@ The mobile client is **offline-first**: it maintains a local WatermelonDB databa
 ```
 Device (WatermelonDB / SQLite)
   ├── Sync down: server → device (full entity snapshots on reconnection)
-  ├── Sync up: device → server (mutation queue via RabbitMQ)
+  ├── Sync up: device → server (device-side queue → batch endpoint)
   └── Weather/sea cache: device → server refresh check on reconnection
 ```
 
@@ -96,7 +100,21 @@ On reconnection, the device pulls **full entity snapshots** for its subscribed t
 | Trip logistics and reservations | No | Pre-departure only |
 | GDPR export data | No | — |
 
-**Sync down protocol**: the server needs to know which entities have changed since the device last synced. A `last_synced_at` timestamp per trip per device, combined with `updated_at` on all entities, is the simplest approach. On reconnection, the device sends its `last_synced_at` per trip; the server returns all entities where `updated_at > last_synced_at`. This protocol must be fully specified in the M9 design document — it is referenced here but not yet built.
+**Sync down protocol**: the server needs to know which entities have changed since the device last synced. A `last_synced_at` timestamp per trip per device, combined with a server-side change timestamp on all entities, is the simplest approach. On reconnection, the device sends its `last_synced_at` per trip; the server returns everything changed since.
+
+> **Superseded in detail by `docs/mobile/sync-protocol-spec.md` (M9a WP1, 2026-08-30).** That
+> document is now the specification; this section survives as the intent behind it. Three
+> corrections it makes to the paragraph above, folded in here so this file does not keep asserting
+> things the spec has disproved:
+>
+> - The column is **`updated`, not `updated_at`** — that is the real name on `BaseModel`. It also
+>   does **not propagate to parents**: moving a `Point` leaves `Day.updated` and
+>   `Itinerary.updated` untouched, so a naive parent-level delta misses child edits entirely.
+> - **The delta cannot detect deletions at all** in this schema. A row that is gone is not a row
+>   with a newer timestamp. Tombstones (a deletion log, capturing DB-cascaded deletes) are required
+>   and are the spec's §5 — the fragile part of the whole design.
+> - Delta granularity is **per aggregate, not uniform** (spec §4), and the route does not travel
+>   on this channel at all (spec §8.2).
 
 ---
 
@@ -105,7 +123,7 @@ On reconnection, the device pulls **full entity snapshots** for its subscribed t
 Weather and sea state data is a primary offline concern. A paddler at sea must be able to see the forecast for the days ahead when connectivity drops. It is included in the offline cache as part of sync-down.
 
 **Key distinctions from other synced data**:
-- Weather/sea data is **read-only on the device** — the mobile client never mutates it. There are no weather mutations to queue to RabbitMQ.
+- Weather/sea data is **read-only on the device** — the mobile client never mutates it. There are no weather mutations to queue at all.
 - It is produced by the backend's Celery weather-fetch task (OpenMeteo, 6h TTL), not by user action.
 - The backend stops refreshing weather rows once a trip transitions to `past` — the server's copy is frozen at whatever the last fetch was.
 
@@ -113,21 +131,55 @@ Weather and sea state data is a primary offline concern. A paddler at sea must b
 
 ```
 for each day in synced trip:
-    if server.weather.updated_at > device.cached_weather.updated_at:
+    if server.weather.fetched_at > device.cached_weather.fetched_at:
         pull full Weather + Sea rows for that day
 ```
 
+> **Corrected 2026-08-30 (M9a WP1, `sync-protocol-spec.md` §6.3/§6.4).** This block previously read
+> `updated_at`, and **neither `Weather` nor `Sea` has such a column** — they deliberately do not
+> derive `BaseModel`, which the spec argues was the right call and actively good for sync. The
+> freshness key is a **new `Weather.fetched_at`**, with `Sea.recorded_at` bumped on refresh; both
+> are backend work this commits to before M9c.
+>
+> This section is also incomplete as written: "refresh on reconnection" omits the
+> **device-initiated** refresh (`POST /day/<id>/weather/refresh`, TTL-bypassing with a short
+> cooldown), which spec §6.4 argues is the *highest-value* weather moment in the product — a
+> paddler with a brief signal window wants to pull a fresh forecast on purpose, not wait for a
+> passive reconnection check.
+
 This is a simple timestamp comparison applied to every day's weather/sea rows — regardless of whether those hours have already passed. A device that was offline yesterday and reconnects today should receive updated rows for yesterday's hours if the server fetched a fresher version while the device was offline. The whole row is replaced (same replace-the-whole-entity principle as all other sync-down data).
 
-**"Forecast as of [timestamp]"**: the cached `updated_at` is displayed in the UI so the paddler knows exactly how fresh the forecast is without any guessing. This label is always shown — not only when data is stale.
+**"Forecast as of [timestamp]"**: the cached `fetched_at` is displayed in the UI so the paddler knows exactly how fresh the forecast is without any guessing. This label is always shown — not only when data is stale. One column serves both jobs, which is why the spec puts it at parent level.
 
-**After a trip transitions to `past`**: the Celery fetch task no longer refreshes weather rows for that trip. The device may pull a final sync on reconnection if the server's `updated_at` is newer than the device's cache, after which the data is effectively immutable. No special case is needed — the timestamp comparison handles it correctly by definition.
+**After a trip transitions to `past`**: the Celery fetch task no longer refreshes weather rows for that trip. The device may pull a final sync on reconnection if the server's `fetched_at` is newer than the device's cache, after which the data is effectively immutable. No special case is needed — the timestamp comparison handles it correctly by definition.
 
 ---
 
-## Sync up — mutation queue via RabbitMQ
+## Sync up — a plain batch endpoint, not a broker
 
-Mutations made offline are published to **RabbitMQ** when connectivity is restored. The backend consumes them in device-timestamp order and applies them via the standard service layer. RabbitMQ durability means the queue survives a broker restart — mutations are not lost if the device reconnects briefly and drops again.
+**Decided 2026-08-30 (M9a WP1), reversing this section's original premise.** Mutations made offline
+are held in the device's own durable queue and POSTed as a **batch to a plain HTTP endpoint** when
+connectivity is restored. The backend applies them in device-timestamp order via the standard
+service layer and answers with a per-mutation result.
+
+The original design published them to **RabbitMQ**. Three things decided against it:
+
+- **Device-side durability is the durability that matters.** The mutations at risk are the ones
+  made at sea, and no broker on the server protects those — the phone's own queue does. A broker's
+  guarantee starts at the moment the device already has a connection, which is exactly the moment
+  the risk has passed.
+- **A broker makes every write async, so the phone can never say "saved."** It can only say
+  "handed off." For a check-in at a waypoint that is a materially worse thing to show a paddler
+  than a synchronous 200.
+- **Failure containment is already solved another way.** The one thing queue separation would have
+  bought is stopping a parked route conflict from wedging check-in and float-plan sync — and
+  `sync-protocol-spec.md` §8.2 already carves the route onto its own channel to get that. Two
+  channels with distinct semantics are far easier to reason about as two endpoints than as two
+  queues.
+
+**RabbitMQ stays, unchanged, as Celery's broker.** This decision is only about whether device
+mutations travel over it; nothing about the weather-fetch, checkpoint-alert or expedition-log tasks
+changes.
 
 ### Mutation envelope
 
@@ -145,7 +197,7 @@ Every queued mutation carries:
 
 ### Idempotency
 
-RabbitMQ delivers at-least-once. The backend consumer checks `mutation_id` against a processed-mutations log before applying. If already seen, the message is acknowledged and skipped silently. The processed-mutations table is append-only; it can be pruned after a safe retention window (90 days is a reasonable starting point — balance storage cost against the need to detect very late redeliveries).
+A device that loses its connection mid-batch retries the batch, so delivery is at-least-once whatever the transport. The backend checks `mutation_id` against a processed-mutations log before applying; if already seen, that entry is reported as applied and skipped silently, which is what makes a whole-batch retry safe. The processed-mutations table is append-only; it can be pruned after a safe retention window (90 days is a reasonable starting point — balance storage cost against the need to detect very late redeliveries). Note this idempotency requirement is **unchanged by dropping the broker** — it was never RabbitMQ's at-least-once delivery that created it, it was the retry.
 
 ### What can be mutated offline
 
@@ -199,11 +251,19 @@ When connected during a `happening` trip, position updates go directly via **Red
 - Open-source fork of the Mapbox React Native SDK taken before Mapbox went proprietary in 2021
 - Native GL rendering — same smoothness as Mapbox Native; no WebView bridge
 - First-class offline region download API; works with any custom XYZ tile server
-- Tile source is our own MinIO proxy (OSM base tiles) and titiler (Sentinel-2 satellite) — same origin as the web client
+- Tile source is our own tile proxy — same origin as the web client. **Corrected 2026-08-30:** this
+  previously read "MinIO proxy (OSM base tiles) and titiler (Sentinel-2 satellite)". Both halves
+  were wrong. **`titiler` appears nowhere in the backend** and never did; the proxy (M8 D10,
+  `tile_service.py`) serves `osm` and `seamark` only, and satellite imagery is not a tile source
+  this product has. And the cache is no longer in an object store at all: v0.6.0 moved it to
+  **local disk** (`Services/tile_cache.py`, `TILE_CACHE_DIR`), because the proxy re-serves tile
+  bytes through Flask, so the browser never fetches from the store and every cache *hit* was
+  paying a WAN round trip once production moved to R2. MinIO is out of production entirely. See
+  `docs/mobile/offline-tiles-spec.md` (M9a WP2)
 - MIT licensed; no usage fees regardless of load volume
 - API close enough to Mapbox RN that if a migration back to Mapbox ever became necessary, the effort would be minimal
 
-The web client stays on react-leaflet. The backend remains SDK-agnostic (raw WGS84 coordinates only). The tile serving infrastructure (MinIO proxy + titiler) is shared between web PWA offline cache and mobile MapLibre offline regions.
+The web client stays on react-leaflet. The backend remains SDK-agnostic (raw WGS84 coordinates only). The tile proxy (`osm` + `seamark`, R2-cached) is shared between the web client and mobile MapLibre offline regions — note the "web PWA offline cache" half of that sharing no longer exists, the PWA tier having been declined outright on 2026-08-23.
 
 **Offline tile management**: the user must explicitly download a region before departure. The pre-departure checklist should include an "offline map downloaded" step. Define a maximum tile storage limit per device. The route corridor for a 200 nm coastal trip at zoom levels 8–15 is roughly a few hundred MB — show a storage estimate before downloading.
 
@@ -304,3 +364,5 @@ These are not optional design work — M9 coding must not begin until each is an
 | Mobile phasing — PWA-offline first, M9 sync when live-expedition use case justifies it | — | 2026-06-15 | "Bring the plan along" met by PWA + GPX + PDF float plan; M9 native app triggered by first real need to mutate/track at sea |
 | **Superseded** — PWA-offline tier declined outright; the mobile app *is* the product | supersedes the 2026-06-15 row above | 2026-08-23 | The 2026-06-15 phasing assumed a PWA would cheaply meet "bring the plan along" before native work started. It was never built, and the call now is that it never should be: nobody plans an expedition from a phone browser, and fewer still install a PWA, so the tier would have been a Service Worker built to be discarded the moment M9c landed. M9a's "open decision: PWA gap" closes as **declined**, not deferred. Note the honest cost: until M9c ships, reading the plan at sea has no in-product answer — GPX export onto a handheld and the PDF float plan are the interim, and both already exist |
 | Distribution — official store channels from the start, Play before App Store | — | 2026-08-23 | Sideloaded APKs were considered and rejected. The app asks a stranger to trust it with route plans, live position and E2E-encrypted medical notes; "download this APK and enable unknown sources" is precisely the friction and the trust signal it cannot afford against an established market. Play first at €25 one-time (versus Apple's yearly fee) with a closed test; App Store follows once the Android beta shows the product is worth the recurring cost. The gating cost of Play is **calendar, not money** — closed-testing tenure, background-location permission review, the Data safety declaration (precise location *and* health data, the latter E2E encrypted, which must be described accurately), and in-app account deletion plus a web-accessible deletion URL. All are free, all are slow, all can be started before the app is finished |
+| **Mutation transport — a plain batch endpoint, not RabbitMQ** | supersedes ADR-015 §"Sync up — mutation queue via RabbitMQ" | 2026-08-30 | M9a WP1's one genuinely open decision, and the last thing blocking WP6 sign-off. Device mutations POST as a batch to a plain HTTP endpoint; the backend applies them in device-timestamp order through the standard service layer and answers per-mutation. Three reasons against the broker. (1) **Device-side durability is the durability that matters** — the at-risk mutations are the ones made at sea, and no server-side broker protects those; the phone's own queue does. A broker's guarantee begins the moment the device already has a connection, which is the moment the risk has passed. (2) **A broker makes every write async, so the phone can never say "saved"**, only "handed off" — materially worse to show a paddler checking in at a waypoint than a synchronous 200. (3) **Failure containment is already solved another way**: the one thing queue separation would buy is stopping a parked route conflict from wedging check-in and float-plan sync, and `sync-protocol-spec.md` §8.2 already carves the route onto its own channel for exactly that. Two channels with distinct semantics are easier to reason about as two endpoints than as two queues. Idempotency via the `mutation_id` processed-log is **unchanged** — it was the retry that required it, never RabbitMQ's at-least-once delivery. **RabbitMQ stays as Celery's broker**, untouched; this was only ever about device mutations |
+| Sync protocol specified; five corrections folded back into this document | ADR-015 | 2026-08-30 | `docs/mobile/sync-protocol-spec.md` (M9a WP1) is now the specification for sync-down; this document keeps the intent and defers detail to it. Its §10 listed corrections this file was still asserting wrongly, all now applied: the change column is **`updated`, not `updated_at`**, and it does **not propagate to parents** (moving a `Point` leaves `Day`/`Itinerary` untouched); the `last_synced_at` delta **cannot detect deletions at all**, so tombstones are required (spec §5, the fragile part); `Weather`/`Sea` have **no `updated_at` column** — freshness moves to a new `Weather.fetched_at` with `Sea.recorded_at` bumped on refresh (§6.3); "refresh on reconnection" omitted the **device-initiated** refresh, which §6.4 argues is the highest-value weather moment in the product; and the tile source described "MinIO proxy + titiler (Sentinel-2)" when **`titiler` appears nowhere in the backend** and never did — the proxy serves `osm` and `seamark` only, and its cache is local disk since v0.6.0, never R2. The spec also commits to **eight pieces of backend work before M9c** (§9), now carried into `plans/M9.md` so M9b is sized against them rather than meeting them late |
