@@ -9,8 +9,12 @@ import {
 } from "@/components/ui/sidebar"
 import { NavigationItems } from "./navigation-items"
 import { SidebarToggleButton } from "./sidebar-toggle-button"
+import packageJson from "@/package.json"
 
-const APP_VERSION = "0.1.0-dev"
+// Read from package.json rather than hardcoded — bumping the version at release time is
+// what keeps this in sync automatically. It previously drifted to "0.1.0-dev" while the
+// app shipped six releases past it, because nothing tied the two together.
+const APP_VERSION = packageJson.version
 
 export function AppSidebar() {
   return (
