@@ -83,8 +83,9 @@ curl http://localhost:5000/api/v1/health
 ## Monitoring / admin tooling
 
 `docker-compose.monitoring.yml` — Portainer (containers), Glances (host CPU/RAM/disk/network),
-pgweb (browse Postgres), Uptime Kuma (health-endpoint monitoring + alert notification —
-closes the silent-failure gap ADR-034 flagged for the home-hosted RabbitMQ path; monitors and
+pgweb (browse Postgres), Uptime Kuma (health-endpoint monitoring + alert notification — narrows
+the silent-failure gap ADR-034 flagged for the home-hosted RabbitMQ path, but does not close it;
+it runs on the box it watches, so see "What this stack cannot do" below; monitors and
 notification channels are configured post-boot in its own web UI, not declaratively here).
 Independent of the app stack's lifecycle — never touched by the redeploy loop above. **Must be
 brought up after `docker-compose.prod.yml` at least once** — it joins the `kayak_net` network that
@@ -130,10 +131,15 @@ notification form are both account/credential steps, done once by a human in the
 
    | Name | Type | Target | Why |
    |---|---|---|---|
-   | App — public | HTTP | `https://<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. |
+   | App — public | HTTP | `https://api.<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. **`api.`, not the apex** — corrected 2026-08-31, this line said `https://<domain>/…` and the apex proxies to the frontend, so it 404s. A monitor built from it sits permanently red and gets dismissed as broken. Verify with `curl` before saving any monitor: the apex answers `/` and `api.` answers `/api/v1/health`. |
    | App — local | HTTP | `http://127.0.0.1:5000/api/v1/health` | If only the public one goes red, it's the tunnel, not the app — this pair is the diagnosis. |
    | RabbitMQ | TCP | `127.0.0.1:5672` | ADR-034's original reason for this container: a silent RabbitMQ death would take the missed-checkpoint shore-contact alert down with it, invisibly. |
-   | Backup heartbeat | Push | (Kuma generates the URL) | Set as `BACKUP_HEARTBEAT_URL` in `.env` — `scripts/backup-db.sh` pings it only on success, so this alerts on *silence*, the actual failure mode of a scheduled job (see "Offsite backups" above). |
+   | ~~Backup heartbeat~~ | Push | — | **Declined 2026-08-31.** `BACKUP_HEARTBEAT_URL` stays unset. A *push* monitor needs the droplet to reach Kuma, and Kuma binds to `127.0.0.1:3001` here and is deliberately never tunnelled — so this would need either a second service or a path-scoped ingress rule on this box. Disproportionate, because the heartbeat's rationale was the *home box's* suspend behaviour (`backup-db.sh`'s comment: "the box suspends, so a missed window produces no output anywhere") and the droplet does not suspend. Accepted gap: a backup job that stops running is not alerted on. |
+
+**What this stack cannot do, by construction.** Every monitor above runs on the machine being
+monitored. That is fine for the pull tools, and it is a real limitation for Kuma: a dead box is a
+dead Kuma. Treat this section as *diagnosis* — which service broke, tunnel or app — and put
+*detection* somewhere that survives the host. See the "Still open" items in the Status section.
 
 ## Deploying configuration to the box
 
@@ -425,13 +431,42 @@ a real production domain before:
    attempt — Cloudflare was faithfully proxying `kayaktrek.app` to that stale record the whole
    time, manifesting as a 522. Deleting it and re-running the route command fixed it.
 
+**Closed since (2026-08-30):**
+- **Uptime Kuma monitors** — configured and verified: health-endpoint checks plus a notification
+  channel. Monitor list and notification setup are under "Monitoring / admin tooling" above.
+  **Read what this does and does not buy** (corrected 2026-08-31 — the first version of this line
+  claimed it catches the box being gone, which is exactly backwards): Kuma runs on the box it
+  watches, so a dead host is a dead Kuma. It cannot report a power cut, an ISP drop, a kernel panic
+  or an unintended suspend — the failure modes that most need an alert. It is a **diagnostic panel**
+  for failures *while the host is alive* (RabbitMQ dead, app 500ing, the public-vs-local pair that
+  separates a tunnel fault from an app fault), and detection has to live somewhere else.
+- **`StorageService.move()` under the live two-bucket R2 split** — manually verified (the M19
+  `isPublic` public/private image toggle).
+
 **Still open, not blockers to the current live state:**
-- **Uptime Kuma monitor configuration** — the stack is up (2026-08-28); the monitors and
-  notification channel themselves are an account/credential step done once by a human in the
-  web UI, not scriptable. Exact monitor list and notification setup: "Monitoring / admin
-  tooling" above.
-- **Carried over from `CLAUDE.md`'s pre-production checklist**: Sentry error alerting, and
-  revisiting `.env`-file secrets management now that a staging-shaped server is genuinely
-  provisioned (the condition `CLAUDE.md` already names for that revisit).
+- ✅ **Backups scheduled and rehearsed on the droplet (2026-08-31).** `kayak-backup.timer` enabled,
+  a real run verified (`kayak-2026-08-31T121029Z.sql.gz.age`, size-checked against B2 by the script),
+  and a restore rehearsed **on this box** rather than only on the retired one. Schedule is **09:17
+  UTC**, not the small hours — see `systemd/kayak-backup.timer`: the heartbeat receiver is Kuma on
+  the home box, which suspends, and a success ping fired at a suspended receiver fails rather than
+  queues, so a night run would false-alarm every morning.
+- ✅ **Off-box monitoring, in two layers (2026-08-31).** DO alert policies and uptime checks run on
+  their control plane — always up, off-droplet by construction — covering droplet-down, CPU, memory,
+  disk and public URL reachability. **Uptime Kuma on the home box** covers the richer application
+  checks during its waking hours; now that the app lives on a droplet, `aspire` is a genuinely
+  independent observer (different machine, network and provider), which is the property the
+  "a box cannot monitor itself" finding demanded — obtained with no new vendor. Healthchecks.io was
+  considered and proved unnecessary. **Residual:** a monitor that silently stops looks identical to
+  "all fine" — if `aspire` fails to wake, no email arrives either way. DO's layer covers the
+  important half.
+- **A Logfire alert on error rate** — cheap, not yet done, and first in the alerting cost order.
+  Sentry proper stays deliberately deferred past the Play closed beta (`CLAUDE.md`'s observability
+  checklist).
+- **R2 object versioning** — R2's durability covers hardware; versioning covers our own delete bug.
+- **No privacy policy exists** (`frontend/app/(public)/` has `terms/` and nothing else) — a Play
+  submission blocker, and it lands on `get.kayaktrek.app` rather than in the app.
+- **Secrets management** — `.env` still lives in exactly one place with no offsite copy; both
+  `.env` files belong in a password manager. The trigger for a real secrets manager is a CI/CD
+  pipeline holding secrets, which M9's mobile builds bring.
 - Minor: two `apispec` `UserWarning`s during `flask seed` (`User`, `UserCertification` schema
   name collisions, M13's OpenAPI spec generation) — non-fatal, doc-quality only.

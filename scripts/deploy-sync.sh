@@ -46,6 +46,8 @@ readonly FILES=(
     docker-compose.prod.yml
     scripts/backup-db.sh
     scripts/restore-db.sh
+	systemd/kayak-backup.service.template
+	systemd/kayak-backup.timer
 )
 
 # nginx is deliberately NOT here. `nginx/kayak-expedition-planner.conf.template` is a
@@ -56,14 +58,17 @@ readonly FILES=(
 # it changes about once a year and is a deliberate, sighted operation when it does. See
 # DEPLOY.md.
 #
-# `systemd/` is excluded on exactly the same grounds: kayak-backup.service.template carries
-# __USER__/__REPO_DIR__ placeholders, lands in /etc/systemd/system/, and needs a
-# daemon-reload to take effect. Syncing it would reintroduce the nginx mistake in a place
-# where the damage is quieter — a clobbered unit does not fail the push, it just stops
-# taking backups.
+# `systemd/` IS in the list above, and the distinction against nginx is worth being precise
+# about, because this comment previously claimed the opposite and the code had moved on.
+# Both are templates needing substitution and root to install. The difference is *where the
+# push lands*: these two arrive in the deploy directory, which is simply where you `sudo cp`
+# them from — nothing reads them there, so a stale copy is inert. The nginx template's
+# hazard was that an earlier script printed a `sudo cp` into sites-available alongside the
+# sync, which is what overwrote a live config.
 #
-# The rule this leaves behind: what this script pushes is what the containers read. What
-# root installs once, by hand, stays out.
+# The rule this leaves behind: this script pushes files into the deploy directory and
+# nothing else. What root installs *out* of that directory — nginx vhost, systemd units — is
+# a separate, sighted, once-in-a-long-while operation. See DEPLOY.md.
 
 for f in "${FILES[@]}"; do
     [ -f "$f" ] || { echo "ERROR: $f is missing from the repo" >&2; exit 1; }
@@ -87,16 +92,63 @@ preview() {
     echo "$out"
 }
 
-echo ">>> Changes to ${HOST}:${REMOTE_PATH}/"
-CHANGES=$(preview --relative "${FILES[@]}" "${HOST}:${REMOTE_PATH}/")
-ENV_CHANGE=$(preview "$ENV_SOURCE" "${HOST}:${REMOTE_PATH}/.env")
-
-if [ -z "$CHANGES" ] && [ -z "$ENV_CHANGE" ]; then
-    echo "    (nothing — the box already matches this checkout)"
+# Does the remote path exist yet? Asked explicitly, before rsync gets a chance to fail on
+# it, because on a box that has never been synced rsync exits 3 with
+#   change_dir "…/kayak-planner" failed: No such file or directory
+# and preview() above would report that as "could not reach ${HOST}" — naming the one cause
+# that is definitely not true. A first run against a fresh box is exactly when --dry-run is
+# most worth having and least worth misreading; that is how the M21 DigitalOcean migration
+# hit it.
+#
+# The real push creates the directory itself (below), so only --dry-run was ever affected.
+# Fixed by asking rather than by inferring from rsync's exit code: 3 covers several
+# "selecting input/output files" conditions and its message text is not a stable contract.
+#
+# ssh returns 255 for its own failures and otherwise the remote command's status, so
+# `test -d` cleanly separates the three cases. REMOTE_PATH is intentionally unquoted in the
+# remote command so the remote shell expands its leading ~.
+#
+# Written as `if ssh …` rather than running ssh and inspecting $? on the next line: this
+# script runs under `set -e`, which would abort on the non-zero exit that means "directory
+# absent" before anything got the chance to interpret it. A condition is a tested context,
+# so the failure is ours to handle.
+if ssh "$HOST" "test -d ${REMOTE_PATH}"; then
+    REMOTE_EXISTS=1
 else
-    [ -n "$CHANGES" ] && echo "$CHANGES" | sed 's/^/    /'
-    # The env file's *content* is never shown; only that it differs.
-    [ -n "$ENV_CHANGE" ] && echo "    ${ENV_SOURCE} -> .env  (differs)"
+    SSH_STATUS=$?
+    if [ "$SSH_STATUS" = "1" ]; then
+        REMOTE_EXISTS=0
+    else
+        echo "ERROR: could not reach ${HOST} over ssh (exit ${SSH_STATUS})" >&2
+        exit 1
+    fi
+fi
+readonly REMOTE_EXISTS
+
+echo ">>> Changes to ${HOST}:${REMOTE_PATH}/"
+if [ "$REMOTE_EXISTS" = "0" ]; then
+    # Nothing to diff against: every file is new. List them rather than erroring, so a
+    # first run still answers "what is about to land on this box?".
+    echo "    (first run — ${REMOTE_PATH} does not exist yet; all of this is new)"
+    printf '    %s\n' "${FILES[@]}"
+    echo "    ${ENV_SOURCE} -> .env"
+else
+    # The same --chmod the real push uses, below. Without it the preview compares local
+    # modes against modes the push itself set, so every file reports a spurious `p`
+    # difference forever and "(nothing — the box already matches)" is unreachable. A tool
+    # whose whole job is answering "is what is on the box what is in the repo?" must not
+    # report permanent phantom drift; the preview has to model the push, not a push nobody
+    # performs.
+    CHANGES=$(preview --relative --chmod=F755 --omit-dir-times "${FILES[@]}" "${HOST}:${REMOTE_PATH}/")
+    ENV_CHANGE=$(preview --chmod=F600 "$ENV_SOURCE" "${HOST}:${REMOTE_PATH}/.env")
+
+    if [ -z "$CHANGES" ] && [ -z "$ENV_CHANGE" ]; then
+        echo "    (nothing — the box already matches this checkout)"
+    else
+        [ -n "$CHANGES" ] && echo "$CHANGES" | sed 's/^/    /'
+        # The env file's *content* is never shown; only that it differs.
+        [ -n "$ENV_CHANGE" ] && echo "    ${ENV_SOURCE} -> .env  (differs)"
+    fi
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -106,7 +158,7 @@ fi
 
 echo ">>> Pushing..."
 ssh "$HOST" "mkdir -p ${REMOTE_PATH}/scripts"
-rsync -az --relative --chmod=F755 "${FILES[@]}" "${HOST}:${REMOTE_PATH}/"
+rsync -az --relative --chmod=F755 --omit-dir-times "${FILES[@]}" "${HOST}:${REMOTE_PATH}/"
 
 # .env last and separately: different name, and 600 because it holds every credential the
 # stack has. --chmod applies on the receiving side regardless of the local mode.

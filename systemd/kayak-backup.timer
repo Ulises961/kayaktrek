@@ -1,26 +1,40 @@
 # Schedule for kayak-backup.service. No placeholders — install as-is.
 #
-# A systemd timer rather than a cron line, and the reason is specific to this box rather
-# than a style preference: it runs `autosuspend`, and cron has no concept of a missed run.
-# A crontab entry at 03:17 on a machine that is suspended at 03:17 does not fire and does
-# not catch up — and produces no output, so not even cron's mail-on-failure tells you.
-# The result is a backup job that looks configured and silently never runs, which is worse
-# than no backup job at all because it reads as done.
+# A systemd timer rather than a cron line. The original reason was specific to the home box:
+# it ran `autosuspend`, and cron has no concept of a missed run — a crontab entry at 03:17 on
+# a machine suspended at 03:17 does not fire and does not catch up, and produces no output, so
+# not even cron's mail-on-failure tells you. That is a backup job which looks configured and
+# silently never runs, worse than none because it reads as done.
 #
-# Persistent=true is the whole point: systemd records the last trigger on disk and fires
-# on the next wake if the window was missed.
+# **Since M21 this runs on a DigitalOcean droplet, which never suspends**, so that argument no
+# longer applies. The choice survives on its own merits: `Persistent=true` records the last
+# trigger on disk, the journal keeps output, and `systemctl list-timers` answers "when did this
+# last run" — which cron cannot. Keeping `Persistent=true` regardless is free insurance if the
+# unit is ever installed on a suspending machine again.
 #
-# Deliberately NOT WakeSystem=true — waking the box nightly to take a backup defeats
-# autosuspend, and running shortly after the next natural wake is the right trade for a
-# home box. On a DigitalOcean droplet (ADR-034) nothing suspends and this simply behaves
-# as an ordinary nightly timer; the unit moves across unchanged, which is why no cron
-# container is needed there.
+# Deliberately NOT WakeSystem=true — nothing suspends now, and on a box that did, waking it
+# nightly to take a backup would defeat the point of suspending at all.
 
 [Unit]
 Description=Nightly Kayak encrypted offsite database backup
 
 [Timer]
-OnCalendar=*-*-* 03:17:00
+# 09:17 UTC (11:17 CEST), not the small hours.
+#
+# **The original reason for this time is void, and is recorded here so nobody re-derives it.**
+# It was moved off 03:17 so `backup-db.sh`'s success ping would land while uptime-kuma — which
+# lives on the home box, under `autosuspend` — was awake, since a ping at a suspended receiver
+# fails rather than queues and Kuma would have false-alarmed every morning. The heartbeat was
+# then declined outright (`BACKUP_HEARTBEAT_URL` is unset; see that block in `backup-db.sh`),
+# so there is no longer a receiver to be awake for and no timing constraint at all.
+#
+# It stays at 09:17 anyway, for a weaker but real reason: a run during working hours is one you
+# might notice failing, where a 03:17 failure is only ever found by going to look. Moving it
+# back would buy nothing.
+#
+# There is no cost to a daytime dump: pg_dump takes an MVCC snapshot, so consistency does not
+# depend on quiet hours, and at beta load the extra I/O is not measurable.
+OnCalendar=*-*-* 09:17:00
 Persistent=true
 # Spread the load a little, and avoid every box in a future fleet hitting B2 at once.
 RandomizedDelaySec=10m
