@@ -162,6 +162,41 @@ describe("register", () => {
     expect(result).toEqual({ success: false, error: "Something went wrong. Please try again." })
     expect(redirect).not.toHaveBeenCalled()
   })
+
+  it("returns a distinct, field-attributable error for a missing/wrong invite code (403)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ code: "invalid_invite_code" }),
+      }),
+    )
+    const result = await register(null, formData(VALID_REGISTRATION))
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid or missing invite code.",
+      code: "invalid_invite_code",
+    })
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("returns a generic access-denied error for a 403 that isn't invalid_invite_code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({}) }),
+    )
+    const result = await register(null, formData(VALID_REGISTRATION))
+    expect(result).toEqual({ success: false, error: "Access denied." })
+  })
+
+  it("sends the invite code in the request body when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 })
+    vi.stubGlobal("fetch", fetchMock)
+    await register(null, formData({ ...VALID_REGISTRATION, inviteCode: "beta-2026" }))
+    const [, options] = fetchMock.mock.calls[0]
+    expect(JSON.parse(options.body)).toMatchObject({ inviteCode: "beta-2026" })
+  })
 })
 
 describe("logout", () => {

@@ -100,6 +100,7 @@ export async function register(
     username: formData.get("username"),
     name: formData.get("name"),
     phone: formData.get("phone") ?? undefined,
+    inviteCode: formData.get("inviteCode") ?? undefined,
     password: formData.get("password"),
   })
   if (!parsed.success) {
@@ -110,9 +111,16 @@ export async function register(
     }
   }
 
-  const { mail, username, name, phone, password } = parsed.data
-  // phone is optional at signup (M12 §F) — JSON.stringify drops the undefined key.
-  const body = { mail, username, name, phone: phone || undefined, pwd: password }
+  const { mail, username, name, phone, inviteCode, password } = parsed.data
+  // phone/inviteCode are optional client-side — JSON.stringify drops the undefined key.
+  const body = {
+    mail,
+    username,
+    name,
+    phone: phone || undefined,
+    inviteCode: inviteCode || undefined,
+    pwd: password,
+  }
 
   let res: Response
   try {
@@ -125,6 +133,17 @@ export async function register(
     return { success: false, error: "Could not reach the server. Please try again." }
   }
 
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    if (body?.code === "invalid_invite_code") {
+      return {
+        success: false,
+        error: "Invalid or missing invite code.",
+        code: "invalid_invite_code",
+      }
+    }
+    return { success: false, error: "Access denied." }
+  }
   if (res.status === 409) {
     return { success: false, error: "Email or username already in use." }
   }

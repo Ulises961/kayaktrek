@@ -1,3 +1,4 @@
+import hmac
 import logging
 from uuid import UUID
 
@@ -120,6 +121,13 @@ def login_user():
         raise e
 
 
+def _invite_code_valid(submitted: str) -> bool:
+    required = current_app.config.get("INVITE_CODE") or ""
+    if not required:
+        return True
+    return hmac.compare_digest(str(submitted or ""), required)
+
+
 @api.route("/api/v1/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
 def register_user():
@@ -130,6 +138,9 @@ def register_user():
       description: >
         Always returns 201, even if the mail/username is already taken — prevents account
         enumeration. Sends a verification email; the account is inactive until verified.
+        When the closed-beta invite gate is enabled (INVITE_CODE set), a missing or wrong
+        `inviteCode` returns 403 before any of that — this check is independent of the
+        enumeration guard, since a shared code carries no per-user information.
       requestBody:
         content:
           application/json:
@@ -137,11 +148,20 @@ def register_user():
       responses:
         201:
           description: Request received (does not imply an account was actually created)
+        403:
+          description: Missing or invalid invite code
     """
     user_json = request.get_json()
 
     if not user_json:
         raise ValueError("Missing request body")
+
+    if not _invite_code_valid(user_json.get("inviteCode")):
+        return jsonify({
+            "status": "fail",
+            "code": "invalid_invite_code",
+            "message": "Invalid or missing invite code.",
+        }), HTTPStatus.FORBIDDEN
 
     AuthService.register_user(user_json)
 

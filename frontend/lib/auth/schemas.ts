@@ -20,6 +20,11 @@ export const RegisterSchema = z.object({
     .refine(noHtmlTags.check, noHtmlTags.message),
   // Optional since M12 §F — signup no longer asks for it; collected in Settings.
   phone: z.string().optional(),
+  // Closed-beta invite gate — required only when the backend has one configured
+  // (INVITE_CODE set). Left optional here so a build with the gate off never blocks
+  // submission on a field the server won't even check; a wrong/missing code server-side
+  // surfaces as a field error instead.
+  inviteCode: z.string().optional(),
   password: z
     .string()
     .min(12, "Password must be at least 12 characters.")

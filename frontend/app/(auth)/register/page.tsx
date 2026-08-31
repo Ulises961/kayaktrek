@@ -58,6 +58,7 @@ export default function RegisterPage() {
     fd.append("mail", data.mail)
     fd.append("username", data.username)
     fd.append("name", data.name)
+    if (data.inviteCode) fd.append("inviteCode", data.inviteCode)
     fd.append("password", data.password)
     startTransition(() => formAction(fd))
   })
@@ -67,6 +68,25 @@ export default function RegisterPage() {
       <AuthCardHeading title="Create account" subtitle="Start planning your expedition" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="inviteCode" className="auth-label">
+            Invite code
+          </label>
+          <Input
+            id="inviteCode"
+            type="text"
+            autoComplete="off"
+            className="auth-input"
+            {...register("inviteCode")}
+          />
+          {errors.inviteCode && (
+            <p className="text-[11px] text-red-600">{errors.inviteCode.message}</p>
+          )}
+          {serverState && !serverState.success && serverState.code === "invalid_invite_code" && (
+            <p className="text-[11px] text-red-600">{serverState.error}</p>
+          )}
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor="mail" className="auth-label">
             Email
@@ -123,7 +143,7 @@ export default function RegisterPage() {
           {errors.password && <p className="text-[11px] text-red-600">{errors.password.message}</p>}
         </div>
 
-        {serverState && !serverState.success && (
+        {serverState && !serverState.success && serverState.code !== "invalid_invite_code" && (
           <p className="auth-notice auth-notice-error">{serverState.error}</p>
         )}
 

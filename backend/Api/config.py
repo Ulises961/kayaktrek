@@ -20,6 +20,9 @@ class Config:
     # publishing a postal address is a trader-identity decision (DSA), not a template default.
     MAIL_POSTAL_ADDRESS = os.getenv("MAIL_POSTAL_ADDRESS", "")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    # Closed-beta registration gate (single shared code). Empty = gate disabled — every
+    # environment that hasn't set one (local dev, CI, testing) registers exactly as before.
+    INVITE_CODE = os.getenv("INVITE_CODE", "")
     CACHE_TYPE = "RedisCache"
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
