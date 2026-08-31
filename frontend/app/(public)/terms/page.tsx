@@ -24,7 +24,8 @@ interface SectionProps {
 // decryptable by your trip leader", which was false on both halves — the encryption runs
 // server-side (`Services/crypto_service.py`), so plaintext and password both reach the
 // backend, and the owner can decrypt too. Two documents describing one mechanism is how
-// that survived; one of them owning it is the fix.
+// that survived; one of them owning it is the fix. §7 (cookies) follows the same rule —
+// Privacy §6 is the one factual statement, this just points at it.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">
@@ -117,8 +118,11 @@ export default function TermsPage() {
 
         <Section title="7. Cookies">
           <p>
-            The Service uses a strictly-necessary session cookie to keep you signed in. We do not
-            use advertising, tracking, or analytics cookies.
+            The Service uses cookies only as described in the{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:no-underline">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </Section>
 

@@ -62,6 +62,15 @@ describe("PrivacyPage", () => {
 
   it("links back to the app from the header", () => {
     render(<PrivacyPage />)
-    expect(screen.getByRole("link", { name: /kayaktrek/i })).toHaveAttribute("href", "/")
+    expect(screen.getByRole("link", { name: "Kayaktrek" })).toHaveAttribute("href", "/")
+  })
+
+  it("makes the contact address a mailto link", () => {
+    render(<PrivacyPage />)
+    const links = screen.getAllByRole("link", { name: "privacy@kayaktrek.app" })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "mailto:privacy@kayaktrek.app")
+    }
   })
 })

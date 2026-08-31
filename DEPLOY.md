@@ -578,8 +578,10 @@ a real production domain before:
   Sentry proper stays deliberately deferred past the Play closed beta (`CLAUDE.md`'s observability
   checklist).
 - **R2 object versioning** — R2's durability covers hardware; versioning covers our own delete bug.
-- **No privacy policy exists** (`frontend/app/(public)/` has `terms/` and nothing else) — a Play
-  submission blocker, and it lands on `get.kayaktrek.app` rather than in the app.
+- ✅ **Privacy policy live in the app** (2026-08-31) — `frontend/app/(public)/privacy`. The
+  earlier plan to put it on a separate `get.kayaktrek.app` static site was dropped the same day
+  (that site's whole premise — surviving the box being down — was removed by this migration;
+  see `docs/adr/foundation.md`'s ADR-034 decision log).
 - **Secrets management** — `.env` still lives in exactly one place with no offsite copy; both
   `.env` files belong in a password manager. The trigger for a real secrets manager is a CI/CD
   pipeline holding secrets, which M9's mobile builds bring.

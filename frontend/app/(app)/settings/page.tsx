@@ -14,8 +14,9 @@ import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
 import { DeviceSessions } from "@/components/settings/device-sessions"
+import { LegalSection } from "@/components/settings/legal-section"
 import { PageHeading } from "@/components/common/page-heading"
-import { LockIcon, RulerIcon, MailIcon, ShieldIcon, DownloadIcon } from "lucide-react"
+import { LockIcon, RulerIcon, MailIcon, ShieldIcon, DownloadIcon, ScaleIcon } from "lucide-react"
 
 export default async function SettingsPage() {
   let user
@@ -138,6 +139,19 @@ export default async function SettingsPage() {
               <DeleteAccountButton />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Legal */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ScaleIcon className="size-4" />
+            Legal
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LegalSection />
         </CardContent>
       </Card>
     </>

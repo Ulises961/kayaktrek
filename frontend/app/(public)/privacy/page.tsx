@@ -2,6 +2,8 @@ import type { ReactNode } from "react"
 import { ChartHeaderBar } from "@/components/common/chart-header"
 import { PageHeading } from "@/components/common/page-heading"
 
+const contactMail = "privacy@kayaktrek.app"
+
 export const metadata = {
   title: "Privacy Policy",
 }
@@ -21,12 +23,11 @@ interface SectionProps {
 //
 // Not a substitute for legal review before a real launch.
 //
-// `__OPERATOR_ADDRESS__` in section 1 is the one value still outstanding, following the same
-// fill-in convention as `systemd/kayak-backup.service.template`. It renders literally, so an
-// accidental deploy is glaring rather than silent. GDPR Art. 13(1)(a) requires the controller's
-// identity and contact details — an email satisfies "contact details", so the policy is servable
-// without a postal address, but Play's store listing requires a physical address separately once
-// an app takes payment.
+// Section 1 deliberately carries no postal address (decided 2026-08-31). GDPR Art. 13(1)(a)
+// requires the controller's identity and contact details — an email satisfies "contact
+// details", so the policy is servable without one. Play's store listing requires a physical
+// address, but only once the app takes payment, and that requirement is on the store listing,
+// not this page. Add it here only if the policy text itself ever needs to carry it.
 //
 // The contact is `privacy@kayaktrek.app`, a Cloudflare Email Routing alias, rather than a personal
 // mailbox — this page is built to be crawled, and an alias also survives a change of mail provider
@@ -65,9 +66,12 @@ export default function PrivacyPage() {
           <p>
             Ulises E. Sosa
             <br />
-            __OPERATOR_ADDRESS__
-            <br />
-            privacy@kayaktrek.app
+            <a
+              href={`mailto:${contactMail}`}
+              className="underline underline-offset-2 hover:no-underline"
+            >
+              {contactMail}
+            </a>
           </p>
           <p>
             This policy applies to the web application and the mobile application. It describes what
@@ -88,9 +92,9 @@ export default function PrivacyPage() {
             public.
           </p>
           <p>
-            <strong>Vessel data.</strong> Make, model, length, and hull colours, if provided. These
-            are the details a search-and-rescue service requests, and they appear on any float plan
-            you share.
+            <strong>Vessel data.</strong> Details about your kayak (such as make, model, and
+            colour), if provided — the kind of description a search-and-rescue service would ask
+            for, and included on any float plan you share.
           </p>
           <p>
             <strong>Emergency contact data.</strong> Name, telephone number, and relationship, if
@@ -98,8 +102,9 @@ export default function PrivacyPage() {
             float plan.
           </p>
           <p>
-            <strong>Trip data.</strong> Routes, waypoints, day plans, notes, equipment lists,
-            reservations, uploaded travel documents, and paddling logs.
+            <strong>Trip data.</strong> The content you create to plan and record a trip: routes and
+            day plans, equipment lists, logistics details, uploaded travel documents, and paddling
+            logs.
           </p>
           <p>
             <strong>Location data</strong> is covered in section 3 and <strong>health data</strong>{" "}
@@ -235,6 +240,10 @@ export default function PrivacyPage() {
             Such transfers are made under the European Commission&rsquo;s standard contractual
             clauses or an adequacy decision.
           </p>
+          <p>
+            Where the recipient is our backup storage provider, only the encrypted backup file
+            described in section 7 is transferred — the provider holds no key and cannot read it.
+          </p>
         </Section>
 
         <Section title="9. Retention">
@@ -314,8 +323,14 @@ export default function PrivacyPage() {
 
         <Section title="15. Contact">
           <p>
-            Enquiries about this policy, and requests under section 11, may be sent to
-            privacy@kayaktrek.app.
+            Enquiries about this policy, and requests under section 11, may be sent to{" "}
+            <a
+              href={`mailto:${contactMail}`}
+              className="underline underline-offset-2 hover:no-underline"
+            >
+              {contactMail}
+            </a>
+            .
           </p>
         </Section>
       </main>

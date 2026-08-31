@@ -9,6 +9,7 @@ import { usePositionWatch } from "@/hooks/use-position-watch"
 import { useLivePositions } from "@/hooks/use-live-positions"
 import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
+import { NavigateConsentDialog } from "./navigate-consent-dialog"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
 import type { Day } from "@/lib/dtos/day"
@@ -76,9 +77,12 @@ export function MapBuilder({
   const [conditionsVersion, setConditionsVersion] = useState(0)
   // Honors the `?navigate=1` deep link once, at mount — as a state initializer
   // rather than an effect, so a user who explicitly turns Navigate off is never
-  // fought by a later re-run.
+  // fought by a later re-run. It opens the consent dialog rather than entering
+  // Navigate mode directly: a deep link is exactly as much "I am now sharing my
+  // location" as a button click, and must not skip the same confirmation.
   const searchParams = useSearchParams()
-  const [navigateMode, setNavigateMode] = useState(
+  const [navigateMode, setNavigateMode] = useState(false)
+  const [showNavigateConfirm, setShowNavigateConfirm] = useState(
     () => showNavigate && searchParams.get("navigate") === "1",
   )
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
@@ -86,13 +90,21 @@ export function MapBuilder({
   const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
 
   // ── Navigate mode (M8) ──────────────────────────────────────────────────
+  // Turning Navigate ON shares live location (Privacy §2/§3's "explicit consent"
+  // claim) and goes through NavigateConsentDialog first. Turning it OFF stops
+  // sharing and needs no confirmation of its own.
 
   const handleToggleNavigate = useCallback(() => {
-    setNavigateMode((prev) => {
-      const next = !prev
-      if (next) setViewMode(true)
-      return next
-    })
+    if (navigateMode) {
+      setNavigateMode(false)
+      return
+    }
+    setShowNavigateConfirm(true)
+  }, [navigateMode])
+
+  const handleConfirmNavigate = useCallback(() => {
+    setNavigateMode(true)
+    setViewMode(true)
   }, [])
 
   const mintStreamUrl = useCallback(
@@ -439,6 +451,11 @@ export function MapBuilder({
           showNavigate={showNavigate}
           navigateMode={navigateMode}
           onToggleNavigate={handleToggleNavigate}
+        />
+        <NavigateConsentDialog
+          open={showNavigateConfirm}
+          onOpenChange={setShowNavigateConfirm}
+          onConfirm={handleConfirmNavigate}
         />
         {/* Panels are layout siblings of the map, not overlays — they push the map
             narrower instead of covering it, so no information is hidden.
