@@ -9,11 +9,13 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/_frontend-validate-run.yml"
   pull_request:
     branches: [master]
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
+      - ".github/workflows/_frontend-validate-run.yml"
 
 # See backend-ci.yml for the reasoning. Separate group name so the two workflows cancel
 # independently — a frontend-only push should not cancel a backend run on the same ref.
@@ -22,72 +24,15 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
-  validate:
-    # See backend-ci.yml for the reasoning. ~6.5 minutes a run; the two together are ~86% of
-    # the GitHub-hosted spend.
-    runs-on: [self-hosted, linux, x64]
+  # GitHub-hosted first: see backend-ci.yml for the fallback policy — same reasoning here.
+  validate-hosted:
+    uses: ./.github/workflows/_frontend-validate-run.yml
+    with:
+      runs-on-json: '["ubuntu-latest"]'
 
-    defaults:
-      run:
-        working-directory: frontend
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --loglevel=error
-
-      - name: Type check
-        run: pnpm exec tsc --noEmit
-
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Test
-        run: pnpm run test:run
-        timeout-minutes: 10
-
-      # Both NEXT_PUBLIC_* origins are required: lib/api/config.ts throws on an empty one in
-      # a production build, which is the point — a missing repo Variable would otherwise ship
-      # a bundle whose every request is a relative URL back at the Next.js server. The values
-      # here are placeholders; the real ones come from repo Variables at image-build time.
-      - name: Build
-        run: pnpm run build
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000
-          NEXT_PUBLIC_SSE_URL: http://localhost:5001
-
-      # `pnpm build` succeeding says nothing about whether the standalone output it
-      # produced can start: v0.4.0 shipped an image that died on its first module load
-      # (@swc/helpers traced through its `require` condition, resolved at runtime through
-      # `import`) and restart-looped, with a green build behind it. Booting the artifact
-      # is the only gate that sees that class of breakage.
-      - name: Smoke-test the standalone server
-        run: |
-          cp -r public .next/standalone/public
-          cp -r .next/static .next/standalone/.next/static
-          PORT=3123 node .next/standalone/server.js &
-          for i in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://127.0.0.1:3123/login; then
-              echo "standalone server served /login"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "standalone server never served a request"
-          exit 1
-
-      - name: Dependency audit
-        run: pnpm audit --prod --audit-level=high
+  validate-fallback:
+    needs: validate-hosted
+    if: always() && needs.validate-hosted.result == 'failure'
+    uses: ./.github/workflows/_frontend-validate-run.yml
+    with:
+      runs-on-json: '["self-hosted","linux","x64"]'

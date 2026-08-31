@@ -1,0 +1,82 @@
+name: Backend test run
+
+# Reusable job body for backend-ci.yml. Exists so the same suite can run on either runner
+# pool (GitHub-hosted first, self-hosted fallback) without duplicating the steps — see
+# backend-ci.yml for the fallback policy and reasoning.
+
+on:
+  workflow_call:
+    inputs:
+      runs-on-json:
+        description: JSON array of runner labels, e.g. '["ubuntu-latest"]'
+        required: true
+        type: string
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+jobs:
+  test:
+    runs-on: ${{ fromJson(inputs.runs-on-json) }}
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: kayak
+          POSTGRES_PASSWORD: kayak_test_password
+          POSTGRES_DB: kayak_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U kayak"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      CONFIG_MODE: testing
+      DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5434/kayak_test
+      SECRET_KEY: ci-secret-key-not-used-in-prod
+      JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
+      RATELIMIT_STORAGE_URI: memory://
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+
+      - name: Dependency audit
+        run: |
+          uv export --no-dev --frozen --no-emit-project > requirements-audit.txt
+          uvx pip-audit --local -r requirements-audit.txt
+
+      - name: Lint (flake8)
+        run: uv run flake8 .
+
+      - name: Type check (mypy)
+        run: uv run mypy
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Check for model/migration drift
+        run: uv run alembic check
+
+      - name: Run tests
+        run: uv run pytest --tb=short -q --cov=. --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: backend/coverage.xml
+          flags: backend

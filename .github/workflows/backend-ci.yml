@@ -9,11 +9,13 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
+      - ".github/workflows/_backend-test-run.yml"
   pull_request:
     branches: [master]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
+      - ".github/workflows/_backend-test-run.yml"
 
 # Cancel a run the moment a newer commit supersedes it. Without this, pushing three times to
 # a PR runs three full suites to completion and only the last one's result is ever read — at
@@ -28,78 +30,24 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
-  test:
-    # Self-hosted: minutes on an own-machine runner are unmetered, and this suite is ~6.7
-    # minutes a run — the single largest consumer of the GitHub-hosted allowance. Nothing
-    # else about the pipeline changes: same steps, same service containers, same gate.
-    #
-    # Matched by label rather than by runner name, so a second machine can be added for
-    # availability without editing this file.
-    #
-    # The trade is that a job queues, rather than fails, when no runner is online — a PR
-    # check sits pending indefinitely instead of going red. That is why the runner should be
-    # installed as a systemd service (`sudo ./svc.sh install && sudo ./svc.sh start`) rather
-    # than started by hand.
-    runs-on: [self-hosted, linux, x64]
+  # GitHub-hosted first: it's idle capacity we're not otherwise using, and it starts
+  # immediately instead of queuing behind whatever the home box is already running.
+  test-hosted:
+    uses: ./.github/workflows/_backend-test-run.yml
+    with:
+      runs-on-json: '["ubuntu-latest"]'
+    secrets: inherit
 
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4-alpine
-        env:
-          POSTGRES_USER: kayak
-          POSTGRES_PASSWORD: kayak_test_password
-          POSTGRES_DB: kayak_test
-        ports:
-          - 5434:5432
-        options: >-
-          --health-cmd "pg_isready -U kayak"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    defaults:
-      run:
-        working-directory: backend
-
-    env:
-      CONFIG_MODE: testing
-      DATABASE_URL: postgresql://kayak:kayak_test_password@localhost:5434/kayak_test
-      SECRET_KEY: ci-secret-key-not-used-in-prod
-      JWT_SECRET_KEY: ci-jwt-secret-key-minimum-32-bytes!
-      RATELIMIT_STORAGE_URI: memory://
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Install dependencies
-        run: uv sync --frozen --dev
-
-      - name: Dependency audit
-        run: |
-          uv export --no-dev --frozen --no-emit-project > requirements-audit.txt
-          uvx pip-audit --local -r requirements-audit.txt
-
-      - name: Lint (flake8)
-        run: uv run flake8 .
-
-      - name: Type check (mypy)
-        run: uv run mypy
-
-      - name: Apply migrations
-        run: uv run alembic upgrade head
-
-      - name: Check for model/migration drift
-        run: uv run alembic check
-
-      - name: Run tests
-        run: uv run pytest --tb=short -q --cov=. --cov-report=xml
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: backend/coverage.xml
-          flags: backend
+  # Falls back to the self-hosted runner only once the hosted run has actually failed —
+  # which is also what happens once the account's free GitHub-hosted minutes run out for
+  # the billing cycle (the job fails fast rather than queuing). A genuine test failure on
+  # the hosted runner pays for one extra self-hosted run before showing red; that's the
+  # accepted cost of not being able to distinguish "out of minutes" from "tests failed"
+  # from inside the workflow.
+  test-fallback:
+    needs: test-hosted
+    if: always() && needs.test-hosted.result == 'failure'
+    uses: ./.github/workflows/_backend-test-run.yml
+    with:
+      runs-on-json: '["self-hosted","linux","x64"]'
+    secrets: inherit
