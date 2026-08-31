@@ -7,6 +7,48 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.7.0] - 2026-08-31
+
+Registration is now invite-gated for the closed beta, the privacy policy is live, and
+production moved from a home server to a managed cloud droplet.
+
+### Added
+
+- **Closed-beta invite code.** Creating an account now requires an invite code; everything
+  else (signing in, the public map, `/explore`, shared routes) is unaffected.
+- **Privacy policy**, linked from the landing footer and the registration form alongside the
+  Terms of Use — covers precise location, health data, the third parties the app actually
+  talks to, retention windows, and how to delete an account when you can no longer sign in.
+
+### Changed
+
+- The app's own version number, shown at the bottom of the sidebar, now always matches what's
+  actually running instead of a placeholder that had been stuck since the very first release.
+- Production hosting moved from a home server to a managed cloud droplet, with offsite backups
+  and health monitoring verified end-to-end on the new box.
+
+### Fixed
+
+- Closed a near-miss in the backup-restore tool where a database name could reach the
+  destructive-restore confirmation prompt before being validated. No live data was ever at
+  risk — the operation failed safely before anything destructive ran — but the prompt and the
+  error it hit afterwards were both confusing, and both are fixed.
+
+### Security
+
+- **Corrected an overstated claim in the Terms of Use**: medical notes were described as
+  "end-to-end encrypted", which is not accurate. They are encrypted at rest with a
+  password-derived key — meaning a stolen database or backup is unreadable — but the
+  encryption happens on the server, not only on your device, so this is not end-to-end
+  encryption in the strict sense. The underlying protection is unchanged and remains sound;
+  only the description of it was wrong, and only in that one place.
+
+### Deploy notes
+
+- New optional `INVITE_CODE` environment variable — set it to require that code at
+  registration, leave it unset to register exactly as before.
+- Production `.env` and deploy tooling now target the new droplet; see `DEPLOY.md`.
+
 ## [0.6.0] - 2026-08-28
 
 The app has a name. Kayaktrek replaces the four different names the product was using across
