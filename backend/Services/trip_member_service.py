@@ -11,7 +11,6 @@ from Models.medical_notes_access_log import MedicalNotesAccessLog
 from Models.user import User
 from Api.database import db
 from Schemas.base_schema import camelcase
-from Services.crypto_service import decrypt, encrypt, encrypt_for_recipient, decrypt_as_recipient
 
 logger = logging.getLogger(__name__)
 
@@ -62,40 +61,34 @@ class TripMemberService:
         return membership
 
     @staticmethod
-    def get_trip_medical_notes(trip_id: str, password: str) -> str | None:
+    def get_trip_medical_notes(trip_id: str) -> Dict[str, str | None]:
         """
-        Decrypt the member's own trip-level medical notes and return plaintext.
-        Returns None if no notes have been stored yet.
+        Return the member's own sealed trip-level medical notes for the client to
+        decrypt (M22). All three fields are None when nothing has been stored yet —
+        the ordinary state of a new membership, not an error.
 
         Raises:
             NoResultFound: If the user is not a member of the trip
         """
         membership = TripMemberService.get_my_membership(trip_id)
-        if not membership.medical_notes_ciphertext:
-            return None
-        assert membership.medical_notes_nonce is not None
-        assert membership.medical_notes_salt is not None
-        return decrypt(
-            membership.medical_notes_ciphertext,
-            membership.medical_notes_nonce,
-            membership.medical_notes_salt,
-            password,
-        )
+        return {
+            "ciphertext": membership.medical_notes_ciphertext,
+            "nonce": membership.medical_notes_nonce,
+            "salt": membership.medical_notes_salt,
+        }
 
     @staticmethod
-    def set_trip_medical_notes(trip_id: str, plaintext: str, password: str) -> TripMember:
+    def set_trip_medical_notes(
+        trip_id: str, ciphertext: str, nonce: str, salt: str
+    ) -> TripMember:
         """
-        Encrypt plaintext and store in TripMember's own medical_notes_ciphertext/nonce/salt.
+        Store client-encrypted notes in the TripMember's own
+        medical_notes_ciphertext/nonce/salt (M22).
 
         Raises:
             NoResultFound: If the user is not a member of the trip
-            ValueError: If plaintext is empty
         """
-        plaintext = plaintext.strip()
-        if not plaintext:
-            raise ValueError("medicalNotes is required")
         membership = TripMemberService.get_my_membership(trip_id)
-        ciphertext, nonce, salt = encrypt(plaintext, password)
         membership.medical_notes_ciphertext = ciphertext
         membership.medical_notes_nonce = nonce
         membership.medical_notes_salt = salt
@@ -109,7 +102,7 @@ class TripMemberService:
     @staticmethod
     def revoke_trip_medical_notes(trip_id: str) -> TripMember:
         """
-        Clear the member's own encrypted trip notes and the leader-visible plaintext copy.
+        Clear the member's own sealed trip notes and the leader-readable copy.
 
         Raises:
             NoResultFound: If the user is not a member of the trip
@@ -130,26 +123,19 @@ class TripMemberService:
         return membership
 
     @staticmethod
-    def share_medical_notes(trip_id: str, password: str) -> TripMember:
+    def get_leader_public_key(trip_id: str) -> str:
         """
-        Decrypt the member's trip-level notes with their password, then ECIES-encrypt
-        the plaintext for the trip leader's public key.
+        Return the trip leader's X25519 public key so a crew member's client can
+        ECIES-seal their notes for the leader itself (M22).
+
+        A public key is public by definition; the gate is membership of the trip, which
+        get_my_membership enforces, and it keeps the key off every broadly-dumped schema.
 
         Raises:
             NoResultFound: If the user is not a member of the trip
-            ValueError: If no trip notes are stored, or the leader has no keypair
+            ValueError: If the leader has not set up a keypair yet
         """
-        membership = TripMemberService.get_my_membership(trip_id)
-        if not membership.medical_notes_ciphertext:
-            raise ValueError("No trip medical notes stored — save notes before sharing")
-
-        plaintext = decrypt(
-            membership.medical_notes_ciphertext,
-            membership.medical_notes_nonce,  # type: ignore
-            membership.medical_notes_salt,  # type: ignore
-            password,
-        )
-
+        TripMemberService.get_my_membership(trip_id)
         leader = (
             db.session.query(User)
             .join(TripMember, TripMember.user_id == User.id)
@@ -161,11 +147,36 @@ class TripMemberService:
         )
         if not leader or not leader.public_key:
             raise ValueError("Trip leader has not set up their encryption keypair yet")
+        return leader.public_key
 
-        ct, nonce, ephemeral = encrypt_for_recipient(plaintext, leader.public_key)
-        membership.medical_notes_leader_ciphertext = ct
+    @staticmethod
+    def share_medical_notes(
+        trip_id: str, ciphertext: str, nonce: str, ephemeral_key: str
+    ) -> TripMember:
+        """
+        Store the leader-readable copy of the member's notes, ECIES-sealed on the
+        client to the leader's public key (M22).
+
+        The member must already have their own sealed copy stored: sharing without
+        saving would leave a leader-readable note the member cannot read back, and the
+        revoke path assumes the two move together.
+
+        Raises:
+            NoResultFound: If the user is not a member of the trip
+            ValueError: If no trip notes are stored, or the leader has no keypair
+        """
+        membership = TripMemberService.get_my_membership(trip_id)
+        if not membership.medical_notes_ciphertext:
+            raise ValueError("No trip medical notes stored — save notes before sharing")
+
+        # Re-checked server-side even though the client fetched this key to encrypt
+        # with: it is the one part of the exchange the server can still verify, and a
+        # leader with no keypair means the blob could never have been sealed correctly.
+        TripMemberService.get_leader_public_key(trip_id)
+
+        membership.medical_notes_leader_ciphertext = ciphertext
         membership.medical_notes_leader_nonce = nonce
-        membership.medical_notes_leader_ephemeral_key = ephemeral
+        membership.medical_notes_leader_ephemeral_key = ephemeral_key
         membership.medical_notes_consent_at = datetime.now(timezone.utc)
         membership.float_plan_confirmed_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -176,16 +187,15 @@ class TripMemberService:
         return membership
 
     @staticmethod
-    def read_shared_medical_notes(trip_id: str, member_id: str, leader_password: str) -> str:
+    def read_shared_medical_notes(trip_id: str, member_id: str) -> Dict[str, str]:
         """
-        Decrypt the ECIES-encrypted leader copy of a member's medical notes.
-        Caller must be the trip leader.
+        Return the ECIES-sealed leader copy of a member's notes for the leader's client
+        to decrypt (M22). Caller must be the trip leader.
 
         Raises:
             NoResultFound: If the trip or member does not exist
             PermissionError: If the caller is not the leader
             ValueError: If no notes have been shared, or the leader has no keypair
-            cryptography.exceptions.InvalidTag: If leader_password is wrong
         """
         caller_membership = TripMemberService.get_my_membership(trip_id)
         if caller_membership.role != MemberRoleType.LEADER:
@@ -203,27 +213,26 @@ class TripMemberService:
 
         leader = db.session.query(User).filter_by(id=UUID(str(g.current_user_id))).first()
         if not leader or not leader.private_key_ciphertext:
-            raise ValueError("Leader keypair not found — generate your keypair first")
+            raise ValueError("Leader keypair not found — set up your keypair first")
 
-        plaintext = decrypt_as_recipient(
-            target_membership.medical_notes_leader_ciphertext,
-            target_membership.medical_notes_leader_nonce,  # type: ignore
-            target_membership.medical_notes_leader_ephemeral_key,  # type: ignore
-            leader.private_key_ciphertext,
-            leader.private_key_nonce,  # type: ignore
-            leader.private_key_salt,  # type: ignore
-            leader_password,
-        )
-
-        # Accountability record (ADR-023) — only reached on a successful decrypt, so a
-        # wrong-password attempt (InvalidTag raised above) is never logged as an access.
+        # Accountability record (ADR-023). Since M22 the decryption happens on the
+        # leader's device, so this logs the leader taking possession of the ciphertext
+        # rather than a proven-successful decrypt. That is over-inclusive against the
+        # old behaviour — a leader who fetches and then mistypes their password is now
+        # logged — and it is the right trade: handing over the sealed notes is the
+        # access the member is entitled to see, and it is the only part of the exchange
+        # the server can still witness.
         db.session.add(MedicalNotesAccessLog(
             trip_member_id=target_membership.id,
             leader_id=leader.id,
         ))
         db.session.commit()
 
-        return plaintext
+        return {
+            "ciphertext": target_membership.medical_notes_leader_ciphertext,
+            "nonce": target_membership.medical_notes_leader_nonce,  # type: ignore[dict-item]
+            "ephemeralKey": target_membership.medical_notes_leader_ephemeral_key,  # type: ignore[dict-item]
+        }
 
     @staticmethod
     def get_medical_notes_access_log(trip_id: str) -> list[MedicalNotesAccessLog]:

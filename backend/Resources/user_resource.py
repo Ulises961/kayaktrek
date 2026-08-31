@@ -19,7 +19,6 @@ from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_self, require_admin
 from Api.limiter import limiter
 from Models.auth_token import AuthTokenType
-from cryptography.exceptions import InvalidTag
 from Tasks.data_export import export_user_data
 from Services.mail_service import send_template_email
 
@@ -27,6 +26,12 @@ logger = logging.getLogger(__name__)
 
 USER_ENDPOINT = "/api/v1/user"
 user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
+
+# Client-supplied crypto material (M22). The server validates that the fields are
+# present and non-empty and nothing more — it cannot tell a real ciphertext from a
+# plausible-looking string, and deliberately holds nothing that would let it try.
+_KEYPAIR_FIELDS = ("publicKey", "privateKeyCiphertext", "privateKeyNonce", "privateKeySalt")
+_SEALED_FIELDS = ("ciphertext", "nonce", "salt")
 
 
 @user_api.route("/me", methods=["GET"])
@@ -396,29 +401,43 @@ def change_password():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@user_api.route("/me/generate-keypair", methods=["POST"])
+@user_api.route("/me/keypair", methods=["POST"])
 @JWTService.authenticate_restful
-def generate_keypair():
+@JWTService.require_elevated_token
+def store_keypair():
     """
     ---
     post:
-      summary: Generate an X25519 keypair for the authenticated user
+      summary: Store a client-generated X25519 keypair for the authenticated user
       description: >
-        Used for medical-notes end-to-end encryption. No-op if a keypair already
-        exists (returns 409).
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth) —
+        that is what establishes the caller is the account holder, since no password is
+        sent. The client generates the keypair and wraps the private key under a
+        password-derived key before posting it (M22); the server stores four opaque
+        strings. Conflicts (409) rather than overwriting an existing keypair, which
+        would orphan every note encrypted under it.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               required:
-                - password
+                - publicKey
+                - privateKeyCiphertext
+                - privateKeyNonce
+                - privateKeySalt
               properties:
-                password:
+                publicKey:
+                  type: string
+                privateKeyCiphertext:
+                  type: string
+                privateKeyNonce:
+                  type: string
+                privateKeySalt:
                   type: string
       responses:
         200:
-          description: Keypair generated
+          description: Keypair stored
           content:
             application/json:
               schema:
@@ -427,9 +446,9 @@ def generate_keypair():
                   hasKeypair:
                     type: boolean
         400:
-          description: password is missing
-        401:
-          description: Password is incorrect
+          description: A required field is missing
+        403:
+          description: Elevated token missing, invalid, or expired
         404:
           description: Authenticated user not found
         409:
@@ -437,17 +456,73 @@ def generate_keypair():
     """
     try:
         raw = request.get_json()
-        if not isinstance(raw, dict) or "password" not in raw:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required")
-        UserService.generate_keypair_for_user(str(g.current_user_id), raw["password"])
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        missing = [
+            field for field in _KEYPAIR_FIELDS if not raw.get(field)
+        ]
+        if missing:
+            abort(HTTPStatus.BAD_REQUEST, description=f"{', '.join(missing)} required")
+        UserService.store_keypair(
+            str(g.current_user_id),
+            raw["publicKey"],
+            raw["privateKeyCiphertext"],
+            raw["privateKeyNonce"],
+            raw["privateKeySalt"],
+        )
         return jsonify({"hasKeypair": True}), HTTPStatus.OK
 
     except HTTPException:
         raise
-    except PermissionError:
-        abort(HTTPStatus.UNAUTHORIZED, description="Password incorrect")
     except ValueError:
         abort(HTTPStatus.CONFLICT, description="Keypair already exists")
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/keypair", methods=["GET"])
+@JWTService.authenticate_restful
+@JWTService.require_elevated_token
+def get_keypair():
+    """
+    ---
+    get:
+      summary: Get the authenticated user's own keypair
+      description: >
+        Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
+        Returns the public key and the password-wrapped private key. The client unwraps
+        the private key in memory to decrypt its own notes and any crew notes shared
+        with it as leader (M22); the wrapping password is never sent to the server.
+      responses:
+        200:
+          description: The caller's own keypair
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  publicKey:
+                    type: string
+                  privateKeyCiphertext:
+                    type: string
+                  privateKeyNonce:
+                    type: string
+                  privateKeySalt:
+                    type: string
+        403:
+          description: Elevated token missing, invalid, or expired
+        404:
+          description: Authenticated user not found, or no keypair stored
+    """
+    try:
+        return jsonify(UserService.get_keypair(str(g.current_user_id))), HTTPStatus.OK
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        abort(HTTPStatus.NOT_FOUND, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
     except Exception as e:
@@ -571,23 +646,27 @@ def grant_medical_consent():
     """
     ---
     post:
-      summary: Encrypt and store the authenticated user's medical notes
+      summary: Store the authenticated user's client-encrypted medical notes
       description: >
         Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
-        Notes are encrypted end-to-end (X25519 ECIES) under the user's keypair,
-        password-derived. Records a consent timestamp.
+        The client encrypts under a key derived from the user's password and posts the
+        sealed triple (M22) — the plaintext and the password never leave the device.
+        Records a consent timestamp.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               required:
-                - medicalNotes
-                - password
+                - ciphertext
+                - nonce
+                - salt
               properties:
-                medicalNotes:
+                ciphertext:
                   type: string
-                password:
+                nonce:
+                  type: string
+                salt:
                   type: string
       responses:
         200:
@@ -596,7 +675,7 @@ def grant_medical_consent():
             application/json:
               schema: UserSchema
         400:
-          description: medicalNotes or password is missing
+          description: A required field is missing
         403:
           description: Elevated token missing, invalid, or expired
         404:
@@ -606,13 +685,12 @@ def grant_medical_consent():
         raw = request.get_json()
         if not isinstance(raw, dict):
             abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
-        plaintext = raw.get("medicalNotes", "").strip()
-        password = raw.get("password")
-        if not plaintext:
-            abort(HTTPStatus.BAD_REQUEST, description="medicalNotes is required")
-        if not password:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required for encryption")
-        user = UserService.grant_medical_consent(str(g.current_user_id), plaintext, password)
+        missing = [field for field in _SEALED_FIELDS if not raw.get(field)]
+        if missing:
+            abort(HTTPStatus.BAD_REQUEST, description=f"{', '.join(missing)} required")
+        user = UserService.grant_medical_consent(
+            str(g.current_user_id), raw["ciphertext"], raw["nonce"], raw["salt"]
+        )
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
 
     except HTTPException:
@@ -653,57 +731,47 @@ def revoke_medical_consent():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@user_api.route("/me/medical-notes", methods=["POST"])
+@user_api.route("/me/medical-notes", methods=["GET"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_medical_notes():
     """
     ---
-    post:
-      summary: Decrypt and retrieve the authenticated user's medical notes
+    get:
+      summary: Retrieve the authenticated user's sealed medical notes
       description: >
         Requires an elevated token (X-Elevated-Token header, see POST .../me/re-auth).
-        POST rather than GET because the decryption password travels in the body.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - password
-              properties:
-                password:
-                  type: string
+        Returns the ciphertext for the client to decrypt with a key derived from the
+        user's password (M22). A GET since the change — the password no longer travels
+        in a body, so there is nothing left to hide from a URL. All three fields are
+        null when no notes have been stored yet, which is a state, not an error.
       responses:
         200:
-          description: The decrypted notes
+          description: The sealed notes, or nulls if none are stored
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  medicalNotes:
+                  ciphertext:
                     type: string
-        400:
-          description: password is missing, no medical notes are stored, or decryption failed (password likely incorrect)
+                    nullable: true
+                  nonce:
+                    type: string
+                    nullable: true
+                  salt:
+                    type: string
+                    nullable: true
         403:
           description: Elevated token missing, invalid, or expired
         404:
           description: Authenticated user not found
     """
     try:
-        password = (request.get_json() or {}).get("password")
-        if not password:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required")
-        plaintext = UserService.get_medical_notes(str(g.current_user_id), password)
-        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+        return jsonify(UserService.get_medical_notes(str(g.current_user_id))), HTTPStatus.OK
 
     except HTTPException:
         raise
-    except ValueError as e:
-        abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except InvalidTag:
-        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
     except Exception as e:

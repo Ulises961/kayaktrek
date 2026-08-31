@@ -12,6 +12,7 @@ from sqlalchemy.exc import NoResultFound
 from Api.database import db
 from Models.user import User
 from Services.user_service import UserService
+from Tests.conftest import _keypair_fields, _registration
 
 _FAKE_UUID = "00000000-0000-7000-8000-0000000000cc"
 
@@ -37,10 +38,10 @@ def make_user(app, client):
         mail = f"svc.{suffix}@example.com"
         username = f"svc_{suffix}"
         phone = f"+39{counter['n']:010d}"
-        resp = client.post("/api/v1/auth/register", json={
+        resp = client.post("/api/v1/auth/register", json=_registration({
             "mail": mail, "pwd": pwd, "phone": phone,
             "name": "Svc", "username": username,
-        })
+        }))
         assert resp.status_code == 201
         user = db.session.query(User).filter_by(mail=mail).first()
         user.active = True
@@ -114,10 +115,10 @@ def test_get_public_profile_deletion_pending_raises(make_user):
 
 # ── keypair flow ──────────────────────────────────────────────────────────────
 
-def test_generate_keypair_for_user_backfills_then_rejects_duplicate(make_user):
+def test_store_keypair_backfills_then_rejects_duplicate(make_user):
     u = make_user()
-    # Registration already provisions a keypair (M3g); clear it to exercise the
-    # backfill path for legacy users created before keypairs existed.
+    # The client posts a keypair at registration (M22); clear it to exercise the
+    # backfill path for accounts created before it did.
     user = db.session.query(User).filter_by(id=uuid.UUID(u["id"])).first()
     user.public_key = None
     user.private_key_ciphertext = None
@@ -125,30 +126,39 @@ def test_generate_keypair_for_user_backfills_then_rejects_duplicate(make_user):
     user.private_key_salt = None
     db.session.commit()
 
-    user = UserService.generate_keypair_for_user(u["id"], u["pwd"])
-    assert user.public_key is not None
-    assert user.private_key_ciphertext is not None
+    fields = _keypair_fields(u["pwd"])
+    user = UserService.store_keypair(
+        u["id"], fields["publicKey"], fields["privateKeyCiphertext"],
+        fields["privateKeyNonce"], fields["privateKeySalt"],
+    )
+    assert user.public_key == fields["publicKey"]
+    assert user.private_key_ciphertext == fields["privateKeyCiphertext"]
 
-    # A user who already has a keypair is rejected.
+    # A user who already has a keypair is rejected — overwriting one would orphan
+    # every note and every leader-shared copy encrypted under it.
     with pytest.raises(ValueError, match="keypair_already_exists"):
-        UserService.generate_keypair_for_user(u["id"], u["pwd"])
+        UserService.store_keypair(
+            u["id"], fields["publicKey"], fields["privateKeyCiphertext"],
+            fields["privateKeyNonce"], fields["privateKeySalt"],
+        )
 
 
-def test_generate_keypair_for_user_wrong_password_raises(make_user):
+def test_get_keypair_none_stored_raises(make_user):
     u = make_user()
-    user = db.session.query(User).filter_by(id=uuid.UUID(u["id"])).first()
-    user.public_key = None
-    db.session.commit()
-    with pytest.raises(PermissionError):
-        UserService.generate_keypair_for_user(u["id"], "WrongPass9$")
+    _set_attrs(u["id"], public_key=None)
+    with pytest.raises(ValueError, match="No keypair"):
+        UserService.get_keypair(u["id"])
 
 
-# ── medical notes guard ───────────────────────────────────────────────────────
+# ── medical notes ─────────────────────────────────────────────────────────────
 
-def test_get_medical_notes_none_stored_raises(make_user):
+def test_get_medical_notes_none_stored_returns_nulls(make_user):
+    """Not an error: an account with no notes is the ordinary starting state, and
+    a client that had to catch an exception for it would be catching it forever."""
     u = make_user()
-    with pytest.raises(ValueError, match="No medical notes"):
-        UserService.get_medical_notes(u["id"], u["pwd"])
+    assert UserService.get_medical_notes(u["id"]) == {
+        "ciphertext": None, "nonce": None, "salt": None,
+    }
 
 
 # ── deletion / cancel flow ────────────────────────────────────────────────────

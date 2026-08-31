@@ -7,11 +7,23 @@ from Api.database import db as _db
 from Models.user import User
 from Resources.user_resource import USER_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Services.crypto_service import decrypt, encrypt
 from Tests.auth_helpers import access_token_for
 
 _USER_PWD = "testPassword6$"
 _NEW_PWD = "newPassword7$"
 _MEDICAL_NOTES = "Allergic to penicillin. Blood type A+."
+
+
+def _sealed(plaintext=_MEDICAL_NOTES, password=_USER_PWD):
+    """Seal notes the way the client does since M22.
+
+    Uses crypto_service — the same code that produced every ciphertext already in the
+    database — so a round trip through these endpoints also demonstrates that no
+    migration is needed: the server stores and returns the blob untouched.
+    """
+    ciphertext, nonce, salt = encrypt(plaintext, password)
+    return {"ciphertext": ciphertext, "nonce": nonce, "salt": salt}
 
 
 @pytest.fixture(scope="function")
@@ -130,7 +142,7 @@ def test_re_auth_returns_elevated_token(client, auth_headers):
 def test_grant_medical_consent_requires_elevated_token(client, auth_headers):
     response = client.post(
         f"{USER_ENDPOINT}/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        json=_sealed(),
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -140,7 +152,7 @@ def test_grant_medical_consent_success(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
     response = client.post(
         f"{USER_ENDPOINT}/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        json=_sealed(),
         headers=headers,
     )
     assert response.status_code == 200
@@ -152,44 +164,53 @@ def test_grant_medical_consent_success(client, auth_headers):
     assert "medicalNotesSalt" not in data
 
 
+def test_grant_medical_consent_rejects_plaintext_body(client, auth_headers):
+    """The pre-M22 body shape must fail loudly rather than storing a plaintext note
+    under a field that everything downstream will try to decrypt."""
+    headers = _elevated_headers(client, auth_headers)
+    response = client.post(
+        f"{USER_ENDPOINT}/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+
 # =============================================================================
-# POST /api/user/me/medical-notes
+# GET /api/user/me/medical-notes
 # =============================================================================
 
 def test_get_medical_notes_requires_elevated_token(client, auth_headers):
-    response = client.post(
+    response = client.get(
         f"{USER_ENDPOINT}/me/medical-notes",
-        json={"password": _USER_PWD},
         headers=auth_headers,
     )
     assert response.status_code == 403
 
 
-def test_get_medical_notes_success(client, auth_headers):
+def test_get_medical_notes_returns_the_stored_blob_verbatim(client, auth_headers):
+    sealed = _sealed()
     headers = _elevated_headers(client, auth_headers)
-    client.post(
-        f"{USER_ENDPOINT}/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
-        headers=headers,
-    )
+    client.post(f"{USER_ENDPOINT}/me/medical-consent", json=sealed, headers=headers)
+
     headers = _elevated_headers(client, auth_headers)
-    response = client.post(
-        f"{USER_ENDPOINT}/me/medical-notes",
-        json={"password": _USER_PWD},
-        headers=headers,
-    )
+    response = client.get(f"{USER_ENDPOINT}/me/medical-notes", headers=headers)
     assert response.status_code == 200
-    assert json.loads(response.data)["medicalNotes"] == _MEDICAL_NOTES
+    data = json.loads(response.data)
+    assert data == sealed
+    # The server is a store, not a decryptor — the notes only exist once the caller
+    # supplies the password, which it never sent.
+    assert decrypt(data["ciphertext"], data["nonce"], data["salt"], _USER_PWD) == _MEDICAL_NOTES
 
 
-def test_get_medical_notes_wrong_password(client, auth_headers):
+def test_get_medical_notes_none_stored_returns_nulls(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
-    response = client.post(
-        f"{USER_ENDPOINT}/me/medical-notes",
-        json={"password": "wrongPassword1$"},
-        headers=headers,
-    )
-    assert response.status_code in (400, 401)
+    client.delete(f"{USER_ENDPOINT}/me/medical-consent", headers=headers)
+
+    headers = _elevated_headers(client, auth_headers)
+    response = client.get(f"{USER_ENDPOINT}/me/medical-notes", headers=headers)
+    assert response.status_code == 200
+    assert json.loads(response.data) == {"ciphertext": None, "nonce": None, "salt": None}
 
 
 # =============================================================================
@@ -230,7 +251,7 @@ def test_medical_notes_reset_flag_after_password_reset(client, pw_user, app):
     headers = _elevated_headers(client, pw_user, password=_USER_PWD)
     client.post(
         f"{USER_ENDPOINT}/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        json=_sealed(),
         headers=headers,
     )
 
@@ -280,7 +301,7 @@ def test_medical_notes_reset_flag_cleared_on_re_consent(client, pw_user, app):
     headers = _elevated_headers(client, pw_user)
     response = client.post(
         f"{USER_ENDPOINT}/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_PWD},
+        json=_sealed(),
         headers=headers,
     )
     assert response.status_code == 200, f"POST /medical-consent failed: {response.status_code} {response.data}"

@@ -20,6 +20,7 @@ from Models.user import User
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.user_resource import USER_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Services.crypto_service import encrypt, encrypt_for_recipient
 from Tests.auth_helpers import access_token_for
 
 
@@ -281,15 +282,21 @@ def test_claim_leadership_clears_shared_medical_notes_trip_wide(app, client, tri
 
     # Crew A shares trip-level medical notes with the current (soon-to-leave) leader.
     elevated = _elevated_headers(client, t["crew_a_headers"], "CrewPass9$")
+    ciphertext, nonce, salt = encrypt("Allergic to bee stings.", "CrewPass9$")
     client.post(
         f"{TRIP_ENDPOINT}/{t['trip_id']}/member/me/medical-consent",
-        json={"medicalNotes": "Allergic to bee stings.", "password": "CrewPass9$"},
+        json={"ciphertext": ciphertext, "nonce": nonce, "salt": salt},
         headers=elevated,
     )
+    leader_key = json.loads(client.get(
+        f"{TRIP_ENDPOINT}/{t['trip_id']}/member/me/leader-public-key",
+        headers=t["crew_a_headers"],
+    ).data)["publicKey"]
+    ct, leader_nonce, ephemeral = encrypt_for_recipient("Allergic to bee stings.", leader_key)
     elevated = _elevated_headers(client, t["crew_a_headers"], "CrewPass9$")
     share = client.post(
         f"{TRIP_ENDPOINT}/{t['trip_id']}/member/me/share-medical-notes",
-        json={"password": "CrewPass9$"},
+        json={"ciphertext": ct, "nonce": leader_nonce, "ephemeralKey": ephemeral},
         headers=elevated,
     )
     assert share.status_code == 200

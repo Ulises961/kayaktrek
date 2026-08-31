@@ -13,7 +13,6 @@ from Models.auth_token import AuthToken, AuthTokenType
 from Models.session import Session
 from Models.user import User
 from Schemas.user_schema import UserSchema
-from Services.crypto_service import generate_keypair
 from Services.mail_service import send_template_email
 from Services.session_service import SessionService
 
@@ -32,6 +31,10 @@ _DUMMY_HASH: str = generate_password_hash("timing-equalizer").decode("UTF-8")
 
 
 class AuthService:
+
+    _KEYPAIR_FIELDS = (
+        "publicKey", "privateKeyCiphertext", "privateKeyNonce", "privateKeySalt",
+    )
 
     @staticmethod
     def authenticate_user(password: str, mail_addr: Optional[str] = None, username: Optional[str] = None) -> Optional[User]:
@@ -116,14 +119,19 @@ class AuthService:
             raise ValueError("User generated incorrectly")
         user = persisted_user
 
-        pwd = user_json.get("pwd")
-        if not pwd:
-            raise ValueError("Password is required for registration")
-        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(pwd)
-        user.public_key = public_key_b64
-        user.private_key_ciphertext = pk_ct
-        user.private_key_nonce = pk_nonce
-        user.private_key_salt = pk_salt
+        # Medical-notes keypair (M22): generated on the client and posted alongside the
+        # registration fields, so the server never sees the password that wraps it.
+        # Optional — a client that omits it (or an older one) gets an account with no
+        # keypair, which POST /api/v1/user/me/keypair fills in later. This runs only
+        # for a genuinely new user: every "already registered" path above returns
+        # early, so a repeat registration can never overwrite the keys of the existing
+        # account and orphan its notes.
+        keypair = {field: user_json.get(field) for field in AuthService._KEYPAIR_FIELDS}
+        if all(keypair.values()):
+            user.public_key = keypair["publicKey"]
+            user.private_key_ciphertext = keypair["privateKeyCiphertext"]
+            user.private_key_nonce = keypair["privateKeyNonce"]
+            user.private_key_salt = keypair["privateKeySalt"]
         db.session.commit()
 
         AuthService._send_verification_email(user)

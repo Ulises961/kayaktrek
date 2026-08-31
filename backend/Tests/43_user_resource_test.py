@@ -182,29 +182,32 @@ def test_grant_medical_consent_body_not_dict_returns_400(client, auth_headers):
     assert resp.status_code == 400
 
 
-def test_grant_medical_consent_missing_notes_returns_400(client, auth_headers):
+def test_grant_medical_consent_missing_ciphertext_returns_400(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
     resp = client.post(f"{USER_ENDPOINT}/me/medical-consent", headers=headers,
-                       json={"password": _USER_PWD})
+                       json={"nonce": "bm9uY2U=", "salt": "c2FsdA=="})
     assert resp.status_code == 400
 
 
-def test_grant_medical_consent_missing_password_returns_400(client, auth_headers):
+def test_grant_medical_consent_missing_salt_returns_400(client, auth_headers):
     headers = _elevated_headers(client, auth_headers)
     resp = client.post(f"{USER_ENDPOINT}/me/medical-consent", headers=headers,
-                       json={"medicalNotes": "penicillin allergy"})
+                       json={"ciphertext": "Y3Q=", "nonce": "bm9uY2U="})
     assert resp.status_code == 400
 
 
-def test_get_medical_notes_missing_password_returns_400(client, auth_headers):
+def test_grant_medical_consent_empty_ciphertext_returns_400(client, auth_headers):
+    """An empty string is present-but-useless — storing it would record consent
+    against a note that can never be decrypted back into anything."""
     headers = _elevated_headers(client, auth_headers)
-    resp = client.post(f"{USER_ENDPOINT}/me/medical-notes", headers=headers, json={})
+    resp = client.post(f"{USER_ENDPOINT}/me/medical-consent", headers=headers,
+                       json={"ciphertext": "", "nonce": "bm9uY2U=", "salt": "c2FsdA=="})
     assert resp.status_code == 400
 
 
 def test_medical_consent_without_elevated_token_returns_403(client, auth_headers):
     resp = client.post(f"{USER_ENDPOINT}/me/medical-consent", headers=auth_headers,
-                       json={"medicalNotes": "x", "password": _USER_PWD})
+                       json={"ciphertext": "Y3Q=", "nonce": "bm9uY2U=", "salt": "c2FsdA=="})
     assert resp.status_code == 403
 
 

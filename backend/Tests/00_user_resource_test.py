@@ -1,11 +1,27 @@
 from unittest.mock import patch
 from uuid import UUID
+import base64
 import io
 import json
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from Api.database import db
 from Models.user import User
 from Resources.user_resource import USER_ENDPOINT
+from Services.crypto_service import decrypt
+from Tests.conftest import _keypair_fields
+
+
+def _public_key_for(private_key_b64: str) -> str:
+    """Derive the public half of a base64 X25519 private key, so a stored keypair can
+    be checked for coherence rather than merely for presence."""
+    private_key = X25519PrivateKey.from_private_bytes(base64.b64decode(private_key_b64))
+    return base64.b64encode(private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )).decode()
 
 
 def test_user_missing_arguments(client):
@@ -122,52 +138,83 @@ def test_delete_user_forbidden_for_other_user(client, auth_headers, id_2):
 # ============================================================================
 
 # ============================================================================
-# POST /api/user/me/generate-keypair
+# POST/GET /api/user/me/keypair
 # ============================================================================
 
 _USER_PWD = "testPassword6$"
 
 
-def test_generate_keypair_returns_has_keypair_true(client, auth_headers):
-    """Calling generate-keypair returns hasKeypair: true."""
+def _elevated(client, auth_headers):
+    token = json.loads(client.post(
+        f"{USER_ENDPOINT}/me/re-auth", json={"password": _USER_PWD}, headers=auth_headers,
+    ).data)["elevatedToken"]
+    return {**auth_headers, "X-Elevated-Token": token}
+
+
+def test_store_keypair_conflicts_when_one_already_exists(client, auth_headers):
+    """A second keypair must never replace the first — every note and every
+    leader-shared copy is encrypted under the one already stored."""
     response = client.post(
-        f"{USER_ENDPOINT}/me/generate-keypair",
-        json={"password": _USER_PWD},
-        headers=auth_headers,
+        f"{USER_ENDPOINT}/me/keypair",
+        json=_keypair_fields(_USER_PWD),
+        headers=_elevated(client, auth_headers),
     )
     assert response.status_code == 409, (
-        "Users registered in tests already have a keypair from register_user(); "
-        "a second call must return 409"
+        "Users registered in tests post a keypair at sign-up; a second call must 409"
     )
 
 
-def test_generate_keypair_wrong_password_returns_401(client, auth_headers):
-    """Wrong password is rejected with 401."""
+def test_store_keypair_missing_field_returns_400(client, auth_headers):
+    """A partial keypair is unusable, so it is rejected rather than half-stored."""
+    partial = _keypair_fields(_USER_PWD).copy()
+    del partial["privateKeyNonce"]
     response = client.post(
-        f"{USER_ENDPOINT}/me/generate-keypair",
-        json={"password": "wrong-password"},
-        headers=auth_headers,
-    )
-    assert response.status_code == 401
-
-
-def test_generate_keypair_missing_password_returns_400(client, auth_headers):
-    """Missing password field returns 400."""
-    response = client.post(
-        f"{USER_ENDPOINT}/me/generate-keypair",
-        json={},
-        headers=auth_headers,
+        f"{USER_ENDPOINT}/me/keypair",
+        json=partial,
+        headers=_elevated(client, auth_headers),
     )
     assert response.status_code == 400
 
 
-def test_generate_keypair_requires_auth(client):
+def test_store_keypair_requires_elevated_token(client, auth_headers):
+    """No password is sent since M22, so the elevated token is the only thing
+    establishing that the caller is the account holder."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/keypair",
+        json=_keypair_fields(_USER_PWD),
+        headers=auth_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_store_keypair_requires_auth(client):
     """Unauthenticated request is rejected."""
     response = client.post(
-        f"{USER_ENDPOINT}/me/generate-keypair",
-        json={"password": _USER_PWD},
+        f"{USER_ENDPOINT}/me/keypair",
+        json=_keypair_fields(_USER_PWD),
     )
     assert response.status_code in (401, 403)
+
+
+def test_get_keypair_returns_the_wrapped_private_key(client, auth_headers):
+    """The client needs its own wrapped private key to decrypt anything; it is safe to
+    hand over because the password that unwraps it never left the device."""
+    response = client.get(f"{USER_ENDPOINT}/me/keypair", headers=_elevated(client, auth_headers))
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert set(data) == {
+        "publicKey", "privateKeyCiphertext", "privateKeyNonce", "privateKeySalt",
+    }
+    assert all(data.values())
+    private_key = decrypt(
+        data["privateKeyCiphertext"], data["privateKeyNonce"], data["privateKeySalt"], _USER_PWD,
+    )
+    assert _public_key_for(private_key) == data["publicKey"]
+
+
+def test_get_keypair_requires_elevated_token(client, auth_headers):
+    response = client.get(f"{USER_ENDPOINT}/me/keypair", headers=auth_headers)
+    assert response.status_code == 403
 
 
 def test_get_me_exposes_has_keypair(client, auth_headers):
@@ -177,7 +224,7 @@ def test_get_me_exposes_has_keypair(client, auth_headers):
     data = json.loads(response.data)
     assert "hasKeypair" in data
     assert isinstance(data["hasKeypair"], bool)
-    assert data["hasKeypair"] is True  # registered users get a keypair at sign-up
+    assert data["hasKeypair"] is True  # the client posts a keypair at sign-up
 
 def test_get_me_returns_current_user(client, auth_headers):
     """Authenticated user receives their own profile."""

@@ -1,13 +1,37 @@
 import json
 import pytest
 
+from cryptography.exceptions import InvalidTag
+
 from Resources.user_resource import USER_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
+from Services.crypto_service import (
+    decrypt, decrypt_as_recipient, encrypt, encrypt_for_recipient,
+)
 
 _USER_1_PWD = "testPassword6$"
 _USER_2_PWD = "pwdTest2$"
 _MEDICAL_NOTES = "Allergic to penicillin. Blood type A+."
 _MEDICAL_NOTES_2 = "No known allergies. Blood type O+."
+
+
+def _sealed(plaintext=_MEDICAL_NOTES, password=_USER_1_PWD):
+    """Seal notes the way the client does since M22 — with crypto_service, the same
+    code that produced every ciphertext already in the database."""
+    ciphertext, nonce, salt = encrypt(plaintext, password)
+    return {"ciphertext": ciphertext, "nonce": nonce, "salt": salt}
+
+
+def _sealed_for_leader(client, headers, trip_id, plaintext=_MEDICAL_NOTES):
+    """Fetch the leader's public key and ECIES-seal to it, as a crew client does."""
+    response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/leader-public-key", headers=headers,
+    )
+    assert response.status_code == 200
+    ciphertext, nonce, ephemeral = encrypt_for_recipient(
+        plaintext, json.loads(response.data)["publicKey"],
+    )
+    return {"ciphertext": ciphertext, "nonce": nonce, "ephemeralKey": ephemeral}
 
 
 def _elevated_headers(client, auth_headers, password=_USER_1_PWD):
@@ -120,17 +144,18 @@ def test_update_float_plan_non_member_returns_404(client, outsider_headers, trip
 
 
 # =============================================================================
-# POST /api/trip/<id>/member/me/medical-consent  (save encrypted trip notes)
+# POST /api/trip/<id>/member/me/medical-consent   (store sealed trip notes)
 # DELETE /api/trip/<id>/member/me/medical-consent (revoke trip notes)
-# POST /api/trip/<id>/member/me/medical-notes     (read/decrypt trip notes)
-# POST /api/trip/<id>/member/me/share-medical-notes (share plaintext with leader)
+# GET /api/trip/<id>/member/me/medical-notes      (fetch sealed trip notes)
+# GET /api/trip/<id>/member/me/leader-public-key  (key to seal for the leader)
+# POST /api/trip/<id>/member/me/share-medical-notes (store the leader's sealed copy)
 # =============================================================================
 
 def test_set_trip_medical_notes_requires_elevated_token(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -147,7 +172,7 @@ def test_set_trip_medical_notes_success(client, auth_headers, trip_with_user2_as
     headers = _elevated_headers(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
     assert response.status_code == 200
@@ -156,11 +181,23 @@ def test_set_trip_medical_notes_success(client, auth_headers, trip_with_user2_as
     assert "medicalNotesCiphertext" not in data
 
 
+def test_set_trip_medical_notes_rejects_plaintext_body(client, auth_headers, trip_with_user2_as_crew):
+    """The pre-M22 body shape must fail loudly rather than storing a plaintext note
+    that everything downstream will then try to decrypt."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    headers = _elevated_headers(client, auth_headers)
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
+        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+
 def test_get_trip_medical_notes_requires_elevated_token(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -169,53 +206,35 @@ def test_get_trip_medical_notes_requires_elevated_token(client, auth_headers, tr
 def test_get_trip_medical_notes_none_stored(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     headers = _elevated_headers(client, auth_headers)
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=headers,
     )
     assert response.status_code == 200
-    data = json.loads(response.data)
-    assert data["medicalNotes"] is None
+    assert json.loads(response.data) == {"ciphertext": None, "nonce": None, "salt": None}
 
 
 def test_get_trip_medical_notes_roundtrip(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
+    sealed = _sealed()
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=sealed,
         headers=headers,
     )
     headers = _elevated_headers(client, auth_headers)
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=headers,
     )
     assert response.status_code == 200
-    assert json.loads(response.data)["medicalNotes"] == _MEDICAL_NOTES
-
-    # Cleanup
-    headers = _elevated_headers(client, auth_headers)
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=headers)
-
-
-def test_get_trip_medical_notes_wrong_password(client, auth_headers, trip_with_user2_as_crew):
-    trip_id = trip_with_user2_as_crew["trip"]["id"]
-    headers = _elevated_headers(client, auth_headers)
-    client.post(
-        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
-        headers=headers,
-    )
-    headers = _elevated_headers(client, auth_headers)
-    response = client.post(
-        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes",
-        json={"password": "wrongPassword1$"},
-        headers=headers,
-    )
-    assert response.status_code in (400, 401)
+    data = json.loads(response.data)
+    # Stored and returned untouched — the server is a store, not a decryptor.
+    assert data == sealed
+    assert decrypt(
+        data["ciphertext"], data["nonce"], data["salt"], _USER_1_PWD,
+    ) == _MEDICAL_NOTES
 
     # Cleanup
     headers = _elevated_headers(client, auth_headers)
@@ -228,7 +247,7 @@ def test_revoke_trip_medical_notes_requires_elevated_token(client, auth_headers,
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
 
@@ -254,7 +273,7 @@ def test_revoke_trip_medical_notes_success(client, auth_headers, trip_with_user2
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
     headers = _elevated_headers(client, auth_headers)
@@ -272,13 +291,13 @@ def test_share_medical_notes_requires_elevated_token(client, auth_headers, trip_
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
 
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-        json={"password": _USER_1_PWD},
+        json=_sealed_for_leader(client, auth_headers, trip_id),
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -299,13 +318,14 @@ def test_share_medical_notes_success(client, auth_headers, trip_with_user2_as_cr
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
+    sealed_for_leader = _sealed_for_leader(client, auth_headers, trip_id)
     headers = _elevated_headers(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-        json={"password": _USER_1_PWD},
+        json=sealed_for_leader,
         headers=headers,
     )
     assert response.status_code == 200
@@ -320,30 +340,40 @@ def test_share_medical_notes_success(client, auth_headers, trip_with_user2_as_cr
 
 def test_share_medical_notes_no_trip_notes_stored(client, auth_headers, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
+    sealed_for_leader = _sealed_for_leader(client, auth_headers, trip_id)
     headers = _elevated_headers(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-        json={"password": _USER_1_PWD},
+        json=sealed_for_leader,
         headers=headers,
     )
     assert response.status_code == 400
 
 
-def test_share_medical_notes_wrong_password(client, auth_headers, trip_with_user2_as_crew):
+def test_share_medical_notes_missing_ephemeral_key_returns_400(client, auth_headers, trip_with_user2_as_crew):
+    """Without the ephemeral public key the leader's copy can never be decrypted, so a
+    partial blob must not be stored beside a hasLeaderMedicalNotes flag saying it can."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     headers = _elevated_headers(client, auth_headers)
     client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-        json={"medicalNotes": _MEDICAL_NOTES, "password": _USER_1_PWD},
+        json=_sealed(),
         headers=headers,
     )
+    partial = _sealed_for_leader(client, auth_headers, trip_id)
+    del partial["ephemeralKey"]
     headers = _elevated_headers(client, auth_headers)
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-        json={"password": "wrongPassword1$"},
+        json=partial,
         headers=headers,
     )
-    assert response.status_code in (400, 401)
+    assert response.status_code == 400
+
+    membership = json.loads(
+        client.get(f"{TRIP_ENDPOINT}/{trip_id}/member/me", headers=auth_headers).data
+    )
+    assert membership["hasLeaderMedicalNotes"] is False
 
     # Cleanup
     headers = _elevated_headers(client, auth_headers)
@@ -354,8 +384,31 @@ def test_share_medical_notes_non_member_returns_404(client, outsider_headers, tr
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     response = client.post(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-        json={"password": _USER_1_PWD},
+        json={"ciphertext": "Y3Q=", "nonce": "bm9uY2U=", "ephemeralKey": "ZXBo"},
         headers=outsider_headers,
+    )
+    assert response.status_code in (403, 404)
+
+
+# =============================================================================
+# GET /api/trip/<id>/member/me/leader-public-key
+# =============================================================================
+
+def test_leader_public_key_returned_to_a_member(client, auth_headers_2, trip_with_user2_as_crew):
+    """Crew need the leader's public key to seal for them — public material, so no
+    elevated token, but membership of the trip is still the gate."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/leader-public-key", headers=auth_headers_2,
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)["publicKey"]
+
+
+def test_leader_public_key_non_member_returns_404(client, outsider_headers, trip_with_user2_as_crew):
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    response = client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/leader-public-key", headers=outsider_headers,
     )
     assert response.status_code in (403, 404)
 
@@ -365,13 +418,14 @@ def test_share_medical_notes_non_member_returns_404(client, outsider_headers, tr
 # =============================================================================
 
 def _set_and_share_trip_notes(client, auth_headers, trip_id, notes, password):
-    """Helper: save trip-level encrypted notes then share with leader (two-step)."""
+    """Helper: store the member's own sealed notes, then the leader-sealed copy."""
     h = _elevated_headers(client, auth_headers, password)
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
-                json={"medicalNotes": notes, "password": password}, headers=h)
+                json=_sealed(notes, password), headers=h)
+    for_leader = _sealed_for_leader(client, auth_headers, trip_id, notes)
     h = _elevated_headers(client, auth_headers, password)
     client.post(f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
-                json={"password": password}, headers=h)
+                json=for_leader, headers=h)
 
 
 def test_leader_sees_has_leader_medical_notes_flag_in_trip_get(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
@@ -476,26 +530,45 @@ def test_leader_profile_snapshot_copied_on_create(client, auth_headers, id):
 
 
 # =============================================================================
-# POST /api/trip/<id>/member/<member_id>/medical-notes  (leader reads ECIES notes)
+# GET /api/trip/<id>/member/<member_id>/medical-notes  (leader fetches ECIES notes)
 # =============================================================================
 
+def _leader_keypair(client, auth_headers, password=_USER_1_PWD):
+    """The leader's own wrapped private key, as their client fetches it."""
+    response = client.get(
+        f"{USER_ENDPOINT}/me/keypair", headers=_elevated_headers(client, auth_headers, password),
+    )
+    assert response.status_code == 200
+    return json.loads(response.data)
+
+
 def test_read_member_medical_notes_roundtrip(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
-    """Leader can decrypt crew medical notes after the crew member shares them."""
+    """Leader can decrypt crew medical notes after the crew member shares them —
+    entirely on the leader's side, with no password sent to the server."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     crew_id = trip_with_user2_as_crew["crew_id"]
 
     # Crew saves and shares their notes
     _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
 
-    # Leader reads them with their own password
+    keypair = _leader_keypair(client, auth_headers)
     h = _elevated_headers(client, auth_headers)
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=h,
     )
     assert response.status_code == 200
-    assert json.loads(response.data)["medicalNotes"] == _MEDICAL_NOTES_2
+    sealed = json.loads(response.data)
+    assert set(sealed) == {"ciphertext", "nonce", "ephemeralKey"}
+    assert decrypt_as_recipient(
+        sealed["ciphertext"],
+        sealed["nonce"],
+        sealed["ephemeralKey"],
+        keypair["privateKeyCiphertext"],
+        keypair["privateKeyNonce"],
+        keypair["privateKeySalt"],
+        _USER_1_PWD,
+    ) == _MEDICAL_NOTES_2
 
     # Cleanup
     h2 = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
@@ -508,28 +581,41 @@ def test_read_member_medical_notes_no_notes_shared(client, auth_headers, trip_wi
     crew_id = trip_with_user2_as_crew["crew_id"]
 
     h = _elevated_headers(client, auth_headers)
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=h,
     )
     assert response.status_code == 404
 
 
-def test_read_member_medical_notes_wrong_password(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
-    """Wrong leader password returns 401."""
+def test_read_member_medical_notes_is_useless_without_the_leader_password(
+    client, auth_headers, auth_headers_2, trip_with_user2_as_crew
+):
+    """The server hands over ciphertext to an authenticated leader, and that is all it
+    can do: the blob stays unreadable to anyone without the password that unwraps the
+    leader's private key. This is the property that replaced the old 401-on-wrong-
+    password, which only existed because the server did the decrypting."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     crew_id = trip_with_user2_as_crew["crew_id"]
 
     _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
 
+    keypair = _leader_keypair(client, auth_headers)
     h = _elevated_headers(client, auth_headers)
-    response = client.post(
-        f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": "wrongPassword1$"},
-        headers=h,
-    )
-    assert response.status_code == 401
+    sealed = json.loads(client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes", headers=h,
+    ).data)
+    assert _MEDICAL_NOTES_2 not in json.dumps(sealed)
+    with pytest.raises(InvalidTag):
+        decrypt_as_recipient(
+            sealed["ciphertext"],
+            sealed["nonce"],
+            sealed["ephemeralKey"],
+            keypair["privateKeyCiphertext"],
+            keypair["privateKeyNonce"],
+            keypair["privateKeySalt"],
+            "wrongPassword1$",
+        )
 
     # Cleanup
     h2 = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
@@ -542,9 +628,8 @@ def test_read_member_medical_notes_crew_forbidden(client, auth_headers_2, trip_w
     crew_id = trip_with_user2_as_crew["crew_id"]
 
     h = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": _USER_2_PWD},
         headers=h,
     )
     assert response.status_code == 403
@@ -561,9 +646,8 @@ def test_read_member_medical_notes_requires_elevated_token(client, auth_headers,
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     crew_id = trip_with_user2_as_crew["crew_id"]
 
-    response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=auth_headers,
     )
     assert response.status_code == 403
@@ -590,9 +674,8 @@ def test_leader_read_writes_an_access_log_row_the_crew_member_can_see(
     _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
 
     h = _elevated_headers(client, auth_headers)
-    read_response = client.post(
+    read_response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": _USER_1_PWD},
         headers=h,
     )
     assert read_response.status_code == 200
@@ -622,29 +705,31 @@ def test_access_log_empty_when_never_read(client, auth_headers_2, trip_with_user
     assert json.loads(response.data) == []
 
 
-def test_access_log_not_written_on_failed_decrypt(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
-    """A wrong-password (failed) leader decrypt attempt is not recorded — only successful reads."""
+def test_access_log_not_written_when_nothing_was_shared(client, auth_headers, auth_headers_2, trip_with_user2_as_crew):
+    """A leader who reaches for notes that were never shared gets a 404 and leaves no
+    trace — the log records accesses, not attempts.
+
+    Note what this test can no longer assert, and why. Before M22 a leader who typed
+    the wrong password was rejected by the server's own decrypt and went unlogged.
+    The decrypt now happens on the leader's device, so the server cannot tell a
+    successful read from a failed one and logs the moment it hands the ciphertext
+    over. That is deliberately over-inclusive: taking possession of a member's sealed
+    notes is the access the member is entitled to see.
+    """
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     crew_id = trip_with_user2_as_crew["crew_id"]
 
-    _set_and_share_trip_notes(client, auth_headers_2, trip_id, _MEDICAL_NOTES_2, _USER_2_PWD)
-
     h = _elevated_headers(client, auth_headers)
-    failed_response = client.post(
+    response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/{crew_id}/medical-notes",
-        json={"password": "wrongPassword1$"},
         headers=h,
     )
-    assert failed_response.status_code == 401
+    assert response.status_code == 404
 
     log_response = client.get(
         f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-notes/access-log", headers=auth_headers_2
     )
     assert json.loads(log_response.data) == []
-
-    # Cleanup
-    h2 = _elevated_headers(client, auth_headers_2, _USER_2_PWD)
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent", headers=h2)
 
 
 def test_access_log_not_visible_to_other_crew_members(client, auth_headers_2, trip_with_user2_as_crew):

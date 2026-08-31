@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from cryptography.exceptions import InvalidTag
 from flask import g
 from flask_bcrypt import check_password_hash, generate_password_hash
 
@@ -21,7 +20,7 @@ from Models.connection import Connection, ConnectionStatusType
 from Api.database import db
 from Schemas.base_schema import camelcase
 from Schemas.user_schema import PublicUserSchema
-from Services.crypto_service import encrypt, decrypt, generate_keypair
+from Services.crypto_service import encrypt, decrypt
 from Services.storage_service import StorageService
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
@@ -396,29 +395,61 @@ class UserService:
         logger.info("password_changed", extra={"user_id": id})
 
     @staticmethod
-    def generate_keypair_for_user(id: str, password: str) -> "User":
+    def store_keypair(
+        id: str,
+        public_key: str,
+        private_key_ciphertext: str,
+        private_key_nonce: str,
+        private_key_salt: str,
+    ) -> "User":
         """
-        Generate an X25519 keypair for an existing user without one.
-        No-op if the user already has a keypair (returns unchanged user).
+        Store a client-generated X25519 keypair for an existing user without one.
+
+        The private key arrives already wrapped under a key the client derived from the
+        user's password (M22) — the server never sees the password or the private key.
+        It cannot verify that the blob unwraps, so a caller sending garbage stores
+        garbage; the elevated-token requirement on the endpoint is what establishes that
+        the caller is the account holder.
 
         Raises:
             NoResultFound: If user does not exist
-            ValueError: If password does not match
+            ValueError: If the user already has a keypair — overwriting one would
+                orphan every note and every leader-shared copy encrypted under it
         """
         user = UserService.get_user_by_id(id)
-        if not check_password_hash(user.pwd, password):
-            raise PermissionError("Password is incorrect")
         if user.public_key:
             raise ValueError("keypair_already_exists")
-        public_key_b64, pk_ct, pk_nonce, pk_salt = generate_keypair(password)
-        user.public_key = public_key_b64
-        user.private_key_ciphertext = pk_ct
-        user.private_key_nonce = pk_nonce
-        user.private_key_salt = pk_salt
+        user.public_key = public_key
+        user.private_key_ciphertext = private_key_ciphertext
+        user.private_key_nonce = private_key_nonce
+        user.private_key_salt = private_key_salt
         db.session.commit()
         db.session.refresh(user)
-        logger.info("keypair_generated", extra={"user_id": id})
+        logger.info("keypair_stored", extra={"user_id": id})
         return user
+
+    @staticmethod
+    def get_keypair(id: str) -> Dict[str, str]:
+        """
+        Return the user's own public key and password-wrapped private key (M22).
+
+        The private key is useless without the password that wraps it, which is why
+        handing it to its owner is safe — the client unwraps it in memory to decrypt
+        notes shared with them.
+
+        Raises:
+            NoResultFound: If user does not exist
+            ValueError: If the user has no keypair yet
+        """
+        user = UserService.get_user_by_id(id)
+        if not user.public_key:
+            raise ValueError("No keypair stored")
+        return {
+            "publicKey": user.public_key,
+            "privateKeyCiphertext": user.private_key_ciphertext,  # type: ignore[dict-item]
+            "privateKeyNonce": user.private_key_nonce,  # type: ignore[dict-item]
+            "privateKeySalt": user.private_key_salt,  # type: ignore[dict-item]
+        }
 
     @staticmethod
     def verify_password(id: str, password: str) -> bool:
@@ -464,16 +495,18 @@ class UserService:
         logger.info("email_change_requested", extra={"user_id": id})
 
     @staticmethod
-    def grant_medical_consent(id: str, plaintext: str, password: str) -> User:
+    def grant_medical_consent(id: str, ciphertext: str, nonce: str, salt: str) -> User:
         """
-        Encrypt medical notes with a user-derived key and record consent timestamp.
+        Store client-encrypted medical notes and record the consent timestamp.
         Requires the caller to have already verified their identity (elevated token).
+
+        Since M22 the ciphertext arrives already sealed — the server stores three
+        opaque strings and never holds the plaintext or the password.
 
         Raises:
             NoResultFound: If user does not exist
         """
         user = UserService.get_user_by_id(id)
-        ciphertext, nonce, salt = encrypt(plaintext, password)
         user.medical_notes_ciphertext = ciphertext
         user.medical_notes_nonce = nonce
         user.medical_notes_salt = salt
@@ -514,26 +547,23 @@ class UserService:
         logger.info("medical_consent_revoked", extra={"user_id": id})
 
     @staticmethod
-    def get_medical_notes(id: str, password: str) -> str:
+    def get_medical_notes(id: str) -> Dict[str, Optional[str]]:
         """
-        Decrypt and return medical notes. Requires re-auth password.
+        Return the user's own sealed medical notes for the client to decrypt (M22).
+
+        Having no notes yet is the ordinary state of a new account, not an error, so
+        the fields come back null rather than as a 404 the client would have to
+        special-case out of its error handling.
 
         Raises:
             NoResultFound: If user does not exist
-            ValueError: If no medical notes are stored or decryption fails
         """
         user = UserService.get_user_by_id(id)
-        if not user.medical_notes_ciphertext:
-            raise ValueError("No medical notes stored")
-        try:
-            return decrypt(
-                user.medical_notes_ciphertext,
-                user.medical_notes_nonce, # type: ignore 
-                user.medical_notes_salt, # type: ignore 
-                password,
-            )
-        except InvalidTag:
-            raise ValueError("Decryption failed — password may be incorrect")
+        return {
+            "ciphertext": user.medical_notes_ciphertext,
+            "nonce": user.medical_notes_nonce,
+            "salt": user.medical_notes_salt,
+        }
 
     @staticmethod
     def request_deletion(id: str) -> str:

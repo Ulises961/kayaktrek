@@ -8,6 +8,7 @@ from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
 from Models.user import User
 from Schemas.user_schema import UserSchema
+from Services.crypto_service import encrypt
 from Services.user_service import UserService
 
 
@@ -322,7 +323,8 @@ class TestMedicalNotesReset:
         user.medical_notes_reset_at = datetime.now(timezone.utc)
         db.session.commit()
 
-        UserService.grant_medical_consent(str(user.id), "Allergic to penicillin", "AuthFlow9$")
+        ciphertext, nonce, salt = encrypt("Allergic to penicillin", "AuthFlow9$")
+        UserService.grant_medical_consent(str(user.id), ciphertext, nonce, salt)
 
         db.session.refresh(user)
         assert user.medical_notes_reset_at is None

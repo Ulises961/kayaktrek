@@ -18,6 +18,8 @@ import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { MedicalNotesViewer } from "@/components/trips/medical-notes-viewer"
 import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
+import { reAuth, getKeypair } from "@/lib/profile/actions"
+import { decrypt, decryptAsRecipient } from "@/lib/crypto/medical"
 import type { TripMember } from "@/lib/dtos/trip-member"
 import { formatDayDate } from "@/lib/utils/date"
 import { formatVesselLength, formatPaddlerName } from "@/lib/user/format"
@@ -164,7 +166,13 @@ interface FloatPlanCrewManifestProps {
 }
 
 export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestProps) {
+  // The leader's own private key, unwrapped once on this device and held in memory only
+  // (M22). Every crew note on the page decrypts against it, so the 600,000-iteration key
+  // derivation is paid once per unlock rather than once per member. The password is kept
+  // alongside it because each fetch re-authenticates for a fresh elevated token, which is
+  // deliberately short-lived.
   const [leaderPassword, setLeaderPassword] = useState<string | null>(null)
+  const [leaderPrivateKey, setLeaderPrivateKey] = useState<string | null>(null)
   const [notesCache, setNotesCache] = useState<Record<string, string>>({})
   const [loadingMembers, setLoadingMembers] = useState<Set<string>>(new Set())
   const [memberErrors, setMemberErrors] = useState<Record<string, string>>({})
@@ -179,29 +187,59 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
     formState: { errors, isSubmitting },
   } = useForm<PasswordFormValues>({ resolver: zodResolver(PasswordSchema) })
 
-  async function fetchNotes(memberId: string, password: string) {
+  /**
+   * Fetch one member's sealed notes and decrypt them here. Re-auth is per fetch because an
+   * elevated token is short-lived and the leader may sit on this page reading several
+   * members; the private key is not, because unwrapping it is the expensive step.
+   */
+  async function fetchNotes(memberId: string, password: string, privateKey: string) {
     setLoadingMembers((prev) => new Set(prev).add(memberId))
     setMemberErrors((prev) => {
       const next = { ...prev }
       delete next[memberId]
       return next
     })
-    const result = await readMemberMedicalNotes(tripId, memberId, password)
+
+    const failWith = (message: string) => {
+      setLoadingMembers((prev) => {
+        const next = new Set(prev)
+        next.delete(memberId)
+        return next
+      })
+      setMemberErrors((prev) => ({ ...prev, [memberId]: message }))
+    }
+
+    const authResult = await reAuth(password)
+    if (!authResult.success) return failWith(authResult.error)
+
+    const result = await readMemberMedicalNotes(tripId, memberId, authResult.elevatedToken)
+    if (!result.success) return failWith(result.error)
+
+    let plaintext: string
+    try {
+      plaintext = decryptAsRecipient(
+        result.sealed.ciphertext,
+        result.sealed.nonce,
+        result.sealed.ephemeralKey,
+        privateKey,
+      )
+    } catch {
+      // The member sealed these to a public key that is not the one this private key
+      // matches — leadership changed after they shared, and their copy was never re-sealed.
+      return failWith("These notes were shared with a previous leader. Ask them to share again.")
+    }
+
     setLoadingMembers((prev) => {
       const next = new Set(prev)
       next.delete(memberId)
       return next
     })
-    if (result.success) {
-      setNotesCache((prev) => ({ ...prev, [memberId]: result.medicalNotes }))
-    } else {
-      setMemberErrors((prev) => ({ ...prev, [memberId]: result.error }))
-    }
+    setNotesCache((prev) => ({ ...prev, [memberId]: plaintext }))
   }
 
   async function handleView(memberId: string) {
-    if (leaderPassword) {
-      await fetchNotes(memberId, leaderPassword)
+    if (leaderPrivateKey) {
+      await fetchNotes(memberId, leaderPassword!, leaderPrivateKey)
     } else {
       setPendingMemberId(memberId)
       setDialogOpen(true)
@@ -210,16 +248,44 @@ export function FloatPlanCrewManifest({ crew, tripId }: FloatPlanCrewManifestPro
 
   async function onPasswordSubmit(values: PasswordFormValues) {
     if (!pendingMemberId) return
-    const result = await readMemberMedicalNotes(tripId, pendingMemberId, values.password)
-    if (result.success) {
-      setLeaderPassword(values.password)
-      setNotesCache((prev) => ({ ...prev, [pendingMemberId]: result.medicalNotes }))
-      setDialogOpen(false)
-      setPendingMemberId(null)
-      reset()
-    } else {
-      setError("password", { message: result.error })
+
+    const authResult = await reAuth(values.password)
+    if (!authResult.success) {
+      setError("password", { message: authResult.error })
+      return
     }
+
+    const keypairResult = await getKeypair(authResult.elevatedToken)
+    if (!keypairResult.success) {
+      setError("password", { message: keypairResult.error })
+      return
+    }
+
+    let privateKey: string
+    try {
+      const { privateKeyCiphertext, privateKeyNonce, privateKeySalt } = keypairResult.keypair
+      privateKey = await decrypt(
+        privateKeyCiphertext,
+        privateKeyNonce,
+        privateKeySalt,
+        values.password,
+      )
+    } catch {
+      // reAuth accepted this password, so the key was wrapped under an older one — a
+      // password change from before M22 re-wrapped it client-side.
+      setError("password", {
+        message:
+          "Your encryption key does not match this password. Change your password to reset it.",
+      })
+      return
+    }
+
+    setLeaderPassword(values.password)
+    setLeaderPrivateKey(privateKey)
+    setDialogOpen(false)
+    setPendingMemberId(null)
+    reset()
+    await fetchNotes(pendingMemberId, values.password, privateKey)
   }
 
   return (

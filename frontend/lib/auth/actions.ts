@@ -91,6 +91,20 @@ export async function login(
   redirect("/dashboard")
 }
 
+const KEYPAIR_FIELDS = [
+  "publicKey",
+  "privateKeyCiphertext",
+  "privateKeyNonce",
+  "privateKeySalt",
+] as const
+
+/** All four keypair fields, or none — a partial keypair is unusable, so it is not sent. */
+function keypairFields(formData: FormData): Record<string, string> {
+  const entries = KEYPAIR_FIELDS.map((field) => [field, formData.get(field)] as const)
+  if (entries.some(([, value]) => typeof value !== "string" || !value)) return {}
+  return Object.fromEntries(entries as readonly (readonly [string, string])[])
+}
+
 export async function register(
   _prevState: AuthResult | null,
   formData: FormData,
@@ -120,6 +134,11 @@ export async function register(
     phone: phone || undefined,
     inviteCode: inviteCode || undefined,
     pwd: password,
+    // The medical-notes keypair, generated in the browser (M22) and passed through
+    // untouched — this action never derives or unwraps anything. Deliberately outside
+    // RegisterSchema: it is opaque key material, not a field a user typed, and the
+    // backend treats all four as optional (an account with no keypair adds one later).
+    ...keypairFields(formData),
   }
 
   let res: Response

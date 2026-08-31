@@ -141,6 +141,12 @@ def register_user():
         When the closed-beta invite gate is enabled (INVITE_CODE set), a missing or wrong
         `inviteCode` returns 403 before any of that — this check is independent of the
         enumeration guard, since a shared code carries no per-user information.
+
+
+        Accepts four optional fields beyond UserSchema — `publicKey`,
+        `privateKeyCiphertext`, `privateKeyNonce`, `privateKeySalt` — the medical-notes
+        keypair the client generates and wraps under the user's password (M22). Omit all
+        four to register without one and add it later via POST /api/v1/user/me/keypair.
       requestBody:
         content:
           application/json:

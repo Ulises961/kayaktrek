@@ -5,6 +5,7 @@ import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { register as registerAction } from "@/lib/auth/actions"
 import { RegisterSchema, PASSWORD_RULES, type RegisterInput } from "@/lib/auth/schemas"
+import { generateKeypair } from "@/lib/crypto/medical"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/common/password-input"
@@ -53,13 +54,23 @@ export default function RegisterPage() {
 
   const password = useWatch({ control, name: "password" }) ?? ""
 
-  const onSubmit = handleSubmit((data) => {
+  const onSubmit = handleSubmit(async (data) => {
+    // The medical-notes keypair is generated here, in the browser, and its private half is
+    // wrapped under the password before it is sent (M22) — the server never sees the key
+    // material unwrapped. Doing it at sign-up rather than on first use means an account
+    // can receive shared notes immediately. Costs one PBKDF2 derivation (~0.4s).
+    const keypair = await generateKeypair(data.password)
+
     const fd = new FormData()
     fd.append("mail", data.mail)
     fd.append("username", data.username)
     fd.append("name", data.name)
     if (data.inviteCode) fd.append("inviteCode", data.inviteCode)
     fd.append("password", data.password)
+    fd.append("publicKey", keypair.publicKey)
+    fd.append("privateKeyCiphertext", keypair.privateKeyCiphertext)
+    fd.append("privateKeyNonce", keypair.privateKeyNonce)
+    fd.append("privateKeySalt", keypair.privateKeySalt)
     startTransition(() => formAction(fd))
   })
 

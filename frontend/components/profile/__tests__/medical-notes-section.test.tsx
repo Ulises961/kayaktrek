@@ -8,6 +8,14 @@ vi.mock("@/lib/profile/actions", () => ({
   grantMedicalConsent: vi.fn(),
   revokeMedicalConsent: vi.fn(),
 }))
+// The crypto is mocked here so these tests stay about the component's phases and error
+// states. Its correctness is pinned by the cross-language vectors
+// (lib/crypto/__tests__), and running the real 600,000-iteration derivation per
+// interaction would add seconds to this file for no extra assurance.
+vi.mock("@/lib/crypto/medical", () => ({
+  encrypt: vi.fn(),
+  decrypt: vi.fn(),
+}))
 
 import {
   reAuth,
@@ -15,20 +23,26 @@ import {
   grantMedicalConsent,
   revokeMedicalConsent,
 } from "@/lib/profile/actions"
+import { encrypt, decrypt } from "@/lib/crypto/medical"
 import { MedicalNotesSection } from "../medical-notes-section"
 
 const ELEVATED_TOKEN = "eyJ.elevated.token"
 const PASSWORD = "MyPass1!"
+const SEALED = { ciphertext: "Y3Q=", nonce: "bm9uY2U=", salt: "c2FsdA==" }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(encrypt).mockResolvedValue(SEALED)
+})
 
 async function openToEdit(hasStoredNotes = false) {
   render(<MedicalNotesSection hasStoredNotes={hasStoredNotes} />)
   vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
   vi.mocked(getMedicalNotes).mockResolvedValue({
     success: true,
-    notes: hasStoredNotes ? "Allergic to penicillin" : null,
+    sealed: hasStoredNotes ? SEALED : null,
   })
+  vi.mocked(decrypt).mockResolvedValue("Allergic to penicillin")
   await userEvent.click(
     screen.getByRole("button", { name: hasStoredNotes ? /edit/i : /add notes/i }),
   )
@@ -76,7 +90,7 @@ describe("MedicalNotesSection — reset prompt", () => {
     vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
     render(<MedicalNotesSection hasStoredNotes={false} resetAt="2026-06-16T10:00:00Z" />)
     vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
-    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, notes: null })
+    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, sealed: null })
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
     await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
@@ -104,13 +118,14 @@ describe("MedicalNotesSection — authenticating state", () => {
 
   it("calls reAuth then getMedicalNotes on Continue", async () => {
     vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
-    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, notes: null })
+    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, sealed: null })
     render(<MedicalNotesSection hasStoredNotes={false} />)
     await userEvent.click(screen.getByRole("button", { name: /add notes/i }))
     await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(reAuth).toHaveBeenCalledWith(PASSWORD))
-    expect(getMedicalNotes).toHaveBeenCalledWith(ELEVATED_TOKEN, PASSWORD)
+    // The elevated token is the only argument — the password stays in the browser.
+    expect(getMedicalNotes).toHaveBeenCalledWith(ELEVATED_TOKEN)
   })
 
   it("shows an error when reAuth returns wrong password", async () => {
@@ -120,6 +135,25 @@ describe("MedicalNotesSection — authenticating state", () => {
     await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), "wrong")
     await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await waitFor(() => expect(screen.getByText("Password incorrect.")).toBeDefined())
+  })
+
+  it("explains a stale ciphertext and still opens the editor so the notes can be replaced", async () => {
+    // reAuth accepted the password, so this is not a wrong password — the stored notes
+    // were sealed under an older one and nothing can recover them. Stranding the user in
+    // the password step would leave no way past it; the editor is the way out.
+    vi.mocked(reAuth).mockResolvedValue({ success: true, elevatedToken: ELEVATED_TOKEN })
+    vi.mocked(getMedicalNotes).mockResolvedValue({ success: true, sealed: SEALED })
+    vi.mocked(decrypt).mockRejectedValue(new Error("invalid tag"))
+    render(<MedicalNotesSection hasStoredNotes={true} />)
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+    await userEvent.type(screen.getByLabelText(/password/i, { selector: "input" }), PASSWORD)
+    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
+
+    await waitFor(() => expect(screen.getByText(/different password/i)).toBeDefined())
+    const textbox = await screen.findByRole("textbox")
+    // Empty, not the undecryptable ciphertext — saving would otherwise store a base64
+    // blob as the user's medical notes.
+    expect((textbox as HTMLTextAreaElement).value).toBe("")
   })
 
   it("returns to idle on Cancel", async () => {
@@ -159,14 +193,15 @@ describe("MedicalNotesSection — editing state", () => {
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("")
   })
 
-  it("calls grantMedicalConsent with token, notes, and password on save", async () => {
+  it("seals the notes in the browser and sends only the ciphertext on save", async () => {
     vi.mocked(grantMedicalConsent).mockResolvedValue({ success: true })
     await openToEdit(false)
     await userEvent.type(screen.getByRole("textbox"), "Blood type A+")
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
-    await waitFor(() =>
-      expect(grantMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN, "Blood type A+", PASSWORD),
-    )
+    await waitFor(() => expect(encrypt).toHaveBeenCalledWith("Blood type A+", PASSWORD))
+    // The action is transport: it receives the sealed triple and neither the notes nor
+    // the password, which is what keeps the plaintext off the wire to the Next server.
+    expect(grantMedicalConsent).toHaveBeenCalledWith(ELEVATED_TOKEN, SEALED)
   })
 
   it("shows a saved confirmation after successful save", async () => {

@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
-import { apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload, isRedirectError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import type { ProfileFormValues } from "@/lib/dtos/user"
+import type { GeneratedKeypair, SealedValue } from "@/lib/crypto/medical"
 import type { DistanceUnit } from "@/lib/itinerary/distance"
 
 export type ProfileActionResult = { success: true } | { success: false; error: string }
@@ -179,8 +180,14 @@ export async function requestAccountDeletion(): Promise<ProfileActionResult> {
 
 export type ReAuthResult =
   { success: true; elevatedToken: string } | { success: false; error: string }
-export type MedicalNotesResult =
-  { success: true; notes: string | null } | { success: false; error: string }
+// These carry ciphertext, never notes and never a password (M22). A server action's arguments
+// cross the network to the Next server, so a password parameter here would defeat the point of
+// moving the crypto to the browser — the plaintext would just leave the device one hop earlier.
+// Everything below is transport: it must not interpret what the browser sealed.
+export type SealedNotesResult =
+  { success: true; sealed: SealedValue | null } | { success: false; error: string }
+export type KeypairResult =
+  { success: true; keypair: GeneratedKeypair } | { success: false; error: string }
 
 export async function reAuth(password: string): Promise<ReAuthResult> {
   try {
@@ -194,26 +201,21 @@ export async function reAuth(password: string): Promise<ReAuthResult> {
   }
 }
 
-export async function getMedicalNotes(
-  elevatedToken: string,
-  password: string,
-): Promise<MedicalNotesResult> {
+export async function getMedicalNotes(elevatedToken: string): Promise<SealedNotesResult> {
   try {
-    const data = await apiPost<{ medicalNotes: string | null }>(
-      "/api/user/me/medical-notes",
-      { password },
-      { "X-Elevated-Token": elevatedToken },
-    )
-    return { success: true, notes: data.medicalNotes ?? null }
+    const data = await apiGet<Partial<SealedValue>>("/api/user/me/medical-notes", {
+      "X-Elevated-Token": elevatedToken,
+    })
+    // All three fields come back null when nothing is stored — the ordinary state of a new
+    // account, which the backend deliberately does not report as a 404.
+    if (!data.ciphertext || !data.nonce || !data.salt) return { success: true, sealed: null }
+    return {
+      success: true,
+      sealed: { ciphertext: data.ciphertext, nonce: data.nonce, salt: data.salt },
+    }
   } catch (e) {
     if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes("400")) return { success: true, notes: null }
-    if (msg.includes("401"))
-      return {
-        success: false,
-        error: "Could not decrypt notes — notes may have been saved with a different password.",
-      }
     if (msg.includes("403"))
       return { success: false, error: "Session expired. Please lock and unlock again." }
     return { success: false, error: `Failed to load medical notes (${msg}).` }
@@ -222,15 +224,10 @@ export async function getMedicalNotes(
 
 export async function grantMedicalConsent(
   elevatedToken: string,
-  medicalNotes: string,
-  password: string,
+  sealed: SealedValue,
 ): Promise<ProfileActionResult> {
   try {
-    await apiPost(
-      "/api/user/me/medical-consent",
-      { medicalNotes, password },
-      { "X-Elevated-Token": elevatedToken },
-    )
+    await apiPost("/api/user/me/medical-consent", sealed, { "X-Elevated-Token": elevatedToken })
     revalidatePath("/profile")
     return { success: true }
   } catch (e) {
@@ -242,16 +239,37 @@ export async function grantMedicalConsent(
   }
 }
 
-export async function generateKeypair(password: string): Promise<ProfileActionResult> {
+export async function storeKeypair(
+  elevatedToken: string,
+  keypair: GeneratedKeypair,
+): Promise<ProfileActionResult> {
   try {
-    await apiPost("/api/user/me/generate-keypair", { password })
+    await apiPost("/api/user/me/keypair", keypair, { "X-Elevated-Token": elevatedToken })
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e
     const msg = e instanceof Error ? e.message : ""
-    if (msg.includes("401")) return { success: false, error: "Password incorrect." }
+    // 409 means a keypair is already stored. The account has what it needs and the one we
+    // generated is discarded — replacing it would orphan every note encrypted under the first.
     if (msg.includes("409")) return { success: true }
+    if (msg.includes("403")) return { success: false, error: "Session expired. Please try again." }
     return { success: false, error: "Failed to set up encryption keypair." }
+  }
+}
+
+export async function getKeypair(elevatedToken: string): Promise<KeypairResult> {
+  try {
+    const keypair = await apiGet<GeneratedKeypair>("/api/user/me/keypair", {
+      "X-Elevated-Token": elevatedToken,
+    })
+    return { success: true, keypair }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    const msg = e instanceof Error ? e.message : ""
+    if (msg.includes("404"))
+      return { success: false, error: "Set up medical note encryption first." }
+    if (msg.includes("403")) return { success: false, error: "Session expired. Please try again." }
+    return { success: false, error: "Failed to load your encryption keys." }
   }
 }
 

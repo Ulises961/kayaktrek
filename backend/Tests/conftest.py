@@ -1,5 +1,6 @@
 import os
 from datetime import date
+from functools import lru_cache
 import json
 import pytest
 from unittest.mock import patch
@@ -17,6 +18,7 @@ from Resources.item_resource import ITEM_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
+from Services.crypto_service import generate_keypair
 from Tests.auth_helpers import FakeDenylist, access_token_for
 from Api.app import createApp
 from Api.database import db as _db
@@ -101,6 +103,28 @@ def app(request):
     return app
 
 
+@lru_cache(maxsize=None)
+def _keypair_fields(password: str) -> dict:
+    """The medical-notes keypair a client generates and posts at registration (M22).
+
+    Memoised per password because 600,000 PBKDF2 iterations is the point of the scheme,
+    and function-scoped fixtures register a fresh user for a large share of the suite.
+    Any keypair wrapped under the right password will do — these tests never care which.
+    """
+    public_key, ciphertext, nonce, salt = generate_keypair(password)
+    return {
+        "publicKey": public_key,
+        "privateKeyCiphertext": ciphertext,
+        "privateKeyNonce": nonce,
+        "privateKeySalt": salt,
+    }
+
+
+def _registration(data: dict) -> dict:
+    """Registration payload plus the client-side keypair, as the web client sends it."""
+    return {**data, **_keypair_fields(data["pwd"])}
+
+
 def _activate_user(mail: str) -> User:
     """Directly activate a test user in the DB (bypasses email flow)."""
     user = User.query.filter_by(mail=mail).first()
@@ -122,7 +146,7 @@ def user_1(app):
         "username": "test",
         "admin": True
     }
-    response = client.post("/api/v1/auth/register", json=user1)
+    response = client.post("/api/v1/auth/register", json=_registration(user1))
     assert response.status_code == 201
     return _activate_user("test.user@gmail.com")
 
@@ -138,7 +162,7 @@ def user_2(app):
         "surname": "charles",
         "username": "charles99"
     }
-    response = client.post("/api/v1/auth/register", json=user2)
+    response = client.post("/api/v1/auth/register", json=_registration(user2))
     assert response.status_code == 201
     return _activate_user("test1.user@gmail.com")
 
@@ -202,7 +226,7 @@ def outsider_headers(app, client):
         "name": "Outsider",
         "username": "outsider_tmp",
     }
-    client.post("/api/v1/auth/register", json=outsider_data)
+    client.post("/api/v1/auth/register", json=_registration(outsider_data))
     with app.app_context():
         outsider = _activate_user("outsider.tmp@example.com")
         token = access_token_for(outsider)
@@ -455,7 +479,7 @@ def trip_with_crew(app, client, auth_headers):
         "name": "Crew",
         "username": "crew_member_tmp",
     }
-    client.post("/api/v1/auth/register", json=crew_data)
+    client.post("/api/v1/auth/register", json=_registration(crew_data))
 
     with app.app_context():
         crew_user = _activate_user("crew.member@example.com")

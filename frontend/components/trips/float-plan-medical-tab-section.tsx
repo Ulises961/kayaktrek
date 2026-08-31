@@ -10,8 +10,10 @@ import {
   getTripMedicalNotes,
   setTripMedicalNotes,
   revokeTripMedicalNotes,
+  getLeaderPublicKey,
   shareMedicalNotes,
 } from "@/lib/trip-member/actions"
+import { decrypt, encrypt, encryptForRecipient } from "@/lib/crypto/medical"
 import { EmptyState } from "@/components/common/empty-state"
 
 interface FloatPlanMedicalTabSectionProps {
@@ -45,6 +47,8 @@ export function FloatPlanMedicalTabSection({
   // The prompt clears once notes are re-entered (hasNotes flips true after a save).
   const showResetPrompt = !!profileResetAt && !hasNotes
 
+  // The password never leaves this component (M22): re-auth proves identity to the server,
+  // which returns ciphertext, and the decryption happens here.
   function handleDecrypt() {
     setError(null)
     startTransition(async () => {
@@ -57,17 +61,32 @@ export function FloatPlanMedicalTabSection({
       const token = authResult.elevatedToken
 
       // Try trip-level notes first; fall back to profile seed if none stored
-      const tripResult = await getTripMedicalNotes(tripId, token, password)
+      const tripResult = await getTripMedicalNotes(tripId, token)
       if (!tripResult.success) {
         setError(tripResult.error)
         return
       }
 
-      let initialNotes = tripResult.notes ?? ""
-      if (!initialNotes) {
-        const profileResult = await getMedicalNotes(token, password)
-        if (profileResult.success) {
-          initialNotes = profileResult.notes ?? ""
+      let sealed = tripResult.sealed
+      if (!sealed) {
+        const profileResult = await getMedicalNotes(token)
+        if (profileResult.success) sealed = profileResult.sealed
+      }
+
+      let initialNotes = ""
+      if (sealed) {
+        try {
+          initialNotes = await decrypt(sealed.ciphertext, sealed.nonce, sealed.salt, password)
+        } catch {
+          // reAuth accepted this password, so the notes were sealed under a different
+          // one. Nothing here can recover them; overwriting is the only way forward.
+          setError(
+            "Could not decrypt notes — they were saved with a different password. " +
+              "Re-enter them to replace what is stored.",
+          )
+          setElevatedToken(token)
+          setPhase("editing")
+          return
         }
       }
 
@@ -81,7 +100,8 @@ export function FloatPlanMedicalTabSection({
     setError(null)
     setSavedOk(false)
     startTransition(async () => {
-      const result = await setTripMedicalNotes(tripId, notes, elevatedToken!, password)
+      const sealed = await encrypt(notes, password)
+      const result = await setTripMedicalNotes(tripId, elevatedToken!, sealed)
       if (!result.success) {
         setError(result.error)
         return
@@ -108,11 +128,24 @@ export function FloatPlanMedicalTabSection({
     })
   }
 
+  // Sharing seals a second copy for the leader, on this device. The notes being shared are
+  // the ones in the editor, which is why this is only reachable from the editing phase —
+  // the server no longer holds anything it could re-encrypt on our behalf.
   function handleShare() {
     setShareError(null)
     setShareOk(false)
     startTransition(async () => {
-      const result = await shareMedicalNotes(tripId, elevatedToken!, password)
+      const keyResult = await getLeaderPublicKey(tripId)
+      if (!keyResult.success) {
+        setShareError(keyResult.error)
+        return
+      }
+      const forLeader = encryptForRecipient(notes, keyResult.publicKey)
+      const result = await shareMedicalNotes(tripId, elevatedToken!, {
+        ciphertext: forLeader.ciphertext,
+        nonce: forLeader.nonce,
+        ephemeralKey: forLeader.ephemeralPublicKey,
+      })
       if (!result.success) {
         setShareError(result.error)
         return

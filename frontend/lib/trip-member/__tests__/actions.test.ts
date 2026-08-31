@@ -17,6 +17,7 @@ import {
   getTripMedicalNotes,
   setTripMedicalNotes,
   revokeTripMedicalNotes,
+  getLeaderPublicKey,
   shareMedicalNotes,
   readMemberMedicalNotes,
 } from "../actions"
@@ -47,6 +48,11 @@ const FLOAT_PLAN_FIELDS = {
 
 const ELEVATED_TOKEN = "eyJ.elevated.token"
 const PASSWORD = "MyPass1!"
+
+// Opaque to these tests on purpose: the actions are transport since M22 and must not
+// interpret, re-shape or validate what the browser sealed.
+const SEALED = { ciphertext: "Y3Q=", nonce: "bm9uY2U=", salt: "c2FsdA==" }
+const SEALED_FOR_LEADER = { ciphertext: "Y3Q=", nonce: "bm9uY2U=", ephemeralKey: "ZXBo" }
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -124,49 +130,41 @@ describe("updateMyFloatPlan", () => {
 })
 
 describe("getTripMedicalNotes", () => {
-  it("POSTs to the correct path with password and elevated header", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin." })
-    await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(apiPost).toHaveBeenCalledWith(
-      `/api/trip/${TRIP_ID}/member/me/medical-notes`,
-      { password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN },
-    )
+  it("GETs the correct path with the elevated header and no password", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED)
+    await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/me/medical-notes`, {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
   })
 
-  it("returns the notes string on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin." })
-    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({ success: true, notes: "Allergic to penicillin." })
+  it("returns the sealed blob for the caller to decrypt", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED)
+    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({
+      success: true,
+      sealed: SEALED,
+    })
   })
 
-  it("returns null notes when none are stored", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: null })
-    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({ success: true, notes: null })
+  it("returns sealed: null when none are stored — the backend sends nulls, not a 404", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ ciphertext: null, nonce: null, salt: null })
+    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({
+      success: true,
+      sealed: null,
+    })
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("403"))
-    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({
+    vi.mocked(apiGet).mockRejectedValue(new Error("403"))
+    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({
       success: false,
       error: "Session expired. Please lock and unlock again.",
     })
   })
 
-  it("returns a decrypt-failure message on 401 (wrong password)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("401"))
-    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({
-      success: false,
-      error: expect.stringMatching(/could not decrypt/i),
-    })
-  })
-
   it("returns a message including the failure detail for other errors", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("500"))
-    const result = await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({
+    vi.mocked(apiGet).mockRejectedValue(new Error("500"))
+    expect(await getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).toEqual({
       success: false,
       error: "Failed to load medical notes (500).",
     })
@@ -174,33 +172,30 @@ describe("getTripMedicalNotes", () => {
 
   it("rethrows a redirect signal instead of returning a failure result", async () => {
     const redirectError = new Error("NEXT_REDIRECT")
-    vi.mocked(apiPost).mockRejectedValue(redirectError)
+    vi.mocked(apiGet).mockRejectedValue(redirectError)
     vi.mocked(isRedirectError).mockReturnValueOnce(true)
-    await expect(getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).rejects.toBe(redirectError)
+    await expect(getTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN)).rejects.toBe(redirectError)
   })
 })
 
 describe("setTripMedicalNotes", () => {
-  it("POSTs to the correct path with notes, password and elevated header", async () => {
+  it("POSTs the sealed blob, never the notes or the password", async () => {
     vi.mocked(apiPost).mockResolvedValue({ hasTripMedicalNotes: true })
-    await setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)
-    expect(apiPost).toHaveBeenCalledWith(
-      `/api/trip/${TRIP_ID}/member/me/medical-consent`,
-      { medicalNotes: "my notes", password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN },
-    )
+    await setTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED)
+    expect(apiPost).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/me/medical-consent`, SEALED, {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
+    expect(JSON.stringify(vi.mocked(apiPost).mock.calls)).not.toContain(PASSWORD)
   })
 
   it("returns success: true on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({ hasTripMedicalNotes: true })
-    expect(await setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)).toEqual({
-      success: true,
-    })
+    expect(await setTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED)).toEqual({ success: true })
   })
 
   it("returns a generic message on non-403 errors", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("400"))
-    expect(await setTripMedicalNotes(TRIP_ID, "", ELEVATED_TOKEN, PASSWORD)).toEqual({
+    expect(await setTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED)).toEqual({
       success: false,
       error: "Failed to save medical notes.",
     })
@@ -208,7 +203,7 @@ describe("setTripMedicalNotes", () => {
 
   it("returns a session-expired message on 403 (elevated token expired)", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("403"))
-    expect(await setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)).toEqual({
+    expect(await setTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED)).toEqual({
       success: false,
       error: "Session expired. Please lock and unlock again.",
     })
@@ -218,9 +213,35 @@ describe("setTripMedicalNotes", () => {
     const redirectError = new Error("NEXT_REDIRECT")
     vi.mocked(apiPost).mockRejectedValue(redirectError)
     vi.mocked(isRedirectError).mockReturnValueOnce(true)
-    await expect(setTripMedicalNotes(TRIP_ID, "my notes", ELEVATED_TOKEN, PASSWORD)).rejects.toBe(
-      redirectError,
-    )
+    await expect(setTripMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED)).rejects.toBe(redirectError)
+  })
+})
+
+describe("getLeaderPublicKey", () => {
+  it("GETs the leader's public key with no elevated token — it is public material", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ publicKey: "cGs=" })
+    await getLeaderPublicKey(TRIP_ID)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/me/leader-public-key`)
+  })
+
+  it("returns the key so the caller can seal for the leader locally", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ publicKey: "cGs=" })
+    expect(await getLeaderPublicKey(TRIP_ID)).toEqual({ success: true, publicKey: "cGs=" })
+  })
+
+  it("explains the leader has no keypair on 400, rather than leaking the status", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("400"))
+    expect(await getLeaderPublicKey(TRIP_ID)).toEqual({
+      success: false,
+      error: expect.stringMatching(/leader/i),
+    })
+  })
+
+  it("rethrows a redirect signal instead of returning a failure result", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiGet).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(getLeaderPublicKey(TRIP_ID)).rejects.toBe(redirectError)
   })
 })
 
@@ -263,54 +284,47 @@ describe("revokeTripMedicalNotes", () => {
 })
 
 describe("shareMedicalNotes", () => {
-  it("POSTs to the share endpoint with password and elevated header", async () => {
+  it("POSTs the leader-sealed blob, never the notes or the password", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
-    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)
     expect(apiPost).toHaveBeenCalledWith(
       `/api/trip/${TRIP_ID}/member/me/share-medical-notes`,
-      { password: PASSWORD },
+      SEALED_FOR_LEADER,
       { "X-Elevated-Token": ELEVATED_TOKEN },
     )
+    expect(JSON.stringify(vi.mocked(apiPost).mock.calls)).not.toContain(PASSWORD)
   })
 
   it("revalidates the my-float-plan segment on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
-    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
   })
 
   it("returns success: true on success", async () => {
     vi.mocked(apiPost).mockResolvedValue({})
-    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true })
+    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)).toEqual({
+      success: true,
+    })
   })
 
   it("returns a user-friendly error on 400 (no trip notes stored)", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("400"))
-    const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)
     expect(result).toEqual({ success: false, error: expect.stringMatching(/save.*notes/i) })
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("403"))
-    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).toEqual({
+    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)).toEqual({
       success: false,
       error: "Session expired. Please try again.",
     })
   })
 
-  it("returns a decrypt-failure message on 401 (wrong password)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("401"))
-    const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({
-      success: false,
-      error: expect.stringMatching(/could not decrypt/i),
-    })
-  })
-
   it("returns a message including the failure detail for other errors", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("500"))
-    const result = await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
-    expect(result).toEqual({
+    expect(await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)).toEqual({
       success: false,
       error: "Failed to share medical notes (500).",
     })
@@ -318,7 +332,7 @@ describe("shareMedicalNotes", () => {
 
   it("does not revalidate when sharing fails", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("403"))
-    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)
+    await shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
@@ -326,81 +340,61 @@ describe("shareMedicalNotes", () => {
     const redirectError = new Error("NEXT_REDIRECT")
     vi.mocked(apiPost).mockRejectedValue(redirectError)
     vi.mocked(isRedirectError).mockReturnValueOnce(true)
-    await expect(shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, PASSWORD)).rejects.toBe(redirectError)
+    await expect(shareMedicalNotes(TRIP_ID, ELEVATED_TOKEN, SEALED_FOR_LEADER)).rejects.toBe(
+      redirectError,
+    )
   })
 })
 
 describe("readMemberMedicalNotes", () => {
   const MEMBER_ID = "01952f1a-0000-7000-8000-000000000030"
 
-  it("re-authenticates then fetches the member's notes with the elevated token", async () => {
-    vi.mocked(apiPost)
-      .mockResolvedValueOnce({ elevatedToken: ELEVATED_TOKEN })
-      .mockResolvedValueOnce({ medicalNotes: "Allergic to penicillin." })
-    await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(apiPost).toHaveBeenNthCalledWith(1, "/api/user/me/re-auth", { password: PASSWORD })
-    expect(apiPost).toHaveBeenNthCalledWith(
-      2,
-      `/api/trip/${TRIP_ID}/member/${MEMBER_ID}/medical-notes`,
-      { password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN },
-    )
+  it("GETs the member's sealed notes with the caller's elevated token", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED_FOR_LEADER)
+    await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)
+    expect(apiGet).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/${MEMBER_ID}/medical-notes`, {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
   })
 
-  it("returns the decrypted notes on success", async () => {
-    vi.mocked(apiPost)
-      .mockResolvedValueOnce({ elevatedToken: ELEVATED_TOKEN })
-      .mockResolvedValueOnce({ medicalNotes: "Allergic to penicillin." })
-    const result = await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(result).toEqual({ success: true, medicalNotes: "Allergic to penicillin." })
-  })
-
-  it("returns 'Incorrect password.' on 401 (wrong password)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("401"))
-    const result = await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(result).toEqual({ success: false, error: "Incorrect password." })
-  })
-
-  it("short-circuits after a failed re-auth — never calls the notes endpoint", async () => {
-    vi.mocked(apiPost).mockRejectedValueOnce(new Error("401"))
-    await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(apiPost).toHaveBeenCalledTimes(1)
+  it("returns the sealed blob for the leader's own client to decrypt", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED_FOR_LEADER)
+    expect(await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)).toEqual({
+      success: true,
+      sealed: SEALED_FOR_LEADER,
+    })
   })
 
   it("returns a leader-only message on 403 (not the trip leader)", async () => {
-    vi.mocked(apiPost)
-      .mockResolvedValueOnce({ elevatedToken: ELEVATED_TOKEN })
-      .mockRejectedValueOnce(new Error("403"))
-    const result = await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(result).toEqual({
+    vi.mocked(apiGet).mockRejectedValue(new Error("403"))
+    expect(await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)).toEqual({
       success: false,
       error: "Only the trip leader can read shared notes.",
     })
   })
 
   it("returns a not-shared message on 404 (member hasn't shared notes)", async () => {
-    vi.mocked(apiPost)
-      .mockResolvedValueOnce({ elevatedToken: ELEVATED_TOKEN })
-      .mockRejectedValueOnce(new Error("404"))
-    const result = await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(result).toEqual({
+    vi.mocked(apiGet).mockRejectedValue(new Error("404"))
+    expect(await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)).toEqual({
       success: false,
       error: "No shared notes for this member.",
     })
   })
 
   it("returns a generic message for other failures", async () => {
-    vi.mocked(apiPost)
-      .mockResolvedValueOnce({ elevatedToken: ELEVATED_TOKEN })
-      .mockRejectedValueOnce(new Error("500"))
-    const result = await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)
-    expect(result).toEqual({ success: false, error: "Failed to read medical notes." })
+    vi.mocked(apiGet).mockRejectedValue(new Error("500"))
+    expect(await readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)).toEqual({
+      success: false,
+      error: "Failed to read medical notes.",
+    })
   })
 
   it("rethrows a redirect signal instead of returning a failure result", async () => {
     const redirectError = new Error("NEXT_REDIRECT")
-    vi.mocked(apiPost).mockRejectedValue(redirectError)
+    vi.mocked(apiGet).mockRejectedValue(redirectError)
     vi.mocked(isRedirectError).mockReturnValueOnce(true)
-    await expect(readMemberMedicalNotes(TRIP_ID, MEMBER_ID, PASSWORD)).rejects.toBe(redirectError)
+    await expect(readMemberMedicalNotes(TRIP_ID, MEMBER_ID, ELEVATED_TOKEN)).rejects.toBe(
+      redirectError,
+    )
   })
 })

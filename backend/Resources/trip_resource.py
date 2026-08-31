@@ -14,7 +14,6 @@ from Services.Middleware.privileges_middleware import require_owner, require_lea
 from Services.trip_service import TripService
 from Services.trip_member_service import TripMemberService
 from Services.trip_leadership_service import TripLeadershipService
-from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +21,12 @@ TRIP_ENDPOINT = "/api/v1/trip"
 ## TODO: Trip creation needs a separate microservice different from trip execution to avoid bogging down service through trip creation
 ## TODO: A trip created is published in Kafka and then stored in db
 trip_api = Blueprint("trip", __name__, url_prefix=TRIP_ENDPOINT)
+
+# Client-supplied crypto material (M22) — see the same constants in user_resource.py.
+# A member's own notes are sealed with a password-derived key (salt); the leader's copy
+# is sealed with ECIES, which carries an ephemeral public key instead.
+_SEALED_FIELDS = ("ciphertext", "nonce", "salt")
+_LEADER_SEALED_FIELDS = ("ciphertext", "nonce", "ephemeralKey")
 
 
 @trip_api.route("/<string:id>", methods=["GET"])
@@ -757,51 +762,47 @@ def update_my_float_plan(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@trip_api.route("/<string:id>/member/me/medical-notes", methods=["POST"])
+@trip_api.route("/<string:id>/member/me/medical-notes", methods=["GET"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_trip_medical_notes(id: str):
     """
-    POST /api/trip/<id>/member/me/medical-notes — Decrypt and return the caller's
-    own stored trip medical notes. Requires an elevated (re-authenticated) token.
+    GET /api/trip/<id>/member/me/medical-notes — Return the caller's own sealed trip
+    medical notes for their client to decrypt. Requires an elevated (re-authenticated)
+    token.
     ---
-    post:
-      summary: Decrypt the caller's own trip medical notes
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  type: string
-              required:
-                - password
+    get:
+      summary: Get the caller's own sealed trip medical notes
+      description: >
+        Since M22 the server returns ciphertext and the client decrypts it with a key
+        derived from the user's password. All three fields are null when nothing has
+        been stored yet.
       responses:
         200:
-          description: The decrypted medical notes
+          description: The sealed medical notes, or nulls if none are stored
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  medicalNotes:
+                  ciphertext:
                     type: string
-        400:
-          description: password is required
-        401:
-          description: Decryption failed — password may be incorrect
+                    nullable: true
+                  nonce:
+                    type: string
+                    nullable: true
+                  salt:
+                    type: string
+                    nullable: true
+        403:
+          description: Elevated token missing, invalid, or expired
         404:
           description: You are not a member of this trip
     """
     try:
-        raw = request.get_json()
-        if not isinstance(raw, dict) or "password" not in raw:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required")
-        plaintext = TripMemberService.get_trip_medical_notes(id, raw["password"])
-        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
-    except InvalidTag:
-        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
+        return jsonify(TripMemberService.get_trip_medical_notes(id)), HTTPStatus.OK
+    except HTTPException:
+        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
     except Exception as e:
@@ -817,20 +818,26 @@ def set_trip_medical_notes(id: str):
     caller's own trip medical notes. Requires an elevated (re-authenticated) token.
     ---
     post:
-      summary: Set the caller's own trip medical notes
+      summary: Store the caller's own client-encrypted trip medical notes
+      description: >
+        Since M22 the client encrypts under a key derived from the user's password and
+        posts the sealed triple; the plaintext and the password never leave the device.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                medicalNotes:
+                ciphertext:
                   type: string
-                password:
+                nonce:
+                  type: string
+                salt:
                   type: string
               required:
-                - medicalNotes
-                - password
+                - ciphertext
+                - nonce
+                - salt
       responses:
         200:
           description: The updated membership record
@@ -838,16 +845,23 @@ def set_trip_medical_notes(id: str):
             application/json:
               schema: TripMemberSchema
         400:
-          description: medicalNotes and password are required
+          description: A required field is missing
         404:
           description: You are not a member of this trip
     """
     try:
         raw = request.get_json()
-        if not isinstance(raw, dict) or "password" not in raw or "medicalNotes" not in raw:
-            abort(HTTPStatus.BAD_REQUEST, description="medicalNotes and password are required")
-        membership = TripMemberService.set_trip_medical_notes(id, raw["medicalNotes"], raw["password"])
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        missing = [field for field in _SEALED_FIELDS if not raw.get(field)]
+        if missing:
+            abort(HTTPStatus.BAD_REQUEST, description=f"{', '.join(missing)} required")
+        membership = TripMemberService.set_trip_medical_notes(
+            id, raw["ciphertext"], raw["nonce"], raw["salt"]
+        )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except HTTPException:
+        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
@@ -884,27 +898,76 @@ def revoke_trip_medical_notes(id: str):
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@trip_api.route("/<string:id>/member/me/leader-public-key", methods=["GET"])
+@JWTService.authenticate_restful
+def get_leader_public_key(id: str):
+    """
+    GET /api/trip/<id>/member/me/leader-public-key — The trip leader's X25519 public
+    key, so a crew member's client can seal its notes for the leader itself (M22).
+    ---
+    get:
+      summary: Get the trip leader's public key
+      description: >
+        Public key material only — no elevated token, since nothing here is secret. The
+        gate is membership of the trip.
+      responses:
+        200:
+          description: The leader's public key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  publicKey:
+                    type: string
+        400:
+          description: The leader has not set up their encryption keypair yet
+        404:
+          description: You are not a member of this trip
+    """
+    try:
+        return jsonify({"publicKey": TripMemberService.get_leader_public_key(id)}), HTTPStatus.OK
+    except HTTPException:
+        raise
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def share_medical_notes(id: str):
     """
-    POST /api/trip/<id>/member/me/share-medical-notes — Re-encrypt the caller's
-    own stored trip medical notes for the trip leader to read (ECIES to the
-    leader's public key). Requires an elevated (re-authenticated) token.
+    POST /api/trip/<id>/member/me/share-medical-notes — Store the leader-readable copy
+    of the caller's own trip medical notes, ECIES-sealed on the client to the leader's
+    public key. Requires an elevated (re-authenticated) token.
     ---
     post:
       summary: Share the caller's own trip medical notes with the trip leader
+      description: >
+        Since M22 the client fetches the leader's public key (GET
+        .../member/me/leader-public-key), seals the notes locally and posts the blob.
+        The server never holds the plaintext.
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                password:
+                ciphertext:
+                  type: string
+                nonce:
+                  type: string
+                ephemeralKey:
                   type: string
               required:
-                - password
+                - ciphertext
+                - nonce
+                - ephemeralKey
       responses:
         200:
           description: The updated membership record
@@ -912,81 +975,76 @@ def share_medical_notes(id: str):
             application/json:
               schema: TripMemberSchema
         400:
-          description: password is required, no trip medical notes are stored, or the leader has not set up their keypair yet
-        401:
-          description: Decryption failed — password may be incorrect
+          description: A required field is missing, no trip medical notes are stored, or the leader has not set up their keypair yet
         404:
           description: You are not a member of this trip
     """
     try:
         raw = request.get_json()
-        if not isinstance(raw, dict) or "password" not in raw:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required")
-        membership = TripMemberService.share_medical_notes(id, raw["password"])
+        if not isinstance(raw, dict):
+            abort(HTTPStatus.BAD_REQUEST, description="Request body must be a JSON object")
+        missing = [field for field in _LEADER_SEALED_FIELDS if not raw.get(field)]
+        if missing:
+            abort(HTTPStatus.BAD_REQUEST, description=f"{', '.join(missing)} required")
+        membership = TripMemberService.share_medical_notes(
+            id, raw["ciphertext"], raw["nonce"], raw["ephemeralKey"]
+        )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
+    except HTTPException:
+        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except InvalidTag:
-        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
     except Exception as e:
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-@trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["POST"])
+@trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["GET"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def read_member_medical_notes(id: str, member_id: str):
     """
-    POST /api/trip/<id>/member/<member_id>/medical-notes — Leader decrypts a
-    crew member's shared trip medical notes with the leader's own keypair.
+    GET /api/trip/<id>/member/<member_id>/medical-notes — The leader-sealed copy of a
+    crew member's shared trip medical notes, for the leader's own client to decrypt.
     Requires an elevated (re-authenticated) token.
     ---
-    post:
-      summary: Decrypt a crew member's shared trip medical notes
-      description: Leader-only.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  type: string
-              required:
-                - password
+    get:
+      summary: Get a crew member's shared trip medical notes, sealed to the leader
+      description: >
+        Leader-only. Since M22 the leader's client unwraps its own private key and
+        decrypts locally, so the server hands over ciphertext and never sees the notes.
+        Records an access-log entry (ADR-023) — since the decrypt now happens on the
+        device, that entry marks the leader taking possession of the ciphertext rather
+        than a proven-successful decrypt.
       responses:
         200:
-          description: The decrypted medical notes
+          description: The sealed medical notes
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  medicalNotes:
+                  ciphertext:
                     type: string
-        400:
-          description: password is required
-        401:
-          description: Decryption failed — password may be incorrect
+                  nonce:
+                    type: string
+                  ephemeralKey:
+                    type: string
         403:
           description: Only the trip leader can read shared medical notes
         404:
           description: Member not found in this trip, or the member has no shared medical notes, or the leader keypair is missing
     """
     try:
-        raw = request.get_json()
-        if not isinstance(raw, dict) or "password" not in raw:
-            abort(HTTPStatus.BAD_REQUEST, description="password is required")
-        plaintext = TripMemberService.read_shared_medical_notes(id, member_id, raw["password"])
-        return jsonify({"medicalNotes": plaintext}), HTTPStatus.OK
+        sealed = TripMemberService.read_shared_medical_notes(id, member_id)
+        return jsonify(sealed), HTTPStatus.OK
+    except HTTPException:
+        raise
     except PermissionError:
         abort(HTTPStatus.FORBIDDEN, description="Only the trip leader can read shared medical notes")
     except ValueError as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except InvalidTag:
-        abort(HTTPStatus.UNAUTHORIZED, description="Decryption failed — password may be incorrect")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Member not found in this trip")
     except Exception as e:

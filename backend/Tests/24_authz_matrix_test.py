@@ -199,11 +199,12 @@ class TestUnauthenticatedReturns401:
         self._401(client, "PATCH",  f"{USER_ENDPOINT}/{D}")
         self._401(client, "DELETE", f"{USER_ENDPOINT}/{D}")
         self._401(client, "PATCH",  f"{USER_ENDPOINT}/me/password")
-        self._401(client, "POST",   f"{USER_ENDPOINT}/me/generate-keypair")
+        self._401(client, "POST",   f"{USER_ENDPOINT}/me/keypair")
+        self._401(client, "GET",    f"{USER_ENDPOINT}/me/keypair")
         self._401(client, "POST",   f"{USER_ENDPOINT}/me/re-auth")
         self._401(client, "POST",   f"{USER_ENDPOINT}/me/medical-consent")
         self._401(client, "DELETE", f"{USER_ENDPOINT}/me/medical-consent")
-        self._401(client, "POST",   f"{USER_ENDPOINT}/me/medical-notes")
+        self._401(client, "GET",    f"{USER_ENDPOINT}/me/medical-notes")
         self._401(client, "POST",   f"{USER_ENDPOINT}/me/avatar")
         self._401(client, "DELETE", f"{USER_ENDPOINT}/me/avatar")
         self._401(client, "POST",   f"{USER_ENDPOINT}/me/data-export")
@@ -228,11 +229,12 @@ class TestUnauthenticatedReturns401:
         self._401(client, "DELETE", f"{TRIP_ENDPOINT}/{D}/member/{D}")
         self._401(client, "GET",    f"{TRIP_ENDPOINT}/{D}/member/me")
         self._401(client, "PATCH",  f"{TRIP_ENDPOINT}/{D}/member/me")
-        self._401(client, "POST",   f"{TRIP_ENDPOINT}/{D}/member/me/medical-notes")
+        self._401(client, "GET",    f"{TRIP_ENDPOINT}/{D}/member/me/medical-notes")
+        self._401(client, "GET",    f"{TRIP_ENDPOINT}/{D}/member/me/leader-public-key")
         self._401(client, "POST",   f"{TRIP_ENDPOINT}/{D}/member/me/medical-consent")
         self._401(client, "DELETE", f"{TRIP_ENDPOINT}/{D}/member/me/medical-consent")
         self._401(client, "POST",   f"{TRIP_ENDPOINT}/{D}/member/me/share-medical-notes")
-        self._401(client, "POST",   f"{TRIP_ENDPOINT}/{D}/member/{D}/medical-notes")
+        self._401(client, "GET",    f"{TRIP_ENDPOINT}/{D}/member/{D}/medical-notes")
 
     # Logistics + float plan
     def test_logistics_endpoints(self, client):
@@ -485,9 +487,9 @@ class TestCrewBlockedOnLeaderActions:
         crew = auth_headers_2
 
         # Only the leader can read another member's medical notes
-        r = _req(client, "POST", f"{TRIP_ENDPOINT}/{tid}/member/{mid}/medical-notes", headers=crew)
+        r = _req(client, "GET", f"{TRIP_ENDPOINT}/{tid}/member/{mid}/medical-notes", headers=crew)
         assert r.status_code in (403, 400), (
-            f"[CREW] POST /member/{mid}/medical-notes → {r.status_code}, want 403 or 400"
+            f"[CREW] GET /member/{mid}/medical-notes → {r.status_code}, want 403 or 400"
         )
 
 

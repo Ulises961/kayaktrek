@@ -275,8 +275,8 @@ def test_outsider_idor(client, outsider_headers, idor_resources):
         # shuttle vehicle
         ("PATCH",  f"{SHUTTLE_ENDPOINT}/vehicle/{r['vehicle_a_id']}",               {"vehicleDescription": "pwned"}, "patch_vehicle"),
         # medical notes: require_elevated_token fires first (no elevated token → 403)
-        ("POST",   f"{TRIP_ENDPOINT}/{r['trip_a_id']}/member/{r['leader_member_id']}/medical-notes",
-                   {"password": "x"}, "get_medical_notes"),
+        ("GET",    f"{TRIP_ENDPOINT}/{r['trip_a_id']}/member/{r['leader_member_id']}/medical-notes",
+                   None,               "get_medical_notes"),
         # DELETE operations last — would destroy resources needed by assertions above
         ("DELETE", f"{POINT_ENDPOINT}/{r['point_a_id']}",                           None,               "delete_point"),
         ("DELETE", f"{TRAVEL_DOCUMENT_ENDPOINT}/{r['doc_a_id']}",                   None,               "delete_doc"),
@@ -328,8 +328,8 @@ def test_cross_trip_idor(client, auth_headers_2, idor_resources):
         ("PATCH",  f"{ITEM_ENDPOINT}/{r['personal_item_id']}",                      {"name": "pwned"},  "patch_personal_item_cross"),
         # crew reading another crew member's medical notes (not leader → 403 from service;
         # but require_elevated_token fires first with a plain JWT)
-        ("POST",   f"{TRIP_ENDPOINT}/{r['trip_a_id']}/member/{r['crew_member_id']}/medical-notes",
-                   {"password": "x"}, "crew_reads_medical_notes"),
+        ("GET",    f"{TRIP_ENDPOINT}/{r['trip_a_id']}/member/{r['crew_member_id']}/medical-notes",
+                   None,               "crew_reads_medical_notes"),
         # DELETE operations last
         ("DELETE", f"{POINT_ENDPOINT}/{r['point_b_id']}",                           None,               "delete_point_b"),
         ("DELETE", f"{TRAVEL_DOCUMENT_ENDPOINT}/{r['doc_b_id']}",                   None,               "delete_doc_b"),

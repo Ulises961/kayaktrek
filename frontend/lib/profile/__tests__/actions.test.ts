@@ -14,7 +14,7 @@ vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }))
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
+import { apiGet, apiPatch, apiDelete, apiPost, apiUpload } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import {
   updateProfile,
@@ -31,7 +31,8 @@ import {
   setProfileVisibility,
   setPhone,
   sendTestEmail,
-  generateKeypair,
+  storeKeypair,
+  getKeypair,
   requestEmailChange,
 } from "../actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
@@ -42,6 +43,16 @@ const SESSION = { userId: USER_ID, email: "ada@example.com", isAdmin: false }
 const PROFILE_FIELDS = {
   name: "Ada",
   username: "ada",
+}
+
+// Opaque to these tests on purpose: the actions are transport since M22 and must not
+// interpret, re-shape or validate what the browser sealed.
+const SEALED = { ciphertext: "Y3Q=", nonce: "bm9uY2U=", salt: "c2FsdA==" }
+const KEYPAIR = {
+  publicKey: "cGs=",
+  privateKeyCiphertext: "c2s=",
+  privateKeyNonce: "bm9uY2U=",
+  privateKeySalt: "c2FsdA==",
 }
 
 beforeEach(() => {
@@ -415,50 +426,47 @@ describe("reAuth", () => {
 })
 
 describe("getMedicalNotes", () => {
-  it("POSTs to /api/user/me/medical-notes with password in body and elevated header", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin" })
-    await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)
-    expect(apiPost).toHaveBeenCalledWith(
-      "/api/user/me/medical-notes",
-      { password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN },
-    )
-  })
-
-  it("returns success: true with notes on success", async () => {
-    vi.mocked(apiPost).mockResolvedValue({ medicalNotes: "Allergic to penicillin" })
-    expect(await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)).toEqual({
-      success: true,
-      notes: "Allergic to penicillin",
+  it("GETs /api/user/me/medical-notes with the elevated header and no password", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED)
+    await getMedicalNotes(ELEVATED_TOKEN)
+    expect(apiGet).toHaveBeenCalledWith("/api/user/me/medical-notes", {
+      "X-Elevated-Token": ELEVATED_TOKEN,
     })
   })
 
-  it("returns success: true with null notes on 400 (no notes stored yet)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-notes failed: 400"))
-    expect(await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)).toEqual({ success: true, notes: null })
+  it("returns the sealed blob for the caller to decrypt", async () => {
+    vi.mocked(apiGet).mockResolvedValue(SEALED)
+    expect(await getMedicalNotes(ELEVATED_TOKEN)).toEqual({ success: true, sealed: SEALED })
+  })
+
+  it("returns sealed: null when no notes are stored — the backend sends nulls, not a 404", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ ciphertext: null, nonce: null, salt: null })
+    expect(await getMedicalNotes(ELEVATED_TOKEN)).toEqual({ success: true, sealed: null })
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
-    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-notes failed: 403"))
-    const result = await getMedicalNotes(ELEVATED_TOKEN, PASSWORD)
+    vi.mocked(apiGet).mockRejectedValue(new Error("GET /api/user/me/medical-notes failed: 403"))
+    const result = await getMedicalNotes(ELEVATED_TOKEN)
     expect(result).toEqual({ success: false, error: expect.any(String) })
   })
 })
 
 describe("grantMedicalConsent", () => {
-  it("POSTs to /api/user/me/medical-consent with elevated header", async () => {
+  it("POSTs the sealed blob, never the notes or the password", async () => {
     vi.mocked(apiPost).mockResolvedValue({
       id: USER_ID,
       mail: "ada@example.com",
       username: "ada",
       name: "Ada",
     })
-    await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)
-    expect(apiPost).toHaveBeenCalledWith(
-      "/api/user/me/medical-consent",
-      { medicalNotes: "notes", password: PASSWORD },
-      { "X-Elevated-Token": ELEVATED_TOKEN },
-    )
+    await grantMedicalConsent(ELEVATED_TOKEN, SEALED)
+    expect(apiPost).toHaveBeenCalledWith("/api/user/me/medical-consent", SEALED, {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
+    // The password is not a parameter of this action, and the plaintext never reaches it.
+    // A server action's arguments travel to the Next server, so this is the assertion that
+    // the crypto actually stayed in the browser.
+    expect(JSON.stringify(vi.mocked(apiPost).mock.calls)).not.toContain(PASSWORD)
   })
 
   it("returns success: true on success", async () => {
@@ -468,12 +476,12 @@ describe("grantMedicalConsent", () => {
       username: "ada",
       name: "Ada",
     })
-    expect(await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)).toEqual({ success: true })
+    expect(await grantMedicalConsent(ELEVATED_TOKEN, SEALED)).toEqual({ success: true })
   })
 
   it("returns success: false on 403 (elevated token expired)", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/medical-consent failed: 403"))
-    expect(await grantMedicalConsent(ELEVATED_TOKEN, "notes", PASSWORD)).toEqual({
+    expect(await grantMedicalConsent(ELEVATED_TOKEN, SEALED)).toEqual({
       success: false,
       error: expect.any(String),
     })
@@ -505,35 +513,59 @@ describe("revokeMedicalConsent", () => {
   })
 })
 
-describe("generateKeypair", () => {
-  it("posts to /api/user/me/generate-keypair with the password", async () => {
+describe("storeKeypair", () => {
+  it("posts the client-generated keypair with the elevated header", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    await generateKeypair(PASSWORD)
-    expect(apiPost).toHaveBeenCalledWith("/api/user/me/generate-keypair", { password: PASSWORD })
+    await storeKeypair(ELEVATED_TOKEN, KEYPAIR)
+    expect(apiPost).toHaveBeenCalledWith("/api/user/me/keypair", KEYPAIR, {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
   })
 
   it("returns success: true on success", async () => {
     vi.mocked(apiPost).mockResolvedValue(undefined)
-    expect(await generateKeypair(PASSWORD)).toEqual({ success: true })
+    expect(await storeKeypair(ELEVATED_TOKEN, KEYPAIR)).toEqual({ success: true })
   })
 
-  it("returns a user-friendly error on 401 (wrong password), not the raw status text", async () => {
-    vi.mocked(apiPost).mockRejectedValue(
-      new Error("POST /api/user/me/generate-keypair failed: 401"),
-    )
-    expect(await generateKeypair("wrong")).toEqual({ success: false, error: "Password incorrect." })
+  it("treats 409 (keypair already exists) as success — the account has what it needs", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/keypair failed: 409"))
+    expect(await storeKeypair(ELEVATED_TOKEN, KEYPAIR)).toEqual({ success: true })
   })
 
-  it("treats 409 (keypair already exists) as success, not an error — generation is idempotent", async () => {
-    vi.mocked(apiPost).mockRejectedValue(
-      new Error("POST /api/user/me/generate-keypair failed: 409"),
-    )
-    expect(await generateKeypair(PASSWORD)).toEqual({ success: true })
+  it("returns success: false on 403 (elevated token expired)", async () => {
+    vi.mocked(apiPost).mockRejectedValue(new Error("POST /api/user/me/keypair failed: 403"))
+    expect(await storeKeypair(ELEVATED_TOKEN, KEYPAIR)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
   })
 
   it("returns a generic error on other failures", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("500"))
-    expect(await generateKeypair(PASSWORD)).toEqual({
+    expect(await storeKeypair(ELEVATED_TOKEN, KEYPAIR)).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+})
+
+describe("getKeypair", () => {
+  it("GETs the caller's own wrapped keypair with the elevated header", async () => {
+    vi.mocked(apiGet).mockResolvedValue(KEYPAIR)
+    await getKeypair(ELEVATED_TOKEN)
+    expect(apiGet).toHaveBeenCalledWith("/api/user/me/keypair", {
+      "X-Elevated-Token": ELEVATED_TOKEN,
+    })
+  })
+
+  it("returns the keypair so the caller can unwrap the private key locally", async () => {
+    vi.mocked(apiGet).mockResolvedValue(KEYPAIR)
+    expect(await getKeypair(ELEVATED_TOKEN)).toEqual({ success: true, keypair: KEYPAIR })
+  })
+
+  it("returns success: false on 404 (no keypair set up yet)", async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error("GET /api/user/me/keypair failed: 404"))
+    expect(await getKeypair(ELEVATED_TOKEN)).toEqual({
       success: false,
       error: expect.any(String),
     })

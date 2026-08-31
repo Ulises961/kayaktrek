@@ -1,5 +1,9 @@
 import { APIRequestContext } from "@playwright/test"
 import { API_URL } from "../playwright.config"
+// The web client's own crypto module, imported rather than reimplemented — a second
+// implementation of the wrapping format here is exactly what M22's cross-language
+// vectors exist to prevent.
+import { generateKeypair } from "../../frontend/lib/crypto/medical"
 
 export interface UserCredentials {
   name: string
@@ -41,7 +45,16 @@ export async function registerAndActivate(
 ): Promise<void> {
   // Registration is idempotent from our perspective — a 400/409 just means
   // the user already exists from a prior run, which is fine.
-  await request.post(`${API_URL}/api/v1/auth/register`, { data: creds })
+  //
+  // The keypair is sent because since M22 the server no longer generates one: the
+  // browser does, and this fixture registers over the API, so without it a fresh
+  // database produces accounts with no keypair and every medical-notes spec fails at
+  // the leader's decrypt. It was invisible for a while — the dev database still held
+  // accounts carrying server-generated keys from before M22, so the suite stayed green
+  // on exactly the data that could not reveal the gap.
+  await request.post(`${API_URL}/api/v1/auth/register`, {
+    data: { ...creds, ...(await generateKeypair(creds.pwd)) },
+  })
 
   // Activation sets active=true unconditionally — safe to call every run.
   const activate = await request.post(`${API_URL}/api/v1/auth/activate-test`, {

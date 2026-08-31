@@ -11,6 +11,7 @@ import {
   grantMedicalConsent,
   revokeMedicalConsent,
 } from "@/lib/profile/actions"
+import { decrypt, encrypt } from "@/lib/crypto/medical"
 import { EmptyState } from "@/components/common/empty-state"
 
 interface MedicalNotesSectionProps {
@@ -34,6 +35,8 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
   // The prompt clears once notes are re-entered (hasNotes flips true after a save).
   const showResetPrompt = !!resetAt && !hasNotes
 
+  // The password never leaves this component (M22): re-auth proves identity to the server,
+  // which returns ciphertext, and the decryption happens here.
   function handleDecrypt() {
     setError(null)
     startTransition(async () => {
@@ -43,14 +46,33 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
         return
       }
 
-      const notesResult = await getMedicalNotes(authResult.elevatedToken, password)
+      const notesResult = await getMedicalNotes(authResult.elevatedToken)
       if (!notesResult.success) {
         setError(notesResult.error)
         return
       }
 
+      let plaintext = ""
+      if (notesResult.sealed) {
+        try {
+          const { ciphertext, nonce, salt } = notesResult.sealed
+          plaintext = await decrypt(ciphertext, nonce, salt, password)
+        } catch {
+          // reAuth already accepted this password, so the notes were sealed under a
+          // different one — a password change before M22's client-side re-wrap, or a
+          // reset. Nothing here can recover them; overwriting is the only way forward.
+          setError(
+            "Could not decrypt notes — they were saved with a different password. " +
+              "Re-enter them to replace what is stored.",
+          )
+          setElevatedToken(authResult.elevatedToken)
+          setPhase("editing")
+          return
+        }
+      }
+
       setElevatedToken(authResult.elevatedToken)
-      setNotes(notesResult.notes ?? "")
+      setNotes(plaintext)
       setPhase("editing")
     })
   }
@@ -59,7 +81,8 @@ export function MedicalNotesSection({ hasStoredNotes, resetAt }: MedicalNotesSec
     setError(null)
     setSavedOk(false)
     startTransition(async () => {
-      const result = await grantMedicalConsent(elevatedToken!, notes, password)
+      const sealed = await encrypt(notes, password)
+      const result = await grantMedicalConsent(elevatedToken!, sealed)
       if (!result.success) {
         setError(result.error)
         return
