@@ -1,0 +1,132 @@
+name: Release publish run
+
+# Reusable job body for release.yml. Exists so the same publish steps can run on either
+# runner pool (GitHub-hosted first, self-hosted fallback) without duplicating them — see
+# release.yml for the fallback policy and reasoning.
+
+on:
+  workflow_call:
+    inputs:
+      runs-on-json:
+        description: JSON array of runner labels, e.g. '["ubuntu-latest"]'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ${{ fromJson(inputs.runs-on-json) }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The ancestry check below needs real history, not the default shallow clone.
+          fetch-depth: 0
+
+      # A tag can be pushed from anywhere, including a branch that never opened a PR.
+      # Releasing only what is already on master means everything published has been
+      # through the gates, which is why this workflow doesn't re-run the suites itself.
+      - name: Refuse to publish a commit that is not on master
+        run: |
+          git fetch --quiet origin master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::$GITHUB_SHA is not an ancestor of origin/master — it has not been through PR CI. Merge it first, then tag the merge commit."
+            exit 1
+          fi
+
+      - name: Resolve image tags
+        id: meta
+        run: |
+          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          backend="ghcr.io/${owner_lc}/kayak-expedition-planner-backend"
+          frontend="ghcr.io/${owner_lc}/kayak-expedition-planner-frontend"
+          short_sha="$(git rev-parse --short HEAD)"
+
+          # A tag push publishes under its version and moves :latest, which is what the
+          # deploy pulls. A manual run on a branch publishes a traceable sha tag ONLY —
+          # :latest must never point at an image with no version behind it, or "what is
+          # deployed" stops being answerable again.
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            version="${{ github.ref_name }}"
+            {
+              echo "backend_tags<<EOF"
+              echo "${backend}:${version}"
+              echo "${backend}:sha-${short_sha}"
+              echo "${backend}:latest"
+              echo "EOF"
+              echo "frontend_tags<<EOF"
+              echo "${frontend}:${version}"
+              echo "${frontend}:sha-${short_sha}"
+              echo "${frontend}:latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            version="sha-${short_sha}"
+            {
+              echo "backend_tags<<EOF"
+              echo "${backend}:sha-${short_sha}"
+              echo "EOF"
+              echo "frontend_tags<<EOF"
+              echo "${frontend}:sha-${short_sha}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Publishing ${version} from ${short_sha}"
+
+      # The runner's default builder uses the `docker` driver, which doesn't support
+      # `cache-to: type=gha` (cache export) at all — only the `docker-container` driver
+      # this action sets up does.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ADR-034: images are private by default (not-yet-public app) — the deploy target
+      # authenticates with `docker login ghcr.io` using a PAT, see DEPLOY.md.
+      - name: Build and push backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          target: runtime
+          push: true
+          tags: ${{ steps.meta.outputs.backend_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # NEXT_PUBLIC_* vars are inlined into the client bundle at build time — sourced from
+      # repo Variables (Settings > Actions > Variables), not hardcoded, so the real values
+      # get set once a domain exists (ADR-034) without touching this workflow.
+      # lib/api/config.ts throws on an empty one, so an unset repo Variable fails the build
+      # here rather than shipping a bundle whose every request is a relative URL.
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_SSE_URL=${{ vars.NEXT_PUBLIC_SSE_URL }}
+          tags: ${{ steps.meta.outputs.frontend_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summarise what was published
+        run: |
+          {
+            echo "### Published \`${{ steps.meta.outputs.version }}\`"
+            echo
+            echo "Deploy with:"
+            echo '```bash'
+            echo "KAYAK_IMAGE_TAG=${{ steps.meta.outputs.version }} docker compose -f docker-compose.prod.yml pull"
+            echo "KAYAK_IMAGE_TAG=${{ steps.meta.outputs.version }} docker compose -f docker-compose.prod.yml up -d"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

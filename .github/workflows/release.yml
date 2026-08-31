@@ -22,116 +22,51 @@ permissions:
   packages: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  # GitHub-hosted first: it's idle capacity we're not otherwise using, and it starts
+  # immediately instead of queuing behind whatever the home box is already running.
+  #
+  # This is the same hosted-first/self-hosted-fallback pattern backend-ci.yml and
+  # frontend-ci.yml already use (PR #164/#166) — extended here after v0.7.0's tag push
+  # discovered that "release.yml stays on GitHub-hosted so it still works with the runner
+  # off" doesn't hold once the account has no payment method and a $0 Actions spending
+  # limit: the hosted job fails to even start ("recent account payments have failed or
+  # your spending limit needs to be increased"), every time, forever, not just when
+  # minutes for the cycle run out.
+  publish-hosted:
+    uses: ./.github/workflows/_release-publish-run.yml
+    with:
+      runs-on-json: '["ubuntu-latest"]'
+    secrets: inherit
 
+  # Falls back to the self-hosted runner once the hosted run has actually failed — which,
+  # per the above, is unconditionally what happens right now. That means every release
+  # currently pays for one guaranteed-failing hosted attempt before the real build runs;
+  # accepted rather than dropping the hosted attempt entirely, because a payment method
+  # or a raised spending limit added later makes it free capacity again with no workflow
+  # change needed.
+  publish-fallback:
+    needs: publish-hosted
+    if: always() && needs.publish-hosted.result == 'failure'
+    uses: ./.github/workflows/_release-publish-run.yml
+    with:
+      runs-on-json: '["self-hosted","linux","x64"]'
+    secrets: inherit
+
+  # A workflow run's own conclusion is the worst of every job in it, so a spent-minutes
+  # (or, currently, billing-blocked) failure on publish-hosted paints the whole run red
+  # even after publish-fallback recovers it. This job is the one status worth looking at:
+  # green if either runner actually published. Self-hosted, not hosted: once GitHub-hosted
+  # is unusable for the reason above, a hosted runner can't be relied on to even pick up
+  # this trivial check.
+  publish-result:
+    needs: [publish-hosted, publish-fallback]
+    if: always()
+    runs-on: [self-hosted, linux, x64]
     steps:
-      - uses: actions/checkout@v7
-        with:
-          # The ancestry check below needs real history, not the default shallow clone.
-          fetch-depth: 0
-
-      # A tag can be pushed from anywhere, including a branch that never opened a PR.
-      # Releasing only what is already on master means everything published has been
-      # through the gates, which is why this workflow doesn't re-run the suites itself.
-      - name: Refuse to publish a commit that is not on master
+      - name: Require at least one runner to have published
         run: |
-          git fetch --quiet origin master
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
-            echo "::error::$GITHUB_SHA is not an ancestor of origin/master — it has not been through PR CI. Merge it first, then tag the merge commit."
-            exit 1
+          if [ "${{ needs.publish-hosted.result }}" = "success" ] || [ "${{ needs.publish-fallback.result }}" = "success" ]; then
+            exit 0
           fi
-
-      - name: Resolve image tags
-        id: meta
-        run: |
-          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          backend="ghcr.io/${owner_lc}/kayak-expedition-planner-backend"
-          frontend="ghcr.io/${owner_lc}/kayak-expedition-planner-frontend"
-          short_sha="$(git rev-parse --short HEAD)"
-
-          # A tag push publishes under its version and moves :latest, which is what the
-          # deploy pulls. A manual run on a branch publishes a traceable sha tag ONLY —
-          # :latest must never point at an image with no version behind it, or "what is
-          # deployed" stops being answerable again.
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            version="${{ github.ref_name }}"
-            {
-              echo "backend_tags<<EOF"
-              echo "${backend}:${version}"
-              echo "${backend}:sha-${short_sha}"
-              echo "${backend}:latest"
-              echo "EOF"
-              echo "frontend_tags<<EOF"
-              echo "${frontend}:${version}"
-              echo "${frontend}:sha-${short_sha}"
-              echo "${frontend}:latest"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          else
-            version="sha-${short_sha}"
-            {
-              echo "backend_tags<<EOF"
-              echo "${backend}:sha-${short_sha}"
-              echo "EOF"
-              echo "frontend_tags<<EOF"
-              echo "${frontend}:sha-${short_sha}"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Publishing ${version} from ${short_sha}"
-
-      # The runner's default builder uses the `docker` driver, which doesn't support
-      # `cache-to: type=gha` (cache export) at all — only the `docker-container` driver
-      # this action sets up does.
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # ADR-034: images are private by default (not-yet-public app) — the deploy target
-      # authenticates with `docker login ghcr.io` using a PAT, see DEPLOY.md.
-      - name: Build and push backend image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./backend
-          target: runtime
-          push: true
-          tags: ${{ steps.meta.outputs.backend_tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # NEXT_PUBLIC_* vars are inlined into the client bundle at build time — sourced from
-      # repo Variables (Settings > Actions > Variables), not hardcoded, so the real values
-      # get set once a domain exists (ADR-034) without touching this workflow.
-      # lib/api/config.ts throws on an empty one, so an unset repo Variable fails the build
-      # here rather than shipping a bundle whose every request is a relative URL.
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./frontend
-          push: true
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_SSE_URL=${{ vars.NEXT_PUBLIC_SSE_URL }}
-          tags: ${{ steps.meta.outputs.frontend_tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Summarise what was published
-        run: |
-          {
-            echo "### Published \`${{ steps.meta.outputs.version }}\`"
-            echo
-            echo "Deploy with:"
-            echo '```bash'
-            echo "KAYAK_IMAGE_TAG=${{ steps.meta.outputs.version }} docker compose -f docker-compose.prod.yml pull"
-            echo "KAYAK_IMAGE_TAG=${{ steps.meta.outputs.version }} docker compose -f docker-compose.prod.yml up -d"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Neither the hosted nor the self-hosted run published."
+          exit 1
