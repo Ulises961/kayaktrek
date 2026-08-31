@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [0.7.1] - 2026-08-31
+
+Medical notes are now encrypted and decrypted on your own device instead of the server, and
+Navigate mode asks before it starts sharing your position.
+
+### Added
+
+- **Terms of Use and Privacy Policy are now reachable from inside the app** (Settings → Legal),
+  alongside a contact address — previously only visible before signing in.
+- **Navigate now asks first.** Turning on live position sharing shows a confirmation naming who
+  receives it (the rest of the trip's crew, and the shore contact if a float plan link has been
+  shared) before anything is sent, whether entered from the map or from the trip's Live tab.
+
+### Changed
+
+- **Medical notes are now end-to-end encrypted.** Encrypting and decrypting your medical notes
+  now happens in your browser; your password is never sent to the server to do it. No stored
+  data changed shape and no action is needed on existing notes.
+- The privacy policy's data section is less itemized (vessel and trip data are now described by
+  purpose rather than field-by-field), and its international-transfers section explains that
+  only an encrypted backup file — unreadable by the storage provider — ever leaves the EU.
+
+### Security
+
+- Closed a gap where the app's own UI never told a user, before they turned on live position
+  sharing, who would receive it — the only prompt was the browser's generic "allow location
+  access?" dialog, which says nothing about the app's own audience for that data.
+
 ## [0.7.0] - 2026-08-31
 
 Registration is now invite-gated for the closed beta, the privacy policy is live, and
