@@ -307,12 +307,25 @@ describe("removeAvatar", () => {
 })
 
 describe("changePassword", () => {
-  it("patches /api/user/me/password with currentPwd and newPwd", async () => {
+  it("patches /api/user/me/password with currentPwd and newPwd when there is no keypair to rewrap", async () => {
     vi.mocked(apiPatch).mockResolvedValue(undefined)
     await changePassword("old", "New1!")
     expect(apiPatch).toHaveBeenCalledWith("/api/user/me/password", {
       currentPwd: "old",
       newPwd: "New1!",
+    })
+  })
+
+  it("carries the rewrapped private key as ciphertext fields, and nowhere carries a raw key", async () => {
+    vi.mocked(apiPatch).mockResolvedValue(undefined)
+    const rewrapped = { ciphertext: "ct", nonce: "nonce", salt: "salt" }
+    await changePassword("old", "New1!", rewrapped)
+    expect(apiPatch).toHaveBeenCalledWith("/api/user/me/password", {
+      currentPwd: "old",
+      newPwd: "New1!",
+      privateKeyCiphertext: "ct",
+      privateKeyNonce: "nonce",
+      privateKeySalt: "salt",
     })
   })
 

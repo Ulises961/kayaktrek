@@ -127,12 +127,24 @@ export async function removeAvatar(): Promise<ProfileActionResult> {
   }
 }
 
+// rewrappedKey carries the private key re-encrypted under newPwd, computed client-side
+// (M22) — the component that already holds both passwords does that, never this action.
+// Omitted when the account has no keypair yet; required by the backend when it does.
 export async function changePassword(
   currentPwd: string,
   newPwd: string,
+  rewrappedKey?: SealedValue,
 ): Promise<ProfileActionResult> {
   try {
-    await apiPatch("/api/user/me/password", { currentPwd, newPwd })
+    await apiPatch("/api/user/me/password", {
+      currentPwd,
+      newPwd,
+      ...(rewrappedKey && {
+        privateKeyCiphertext: rewrappedKey.ciphertext,
+        privateKeyNonce: rewrappedKey.nonce,
+        privateKeySalt: rewrappedKey.salt,
+      }),
+    })
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

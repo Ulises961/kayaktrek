@@ -21,11 +21,13 @@ interface SectionProps {
 //
 // §8 deliberately does not describe how anything is encrypted; it points at the privacy
 // policy instead. It used to claim medical notes were "end-to-end encrypted and only ever
-// decryptable by your trip leader", which was false on both halves — the encryption runs
-// server-side (`Services/crypto_service.py`), so plaintext and password both reach the
-// backend, and the owner can decrypt too. Two documents describing one mechanism is how
-// that survived; one of them owning it is the fix. §7 (cookies) follows the same rule —
-// Privacy §6 is the one factual statement, this just points at it.
+// decryptable by your trip leader", which was false on both halves when it was written —
+// the encryption ran server-side (`Services/crypto_service.py`), so plaintext and password
+// both reached the backend, and the owner could decrypt too. Two documents describing one
+// mechanism is how that survived; one of them owning it is the fix, and it stands even
+// though M22 (2026-09) moved the crypto client-side and made the claim true again —
+// Privacy §4 is still the one place that should say so. §7 (cookies) follows the same
+// rule — Privacy §6 is the one factual statement, this just points at it.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">

@@ -1,7 +1,7 @@
 ---
 id: safety-privacy
 title: "Safety & Privacy: Float Plan, Medical Notes & Sharing"
-abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + ECIES encryption at rest for leader-visible copy (password-wrapped key, explicitly NOT zero-knowledge E2E), frozen snapshot sharing via opaque token with 30-day post-trip expiry.
+abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + client-side ECIES encryption for the leader-visible copy (password-derived key, never sent to the server — M22 made this genuinely zero-knowledge), frozen snapshot sharing via opaque token with 30-day post-trip expiry.
 implementation: shipped
 status: accepted
 date: 2026-06-10
@@ -53,15 +53,22 @@ The original design wrote a plaintext copy of medical notes to `TripMember.medic
 
 The fix: **ECIES encryption** (X25519 key agreement + AES-GCM). No new dependency — the `cryptography` library already installed supports X25519 and HKDF.
 
-**Threat model boundary.** "End-to-end" here means the ciphertext at rest is meaningless without a
-password — it defeats DB-read-access threats (admin, backup leak, SQL injection). It is not a
-zero-knowledge design: keypair generation (registration) and every decrypt (`share_medical_notes`,
-leader read) require the plaintext password in a request to the backend, so a compromised or
-malicious *live* server can capture it and decrypt. A true zero-knowledge design would derive the
-encryption key client-side and never transmit the password to the server at all — out of scope
-here; the current design is the standard "encrypted at rest, password-wrapped key" pattern, not
-Signal/WhatsApp-style E2E. Worth being precise about this distinction anywhere this feature is
-described as "E2E encryption" (e.g. the root `CLAUDE.md` milestone table).
+**Threat model boundary — resolved by M22 (2026-09-01).** This paragraph originally recorded a gap
+and warned every downstream document not to overstate it (a warning that was not heeded — see the
+2026-08-31 decision-log entry below). At the time, keypair generation and every decrypt
+(`share_medical_notes`, leader read) took the plaintext password in a request to the backend, so a
+compromised or malicious *live* server could capture it and decrypt — the standard "encrypted at
+rest, password-wrapped key" pattern, not Signal/WhatsApp-style E2E. M22 moved all of that
+client-side: `frontend/lib/crypto/medical.ts` derives the key and does every encrypt/decrypt in the
+browser (falling back to React Native for M9), and the backend endpoints now accept and return only
+ciphertext — no medical-notes endpoint accepts a password. **The claim is now true**: the server
+never sees a plaintext password or a plaintext private key for this feature, only opaque
+ciphertext, so a compromised live server can no longer capture the key in transit. What is
+unchanged, and remains the honest boundary: the server *did* decrypt on every past operation before
+M22, so ciphertext written before this milestone offers no retroactive guarantee about who saw it
+in the clear at the time; and the leader's own client still holds the unwrapped key in memory while
+reading crew notes, which a compromised *client* (not server) can still exfiltrate — no design
+changes that.
 
 ### Keypair model
 
@@ -282,3 +289,4 @@ structurally mirrored on the existing token/re-auth machinery rather than invent
 | Email-change flow (M12 §J) | — | 2026-07-13 | Request (elevated-token-gated) → verify (anonymous, token-only, mirrors `/auth/verify`) two-step; new `pending_mail` column on `User` (not an `AuthToken` payload field); enumeration-safe (silent no-op for a taken address); `token_version` bumped on verify, not request; old address gets a non-actionable notice email. |
 | Trip-invite email/username oracle (M12 §N) | — | 2026-07-13 | Removed the `email`/`username` invite-lookup branches from `POST /trip/<id>/invite` (frontend `InviteForm` removed in the same change) — buddy-picker `userId` invite is now the sole path; accepted cost is invite-a-non-buddy becomes connect-then-invite. |
 | **"E2E encryption" corrected in every downstream doc** | — | 2026-08-31 | This document's threat-model paragraph has always been precise — password-wrapped key at rest, *not* zero-knowledge, with the explicit warning to *"be precise about this distinction anywhere this feature is described as 'E2E encryption' (e.g. the root `CLAUDE.md` milestone table)"*. That is exactly where it drifted, and further: root `CLAUDE.md`'s M3g row read "Medical notes E2E encryption"; `docs/play-store-checklist.md` §3b argued for a softer Play health-data declaration on the grounds the feature is *"genuinely client-side E2E encrypted … the server stores only ciphertext it cannot read"*; the live **Terms of Use** told users their notes were *"end-to-end encrypted and only ever decryptable by your trip leader"* — false twice over, since the server sees plaintext and password on every operation, and the owner can decrypt too. **Even this file's own frontmatter abstract said "ECIES E2E encryption"**, contradicting its body. Caught while writing the privacy policy, which would otherwise have shipped the same false claim to users and to Play. All corrected; the Terms section now defers to the privacy policy rather than restating crypto. **The design is unchanged and remains sound** — a stolen database or backup is unreadable, which is the threat it was built for. The Play consequence is concrete: Health info is declared as collected, plainly, because the E2E carve-out does not apply. Pattern worth naming, the fourth instance in one day: a caveat recorded in one document does not reach the places that describe the same thing, even when the caveat names those places |
+| **M22 made the E2E claim true** | — | 2026-09-01 | The 2026-08-31 entry above corrected every doc to admit the design was *not* E2E; this entry is the fix to the design itself, closing that gap for good rather than continuing to caveat it. `frontend/lib/crypto/medical.ts` reimplements `Services/crypto_service.py` byte-for-byte and every medical-notes operation (registration keypair, save/read own notes, share-with-leader, leader read, password-change rewrap) moved client-side; no endpoint accepts a password for any of it. No migration was needed — the wrapped-key format didn't change, so client-side code reads every ciphertext the old server-side code produced, verified against a pre-M22 account's real row. WP4 (password-change rewrap) closed 2026-09-01: `PATCH /me/password` now takes an optional rewrapped-key triple instead of doing the unwrap/rewrap itself, and rejects the request (400) if the account has a keypair and the triple is missing, so a keypair can never be silently orphaned by a password change. |

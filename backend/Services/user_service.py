@@ -20,7 +20,6 @@ from Models.connection import Connection, ConnectionStatusType
 from Api.database import db
 from Schemas.base_schema import camelcase
 from Schemas.user_schema import PublicUserSchema
-from Services.crypto_service import encrypt, decrypt
 from Services.storage_service import StorageService
 from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
@@ -359,20 +358,40 @@ class UserService:
         return user
 
     @staticmethod
-    def change_password(id: str, current_pwd: str, new_pwd: str) -> None:
+    def change_password(
+        id: str,
+        current_pwd: str,
+        new_pwd: str,
+        private_key_ciphertext: Optional[str] = None,
+        private_key_nonce: Optional[str] = None,
+        private_key_salt: Optional[str] = None,
+    ) -> None:
         """
         Verify current password then replace with the new one.
-        If the user has an X25519 keypair, re-encrypts the private key under the new password.
+
+        If the user has an X25519 keypair, the caller must supply it re-wrapped under the
+        new password (M22) — the client derives both keys and re-encrypts locally, since the
+        server no longer receives a password it can use to unwrap the old ciphertext. Nothing
+        here decrypts the private key or sees it in the clear; the three fields are stored
+        exactly as given, the same trust boundary as POST /me/keypair.
         If user has medical notes, sets medical_notes_reset_at flag to require re-consent
-        (security: old password may have been leaked, medical notes potentially compromised).
+        (security: old password may have been leaked, medical notes potentially compromised
+        regardless of whether the rewrap below succeeds).
 
         Raises:
             NoResultFound: If user does not exist
-            ValueError: If current password does not match
+            ValueError: If current password does not match, or the user has a keypair and
+                the rewrapped private key was not supplied
         """
         user = UserService.get_user_by_id(id)
         if not check_password_hash(user.pwd, current_pwd):
             raise ValueError("Current password is incorrect")
+        if user.public_key and not (
+            private_key_ciphertext and private_key_nonce and private_key_salt
+        ):
+            raise ValueError(
+                "privateKeyCiphertext, privateKeyNonce and privateKeySalt are required"
+            )
         user.pwd = generate_password_hash(new_pwd).decode("UTF-8")
         user.password_changed_at = datetime.now(timezone.utc)
         user.token_version += 1
@@ -381,16 +400,9 @@ class UserService:
         if user.medical_notes_consent_at is not None:
             user.medical_notes_reset_at = datetime.now(timezone.utc)
         if user.public_key:
-            private_key_b64 = decrypt(
-                user.private_key_ciphertext,  # type: ignore
-                user.private_key_nonce,  # type: ignore
-                user.private_key_salt,  # type: ignore
-                current_pwd,
-            )
-            pk_ct, pk_nonce, pk_salt = encrypt(private_key_b64, new_pwd)
-            user.private_key_ciphertext = pk_ct
-            user.private_key_nonce = pk_nonce
-            user.private_key_salt = pk_salt
+            user.private_key_ciphertext = private_key_ciphertext
+            user.private_key_nonce = private_key_nonce
+            user.private_key_salt = private_key_salt
         db.session.commit()
         logger.info("password_changed", extra={"user_id": id})
 

@@ -159,10 +159,12 @@ class UserUpdateSchema(UserSchema):
     mail is excluded: email changes require a dedicated verification flow.
     pwd is excluded: password changes go through PATCH /me/password
     (Services.user_service.UserService.change_password), which verifies the
-    current password, bumps token_version, revokes other sessions, and
-    re-encrypts the X25519 private key under the new password. Accepting pwd
-    here would silently skip all four of those and corrupt the encrypted
-    medical-notes keypair for any user who has one.
+    current password, bumps token_version, revokes other sessions, and (for an
+    account with an X25519 keypair) stores the private key re-wrapped under the
+    new password — the client does the rewrap locally and posts the result (M22);
+    the server never derives or re-wraps it. Accepting pwd here would silently
+    skip all of that and corrupt the encrypted medical-notes keypair for any user
+    who has one.
     Medical notes fields are excluded — managed via dedicated consent endpoints.
     """
     mail = fields.Email(dump_only=True)

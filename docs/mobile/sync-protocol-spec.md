@@ -449,3 +449,37 @@ For WP6 to fold in:
   MinIO half did **not** move to R2 with the rest of object storage — v0.6.0 moved the tile
   cache to local disk (`Services/tile_cache.py`) precisely because the proxy re-serves bytes
   through Flask, making every cache hit a WAN round trip (see `offline-tiles-spec.md`).
+
+## 11. Medical notes — what M22 changes for this spec (2026-09-01)
+
+WP1 §9's list above still stands unchanged; this section doesn't add a backend item, it changes
+what the answer to WP6's open question would cost if M9c says yes.
+
+**The open question itself is not decided here.** M9a WP6 left it open: whether medical notes
+sync to the device at all, because a leader needs a crew member's notes in an emergency and an
+emergency at sea is exactly when there is no connectivity — but the sync table said no, because
+server-side decryption meant offline access = caching plaintext health data in WatermelonDB on a
+phone that can be lost at sea. That trade is what M9c has to weigh, and it still does.
+
+**What M22 changes is the cost side of that trade, not the decision.** Medical-notes crypto now
+runs client-side (`frontend/lib/crypto/medical.ts` on web; the same module, or a React Native
+port of it per the library-choice note in `plans/M22-client-side-medical-crypto.md`, would run on
+mobile). Concretely, if M9c decides notes should sync:
+
+- What syncs down is `User.public_key` / `private_key_ciphertext/nonce/salt` and the sealed
+  `medical_notes_ciphertext/nonce/salt` triples (own and, for a leader, each consenting crew
+  member's leader-sealed copy) — opaque strings, synced like any other row via the existing
+  `pullChanges` shape (§4). No new sync mechanism, no new conflict semantics: these columns are
+  never edited concurrently by two devices the way a route point is.
+- **No plaintext note, and no plaintext private key, is ever written to WatermelonDB.** The
+  private key is derived and held in memory only, for the session, the same "derive once per
+  session, never on disk" rule §"Library choice" in the M22 plan sets for the web session-length
+  key hold — mobile has the same requirement and a harder deadline, since a lost phone is the
+  threat model this whole milestone exists for.
+- The **PBKDF2 cost measured in that plan** (600k iterations: 365ms via WebCrypto, ~2.9s in pure
+  `@noble` JS — the only path React Native has) is the real budget for whatever "unlock to read
+  crew notes offline" interaction M9c designs, not an estimate to redo from scratch.
+
+So M9c's decision is unblocked from "would this mean shipping plaintext health data to a phone" —
+it no longer would — and is now purely about UX and the interaction cost of a multi-second local
+unlock, which is a product call M9c is better placed to make than this spec.

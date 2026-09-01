@@ -14,10 +14,14 @@ describe("PrivacyPage", () => {
     expect(screen.getByText(/cannot be read without that password/i)).toBeInTheDocument()
   })
 
-  it("states plainly that this is not end-to-end encryption", () => {
+  // M22 (2026-09) moved this crypto client-side, making the E2E claim true — this test used
+  // to assert the opposite (that the page correctly disclaimed E2E) for the same reason it now
+  // asserts the claim: removing either statement, in either direction, is the substantive
+  // change this file exists to catch.
+  it("states plainly that this is end-to-end encryption performed on the user's device", () => {
     render(<PrivacyPage />)
-    expect(screen.getByText(/not end-to-end encryption/i)).toBeInTheDocument()
-    expect(screen.getByText(/encryption is performed on our servers/i)).toBeInTheDocument()
+    expect(screen.getByText(/this is end-to-end encryption/i)).toBeInTheDocument()
+    expect(screen.getByText(/encryption and decryption happen on your device/i)).toBeInTheDocument()
   })
 
   it("states that position sharing is off unless turned on", () => {

@@ -5,13 +5,19 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ChangePasswordSchema, type ChangePasswordValues } from "@/lib/dtos/user"
-import { changePassword } from "@/lib/profile/actions"
+import { changePassword, getKeypair, reAuth } from "@/lib/profile/actions"
+import { decrypt, encrypt } from "@/lib/crypto/medical"
 import { Button } from "@/components/ui/button"
 import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 
-export function ChangePasswordForm() {
+interface ChangePasswordFormProps {
+  /** Whether the account has a medical-notes keypair that needs re-wrapping (M22). */
+  hasKeypair: boolean
+}
+
+export function ChangePasswordForm({ hasKeypair }: ChangePasswordFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -27,16 +33,57 @@ export function ChangePasswordForm() {
 
   const onSubmit = handleSubmit(({ currentPwd, newPwd }) => {
     startTransition(async () => {
-      const result = await changePassword(currentPwd, newPwd)
-      if (result.success) {
-        reset()
-        router.push("/settings?changed=1")
-      } else {
-        if (result.error.toLowerCase().includes("current")) {
+      if (!hasKeypair) {
+        const result = await changePassword(currentPwd, newPwd)
+        if (result.success) {
+          reset()
+          router.push("/settings?changed=1")
+        } else if (result.error.toLowerCase().includes("current")) {
           setError("currentPwd", { message: result.error })
         } else {
           setError("root", { message: result.error })
         }
+        return
+      }
+
+      // The private key is re-wrapped here, in the browser, before either password is
+      // sent anywhere (M22) — re-auth is what proves currentPwd to the server, since the
+      // password itself no longer travels on the medical-notes endpoints.
+      const authResult = await reAuth(currentPwd)
+      if (!authResult.success) {
+        setError("currentPwd", { message: authResult.error })
+        return
+      }
+      const keypairResult = await getKeypair(authResult.elevatedToken)
+      if (!keypairResult.success) {
+        setError("root", { message: keypairResult.error })
+        return
+      }
+      let rewrappedKey
+      try {
+        const { privateKeyCiphertext, privateKeyNonce, privateKeySalt } = keypairResult.keypair
+        const privateKeyB64 = await decrypt(
+          privateKeyCiphertext,
+          privateKeyNonce,
+          privateKeySalt,
+          currentPwd,
+        )
+        rewrappedKey = await encrypt(privateKeyB64, newPwd)
+      } catch {
+        setError("root", {
+          message: "Could not re-encrypt your medical-notes key. Please try again.",
+        })
+        return
+      }
+
+      const result = await changePassword(currentPwd, newPwd, rewrappedKey)
+      if (result.success) {
+        reset()
+        router.push("/settings?changed=1")
+      } else if (result.error.toLowerCase().includes("current")) {
+        setError("currentPwd", { message: result.error })
+      } else {
+        setError("root", { message: result.error })
       }
     })
   })

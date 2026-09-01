@@ -359,6 +359,13 @@ def change_password():
     ---
     patch:
       summary: Change the authenticated user's password
+      description: >
+        currentPwd/newPwd prove identity and set the new password hash — that part is
+        unavoidable and unrelated to the medical-notes scheme. If the account has an X25519
+        keypair, the client must also derive both password-keys locally, decrypt the private
+        key under currentPwd and re-encrypt it under newPwd, and post the result here
+        (privateKeyCiphertext/privateKeyNonce/privateKeySalt); the server stores those three
+        opaque strings verbatim and never re-derives or re-wraps the key itself (M22).
       requestBody:
         content:
           application/json:
@@ -372,11 +379,20 @@ def change_password():
                   type: string
                 newPwd:
                   type: string
+                privateKeyCiphertext:
+                  type: string
+                  description: Required if the account has a keypair; the private key re-wrapped under newPwd.
+                privateKeyNonce:
+                  type: string
+                privateKeySalt:
+                  type: string
       responses:
         204:
           description: Password changed
         400:
-          description: currentPwd/newPwd missing, or currentPwd is incorrect
+          description: >
+            currentPwd/newPwd missing, currentPwd is incorrect, or the account has a keypair
+            and no rewrapped private key was supplied
         404:
           description: Authenticated user not found
     """
@@ -388,7 +404,14 @@ def change_password():
         new_pwd = raw.get("newPwd")
         if not current_pwd or not new_pwd:
             abort(HTTPStatus.BAD_REQUEST, description="currentPwd and newPwd are required")
-        UserService.change_password(str(g.current_user_id), current_pwd, new_pwd)
+        UserService.change_password(
+            str(g.current_user_id),
+            current_pwd,
+            new_pwd,
+            raw.get("privateKeyCiphertext"),
+            raw.get("privateKeyNonce"),
+            raw.get("privateKeySalt"),
+        )
         return "", HTTPStatus.NO_CONTENT
 
     except HTTPException:

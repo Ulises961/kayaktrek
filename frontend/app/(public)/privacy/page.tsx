@@ -158,11 +158,10 @@ export default function PrivacyPage() {
             backup.
           </p>
           <p>
-            The encryption is performed on our servers rather than on your device. When you save or
-            retrieve this information, the text and your password are transmitted to us over an
-            encrypted connection and held in memory for the duration of the operation. Neither is
-            written to disk unencrypted, and your password is not stored. This is not end-to-end
-            encryption and should not be relied on as protection against the operator.
+            The encryption and decryption happen on your device, in your browser or app, not on our
+            servers. Your password never leaves your device for this purpose — we receive and store
+            only the resulting encrypted data. This is end-to-end encryption: we cannot read your
+            health data even if we wanted to, and neither can anyone who compromises our servers.
           </p>
           <p>
             Access is limited to the leader of a trip you have joined, using a key created for that
@@ -171,8 +170,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             Because the key is derived from your password, resetting a forgotten password renders
-            existing entries permanently unreadable. They are cleared and you are prompted to
-            re-enter them.
+            existing entries permanently unreadable — we have no way to recover them for you, by
+            design. They are cleared and you are prompted to re-enter them. Changing your password
+            while you still know the current one is different: your device re-encrypts the existing
+            entry under the new password before sending it to us, so nothing is lost.
           </p>
           <p>
             Health data is used only for the purpose described above. It is not used for

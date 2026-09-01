@@ -153,7 +153,21 @@ listing suppression/removal. This app collects two categories worth getting righ
 
 This is the one requiring the most care, because it must be described **accurately, not
 omitted just because it's encrypted**, per the explicit instruction in both `plans/M9.md` and
-this task. The backend's medical notes feature (M3g) is genuinely **client-side E2E encrypted**
+this task.
+
+**Correction (2026-09-01):** this section originally claimed the feature (M3g) was "genuinely
+client-side E2E encrypted" when it was written (2026-08-26) — that was false at the time. The
+crypto ran server-side: keypair generation and every decrypt sent the plaintext password to the
+backend (`Services/crypto_service.py`), which could therefore read a note in transit even though
+it never stored plaintext. `docs/adr/safety-privacy.md`'s 2026-08-31 correction pass caught the
+same false claim in `CLAUDE.md` and the Terms of Use and fixed both, but missed this file — the
+"all corrected" note in that decision log was wrong about scope, not about the underlying fact.
+**M22 (2026-09-01) closed the gap by changing the code, not just the words**: the crypto moved
+client-side (`frontend/lib/crypto/medical.ts`), no medical-notes endpoint accepts a password any
+more, and the argument below is now actually true, restored with today's date rather than the
+original one. The X25519 ECIES design itself never changed — only where it runs.
+
+The backend's medical notes feature (M3g/M22) is genuinely **client-side E2E encrypted**
 (X25519 ECIES) — the server stores only ciphertext it cannot read, and only the trip leader
 holds a key able to decrypt a given crew member's note.
 

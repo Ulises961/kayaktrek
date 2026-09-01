@@ -1,4 +1,5 @@
 import json
+import time
 from uuid import UUID
 
 import pytest
@@ -9,6 +10,7 @@ from Resources.user_resource import USER_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
 from Services.crypto_service import decrypt, encrypt
 from Tests.auth_helpers import access_token_for
+from Tests.conftest import _keypair_fields
 
 _USER_PWD = "testPassword6$"
 _NEW_PWD = "newPassword7$"
@@ -43,6 +45,36 @@ def pw_user(app, client):
     client.post("/api/v1/auth/register", json=data)
     with app.app_context():
         user = User.query.filter_by(mail="pwchange.tmp@example.com").first()
+        user.active = True
+        _db.session.commit()
+        token = access_token_for(user)
+        user_id = str(user.id)
+    yield {"Authorization": f"Bearer {token}"}
+    with app.app_context():
+        u = _db.session.query(User).filter_by(id=UUID(user_id)).first()
+        if u:
+            _db.session.delete(u)
+            _db.session.commit()
+
+
+@pytest.fixture(scope="function")
+def pw_user_with_keypair(app, client):
+    """Throwaway user with a medical-notes keypair, for password-change rewrap tests.
+
+    Mirrors pw_user but registers with a keypair (as the web client does since M22) so the
+    rewrap-on-change path has something to exercise.
+    """
+    data = {
+        "mail": "pwchange.keypair.tmp@example.com",
+        "pwd": _USER_PWD,
+        "phone": "+39099900004",
+        "name": "PwChangeKeypair",
+        "username": "pwchange_keypair_tmp",
+        **_keypair_fields(_USER_PWD),
+    }
+    client.post("/api/v1/auth/register", json=data)
+    with app.app_context():
+        user = User.query.filter_by(mail="pwchange.keypair.tmp@example.com").first()
         user.active = True
         _db.session.commit()
         token = access_token_for(user)
@@ -103,6 +135,81 @@ def test_change_password_success(client, pw_user):
     )
     assert response.status_code == 204
     # No restore needed — the fixture cleans up the user entirely.
+
+
+def test_change_password_missing_rewrap_when_keypair_exists(client, pw_user_with_keypair):
+    """A keypair must never be silently orphaned: changing the password without supplying
+    the rewrapped private key is rejected rather than leaving the key wrapped under a
+    password that no longer works (M22 — the server no longer rewraps it itself)."""
+    response = client.patch(
+        f"{USER_ENDPOINT}/me/password",
+        json={"currentPwd": _USER_PWD, "newPwd": _NEW_PWD},
+        headers=pw_user_with_keypair,
+    )
+    assert response.status_code == 400
+
+
+def test_change_password_rewraps_private_key(app, client, pw_user_with_keypair):
+    """The client rewraps the private key locally and posts ciphertext only (M22). Proves
+    the server stores it verbatim: the key unwraps under the new password afterwards and
+    no longer unwraps under the old one — the no-migration guarantee for this path."""
+    elevated = _elevated_headers(client, pw_user_with_keypair)
+    current = json.loads(client.get(f"{USER_ENDPOINT}/me/keypair", headers=elevated).data)
+    private_key_b64 = decrypt(
+        current["privateKeyCiphertext"],
+        current["privateKeyNonce"],
+        current["privateKeySalt"],
+        _USER_PWD,
+    )
+    new_ct, new_nonce, new_salt = encrypt(private_key_b64, _NEW_PWD)
+
+    response = client.patch(
+        f"{USER_ENDPOINT}/me/password",
+        json={
+            "currentPwd": _USER_PWD,
+            "newPwd": _NEW_PWD,
+            "privateKeyCiphertext": new_ct,
+            "privateKeyNonce": new_nonce,
+            "privateKeySalt": new_salt,
+        },
+        headers=pw_user_with_keypair,
+    )
+    assert response.status_code == 204
+
+    # password_changed_at bumped token_version, so the bearer token above is now dead —
+    # mint a fresh one exactly like a real re-login would produce. The password-change
+    # guard rejects a token whose `iat` (JWT truncates to whole seconds) reads earlier
+    # than password_changed_at (sub-second precision); a real login is never this fast
+    # after the request that set it, but a test can be, so cross the second boundary.
+    time.sleep(1)
+    with app.app_context():
+        user = User.query.filter_by(mail="pwchange.keypair.tmp@example.com").first()
+        fresh_headers = {"Authorization": f"Bearer {access_token_for(user)}"}
+
+    reauth_new = client.post(
+        f"{USER_ENDPOINT}/me/re-auth", json={"password": _NEW_PWD}, headers=fresh_headers,
+    )
+    assert reauth_new.status_code == 200
+    elevated_new = {
+        **fresh_headers,
+        "X-Elevated-Token": json.loads(reauth_new.data)["elevatedToken"],
+    }
+    stored = json.loads(client.get(f"{USER_ENDPOINT}/me/keypair", headers=elevated_new).data)
+    assert stored["privateKeyCiphertext"] == new_ct
+    assert (
+        decrypt(
+            stored["privateKeyCiphertext"], stored["privateKeyNonce"], stored["privateKeySalt"],
+            _NEW_PWD,
+        )
+        == private_key_b64
+    )
+
+    # The old password no longer re-authenticates at all, so there's nothing to unwrap
+    # with it — this is what "no server-side rewrap of a plaintext password" now means.
+    reauth_old = client.post(
+        f"{USER_ENDPOINT}/me/re-auth", json={"password": _USER_PWD}, headers=fresh_headers,
+    )
+    assert reauth_old.status_code == 401
 
 
 # =============================================================================
