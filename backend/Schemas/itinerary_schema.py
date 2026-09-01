@@ -157,6 +157,20 @@ class ItineraryExploreItemSchema(BaseSchema):
     original_author = fields.Nested(
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
+    # M23 §3 — signals derivable without an author writing anything, which is what the
+    # library needs: its routes have null description and null difficulty in practice.
+    #
+    # `author` is who wrote THIS route, and is distinct from `original_author` (who wrote
+    # the route a fork came from). Same projection, since both feed the same card and
+    # both must respect profile_is_public before linking.
+    author = fields.Nested(OriginalAuthorSchema, dump_only=True, allow_none=True)
+    # The hardest day, not the average — the closest stand-in for the missing difficulty.
+    longest_day_miles = fields.Float(dump_only=True, allow_none=True)
+    point_count = fields.Integer(dump_only=True, dump_default=0)
+    # Public places and public photos only: the card is an anonymous surface, so a count
+    # a visitor cannot then see would misrepresent how annotated the route is.
+    place_count = fields.Integer(dump_only=True, dump_default=0)
+    photo_count = fields.Integer(dump_only=True, dump_default=0)
 
 
 class ItineraryPublicSchema(BaseSchema):
