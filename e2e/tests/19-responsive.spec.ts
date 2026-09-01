@@ -1177,28 +1177,41 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
       // Not networkidle: Navigate holds an SSE connection open, so this page is
       // never idle by design and waiting for it times out.
       await page.goto(`/itinerary/${seeded.itineraryId}?navigate=1`)
-      const chrome = page.getByTestId("navigate-chrome")
-
-      // Settle before measuring, in two steps, because this is a layout assertion and an
-      // unsettled layout is not the one under test.
+      // Scoped to `main`, and that is the whole fix for a flake this test carried for a
+      // while (#172). During load the page subtree is briefly present *twice*: once inside
+      // the app shell, and once on a bare `<div>` hanging directly off `<body>`, with no
+      // sidebar wrapper and no `main` above it. Both are visible, and they run independent
+      // effects — the two copies were caught showing different geolocation states in the
+      // same frame. No application path produces that second copy: one route renders
+      // MapBuilder and it renders through `(app)/layout.tsx`, so the stray copy is a
+      // framework-level streaming/hydration artifact, not a double mount of ours.
       //
-      // `toHaveCount(1)` first: while the geolocation permission resolves, the chip's
-      // subtree is briefly present twice — both copies hidden, the DOM settling to one.
-      // `toBeVisible()` on its own throws a strict-mode violation in that window instead of
-      // waiting through it, which is what made this test fail. Nothing renders twice on
-      // screen; a failure snapshot taken after the fact contains exactly one chip.
-      // Wait on `.first()` — a non-strict locator — until the chip shows a *terminal*
-      // status. Ordering matters and the first attempt at this got it wrong: waiting for
-      // the count to settle first still raced, because the second copy appears while the
-      // status is being committed, i.e. after the count has momentarily been 1. Waiting
-      // for the settled text is what actually outlasts the transition; the count and
-      // visibility checks then hold.
-      await expect(chrome.first()).toContainText(/Location denied|Location unavailable|Sharing/)
+      // Earlier attempts tried to *wait out* the window — settle the text, then check the
+      // count, then visibility. That cannot work, because the second copy appears after
+      // the first has reached a terminal status: the count is momentarily 1 and then 2 one
+      // assertion later, which is exactly how this failed. Scoping to `main` sidesteps the
+      // race entirely rather than timing it, and it also says what the test means: the chip
+      // *in the page*.
+      const chrome = page.locator('main [data-testid="navigate-chrome"]')
+
+      // Settle before measuring — this is a layout assertion, and an unsettled layout is
+      // not the one under test.
+      await expect(chrome).toContainText(/Location denied|Location unavailable|Sharing/)
       await expect(chrome).toHaveCount(1)
       await expect(chrome).toBeVisible()
 
-      const chromeBox = (await chrome.boundingBox())!
-      const fab = (await page.getByTestId("add-button").boundingBox())!
+      // Both elements, not just the chip. This assertion compares two boxes, so both have
+      // to exist before either is measured — and `boundingBox()` answers null for one that
+      // does not, which the old `!` turned into a bare "Cannot read properties of null"
+      // pointing at the arithmetic rather than at the element that was missing.
+      const fabLocator = page.getByTestId("add-button")
+      await expect(fabLocator).toBeVisible()
+
+      const chromeBox = await chrome.boundingBox()
+      const fab = await fabLocator.boundingBox()
+      expect(chromeBox, "the Navigate chip has no box to measure").not.toBeNull()
+      expect(fab, "the Annotate FAB has no box to measure").not.toBeNull()
+      if (!chromeBox || !fab) throw new Error("unreachable — asserted non-null above")
 
       // Same row: their vertical spans overlap. Asserted as overlap rather than
       // equal `y`, since the chip and the FAB are different heights.
