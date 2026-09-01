@@ -64,7 +64,6 @@ export default function RegisterPage() {
     const fd = new FormData()
     fd.append("mail", data.mail)
     fd.append("username", data.username)
-    fd.append("name", data.name)
     if (data.inviteCode) fd.append("inviteCode", data.inviteCode)
     fd.append("password", data.password)
     fd.append("publicKey", keypair.publicKey)
@@ -124,20 +123,6 @@ export default function RegisterPage() {
             {...register("username")}
           />
           {errors.username && <p className="text-[11px] text-red-600">{errors.username.message}</p>}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="name" className="auth-label">
-            Full name
-          </label>
-          <Input
-            id="name"
-            type="text"
-            autoComplete="name"
-            className="auth-input"
-            {...register("name")}
-          />
-          {errors.name && <p className="text-[11px] text-red-600">{errors.name.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">

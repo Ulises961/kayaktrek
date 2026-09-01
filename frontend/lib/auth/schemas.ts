@@ -1,5 +1,4 @@
 import { z } from "zod"
-import { noHtmlTags } from "@/lib/validators"
 
 export const LoginSchema = z.object({
   mail: z.string().email("Enter a valid email address."),
@@ -13,11 +12,6 @@ export const RegisterSchema = z.object({
     .min(3, "Username must be at least 3 characters.")
     .max(32, "Username must be at most 32 characters.")
     .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores."),
-  name: z
-    .string()
-    .min(1, "Name is required.")
-    .max(100, "Name must be at most 100 characters.")
-    .refine(noHtmlTags.check, noHtmlTags.message),
   // Optional since M12 §F — signup no longer asks for it; collected in Settings.
   phone: z.string().optional(),
   // Closed-beta invite gate — required only when the backend has one configured

@@ -95,6 +95,12 @@ class AuthService:
                 AuthService._send_already_registered_email(existing)
             return existing
 
+        # Full name is optional at signup (simplify-register) — collected later in
+        # Settings, same pattern as phone (M12 §F). name stays NOT NULL on the model,
+        # so default it to the username rather than relaxing the column.
+        if not user_json.get("name"):
+            user_json["name"] = username
+
         user = cast(User, UserSchema().load(user_json))
         user.active = False
         db.session.add(user)

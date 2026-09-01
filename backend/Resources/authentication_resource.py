@@ -147,6 +147,9 @@ def register_user():
         `privateKeyCiphertext`, `privateKeyNonce`, `privateKeySalt` — the medical-notes
         keypair the client generates and wraps under the user's password (M22). Omit all
         four to register without one and add it later via POST /api/v1/user/me/keypair.
+
+        `name` is also optional at signup — omitted, it defaults to `username`; the real
+        name is collected later in Settings (same pattern as `phone`, M12 §F).
       requestBody:
         content:
           application/json:

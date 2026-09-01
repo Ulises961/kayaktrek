@@ -112,7 +112,6 @@ export async function register(
   const parsed = RegisterSchema.safeParse({
     mail: formData.get("mail"),
     username: formData.get("username"),
-    name: formData.get("name"),
     phone: formData.get("phone") ?? undefined,
     inviteCode: formData.get("inviteCode") ?? undefined,
     password: formData.get("password"),
@@ -125,12 +124,13 @@ export async function register(
     }
   }
 
-  const { mail, username, name, phone, inviteCode, password } = parsed.data
+  const { mail, username, phone, inviteCode, password } = parsed.data
   // phone/inviteCode are optional client-side — JSON.stringify drops the undefined key.
+  // name is omitted entirely: the backend defaults it to username at signup and it's
+  // collected later in Settings (simplify-register, same pattern as phone, M12 §F).
   const body = {
     mail,
     username,
-    name,
     phone: phone || undefined,
     inviteCode: inviteCode || undefined,
     pwd: password,

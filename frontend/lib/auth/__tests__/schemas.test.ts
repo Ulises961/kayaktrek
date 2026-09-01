@@ -32,7 +32,6 @@ describe("RegisterSchema", () => {
   const valid = {
     mail: "user@example.com",
     username: "kayaker_42",
-    name: "Ulises",
     phone: "+34600000000",
     password: STRONG_PASSWORD,
   }
@@ -71,13 +70,6 @@ describe("RegisterSchema", () => {
 
     it("accepts usernames with letters, numbers, and underscores", () => {
       expect(RegisterSchema.safeParse({ ...valid, username: "kayaker_42" }).success).toBe(true)
-    })
-  })
-
-  describe("name", () => {
-    it("rejects an empty name", () => {
-      const result = RegisterSchema.safeParse({ ...valid, name: "" })
-      expect(result.success).toBe(false)
     })
   })
 

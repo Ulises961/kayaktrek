@@ -129,7 +129,6 @@ describe("login", () => {
 const VALID_REGISTRATION = {
   mail: "a@b.com",
   username: "kayaker",
-  name: "N",
   phone: "+34600000000",
   password: "Expedition#24",
 }

@@ -162,6 +162,23 @@ class TestAuthenticationEndpoints:
         assert user is not None
         assert user.phone is None
 
+    def test_register_without_name(self, client):
+        """Full name is optional at signup (simplify-register) — defaults to the
+        username and is collected later in Settings, same pattern as phone."""
+        username = f"noname_{uuid.uuid4().hex[:8]}"
+        new_user_data = {
+            "username": username,
+            "mail": f"noname_{uuid.uuid4().hex[:8]}@example.com",
+            "pwd": "SecurePass123!",
+        }
+
+        response = client.post('/api/v1/auth/register', json=new_user_data)
+
+        assert response.status_code == 201
+        user = User.query.filter_by(mail=new_user_data['mail']).first()
+        assert user is not None
+        assert user.name == username
+
     def test_register_two_users_without_phone(self, client):
         """unique=True on phone must tolerate multiple NULLs (Postgres semantics)."""
         for _ in range(2):
