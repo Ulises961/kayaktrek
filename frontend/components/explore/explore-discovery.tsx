@@ -30,6 +30,7 @@ import type {
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
 import { SeasonBadge } from "./season-badge"
+import { RouteSignals } from "./route-signals"
 import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { EmptyState } from "@/components/common/empty-state"
 
@@ -48,6 +49,9 @@ type Props = {
   isAuthenticated: boolean
   ownedIds: string[]
   unit?: DistanceUnit
+  // The anonymous root renders this same surface as the product's chart; /explore inside
+  // the app shell renders it as a tool. Only the map's furniture differs.
+  chartFurniture?: boolean
 }
 
 function toNumber(value: string): number | undefined {
@@ -76,6 +80,7 @@ export function ExploreDiscovery({
   isAuthenticated,
   ownedIds,
   unit = DISTANCE_UNIT.NM,
+  chartFurniture = false,
 }: Props) {
   const router = useRouter()
   const [isForking, startFork] = useTransition()
@@ -216,6 +221,7 @@ export function ExploreDiscovery({
           boundsEnabled={boundsEnabled}
           onSelect={select}
           onBoundsChange={setBbox}
+          chartFurniture={chartFurniture}
         />
       </div>
 
@@ -321,14 +327,29 @@ export function ExploreDiscovery({
             {total === 0 ? "No routes match" : `${total} ${total === 1 ? "route" : "routes"}`}
           </p>
           {items.length === 0 && !isSearching ? (
-            // Filter-driven, so no ghost rows: the panel is warranted at this
+            // Two different emptinesses, and telling them apart matters most on the
+            // anonymous root, where this is a visitor's first impression. "Widen the
+            // search" is actively misleading when the library itself is empty and no
+            // filter is on — there is nothing to widen towards. Cold start gets an
+            // invitation instead; a filtered miss keeps the advice that helps.
+            //
+            // Filter-driven either way, so no ghost rows: the panel is warranted at this
             // size, the promise that content will arrive on its own is not.
-            <EmptyState
-              className="m-4"
-              title="No public routes match these filters."
-              description="Widen the search, or clear a filter to see the full library."
-              ghostRows={0}
-            />
+            activeFilterCount === 0 && debouncedName.trim() === "" ? (
+              <EmptyState
+                className="m-4"
+                title="No routes have been shared yet."
+                description="This library is built by the people who paddle it. Publish a route you know and it will show up here."
+                ghostRows={0}
+              />
+            ) : (
+              <EmptyState
+                className="m-4"
+                title="No public routes match these filters."
+                description="Widen the search, or clear a filter to see the full library."
+                ghostRows={0}
+              />
+            )
           ) : (
             items.map((item) => (
               <Card
@@ -381,6 +402,7 @@ export function ExploreDiscovery({
                       {item.description}
                     </p>
                   )}
+                  <RouteSignals item={item} unit={unit} />
                   {item.originalAuthor && (
                     <p className="text-muted-foreground text-xs">
                       Cloned from{" "}

@@ -39,6 +39,11 @@ function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
     originalAuthor: null,
     description: null,
     difficulty: null,
+    author: null,
+    longestDayMiles: null,
+    pointCount: 0,
+    placeCount: 0,
+    photoCount: 0,
     ...overrides,
   }
 }
@@ -279,5 +284,37 @@ describe("ExploreDiscovery", () => {
     )
     expect(screen.getByRole("button", { name: /use this route/i })).toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /open your route/i })).not.toBeInTheDocument()
+  })
+})
+
+// M23 §4. The library's emptiness has two causes and they need different copy — this is
+// the anonymous root's first impression, and "widen the search" is nonsense advice when
+// there is nothing in the library to widen towards.
+describe("empty states", () => {
+  it("invites a contribution when the library itself is empty", async () => {
+    render(
+      <ExploreDiscovery
+        initial={{ items: [], total: 0, page: 1, pages: 1 }}
+        isAuthenticated={false}
+        ownedIds={[]}
+      />,
+    )
+    expect(await screen.findByText(/no routes have been shared yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/widen the search/i)).not.toBeInTheDocument()
+  })
+
+  it("advises widening the search once a filter is responsible for the miss", async () => {
+    mockSearch.mockResolvedValue({ items: [], total: 0, page: 1, pages: 1 })
+    render(
+      <ExploreDiscovery
+        initial={{ items: [item()], total: 1, page: 1, pages: 1 }}
+        isAuthenticated={false}
+        ownedIds={[]}
+      />,
+    )
+    await userEvent.type(screen.getByLabelText(/search routes by name/i), "nothing-matches")
+
+    expect(await screen.findByText(/no public routes match these filters/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no routes have been shared yet/i)).not.toBeInTheDocument()
   })
 })

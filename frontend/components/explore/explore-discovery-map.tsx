@@ -8,7 +8,18 @@ import type { ExploreItem, ExploreBounds } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RouteDayLayers } from "@/components/map/route-day-layers"
 import { MapCredits } from "@/components/map/map-credits"
-import { OSM_TILE_URL, OSM_ATTRIBUTION } from "@/lib/map/tiles"
+import {
+  OSM_TILE_URL,
+  OSM_ATTRIBUTION,
+  SEAMARK_TILE_URL,
+  SEAMARK_ATTRIBUTION,
+} from "@/lib/map/tiles"
+// Imported from their own modules, not the `chart` barrel: the barrel also exports
+// ForecastCell, which pulls in leaflet-velocity, and that library reads a global `L` at
+// import time. The barrel would drag the velocity engine into every explore bundle to
+// draw a graticule.
+import { Graticule } from "@/components/map/chart/graticule"
+import { ScaleBar } from "@/components/map/chart/scale-bar"
 
 type Props = {
   items: ExploreItem[]
@@ -17,6 +28,9 @@ type Props = {
   boundsEnabled: boolean
   onSelect: (id: string) => void
   onBoundsChange: (bounds: ExploreBounds) => void
+  // Seamark overlay + graticule + scale bar. On at the anonymous root, where this map
+  // is the product's chart; off inside the app shell.
+  chartFurniture?: boolean
 }
 
 // Reports the viewport bounds on every user pan/zoom while "filter to map area"
@@ -79,6 +93,7 @@ export default function ExploreDiscoveryMap({
   boundsEnabled,
   onSelect,
   onBoundsChange,
+  chartFurniture = false,
 }: Props) {
   const located = items.filter((i) => i.centroidLat != null && i.centroidLng != null)
   const center: [number, number] = located.length
@@ -88,7 +103,15 @@ export default function ExploreDiscoveryMap({
   return (
     <MapContainer center={center} zoom={5} className="h-full w-full" zoomControl={false}>
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
+      {/* The seamark overlay and the graticule/scale bar are the chart identity. They
+          ride on this map only where it IS the chart — the anonymous root — and stay
+          off /explore inside the app shell, where they would be instruments competing
+          with the result list for a much narrower map (M18's "loud instruments, hero
+          only" rule, which the retired landing map applied via its own `isHero`). */}
+      {chartFurniture && <TileLayer url={SEAMARK_TILE_URL} attribution={SEAMARK_ATTRIBUTION} />}
       <MapCredits />
+      {chartFurniture && <Graticule />}
+      {chartFurniture && <ScaleBar />}
       <BoundsWatcher enabled={boundsEnabled} onChange={onBoundsChange} />
       <SelectionFlyTo selectedId={selectedId} selectedRoute={selectedRoute} items={items} />
       {located.map((item) => {

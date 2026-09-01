@@ -130,6 +130,44 @@ test.describe("Public links stay public", () => {
         }
       })
 
+      // M23 §2. Reachability was never the problem — /explore has always returned 200 to
+      // an anonymous visitor. It was that nothing linked there: the landing emitted only
+      // /register, /login, /terms and /privacy, which is indistinguishable from a gate
+      // for anyone who does not already know the URL. So assert the library is ON the
+      // root, not merely that the root loads.
+      test("the anonymous root IS the route library", async ({ browser }) => {
+        const { context, page } = await openAs(browser, visitor.cookies)
+        try {
+          await page.goto("/")
+          await expectNotGated(page, "/")
+          await expect(page.getByLabel(/search routes by name/i)).toBeVisible()
+          // The pitch has to survive the library landing on top of it — ADR-034 dropped
+          // get.kayaktrek.app on the grounds that the root already is the pitch.
+          await expect(page.getByRole("link", { name: /^sign up$/i })).toBeVisible()
+        } finally {
+          await context.close()
+        }
+      })
+
+      // M23 §1. The (app) shell renders for anonymous visitors because /explore lives in
+      // it. It used to offer the full signed-in nav, every entry redirecting to /login.
+      test("the shell offers an anonymous visitor no doors that only lead to /login", async ({
+        browser,
+      }) => {
+        const { context, page } = await openAs(browser, visitor.cookies)
+        try {
+          await page.goto("/explore")
+          await expectNotGated(page, "/explore")
+          const nav = page.getByRole("navigation")
+          await expect(nav.getByText("Explore", { exact: true })).toBeVisible()
+          for (const gated of ["Dashboard", "Trips", "Gear", "Logs"]) {
+            await expect(nav.getByText(gated, { exact: true })).toHaveCount(0)
+          }
+        } finally {
+          await context.close()
+        }
+      })
+
       test("a shared route detail page opens and shows the route", async ({ browser }) => {
         const { context, page } = await openAs(browser, visitor.cookies)
         try {
