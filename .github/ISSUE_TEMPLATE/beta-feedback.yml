@@ -1,0 +1,42 @@
+name: Beta feedback
+description: Bug, confusing UX, or feedback from closed-beta testing (Play/web)
+title: "[Beta] "
+labels: ["beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing kayaktrek.app. If this came in through the tester Google Form,
+        transcribe it here rather than editing the form response in place — this is the
+        tracker of record.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Web
+        - Mobile (Android/Play)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what happened instead of what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: If you can reproduce it, the exact steps. If not, say so.
+    validations:
+      required: false
+  - type: input
+    id: tester-contact
+    attributes:
+      label: Tester contact (optional)
+      description: Email, only if you're OK being asked a follow-up question.
+    validations:
+      required: false
