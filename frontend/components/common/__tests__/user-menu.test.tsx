@@ -84,4 +84,29 @@ describe("UserMenu", () => {
     expect(await screen.findByRole("menuitem", { name: /^sign out$/i })).toBeInTheDocument()
     expect(screen.queryByText(account.mail)).not.toBeInTheDocument()
   })
+
+  // M23 §1. A null account means two different things — an anonymous visitor, and a signed-in
+  // one whose /api/user/me call failed. The test above pins the second; these pin the first.
+  // Only `isAuthenticated` separates them, which is why it is a prop and not `account == null`.
+  describe("anonymous visitor", () => {
+    it("offers a way in, not account actions", async () => {
+      render(<UserMenu account={null} isAuthenticated={false} />)
+      await openMenu()
+      expect(await screen.findByRole("menuitem", { name: /sign in/i })).toBeInTheDocument()
+      expect(screen.getByRole("menuitem", { name: /create account/i })).toBeInTheDocument()
+    })
+
+    it.each(["Profile", "Settings", "Sign out"])(
+      "does not offer %s, which would only redirect to /login",
+      async (label) => {
+        render(<UserMenu account={null} isAuthenticated={false} />)
+        await openMenu()
+        // Wait for the menu to actually open before asserting an absence.
+        expect(await screen.findByRole("menuitem", { name: /sign in/i })).toBeInTheDocument()
+        expect(
+          screen.queryByRole("menuitem", { name: new RegExp(`^${label}$`, "i") }),
+        ).not.toBeInTheDocument()
+      },
+    )
+  })
 })

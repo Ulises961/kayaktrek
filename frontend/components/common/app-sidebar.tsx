@@ -16,7 +16,7 @@ import packageJson from "@/package.json"
 // app shipped six releases past it, because nothing tied the two together.
 const APP_VERSION = packageJson.version
 
-export function AppSidebar() {
+export function AppSidebar({ isAuthenticated = true }: { isAuthenticated?: boolean }) {
   return (
     <Sidebar collapsible="icon">
       {/* Header holds only the collapse toggle. The brand lives in the app
@@ -34,7 +34,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <NavigationItems />
+              <NavigationItems isAuthenticated={isAuthenticated} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

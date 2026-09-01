@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useTransition } from "react"
-import { LogOutIcon, SettingsIcon, UserIcon } from "lucide-react"
+import { LogInIcon, LogOutIcon, SettingsIcon, UserIcon, UserPlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -27,9 +27,13 @@ interface UserMenuProps {
   // Null when /api/user/me did not resolve. The menu still renders: the sign-out
   // path must not depend on a fetch that can fail.
   account: UserMenuAccount | null
+  // Separate from `account` because a null account covers two opposite visitors: an
+  // anonymous one, and a signed-in one whose user record failed to load. The second
+  // still needs Sign out, so only this may switch the menu to Sign in.
+  isAuthenticated?: boolean
 }
 
-export function UserMenu({ account }: UserMenuProps) {
+export function UserMenu({ account, isAuthenticated = true }: UserMenuProps) {
   const [isSigningOut, startSignOut] = useTransition()
   const displayName = account ? formatPaddlerName(account) : ""
 
@@ -51,7 +55,24 @@ export function UserMenu({ account }: UserMenuProps) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        {account && (
+        {!isAuthenticated && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/login">
+                <LogInIcon />
+                Sign in
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/register">
+                <UserPlusIcon />
+                Create account
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
+
+        {isAuthenticated && account && (
           <>
             <div className="flex min-w-0 flex-col px-2 py-1.5">
               <span className="truncate text-sm font-medium">{displayName}</span>
@@ -61,34 +82,38 @@ export function UserMenu({ account }: UserMenuProps) {
           </>
         )}
 
-        <DropdownMenuItem asChild>
-          <Link href="/profile">
-            <UserIcon />
-            Profile
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <SettingsIcon />
-            Settings
-          </Link>
-        </DropdownMenuItem>
+        {isAuthenticated && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <UserIcon />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <SettingsIcon />
+                Settings
+              </Link>
+            </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+            <DropdownMenuSeparator />
 
-        {/* Keeping the menu open (`preventDefault`) is what makes the pending label
-            visible — sign-out is a round trip, and a menu that vanished on click
-            would leave nothing on screen saying it had started. */}
-        <DropdownMenuItem
-          disabled={isSigningOut}
-          onSelect={(event) => {
-            event.preventDefault()
-            startSignOut(() => logout())
-          }}
-        >
-          <LogOutIcon />
-          {isSigningOut ? "Signing out…" : "Sign out"}
-        </DropdownMenuItem>
+            {/* Keeping the menu open (`preventDefault`) is what makes the pending label
+                visible — sign-out is a round trip, and a menu that vanished on click
+                would leave nothing on screen saying it had started. */}
+            <DropdownMenuItem
+              disabled={isSigningOut}
+              onSelect={(event) => {
+                event.preventDefault()
+                startSignOut(() => logout())
+              }}
+            >
+              <LogOutIcon />
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

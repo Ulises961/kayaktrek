@@ -15,26 +15,30 @@ import { UserSchema, type User } from "@/lib/dtos/user"
  * below want opposite things — which is why the decision cannot live in here. Sharing one
  * cache also means a page may call either accessor without a second round trip.
  */
-const loadMe = cache(async (): Promise<{ user: User | null; sessionDead: boolean }> => {
-  // No credentials at all is not a dead session, it is an anonymous visitor. Asking the API
-  // would 401, fail to refresh, and bounce someone who never claimed to be signed in.
-  const cookieStore = await cookies()
-  const hasCredentials = cookieStore.get("access_token") || cookieStore.get("refresh_token")
-  if (!hasCredentials) return { user: null, sessionDead: false }
+const loadMe = cache(
+  async (): Promise<{ user: User | null; sessionDead: boolean; hasCredentials: boolean }> => {
+    // No credentials at all is not a dead session, it is an anonymous visitor. Asking the API
+    // would 401, fail to refresh, and bounce someone who never claimed to be signed in.
+    const cookieStore = await cookies()
+    const hasCredentials = Boolean(
+      cookieStore.get("access_token") || cookieStore.get("refresh_token"),
+    )
+    if (!hasCredentials) return { user: null, sessionDead: false, hasCredentials: false }
 
-  try {
-    const raw = await apiGet<unknown>("/api/user/me")
-    return { user: UserSchema.parse(raw), sessionDead: false }
-  } catch (error) {
-    // apiFetch signals an unrecoverable session by calling redirect("/login"), and Next
-    // implements redirect() by throwing. Catching it here turns the signal into a fact the
-    // callers can act on — getMe re-raises it, so it is deferred, never dropped.
-    if (isRedirectError(error)) return { user: null, sessionDead: true }
-    // Anything else (a 500, a schema mismatch) is a failed fetch, not a verdict on the
-    // session — degrade to null and let the page render what it can.
-    return { user: null, sessionDead: false }
-  }
-})
+    try {
+      const raw = await apiGet<unknown>("/api/user/me")
+      return { user: UserSchema.parse(raw), sessionDead: false, hasCredentials: true }
+    } catch (error) {
+      // apiFetch signals an unrecoverable session by calling redirect("/login"), and Next
+      // implements redirect() by throwing. Catching it here turns the signal into a fact the
+      // callers can act on — getMe re-raises it, so it is deferred, never dropped.
+      if (isRedirectError(error)) return { user: null, sessionDead: true, hasCredentials: true }
+      // Anything else (a 500, a schema mismatch) is a failed fetch, not a verdict on the
+      // session — degrade to null and let the page render what it can.
+      return { user: null, sessionDead: false, hasCredentials: true }
+    }
+  },
+)
 
 /**
  * The signed-in user, for pages that require one — every `(app)` route.
@@ -65,4 +69,17 @@ export async function getMe(): Promise<User | null> {
  */
 export async function getViewer(): Promise<User | null> {
   return (await loadMe()).user
+}
+
+/**
+ * Whether the visitor presented credentials at all — the anonymous/signed-in split the app
+ * *shell* needs, which is not the same question as `getViewer() !== null`.
+ *
+ * A signed-in visitor whose `/api/user/me` call failed also has a null viewer, and the shell
+ * must keep treating them as signed in: they still need Sign out, and offering them Sign in
+ * instead would be a lie the moment the API recovers. So chrome that changes shape by auth
+ * state reads this, while chrome that merely renders the user's details reads `getViewer()`.
+ */
+export async function hasSessionCredentials(): Promise<boolean> {
+  return (await loadMe()).hasCredentials
 }
