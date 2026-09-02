@@ -25,6 +25,11 @@ from Models.trip import TripStateType
 # a time bomb that silently changes what they cover on the day it passes.
 FUTURE_DATE = (date.today() + timedelta(days=60)).isoformat()
 PAST_DATE = (date.today() - timedelta(days=60)).isoformat()
+# Before FUTURE_DATE but still ahead of today — for the expiry-precedes-date 422 checks, which
+# need an ordering violation and nothing else. Relative for the same reason the two above are:
+# a literal here is what made TestTravelDocumentUpdate start failing on 2026-09-02, when the
+# date it pinned went past and the endpoint began (correctly) refusing to edit the document.
+EARLIER_THAN_FUTURE_DATE = (date.today() + timedelta(days=30)).isoformat()
 
 def _member_id(client, trip_id: str, headers: dict) -> str:
     """Return the TripMember.id for the calling user on the given trip."""
@@ -153,10 +158,10 @@ class TestTravelDocumentCreate:
     def test_leader_creates_document(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
-                          date="2026-08-15", confirmationNumber="ABC123")
+                          date=FUTURE_DATE, confirmationNumber="ABC123")
         assert doc["name"] == "Hotel Marisol"
         assert doc["type"] == "accommodation"
-        assert doc["date"] == "2026-08-15"
+        assert doc["date"] == FUTURE_DATE
         assert doc["confirmationNumber"] == "ABC123"
         assert "id" in doc
 
@@ -191,7 +196,8 @@ class TestTravelDocumentCreate:
         r = client.post(
             f"{TRAVEL_DOCUMENT_ENDPOINT}/{trip_id}/create",
             headers=trip_with_user2_as_crew["leader_headers"],
-            json={"type": "insurance", "name": "Policy", "date": "2026-08-15", "expiryDate": "2026-07-01"},
+            json={"type": "insurance", "name": "Policy", "date": FUTURE_DATE,
+                  "expiryDate": EARLIER_THAN_FUTURE_DATE},
         )
         assert r.status_code == 422
 
@@ -201,7 +207,7 @@ class TestTravelDocumentUpdate:
     def test_owner_can_update(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
-                          date="2026-09-01")
+                          date=FUTURE_DATE)
         r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                          headers=trip_with_user2_as_crew["crew_headers"],
                          json={"name": "Hotel Nordkapp"})
@@ -211,7 +217,7 @@ class TestTravelDocumentUpdate:
     def test_leader_can_update_any_document(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["crew_headers"],
-                          date="2026-09-01")
+                          date=FUTURE_DATE)
         r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                          headers=trip_with_user2_as_crew["leader_headers"],
                          json={"notes": "Leader override"})
@@ -222,7 +228,7 @@ class TestTravelDocumentUpdate:
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         # Leader creates a doc; crew (user_2) should not be able to update it
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
-                          date="2026-09-01")
+                          date=FUTURE_DATE)
         r = client.patch(f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
                          headers=trip_with_user2_as_crew["crew_headers"],
                          json={"name": "Hacked"})
@@ -235,11 +241,11 @@ class TestTravelDocumentUpdate:
     def test_expiry_before_date_returns_422(self, client, trip_with_user2_as_crew):
         trip_id = trip_with_user2_as_crew["trip"]["id"]
         doc = _create_doc(client, trip_id, trip_with_user2_as_crew["leader_headers"],
-                          date="2026-09-01")
+                          date=FUTURE_DATE)
         r = client.patch(
             f"{TRAVEL_DOCUMENT_ENDPOINT}/{doc['id']}",
             headers=trip_with_user2_as_crew["leader_headers"],
-            json={"expiryDate": "2026-08-01"},
+            json={"expiryDate": EARLIER_THAN_FUTURE_DATE},
         )
         assert r.status_code == 422
 
