@@ -28,7 +28,10 @@ export const metadata: Metadata = {
   // subject and the brand lives here alone — the metadata counterpart to
   // `BrandLockup` owning the wordmark.
   title: {
-    default: "Kayaktrek — sea-kayak expedition planner",
+    // Middle dot, not an em dash — same separator `BrandLockup`'s header subtitle
+    // uses and for the same reason: "Sea-kayak" already carries a hyphen, so a
+    // second dash-like mark beside it read as a stutter.
+    default: "Kayaktrek · Sea-kayak expedition planner",
     template: "%s · Kayaktrek",
   },
   description: "Plan, crew, and navigate your sea-kayak expedition",

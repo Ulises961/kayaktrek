@@ -12,15 +12,20 @@ import { CHART_INK as INK, CHART_PAPER_GLOW as PAPER_GLOW } from "./chart-theme"
 // per-zoom degree step; they pan and zoom with the map like a true chart graticule.
 // Roughly doubles the step as zoom drops a couple of levels, keeping on-screen
 // line density stable instead of the old fixed 1° floor packing in an
-// unreadable mesh once zoomed out past a regional view. Below z4 there's no
-// step that reads as a navigation aid rather than clutter at that scale, so
-// the grid stops rendering entirely (a chart graticule is a coastal/regional
-// tool, not a whole-ocean one) — see the `null` handling in `Graticule`.
+// unreadable mesh once zoomed out past a regional view. Below this zoom there's no
+// step that reads as a navigation aid rather than clutter at that scale, so the grid
+// stops rendering entirely (a chart graticule is a coastal/regional tool, not a
+// whole-ocean one) — see the `null` handling in `Graticule`. Exported so a map that
+// wants the grid gone a level or two before its own `minZoom` (rather than the two
+// limits coinciding, which reads as the grid abruptly vanishing right at the floor)
+// can derive that gap from this instead of guessing a second number that can drift.
+export const GRATICULE_MIN_ZOOM = 5
+
 function niceStep(zoom: number): number | null {
   if (zoom >= 10) return 0.25
   if (zoom >= 8) return 0.5
   if (zoom >= 6) return 1
-  if (zoom >= 4) return 2
+  if (zoom >= GRATICULE_MIN_ZOOM) return 2
   return null
 }
 

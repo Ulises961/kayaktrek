@@ -50,11 +50,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Separator orientation="vertical" className="h-4 md:hidden" />
               {/* The mark lives here, not in the sidebar, which collapses to
                   icons and would take the brand with it. Wordmark drops below
-                  md, where the breadcrumb needs the width more. */}
+                  md, where the breadcrumb needs the width more — the subtitle
+                  matches that same gate so it never shows without the wordmark. */}
               <BrandLockup
                 href={isAuthenticated ? "/dashboard" : "/"}
                 size={22}
                 wordmarkClassName="hidden text-sm md:inline"
+                subtitle="Sea-kayak expedition planner"
+                subtitleClassName="hidden md:inline-flex"
               />
               {/* min-w-0 is load-bearing from `sm` up, where the trail renders: a flex
                   item defaults to min-width:auto, so `flex-1` alone will not shrink this

@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ctaButtonClass } from "@/components/common/button-roles"
 import { cn } from "@/lib/utils"
 import { ExploreDiscovery } from "@/components/explore/explore-discovery"
-import {
-  Cartouche,
-  CartoucheEyebrow,
-  CartoucheTitle,
-  CartoucheRule,
-  CartoucheNote,
-} from "./cartouche"
+import { DiscoveryIntro } from "./discovery-intro"
 import type { ExplorePage } from "@/lib/dtos/itinerary"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
@@ -28,41 +22,41 @@ const chartLink =
  * `explore-discovery-map.tsx` has had selection, fly-to-bounds and bounds-filtering all
  * along. The two were drawing the same public itineraries; only one of them worked.
  *
- * The cartouche keeps its copy and its Sign up / Log in pair unchanged — the root is
- * still the product's pitch (ADR-034 dropped `get.kayaktrek.app` on exactly that
- * ground), so the library sits beneath the argument for it rather than replacing it.
+ * Sign up / Log in live in the header, not the pitch: `DiscoveryIntro` floats over the
+ * map and dismisses on its own "Explore" action, so it can't also be the one place
+ * carrying auth entry points — those need to survive the dismiss.
  */
 export function LandingExplore({ initial }: { initial: ExplorePage }) {
   return (
-    <div className="flex min-h-svh flex-col">
-      <ChartHeaderBar className="sticky top-0 z-[1001]" />
-
-      <div className="border-border border-b px-5 py-6 sm:px-9 sm:py-8">
-        <Cartouche className="max-w-[34rem] p-6 sm:p-7">
-          <CartoucheEyebrow>Sea-kayak expedition planning</CartoucheEyebrow>
-          <CartoucheTitle className="mt-3 text-[2rem] sm:text-[2.35rem]">
-            Plan the passage.
-            <br />
-            <em>Paddle it with your crew.</em>
-          </CartoucheTitle>
-          <CartoucheRule className="mt-4" />
-          <CartoucheNote className="mt-4">
-            A growing chart of paddled waters — add the one you know best.
-          </CartoucheNote>
-          <div className="mt-5 flex items-center gap-4">
+    // `h-svh`, not `min-h-svh`: ExploreDiscovery's desktop layout (`xl:h-full` on the map,
+    // `xl:overflow-y-auto` on the results column) needs a definite height to resolve its
+    // percentage-height chain against. `min-height` alone leaves this container's own height
+    // "auto" for CSS sizing purposes even though flex-grow gives it a real box on screen, so
+    // every descendant's `h-full`/`xl:h-full` collapsed to 0 (clamped up by `min-h-48`) —
+    // the map never got a height and the results column never got its internal scroll. An
+    // explicit height doesn't break shorter viewports: children still overflow visibly past
+    // it (nothing here clips), so the document scrolls exactly as it did with `min-h-svh`.
+    <div className="flex h-svh flex-col">
+      <ChartHeaderBar
+        className="sticky top-0 z-[1001]"
+        nav={
+          <>
+            <Link href="/login" className={chartLink}>
+              Log in
+            </Link>
             <Button asChild size="sm" className={cn(chartCta, ctaButtonClass)}>
               <Link href="/register">Sign up</Link>
             </Button>
-            <Button asChild variant="link" size="sm" className={chartLink}>
-              <Link href="/login">Log in</Link>
-            </Button>
-          </div>
-        </Cartouche>
-      </div>
+          </>
+        }
+      />
+
+      <DiscoveryIntro />
 
       {/* The library itself. `isAuthenticated={false}` is not a guess about the viewer —
           this component only ever renders for one, since a signed-in visitor is
-          redirected to /dashboard before it mounts. */}
+          redirected to /dashboard before it mounts. Unwrapped (no border/padding), same as
+          `(app)/explore/page.tsx` — a full-bleed map is the page, not a padded panel. */}
       <div className="min-h-0 flex-1">
         <ExploreDiscovery
           initial={initial}

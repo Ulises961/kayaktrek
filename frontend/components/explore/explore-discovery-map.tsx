@@ -18,7 +18,7 @@ import {
 // ForecastCell, which pulls in leaflet-velocity, and that library reads a global `L` at
 // import time. The barrel would drag the velocity engine into every explore bundle to
 // draw a graticule.
-import { Graticule } from "@/components/map/chart/graticule"
+import { Graticule, GRATICULE_MIN_ZOOM } from "@/components/map/chart/graticule"
 import { ScaleBar } from "@/components/map/chart/scale-bar"
 
 type Props = {
@@ -101,7 +101,18 @@ export default function ExploreDiscoveryMap({
     : [43, 13]
 
   return (
-    <MapContainer center={center} zoom={5} className="h-full w-full" zoomControl={false}>
+    <MapContainer
+      center={center}
+      zoom={4}
+      // Only clamped where the graticule renders (`chartFurniture`). One level below where
+      // `niceStep` stops returning a step, not the same floor — coinciding the two reads
+      // as the grid abruptly vanishing right at the edge, so the grid gets one zoom level
+      // of plain map (Graticule degrades cleanly there, no grid rather than a broken one)
+      // before the map itself is clamped.
+      minZoom={chartFurniture ? GRATICULE_MIN_ZOOM - 1 : undefined}
+      className="h-full w-full"
+      zoomControl={false}
+    >
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
       {/* The seamark overlay and the graticule/scale bar are the chart identity. They
           ride on this map only where it IS the chart — the anonymous root — and stay
