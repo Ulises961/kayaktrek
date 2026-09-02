@@ -18,6 +18,7 @@ import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
 import { reAuth, storeKeypair } from "@/lib/profile/actions"
 import { generateKeypair } from "@/lib/crypto/medical"
+import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 
 const Schema = z.object({ password: z.string().min(1, "Password is required") })
 type FormValues = z.infer<typeof Schema>
@@ -38,7 +39,10 @@ export function KeypairPromptBanner({ hasKeypair }: KeypairPromptBannerProps) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(Schema) })
 
-  if (done) return null
+  // Nothing to nag about while medical notes are parked — this banner exists only to set
+  // up the key that feature reads. Registration still generates a keypair silently, so
+  // unparking prompts only the accounts that predate that.
+  if (done || !MEDICAL_NOTES_ENABLED) return null
 
   // The keypair is generated here and the private half wrapped under the password before
   // anything is sent (M22). Re-auth is what proves to the server that this is the account

@@ -260,6 +260,14 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     environment:
+      # Medical notes was parked 2026-09-02 (docs/adr/safety-privacy.md) — off by default
+      # everywhere, production included. Hardcoded on here rather than
+      # ${MEDICAL_NOTES_ENABLED:-} because dev and e2e are where the parked feature stays
+      # alive: e2e/tests/08-medical-notes.spec.ts is its regression guard and can only run
+      # against a stack that still serves the endpoints. Pinned rather than passed through
+      # so an absent var in .env cannot silently flip the dev stack either way. Only
+      # `backend` needs it — no Celery task touches a gated route.
+      MEDICAL_NOTES_ENABLED: "true"
       # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
       # tile bytes through Flask, so the browser never fetches them from R2 and every cache
       # *hit* was paying a WAN round trip for nothing.

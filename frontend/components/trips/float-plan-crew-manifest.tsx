@@ -20,6 +20,7 @@ import { MedicalNotesViewer } from "@/components/trips/medical-notes-viewer"
 import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
 import { reAuth, getKeypair } from "@/lib/profile/actions"
 import { decrypt, decryptAsRecipient } from "@/lib/crypto/medical"
+import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 import type { TripMember } from "@/lib/dtos/trip-member"
 import { formatDayDate } from "@/lib/utils/date"
 import { formatVesselLength, formatPaddlerName } from "@/lib/user/format"
@@ -130,18 +131,20 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
         </div>
       </div>
 
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
-          Medical Notes
-        </p>
-        <MedicalNotesViewer
-          hasLeaderMedicalNotes={member.hasLeaderMedicalNotes ?? false}
-          notes={notes}
-          loading={loading}
-          error={notesError}
-          onView={() => onView(memberId)}
-        />
-      </div>
+      {MEDICAL_NOTES_ENABLED && (
+        <div>
+          <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">
+            Medical Notes
+          </p>
+          <MedicalNotesViewer
+            hasLeaderMedicalNotes={member.hasLeaderMedicalNotes ?? false}
+            notes={notes}
+            loading={loading}
+            error={notesError}
+            onView={() => onView(memberId)}
+          />
+        </div>
+      )}
 
       {member.floatPlanConfirmedAt ? (
         <p className="text-muted-foreground text-xs">

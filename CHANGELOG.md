@@ -7,6 +7,23 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [Unreleased]
+
+### Removed
+
+- **Medical notes have been withdrawn.** The app no longer asks for allergies, conditions, or
+  medication, and no longer stores them. Any notes previously saved — yours and any a crew
+  member shared with you as a trip leader — have been permanently deleted from the database
+  and cannot be recovered. Float plans still carry vessel details and emergency contacts,
+  which is what a search-and-rescue service asks for first.
+- The privacy policy's health-data section is gone with it. It now states plainly that the
+  Service does not collect health data.
+
+Why: holding medical information means holding a special category of personal data under the
+GDPR, and that responsibility is disproportionate for a feature nothing else in the app depends
+on, at this stage of the product. The feature is set aside, not deleted from the codebase, and
+could return.
+
 ## [0.7.1] - 2026-08-31
 
 Medical notes are now encrypted and decrypted on your own device instead of the server, and

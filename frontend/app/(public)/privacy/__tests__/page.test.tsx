@@ -6,22 +6,24 @@ import PrivacyPage from "../page"
 // ones a user relies on. A wording tweak that keeps the meaning should keep these passing; a
 // change that removes the claim should fail, because removing it is a substantive change.
 describe("PrivacyPage", () => {
-  // The claim has to match crypto_service.py: PBKDF2 from the user's password, performed
-  // server-side. Asserting the limit is stated, not just the protection, because overclaiming
-  // here is the failure that matters — a user discloses more than they would have.
-  it("states the encryption protects the stored data", () => {
+  // This assertion has now been inverted twice, and the reason is the same each time: the
+  // page must state whatever is currently true about health data, and a change in either
+  // direction is substantive. It first asserted the policy correctly *disclaimed* E2E; M22
+  // (2026-09-01) moved the crypto client-side and it asserted the E2E claim; parking the
+  // feature (2026-09-02) means the app collects no health data at all, so that is the claim
+  // now. If medical notes are unparked, the E2E section comes back and so does its assertion
+  // — but a stale "we encrypt your health data" on a page for an app that never asks for any
+  // is the failure this test exists to catch, and it is worse than the overclaim was.
+  it("states that no health data is collected", () => {
     render(<PrivacyPage />)
-    expect(screen.getByText(/cannot be read without that password/i)).toBeInTheDocument()
+    expect(screen.getByText(/does not collect health data/i)).toBeInTheDocument()
+    expect(screen.getByText(/holds no such information about you/i)).toBeInTheDocument()
   })
 
-  // M22 (2026-09) moved this crypto client-side, making the E2E claim true — this test used
-  // to assert the opposite (that the page correctly disclaimed E2E) for the same reason it now
-  // asserts the claim: removing either statement, in either direction, is the substantive
-  // change this file exists to catch.
-  it("states plainly that this is end-to-end encryption performed on the user's device", () => {
-    render(<PrivacyPage />)
-    expect(screen.getByText(/this is end-to-end encryption/i)).toBeInTheDocument()
-    expect(screen.getByText(/encryption and decryption happen on your device/i)).toBeInTheDocument()
+  it("does not describe collecting or encrypting medical information", () => {
+    const { container } = render(<PrivacyPage />)
+    expect(container.textContent).not.toMatch(/end-to-end encryption/i)
+    expect(container.textContent).not.toMatch(/special category data/i)
   })
 
   it("states that position sharing is off unless turned on", () => {

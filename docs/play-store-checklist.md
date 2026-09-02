@@ -151,9 +151,21 @@ listing suppression/removal. This app collects two categories worth getting righ
 
 ### 3b. Health-adjacent data (medical notes)
 
-This is the one requiring the most care, because it must be described **accurately, not
-omitted just because it's encrypted**, per the explicit instruction in both `plans/M9.md` and
-this task.
+> **Moot as of 2026-09-02 — declare "Health info" as NOT collected.** The medical-notes
+> feature was **parked** (`docs/adr/safety-privacy.md` "Parked (2026-09-02)"): the endpoints
+> 404, the UI surfaces do not render, and migration `e7a2c40d9b13` purged the stored
+> ciphertext, consent timestamps and access log. The app neither asks for nor holds health
+> data, so the careful E2E argument below does not need to be made at all — and making it
+> would be wrong, since it describes collection that no longer happens.
+>
+> That is the whole point of parking: the hardest item on this checklist stopped being an
+> item. Everything below is preserved for the day the feature is unparked, at which point
+> this section governs again **in full** — including the conclusion that "Health info" is
+> declared as collected.
+
+The rest of this section applies **only if medical notes are unparked.** It required the most
+care of anything here, because it must be described **accurately, not omitted just because
+it's encrypted**, per the explicit instruction in both `plans/M9.md` and this task.
 
 **Correction (2026-09-01):** this section originally claimed the feature (M3g) was "genuinely
 client-side E2E encrypted" when it was written (2026-08-26) — that was false at the time. The
@@ -272,7 +284,9 @@ because it interacts with §3/§4 (an email/password-only account is exactly wha
 Nothing found in this research **contradicts** `plans/M9.md`'s existing text — every item it
 flagged (tenure requirement revised more than once, background-location review, Data safety
 declaration needing to describe E2E-encrypted medical notes accurately, GDPR backend already
-built) held up under live-ish research. Three points sharpen or add to what the plan currently
+built) held up under live-ish research. The medical-notes half of that has since been removed
+rather than solved — the feature was parked on 2026-09-02 (§3b), so Health info is declared as
+not collected. Three points sharpen or add to what the plan currently
 says and are worth folding back in:
 
 1. **The 12-testers/14-days figure has been stable since December 2024 and is still current** —

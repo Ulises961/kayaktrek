@@ -123,9 +123,18 @@ def _build_spec(app: Flask) -> APISpec:
             blueprint_name = rule.endpoint.split(".", 1)[0]
             if blueprint_name in _EXCLUDED_BLUEPRINTS:
                 continue
-            seen_endpoints.add(rule.endpoint)
 
             view = app.view_functions[rule.endpoint]
+
+            # A route parked behind a feature gate (Api/features.py) 404s while its flag is
+            # off, so publishing it would describe a contract this deployment does not
+            # honour. Read from the same marker the decorator sets rather than a second
+            # list, for the same reason _auth_required is: the two cannot drift.
+            feature_flag = getattr(view, "_feature_flag", None)
+            if feature_flag and not app.config.get(feature_flag):
+                continue
+
+            seen_endpoints.add(rule.endpoint)
 
             # JWTService.authenticate_restful (Services/Middleware/auth_middleware.py) sets
             # _auth_required on its wrapper; functools.wraps' __dict__ copy propagates it through

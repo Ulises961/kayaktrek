@@ -15,8 +15,14 @@ COPY . .
 # runtime equivalent for a self-hosted image, unlike a server-only env var.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SSE_URL
+# Medical notes, parked 2026-09-02 (docs/adr/safety-privacy.md). Unset here on purpose, so
+# an image built without deciding anything ships the feature hidden. Unparking is passing
+# `true` as a build arg from _release-publish-run.yml — it cannot be a runtime toggle,
+# since the value is inlined into the client bundle above.
+ARG NEXT_PUBLIC_MEDICAL_NOTES
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_SSE_URL=${NEXT_PUBLIC_SSE_URL} \
+    NEXT_PUBLIC_MEDICAL_NOTES=${NEXT_PUBLIC_MEDICAL_NOTES} \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm build

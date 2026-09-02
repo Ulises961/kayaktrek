@@ -452,6 +452,17 @@ For WP6 to fold in:
 
 ## 11. Medical notes — what M22 changes for this spec (2026-09-01)
 
+> **Moot as of 2026-09-02 — nothing to sync.** The medical-notes feature was **parked**
+> (`docs/adr/safety-privacy.md` "Parked (2026-09-02)"): the endpoints 404, the UI does not
+> render it, and the stored ciphertext was purged. There are no notes for a device to hold,
+> so M9c has no medical-notes decision to make.
+>
+> **The question is sidestepped, not answered.** If medical notes are ever unparked, WP6's
+> open question comes back exactly as stated below — a leader needs crew notes when there is
+> no connectivity, and that is still in tension with what belongs on a phone that can be lost
+> at sea. Everything below stays because it is the work already done on that trade, and it is
+> the right starting point for whoever picks it up.
+
 WP1 §9's list above still stands unchanged; this section doesn't add a backend item, it changes
 what the answer to WP6's open question would cost if M9c says yes.
 

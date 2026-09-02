@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { FloatPlanMedicalTabSection } from "@/components/trips/float-plan-medical-tab-section"
+import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 import { FloatPlanFormSchema } from "@/lib/dtos/trip-member"
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
 import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
@@ -271,20 +272,24 @@ export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: Flo
         </div>
       )}
 
-      <Separator />
+      {MEDICAL_NOTES_ENABLED && (
+        <>
+          <Separator />
 
-      <div className="flex flex-col gap-4">
-        <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Medical notes</SectionLabel>
-        <p className="text-muted-foreground -mt-2 text-xs">
-          Private — visible only to the trip leader on the float plan.
-        </p>
-        <FloatPlanMedicalTabSection
-          tripId={tripId}
-          hasStoredNotes={!!currentMember.hasTripMedicalNotes}
-          sharedAt={currentMember.medicalNotesConsentAt ?? null}
-          profileResetAt={medicalNotesResetAt}
-        />
-      </div>
+          <div className="flex flex-col gap-4">
+            <SectionLabel icon={<ShieldAlertIcon className="size-4" />}>Medical notes</SectionLabel>
+            <p className="text-muted-foreground -mt-2 text-xs">
+              Private — visible only to the trip leader on the float plan.
+            </p>
+            <FloatPlanMedicalTabSection
+              tripId={tripId}
+              hasStoredNotes={!!currentMember.hasTripMedicalNotes}
+              sharedAt={currentMember.medicalNotesConsentAt ?? null}
+              profileResetAt={medicalNotesResetAt}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }

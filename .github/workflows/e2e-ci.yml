@@ -129,11 +129,16 @@ jobs:
       # build, so without this the "Start frontend" step below dies. Both NEXT_PUBLIC_*
       # origins are read at build time and lib/api/config.ts throws on an empty one in a
       # production build, so both must be present here even though no sidecar runs.
+      # NEXT_PUBLIC_MEDICAL_NOTES: medical notes was parked 2026-09-02 and is off by
+      # default (docs/adr/safety-privacy.md), but 08-medical-notes.spec.ts is the parked
+      # feature's regression guard and needs the surface built in. The backend half is
+      # already on here — CONFIG_MODE=testing forces MEDICAL_NOTES_ENABLED.
       - name: Build frontend
         working-directory: frontend
         env:
           NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
           NEXT_PUBLIC_SSE_URL: http://localhost:${{ env.CI_SSE_PORT }}
+          NEXT_PUBLIC_MEDICAL_NOTES: "true"
           NEXT_OUTPUT_STANDALONE: "0"
         run: pnpm build
 
@@ -144,6 +149,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:${{ env.CI_BACKEND_PORT }}
           NEXT_PUBLIC_SSE_URL: http://localhost:${{ env.CI_SSE_PORT }}
+          NEXT_PUBLIC_MEDICAL_NOTES: "true"
           NEXT_OUTPUT_STANDALONE: "0"
           PORT: ${{ env.CI_FRONTEND_PORT }}
         run: |

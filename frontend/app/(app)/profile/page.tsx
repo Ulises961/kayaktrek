@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { MedicalNotesSection } from "@/components/profile/medical-notes-section"
+import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 import { PublicProfileToggle } from "@/components/profile/public-profile-toggle"
 import { CertificationsSection } from "@/components/profile/certifications-section"
 import { StatsDashboard } from "@/components/stats/stats-dashboard"
@@ -236,20 +237,22 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HeartPulseIcon className="size-4" />
-              Medical notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MedicalNotesSection
-              hasStoredNotes={!!user.medicalNotesConsentAt}
-              resetAt={user.medicalNotesResetAt}
-            />
-          </CardContent>
-        </Card>
+        {MEDICAL_NOTES_ENABLED && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <HeartPulseIcon className="size-4" />
+                Medical notes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MedicalNotesSection
+                hasStoredNotes={!!user.medicalNotesConsentAt}
+                resetAt={user.medicalNotesResetAt}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Separator />

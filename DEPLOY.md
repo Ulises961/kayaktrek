@@ -74,6 +74,19 @@ pin stick across deploys. See "Rolling back" for the full form and its one real 
 `migrate` re-runs `alembic upgrade head && flask seed` on every `up` — both are idempotent, so
 this is safe to run on every deploy, not just the first one.
 
+> **One-time note for the deploy that carries `e7a2c40d9b13` (medical-notes parking, 2026-09-02).**
+> That migration **deletes data and cannot be undone** — every stored medical note, consent
+> timestamp and access-log row, on purpose (`docs/adr/safety-privacy.md` "Parked (2026-09-02)").
+> The plaintext was never on the server and the ciphertext is gone after this, so the only route
+> back is a database restore from a backup taken beforehand. Take one first if you want that
+> option; `kayak-backup.timer`'s most recent run is probably enough, but check its timestamp
+> rather than assuming. Keypairs are kept, so nothing else about accounts changes.
+>
+> No environment variable needs setting for this: `MEDICAL_NOTES_ENABLED` and
+> `NEXT_PUBLIC_MEDICAL_NOTES` are both off when unset, and the released image is built without
+> the frontend one. Unparking later means setting the backend var *and* rebuilding the frontend
+> image with the build arg — the client flag is inlined at build time and is not a runtime toggle.
+
 Check it came up clean:
 ```bash
 docker compose -f docker-compose.prod.yml ps
@@ -270,7 +283,7 @@ a support address of its own.
 |---|---|
 | `privacy@kayaktrek.app` | named in the privacy policy; GDPR requests |
 | `support@kayaktrek.app` | user-facing help; the address Play's store listing requires |
-| `no-reply@kayaktrek.app` | `MAIL_DEFAULT_SENDER` — outbound app mail only, not a mailbox. Set as `Kayaktrek <no-reply@kayaktrek.app>` (2026-08-31): a bare address in the From line is the shape both spam filters and cautious humans dislike, on a product that asks for medical notes. The display part must not be quoted in `.env`, or the quotes reach the header |
+| `no-reply@kayaktrek.app` | `MAIL_DEFAULT_SENDER` — outbound app mail only, not a mailbox. Set as `Kayaktrek <no-reply@kayaktrek.app>` (2026-08-31): a bare address in the From line is the shape both spam filters and cautious humans dislike, on a product that asks for float-plan and emergency-contact details. The display part must not be quoted in `.env`, or the quotes reach the header |
 
 Verified by SMTP probe against `route1.mx.cloudflare.net` rather than by trusting the dashboard —
 both accepted with `250`, and a made-up address on the same domain got `550 Address does not
