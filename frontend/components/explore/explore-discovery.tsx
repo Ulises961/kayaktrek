@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { ctaEchoClass } from "@/components/common/button-roles"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -15,11 +12,7 @@ import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { ListFilterPopover } from "@/components/common/list-filter-popover"
 import { cn } from "@/lib/utils"
 import { useDebouncedValue } from "@/lib/utils/debounce"
-import {
-  searchPublicItineraries,
-  fetchPublicRouteData,
-  forkItinerary,
-} from "@/lib/itinerary/actions"
+import { searchPublicItineraries, fetchPublicRouteData } from "@/lib/itinerary/actions"
 import type {
   ExploreItem,
   ExplorePage,
@@ -29,6 +22,7 @@ import type {
 } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
+import { resolveRouteName } from "@/lib/itinerary/format"
 import { SeasonBadge } from "./season-badge"
 import { RouteSignals } from "./route-signals"
 import { DifficultyBadge } from "@/components/common/difficulty-badge"
@@ -46,8 +40,6 @@ const SORTS: { value: ExploreSort; label: string }[] = [
 
 type Props = {
   initial: ExplorePage
-  isAuthenticated: boolean
-  ownedIds: string[]
   unit?: DistanceUnit
   // The anonymous root renders this same surface as the product's chart; /explore inside
   // the app shell renders it as a tool. Only the map's furniture differs.
@@ -66,7 +58,7 @@ function toNumber(value: string): number | undefined {
 function previewRoute(item: ExploreItem): RouteData {
   return {
     id: item.id,
-    name: item.name ?? "Untitled",
+    name: resolveRouteName(item.name),
     positions: item.previewPositions,
     days: [],
     boundaryColors: {},
@@ -77,15 +69,9 @@ function previewRoute(item: ExploreItem): RouteData {
 
 export function ExploreDiscovery({
   initial,
-  isAuthenticated,
-  ownedIds,
   unit = DISTANCE_UNIT.NM,
   chartFurniture = false,
 }: Props) {
-  const router = useRouter()
-  const [isForking, startFork] = useTransition()
-  const owned = new Set(ownedIds)
-
   // Filter inputs
   const [name, setName] = useState("")
   const debouncedName = useDebouncedValue(name, 300)
@@ -193,21 +179,6 @@ export function ExploreDiscovery({
     setMinDays("")
     setMaxDays("")
     setBoundsEnabled(false)
-  }
-
-  function handleFork(id: string) {
-    if (!isAuthenticated) {
-      router.push("/login")
-      return
-    }
-    startFork(async () => {
-      const result = await forkItinerary(id)
-      if (result.success) {
-        router.push(`/itinerary/${result.itineraryId}`)
-        return
-      }
-      toast.error(result.error)
-    })
   }
 
   return (
@@ -379,14 +350,16 @@ export function ExploreDiscovery({
                 )}
                 <div className="flex flex-col gap-2 p-3 pt-1.5">
                   <div className="flex items-start justify-between gap-2">
-                    {/* `text-primary` year-round, not just on hover — the button below
-                        already reads as an action; the title needs to read as a
-                        destination without a visitor having to find out by hovering. */}
+                    {/* `text-primary` so the card's one action reads as a destination
+                        without a visitor having to hover to discover it — there's no
+                        competing button on the card any more to leave it looking plain
+                        by comparison (M23 follow-up; the CTA now lives solely on the
+                        route detail page, once the visitor has actually seen the route). */}
                     <Link
                       href={`/routes/${item.id}`}
                       className="text-primary text-sm leading-tight font-medium hover:underline"
                     >
-                      {item.name ?? "Untitled"}
+                      {resolveRouteName(item.name)}
                     </Link>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <DifficultyBadge difficulty={item.difficulty} />
@@ -432,39 +405,6 @@ export function ExploreDiscovery({
                         </span>
                       )}
                     </p>
-                  )}
-                  {owned.has(item.id) ? (
-                    // The viewer authored this route — open the original, don't clone it.
-                    // No amber, and that is the rule working rather than an oversight:
-                    // opening something you already have brings nothing into existence.
-                    //
-                    // It does need its own hover, though. The default outline hover is
-                    // `bg-accent`, which is exactly the surface a *selected* card already
-                    // sits on — so on the card the pointer is over, the button dissolved
-                    // into its own background. Structure ink instead, legible on both.
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      // `border-transparent` at rest: the neutral outline made this the
-                      // most defined shape on the card, ahead of the title it sits
-                      // below. The border still appears, coloured, on hover — the outline
-                      // variant is kept for its focus ring and hit-area padding, not its
-                      // rest-state border.
-                      className="hover:border-primary hover:text-primary h-7 w-full border-transparent text-xs hover:bg-transparent"
-                    >
-                      <Link href={`/itinerary/${item.id}`}>Open your route</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn("h-7 w-full border-transparent text-xs", ctaEchoClass)}
-                      disabled={isForking}
-                      onClick={() => handleFork(item.id)}
-                    >
-                      Use this route
-                    </Button>
                   )}
                 </div>
               </Card>

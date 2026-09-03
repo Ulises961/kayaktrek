@@ -1,6 +1,15 @@
 import { daysBetween } from "@/lib/trips/format"
 import { addDaysIso } from "@/lib/utils/date"
 
+// The one canonical "Untitled" fallback. `?? "Untitled"` alone (the pattern this
+// replaced at every call site) only catches null/undefined — an itinerary saved
+// with its name field cleared to "" passes that check and renders as a blank
+// title, which on the explore card left nothing but badges above the CTA button
+// for a visitor to click.
+export function resolveRouteName(name: string | null | undefined): string {
+  return name?.trim() ? name : "Untitled"
+}
+
 // The one canonical place-to-place range label. Falls back to just the start name
 // when there's no distinct end name to show.
 export function formatRouteRange(

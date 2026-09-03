@@ -55,18 +55,10 @@ export function LandingExplore({ initial }: { initial: ExplorePage }) {
 
       <DiscoveryIntro />
 
-      {/* The library itself. `isAuthenticated={false}` is not a guess about the viewer —
-          this component only ever renders for one, since a signed-in visitor is
-          redirected to /dashboard before it mounts. Unwrapped (no border/padding), same as
+      {/* The library itself. Unwrapped (no border/padding), same as
           `(app)/explore/page.tsx` — a full-bleed map is the page, not a padded panel. */}
       <div className="min-h-0 flex-1">
-        <ExploreDiscovery
-          initial={initial}
-          isAuthenticated={false}
-          ownedIds={[]}
-          unit={DISTANCE_UNIT.NM}
-          chartFurniture
-        />
+        <ExploreDiscovery initial={initial} unit={DISTANCE_UNIT.NM} chartFurniture />
       </div>
 
       <footer className="border-border flex items-center justify-end gap-2 border-t px-4 py-3 sm:px-7">

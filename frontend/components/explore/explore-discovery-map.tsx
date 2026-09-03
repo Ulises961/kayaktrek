@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } 
 import "leaflet/dist/leaflet.css"
 import type { ExploreItem, ExploreBounds } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
+import { resolveRouteName } from "@/lib/itinerary/format"
 import { RouteDayLayers } from "@/components/map/route-day-layers"
 import { MapCredits } from "@/components/map/map-credits"
 import {
@@ -140,7 +141,7 @@ export default function ExploreDiscoveryMap({
             }}
             eventHandlers={{ click: () => onSelect(item.id) }}
           >
-            <Tooltip>{item.name ?? "Untitled"}</Tooltip>
+            <Tooltip>{resolveRouteName(item.name)}</Tooltip>
           </CircleMarker>
         )
       })}
