@@ -1,13 +1,15 @@
 import * as React from "react"
-import { SafeAreaView, View, type ViewProps } from "react-native"
+import { View, type ViewProps } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 
 import { cn } from "../../lib/cn"
 
 /**
  * The small set of layout atoms — full screen container, vertical/horizontal stacks.
- * Deliberately RN's own `SafeAreaView`/`View`, not `react-native-safe-area-context`:
- * no new native dependency belongs in a scaffold-only work package, and M9b's real
- * navigation shell is exactly where that call gets made for real screens.
+ * `Screen` now uses `react-native-safe-area-context`'s `SafeAreaView`, not RN's own
+ * (deprecated) one — installed as part of M9b WP1's real navigation shell, which is
+ * exactly the "real screens" moment this component's original comment deferred to.
+ * Requires `<SafeAreaProvider>` somewhere above it in the tree (app/_layout.tsx).
  */
 function Screen({ className, ...props }: ViewProps & { className?: string }) {
   return <SafeAreaView className={cn("flex-1 bg-background", className)} {...props} />

@@ -1,0 +1,90 @@
+import { API_URL, API_PREFIX } from "./config"
+import { getAccessToken } from "../auth/token-store"
+import { refreshSession } from "../auth/refresh"
+
+// Callers pass unversioned `/api/...` paths, same convention as the web client
+// (frontend/lib/api/client.ts) so a path can be copied between the two verbatim.
+function versionPath(path: string): string {
+  return path.replace(/^\/api(?=\/|$)/, API_PREFIX)
+}
+
+// Mirrors frontend/lib/api/client.ts's errorMessage exactly — same backend error shape
+// (Api/error_handlers.py: {error, message}), same rule that .message must always be
+// something a user can read, never the raw "METHOD /path failed: <status>" wrapper.
+async function errorMessage(method: string, path: string, res: Response): Promise<string> {
+  const technical = `${method} ${path} failed: ${res.status}`
+  let body: { message?: unknown } | null = null
+  try {
+    body = (await res.json()) as { message?: unknown } | null
+  } catch {
+    body = null
+  }
+  if (typeof body?.message === "string") return body.message
+  if (body?.message && typeof body.message === "object") {
+    const fieldErrors = Object.entries(body.message as Record<string, unknown>).map(
+      ([field, messages]) =>
+        `${field}: ${Array.isArray(messages) ? messages.join(", ") : String(messages)}`,
+    )
+    if (fieldErrors.length > 0) return fieldErrors.join("; ")
+  }
+  return technical
+}
+
+// Thrown when a request 401s and the one-shot refresh retry also fails — the mobile
+// analogue of the web client's redirect("/login") (apiFetch there signals a dead session
+// by throwing Next's redirect error). Here there's no throw-based navigation, so this is
+// a plain marker callers can check; refreshSession() itself already called
+// notifySessionExpired() to drive the (app) layout's <Redirect>, so callers generally
+// don't need to catch this specifically — it exists so a caller CAN distinguish "session
+// died" from "this particular request failed" if it needs to.
+export class SessionExpiredError extends Error {
+  constructor() {
+    super("Session expired")
+    this.name = "SessionExpiredError"
+  }
+}
+
+async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
+  const token = await getAccessToken()
+
+  const res = await fetch(`${API_URL}${versionPath(path)}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  })
+
+  if (res.status === 401 && retry) {
+    const refreshed = await refreshSession()
+    if (refreshed) return apiFetch(path, options, false)
+    throw new SessionExpiredError()
+  }
+
+  return res
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await apiFetch(path)
+  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
+  return res.json() as Promise<T>
+}
+
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
+  const text = await res.text()
+  return (text ? JSON.parse(text) : null) as T
+}
+
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await apiFetch(path, { method: "PATCH", body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(await errorMessage("PATCH", path, res))
+  return res.json() as Promise<T>
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const res = await apiFetch(path, { method: "DELETE" })
+  if (!res.ok) throw new Error(await errorMessage("DELETE", path, res))
+}
