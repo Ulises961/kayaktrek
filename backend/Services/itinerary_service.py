@@ -17,6 +17,7 @@ from Api.database import db
 from Models.day import Day
 from Models.difficulty import DifficultyType, VALID_DIFFICULTIES
 from Models.itinerary import Itinerary
+from Models.place import Place, PlaceVisibility
 from Models.point import Point, PointType
 from Models.trip import Trip
 from Models.user import User
@@ -24,7 +25,7 @@ from Schemas.day_schema import DaySchema
 from Schemas.itinerary_schema import ItinerarySchema, ItineraryUpdateSchema
 from Services.Utils.point_ordering import chain_in_order, walk_linked_list
 from Services.Utils.rdp import rdp_simplify
-from Services.Utils.route_distance import compute_total_miles
+from Services.Utils.route_distance import compute_day_miles, compute_total_miles
 from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
 
 logger = logging.getLogger(__name__)
@@ -349,10 +350,23 @@ class ItineraryService:
             )
             if itinerary.created_from_id is not None:
                 source_ids.add(itinerary.created_from_id)
+            day_miles = compute_day_miles(itinerary.days or [])
+            points = [point for day in numbered for point in (day.points or [])]
             items.append(
                 {
                     "id": str(itinerary.id),
                     "name": itinerary.name,
+                    # The closest available stand-in for `difficulty`, which is null on
+                    # every route in the library — an even split of the total says
+                    # nothing about whether one day is a slog.
+                    "longest_day_miles": max(day_miles.values()) if day_miles else None,
+                    "point_count": len(points),
+                    "photo_count": sum(
+                        1 for point in points for image in (point.images or []) if image.is_public
+                    ),
+                    "_owner_id": itinerary.user_id,
+                    "author": None,
+                    "place_count": 0,
                     "description": itinerary.description,
                     "difficulty": (
                         itinerary.difficulty.value
@@ -376,11 +390,63 @@ class ItineraryService:
             )
 
         authors = ItineraryService._authors_for_sources(source_ids)
+        # Batched for the whole page, the way fork authors already are — /explore is the
+        # app's most public endpoint and a per-row query would scale with page size.
+        owners = ItineraryService._authors_for_users(
+            {item["_owner_id"] for item in items if item["_owner_id"] is not None}
+        )
+        place_counts = ItineraryService._public_place_counts(
+            [UUID(item["id"]) for item in items]
+        )
         for item in items:
             source_id = item.pop("_source_id")
             if source_id is not None:
                 item["original_author"] = authors.get(source_id)
+            owner_id = item.pop("_owner_id")
+            if owner_id is not None:
+                item["author"] = owners.get(owner_id)
+            item["place_count"] = place_counts.get(UUID(item["id"]), 0)
         return items
+
+    @staticmethod
+    def _authors_for_users(user_ids: Set[UUID]) -> Dict[UUID, dict]:
+        """Batch-resolve users to the same author projection forks already use.
+
+        Separate from `_authors_for_sources` because that one keys by *itinerary* id
+        (the route a fork came from); this keys by user id (who wrote this route).
+        `linkable` mirrors profile_is_public so a card never deep-links a private profile.
+        """
+        if not user_ids:
+            return {}
+        rows = (
+            db.session.query(User.id, User.username, User.name, User.profile_is_public)
+            .filter(User.id.in_(user_ids))
+            .all()
+        )
+        return {
+            user_id: {"username": username, "name": name, "linkable": bool(is_public)}
+            for user_id, username, name, is_public in rows
+        }
+
+    @staticmethod
+    def _public_place_counts(itinerary_ids: List[UUID]) -> Dict[UUID, int]:
+        """How many PUBLIC places each itinerary carries, in one grouped query.
+
+        Private places are excluded: the card is an anonymous surface, and advertising a
+        count a visitor cannot then see would be a lie about how annotated the route is.
+        """
+        if not itinerary_ids:
+            return {}
+        rows = (
+            db.session.query(Place.itinerary_id, func.count(Place.id))
+            .filter(
+                Place.itinerary_id.in_(itinerary_ids),
+                Place.visibility == PlaceVisibility.PUBLIC,
+            )
+            .group_by(Place.itinerary_id)
+            .all()
+        )
+        return {itinerary_id: count for itinerary_id, count in rows}
 
     @staticmethod
     def _authors_for_sources(source_ids: Set[UUID]) -> Dict[UUID, dict]:

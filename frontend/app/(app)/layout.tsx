@@ -10,7 +10,7 @@ import { BreadcrumbProvider } from "@/components/common/breadcrumb-context"
 import { HeaderBreadcrumb } from "@/components/common/header-breadcrumb"
 import { BrandLockup } from "@/components/common/brand-lockup"
 import { Separator } from "@/components/ui/separator"
-import { getViewer } from "@/lib/user/me"
+import { getViewer, hasSessionCredentials } from "@/lib/user/me"
 import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import React from "react"
 
@@ -20,7 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // thing that demands a session. Everything below already treats a null user as normal.
   // Auth for the genuinely gated segments stays where it belongs, in proxy.ts, with each
   // page's own authenticated fetch redirecting if a live token is revoked mid-session.
-  const [user, pendingRequests] = await Promise.all([getViewer(), getPendingRequestsSummary()])
+  const [user, pendingRequests, isAuthenticated] = await Promise.all([
+    getViewer(),
+    getPendingRequestsSummary(),
+    hasSessionCredentials(),
+  ])
   const hasKeypair = user?.hasKeypair ?? true
 
   return (
@@ -46,11 +50,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Separator orientation="vertical" className="h-4 md:hidden" />
               {/* The mark lives here, not in the sidebar, which collapses to
                   icons and would take the brand with it. Wordmark drops below
-                  md, where the breadcrumb needs the width more. */}
+                  md, where the breadcrumb needs the width more — the subtitle
+                  matches that same gate so it never shows without the wordmark. */}
               <BrandLockup
-                href="/dashboard"
+                href={isAuthenticated ? "/dashboard" : "/"}
                 size={22}
                 wordmarkClassName="hidden text-sm md:inline"
+                subtitle="Sea-kayak expedition planner"
+                subtitleClassName="hidden md:inline-flex"
               />
               {/* min-w-0 is load-bearing from `sm` up, where the trail renders: a flex
                   item defaults to min-width:auto, so `flex-1` alone will not shrink this
@@ -61,12 +68,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="flex min-w-0 flex-1 items-center gap-3 ps-1">
                 <HeaderBreadcrumb />
               </div>
-              <RequestsMenu pendingRequests={pendingRequests} />
+              {/* Nobody is waiting on a visitor who is not signed in — the summary is
+                  empty for them by construction, so the bell would only ever be a dead
+                  control. */}
+              {isAuthenticated && <RequestsMenu pendingRequests={pendingRequests} />}
               <ThemeToggle />
               {/* Account-scoped chrome sits at the far right of the header, where
                   a signed-in user expects it — profile, settings and sign out all
                   hang off the avatar rather than off the sidebar's footer. */}
               <UserMenu
+                isAuthenticated={isAuthenticated}
                 account={
                   user && {
                     name: user.name,
@@ -83,7 +94,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 min-h-0 lets the content column scroll instead of pushing the
                 row taller than the viewport. */}
             <div className="flex min-h-0 w-full flex-1">
-              <AppSidebar />
+              <AppSidebar isAuthenticated={isAuthenticated} />
               <main className="flex w-full flex-col overflow-auto p-1 pt-4 md:p-4">
                 <KeypairPromptBanner hasKeypair={hasKeypair} />
                 <ContentArea>{children}</ContentArea>

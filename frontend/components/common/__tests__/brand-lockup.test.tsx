@@ -19,4 +19,14 @@ describe("BrandLockup", () => {
     render(<BrandLockup wordmarkClassName="hidden md:inline" />)
     expect(screen.getByRole("link", { name: /kayaktrek/i })).toBeInTheDocument()
   })
+
+  it("renders no subtitle unless the caller opts in", () => {
+    render(<BrandLockup />)
+    expect(screen.queryByText(/expedition planner/i)).not.toBeInTheDocument()
+  })
+
+  it("renders the subtitle when the caller passes one", () => {
+    render(<BrandLockup subtitle="Sea-kayak expedition planner" />)
+    expect(screen.getByText(/sea-kayak expedition planner/i)).toBeInTheDocument()
+  })
 })

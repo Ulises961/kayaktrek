@@ -1,0 +1,137 @@
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { ctaButtonClass } from "@/components/common/button-roles"
+import { cn } from "@/lib/utils"
+import {
+  Cartouche,
+  CartoucheEyebrow,
+  CartoucheTitle,
+  CartoucheRule,
+  CartoucheNote,
+} from "./cartouche"
+
+// Must match the `duration-300` Tailwind classes below — Tailwind can't read this
+// constant (it scans source text, not runtime values), so the two have to agree by hand.
+const EXIT_DURATION_MS = 300
+
+const DISMISSED_KEY = "kayaktrek:discovery-intro-dismissed"
+
+function wasDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(DISMISSED_KEY) === "1"
+  } catch {
+    // Private browsing / storage disabled — the intro just shows again next visit.
+    return false
+  }
+}
+
+function persistDismissed() {
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, "1")
+  } catch {
+    // Same fallback as above: dismissal only lasts this visit.
+  }
+}
+
+// Floats over the map, corner-anchored. Dismisses on "Explore", on a click anywhere
+// outside the card (the map underneath is the whole rest of the page, so most
+// dismissals will land there), or on the first scroll — both just trigger the same
+// close, there's nowhere an outside click could sensibly navigate to instead. The
+// backdrop below the card exists purely to pull the eye to it on first paint, not to
+// gate interaction with the map (hence pointer-events-none).
+export function DiscoveryIntro() {
+  const [state, setState] = useState<"open" | "closing" | "closed">("open")
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  function close() {
+    persistDismissed()
+    setState("closing")
+    window.setTimeout(() => setState("closed"), EXIT_DURATION_MS)
+  }
+
+  // A returning visitor who already dismissed the intro skips the open state
+  // entirely — no backdrop, no animation to replay. This has to run in an effect,
+  // not the initial `useState`, because `localStorage` isn't available during SSR:
+  // the first client paint still matches the server's ("open"), and this closes it
+  // before the visitor perceives the card as having shown.
+  useEffect(() => {
+    // localStorage is an external store with no earlier point to read it: it isn't
+    // available during SSR, so the state can't start "closed" without a
+    // server/client mismatch, and this mount is the first moment the client can
+    // check it. That one-time read is the synchronous setState the rule flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (wasDismissed()) setState("closed")
+  }, [])
+
+  useEffect(() => {
+    if (state !== "open") return
+    function handlePointerDown(event: MouseEvent) {
+      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
+        close()
+      }
+    }
+    // Below `xl` the map is hidden and the route cards are the page's own scrollable
+    // content (no map to float over), so the first scroll is the visitor moving past
+    // the card's fixed position — treat it the same as a click outside.
+    function handleScroll() {
+      close()
+    }
+    document.addEventListener("mousedown", handlePointerDown)
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [state])
+
+  if (state === "closed") return null
+
+  const closing = state === "closing"
+
+  return (
+    <>
+      {/* Lower-left-weighted scrim, same technique as the auth pages' ChartBackdrop but
+          tinted with ink, not paper: paper is a pale cream, near-invisible over the
+          explore map's light OSM basemap (ChartBackdrop gets away with paper because it
+          dims the dark Esri Ocean basemap instead). z-[900]: `.leaflet-container` is
+          `position` with `z-index: auto`, so it forms no stacking context and its panes
+          (tiles 200 … popups 700) compete directly with this sibling — 900 clears them
+          while staying under Leaflet's own controls (1000). */}
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none fixed inset-0 z-[900] transition-opacity duration-300 ease-out",
+          "bg-[radial-gradient(ellipse_at_10%_90%,color-mix(in_oklch,var(--chart-ink)_45%,transparent)_0%,color-mix(in_oklch,var(--chart-ink)_15%,transparent)_35%,transparent_75%)]",
+          closing && "opacity-0",
+        )}
+      />
+      <div
+        ref={cardRef}
+        className={cn(
+          "fixed inset-x-4 bottom-4 z-[1001] transition-all duration-300 ease-out sm:inset-x-auto sm:bottom-9 sm:left-9",
+          closing && "translate-y-2 opacity-0",
+        )}
+      >
+        <Cartouche className="max-w-[28rem] p-5 sm:p-7">
+          <CartoucheEyebrow>Sea-kayak expedition planning</CartoucheEyebrow>
+          <CartoucheTitle className="mt-3 text-[1.75rem] sm:text-[2.1rem]">
+            Plan the passage.
+            <br />
+            <em>Paddle it with your crew.</em>
+          </CartoucheTitle>
+          <CartoucheRule className="mt-4" />
+          <CartoucheNote className="mt-4">
+            A growing chart of paddled waters — add the one you know best.
+          </CartoucheNote>
+          <div className="mt-5">
+            <Button size="sm" className={ctaButtonClass} onClick={close}>
+              Explore
+            </Button>
+          </div>
+        </Cartouche>
+      </div>
+    </>
+  )
+}

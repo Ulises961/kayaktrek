@@ -12,20 +12,29 @@ import { usePathname, useRouter } from "next/navigation"
 import { UserGroupIcon } from "../icons/heroicons-user-group"
 import { SidebarMenuItem, SidebarMenuButton, useSidebar } from "../ui/sidebar"
 
-export function NavigationItems() {
+const EXPLORE_ITEM = { title: "Explore", url: "/explore", icon: CompassIcon }
+
+const AUTHENTICATED_ITEMS = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "Trips", url: "/trips", icon: KayakIcon },
+  { title: "Itineraries", url: "/itinerary", icon: SignpostBigIcon },
+  EXPLORE_ITEM,
+  { title: "Gear", url: "/gear", icon: PocketKnifeIcon },
+  { title: "Paddlers", url: "/paddlers", icon: UserGroupIcon },
+  { title: "Logs", url: "/logs", icon: NewspaperIcon },
+]
+
+// `/explore` is the only segment of this shell an anonymous visitor can use — it renders
+// here for the sidebar but stays out of proxy.ts's AUTH_GATED_PREFIXES. Offering the rest
+// sent every click to /login.
+const ANONYMOUS_ITEMS = [EXPLORE_ITEM]
+
+export function NavigationItems({ isAuthenticated = true }: { isAuthenticated?: boolean }) {
   const pathname = usePathname() || ""
   const router = useRouter()
   const { isMobile, setOpenMobile } = useSidebar()
 
-  const menuItems = [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
-    { title: "Trips", url: "/trips", icon: KayakIcon },
-    { title: "Itineraries", url: "/itinerary", icon: SignpostBigIcon },
-    { title: "Explore", url: "/explore", icon: CompassIcon },
-    { title: "Gear", url: "/gear", icon: PocketKnifeIcon },
-    { title: "Paddlers", url: "/paddlers", icon: UserGroupIcon },
-    { title: "Logs", url: "/logs", icon: NewspaperIcon },
-  ]
+  const menuItems = isAuthenticated ? AUTHENTICATED_ITEMS : ANONYMOUS_ITEMS
 
   return (
     <>

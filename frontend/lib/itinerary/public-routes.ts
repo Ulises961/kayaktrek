@@ -6,6 +6,7 @@ import { getDayColor } from "@/lib/itinerary/colors"
 import { buildBoundaryColorMap, type BoundaryColors } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
 import { walkDayRoutePoints } from "@/lib/itinerary/day-points"
+import { resolveRouteName } from "@/lib/itinerary/format"
 
 // A typed waypoint along a route — enough to drop the shared ringIcon marker
 // (stop vs position) without exposing private point notes.
@@ -211,7 +212,7 @@ function buildRouteData(src: RouteSource): RouteData {
 
   return {
     id: src.id ?? "",
-    name: src.name ?? "Untitled",
+    name: resolveRouteName(src.name),
     description: src.description ?? null,
     difficulty: src.difficulty ?? null,
     positions,

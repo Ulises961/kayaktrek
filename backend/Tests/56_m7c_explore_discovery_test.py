@@ -275,6 +275,11 @@ def test_explore_item_carries_no_trip_data(client, make_itinerary):
         "id", "name", "description", "difficulty", "totalMiles", "dayCount", "season",
         "centroidLat", "centroidLng", "createdFromId", "originalAuthor",
         "previewPositions",
+        # M23 §3 — each derived from the itinerary's own points, places, photos or owner.
+        # `author` is reached via Itinerary.user_id and carries only the projection
+        # `originalAuthor` already exposed (username, name, linkable); the raw `userId`
+        # stays off the row, which is what the assertion above pins.
+        "author", "longestDayMiles", "pointCount", "placeCount", "photoCount",
     }
 
 

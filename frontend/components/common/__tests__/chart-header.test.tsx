@@ -23,4 +23,14 @@ describe("ChartHeaderBar", () => {
     render(<ChartHeaderBar />)
     expect(screen.getByRole("button", { name: /toggle theme/i })).toBeInTheDocument()
   })
+
+  it("defaults the brand subtitle on, so every caller gets it without asking", () => {
+    render(<ChartHeaderBar />)
+    expect(screen.getByText(/sea-kayak expedition planner/i)).toBeInTheDocument()
+  })
+
+  it("lets a caller suppress the subtitle", () => {
+    render(<ChartHeaderBar brandSubtitle="" />)
+    expect(screen.queryByText(/expedition planner/i)).not.toBeInTheDocument()
+  })
 })

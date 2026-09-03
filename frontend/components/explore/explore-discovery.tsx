@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { ctaEchoClass } from "@/components/common/button-roles"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -15,11 +12,7 @@ import { RouteThumbnail } from "@/components/common/route-thumbnail"
 import { ListFilterPopover } from "@/components/common/list-filter-popover"
 import { cn } from "@/lib/utils"
 import { useDebouncedValue } from "@/lib/utils/debounce"
-import {
-  searchPublicItineraries,
-  fetchPublicRouteData,
-  forkItinerary,
-} from "@/lib/itinerary/actions"
+import { searchPublicItineraries, fetchPublicRouteData } from "@/lib/itinerary/actions"
 import type {
   ExploreItem,
   ExplorePage,
@@ -29,7 +22,9 @@ import type {
 } from "@/lib/dtos/itinerary"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { DISTANCE_UNIT, formatDistance, type DistanceUnit } from "@/lib/itinerary/distance"
+import { resolveRouteName } from "@/lib/itinerary/format"
 import { SeasonBadge } from "./season-badge"
+import { RouteSignals } from "./route-signals"
 import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { EmptyState } from "@/components/common/empty-state"
 
@@ -45,9 +40,10 @@ const SORTS: { value: ExploreSort; label: string }[] = [
 
 type Props = {
   initial: ExplorePage
-  isAuthenticated: boolean
-  ownedIds: string[]
   unit?: DistanceUnit
+  // The anonymous root renders this same surface as the product's chart; /explore inside
+  // the app shell renders it as a tool. Only the map's furniture differs.
+  chartFurniture?: boolean
 }
 
 function toNumber(value: string): number | undefined {
@@ -62,7 +58,7 @@ function toNumber(value: string): number | undefined {
 function previewRoute(item: ExploreItem): RouteData {
   return {
     id: item.id,
-    name: item.name ?? "Untitled",
+    name: resolveRouteName(item.name),
     positions: item.previewPositions,
     days: [],
     boundaryColors: {},
@@ -73,14 +69,9 @@ function previewRoute(item: ExploreItem): RouteData {
 
 export function ExploreDiscovery({
   initial,
-  isAuthenticated,
-  ownedIds,
   unit = DISTANCE_UNIT.NM,
+  chartFurniture = false,
 }: Props) {
-  const router = useRouter()
-  const [isForking, startFork] = useTransition()
-  const owned = new Set(ownedIds)
-
   // Filter inputs
   const [name, setName] = useState("")
   const debouncedName = useDebouncedValue(name, 300)
@@ -190,25 +181,14 @@ export function ExploreDiscovery({
     setBoundsEnabled(false)
   }
 
-  function handleFork(id: string) {
-    if (!isAuthenticated) {
-      router.push("/login")
-      return
-    }
-    startFork(async () => {
-      const result = await forkItinerary(id)
-      if (result.success) {
-        router.push(`/itinerary/${result.itineraryId}`)
-        return
-      }
-      toast.error(result.error)
-    })
-  }
-
   return (
     <div className="flex flex-col xl:h-full xl:flex-row">
-      {/* Map panel */}
-      <div className="h-[45vw] max-h-80 min-h-48 shrink-0 xl:h-full xl:max-h-none xl:min-w-0 xl:flex-1">
+      {/* Map panel — hidden below `xl`. On a phone the route cards, each carrying their
+          own thumbnail, are the whole point; a squeezed map above them was pure scroll
+          cost with no affordance the thumbnails don't already give. It reappears exactly
+          where the layout goes side-by-side, so there's no half-state where it's on
+          screen but too short to be useful. */}
+      <div className="hidden xl:block xl:h-full xl:max-h-none xl:min-w-0 xl:flex-1">
         <ExploreDiscoveryMap
           items={items}
           selectedId={selectedId}
@@ -216,6 +196,7 @@ export function ExploreDiscovery({
           boundsEnabled={boundsEnabled}
           onSelect={select}
           onBoundsChange={setBbox}
+          chartFurniture={chartFurniture}
         />
       </div>
 
@@ -321,14 +302,29 @@ export function ExploreDiscovery({
             {total === 0 ? "No routes match" : `${total} ${total === 1 ? "route" : "routes"}`}
           </p>
           {items.length === 0 && !isSearching ? (
-            // Filter-driven, so no ghost rows: the panel is warranted at this
+            // Two different emptinesses, and telling them apart matters most on the
+            // anonymous root, where this is a visitor's first impression. "Widen the
+            // search" is actively misleading when the library itself is empty and no
+            // filter is on — there is nothing to widen towards. Cold start gets an
+            // invitation instead; a filtered miss keeps the advice that helps.
+            //
+            // Filter-driven either way, so no ghost rows: the panel is warranted at this
             // size, the promise that content will arrive on its own is not.
-            <EmptyState
-              className="m-4"
-              title="No public routes match these filters."
-              description="Widen the search, or clear a filter to see the full library."
-              ghostRows={0}
-            />
+            activeFilterCount === 0 && debouncedName.trim() === "" ? (
+              <EmptyState
+                className="m-4"
+                title="No routes have been shared yet."
+                description="This library is built by the people who paddle it. Publish a route you know and it will show up here."
+                ghostRows={0}
+              />
+            ) : (
+              <EmptyState
+                className="m-4"
+                title="No public routes match these filters."
+                description="Widen the search, or clear a filter to see the full library."
+                ghostRows={0}
+              />
+            )
           ) : (
             items.map((item) => (
               <Card
@@ -344,15 +340,26 @@ export function ExploreDiscovery({
                 onMouseEnter={() => select(item.id)}
               >
                 {item.previewPositions.length > 1 && (
-                  <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
+                  // The thumbnail is part of the same click target as the title below —
+                  // a picture that does nothing when tapped reads as decoration, and the
+                  // "Use this route" button right underneath was winning every click that
+                  // was actually aimed at opening the route.
+                  <Link href={`/routes/${item.id}`} className="block">
+                    <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
+                  </Link>
                 )}
                 <div className="flex flex-col gap-2 p-3 pt-1.5">
                   <div className="flex items-start justify-between gap-2">
+                    {/* `text-primary` so the card's one action reads as a destination
+                        without a visitor having to hover to discover it — there's no
+                        competing button on the card any more to leave it looking plain
+                        by comparison (M23 follow-up; the CTA now lives solely on the
+                        route detail page, once the visitor has actually seen the route). */}
                     <Link
                       href={`/routes/${item.id}`}
-                      className="text-sm leading-tight font-medium hover:underline"
+                      className="text-primary text-sm leading-tight font-medium hover:underline"
                     >
-                      {item.name ?? "Untitled"}
+                      {resolveRouteName(item.name)}
                     </Link>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <DifficultyBadge difficulty={item.difficulty} />
@@ -381,6 +388,7 @@ export function ExploreDiscovery({
                       {item.description}
                     </p>
                   )}
+                  <RouteSignals item={item} unit={unit} />
                   {item.originalAuthor && (
                     <p className="text-muted-foreground text-xs">
                       Cloned from{" "}
@@ -397,34 +405,6 @@ export function ExploreDiscovery({
                         </span>
                       )}
                     </p>
-                  )}
-                  {owned.has(item.id) ? (
-                    // The viewer authored this route — open the original, don't clone it.
-                    // No amber, and that is the rule working rather than an oversight:
-                    // opening something you already have brings nothing into existence.
-                    //
-                    // It does need its own hover, though. The default outline hover is
-                    // `bg-accent`, which is exactly the surface a *selected* card already
-                    // sits on — so on the card the pointer is over, the button dissolved
-                    // into its own background. Structure ink instead, legible on both.
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className="hover:border-primary hover:text-primary h-7 w-full text-xs hover:bg-transparent"
-                    >
-                      <Link href={`/itinerary/${item.id}`}>Open your route</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn("h-7 w-full text-xs", ctaEchoClass)}
-                      disabled={isForking}
-                      onClick={() => handleFork(item.id)}
-                    >
-                      Use this route
-                    </Button>
                   )}
                 </div>
               </Card>

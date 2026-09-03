@@ -41,6 +41,11 @@ function item(overrides: Partial<ExploreItem> = {}): ExploreItem {
     previewPositions: [],
     createdFromId: null,
     originalAuthor: null,
+    author: null,
+    longestDayMiles: null,
+    pointCount: 0,
+    placeCount: 0,
+    photoCount: 0,
     ...overrides,
   }
 }

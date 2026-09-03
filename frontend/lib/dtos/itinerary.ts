@@ -143,6 +143,18 @@ export const ExploreItemSchema = z.object({
   previewPositions: z.array(z.tuple([z.number(), z.number()])).default([]),
   createdFromId: z.string().nullish(),
   originalAuthor: OriginalAuthorSchema.nullish(),
+  // M23 §3. Signals the backend derives from the route itself, because the two fields
+  // written to answer "is this worth my time" — description and difficulty — are null
+  // on the routes that actually exist.
+  //
+  // `author` is who wrote THIS route; `originalAuthor` above is who wrote the route a
+  // fork came from. Both carry `linkable`, so neither ever deep-links a private profile.
+  author: OriginalAuthorSchema.nullish(),
+  // The hardest day, not the average — an even split hides a slog.
+  longestDayMiles: z.number().nullish(),
+  pointCount: z.number().default(0),
+  placeCount: z.number().default(0),
+  photoCount: z.number().default(0),
 })
 export type ExploreItem = z.infer<typeof ExploreItemSchema>
 
