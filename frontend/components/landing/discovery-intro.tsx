@@ -16,20 +16,54 @@ import {
 // constant (it scans source text, not runtime values), so the two have to agree by hand.
 const EXIT_DURATION_MS = 300
 
-// Floats over the map, corner-anchored. Dismisses on "Explore" or on a click anywhere
+const DISMISSED_KEY = "kayaktrek:discovery-intro-dismissed"
+
+function wasDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(DISMISSED_KEY) === "1"
+  } catch {
+    // Private browsing / storage disabled — the intro just shows again next visit.
+    return false
+  }
+}
+
+function persistDismissed() {
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, "1")
+  } catch {
+    // Same fallback as above: dismissal only lasts this visit.
+  }
+}
+
+// Floats over the map, corner-anchored. Dismisses on "Explore", on a click anywhere
 // outside the card (the map underneath is the whole rest of the page, so most
-// dismissals will land there) — both just trigger the same close, there's nowhere an
-// outside click could sensibly navigate to instead. The backdrop below the card exists
-// purely to pull the eye to it on first paint, not to gate interaction with the map
-// (hence pointer-events-none).
+// dismissals will land there), or on the first scroll — both just trigger the same
+// close, there's nowhere an outside click could sensibly navigate to instead. The
+// backdrop below the card exists purely to pull the eye to it on first paint, not to
+// gate interaction with the map (hence pointer-events-none).
 export function DiscoveryIntro() {
   const [state, setState] = useState<"open" | "closing" | "closed">("open")
   const cardRef = useRef<HTMLDivElement>(null)
 
   function close() {
+    persistDismissed()
     setState("closing")
     window.setTimeout(() => setState("closed"), EXIT_DURATION_MS)
   }
+
+  // A returning visitor who already dismissed the intro skips the open state
+  // entirely — no backdrop, no animation to replay. This has to run in an effect,
+  // not the initial `useState`, because `localStorage` isn't available during SSR:
+  // the first client paint still matches the server's ("open"), and this closes it
+  // before the visitor perceives the card as having shown.
+  useEffect(() => {
+    // localStorage is an external store with no earlier point to read it: it isn't
+    // available during SSR, so the state can't start "closed" without a
+    // server/client mismatch, and this mount is the first moment the client can
+    // check it. That one-time read is the synchronous setState the rule flags.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (wasDismissed()) setState("closed")
+  }, [])
 
   useEffect(() => {
     if (state !== "open") return
