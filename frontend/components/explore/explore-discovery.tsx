@@ -212,8 +212,12 @@ export function ExploreDiscovery({
 
   return (
     <div className="flex flex-col xl:h-full xl:flex-row">
-      {/* Map panel */}
-      <div className="h-[45vw] max-h-80 min-h-48 shrink-0 xl:h-full xl:max-h-none xl:min-w-0 xl:flex-1">
+      {/* Map panel — hidden below `xl`. On a phone the route cards, each carrying their
+          own thumbnail, are the whole point; a squeezed map above them was pure scroll
+          cost with no affordance the thumbnails don't already give. It reappears exactly
+          where the layout goes side-by-side, so there's no half-state where it's on
+          screen but too short to be useful. */}
+      <div className="hidden xl:block xl:h-full xl:max-h-none xl:min-w-0 xl:flex-1">
         <ExploreDiscoveryMap
           items={items}
           selectedId={selectedId}

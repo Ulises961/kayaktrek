@@ -8,9 +8,11 @@ import { DiscoveryIntro } from "./discovery-intro"
 import type { ExplorePage } from "@/lib/dtos/itinerary"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
-// Chart-variant overrides on the DS Button: square neat-line corners + the wider
-// letter-spacing of engraved chart lettering.
-const chartCta = "rounded-[2px] text-xs tracking-[0.04em]"
+// Chart-variant overrides on the DS Button: the wider letter-spacing of engraved
+// chart lettering, at the header's more compact size. Corners stay the primitive's
+// default `rounded-md` — squaring them off read as a harder shape than the plain-text
+// "Log in" beside it, and the cartouche's own CTA (same role) is already rounded.
+const chartCta = "text-xs tracking-[0.04em]"
 const chartLink =
   "text-foreground hover:text-primary px-0 text-xs tracking-[0.02em] no-underline hover:no-underline"
 

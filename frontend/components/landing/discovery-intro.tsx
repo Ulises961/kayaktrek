@@ -38,8 +38,18 @@ export function DiscoveryIntro() {
         close()
       }
     }
+    // Below `xl` the map is hidden and the route cards are the page's own scrollable
+    // content (no map to float over), so the first scroll is the visitor moving past
+    // the card's fixed position — treat it the same as a click outside.
+    function handleScroll() {
+      close()
+    }
     document.addEventListener("mousedown", handlePointerDown)
-    return () => document.removeEventListener("mousedown", handlePointerDown)
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      window.removeEventListener("scroll", handleScroll)
+    }
   }, [state])
 
   if (state === "closed") return null

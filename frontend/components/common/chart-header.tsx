@@ -37,7 +37,14 @@ export function ChartHeaderBar({
     <header
       className={cn("chart-header flex items-center justify-between px-5 py-3 sm:px-7", className)}
     >
-      <BrandLockup wordmarkClassName="text-[0.95rem] sm:text-base" subtitle={brandSubtitle} />
+      {/* Wordmark drops below `sm`, same collapse-to-glyph the app shell uses when its
+          breadcrumb needs the width (`app/(app)/layout.tsx`) — here it's `nav` (Log in /
+          Sign up) that needs it. At 320 "Kayaktrek" plus both buttons has no room and
+          "Log in" wraps mid-word; the glyph alone leaves the nav its full width. */}
+      <BrandLockup
+        wordmarkClassName="hidden text-[0.95rem] sm:inline sm:text-base"
+        subtitle={brandSubtitle}
+      />
       <nav className="flex items-center gap-1 sm:gap-3">
         {nav}
         <ThemeToggle className="chart-header-toggle" />
