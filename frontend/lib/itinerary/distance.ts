@@ -130,3 +130,41 @@ export function dayRouteLegs<T extends DayPoint>(seed: T | null, dayPoints: T[])
   if (!usable) return routeLegs(dayPoints)
   return routeLegs([seed, ...dayPoints]).filter((leg) => leg.point !== seed)
 }
+
+export type StopGroup<T extends DayPoint> = {
+  point: T
+  isStart: boolean
+  legNm: number // from the previous stop; 0 for the day's first point
+  cumulativeNm: number
+  // The pass-through positions this stop's leg aggregated, each carrying its own
+  // running `legNm`/`cumulativeNm` from `routeLegs` — the figures a waypoint
+  // accordion shows on request (distance/time from the *last stop*, not the whole
+  // route). Empty when the previous stop is adjacent with nothing between.
+  via: RouteLeg<T>[]
+}
+
+/**
+ * Collapse `routeLegs` to one entry per stop, carrying the positions it
+ * aggregated rather than just a count — the shape both the builder's Route tab
+ * and the public route detail page need to render a stop list with an
+ * expand-on-request waypoint accordion underneath each one.
+ */
+export function groupStopsWithVia<T extends DayPoint>(dayPoints: T[]): StopGroup<T>[] {
+  const groups: StopGroup<T>[] = []
+  let via: RouteLeg<T>[] = []
+  for (const leg of routeLegs(dayPoints)) {
+    if (!leg.isAnchor) {
+      via.push(leg)
+      continue
+    }
+    groups.push({
+      point: leg.point,
+      isStart: leg.isStart,
+      legNm: leg.legNm,
+      cumulativeNm: leg.cumulativeNm,
+      via,
+    })
+    via = []
+  }
+  return groups
+}

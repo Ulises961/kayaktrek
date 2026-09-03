@@ -57,13 +57,10 @@ export type RouteData = {
   boundaryColors: Record<string, BoundaryColors>
   totalMiles: number | null
   dayCount: number
-}
-
-// One numbered day's at-a-glance summary for the public route breakdown.
-export type DaySummary = {
-  dayNumber: number
-  date: string | null
-  distanceNm: number
+  // The planning speed legs are estimated at (`legLabel`, `lib/itinerary/distance.ts`).
+  // Optional for the same reason `description`/`difficulty` are: a listing row or the
+  // landing chart builds a RouteData with none of these.
+  avgSpeedKnots?: number | null
 }
 
 // The minimal point shape both the public and authed DTOs satisfy — a linked-list
@@ -84,6 +81,7 @@ type RouteSource = {
   description?: string | null
   difficulty?: Difficulty | null
   totalMiles?: number | null
+  avgSpeedKnots?: number | null
   days: {
     dayNumber: number
     date?: string | null
@@ -221,6 +219,7 @@ function buildRouteData(src: RouteSource): RouteData {
     boundaryColors: buildBoundaryColorMap(numberedDays),
     totalMiles: src.totalMiles ?? null,
     dayCount: numberedDays.length,
+    avgSpeedKnots: src.avgSpeedKnots ?? null,
   }
 }
 
@@ -233,6 +232,7 @@ export function extractRouteData(itinerary: PublicItineraryDetail): RouteData {
     description: itinerary.description,
     difficulty: itinerary.difficulty,
     totalMiles: itinerary.totalMiles,
+    avgSpeedKnots: itinerary.avgSpeedKnots,
     days: itinerary.days.map((d) => ({
       dayNumber: d.dayNumber,
       date: d.date ?? null,
@@ -252,6 +252,7 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
     description: itinerary.description,
     difficulty: itinerary.difficulty,
     totalMiles: itinerary.totalMiles,
+    avgSpeedKnots: itinerary.avgSpeedKnots,
     days: (itinerary.days ?? []).map((d) => ({
       dayNumber: d.dayNumber,
       date: d.date ?? null,
@@ -260,17 +261,6 @@ export function extractItineraryRoute(itinerary: Itinerary): RouteData {
       endPointId: d.endPointId ?? null,
     })),
   })
-}
-
-// Per-day distances for the public detail breakdown. Derived straight from a route's
-// own day segments (§5's buildRouteData already walked each day once) rather than
-// re-walking the raw itinerary — see daySummariesFromRoute.
-export function daySummariesFromRoute(route: RouteData): DaySummary[] {
-  return route.days.map((d) => ({
-    dayNumber: d.dayNumber,
-    date: d.date,
-    distanceNm: d.distanceNm,
-  }))
 }
 
 export type RoutePhoto = {

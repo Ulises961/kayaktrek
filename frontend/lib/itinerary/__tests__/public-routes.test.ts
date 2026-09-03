@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { daySummariesFromRoute, extractRouteData, extractItineraryRoute } from "../public-routes"
+import { extractRouteData, extractItineraryRoute } from "../public-routes"
 import { haversineNm } from "../distance"
 import { getDayColor } from "../colors"
 import type { PublicItineraryDetail, PublicPoint } from "@/lib/dtos/itinerary"
@@ -19,60 +19,6 @@ function detail(days: PublicItineraryDetail["days"]): PublicItineraryDetail {
   return { id: "it-1", name: "Route", isPublic: true, totalMiles: 0, days, places: [] }
 }
 
-describe("daySummariesFromRoute", () => {
-  it("excludes day 0 and returns numbered days sorted", () => {
-    const summaries = daySummariesFromRoute(
-      extractRouteData(
-        detail([
-          { dayNumber: 2, points: [point("b", 44.1, 8.6)] },
-          { dayNumber: 0, points: [point("z", 44.0, 8.5)] },
-          { dayNumber: 1, points: [point("a", 44.0, 8.5)] },
-        ]),
-      ),
-    )
-    expect(summaries.map((s) => s.dayNumber)).toEqual([1, 2])
-  })
-
-  it("sums per-day distance from the ordered points", () => {
-    const a = point("a", 44.0, 8.5, "b")
-    const b = point("b", 44.2, 8.7)
-    const summaries = daySummariesFromRoute(
-      extractRouteData(detail([{ dayNumber: 1, date: "2026-07-01", points: [a, b] }])),
-    )
-    const expected = haversineNm(
-      { latitude: 44.0, longitude: 8.5 },
-      { latitude: 44.2, longitude: 8.7 },
-    )
-    expect(summaries[0].distanceNm).toBeCloseTo(expected, 5)
-    expect(summaries[0].date).toBe("2026-07-01")
-  })
-
-  it("walks the nextId linked list regardless of array order", () => {
-    const a = point("a", 44.0, 8.5, "b")
-    const b = point("b", 44.2, 8.7)
-    const ordered = daySummariesFromRoute(
-      extractRouteData(detail([{ dayNumber: 1, points: [a, b] }])),
-    )
-    const reversed = daySummariesFromRoute(
-      extractRouteData(detail([{ dayNumber: 1, points: [b, a] }])),
-    )
-    expect(reversed[0].distanceNm).toBeCloseTo(ordered[0].distanceNm, 5)
-  })
-
-  it("treats a single-point day as zero distance", () => {
-    const summaries = daySummariesFromRoute(
-      extractRouteData(detail([{ dayNumber: 1, points: [point("a", 44, 8.5)] }])),
-    )
-    expect(summaries[0].distanceNm).toBe(0)
-  })
-
-  it("returns an empty list when there are no numbered days", () => {
-    expect(daySummariesFromRoute(extractRouteData(detail([{ dayNumber: 0, points: [] }])))).toEqual(
-      [],
-    )
-  })
-})
-
 describe("extractRouteData — day segments", () => {
   it("groups points into per-day segments, excluding day 0", () => {
     const route = extractRouteData(
@@ -84,6 +30,34 @@ describe("extractRouteData — day segments", () => {
     )
     expect(route.days.map((d) => d.dayNumber)).toEqual([1, 2])
     expect(route.days[0].date).toBe("2026-07-01")
+  })
+
+  it("returns numbered days sorted even when the source is out of order", () => {
+    const route = extractRouteData(
+      detail([
+        { dayNumber: 2, points: [point("b", 44.1, 8.6)] },
+        { dayNumber: 0, points: [point("z", 44.0, 8.5)] },
+        { dayNumber: 1, points: [point("a", 44.0, 8.5)] },
+      ]),
+    )
+    expect(route.days.map((d) => d.dayNumber)).toEqual([1, 2])
+  })
+
+  it("walks the nextId linked list regardless of array order", () => {
+    const a = point("a", 44.0, 8.5, "b")
+    const b = point("b", 44.2, 8.7)
+    const ordered = extractRouteData(detail([{ dayNumber: 1, points: [a, b] }]))
+    const reversed = extractRouteData(detail([{ dayNumber: 1, points: [b, a] }]))
+    expect(reversed.days[0].distanceNm).toBeCloseTo(ordered.days[0].distanceNm, 5)
+  })
+
+  it("treats a single-point day as zero distance", () => {
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [point("a", 44, 8.5)] }]))
+    expect(route.days[0].distanceNm).toBe(0)
+  })
+
+  it("returns an empty day list when there are no numbered days", () => {
+    expect(extractRouteData(detail([{ dayNumber: 0, points: [] }])).days).toEqual([])
   })
 
   it("colours each day segment via getDayColor", () => {
@@ -138,6 +112,19 @@ describe("extractRouteData — day segments", () => {
       [44.1, 8.6],
     ])
     expect(route.points).toHaveLength(2)
+  })
+
+  it("carries avgSpeedKnots through — the figure the waypoint accordion estimates time from", () => {
+    const route = extractRouteData({
+      ...detail([{ dayNumber: 1, points: [point("a", 44.0, 8.5)] }]),
+      avgSpeedKnots: 3.5,
+    })
+    expect(route.avgSpeedKnots).toBe(3.5)
+  })
+
+  it("carries a null avgSpeedKnots as null, not undefined", () => {
+    const route = extractRouteData(detail([{ dayNumber: 1, points: [point("a", 44.0, 8.5)] }]))
+    expect(route.avgSpeedKnots).toBeNull()
   })
 })
 

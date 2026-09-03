@@ -7,6 +7,7 @@ import type { MapBuilderContextValue } from "@/lib/itinerary/map-builder-context
 import type { MapState } from "@/lib/itinerary/map-reducer"
 import type { Day } from "@/lib/dtos/day"
 import type { Point } from "@/lib/dtos/point"
+import { legLabel } from "@/lib/itinerary/distance"
 
 vi.mock("@/lib/weather/actions", () => ({
   fetchDayWeather: vi.fn().mockResolvedValue({ success: false }),
@@ -209,8 +210,8 @@ describe("FeatureDrawer — Route tab", () => {
     expect(screen.getByText("Launch")).toBeInTheDocument()
     expect(screen.getByText("Camp")).toBeInTheDocument()
     expect(screen.queryByText("Waypoint")).not.toBeInTheDocument()
-    // The collapsed position is signalled on the rail reaching Camp.
-    expect(screen.getByTitle("1 waypoint along the way")).toBeInTheDocument()
+    // The collapsed position is signalled by a toggle, not shown itself.
+    expect(screen.getByRole("button", { name: /1 waypoint along the way/i })).toBeInTheDocument()
   })
 
   it("clicking a waypoint calls setSelectedPointId with its id", async () => {
@@ -256,6 +257,125 @@ describe("FeatureDrawer — Route tab", () => {
       }),
     )
     expect(screen.getByText(/no waypoints/i)).toBeInTheDocument()
+  })
+})
+
+// ─── route tab: waypoint accordion ───────────────────────────────────────────
+
+describe("FeatureDrawer — waypoint accordion", () => {
+  function launchWaypointCamp() {
+    return makeCtx({
+      selectedDayId: DAY1_ID,
+      state: {
+        points: [
+          pt("p1", DAY1_ID, { name: "Launch", type: "stop" }),
+          pt("p2", DAY1_ID, { name: "Waypoint", type: "position" }),
+          pt("p3", DAY1_ID, { name: "Camp", type: "stop" }),
+        ],
+        pointOrder: ["p1", "p2", "p3"],
+        pendingPointId: null,
+        pendingPointName: null,
+        savingCount: 0,
+        days: [day(DAY1_ID, 1)],
+      },
+    })
+  }
+
+  it("does not render the position as a row until the toggle is opened", () => {
+    renderWithCtx(launchWaypointCamp())
+    expect(screen.queryByTestId("route-waypoint-via")).not.toBeInTheDocument()
+  })
+
+  it("reveals the position on toggle, expanded with its distance/time from the last stop", async () => {
+    renderWithCtx(launchWaypointCamp())
+    const toggle = screen.getByRole("button", { name: /1 waypoint along the way/i })
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+
+    await userEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+    const via = screen.getByTestId("route-waypoint-via")
+    expect(via).toHaveTextContent("Waypoint")
+    // avgSpeedKnots: 2.5 (fixture default); asserts against the real helper's output
+    // (every fixture point sits at the same coordinates, so this is legLabel(0, ...))
+    // rather than a hand-typed string that would drift if the fixture changed.
+    expect(via).toHaveTextContent(legLabel(0, 2.5, "nm"))
+  })
+
+  it("falls back to the absolute route ordinal when the position has no name", async () => {
+    const ctx = makeCtx({
+      selectedDayId: DAY1_ID,
+      state: {
+        points: [
+          pt("p1", DAY1_ID, { name: "Launch", type: "stop" }),
+          pt("p2", DAY1_ID, { type: "position" }), // unnamed
+          pt("p3", DAY1_ID, { name: "Camp", type: "stop" }),
+        ],
+        pointOrder: ["p1", "p2", "p3"],
+        pendingPointId: null,
+        pendingPointName: null,
+        savingCount: 0,
+        days: [day(DAY1_ID, 1)],
+      },
+    })
+    renderWithCtx(ctx)
+    await userEvent.click(screen.getByRole("button", { name: /1 waypoint along the way/i }))
+    // "p2" is 2nd overall in pointOrder — matches the map's own marker numbering.
+    expect(screen.getByTestId("route-waypoint-via")).toHaveTextContent("Point 2")
+  })
+
+  it("places the toggle before the stop it leads to, matching paddling order", async () => {
+    // Launch -> Waypoint -> Camp: Waypoint is paddled *before* reaching Camp, so
+    // the accordion revealing it must read between Launch and Camp, not after Camp.
+    renderWithCtx(launchWaypointCamp())
+    await userEvent.click(screen.getByRole("button", { name: /1 waypoint along the way/i }))
+
+    const rowTexts = screen.getAllByText(/^(Launch|Waypoint|Camp)$/).map((el) => el.textContent)
+    expect(rowTexts).toEqual(["Launch", "Waypoint", "Camp"])
+  })
+
+  it("collapses again on a second click of the toggle", async () => {
+    renderWithCtx(launchWaypointCamp())
+    const toggle = screen.getByRole("button", { name: /1 waypoint along the way/i })
+    await userEvent.click(toggle)
+    expect(screen.getByTestId("route-waypoint-via")).toBeInTheDocument()
+
+    await userEvent.click(toggle)
+    expect(screen.queryByTestId("route-waypoint-via")).not.toBeInTheDocument()
+  })
+
+  it("clicking a revealed position calls setSelectedPointId with its own id, not the stop's", async () => {
+    const setSelectedPointId = vi.fn()
+    renderWithCtx({ ...launchWaypointCamp(), setSelectedPointId })
+    await userEvent.click(screen.getByRole("button", { name: /1 waypoint along the way/i }))
+    await userEvent.click(screen.getByTestId("route-waypoint-via"))
+    expect(setSelectedPointId).toHaveBeenCalledWith("p2")
+  })
+
+  it("names a named position instead of falling back to its ordinal", async () => {
+    const ctx = makeCtx({
+      selectedDayId: DAY1_ID,
+      state: {
+        points: [
+          pt("p1", DAY1_ID, { name: "Launch", type: "stop" }),
+          pt("p2", DAY1_ID, { name: "Rocky point", type: "position" }),
+          pt("p3", DAY1_ID, { name: "Camp", type: "stop" }),
+        ],
+        pointOrder: ["p1", "p2", "p3"],
+        pendingPointId: null,
+        pendingPointName: null,
+        savingCount: 0,
+        days: [day(DAY1_ID, 1)],
+      },
+    })
+    renderWithCtx(ctx)
+    await userEvent.click(screen.getByRole("button", { name: /1 waypoint along the way/i }))
+    expect(screen.getByTestId("route-waypoint-via")).toHaveTextContent("Rocky point")
+  })
+
+  it("does not render a toggle for two adjacent stops with nothing between them", () => {
+    renderWithCtx(makeCtx({ selectedDayId: DAY1_ID })) // fixture default: p1, p2, both stops-by-position (first/last anchors)
+    expect(screen.queryByTestId("route-waypoint-via-toggle")).not.toBeInTheDocument()
   })
 })
 

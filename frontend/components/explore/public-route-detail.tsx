@@ -5,7 +5,7 @@ import { BrandLockup } from "@/components/common/brand-lockup"
 import { SeasonBadge } from "@/components/explore/season-badge"
 import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
-import { daySummariesFromRoute, routePhotos } from "@/lib/itinerary/public-routes"
+import { routePhotos } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RoutePlaces } from "@/components/explore/route-places"
 import { RouteGallery } from "@/components/explore/route-gallery"
@@ -52,7 +52,6 @@ export function PublicRouteDetail({
   unit = DISTANCE_UNIT.NM,
 }: Props) {
   const isHistory = tripState === TRIP_STATE.PAST || tripState === TRIP_STATE.ARCHIVED
-  const daySummaries = daySummariesFromRoute(route)
 
   return (
     <div
@@ -103,7 +102,7 @@ export function PublicRouteDetail({
             {route.description}
           </p>
         )}
-        <RouteDayBreakdown days={daySummaries} unit={unit} />
+        <RouteDayBreakdown days={route.days} avgSpeedKnots={route.avgSpeedKnots} unit={unit} />
         <RoutePlaces places={places} />
         <RouteGallery photos={routePhotos(route)} />
         {author && (

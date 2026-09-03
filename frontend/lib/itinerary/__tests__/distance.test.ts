@@ -10,6 +10,7 @@ import {
   legLabel,
   routeLegs,
   dayRouteLegs,
+  groupStopsWithVia,
 } from "../distance"
 
 describe("haversineNm", () => {
@@ -204,5 +205,42 @@ describe("dayRouteLegs", () => {
     expect(legs.filter((l) => l.isAnchor).map((l) => l.point.id)).toEqual(["b", "c"])
     // "c" is the day's last point, so it is an anchor and reports its leg from "b".
     expect(legs.find((l) => l.point.id === "c")!.legNm).toBeCloseTo(30, 0)
+  })
+})
+
+describe("groupStopsWithVia", () => {
+  // Points along a meridian (lon 0); each 0.5° latitude step ≈ 30 nm.
+  const at = (lat: number, type: string, id: string) => ({ id, latitude: lat, longitude: 0, type })
+
+  it("carries the intervening positions on the stop that follows them", () => {
+    const groups = groupStopsWithVia([
+      at(0, "stop", "a"),
+      at(0.5, "position", "b"),
+      at(1.0, "stop", "c"),
+    ])
+    expect(groups.map((g) => g.point.id)).toEqual(["a", "c"])
+    const [, stopC] = groups
+    expect(stopC.via.map((leg) => leg.point.id)).toEqual(["b"])
+    // "b"'s own legNm is its running distance from "a", not the leg to "c".
+    expect(stopC.via[0].legNm).toBeCloseTo(30, 0)
+    expect(stopC.legNm).toBeCloseTo(60, 0) // a -> c via b
+  })
+
+  it("reports an empty via list for two adjacent stops", () => {
+    const groups = groupStopsWithVia([at(0, "stop", "a"), at(0.5, "stop", "b")])
+    expect(groups[1].via).toEqual([])
+  })
+
+  it("attaches multiple intervening positions in order", () => {
+    const groups = groupStopsWithVia([
+      at(0, "stop", "a"),
+      at(0.2, "position", "b"),
+      at(0.4, "position", "c"),
+      at(0.6, "stop", "d"),
+    ])
+    const stopD = groups[1]
+    expect(stopD.via.map((leg) => leg.point.id)).toEqual(["b", "c"])
+    // Each position's legNm is its own running distance from "a", not from its neighbour.
+    expect(stopD.via[1].legNm).toBeGreaterThan(stopD.via[0].legNm)
   })
 })

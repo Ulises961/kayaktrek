@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
   X,
-  Anchor,
   CircleDot,
   ChevronRight,
   MapPin,
@@ -15,10 +14,10 @@ import {
 import { cn } from "@/lib/utils"
 import { useMapBuilder } from "@/lib/itinerary/map-builder-context"
 import { useDayConditions } from "@/lib/weather/use-day-conditions"
-import { routeLegs, legLabel, formatDistance } from "@/lib/itinerary/distance"
+import { groupStopsWithVia, legLabel, formatDistance } from "@/lib/itinerary/distance"
 import { formatDayDate } from "@/lib/utils/date"
 import { TRIP_STATE } from "@/lib/dtos/trip"
-import { POINT_TYPE } from "@/lib/dtos/point"
+import { railConnectorClass, RailTypeIcon, ViaDots } from "@/components/common/route-rail"
 import { WeatherGrid } from "@/components/weather/weather-grid"
 import { SeaGrid } from "@/components/weather/sea-grid"
 import { TidalEntryForm } from "@/components/weather/tidal-entry-form"
@@ -34,11 +33,6 @@ const TABS: { id: Tab; label: string; Icon: React.ElementType }[] = [
   { id: "forecast", label: "Forecast", Icon: Cloud },
   { id: "tides", label: "Tides", Icon: Waves },
 ]
-
-function TypeIcon({ type }: { type: string }) {
-  if (type === POINT_TYPE.STOP) return <Anchor className="size-3.5 shrink-0" />
-  return <CircleDot className="size-3.5 shrink-0" />
-}
 
 export function FeatureDrawer() {
   const {
@@ -58,6 +52,11 @@ export function FeatureDrawer() {
 
   const [tab, setTab] = useState<Tab>("route")
   const contentRef = useRef<HTMLDivElement>(null)
+  // Which arriving stop's pass-through positions are expanded — keyed by the
+  // stop's point id, several can be open at once. Positions are never shown by
+  // default (they are geometry, not destinations, per the leg-attribution ADR);
+  // this is the on-request path a paddler takes to see the shape between stops.
+  const [openVia, setOpenVia] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0
@@ -106,32 +105,26 @@ export function FeatureDrawer() {
         .filter((p): p is NonNullable<typeof p> => p != null && p.dayId === selectedDayId)
     : []
 
-  // Collapse to anchors, carrying `via` — how many pass-through positions were
-  // aggregated into the leg reaching this stop. `via > 0` marks the rail dashed so
-  // the list reads as a continuous route rather than a dislocated set of points.
-  const stops: {
-    point: (typeof dayPoints)[number]
-    idx: number
-    legText: string | null
-    totalText: string | null
-    via: number
-  }[] = []
-  let via = 0
-  for (const leg of routeLegs(dayPoints)) {
-    if (!leg.isAnchor) {
-      via++
-      continue
-    }
-    stops.push({
-      point: leg.point,
-      idx: absIndexById.get(leg.point.id ?? "") ?? 0,
-      legText: leg.isStart ? null : legLabel(leg.legNm, avgSpeedKnots, distanceUnit),
-      totalText: leg.isStart
-        ? null
-        : `${formatDistance(leg.cumulativeNm, distanceUnit)} ${distanceUnit} total`,
-      via,
+  // Collapse to anchors, each carrying the pass-through positions aggregated into
+  // the leg reaching it — `via.length > 0` marks the rail dashed so the list reads
+  // as a continuous route rather than a dislocated set of points, and is also what
+  // the accordion toggle below expands on request.
+  const stops = groupStopsWithVia(dayPoints).map((group) => ({
+    ...group,
+    idx: absIndexById.get(group.point.id ?? "") ?? 0,
+    legText: group.isStart ? null : legLabel(group.legNm, avgSpeedKnots, distanceUnit),
+    totalText: group.isStart
+      ? null
+      : `${formatDistance(group.cumulativeNm, distanceUnit)} ${distanceUnit} total`,
+  }))
+
+  function toggleVia(stopId: string) {
+    setOpenVia((prev) => {
+      const next = new Set(prev)
+      if (next.has(stopId)) next.delete(stopId)
+      else next.add(stopId)
+      return next
     })
-    via = 0
   }
 
   const hasForecast = !!weather?.weatherStates?.length || !!sea?.seaStates?.length
@@ -223,63 +216,118 @@ export function FeatureDrawer() {
                 {stops.map(({ point, idx, legText, totalText, via }, i) => {
                   // A dashed rail segment above a stop means positions were aggregated
                   // into the leg reaching it; solid means the two stops are adjacent.
-                  const topDashed = via > 0
-                  const bottomDashed = (stops[i + 1]?.via ?? 0) > 0
-                  const connector = (dashed: boolean, hidden: boolean) =>
-                    cn(
-                      "w-0 flex-1",
-                      hidden
-                        ? ""
-                        : dashed
-                          ? "border-l border-dashed border-border"
-                          : "border-l border-border",
-                    )
+                  const topDashed = via.length > 0
+                  const bottomDashed = (stops[i + 1]?.via.length ?? 0) > 0
+                  const isLastRow = i === stops.length - 1
+                  const isViaOpen = openVia.has(point.id ?? "")
                   return (
-                    <button
-                      key={point.id}
-                      type="button"
-                      data-testid="route-waypoint"
-                      onClick={() => setSelectedPointId(point.id!)}
-                      className="border-border/40 hover:bg-muted/40 flex w-full items-stretch gap-2.5 border-b px-3 text-left transition-colors last:border-0"
-                    >
-                      {/* timeline rail: stops strung on a thread, dashed where positions collapse */}
-                      <div className="relative flex w-4 shrink-0 flex-col items-center self-stretch">
-                        <span aria-hidden className={connector(topDashed, i === 0)} />
-                        <span
-                          className="bg-background text-muted-foreground z-10 my-1 flex"
-                          title={
-                            via > 0
-                              ? `${via} waypoint${via === 1 ? "" : "s"} along the way`
-                              : undefined
-                          }
-                        >
-                          <TypeIcon type={point.type ?? "position"} />
-                        </span>
-                        <span
-                          aria-hidden
-                          className={connector(bottomDashed, i === stops.length - 1)}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 py-2.5">
-                        <p className="truncate text-[11px] font-medium">
-                          {point.name || `Point ${idx}`}
-                        </p>
-                        {legText ? (
-                          <p className="text-muted-foreground font-mono text-[9px]">
-                            {legText}
-                            {totalText && (
-                              <span className="text-muted-foreground/60"> · {totalText}</span>
-                            )}
-                          </p>
-                        ) : (
-                          <p className="text-muted-foreground/60 font-mono text-[9px]">start</p>
+                    <div key={point.id}>
+                      {/* Positions are pass-through geometry, never shown by default — this
+                          is the on-request path to see the shape between two stops (name,
+                          and distance/time run from the *last stop*, not the whole route).
+                          The rail carries its own glyphs — one dot per aggregated position,
+                          capped so a long crossing doesn't stretch the rail — rather than a
+                          chevron or a count in words: the rail itself reads anchor —
+                          waypoint(s) — anchor. Exact count and names are still there, in the
+                          expanded rows below and in the aria-label, for whoever the dots'
+                          own count doesn't reach. */}
+                      {via.length > 0 && (
+                        <div className="border-border/40 border-b">
+                          <button
+                            type="button"
+                            data-testid="route-waypoint-via-toggle"
+                            aria-expanded={isViaOpen}
+                            aria-label={`${via.length} waypoint${via.length === 1 ? "" : "s"} along the way`}
+                            onClick={() => toggleVia(point.id!)}
+                            className="hover:bg-muted/40 flex w-full items-center py-1.5 pr-3 pl-3 transition-colors"
+                          >
+                            <span className="flex w-4 shrink-0 flex-col items-center self-stretch">
+                              <span
+                                aria-hidden
+                                className="border-border w-0 flex-1 border-l border-dashed"
+                              />
+                              <ViaDots count={via.length} />
+                              <span
+                                aria-hidden
+                                className="border-border w-0 flex-1 border-l border-dashed"
+                              />
+                            </span>
+                          </button>
+                          {isViaOpen && (
+                            <div className="bg-muted/20 flex flex-col">
+                              {via.map((leg) => (
+                                <button
+                                  key={leg.point.id}
+                                  type="button"
+                                  data-testid="route-waypoint-via"
+                                  onClick={() => setSelectedPointId(leg.point.id!)}
+                                  className="hover:bg-muted/40 flex w-full items-center gap-2.5 py-1.5 pr-3 pl-3 text-left transition-colors"
+                                >
+                                  <span className="flex w-4 shrink-0 justify-center">
+                                    <CircleDot className="text-muted-foreground/70 size-3" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <p className="truncate text-[10px] font-medium">
+                                      {leg.point.name ||
+                                        `Point ${absIndexById.get(leg.point.id ?? "") ?? 0}`}
+                                    </p>
+                                    <p className="text-muted-foreground font-mono text-[9px]">
+                                      {legLabel(leg.legNm, avgSpeedKnots, distanceUnit)}
+                                    </p>
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        data-testid="route-waypoint"
+                        onClick={() => setSelectedPointId(point.id!)}
+                        className={cn(
+                          "border-border/40 hover:bg-muted/40 flex w-full items-stretch gap-2.5 px-3 text-left transition-colors",
+                          !isLastRow && "border-b",
                         )}
-                      </div>
-                      <ChevronRight
-                        className="text-muted-foreground/40 size-3 shrink-0 self-center"
-                        aria-hidden
-                      />
-                    </button>
+                      >
+                        {/* timeline rail: stops strung on a thread, dashed where positions collapse */}
+                        <div className="relative flex w-4 shrink-0 flex-col items-center self-stretch">
+                          {/* Hidden when the toggle row above already draws this segment
+                              (via.length > 0), or when this is the first row with nothing
+                              above it at all. */}
+                          <span
+                            aria-hidden
+                            className={railConnectorClass(topDashed, i === 0 || via.length > 0)}
+                          />
+                          <span className="bg-background text-muted-foreground z-10 my-1 flex">
+                            <RailTypeIcon type={point.type ?? "position"} className="size-3.5" />
+                          </span>
+                          <span
+                            aria-hidden
+                            className={railConnectorClass(bottomDashed, isLastRow)}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 py-2.5">
+                          <p className="truncate text-[11px] font-medium">
+                            {point.name || `Point ${idx}`}
+                          </p>
+                          {legText ? (
+                            <p className="text-muted-foreground font-mono text-[9px]">
+                              {legText}
+                              {totalText && (
+                                <span className="text-muted-foreground/60"> · {totalText}</span>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground/60 font-mono text-[9px]">start</p>
+                          )}
+                        </div>
+                        <ChevronRight
+                          className="text-muted-foreground/40 size-3 shrink-0 self-center"
+                          aria-hidden
+                        />
+                      </button>
+                    </div>
                   )
                 })}
               </>
