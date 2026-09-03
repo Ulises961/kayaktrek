@@ -111,6 +111,11 @@ trap cleanup EXIT
 # compose stack actually publishes, letting an explicit override win.
 export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://localhost:5000}"
 export NEXT_PUBLIC_SSE_URL="${NEXT_PUBLIC_SSE_URL:-http://localhost:5001}"
+# Medical notes was parked 2026-09-02 and is off by default (docs/adr/safety-privacy.md).
+# 08-medical-notes.spec.ts is the parked feature's regression guard, so the harness has to
+# build the surface in — the compose stack it talks to already pins the backend half on.
+# Pinned, not defaulted: this build must match that stack, not whatever is in .env.local.
+export NEXT_PUBLIC_MEDICAL_NOTES=true
 
 echo ">>> Building frontend (isolated dist dir) for the e2e run..."
 NEXT_DIST_DIR=.next-e2e NEXT_OUTPUT_STANDALONE=0 pnpm --dir frontend build

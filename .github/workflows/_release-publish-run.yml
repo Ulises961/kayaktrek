@@ -107,6 +107,13 @@ jobs:
       # get set once a domain exists (ADR-034) without touching this workflow.
       # lib/api/config.ts throws on an empty one, so an unset repo Variable fails the build
       # here rather than shipping a bundle whose every request is a relative URL.
+      #
+      # NEXT_PUBLIC_MEDICAL_NOTES is the exception that must NOT fail on empty: medical notes
+      # are parked (docs/adr/safety-privacy.md "Parked", 2026-09-02) and an unset repo
+      # Variable is exactly the intended state — it arrives as "", the flag reads false, and
+      # the image ships with the feature hidden. It is a build arg rather than a runtime env
+      # var because the value is inlined into the client bundle; unparking means setting the
+      # Variable to `true` and cutting a new tag, not restarting a container.
       - name: Build and push frontend image
         uses: docker/build-push-action@v7
         with:
@@ -115,6 +122,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_SSE_URL=${{ vars.NEXT_PUBLIC_SSE_URL }}
+            NEXT_PUBLIC_MEDICAL_NOTES=${{ vars.NEXT_PUBLIC_MEDICAL_NOTES }}
           tags: ${{ steps.meta.outputs.frontend_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

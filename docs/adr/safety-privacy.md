@@ -1,8 +1,8 @@
 ---
 id: safety-privacy
 title: "Safety & Privacy: Float Plan, Medical Notes & Sharing"
-abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + client-side ECIES encryption for the leader-visible copy (password-derived key, never sent to the server — M22 made this genuinely zero-knowledge), frozen snapshot sharing via opaque token with 30-day post-trip expiry.
-implementation: shipped
+abstract: Float plan as computed view (no FloatPlan table), medical notes with copy-on-join + client-side ECIES encryption for the leader-visible copy (password-derived key, never sent to the server — M22 made this genuinely zero-knowledge) but PARKED since 2026-09-02 and not offered, frozen snapshot sharing via opaque token with 30-day post-trip expiry.
+implementation: shipped; medical notes parked 2026-09-02 (see "Parked")
 status: accepted
 date: 2026-06-10
 deciders: []
@@ -32,6 +32,57 @@ A float plan is a standard safety practice in sea kayaking: a document left with
 The float plan is accessible during `building` and `happening` states. It is visible only to the trip leader and the shore contact link holder — never publicly accessible regardless of itinerary visibility.
 
 The shore contact is stored as structured fields on `Logistics` — not a free-text string: `shore_contact_name`, `shore_contact_email`, `shore_contact_phone`, `shore_contact_relationship`. Structured fields enable the missed-checkpoint email alert (M8) to reach a validated address without additional model changes.
+
+---
+
+## Parked (2026-09-02)
+
+**Everything below about medical notes describes a feature that is built, tested, and not
+offered.** Read the rest of this document as a design record, not as a description of what
+the running app does.
+
+The decision: the feature carries real legal weight — GDPR Art. 9 special-category health
+data, a Play Data-safety declaration, a section of the privacy policy — in exchange for a
+convenience on an app that is not yet in alpha. Nothing else in the product is load-bearing
+on it. That trade is wrong at this stage, and it is wrong in a way that gets *worse* with
+every tester who stores something, because parking later means deleting more.
+
+Parking is not dropping. The work stays in the repository in full and is unparked by an
+environment variable:
+
+| Layer | Gate | Off by default |
+|-------|------|----------------|
+| Backend | `MEDICAL_NOTES_ENABLED` (`Api/features.py`, `Api/config.py`) | All nine endpoints 404, ahead of auth; the paths leave the OpenAPI contract |
+| Frontend | `NEXT_PUBLIC_MEDICAL_NOTES` (`lib/features.ts`) | Profile section, float-plan tab section, leader's crew-manifest viewer, and keypair prompt banner all stop rendering |
+| Data | migration `e7a2c40d9b13` | Stored notes, consent timestamps, and the access log are purged; keypairs are kept |
+
+Four things worth knowing about the shape of it:
+
+- **404, not 403.** A parked endpoint should look like one that was never built. The gate
+  sits above the auth decorators so an anonymous probe and an authenticated one get the
+  same answer — a route that 403s for one and 404s for the other still advertises itself.
+- **Both flags are needed.** Hiding a control does not stop an endpoint accepting data, and
+  a live control calling a 404 endpoint is a broken page rather than a parked feature.
+- **Keypairs are deliberately kept**, and registration still generates one silently. They
+  are generic X25519 material, not health data. Dropping them would make unparking a
+  migration plus a re-key prompt for every existing account instead of one variable, and
+  would break the password-change rewrap path for no benefit.
+- **The test suites force the flag on** (`TestingConfig`, `vitest.config.ts`, the dev/e2e
+  compose stack and `run-live-stack.sh`) so that parking the feature does not quietly stop
+  testing it. The flag-*off* path has its own file on each side
+  (`Tests/81_medical_notes_parked_test.py`, `lib/__tests__/features-parked.test.tsx`).
+
+The privacy policy's health-data section was removed rather than marked unavailable, and
+section 2 now states plainly that the Service does not collect health data. **A policy
+describing processing the app does not perform is a liability, not a courtesy** — and the
+flag, not the presence of code in the repository, is what determines which is true. If the
+feature is unparked, that section has to come back in the same change.
+
+This also settles, for now, M9's open question of whether medical notes sync to the device
+(`docs/adr/mobile-offline.md`) — there is nothing to sync — and removes Health info from
+the Play Data-safety declaration (`docs/play-store-checklist.md` §3b). Both reopen on
+unparking, and the mobile question reopens unresolved: parking sidesteps it rather than
+answering it.
 
 ---
 
@@ -290,3 +341,4 @@ structurally mirrored on the existing token/re-auth machinery rather than invent
 | Trip-invite email/username oracle (M12 §N) | — | 2026-07-13 | Removed the `email`/`username` invite-lookup branches from `POST /trip/<id>/invite` (frontend `InviteForm` removed in the same change) — buddy-picker `userId` invite is now the sole path; accepted cost is invite-a-non-buddy becomes connect-then-invite. |
 | **"E2E encryption" corrected in every downstream doc** | — | 2026-08-31 | This document's threat-model paragraph has always been precise — password-wrapped key at rest, *not* zero-knowledge, with the explicit warning to *"be precise about this distinction anywhere this feature is described as 'E2E encryption' (e.g. the root `CLAUDE.md` milestone table)"*. That is exactly where it drifted, and further: root `CLAUDE.md`'s M3g row read "Medical notes E2E encryption"; `docs/play-store-checklist.md` §3b argued for a softer Play health-data declaration on the grounds the feature is *"genuinely client-side E2E encrypted … the server stores only ciphertext it cannot read"*; the live **Terms of Use** told users their notes were *"end-to-end encrypted and only ever decryptable by your trip leader"* — false twice over, since the server sees plaintext and password on every operation, and the owner can decrypt too. **Even this file's own frontmatter abstract said "ECIES E2E encryption"**, contradicting its body. Caught while writing the privacy policy, which would otherwise have shipped the same false claim to users and to Play. All corrected; the Terms section now defers to the privacy policy rather than restating crypto. **The design is unchanged and remains sound** — a stolen database or backup is unreadable, which is the threat it was built for. The Play consequence is concrete: Health info is declared as collected, plainly, because the E2E carve-out does not apply. Pattern worth naming, the fourth instance in one day: a caveat recorded in one document does not reach the places that describe the same thing, even when the caveat names those places |
 | **M22 made the E2E claim true** | — | 2026-09-01 | The 2026-08-31 entry above corrected every doc to admit the design was *not* E2E; this entry is the fix to the design itself, closing that gap for good rather than continuing to caveat it. `frontend/lib/crypto/medical.ts` reimplements `Services/crypto_service.py` byte-for-byte and every medical-notes operation (registration keypair, save/read own notes, share-with-leader, leader read, password-change rewrap) moved client-side; no endpoint accepts a password for any of it. No migration was needed — the wrapped-key format didn't change, so client-side code reads every ciphertext the old server-side code produced, verified against a pre-M22 account's real row. WP4 (password-change rewrap) closed 2026-09-01: `PATCH /me/password` now takes an optional rewrapped-key triple instead of doing the unwrap/rewrap itself, and rejects the request (400) if the account has a keypair and the triple is missing, so a keypair can never be silently orphaned by a password change. |
+| **Medical notes parked** | — | 2026-09-02 | The feature is built, tested and **not offered**. Two flags (`MEDICAL_NOTES_ENABLED`, `NEXT_PUBLIC_MEDICAL_NOTES`), off by default everywhere, plus migration `e7a2c40d9b13` purging stored notes/consent/access-log while keeping keypairs. Reasoning: Art. 9 special-category data, a Play Data-safety declaration and a privacy-policy section, all carried for a convenience nothing else depends on, on an app not yet in alpha — and the cost of parking only grows with every tester who stores something. **Not a reversal of M22**; that work is what made the parked state cheap to hold, since the server holds no plaintext to worry about either way. The privacy policy's health-data section was **removed**, not marked unavailable, and §2 now states the Service does not collect health data — describing processing the app does not perform is a liability. Side effects: M9's medical-notes-on-device question is moot for now (sidestepped, not answered) and Health info leaves the Play declaration; both reopen on unparking. See "Parked (2026-09-02)" above for the full shape. |

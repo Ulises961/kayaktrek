@@ -23,6 +23,14 @@ interface SectionProps {
 //
 // Not a substitute for legal review before a real launch.
 //
+// The health-data section was REMOVED on 2026-09-02 when the medical-notes feature was
+// parked (docs/adr/safety-privacy.md "Parked"). Section 2's flat "does not collect health
+// data" replaces it — a policy that describes processing the app does not perform is a
+// liability, not a courtesy, and Art. 9 data is the last place to leave a stale claim.
+// Restore the section, and the section 2 legal-basis sentence, if the feature is unparked;
+// the deleted text is in this file's git history. Do NOT restore it because the code is
+// still present — the flag, not the codebase, is what says whether the Service collects it.
+//
 // Section 1 deliberately carries no postal address (decided 2026-08-31). GDPR Art. 13(1)(a)
 // requires the controller's identity and contact details — an email satisfies "contact
 // details", so the policy is servable without one. Play's store listing requires a physical
@@ -31,10 +39,10 @@ interface SectionProps {
 //
 // The contact is `privacy@kayaktrek.app`, a Cloudflare Email Routing alias, rather than a personal
 // mailbox — this page is built to be crawled, and an alias also survives a change of mail provider
-// without editing a legal document. Same reasoning as section 7 listing recipient categories
+// without editing a legal document. Same reasoning as section 6 listing recipient categories
 // instead of vendor names: keep values that churn out of a document whose value is being accurate.
 // The alias must stay deliverable for as long as the policy is published; it is the only route a
-// data subject has for the rights in section 11.
+// data subject has for the rights in section 10.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">
@@ -54,7 +62,7 @@ export default function PrivacyPage() {
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
         <div className="flex flex-col gap-1">
           <PageHeading>Privacy Policy</PageHeading>
-          <p className="text-muted-foreground text-xs">Last updated 31 August 2026</p>
+          <p className="text-muted-foreground text-xs">Last updated 2 September 2026</p>
         </div>
 
         <Section title="1. Who we are">
@@ -107,8 +115,11 @@ export default function PrivacyPage() {
             logs.
           </p>
           <p>
-            <strong>Location data</strong> is covered in section 3 and <strong>health data</strong>{" "}
-            in section 4.
+            <strong>Location data</strong> is covered in section 3.
+          </p>
+          <p>
+            <strong>The Service does not collect health data.</strong> It does not ask for
+            allergies, medical conditions, or medication, and holds no such information about you.
           </p>
           <p>
             <strong>Technical data.</strong> Server logs and error traces, containing IP address,
@@ -119,8 +130,8 @@ export default function PrivacyPage() {
           <p>
             <strong>Legal bases.</strong> Account, profile, vessel, emergency contact, and trip data
             are processed to perform our contract with you. Technical data is processed under our
-            legitimate interest in operating and securing the Service. Location data and health data
-            are processed on the basis of your explicit consent, which you may withdraw at any time.
+            legitimate interest in operating and securing the Service. Location data is processed on
+            the basis of your explicit consent, which you may withdraw at any time.
           </p>
         </Section>
 
@@ -146,42 +157,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="4. Health data">
-          <p>
-            You may optionally record medical information — allergies, conditions, medication — so
-            that a trip leader can provide it to emergency services. This is special category data
-            under Article 9 of the GDPR and is processed only on your explicit consent.
-          </p>
-          <p className="font-medium">
-            It is stored encrypted under a key derived from your password. The stored data cannot be
-            read without that password, and is not readable by anyone obtaining our database or a
-            backup.
-          </p>
-          <p>
-            The encryption and decryption happen on your device, in your browser or app, not on our
-            servers. Your password never leaves your device for this purpose — we receive and store
-            only the resulting encrypted data. This is end-to-end encryption: we cannot read your
-            health data even if we wanted to, and neither can anyone who compromises our servers.
-          </p>
-          <p>
-            Access is limited to the leader of a trip you have joined, using a key created for that
-            leader when you give consent. Each access is recorded. You may withdraw consent and
-            erase the information at any time from your profile.
-          </p>
-          <p>
-            Because the key is derived from your password, resetting a forgotten password renders
-            existing entries permanently unreadable — we have no way to recover them for you, by
-            design. They are cleared and you are prompted to re-enter them. Changing your password
-            while you still know the current one is different: your device re-encrypts the existing
-            entry under the new password before sending it to us, so nothing is lost.
-          </p>
-          <p>
-            Health data is used only for the purpose described above. It is not used for
-            advertising, profiling, or eligibility decisions, and is not disclosed to third parties.
-          </p>
-        </Section>
-
-        <Section title="5. Photographs, documents, and publication">
+        <Section title="4. Photographs, documents, and publication">
           <p>
             Photographs attached to a route and uploaded travel documents are private by default.
             Documents are never published and are served through short-lived links to authorised
@@ -205,7 +181,7 @@ export default function PrivacyPage() {
           <p>Notes recorded against a waypoint are never included in published content.</p>
         </Section>
 
-        <Section title="6. Cookies">
+        <Section title="5. Cookies">
           <p>
             The Service uses strictly necessary cookies only, to maintain your session and to
             protect against cross-site request forgery. It does not use advertising, analytics, or
@@ -213,7 +189,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="7. Recipients">
+        <Section title="6. Recipients">
           <p>
             We do not sell personal data and do not disclose it for advertising purposes. Within the
             Service, data is visible to other users only as described in sections 3 and 5.
@@ -234,7 +210,7 @@ export default function PrivacyPage() {
           <p>The identity of our current processors is available on request.</p>
         </Section>
 
-        <Section title="8. International transfers">
+        <Section title="7. International transfers">
           <p>
             Application servers and the database are located in the European Union. Certain
             processors are established outside the EU and may process data in other jurisdictions.
@@ -243,11 +219,11 @@ export default function PrivacyPage() {
           </p>
           <p>
             Where the recipient is our backup storage provider, only the encrypted backup file
-            described in section 7 is transferred — the provider holds no key and cannot read it.
+            described in section 6 is transferred — the provider holds no key and cannot read it.
           </p>
         </Section>
 
-        <Section title="9. Retention">
+        <Section title="8. Retention">
           <ul className="ml-4 flex list-disc flex-col gap-1">
             <li>Account and trip data: retained until you delete your account.</li>
             <li>Recorded positions: deleted 30 days after the trip ends.</li>
@@ -267,7 +243,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="10. Account deletion">
+        <Section title="9. Account deletion">
           <p>
             You may delete your account and its data at any time from{" "}
             <strong>Settings &rarr; Account</strong>. Deletion begins a 30-day grace period, during
@@ -280,26 +256,24 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="11. Your rights">
+        <Section title="10. Your rights">
           <p>
             You have the right to access your personal data, to rectification, to erasure, to
             restriction of and objection to processing, and to data portability. Access,
             rectification, export, and erasure are available directly in your profile settings.
           </p>
           <p>
-            Where processing is based on consent — location data and health data — you may withdraw
-            that consent at any time, without affecting the lawfulness of processing carried out
-            beforehand. You also have the right to lodge a complaint with your national supervisory
-            authority.
+            Where processing is based on consent — location data — you may withdraw that consent at
+            any time, without affecting the lawfulness of processing carried out beforehand. You
+            also have the right to lodge a complaint with your national supervisory authority.
           </p>
         </Section>
 
-        <Section title="12. Security">
+        <Section title="11. Security">
           <p>
-            Data is encrypted in transit. Passwords are stored as salted hashes. Health data is
-            encrypted at rest as described in section 4. Backups are encrypted before transfer.
-            Sessions are held per device and can be revoked individually from your settings, taking
-            effect immediately.
+            Data is encrypted in transit. Passwords are stored as salted hashes. Backups are
+            encrypted before transfer. Sessions are held per device and can be revoked individually
+            from your settings, taking effect immediately.
           </p>
           <p>
             No system can be guaranteed secure. Where a breach is likely to affect your rights, we
@@ -307,7 +281,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="13. Children">
+        <Section title="12. Children">
           <p>
             The Service is not directed at children under 16 and we do not knowingly process their
             personal data. If you believe a child has provided us with personal data, contact us and
@@ -315,16 +289,16 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="14. Changes">
+        <Section title="13. Changes">
           <p>
             We may update this policy. The date above indicates the current version. Where a change
             materially affects how personal data is used, we will notify you by email in advance.
           </p>
         </Section>
 
-        <Section title="15. Contact">
+        <Section title="14. Contact">
           <p>
-            Enquiries about this policy, and requests under section 11, may be sent to{" "}
+            Enquiries about this policy, and requests under section 10, may be sent to{" "}
             <a
               href={`mailto:${contactMail}`}
               className="underline underline-offset-2 hover:no-underline"

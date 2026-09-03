@@ -59,6 +59,11 @@ export default function RegisterPage() {
     // wrapped under the password before it is sent (M22) — the server never sees the key
     // material unwrapped. Doing it at sign-up rather than on first use means an account
     // can receive shared notes immediately. Costs one PBKDF2 derivation (~0.4s).
+    //
+    // Kept running while medical notes are parked (docs/adr/safety-privacy.md "Parked",
+    // 2026-09-02), deliberately: a keypair is generic X25519 material, not health data, and
+    // generating one for every account is what keeps unparking a single environment variable
+    // rather than a re-key prompt for everyone who signed up in the meantime.
     const keypair = await generateKeypair(data.password)
 
     const fd = new FormData()

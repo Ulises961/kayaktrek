@@ -217,6 +217,13 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     environment:
+      # Medical notes, parked 2026-09-02 (docs/adr/safety-privacy.md "Parked"). Passed
+      # through rather than pinned so unparking the server half is one line in .env.prod —
+      # but that alone is not enough: the client flag is inlined into the frontend bundle at
+      # build time, so unparking also needs an image rebuilt with
+      # NEXT_PUBLIC_MEDICAL_NOTES=true, and the privacy policy's health-data section back.
+      # Empty/unset — the state this box runs in — 404s all nine endpoints.
+      MEDICAL_NOTES_ENABLED: ${MEDICAL_NOTES_ENABLED:-}
       # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
       # tile bytes through Flask, so the browser never fetches them from R2 and every cache
       # *hit* was paying a WAN round trip for nothing.

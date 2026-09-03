@@ -24,10 +24,15 @@ interface SectionProps {
 // decryptable by your trip leader", which was false on both halves when it was written —
 // the encryption ran server-side (`Services/crypto_service.py`), so plaintext and password
 // both reached the backend, and the owner could decrypt too. Two documents describing one
-// mechanism is how that survived; one of them owning it is the fix, and it stands even
-// though M22 (2026-09) moved the crypto client-side and made the claim true again —
-// Privacy §4 is still the one place that should say so. §7 (cookies) follows the same
-// rule — Privacy §6 is the one factual statement, this just points at it.
+// mechanism is how that survived; one of them owning it is the fix, and it stood even
+// while M22 (2026-09) had moved the crypto client-side and made the claim true again.
+// §7 (cookies) follows the same
+// rule — Privacy §5 is the one factual statement, this just points at it.
+//
+// That single-owner rule is why parking medical notes (2026-09-02) needed no edit to the
+// body of this page: §8 never described the feature, so removing Privacy's health-data
+// section left nothing here to go stale. Two documents describing one mechanism is exactly
+// the failure this arrangement was built to avoid, and it paid off here.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">

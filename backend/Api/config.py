@@ -23,6 +23,12 @@ class Config:
     # Closed-beta registration gate (single shared code). Empty = gate disabled — every
     # environment that hasn't set one (local dev, CI, testing) registers exactly as before.
     INVITE_CODE = os.getenv("INVITE_CODE", "")
+    # Medical notes (M3g, client-side crypto since M22) — parked 2026-09-02, off unless a
+    # deployment opts in. The code, schema and tests all stay; only the surface is closed.
+    # Off is the default precisely because the reason for parking is legal exposure: an
+    # environment that forgets to configure this must not end up collecting health data.
+    # See docs/adr/safety-privacy.md "Parked" and Api/features.py.
+    MEDICAL_NOTES_ENABLED = os.getenv("MEDICAL_NOTES_ENABLED", "").lower() in {"1", "true", "yes"}
     CACHE_TYPE = "RedisCache"
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
@@ -51,6 +57,10 @@ class TestingConfig(Config):
     RATELIMIT_STORAGE_URI = "memory://"
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = 0
+    # Forced on so the parked feature keeps its whole test suite — parking it must not
+    # quietly stop testing it. The flag-off path has its own file
+    # (Tests/80_medical_notes_parked_test.py), which overrides this back to False.
+    MEDICAL_NOTES_ENABLED = True
 
 
 class StagingConfig(Config):

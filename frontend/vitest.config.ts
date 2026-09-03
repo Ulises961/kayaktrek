@@ -34,6 +34,13 @@ export default defineConfig({
     // not exhibit this; CI falls back to it, keeping vmThreads for the local/dev
     // environment where it was actually measured to help.
     pool: process.env.CI ? "forks" : "vmThreads",
+    // Medical notes was parked (2026-09-02) behind NEXT_PUBLIC_MEDICAL_NOTES, off by
+    // default everywhere that has not opted in. Forced on for the suite so parking the
+    // feature does not quietly stop testing it — the same reason TestingConfig forces the
+    // backend's MEDICAL_NOTES_ENABLED on. The flag-off path has its own file
+    // (lib/__tests__/features-parked.test.tsx), which mocks lib/features rather than
+    // relying on this.
+    env: { NEXT_PUBLIC_MEDICAL_NOTES: "true" },
   },
   resolve: {
     alias: {

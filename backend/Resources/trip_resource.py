@@ -9,6 +9,7 @@ from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
 from Schemas.medical_notes_access_log_schema import MedicalNotesAccessLogSchema
+from Api.features import require_medical_notes
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_service import TripService
@@ -763,6 +764,7 @@ def update_my_float_plan(id: str):
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["GET"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_trip_medical_notes(id: str):
@@ -810,6 +812,7 @@ def get_trip_medical_notes(id: str):
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["POST"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def set_trip_medical_notes(id: str):
@@ -871,6 +874,7 @@ def set_trip_medical_notes(id: str):
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["DELETE"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def revoke_trip_medical_notes(id: str):
@@ -938,6 +942,7 @@ def get_leader_public_key(id: str):
 
 
 @trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def share_medical_notes(id: str):
@@ -1001,6 +1006,7 @@ def share_medical_notes(id: str):
 
 
 @trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["GET"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def read_member_medical_notes(id: str, member_id: str):
@@ -1052,6 +1058,7 @@ def read_member_medical_notes(id: str, member_id: str):
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes/access-log", methods=["GET"])
+@require_medical_notes
 @JWTService.authenticate_restful
 def get_medical_notes_access_log(id: str):
     """Who has read the caller's own shared medical notes on this trip, and when.

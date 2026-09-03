@@ -17,6 +17,7 @@ from Services.storage_service import StorageService, StorageValidationError
 from Services.auth_service import AuthService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_self, require_admin
+from Api.features import require_medical_notes
 from Api.limiter import limiter
 from Models.auth_token import AuthTokenType
 from Tasks.data_export import export_user_data
@@ -663,6 +664,7 @@ def request_email_change():
 
 
 @user_api.route("/me/medical-consent", methods=["POST"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def grant_medical_consent():
@@ -725,6 +727,7 @@ def grant_medical_consent():
 
 
 @user_api.route("/me/medical-consent", methods=["DELETE"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def revoke_medical_consent():
@@ -755,6 +758,7 @@ def revoke_medical_consent():
 
 
 @user_api.route("/me/medical-notes", methods=["GET"])
+@require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 def get_medical_notes():
