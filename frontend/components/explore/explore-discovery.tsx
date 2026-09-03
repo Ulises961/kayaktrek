@@ -369,13 +369,22 @@ export function ExploreDiscovery({
                 onMouseEnter={() => select(item.id)}
               >
                 {item.previewPositions.length > 1 && (
-                  <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
+                  // The thumbnail is part of the same click target as the title below —
+                  // a picture that does nothing when tapped reads as decoration, and the
+                  // "Use this route" button right underneath was winning every click that
+                  // was actually aimed at opening the route.
+                  <Link href={`/routes/${item.id}`} className="block">
+                    <RouteThumbnail route={previewRoute(item)} className="h-20 sm:h-24" />
+                  </Link>
                 )}
                 <div className="flex flex-col gap-2 p-3 pt-1.5">
                   <div className="flex items-start justify-between gap-2">
+                    {/* `text-primary` year-round, not just on hover — the button below
+                        already reads as an action; the title needs to read as a
+                        destination without a visitor having to find out by hovering. */}
                     <Link
                       href={`/routes/${item.id}`}
-                      className="text-sm leading-tight font-medium hover:underline"
+                      className="text-primary text-sm leading-tight font-medium hover:underline"
                     >
                       {item.name ?? "Untitled"}
                     </Link>
@@ -437,7 +446,12 @@ export function ExploreDiscovery({
                       asChild
                       size="sm"
                       variant="outline"
-                      className="hover:border-primary hover:text-primary h-7 w-full text-xs hover:bg-transparent"
+                      // `border-transparent` at rest: the neutral outline made this the
+                      // most defined shape on the card, ahead of the title it sits
+                      // below. The border still appears, coloured, on hover — the outline
+                      // variant is kept for its focus ring and hit-area padding, not its
+                      // rest-state border.
+                      className="hover:border-primary hover:text-primary h-7 w-full border-transparent text-xs hover:bg-transparent"
                     >
                       <Link href={`/itinerary/${item.id}`}>Open your route</Link>
                     </Button>
@@ -445,7 +459,7 @@ export function ExploreDiscovery({
                     <Button
                       size="sm"
                       variant="outline"
-                      className={cn("h-7 w-full text-xs", ctaEchoClass)}
+                      className={cn("h-7 w-full border-transparent text-xs", ctaEchoClass)}
                       disabled={isForking}
                       onClick={() => handleFork(item.id)}
                     >
