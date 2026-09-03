@@ -66,7 +66,12 @@ describe("PrivacyPage", () => {
 
   it("links back to the app from the header", () => {
     render(<PrivacyPage />)
-    expect(screen.getByRole("link", { name: "Kayaktrek" })).toHaveAttribute("href", "/")
+    // The link's accessible name also carries ChartHeaderBar's subtitle ("Sea-kayak
+    // expedition planner") — visually hidden below `sm` via CSS, but jsdom applies no
+    // stylesheet, so `hidden` never actually removes it from the render. A prefix match
+    // is the correct assertion in both environments: a real browser at `sm`+ shows the
+    // subtitle too, so it belongs in the link's name there as well.
+    expect(screen.getByRole("link", { name: /^kayaktrek/i })).toHaveAttribute("href", "/")
   })
 
   it("makes the contact address a mailto link", () => {
