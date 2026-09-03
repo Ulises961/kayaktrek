@@ -10,6 +10,17 @@ body:
         transcribe it here rather than editing the form response in place — this is the
         tracker of record.
   - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Bug
+        - Feature request
+        - UX feedback
+        - Other
+    validations:
+      required: true
+  - type: dropdown
     id: platform
     attributes:
       label: Platform
