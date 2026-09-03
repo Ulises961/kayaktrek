@@ -7,7 +7,28 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
-## [Unreleased]
+## [0.8.0] - 2026-09-04
+
+The signed-out home page is now the public route library instead of a decorative map — the
+public library was already there and working, it just had no door into it. Route detail pages
+(both the public library and the builder's own Route tab) can now show you the paddling
+in between two stops, not just the stops themselves. Medical notes have been withdrawn.
+
+### Added
+
+- **See the shape of a day, not just its stops.** Positions between two stops — the geometry
+  that bends a route around a headland or through a channel — now show on request: an
+  expandable waypoint list under each stop, with each position's own distance and estimated
+  time from that stop. Available both on the itinerary planner's Route tab and on every public
+  route page.
+
+### Changed
+
+- **The signed-out home page is the route library.** Previously a decorative map with no way
+  into the app's actual public content; anonymous visitors now land directly on the searchable,
+  filterable library that `/explore` already offered, with the pitch for signing up alongside
+  it rather than in its way.
+- **Registration no longer asks for a full name.**
 
 ### Removed
 
@@ -19,10 +40,25 @@ A version here means a git tag, which is the only thing that publishes images �
 - The privacy policy's health-data section is gone with it. It now states plainly that the
   Service does not collect health data.
 
-Why: holding medical information means holding a special category of personal data under the
-GDPR, and that responsibility is disproportionate for a feature nothing else in the app depends
-on, at this stage of the product. The feature is set aside, not deleted from the codebase, and
-could return.
+  Why: holding medical information means holding a special category of personal data under the
+  GDPR, and that responsibility is disproportionate for a feature nothing else in the app
+  depends on, at this stage of the product. The feature is set aside, not deleted from the
+  codebase, and could return.
+
+### Security
+
+- `fast-uri` bumped past three high-severity advisories.
+
+### Deploy notes
+
+- **One migration, destructive and irreversible for medical notes.** It permanently purges
+  every stored note, consent record and access log. It deliberately **keeps** each user's
+  encryption keypair, so re-enabling the feature later does not require re-keying every
+  account. `migrate` only ever runs `alembic upgrade head` — rolling back the images afterwards
+  restores code, not the deleted data.
+- **Two flags, both default off:** `MEDICAL_NOTES_ENABLED` (backend) and
+  `NEXT_PUBLIC_MEDICAL_NOTES` (frontend, baked in at image build). Both must agree — one hides
+  the UI, the other closes the API, and neither substitutes for the other.
 
 ## [0.7.1] - 2026-08-31
 
