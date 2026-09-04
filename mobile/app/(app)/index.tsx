@@ -1,50 +1,94 @@
-// Placeholder authenticated home — WP1 proves the auth+nav shell round-trips end to end
-// (login -> token stored -> this screen -> sign out -> back to login). The real trip list
-// is WP2 (plans/M9b.md); this keeps the WP5 watchFolders proof (frontend/lib/tokens.ts,
-// frontend/lib/dtos/point) alive rather than deleting it, since it's still validating the
-// same cross-workspace import path WP2 will lean on for real DTOs.
-import { palette } from "../../../frontend/lib/tokens"
-import { PointSchema } from "../../../frontend/lib/dtos/point"
+import { useCallback, useEffect, useState } from "react"
+import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
-import { Badge } from "../../components/ui/badge"
+import type { Trip } from "../../../frontend/lib/dtos/trip"
+
+import { TripCard } from "../../components/trips/trip-card"
 import { Button } from "../../components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { Row, Screen, Stack } from "../../components/ui/layout"
+import { Screen, Stack } from "../../components/ui/layout"
 import { Text } from "../../components/ui/text"
 import { useAuth } from "../../lib/auth/auth-context"
+import { getTrips } from "../../lib/trips/actions"
 
-const mockLaunchPoint = PointSchema.parse({
-  type: "stop",
-  name: "Porthmadog slipway",
-  notes: "High-water launch only — check the rule of twelfths before setting off.",
-})
-
-export default function HomeScreen() {
+// WP2 (plans/M9b.md): page 1 only, no offline fallback (that's M9c) — validates the
+// real backend round trip (auth -> trip/<user_id>/all -> TripSchema) rather than
+// building out pagination for a milestone whose whole point is proving the stack works.
+export default function TripListScreen() {
   const { signOut } = useAuth()
+  const [trips, setTrips] = useState<Trip[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  return (
-    <Screen>
-      <Stack className="flex-1 items-center justify-center p-6">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <Row>
-              <Badge className="bg-ocean-600">
-                <Text className="text-xs font-medium text-white">Route point</Text>
-              </Badge>
-            </Row>
-            <CardTitle>{mockLaunchPoint.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Text className="text-muted-foreground">{mockLaunchPoint.notes}</Text>
-            <Text className="text-xs text-muted-foreground">
-              Ocean 600 swatch: {palette.ocean600}
-            </Text>
-          </CardContent>
-        </Card>
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setIsRefreshing(true)
+    setError(null)
+    try {
+      const page = await getTrips()
+      setTrips(page.items)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+    } finally {
+      if (isRefresh) setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Fetching on mount is exactly the "sync with an external system" case the rule's
+    // own docs carve out — the setState calls just happen inside `load`'s async body
+    // rather than the effect body itself, which the lint rule can't see through.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [load])
+
+  if (trips === null && !error) {
+    return (
+      <Screen className="items-center justify-center">
+        <ActivityIndicator />
+      </Screen>
+    )
+  }
+
+  if (error) {
+    return (
+      <Screen className="items-center justify-center gap-4 p-6">
+        <Text className="text-center text-muted-foreground">{error}</Text>
+        <Button onPress={() => void load()}>Try again</Button>
+      </Screen>
+    )
+  }
+
+  if (trips && trips.length === 0) {
+    return (
+      <Screen className="items-center justify-center gap-4 p-6">
+        <Text className="text-center text-muted-foreground">No trips yet.</Text>
         <Button variant="outline" onPress={signOut} testID="sign-out">
           Sign out
         </Button>
-      </Stack>
+      </Screen>
+    )
+  }
+
+  return (
+    <Screen>
+      {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
+          the read-only "validate the stack" milestone, not the place to chase a
+          FlatList/VirtualizedList context crash under this RN/jest pairing. Revisit if
+          a real trip list ever grows large enough to need virtualization. */}
+      <ScrollView
+        contentContainerClassName="gap-3 p-4"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
+        }
+      >
+        {(trips ?? []).map((trip, index) => (
+          <TripCard key={trip.id ?? String(index)} trip={trip} />
+        ))}
+        <Stack className="items-center py-4">
+          <Button variant="outline" onPress={signOut} testID="sign-out">
+            Sign out
+          </Button>
+        </Stack>
+      </ScrollView>
     </Screen>
   )
 }
