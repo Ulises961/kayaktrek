@@ -62,9 +62,20 @@ a tagged version, so "what is deployed" stays answerable.
 
 ## Deploying (every time)
 
+From your own machine, `scripts/deploy.sh` runs the whole sequence — sync the deploy set
+(`deploy-sync.sh`), pull, `up -d --remove-orphans`, then a health check — in one call:
+
+```bash
+DEPLOY_HOST=user@box ./scripts/deploy.sh                        # deploy :latest
+DEPLOY_HOST=user@box KAYAK_IMAGE_TAG=v0.8.0 ./scripts/deploy.sh  # pin a version
+DEPLOY_HOST=user@box ./scripts/deploy.sh --dry-run               # sync preview only
+```
+
+What it runs on the box, if you'd rather do it by hand over an existing ssh session:
+
 ```bash
 docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d --remove-orphans
 ```
 
 `pull` fetches `:latest`, i.e. the most recently *tagged* release. To deploy a specific version
