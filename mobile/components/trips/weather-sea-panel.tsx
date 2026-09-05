@@ -27,7 +27,7 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
           </Text>
           {weatherNow.windForce != null && (
             <Text className="text-sm text-muted-foreground">
-              Wind {weatherNow.windForce} bf
+              Wind {Math.round(weatherNow.windForce)} kn
               {weatherNow.windDirection != null ? ` @ ${Math.round(weatherNow.windDirection)}°` : ""}
             </Text>
           )}
