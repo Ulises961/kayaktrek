@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { TripSchema } from "../../../frontend/lib/dtos/trip"
+import { TripSchema, type Trip } from "../../../frontend/lib/dtos/trip"
 
 import { apiGet } from "../api/client"
 import { getSession } from "../auth/session"
@@ -21,4 +21,12 @@ export async function getTrips(): Promise<TripsPage> {
 
   const raw = await apiGet<unknown>(`/api/trip/${session.userId}/all`)
   return TripsPageSchema.parse(raw)
+}
+
+// GET /api/v1/trip/<id> — full trip including the nested itinerary (days -> points),
+// per backend/Resources/trip_resource.py's TripSchema dump. WP3's map screen and WP5/WP6's
+// weather/float-plan reads all come from this one fetch, not a separate itinerary call.
+export async function getTrip(id: string): Promise<Trip> {
+  const raw = await apiGet<unknown>(`/api/trip/${id}`)
+  return TripSchema.parse(raw)
 }

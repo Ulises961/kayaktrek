@@ -12,13 +12,29 @@ import { cn } from "../../lib/cn"
  * silent no-op (confirmed: login's `items-center justify-center p-6` never rendered). Plain
  * `View` gets real Tailwind support; insets go through style instead.
  * Requires `<SafeAreaProvider>` somewhere above it in the tree (app/_layout.tsx).
+ *
+ * `edges` picks which insets to pad for — default is top+bottom, for a screen with no
+ * native header (login, under `(auth)`'s headerless Slot). A screen that sits under a
+ * `Stack.Screen` header (everything in `(app)`) already has its top inset consumed by
+ * that header, so it passes `edges={["bottom"]}` to avoid double-padding the top.
  */
-function Screen({ className, style, ...props }: ViewProps & { className?: string }) {
+function Screen({
+  className,
+  style,
+  edges = ["top", "bottom"],
+  ...props
+}: ViewProps & { className?: string; edges?: ("top" | "bottom")[] }) {
   const insets = useSafeAreaInsets()
   return (
     <View
       className={cn("flex-1 bg-background", className)}
-      style={[{ paddingTop: insets.top, paddingBottom: insets.bottom }, style]}
+      style={[
+        {
+          paddingTop: edges.includes("top") ? insets.top : 0,
+          paddingBottom: edges.includes("bottom") ? insets.bottom : 0,
+        },
+        style,
+      ]}
       {...props}
     />
   )

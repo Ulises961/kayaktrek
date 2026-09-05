@@ -3,24 +3,25 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@maplibre/maplibre-react-native": "11.3.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "expo": "~57.0.16",
+    "expo": "~57.0.20",
     "expo-constants": "~57.0.17",
     "expo-linking": "~57.0.9",
-    "expo-modules-core": "~57.0.13",
-    "expo-router": "~57.0.18",
+    "expo-modules-core": "~57.0.16",
+    "expo-router": "~57.0.19",
     "expo-secure-store": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "lightningcss": "1.30.1",
     "nativewind": "^5.0.0-preview.4",
     "react": "19.2.3",
-    "react-native": "0.86.2",
+    "react-native": "0.86.3",
     "react-native-css": "^3.0.7",
-    "react-native-reanimated": "^4.5.4",
+    "react-native-reanimated": "^4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.2",
-    "react-native-worklets": "^0.12.1",
+    "react-native-worklets": "^0.10.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "zod": "4.4.3"
@@ -29,7 +30,7 @@
     "@react-native/jest-preset": "^0.86.3",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react-native": "^14.0.1",
-    "@types/jest": "^30.0.0",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^57.0.8",
     "eslint": "^9.39.5",
@@ -52,6 +53,9 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "./jest.setup.ts"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|expo-router|expo-secure-store|expo-linking|expo-constants|expo-modules-core|standard-navigation|react-native-safe-area-context|react-native-screens|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
     ]

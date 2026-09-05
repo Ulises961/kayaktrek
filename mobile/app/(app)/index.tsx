@@ -42,7 +42,7 @@ export default function TripListScreen() {
 
   if (trips === null && !error) {
     return (
-      <Screen className="items-center justify-center">
+      <Screen edges={["bottom"]} className="items-center justify-center">
         <ActivityIndicator />
       </Screen>
     )
@@ -50,7 +50,7 @@ export default function TripListScreen() {
 
   if (error) {
     return (
-      <Screen className="items-center justify-center gap-4 p-6">
+      <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
         <Text className="text-center text-muted-foreground">{error}</Text>
         <Button onPress={() => void load()}>Try again</Button>
       </Screen>
@@ -59,7 +59,7 @@ export default function TripListScreen() {
 
   if (trips && trips.length === 0) {
     return (
-      <Screen className="items-center justify-center gap-4 p-6">
+      <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
         <Text className="text-center text-muted-foreground">No trips yet.</Text>
         <Button variant="outline" onPress={signOut} testID="sign-out">
           Sign out
@@ -69,7 +69,7 @@ export default function TripListScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edges={["bottom"]}>
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
           the read-only "validate the stack" milestone, not the place to chase a
           FlatList/VirtualizedList context crash under this RN/jest pairing. Revisit if
