@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@import "nativewind/theme.css";
+@source "./app/**/*.{ts,tsx}";
+@source "./components/**/*.{ts,tsx}";
+@import "nativewind/theme";
 
 /* Design tokens generated from ../frontend/lib/tokens.ts (see scripts/generate-theme-css.js
  * and that file's own header) — deliberately a generated CSS `@theme` block and not
