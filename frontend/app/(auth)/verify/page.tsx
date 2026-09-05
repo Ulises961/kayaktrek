@@ -1,7 +1,14 @@
-import { API_URL, API_PREFIX } from "@/lib/api/config"
-import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
+import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
+import { VerifyConfirm } from "@/components/auth/verify-confirm"
 
+// M25 §3. This page used to verify on render and then offer a link to /login, which made
+// the funnel from a blog post four steps and two credential entries. It now asks for one
+// deliberate click, and that click both activates the account and signs the person in.
+//
+// Verification stays behind that click rather than happening on render: a mail scanner or
+// link-preview fetcher that follows the emailed URL would otherwise burn the token before
+// the recipient ever clicks, and the recipient would meet "invalid or expired".
 export default async function VerifyPage({
   searchParams,
 }: {
@@ -13,37 +20,12 @@ export default async function VerifyPage({
     return (
       <AuthCard>
         <AuthCardHeading title="Verification failed" />
-        <p className="auth-footnote text-[11px]">Missing verification token.</p>
-      </AuthCard>
-    )
-  }
-
-  let success = false
-  let errorMessage = "Invalid or expired verification link."
-
-  try {
-    const res = await fetch(
-      `${API_URL}${API_PREFIX}/auth/verify?token=${encodeURIComponent(token)}`,
-      {
-        cache: "no-store",
-      },
-    )
-    if (res.ok) {
-      success = true
-    } else {
-      const data = await res.json().catch(() => ({}))
-      errorMessage = data.description || errorMessage
-    }
-  } catch {
-    errorMessage = "Could not reach the server. Please try again later."
-  }
-
-  if (success) {
-    return (
-      <AuthCard>
-        <AuthCardHeading title="Email verified" subtitle="Your account is now active." />
+        <p className="auth-notice auth-notice-error">
+          This link is missing its verification token. Check that you copied the whole address from
+          the email.
+        </p>
         <Link href="/login" className="auth-link text-[11px]">
-          Sign in
+          Back to sign in
         </Link>
       </AuthCard>
     )
@@ -51,11 +33,11 @@ export default async function VerifyPage({
 
   return (
     <AuthCard>
-      <AuthCardHeading title="Verification failed" />
-      <p className="auth-notice auth-notice-error">{errorMessage}</p>
-      <Link href="/login" className="auth-link text-[11px]">
-        Back to sign in
-      </Link>
+      <AuthCardHeading
+        title="Confirm your email"
+        subtitle="One tap and you are in — no password needed."
+      />
+      <VerifyConfirm token={token} />
     </AuthCard>
   )
 }

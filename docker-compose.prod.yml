@@ -224,6 +224,18 @@ services:
       # NEXT_PUBLIC_MEDICAL_NOTES=true, and the privacy policy's health-data section back.
       # Empty/unset — the state this box runs in — 404s all nine endpoints.
       MEDICAL_NOTES_ENABLED: ${MEDICAL_NOTES_ENABLED:-}
+      # Closed-beta registration gate (PR #160). This line was missing until M25 §1, and
+      # `environment:` is the only path into these containers — there is no `env_file:` in
+      # this compose file — so the backend has always received an empty INVITE_CODE, and
+      # `_invite_code_valid` treats empty as "no gate". The gate has therefore never been
+      # active in production, whatever CLAUDE.md said; registration has been open since
+      # #160 shipped.
+      #
+      # Left empty here, because M25 opens registration deliberately. What the line buys is
+      # the kill switch: set INVITE_CODE in .env.prod and restart the backend to shut new
+      # signups behind a code, with no image rebuild (unlike the NEXT_PUBLIC_* flags, which
+      # are baked in at build). See DEPLOY.md "Closing registration in a hurry".
+      INVITE_CODE: ${INVITE_CODE:-}
       # Local disk, not the object store — see Services/tile_cache.py. The proxy re-serves
       # tile bytes through Flask, so the browser never fetches them from R2 and every cache
       # *hit* was paying a WAN round trip for nothing.

@@ -509,6 +509,34 @@ add a periodic `rclone` copy R2 → B2; R2 charges no egress, so it is free to r
 **`.env` itself** is not backed up either, and holds `JWT_SECRET_KEY` — losing it logs out
 every user. It belongs in your password manager.
 
+## Closing registration in a hurry
+
+M25 opens registration to anyone. The kill switch is `INVITE_CODE`: set it, restart the backend,
+and `/api/v1/auth/register` starts requiring a matching code. Everyone already registered is
+unaffected — this gates new signups only.
+
+```bash
+# on the box, in the deploy directory
+echo 'INVITE_CODE=some-shared-secret' >> .env
+docker compose -f docker-compose.prod.yml up -d backend
+```
+
+**No image rebuild.** The backend reads `INVITE_CODE` from the environment at app start, so a
+container restart is the whole operation — unlike the `NEXT_PUBLIC_*` flags, which are inlined
+into the frontend bundle at build time and need a new image. Reopening is the reverse: remove the
+line, restart the backend.
+
+Two things worth knowing before relying on it:
+
+- **It was wired only in M25 §1.** `INVITE_CODE` was never present in `docker-compose.prod.yml`,
+  and this file has no `env_file:` directive, so the backend has always received an empty value —
+  and an empty `INVITE_CODE` means "no gate". The closed-beta gate was never active in production,
+  whatever the docs claimed. Verify it is doing something before trusting it, with a registration
+  attempt from a clean browser.
+- **It closes the front door, not the building.** Existing accounts keep working, and every public
+  surface (`/`, `/explore`, `/routes/<id>`, share links) stays reachable. If the reason to pull the
+  switch is abuse rather than load, Cloudflare is the faster lever.
+
 ## Rolling back
 
 Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:

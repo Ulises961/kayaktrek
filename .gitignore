@@ -9,6 +9,11 @@ storage/
 .env.*
 !.env*.example
 .venv/
+# Without the bare form, a worktree's `.venv` shows up as an untracked file: the trailing
+# slash above matches directories only, and the use-worktrees `link-deps.sh` makes `.venv`
+# a *symlink* to the main checkout's, which git treats as a file. `*/node_modules` below
+# has no trailing slash, which is why the node_modules symlinks never had this problem.
+.venv
 __pycache__
 *.log*
 Pipfile.lock

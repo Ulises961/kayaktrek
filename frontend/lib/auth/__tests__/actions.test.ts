@@ -20,6 +20,7 @@ import {
   refreshSession,
   cancelDeletion,
   resendDeletionCancel,
+  verifyAccount,
 } from "../actions"
 
 const mockCookieStore = {
@@ -540,3 +541,75 @@ function formData(fields: Record<string, string>): FormData {
   Object.entries(fields).forEach(([k, v]) => fd.append(k, v))
   return fd
 }
+
+describe("verifyAccount", () => {
+  it("POSTs the token — a GET would let a mail scanner mint the session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: "acc", refresh_token: "ref" }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await verifyAccount("tok-123")
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain("/auth/verify")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({ token: "tok-123" })
+  })
+
+  it("signs the user in and lands them in the app", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "acc", refresh_token: "ref" }),
+      }),
+    )
+
+    await verifyAccount("tok-123")
+
+    expect(mockCookieStore.set).toHaveBeenCalledWith("access_token", "acc", expect.any(Object))
+    expect(mockCookieStore.set).toHaveBeenCalledWith("refresh_token", "ref", expect.any(Object))
+    expect(redirect).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("surfaces the server's reason for an expired link, and sets no cookies", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ description: "Token expired" }),
+      }),
+    )
+
+    const result = await verifyAccount("stale")
+
+    expect(result).toEqual({ success: false, error: "Token expired" })
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("falls back to its own message when the server sends no description", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({}) }),
+    )
+
+    const result = await verifyAccount("stale")
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining("expired") })
+  })
+
+  it("returns a reachability error without signing anyone in", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+
+    const result = await verifyAccount("tok-123")
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+})

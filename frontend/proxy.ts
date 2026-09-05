@@ -50,7 +50,10 @@ function isTokenExpired(token: string): boolean {
 // This used to be the proxy's `matcher` — now the matcher runs on every route (needed so the
 // CSP nonce below is set everywhere, not just authenticated segments), so the auth gate is a
 // path check inside the function instead.
-const AUTH_GATED_PREFIXES = [
+// Exported so `lib/seo/robots.ts` can assert its Disallow list covers the real gate
+// rather than a hand-kept copy of it — a new (app) segment that misses robots.txt then
+// fails a test instead of quietly becoming crawlable.
+export const AUTH_GATED_PREFIXES = [
   "/dashboard",
   "/design",
   "/gear",

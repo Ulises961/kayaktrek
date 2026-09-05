@@ -9,6 +9,12 @@ import { seasonOfDetail } from "@/lib/itinerary/season"
 import { getViewer } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { TRIP_STATE } from "@/lib/dtos/trip"
+import { UNLISTED } from "@/lib/seo/robots"
+
+// Belt and braces with robots.txt (M25 §1). These links get pasted into WhatsApp and
+// email, and link-preview fetchers do not read robots.txt — a header they cannot skip is
+// what actually keeps an unlisted share unlisted.
+export const metadata = UNLISTED
 
 // Unlisted trip-narrative share (M7d): reachable by anyone with the link, whether or
 // not the itinerary is also discoverable-public. Renders the same detail view as

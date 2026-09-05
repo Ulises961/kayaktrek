@@ -251,6 +251,63 @@ def verify_account():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
 
+@api.route("/api/v1/auth/verify", methods=["POST"])
+@limiter.limit("10 per hour")
+def verify_account_and_sign_in():
+    """
+    ---
+    post:
+      summary: Verify an account via the emailed token, and open a session for it
+      description: >
+        Activates the account and returns a token pair, so a newly verified user lands in
+        the app without entering a password they typed minutes earlier. Deliberately POST,
+        not GET: mail scanners and link-preview fetchers follow emailed links, and a
+        session handed to one of those is a live refresh token nobody knows to revoke. The
+        GET form remains and only activates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        200:
+          description: Account activated, access + refresh token pair issued
+        400:
+          description: Missing or invalid/expired token
+    """
+    post_data = request.get_json(silent=True) or {}
+    token = post_data.get("token")
+    if not token:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing token")
+
+    try:
+        user = AuthService.verify_account(token)
+    except ValueError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except Exception as e:
+        logger.error(e)
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
+
+    session = SessionService.start(
+        user.id,
+        device_label=resolve_device_label(request.headers.get("User-Agent")),
+        location_label=resolve_location_label(),
+    )
+    access_token = JWTService.generate_access_token(str(user.id), user.mail, user.admin, user.token_version, str(session.id))
+    refresh_token = JWTService.generate_refresh_token(str(user.id), user.token_version, session.token_version, str(session.id))
+
+    return jsonify({
+        "status": "success",
+        "message": "Account activated",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }), HTTPStatus.OK
+
+
 @api.route("/api/v1/auth/verify-email-change", methods=["GET"])
 def verify_email_change():
     """

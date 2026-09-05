@@ -229,6 +229,39 @@ export async function resetPassword(
   redirect("/login?reset=1")
 }
 
+// M25 §3. Confirms the emailed verification token and signs the new account in, so the
+// funnel from a blog post is link → confirm → the app, rather than link → "now go and log
+// in" → the password they typed two minutes ago.
+//
+// The POST is the point. The backend keeps a GET form that only activates; only this one
+// opens a session, and only a deliberate click can reach it — mail scanners and
+// link-preview fetchers issue GETs, and a session handed to one of those is a live refresh
+// token nobody knows to revoke.
+export async function verifyAccount(token: string): Promise<AuthResult> {
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return {
+      success: false,
+      error: body?.description ?? "This verification link is invalid or has expired.",
+    }
+  }
+
+  const { access_token, refresh_token } = await res.json()
+  await setAuthCookies(access_token, refresh_token)
+  redirect("/dashboard")
+}
+
 export async function cancelDeletion(token: string): Promise<AuthResult> {
   let res: Response
   try {

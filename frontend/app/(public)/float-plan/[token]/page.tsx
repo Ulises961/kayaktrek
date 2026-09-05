@@ -9,6 +9,11 @@ import { PageHeading } from "@/components/common/page-heading"
 import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { EmptyState } from "@/components/common/empty-state"
+import { UNLISTED } from "@/lib/seo/robots"
+
+// See lib/seo/robots.ts. A float plan carries crew names and emergency contacts; robots.txt
+// asks crawlers not to fetch it, this stops anything that did from indexing it.
+export const metadata = UNLISTED
 
 async function fetchSnapshot(token: string) {
   try {

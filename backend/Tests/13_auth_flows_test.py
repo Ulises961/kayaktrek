@@ -6,6 +6,7 @@ from unittest.mock import patch
 from Api.database import db
 from Api.mail import mail
 from Models.auth_token import AuthToken, AuthTokenType
+from Models.session import Session
 from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.crypto_service import encrypt
@@ -551,3 +552,88 @@ class TestRefreshTokenRotation:
 
         r = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_tok})
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/verify — activate and sign in (M25 §3)
+#
+# The GET form stays as it is. The POST form is what the verify page calls, and it exists
+# specifically because a GET must not mint a session: mail scanners and link-preview
+# fetchers follow emailed links, and a session handed to one of those is a live refresh
+# token nobody knows to revoke.
+# ---------------------------------------------------------------------------
+
+class TestVerifyAndSignIn:
+
+    def test_post_verify_activates_and_returns_a_token_pair(self, app, client):
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        assert user is not None
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
+
+        r = client.post("/api/v1/auth/verify", json={"token": raw})
+
+        assert r.status_code == 200
+        body = r.get_json()
+        assert body["status"] == "success"
+        assert body["access_token"]
+        assert body["refresh_token"]
+
+    def test_the_returned_session_actually_works(self, app, client):
+        """The point of the endpoint is being signed in — assert the token authenticates."""
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
+
+        access = client.post("/api/v1/auth/verify", json={"token": raw}).get_json()["access_token"]
+
+        me = client.get("/api/v1/user/me", headers={"Authorization": f"Bearer {access}"})
+        assert me.status_code == 200
+        assert me.get_json()["mail"] == d["mail"]
+
+    def test_it_opens_a_real_session_row(self, app, client):
+        """A per-device Session (M17) must exist, or the token carries an unrevocable sid."""
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
+
+        client.post("/api/v1/auth/verify", json={"token": raw})
+
+        assert Session.query.filter_by(user_id=user.id).count() == 1
+
+    def test_token_is_single_use(self, app, client):
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
+
+        client.post("/api/v1/auth/verify", json={"token": raw})
+        second = client.post("/api/v1/auth/verify", json={"token": raw})
+
+        assert second.status_code == 400
+
+    def test_a_second_attempt_opens_no_further_session(self, app, client):
+        """Failure path: the rejected retry must not leave another session behind."""
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION)
+
+        client.post("/api/v1/auth/verify", json={"token": raw})
+        client.post("/api/v1/auth/verify", json={"token": raw})
+
+        assert Session.query.filter_by(user_id=user.id).count() == 1
+
+    def test_expired_token_rejected_and_no_session_created(self, app, client):
+        d = _register(client)
+        user = User.query.filter_by(mail=d["mail"]).first()
+        raw = _insert_token(user.id, AuthTokenType.VERIFICATION, expired=True)
+
+        r = client.post("/api/v1/auth/verify", json={"token": raw})
+
+        assert r.status_code == 400
+        assert Session.query.filter_by(user_id=user.id).count() == 0
+
+    def test_missing_body_returns_400(self, client):
+        assert client.post("/api/v1/auth/verify", json={}).status_code == 400
+
+    def test_invalid_token_returns_400(self, client):
+        assert client.post("/api/v1/auth/verify", json={"token": "notarealtoken"}).status_code == 400
