@@ -1,6 +1,13 @@
-import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, Marker } from "@maplibre/maplibre-react-native"
+import {
+  Camera,
+  type CameraRef,
+  GeoJSONSource,
+  Layer,
+  Map as MapLibreMap,
+  Marker,
+} from "@maplibre/maplibre-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, ScrollView, TouchableOpacity, View } from "react-native"
 
 import type { Day } from "../../../../../frontend/lib/dtos/day"
@@ -9,6 +16,7 @@ import { palette } from "../../../../../frontend/lib/tokens"
 import { walkPoints } from "../../../../../frontend/lib/itinerary/linked-list"
 
 import { WeatherSeaPanel } from "../../../../components/trips/weather-sea-panel"
+import { ZoomControl } from "../../../../components/trips/zoom-control"
 import { Row, Screen, Stack } from "../../../../components/ui/layout"
 import { Text } from "../../../../components/ui/text"
 import { OSM_TILE_URL } from "../../../../lib/map/tiles"
@@ -63,6 +71,8 @@ export default function TripMapScreen() {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(10)
+  const cameraRef = useRef<CameraRef>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -157,34 +167,48 @@ export default function TripMapScreen() {
 
       <WeatherSeaPanel day={selectedDay} />
 
-      <MapLibreMap mapStyle={MAP_STYLE} style={{ flex: 1 }}>
-        {bounds && <Camera initialViewState={{ bounds }} />}
+      <View style={{ flex: 1 }}>
+        <MapLibreMap
+          mapStyle={MAP_STYLE}
+          style={{ flex: 1 }}
+          onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
+        >
+          {/* Always mounted — even with no located points, so cameraRef is available for
+              the zoom control. Conditionally rendering this on `bounds` left cameraRef
+              null and the zoom buttons a silent no-op for any day with no points yet. */}
+          <Camera
+            ref={cameraRef}
+            initialViewState={bounds ? { bounds } : { center: [0, 20], zoom: 1 }}
+          />
 
-        {locatedPoints.length > 1 && (
-          <GeoJSONSource id="route" data={routeGeoJson}>
-            <Layer
-              id="route-line"
-              type="line"
-              paint={{ "line-color": palette.ocean600, "line-width": 3 }}
-            />
-          </GeoJSONSource>
-        )}
+          {locatedPoints.length > 1 && (
+            <GeoJSONSource id="route" data={routeGeoJson}>
+              <Layer
+                id="route-line"
+                type="line"
+                paint={{ "line-color": palette.ocean600, "line-width": 3 }}
+              />
+            </GeoJSONSource>
+          )}
 
-        {locatedPoints.map((point, index) => (
-          <Marker key={point.id ?? index} id={point.id ?? String(index)} lngLat={[point.longitude, point.latitude]}>
-            <View
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: 6,
-                backgroundColor: point.type === "stop" ? palette.ocean700 : palette.ocean400,
-                borderWidth: 2,
-                borderColor: "white",
-              }}
-            />
-          </Marker>
-        ))}
-      </MapLibreMap>
+          {locatedPoints.map((point, index) => (
+            <Marker key={point.id ?? index} id={point.id ?? String(index)} lngLat={[point.longitude, point.latitude]}>
+              <View
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: point.type === "stop" ? palette.ocean700 : palette.ocean400,
+                  borderWidth: 2,
+                  borderColor: "white",
+                }}
+              />
+            </Marker>
+          ))}
+        </MapLibreMap>
+
+        <ZoomControl cameraRef={cameraRef} zoom={zoom} />
+      </View>
     </Screen>
   )
 }
