@@ -3,7 +3,6 @@
     "name": "mobile",
     "slug": "mobile",
     "version": "1.0.0",
-    "scheme": "kayaktrek",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,16 +16,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "@maplibre/maplibre-react-native"
-    ]
+    }
   }
 }
