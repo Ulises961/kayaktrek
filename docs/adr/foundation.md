@@ -554,6 +554,92 @@ drifting per-agent interpretations.
 
 ---
 
+## Open source — examined, left undecided (M25)
+
+**Status (2026-09-05): undecided, and deliberately not a gate on 1.0.** Opening the repository was
+proposed as a credibility measure for the release, examined at length, and not settled. It sits in
+`plans/M25-web-1.0-release.md`'s non-goals. **This section records an audit, not a decision** — the
+audit's result is durable, and is what would make the decision cheap whenever it is taken.
+
+**The argument for.** An app that asks strangers for route plans, crew contacts and live position
+can *say* it has no hidden second scope, or it can let anyone check. Auditability is a claim the
+source can back, and no other artifact can.
+
+**The arguments against, which is why it is not settled.**
+
+- **The audience that would exercise it is not the audience being launched to.** Kayakers arriving
+  from a blog post do not read source; the people who audit are developers. The signal is real but
+  largely symbolic, and its value scales with how many people are wondering whether to trust the
+  operator — which at 1.0 is nobody yet.
+- **Trust is not what is blocking the launch.** `/explore` served one route on 2026-09-05. What a
+  visitor judges is the library, not the repository.
+- **Closed → open is available on any day; open → closed never is.** Deferring costs nothing
+  recoverable and spends no irreversible move at the point of least information. This is the same
+  asymmetry that governs licence direction, one level up.
+
+**A false premise was nearly acted on, in both directions.** The 2026-08-30 row below recommends
+deferring, and gives as its obstacle that untracked planning material sits in the history, so
+opening would need a fresh repository rather than a visibility flip. Checked 2026-09-05: the files
+in question return **zero commits** on any branch — they have been gitignored throughout. The
+obstacle does not exist and never did, and it was asserted without being checked. **Generalised:
+`git log --all -- <path>` is one command, and a claim about what history contains should not be
+made without running it.**
+
+**The audit, which stands whichever way this goes**, run 2026-09-05:
+
+- **No plaintext secret was ever committed.** Every secret-shaped path in the full history is an
+  `.example` file, except one: `secrets/env.prod.sops` (added #129, removed #133 — the SOPS
+  experiment that lasted a day). It carries 36 `ENC[AES256_GCM,...]` values, the `age` key never
+  entered the repository, and the values have since been rotated.
+- **Licensing is unencumbered.** A second human contributed 66 commits between 2022-10 and
+  2023-08, which would ordinarily mean their permission is needed to license the work. Full-file
+  `git blame` across every tracked source file attributes **zero surviving lines** to them —
+  92,101 and 39,047 to the operator's two addresses, 2,763 to `noreply@anthropic.com`. Their code
+  has been entirely rewritten out, so the work can be licensed unilaterally whenever the question
+  is answered.
+- **A fresh repository is not required**, per the correction above. Whatever is decided, it is a
+  visibility flip on the repository that exists.
+
+**Two things about *how*, settled in advance of the *whether*.**
+
+- **Licence direction: start at the stricter end.** Relaxing a licence later is uncontroversial and
+  can be done unilaterally; tightening one splits a community and invites a fork of the last
+  permissive release. Starting permissive is the only choice that cannot be walked back, so it is
+  the one to avoid. **AGPL-3.0 is the leading candidate** — it is OSI open source, so the
+  description stays literally true, while its network-copyleft term deters commercial absorption
+  without the project having to say anything about that anywhere. Source-available licences
+  (BUSL-1.1, PolyForm Shield, Elastic 2.0) restrict a competing service outright but are **not**
+  OSI open source, and a project whose pitch is auditability cannot afford the one claim in its
+  README a developer audience would dispute on sight.
+- **The brand does the work the licence should not.** The code would be open; the name and mark
+  reserved. This is the arrangement the Android comparison actually describes — AOSP is Apache-2.0
+  and entirely clonable, and what Google withholds is Play Services and the trademark, not the
+  source terms. Reserving a name is unremarkable and costs no licence compromise.
+
+**A named risk for the day it is opened.** The candour of these documents is exactly what would be
+published, and the failure mode is that they quietly turn into marketing copy. A decision log that
+stops recording the unflattering half is worth less than no decision log. Related: collaborators
+are a hoped-for side effect and not a justification — most niche projects receive no external pull
+requests, so contribution infrastructure should not be built ahead of a contributor.
+
+**Separately, and not contingent on any of the above: the `noreply@anthropic.com` commit authorship
+is to be corrected.** The operator is the author — he directed the work and holds the copyright,
+and Anthropic asserts no authorship over outputs. A git `author` field naming an assistant does not
+say "assistance was received"; it says the assistant *is* the author of that commit, which is a
+stronger claim than the true one, and it entered the history through an agent acting against a
+preference the operator had already stated rather than through any decision. Correcting it is not
+editing the record — the record is currently wrong. Assistance is disclosed in prose instead, where
+it is both accurate and legible to a reader who will never run `git log`. Scope, measured
+2026-09-05: **22 commits** authored and committed by that address (2026-07-03 → 2026-08-23), plus
+**18** carrying `Co-Authored-By: Claude …` trailers (2026-06-05 → 2026-09-05, i.e. still being
+added); the **21** dependabot co-author trailers are legitimate and must survive. `git
+filter-repo --mailmap` does both in one pass — a clone-and-rebase would mangle the real merge
+commits — and rewrites **617 of 1129** hashes, so it needs a moment with no open PRs and no live
+worktrees. **The source is still open:** a trailer was added on 2026-09-05 by a session that had
+the stored preference available to it, so cleaning history without closing that just refills it.
+
+---
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -596,3 +682,4 @@ drifting per-agent interpretations.
 | A box cannot monitor itself — detection moves off-box | ADR-034 | 2026-08-31 | ADR-034 flagged a "silent failure" gap for the home-hosted path, and `uptime-kuma` was adopted against it. It does not close it, for a reason that is structural rather than configurational: **Kuma runs in `docker-compose.monitoring.yml` on the box it watches**, so a dead host is a dead Kuma, and the failure modes that most need an alert — power cut, ISP drop, kernel panic, an unintended suspend — are exactly the ones it cannot report. The 2026-08-30 write-up claiming it "catches the box being gone" was precisely backwards and is corrected in `CLAUDE.md` and `DEPLOY.md`. **Kuma is re-scoped as a diagnostic panel, not a detector**, and keeps real value in that role: service-level failures while the host is alive, and the public-vs-local monitor pair that separates a tunnel fault from an app fault. **Detection needs two things off the box**, neither built: an external URL monitor on the health endpoint (UptimeRobot / Better Stack free tier, or a Cloudflare Worker on a Cron Trigger — that one also exercises the real public path through DNS, Cloudflare and the tunnel, which is what a user experiences), and a **dead-man's switch** for the backup job, since `BACKUP_HEARTBEAT_URL` currently points at Kuma's push monitor and so inherits the defect twice over — a box that is off neither runs the backup nor reports the miss. Both assume the box is meant to be up continuously, which the beta's `keep-awake` lock provides; re-enabling `autosuspend` later means giving the external monitor a maintenance window or being paged nightly. Generalised: **the monitor and the monitored must not share a failure domain**, which is the same reasoning that put database backups on Backblaze rather than beside the objects in R2 |
 | Beta surface split — app keeps the apex, `get.` is the always-up half; no perimeter gate | ADR-034 | 2026-08-30 | Scoping the Play closed beta. **The app stays at `kayaktrek.app`**, which reverses nothing and costs nothing: no cert SAN edit, no `cloudflared` ingress change, no `FRONTEND_URL`/CORS/CSP/cookie-domain churn, no already-issued float-plan or story share link breaking. The 2026-07-31 row justified the bare apex on the grounds that "there's no separate marketing site" — that premise now changes, but the conclusion survives, because the promo site is not a landing page: the app's own chart hero already pitches at the apex. **`get.kayaktrek.app` is a separate static site on Cloudflare Pages from its own public repo**, carrying only what must survive the box being asleep — privacy policy, terms, account-deletion instructions, support contact, store badges, issue tracker. Public repo with Issues is the **cheap half of opening up** without opening the app source (you can open later, never close later; `ROADMAP.md` and `docs/reviews/` are in the history, so opening means a fresh repo, not a visibility flip) — it is a public repo, not an open-source project, and takes no license badge. **htpasswd was rejected**: `frontend/app/(public)/` is six anonymous-by-design routes plus the landing map, float-plan links are the shore-contact *safety* path, and `EventSource` cannot send an `Authorization` header, so gating `live.` kills live position while not gating it leaves the perimeter partial. The gate is the app's own auth, plus `X-Robots-Tag: noindex, nofollow` and Cloudflare edge bot rules; Play's tester list already restricts the mobile side. An **invite code on registration** is the recorded escalation if open web registration stops being tolerable. `noindex` is for the beta only — `/explore` and public route pages are a real discovery channel and get un-blocked at open release |
 | `get.kayaktrek.app` dropped — the row above did not survive one day | ADR-034 | 2026-08-31 | Two things moved out from under the row above between when it was written and now. **M21 (this same date) removed its stated reason to exist**: the row's own text says `get.` carries "what must survive the box being asleep" — that box was the home server, and M21 moved the app to an always-up droplet, so `kayaktrek.app/privacy` is now exactly as reachable independent-of-app-downtime as a separate domain would have been. **Implementation had also already diverged from the plan**: the privacy policy shipped *in the app* (`frontend/app/(public)/privacy`, this date) rather than on `get.`, which the row's own text says should not have been possible — nobody re-read the ADR when writing the page. Revisiting the scope surfaced the real problem: the row conflates two audiences that do not belong on one domain. Play-required boilerplate (privacy, terms, account-deletion, support contact) is for a data subject or a reviewer; a promotional pitch with screenshots or video — what was actually being asked for when this got re-opened — is for a recruiter or collaborator evaluating the *build*, a different audience than either the app's own kayaker-facing landing page or the compliance page serve. Komoot/AllTrails/Strava's model was checked and doesn't recommend a separate marketing domain either: in each, the product's own root domain is the pitch, which `kayaktrek.app`'s landing page already is. **Resolution:** no `get.kayaktrek.app`. Compliance content stays in the app, where it already lives and where the original "must survive downtime" requirement is now met by the app itself. A portfolio/case-study page, if built, is a separate deliverable for a separate audience — not a subdomain of the product, so it doesn't undersell either audience by sitting next to the other's content. Not decided here: where that case-study page would live, if wanted. The "public repo as the cheap half of opening up" idea loses its vehicle along with `get.`'s own repo — revisit under the still-undecided open-source-strategy question (`ROADMAP.md`) if still wanted, now against the app repo directly rather than a throwaway promo repo |
+| **Open-sourcing examined and left undecided; the audit behind it stands** | ADR-034 | 2026-09-05 | Revisits the question the row above defers "against the app repo directly" and **does not settle it** — opening is explicitly not a gate on 1.0 (`plans/M25-web-1.0-release.md` non-goals). The argument for: 1.0 asks strangers to trust the app with route plans, crew contacts and live position, so auditability is a claim the source can back and nothing else can. Why it stays open: **the audience that would exercise it is not the audience being launched to** (kayakers arriving from a blog post do not read source), **trust is not the binding constraint** (`/explore` served one route on 2026-09-05 — a visitor judges the library, not the repository), and **closed → open is available any day while open → closed never is**, so deferring spends nothing irreversible at the point of least information. **The deferral's own stated premise was nevertheless false, and was never checked**: it holds that untracked planning material sits in the history so opening needs a fresh repo, but those paths return **zero commits** on any branch — gitignored throughout. *`git log --all -- <path>` is one command; do not claim what history contains without running it.* **Audit, durable whichever way this goes:** no plaintext secret was ever committed (every match is an `.example`, except `secrets/env.prod.sops` — 36 `ENC[AES256_GCM]` values, `age` key never in the repo, values since rotated); and licensing is unencumbered — a second human contributed 66 commits in 2022–23, but full-file blame attributes them **zero surviving lines** (92,101 + 39,047 to the operator, 2,763 to `noreply@anthropic.com`), so the work can be licensed unilaterally whenever the question is answered. Settled about *how*, in advance of the *whether*: **start at the stricter licence end** (relaxing later is unilateral and uncontroversial; tightening splits a community and invites a fork of the last permissive release), **AGPL-3.0** leading because it is OSI open source *and* its network copyleft deters commercial absorption without the project having to say so anywhere — source-available licences (BUSL, PolyForm, Elastic) are rejected because a project pitching auditability cannot afford the one README claim a developer audience would dispute on sight; and **the brand does what the licence should not** (code open, name and mark reserved — the actual Android arrangement, since AOSP is Apache-2.0 and what Google withholds is Play Services and the trademark). **Decided separately, and not contingent on any of this: the `noreply@anthropic.com` commit authorship is to be corrected.** The operator directed the work and holds the copyright; an `author` field naming an assistant claims more than the truth, and it entered the history through an agent acting against an already-stated preference rather than by any decision — so correcting it fixes the record rather than editing it. Scope: **22 commits** authored and committed by that address, plus **18** carrying `Co-Authored-By: Claude` trailers; the **21** dependabot trailers must survive. `filter-repo --mailmap` does both in one pass (a clone-and-rebase would mangle the real merge commits) and rewrites **617 of 1129** hashes, so it wants a moment with no open PRs and no live worktrees. **The source is still open** — a trailer was added on 2026-09-05 itself, so cleaning history without closing that just refills it |
