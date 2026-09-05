@@ -25,4 +25,11 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
 ];
 
-module.exports = withNativewind(config);
+const finalConfig = withNativewind(config);
+
+// withNativewind (react-native-css's withReactNativeCSS) sets transformerPath with
+// no exclude option — override it with a thin wrapper that carves out @expo/log-box's
+// CSS Modules files. See metro-css-transformer.js for why.
+finalConfig.transformerPath = require.resolve("./metro-css-transformer.js");
+
+module.exports = finalConfig;

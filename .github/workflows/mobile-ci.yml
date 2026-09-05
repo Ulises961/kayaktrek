@@ -11,6 +11,9 @@ on:
       - "mobile/**"
       - "frontend/lib/tokens.ts"
       - "frontend/lib/dtos/**"
+      - "frontend/lib/itinerary/linked-list.ts"
+      - "frontend/lib/weather/hourly.ts"
+      - "frontend/lib/user/format.ts"
       - ".github/workflows/mobile-ci.yml"
   pull_request:
     branches: [master]
@@ -18,6 +21,9 @@ on:
       - "mobile/**"
       - "frontend/lib/tokens.ts"
       - "frontend/lib/dtos/**"
+      - "frontend/lib/itinerary/linked-list.ts"
+      - "frontend/lib/weather/hourly.ts"
+      - "frontend/lib/user/format.ts"
       - ".github/workflows/mobile-ci.yml"
 
 # See backend-ci.yml for the reasoning. Separate group name so the three workflows cancel
