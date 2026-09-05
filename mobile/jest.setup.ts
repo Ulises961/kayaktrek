@@ -11,3 +11,13 @@ jest.mock("react-native-safe-area-context", () => {
   const mock = require("react-native-safe-area-context/jest/mock")
   return mock.default ?? mock
 })
+
+// Screens set their own Stack title via `<Stack.Screen options={...} />` rendered
+// inline (see (app)/_layout.tsx's comment on why) — that calls useRoute() under the
+// hood, which throws "Couldn't find a route object" without a real navigator, and
+// none of these screen tests mount one. Stub it inert; tests assert screen content,
+// not the native header title.
+jest.mock("expo-router", () => {
+  const actual = jest.requireActual("expo-router")
+  return { ...actual, Stack: Object.assign(actual.Stack, { Screen: () => null }) }
+})

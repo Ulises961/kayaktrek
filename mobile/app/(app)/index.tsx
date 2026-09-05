@@ -1,3 +1,4 @@
+import { Stack as RouterStack } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
@@ -9,6 +10,10 @@ import { Screen, Stack } from "../../components/ui/layout"
 import { Text } from "../../components/ui/text"
 import { useAuth } from "../../lib/auth/auth-context"
 import { getTrips } from "../../lib/trips/actions"
+
+// Sets this screen's title on the (app) Stack navigator — see (app)/_layout.tsx's
+// comment on why the title is declared here rather than in the parent layout.
+const header = <RouterStack.Screen options={{ title: "Your trips" }} />
 
 // WP2 (plans/M9b.md): page 1 only, no offline fallback (that's M9c) — validates the
 // real backend round trip (auth -> trip/<user_id>/all -> TripSchema) rather than
@@ -43,6 +48,7 @@ export default function TripListScreen() {
   if (trips === null && !error) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
+        {header}
         <ActivityIndicator />
       </Screen>
     )
@@ -51,6 +57,7 @@ export default function TripListScreen() {
   if (error) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
+        {header}
         <Text className="text-center text-muted-foreground">{error}</Text>
         <Button onPress={() => void load()}>Try again</Button>
       </Screen>
@@ -60,6 +67,7 @@ export default function TripListScreen() {
   if (trips && trips.length === 0) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
+        {header}
         <Text className="text-center text-muted-foreground">No trips yet.</Text>
         <Button variant="outline" onPress={signOut} testID="sign-out">
           Sign out
@@ -70,6 +78,7 @@ export default function TripListScreen() {
 
   return (
     <Screen edges={["bottom"]}>
+      {header}
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
           the read-only "validate the stack" milestone, not the place to chase a
           FlatList/VirtualizedList context crash under this RN/jest pairing. Revisit if

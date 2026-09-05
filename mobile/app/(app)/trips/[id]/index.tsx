@@ -1,19 +1,20 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, Marker } from "@maplibre/maplibre-react-native"
-import { useLocalSearchParams } from "expo-router"
+import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useState } from "react"
 import { ActivityIndicator, ScrollView, TouchableOpacity, View } from "react-native"
 
-import type { Day } from "../../../../frontend/lib/dtos/day"
-import type { Point } from "../../../../frontend/lib/dtos/point"
-import { palette } from "../../../../frontend/lib/tokens"
-import { walkPoints } from "../../../../frontend/lib/itinerary/linked-list"
+import type { Day } from "../../../../../frontend/lib/dtos/day"
+import type { Point } from "../../../../../frontend/lib/dtos/point"
+import { palette } from "../../../../../frontend/lib/tokens"
+import { walkPoints } from "../../../../../frontend/lib/itinerary/linked-list"
 
-import { Screen, Stack } from "../../../components/ui/layout"
-import { Text } from "../../../components/ui/text"
-import { OSM_TILE_URL } from "../../../lib/map/tiles"
-import { getTrip } from "../../../lib/trips/actions"
+import { WeatherSeaPanel } from "../../../../components/trips/weather-sea-panel"
+import { Row, Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
+import { OSM_TILE_URL } from "../../../../lib/map/tiles"
+import { getTrip } from "../../../../lib/trips/actions"
 
-import type { Trip } from "../../../../frontend/lib/dtos/trip"
+import type { Trip } from "../../../../../frontend/lib/dtos/trip"
 
 // A minimal inline style — one raster source pointing at the M8 tile proxy, one layer
 // to render it — rather than a hosted style.json (plans/M9b.md WP3: "no new backend
@@ -105,6 +106,7 @@ export default function TripMapScreen() {
   if (error) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
+        <RouterStack.Screen options={{ title: "Trip" }} />
         <Text className="text-center text-muted-foreground">{error}</Text>
       </Screen>
     )
@@ -113,6 +115,7 @@ export default function TripMapScreen() {
   if (!trip) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
+        <RouterStack.Screen options={{ title: "Trip" }} />
         <ActivityIndicator />
       </Screen>
     )
@@ -120,26 +123,39 @@ export default function TripMapScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      {days.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-none px-4 py-3">
-          <Stack className="flex-row gap-2">
-            {days.map((day) => {
-              const active = day.id === selectedDayId
-              return (
-                <TouchableOpacity
-                  key={day.id}
-                  onPress={() => setSelectedDayId(day.id ?? null)}
-                  className={active ? "rounded-full bg-primary px-4 py-2" : "rounded-full border border-border px-4 py-2"}
-                >
-                  <Text className={active ? "text-primary-foreground" : "text-foreground"}>
-                    Day {day.dayNumber}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </Stack>
-        </ScrollView>
-      )}
+      <RouterStack.Screen options={{ title: trip.destination ?? "Trip" }} />
+      <Row className="items-center justify-between px-4 py-3">
+        {days.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
+            <Stack className="flex-row gap-2">
+              {days.map((day) => {
+                const active = day.id === selectedDayId
+                return (
+                  <TouchableOpacity
+                    key={day.id}
+                    onPress={() => setSelectedDayId(day.id ?? null)}
+                    className={active ? "rounded-full bg-primary px-4 py-2" : "rounded-full border border-border px-4 py-2"}
+                  >
+                    <Text className={active ? "text-primary-foreground" : "text-foreground"}>
+                      Day {day.dayNumber}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </Stack>
+          </ScrollView>
+        ) : (
+          <View className="flex-1" />
+        )}
+
+        <Link href={{ pathname: "/trips/[id]/float-plan", params: { id } }} asChild>
+          <TouchableOpacity className="rounded-full border border-border px-4 py-2">
+            <Text className="text-sm">Float plan</Text>
+          </TouchableOpacity>
+        </Link>
+      </Row>
+
+      <WeatherSeaPanel day={selectedDay} />
 
       <MapLibreMap mapStyle={MAP_STYLE} style={{ flex: 1 }}>
         {bounds && <Camera initialViewState={{ bounds }} />}
