@@ -166,6 +166,13 @@ export default function TripMapScreen() {
           mapStyle={MAP_STYLE}
           style={{ flex: 1 }}
           onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
+          // Default "surface" renders via Android's GLSurfaceView, a separate hardware
+          // compositing layer outside RN's normal view z-order — this is what caused the
+          // day-strip/weather-panel area above the map to render as a solid black bar
+          // (M9b2 bug report, 2026-09-06). "texture" uses a regular TextureView, which
+          // composites normally within the RN view hierarchy at a real perf cost that's
+          // fine for this static, non-gesture-heavy map.
+          androidView="texture"
         >
           {/* Always mounted — even with no located points, so cameraRef is available for
               the zoom control. Conditionally rendering this on `bounds` left cameraRef
