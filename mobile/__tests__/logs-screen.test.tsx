@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import LogsScreen from "../app/(app)/logs/index"
+import LogsScreen from "../app/(app)/(drawer)/(logs)/index"
 import { deleteEndorsementRequest, listEndorsementRequests } from "../lib/endorsement-requests/actions"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "../lib/logs/actions"
 

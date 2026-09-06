@@ -4,12 +4,12 @@ import { ActivityIndicator, ScrollView } from "react-native"
 
 import type { PublicUser } from "@shared/dtos/public-profile"
 
-import { StatsPanel } from "../../../components/profile/stats-panel"
-import { Badge } from "../../../components/ui/badge"
-import { Card, CardContent } from "../../../components/ui/card"
-import { Row, Screen, Stack } from "../../../components/ui/layout"
-import { Text } from "../../../components/ui/text"
-import { getPublicProfile } from "../../../lib/profile/actions"
+import { StatsPanel } from "../../../../components/profile/stats-panel"
+import { Badge } from "../../../../components/ui/badge"
+import { Card, CardContent } from "../../../../components/ui/card"
+import { Row, Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
+import { getPublicProfile } from "../../../../lib/profile/actions"
 
 // Undifferentiated "not found" for missing/inactive/deletion-pending/non-public —
 // no existence oracle (M7a). Same privacy behavior web's public profile page has.

@@ -4,18 +4,18 @@ import { ActivityIndicator } from "react-native"
 
 import type { Log, LogFields } from "@shared/dtos/log"
 
-import { Button } from "../../../components/ui/button"
-import { Row, Screen, Stack } from "../../../components/ui/layout"
-import { Text } from "../../../components/ui/text"
-import { LogForm } from "../../../components/logs/log-form"
-import { getSession } from "../../../lib/auth/session"
+import { Button } from "../../../../components/ui/button"
+import { Row, Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
+import { LogForm } from "../../../../components/logs/log-form"
+import { getSession } from "../../../../lib/auth/session"
 import {
   deleteLog,
   endorseLog,
   getLog,
   unendorseLog,
   updateLog,
-} from "../../../lib/logs/actions"
+} from "../../../../lib/logs/actions"
 
 const header = <RouterStack.Screen options={{ title: "Log" }} />
 

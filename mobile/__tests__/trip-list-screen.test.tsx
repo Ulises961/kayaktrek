@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import TripListScreen from "../app/(app)/index"
+import TripListScreen from "../app/(app)/(drawer)/(trips)/index"
 import { useAuth } from "../lib/auth/auth-context"
 import { getTrips } from "../lib/trips/actions"
 

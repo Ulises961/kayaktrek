@@ -1,4 +1,5 @@
 import { Stack as RouterStack, Link } from "expo-router"
+import { DrawerToggleButton } from "expo-router/drawer"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
@@ -7,19 +8,23 @@ import type { Stats } from "@shared/dtos/public-profile"
 import type { EndorsementRequest } from "@shared/dtos/endorsement-request"
 import { formatDayDate } from "@shared/utils/date"
 
-import { LogCard } from "../../../components/logs/log-card"
-import { Button } from "../../../components/ui/button"
-import { Card, CardContent } from "../../../components/ui/card"
-import { Chip } from "../../../components/ui/chip"
-import { Row, Screen, Stack } from "../../../components/ui/layout"
-import { Text } from "../../../components/ui/text"
+import { LogCard } from "../../../../components/logs/log-card"
+import { Button } from "../../../../components/ui/button"
+import { Card, CardContent } from "../../../../components/ui/card"
+import { Chip } from "../../../../components/ui/chip"
+import { Row, Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
 import {
   deleteEndorsementRequest,
   listEndorsementRequests,
-} from "../../../lib/endorsement-requests/actions"
-import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "../../../lib/logs/actions"
+} from "../../../../lib/endorsement-requests/actions"
+import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "../../../../lib/logs/actions"
 
-const header = <RouterStack.Screen options={{ title: "Logs" }} />
+// headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Logs" drawer
+// item's root screen, so it supplies its own menu button.
+const header = (
+  <RouterStack.Screen options={{ title: "Logs", headerLeft: () => <DrawerToggleButton /> }} />
+)
 
 type Tab = "mine" | "endorsed"
 

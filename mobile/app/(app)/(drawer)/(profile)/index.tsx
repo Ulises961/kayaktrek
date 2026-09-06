@@ -1,20 +1,25 @@
 import { Stack as RouterStack, Link } from "expo-router"
+import { DrawerToggleButton } from "expo-router/drawer"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView, Switch } from "react-native"
 
 import type { User } from "@shared/dtos/user"
 import type { Stats } from "@shared/dtos/public-profile"
 
-import { StatsPanel } from "../../../components/profile/stats-panel"
-import { Badge } from "../../../components/ui/badge"
-import { Button } from "../../../components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
-import { Row, Screen, Stack } from "../../../components/ui/layout"
-import { Text } from "../../../components/ui/text"
-import { getLogStats } from "../../../lib/logs/actions"
-import { getMe, setProfileVisibility } from "../../../lib/profile/actions"
+import { StatsPanel } from "../../../../components/profile/stats-panel"
+import { Badge } from "../../../../components/ui/badge"
+import { Button } from "../../../../components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card"
+import { Row, Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
+import { getLogStats } from "../../../../lib/logs/actions"
+import { getMe, setProfileVisibility } from "../../../../lib/profile/actions"
 
-const header = <RouterStack.Screen options={{ title: "Profile" }} />
+// headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Profile" drawer
+// item's root screen, so it supplies its own menu button.
+const header = (
+  <RouterStack.Screen options={{ title: "Profile", headerLeft: () => <DrawerToggleButton /> }} />
+)
 
 // Certifications render read-only here — add/edit/delete needs the elevated
 // re-auth token flow (backend/Resources/user_certification_resource.py), which

@@ -1,19 +1,28 @@
 import { Stack as RouterStack } from "expo-router"
+import { DrawerToggleButton } from "expo-router/drawer"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
 import type { Trip } from "@shared/dtos/trip"
 
-import { TripCard } from "../../components/trips/trip-card"
-import { Button } from "../../components/ui/button"
-import { Screen, Stack } from "../../components/ui/layout"
-import { Text } from "../../components/ui/text"
-import { useAuth } from "../../lib/auth/auth-context"
-import { getTrips } from "../../lib/trips/actions"
+import { TripCard } from "../../../../components/trips/trip-card"
+import { Button } from "../../../../components/ui/button"
+import { Screen, Stack } from "../../../../components/ui/layout"
+import { Text } from "../../../../components/ui/text"
+import { useAuth } from "../../../../lib/auth/auth-context"
+import { getTrips } from "../../../../lib/trips/actions"
 
-// Sets this screen's title on the (app) Stack navigator — see (app)/_layout.tsx's
+// Sets this screen's title on its group's Stack navigator — see (trips)/_layout.tsx's
 // comment on why the title is declared here rather than in the parent layout.
-const header = <RouterStack.Screen options={{ title: "Your trips" }} />
+// headerLeft: the drawer's own header is hidden ((drawer)/_layout.tsx), so this root
+// screen of the "Trips" drawer item supplies its own menu button; a screen pushed
+// deeper in this stack (trip detail, float plan) gets a back button instead and needs
+// no drawer toggle of its own.
+const header = (
+  <RouterStack.Screen
+    options={{ title: "Your trips", headerLeft: () => <DrawerToggleButton /> }}
+  />
+)
 
 // WP2 (plans/M9b.md): page 1 only, no offline fallback (that's M9c) — validates the
 // real backend round trip (auth -> trip/<user_id>/all -> TripSchema) rather than
