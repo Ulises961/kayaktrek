@@ -1,5 +1,5 @@
 import { Drawer } from "expo-router/drawer"
-import { BookOpen, Sailboat, UserRound } from "lucide-react-native"
+import { BookOpen, Sailboat, UserRound, Users } from "lucide-react-native"
 
 import { palette } from "@shared/tokens"
 
@@ -37,6 +37,13 @@ export default function DrawerLayout() {
         options={{
           drawerLabel: "Logs",
           drawerIcon: ({ color, size }) => <BookOpen color={color} size={size} />,
+        }}
+      />
+      <Drawer.Screen
+        name="(paddlers)"
+        options={{
+          drawerLabel: "Paddlers",
+          drawerIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />
       <Drawer.Screen
