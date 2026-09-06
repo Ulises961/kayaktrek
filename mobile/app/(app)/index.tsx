@@ -2,7 +2,7 @@ import { Stack as RouterStack } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
-import type { Trip } from "../../../frontend/lib/dtos/trip"
+import type { Trip } from "@shared/dtos/trip"
 
 import { TripCard } from "../../components/trips/trip-card"
 import { Button } from "../../components/ui/button"

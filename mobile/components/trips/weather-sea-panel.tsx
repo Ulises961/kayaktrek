@@ -1,5 +1,8 @@
-import type { Day } from "../../../frontend/lib/dtos/day"
-import { formatHour, representativeHour } from "../../../frontend/lib/weather/hourly"
+import { ArrowDownFromLine, ArrowUpFromLine, Wind, WavesHorizontal } from "lucide-react-native"
+
+import type { Day } from "@shared/dtos/day"
+import { palette } from "@shared/tokens"
+import { formatHour, representativeHour } from "@shared/weather/hourly"
 
 import { Row, Stack } from "../ui/layout"
 import { Text } from "../ui/text"
@@ -8,6 +11,10 @@ import { Text } from "../ui/text"
 // builder's tidal-gate calculator is explicitly out of scope for this milestone.
 // One representative hourly reading per condition, same convention the web day
 // strip/feature-drawer chips use (representativeHour prefers midday).
+// M9b2 WP4: icons per metric row — lucide-react-native 1.41 dropped the plain
+// `Waves` export web's lucide-react still has; `WavesHorizontal` is the closest
+// equivalent, not a substitute for a shared icon (there is no shared icon set
+// between the two workspaces, only shared color tokens).
 export function WeatherSeaPanel({ day }: { day: Day | null }) {
   if (!day || (!day.weather && !day.sea)) return null
 
@@ -26,10 +33,15 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
             {weatherNow.temperature != null ? `${Math.round(weatherNow.temperature)}°C` : "—"}
           </Text>
           {weatherNow.windForce != null && (
-            <Text className="text-sm text-muted-foreground">
-              Wind {Math.round(weatherNow.windForce)} kn
-              {weatherNow.windDirection != null ? ` @ ${Math.round(weatherNow.windDirection)}°` : ""}
-            </Text>
+            <Row className="items-center gap-1">
+              <Wind size={13} color={palette.ocean500} />
+              <Text className="text-sm text-muted-foreground">
+                {Math.round(weatherNow.windForce)} kn
+                {weatherNow.windDirection != null
+                  ? ` @ ${Math.round(weatherNow.windDirection)}°`
+                  : ""}
+              </Text>
+            </Row>
           )}
           {weatherNow.precipitation != null && (
             <Text className="text-sm text-muted-foreground">
@@ -41,9 +53,12 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
 
       {seaNow && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
-          <Text className="text-sm text-muted-foreground">
-            Waves {seaNow.waveHeight.toFixed(1)} m @ {Math.round(seaNow.waveDirection)}°
-          </Text>
+          <Row className="items-center gap-1">
+            <WavesHorizontal size={13} color={palette.ocean500} />
+            <Text className="text-sm text-muted-foreground">
+              {seaNow.waveHeight.toFixed(1)} m @ {Math.round(seaNow.waveDirection)}°
+            </Text>
+          </Row>
           {seaNow.swellWaveHeight != null && (
             <Text className="text-sm text-muted-foreground">
               Swell {seaNow.swellWaveHeight.toFixed(1)} m
@@ -55,10 +70,16 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
       {sea && (sea.highTide || sea.lowTide) && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
           {sea.highTide && (
-            <Text className="text-sm text-muted-foreground">HW {formatHour(sea.highTide)}</Text>
+            <Row className="items-center gap-1">
+              <ArrowUpFromLine size={13} color={palette.ocean500} />
+              <Text className="text-sm text-muted-foreground">{formatHour(sea.highTide)}</Text>
+            </Row>
           )}
           {sea.lowTide && (
-            <Text className="text-sm text-muted-foreground">LW {formatHour(sea.lowTide)}</Text>
+            <Row className="items-center gap-1">
+              <ArrowDownFromLine size={13} color={palette.ocean500} />
+              <Text className="text-sm text-muted-foreground">{formatHour(sea.lowTide)}</Text>
+            </Row>
           )}
           {sea.tidalRangeM != null && (
             <Text className="text-sm text-muted-foreground">Range {sea.tidalRangeM.toFixed(1)} m</Text>

@@ -8,21 +8,22 @@ import {
 } from "@maplibre/maplibre-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from "react-native"
+import { ActivityIndicator, ScrollView, View } from "react-native"
 
-import type { Day } from "../../../../../frontend/lib/dtos/day"
-import type { Point } from "../../../../../frontend/lib/dtos/point"
-import { palette } from "../../../../../frontend/lib/tokens"
-import { walkPoints } from "../../../../../frontend/lib/itinerary/linked-list"
+import type { Day } from "@shared/dtos/day"
+import type { Point } from "@shared/dtos/point"
+import { palette } from "@shared/tokens"
+import { walkPoints } from "@shared/itinerary/linked-list"
 
 import { WeatherSeaPanel } from "../../../../components/trips/weather-sea-panel"
 import { ZoomControl } from "../../../../components/trips/zoom-control"
+import { Chip } from "../../../../components/ui/chip"
 import { Row, Screen, Stack } from "../../../../components/ui/layout"
 import { Text } from "../../../../components/ui/text"
 import { OSM_TILE_URL } from "../../../../lib/map/tiles"
 import { getTrip } from "../../../../lib/trips/actions"
 
-import type { Trip } from "../../../../../frontend/lib/dtos/trip"
+import type { Trip } from "@shared/dtos/trip"
 
 // A minimal inline style — one raster source pointing at the M8 tile proxy, one layer
 // to render it — rather than a hosted style.json (plans/M9b.md WP3: "no new backend
@@ -138,20 +139,15 @@ export default function TripMapScreen() {
         {days.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
             <Stack className="flex-row gap-2">
-              {days.map((day) => {
-                const active = day.id === selectedDayId
-                return (
-                  <TouchableOpacity
-                    key={day.id}
-                    onPress={() => setSelectedDayId(day.id ?? null)}
-                    className={active ? "rounded-full bg-primary px-4 py-2" : "rounded-full border border-border px-4 py-2"}
-                  >
-                    <Text className={active ? "text-primary-foreground" : "text-foreground"}>
-                      Day {day.dayNumber}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
+              {days.map((day) => (
+                <Chip
+                  key={day.id}
+                  active={day.id === selectedDayId}
+                  onPress={() => setSelectedDayId(day.id ?? null)}
+                >
+                  Day {day.dayNumber}
+                </Chip>
+              ))}
             </Stack>
           </ScrollView>
         ) : (
@@ -159,9 +155,7 @@ export default function TripMapScreen() {
         )}
 
         <Link href={{ pathname: "/trips/[id]/float-plan", params: { id } }} asChild>
-          <TouchableOpacity className="rounded-full border border-border px-4 py-2">
-            <Text className="text-sm">Float plan</Text>
-          </TouchableOpacity>
+          <Chip>Float plan</Chip>
         </Link>
       </Row>
 

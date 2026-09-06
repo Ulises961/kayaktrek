@@ -8,8 +8,19 @@
     // (Metro's watchFolders proof, plans/M9a.md WP5), and those files use `@/...`
     // imports internally (e.g. frontend/lib/itinerary/distance.ts -> "@/lib/dtos/point").
     // Without this mapping tsc resolves `@/*` relative to mobile/, not frontend/.
+    //
+    // `@shared/*` is a second, mobile-only alias for the SAME cross-workspace reuse
+    // M9a/M9b already relied on (deep relative imports like
+    // "../../../../../frontend/lib/dtos/trip") — not a new resolution mechanism.
+    // `babel-preset-expo` already reads this file's `paths` at bundle time (verified:
+    // frontend/lib/trips/format.ts's own "@/lib/utils/date" import resolves on-device),
+    // so this needs no Metro/babel config of its own. Deliberately a distinct name from
+    // `@/*` rather than reusing it: `@/` means "frontend's own root" inside frontend's
+    // files, and mobile code importing the same alias for a different root would be
+    // ambiguous about which workspace it points to.
     "paths": {
-      "@/*": ["../frontend/*"]
+      "@/*": ["../frontend/*"],
+      "@shared/*": ["../frontend/lib/*"]
     }
   }
 }
