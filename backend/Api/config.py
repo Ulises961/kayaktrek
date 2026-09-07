@@ -19,6 +19,11 @@ class Config:
     # Rendered in every email footer when set, omitted entirely when not. Left unset by default:
     # publishing a postal address is a trader-identity decision (DSA), not a template default.
     MAIL_POSTAL_ADDRESS = os.getenv("MAIL_POSTAL_ADDRESS", "")
+    # Brevo's transactional HTTP API, used instead of SMTP when set. DigitalOcean blocks
+    # outbound SMTP (25/465/587) on every droplet, unconditionally — confirmed 2026-09-06,
+    # not liftable by a support ticket. Empty (the default) keeps the SMTP path, which is
+    # what local dev/mailpit and CI/testing use. See Services/mail_service.py.
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
     # Closed-beta registration gate (single shared code). Empty = gate disabled — every
     # environment that hasn't set one (local dev, CI, testing) registers exactly as before.

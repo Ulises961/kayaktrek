@@ -1,4 +1,4 @@
-import { ResetPasswordForm } from "@/components/auth/reset-password-form"
+import { ResetPasswordForm } from "@/components/auth/reset-password-form-loader"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 import Link from "next/link"
 

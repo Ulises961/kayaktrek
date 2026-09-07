@@ -35,6 +35,11 @@ Type=oneshot
 User=__USER__
 WorkingDirectory=__REPO_DIR__
 ExecStart=__REPO_DIR__/scripts/backup-db.sh
+# R2 objects (photos, avatars, documents) — M25 §2. A separate script and a separate
+# ExecStart line (systemd runs oneshot ExecStart lines in order, and a failure in either
+# fails the unit) rather than folding it into backup-db.sh: two independent things to
+# back up, two things that can fail independently, one unit and one timer to operate.
+ExecStart=__REPO_DIR__/scripts/backup-r2.sh
 
 # Set explicitly rather than inherited. A systemd service gets a minimal PATH that does
 # NOT include ~/.local/bin, ~/go/bin or /snap/bin — and `age` and `rclone` are commonly

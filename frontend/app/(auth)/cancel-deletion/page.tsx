@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { CancelDeletionForm } from "./cancel-deletion-form"
+import { CancelDeletionForm } from "./cancel-deletion-form-loader"
 import { AuthCard, AuthCardHeading } from "@/components/auth/auth-card"
 
 export default function CancelDeletionPage() {

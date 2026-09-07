@@ -36,6 +36,28 @@ class TestInviteGateDisabled:
         response = client.post("/api/v1/auth/register", json=_payload())
         assert response.status_code == 201
 
+    def test_registration_status_reports_not_required(self, client):
+        response = client.get("/api/v1/auth/registration-status")
+        assert response.status_code == 200
+        assert response.get_json() == {"inviteCodeRequired": False}
+
+
+class TestRegistrationStatus:
+
+    def test_reports_required_once_the_kill_switch_is_armed(self, client, invite_gate_enabled):
+        """
+        The register form (M25 §3) reads this to decide whether to show its invite-code
+        field, without a frontend rebuild — the whole point of the kill switch.
+        """
+        response = client.get("/api/v1/auth/registration-status")
+        assert response.status_code == 200
+        assert response.get_json() == {"inviteCodeRequired": True}
+
+    def test_is_public_and_unaffected_by_the_default_rate_limit_at_normal_volume(self, client):
+        """No auth header, no 403/401 — this must be readable before a visitor has an account."""
+        response = client.get("/api/v1/auth/registration-status")
+        assert response.status_code == 200
+
 
 class TestInviteGateEnabled:
 

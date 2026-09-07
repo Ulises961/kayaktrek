@@ -128,6 +128,32 @@ def _invite_code_valid(submitted: str) -> bool:
     return hmac.compare_digest(str(submitted or ""), required)
 
 
+@api.route("/api/v1/auth/registration-status", methods=["GET"])
+def registration_status():
+    """
+    Whether the invite-code kill switch (DEPLOY.md "Closing registration in a hurry") is
+    currently armed, so the register form can show or hide its invite-code field without a
+    frontend rebuild — the whole point of the kill switch is INVITE_CODE + a container
+    restart, no image rebuild, and a NEXT_PUBLIC_* flag would defeat that by baking the
+    answer in at build time.
+    ---
+    get:
+      summary: Whether the invite-code registration gate is currently required
+      responses:
+        200:
+          description: Gate status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteCodeRequired:
+                    type: boolean
+    """
+    required = bool(current_app.config.get("INVITE_CODE"))
+    return jsonify({"inviteCodeRequired": required}), HTTPStatus.OK
+
+
 @api.route("/api/v1/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
 def register_user():

@@ -12,7 +12,9 @@ import { EmptyState } from "@/components/common/empty-state"
 import { UNLISTED } from "@/lib/seo/robots"
 
 // See lib/seo/robots.ts. A float plan carries crew names and emergency contacts; robots.txt
-// asks crawlers not to fetch it, this stops anything that did from indexing it.
+// asks crawlers not to fetch it, this stops anything that did from indexing it. Belt and
+// braces: these links are pasted into WhatsApp/email, and a link-preview fetcher does not
+// read robots.txt, so this metadata is the only thing that reaches it.
 export const metadata = UNLISTED
 
 async function fetchSnapshot(token: string) {

@@ -1,5 +1,7 @@
 import logging
+from email.utils import parseaddr
 
+import requests
 from flask import current_app, render_template
 from flask_mail import Message
 
@@ -11,6 +13,8 @@ logger = logging.getLogger(__name__)
 # Object key of the rasterised brand mark in the public bucket. Written by
 # scripts/build-mail-mark.sh; the committed copy is docs/brand/mail-mark-96.png.
 MAIL_MARK_KEY = "brand/mail-mark-96.png"
+
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def _identity_context() -> dict[str, str]:
@@ -40,6 +44,37 @@ def _identity_context() -> dict[str, str]:
     }
 
 
+def _send_via_brevo_api(to: str, subject: str, text_body: str, html_body: str, api_key: str) -> None:
+    """
+    Brevo's transactional email HTTP API, not SMTP.
+
+    DigitalOcean blocks outbound SMTP (ports 25, 465, 587) on every droplet, unconditionally
+    — confirmed 2026-09-06 in production, not liftable by a support ticket. The API sends the
+    same mail over 443, which nothing blocks, and needs its own credential (Brevo dashboard >
+    SMTP & API > API Keys) — distinct from the SMTP key MAIL_PASSWORD holds, which stays
+    configured for local dev/mailpit. Only the transport changes: same domain, same
+    SPF/DKIM/DMARC setup (DEPLOY.md "Mail").
+    """
+    sender_name, sender_email = parseaddr(current_app.config.get("MAIL_DEFAULT_SENDER") or "")
+    response = requests.post(
+        BREVO_API_URL,
+        json={
+            "sender": {"email": sender_email, "name": sender_name or sender_email},
+            "to": [{"email": to}],
+            "subject": subject,
+            "textContent": text_body,
+            "htmlContent": html_body,
+        },
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+
 def send_template_email(to: str, subject: str, template: str, **ctx) -> None:
     """
     Render and send a dual-part (plain text + HTML) email from templates.
@@ -47,6 +82,10 @@ def send_template_email(to: str, subject: str, template: str, **ctx) -> None:
     Templates are resolved from templates/email/<template>.txt and
     templates/email/<template>.html. Both parts are sent so the recipient's
     client chooses whichever it prefers.
+
+    Transport is Brevo's HTTP API when BREVO_API_KEY is configured, SMTP (Flask-Mail)
+    otherwise — see _send_via_brevo_api for why. Local dev/mailpit and CI/testing never set
+    the key, so they keep using SMTP unchanged.
 
     Args:
         to:       Recipient email address.
@@ -58,10 +97,17 @@ def send_template_email(to: str, subject: str, template: str, **ctx) -> None:
     try:
         # Identity first so an explicit kwarg still wins, but no call site needs to pass one.
         ctx = {**_identity_context(), **ctx}
-        msg = Message(subject=subject, recipients=[to])
-        msg.body = render_template(f"email/{template}.txt", **ctx)
-        msg.html = render_template(f"email/{template}.html", **ctx)
-        mail.send(msg)
+        text_body = render_template(f"email/{template}.txt", **ctx)
+        html_body = render_template(f"email/{template}.html", **ctx)
+
+        api_key = current_app.config.get("BREVO_API_KEY")
+        if api_key:
+            _send_via_brevo_api(to, subject, text_body, html_body, api_key)
+        else:
+            msg = Message(subject=subject, recipients=[to])
+            msg.body = text_body
+            msg.html = html_body
+            mail.send(msg)
     except Exception as e:
         logger.error(
             "email_send_failed",

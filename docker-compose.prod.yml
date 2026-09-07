@@ -14,6 +14,24 @@
 # CPU limits are deliberately absent. Memory is the failure mode here — an OOM takes the box,
 # while CPU contention just makes things slow, and a `cpus:` cap set too low on a 2-vCPU
 # droplet would throttle normal work to prevent a problem that has not happened.
+#
+# Log rotation — every service gets it, found missing 2026-09-07. Neither this file nor the
+# droplet's Docker daemon set any log-driver options, so every container's stdout (gunicorn's
+# access logs on `backend`/`worker`/`beat`/`sse` included, which log the client IP on every
+# request) was writing to the default `json-file` driver with no size cap and no expiry —
+# unbounded growth on disk, and a privacy-policy retention claim `docker-compose.prod.yml`
+# could not actually back up. `max-size`/`max-file` bounds it per-container (30M total here);
+# an in-compose default rather than a Docker-daemon-wide one in `/etc/docker/daemon.json`
+# because it's git-tracked infra-as-code deployed the same way as everything else in this
+# file, and a compose change only restarts the containers it touches — a daemon-level change
+# would restart the whole box's Docker daemon, every container at once, for no reason tied to
+# this fix.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   rabbitmq:
@@ -28,6 +46,7 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -54,6 +73,7 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:5432:5432"
     environment:
@@ -72,6 +92,7 @@ services:
     image: redis:7-alpine
     container_name: kayak_redis
     restart: unless-stopped
+    logging: *default-logging
     # 384M against redis's own 256mb maxmemory below — the gap is allocator fragmentation
     # and copy-on-write, which is why the container cap has to sit above the internal one
     # rather than match it.
@@ -139,6 +160,7 @@ services:
     image: redis:7-alpine
     container_name: kayak_redis_auth
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -160,6 +182,7 @@ services:
   migrate:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_migrate
+    logging: *default-logging
     # Same budget as `backend`'s idle figure, not the smaller one a one-shot job looks like
     # it deserves: `flask seed` calls createApp(), so this pays the full app-factory cost —
     # every blueprint and model, plus apispec resolving the whole OpenAPI spec — on top of
@@ -205,6 +228,7 @@ services:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_backend
     restart: unless-stopped
+    logging: *default-logging
     # gunicorn master + 2 sync workers (entrypoint.sh). Measured idle 281 MiB, and it stays
     # there under marine-field requests now that Services/Utils/land_mask.py mmaps the land
     # mask instead of resident-loading it — a 24x24 grid touches ~2 MB of reclaimable page
@@ -276,6 +300,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
+      # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
+      # this is the actual transport in production. See Services/mail_service.py.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing
       # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
@@ -327,6 +355,7 @@ services:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_sse
     restart: unless-stopped
+    logging: *default-logging
     # One gevent worker holding up to 200 concurrent connections. Greenlets are cheap
     # individually, but this is the container whose footprint scales with *viewers* rather
     # than with request rate, so it gets its own headroom.
@@ -366,6 +395,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
+      # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
+      # this is the actual transport in production. See Services/mail_service.py.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing
       # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
@@ -412,6 +445,7 @@ services:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_worker
     restart: unless-stopped
+    logging: *default-logging
     # Measured idle: 242 MiB, for the master plus 2 forked children.
     deploy:
       resources:
@@ -468,6 +502,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
+      # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
+      # this is the actual transport in production. See Services/mail_service.py.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing
@@ -504,6 +542,7 @@ services:
     image: ghcr.io/ulises961/kayak-expedition-planner-backend:${KAYAK_IMAGE_TAG:-latest}
     container_name: kayak_beat
     restart: unless-stopped
+    logging: *default-logging
     # Single process that only ever enqueues — the tasks themselves run in the worker.
     # Measured idle: 140 MiB. It was 1,031 MiB before tidal_service.py's import was made
     # lazy — a timer process was carrying the entire global land mask.
@@ -541,6 +580,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
+      # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
+      # this is the actual transport in production. See Services/mail_service.py.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing
       # local to default to. An unset STORAGE_ENDPOINT must refuse to start rather than
@@ -578,6 +621,7 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    logging: *default-logging
     ports:
       # Host 3300, not 3000 — 3000 is already taken by another app on this box. The
       # container's internal port stays 3000 (that's what the Next.js server inside it

@@ -43,6 +43,29 @@ interface SectionProps {
 // instead of vendor names: keep values that churn out of a document whose value is being accurate.
 // The alias must stay deliverable for as long as the policy is published; it is the only route a
 // data subject has for the rights in section 10.
+//
+// Section 12's minimum age moved from 16 to 18 (2026-09-07) to match the Terms of Use, whose
+// own minimum was raised the same day — the two documents must agree on this number, and the
+// Terms is the one that changed. Benchmarked against a comparable HR-platform's privacy policy
+// in the same pass; the rest of it didn't transfer — it's built for an ad-tech/US-state-law
+// model (targeted advertising, "sale" of data, analytics) this Service doesn't have, and
+// importing that machinery would violate this file's own rule of describing only what the code
+// does.
+//
+// A second benchmark, against a comparable route-planning/live-tracking platform's privacy
+// policy (2026-09-07), was far more relevant — same domain, same Live Tracking-shaped feature —
+// and contributed explicit GDPR Art. 6(1) citations next to each legal basis in section 2 and
+// each right in section 10 (precision, not a new claim — the bases and rights were already
+// stated correctly, just not cited to the specific article).
+//
+// That same pass also surfaced a real gap, not just a documentation one: section 8's technical-
+// data retention line was unwritable, because nothing bounded it. Logfire (structured logs) is
+// confirmed 30 days, but the *raw* container logs — gunicorn's access log on backend/worker/
+// beat/sse, which includes the client IP on every request — had no rotation configured anywhere,
+// neither in `docker-compose.prod.yml` nor the droplet's Docker daemon: unbounded growth on
+// disk, no expiry at all. Fixed the same day with a `logging: *default-logging` block per
+// service (`docker-compose.prod.yml`, `max-size`/`max-file`) before writing the retention line
+// here — a policy claim needs the config to back it up, not the other way around.
 function Section({ title, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-2">
@@ -62,7 +85,7 @@ export default function PrivacyPage() {
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
         <div className="flex flex-col gap-1">
           <PageHeading>Privacy Policy</PageHeading>
-          <p className="text-muted-foreground text-xs">Last updated 2 September 2026</p>
+          <p className="text-muted-foreground text-xs">Last updated 7 September 2026</p>
         </div>
 
         <Section title="1. Who we are">
@@ -129,9 +152,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             <strong>Legal bases.</strong> Account, profile, vessel, emergency contact, and trip data
-            are processed to perform our contract with you. Technical data is processed under our
-            legitimate interest in operating and securing the Service. Location data is processed on
-            the basis of your explicit consent, which you may withdraw at any time.
+            are processed to perform our contract with you (Art. 6(1)(b) GDPR). Technical data is
+            processed under our legitimate interest in operating and securing the Service (Art.
+            6(1)(f) GDPR). Location data is processed on the basis of your explicit consent (Art.
+            6(1)(a) GDPR), which you may withdraw at any time.
           </p>
         </Section>
 
@@ -235,6 +259,10 @@ export default function PrivacyPage() {
               Backups: encrypted copies expire on a fixed schedule, so data may persist in backup
               for a limited period after deletion from live systems.
             </li>
+            <li>
+              Technical data: structured logs are retained for up to 30 days by our observability
+              provider. Raw server logs are capped in size and rotate automatically.
+            </li>
           </ul>
           <p>
             Where you have led a trip involving other members, erasure of your account removes your
@@ -258,14 +286,16 @@ export default function PrivacyPage() {
 
         <Section title="10. Your rights">
           <p>
-            You have the right to access your personal data, to rectification, to erasure, to
-            restriction of and objection to processing, and to data portability. Access,
-            rectification, export, and erasure are available directly in your profile settings.
+            You have the right to access your personal data (Art. 15 GDPR), to rectification (Art.
+            16), to erasure (Art. 17), to restriction of processing (Art. 18), to object to
+            processing (Art. 21), and to data portability (Art. 20). Access, rectification, export,
+            and erasure are available directly in your profile settings.
           </p>
           <p>
             Where processing is based on consent — location data — you may withdraw that consent at
-            any time, without affecting the lawfulness of processing carried out beforehand. You
-            also have the right to lodge a complaint with your national supervisory authority.
+            any time (Art. 7(3)), without affecting the lawfulness of processing carried out
+            beforehand. You also have the right to lodge a complaint with your national supervisory
+            authority (Art. 77).
           </p>
         </Section>
 
@@ -283,9 +313,9 @@ export default function PrivacyPage() {
 
         <Section title="12. Children">
           <p>
-            The Service is not directed at children under 16 and we do not knowingly process their
-            personal data. If you believe a child has provided us with personal data, contact us and
-            we will delete it.
+            The Service is not directed at children under 18 and we do not knowingly process their
+            personal data — the Terms of Use set the same minimum age. If you believe a child has
+            provided us with personal data, contact us and we will delete it.
           </p>
         </Section>
 

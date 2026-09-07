@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
   }),
 }))
 
-import StoryPage from "../page"
+import StoryPage, { metadata } from "../page"
 
 const DETAIL = {
   id: "01952f1a-0000-7000-8000-000000000r01",
@@ -31,6 +31,10 @@ const DETAIL = {
 describe("StoryPage", () => {
   afterEach(() => {
     vi.clearAllMocks()
+  })
+
+  it("is not indexed — unlisted-by-design, not unlisted-by-hope", () => {
+    expect(metadata.robots).toEqual({ index: false, follow: false })
   })
 
   it("renders the live map while the trip is happening", async () => {

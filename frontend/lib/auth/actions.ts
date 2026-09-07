@@ -105,6 +105,27 @@ function keypairFields(formData: FormData): Record<string, string> {
   return Object.fromEntries(entries as readonly (readonly [string, string])[])
 }
 
+/**
+ * Whether the invite-code kill switch is currently armed (DEPLOY.md "Closing registration
+ * in a hurry") — read at request time, not baked in at build like a NEXT_PUBLIC_* flag would
+ * be, since the whole point of the kill switch is INVITE_CODE + a container restart, no
+ * frontend rebuild. cache()-wrapped so the register page's one render issues one call.
+ * Fails closed to `false` (field hidden) on a network error — an unreachable backend means
+ * the register submit will fail anyway, and showing a field for a status we couldn't
+ * confirm is worse than a visitor with the real code hitting a "field missing" dead end.
+ */
+export const getRegistrationStatus = cache(async (): Promise<{ inviteCodeRequired: boolean }> => {
+  try {
+    const res = await fetch(`${API_URL}${API_PREFIX}/auth/registration-status`, {
+      cache: "no-store",
+    })
+    if (!res.ok) return { inviteCodeRequired: false }
+    return await res.json()
+  } catch {
+    return { inviteCodeRequired: false }
+  }
+})
+
 export async function register(
   _prevState: AuthResult | null,
   formData: FormData,
@@ -154,6 +175,11 @@ export async function register(
 
   if (res.status === 403) {
     const body = await res.json().catch(() => ({}))
+    // The form no longer collects an invite code (M25 §3, 1.0 opens registration), but the
+    // backend gate itself is a kill switch, not removed (DEPLOY.md "Closing registration in
+    // a hurry") — INVITE_CODE re-armed there rejects every submission, since none can ever
+    // carry one from this form. Keeping this branch is what turns that into a coherent
+    // message instead of a bare "Access denied."
     if (body?.code === "invalid_invite_code") {
       return {
         success: false,

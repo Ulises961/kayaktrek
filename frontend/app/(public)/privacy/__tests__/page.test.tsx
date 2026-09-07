@@ -84,4 +84,27 @@ describe("PrivacyPage", () => {
       expect(link).toHaveAttribute("href", "mailto:privacy@kayaktrek.app")
     }
   })
+
+  it("sets the same minimum age as the Terms of Use (18)", () => {
+    render(<PrivacyPage />)
+    expect(screen.getByText(/not directed at children under 18/i)).toBeInTheDocument()
+  })
+
+  it("cites the specific GDPR article for each legal basis", () => {
+    render(<PrivacyPage />)
+    expect(screen.getByText(/Art\. 6\(1\)\(b\) GDPR/)).toBeInTheDocument()
+    expect(screen.getByText(/Art\. 6\(1\)\(f\) GDPR/)).toBeInTheDocument()
+    expect(screen.getByText(/Art\. 6\(1\)\(a\) GDPR/)).toBeInTheDocument()
+  })
+
+  it("cites the specific GDPR article for each listed right", () => {
+    render(<PrivacyPage />)
+    expect(screen.getByText(/Art\. 15 GDPR/)).toBeInTheDocument()
+    expect(screen.getByText(/Art\. 77/)).toBeInTheDocument()
+  })
+
+  it("states a retention period for technical/server logs", () => {
+    render(<PrivacyPage />)
+    expect(screen.getByText(/retained for up to 30 days/i)).toBeInTheDocument()
+  })
 })

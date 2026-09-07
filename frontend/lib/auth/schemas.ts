@@ -14,10 +14,9 @@ export const RegisterSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores."),
   // Optional since M12 §F — signup no longer asks for it; collected in Settings.
   phone: z.string().optional(),
-  // Closed-beta invite gate — required only when the backend has one configured
-  // (INVITE_CODE set). Left optional here so a build with the gate off never blocks
-  // submission on a field the server won't even check; a wrong/missing code server-side
-  // surfaces as a field error instead.
+  // The register form only renders this field while the invite-code kill switch is armed
+  // (M25 §3 follow-up) — optional here so the schema itself never blocks submission on a
+  // field that may not exist on the page; a wrong/missing code surfaces as a server error.
   inviteCode: z.string().optional(),
   password: z
     .string()

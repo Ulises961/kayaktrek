@@ -13,6 +13,8 @@ import { redirect } from "next/navigation"
 import {
   login,
   register,
+  getRegistrationStatus,
+  verifyAccount,
   logout,
   logoutEverywhere,
   forgotPassword,
@@ -20,7 +22,6 @@ import {
   refreshSession,
   cancelDeletion,
   resendDeletionCancel,
-  verifyAccount,
 } from "../actions"
 
 const mockCookieStore = {
@@ -190,12 +191,40 @@ describe("register", () => {
     expect(result).toEqual({ success: false, error: "Access denied." })
   })
 
-  it("sends the invite code in the request body when provided", async () => {
+  it("omits inviteCode when the form didn't send one (kill switch off)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 })
+    vi.stubGlobal("fetch", fetchMock)
+    await register(null, formData(VALID_REGISTRATION))
+    const [, options] = fetchMock.mock.calls[0]
+    expect(JSON.parse(options.body)).not.toHaveProperty("inviteCode")
+  })
+
+  it("sends the invite code in the request body when provided (kill switch on)", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 })
     vi.stubGlobal("fetch", fetchMock)
     await register(null, formData({ ...VALID_REGISTRATION, inviteCode: "beta-2026" }))
     const [, options] = fetchMock.mock.calls[0]
     expect(JSON.parse(options.body)).toMatchObject({ inviteCode: "beta-2026" })
+  })
+})
+
+describe("getRegistrationStatus", () => {
+  it("reports whether the invite-code kill switch is armed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ inviteCodeRequired: true }) }),
+    )
+    expect(await getRegistrationStatus()).toEqual({ inviteCodeRequired: true })
+  })
+
+  it("fails closed to not-required on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }))
+    expect(await getRegistrationStatus()).toEqual({ inviteCodeRequired: false })
+  })
+
+  it("fails closed to not-required when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+    expect(await getRegistrationStatus()).toEqual({ inviteCodeRequired: false })
   })
 })
 

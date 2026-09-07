@@ -234,13 +234,28 @@ product limitation rather than a preference.
 
 | Direction | Provider | Why not the other one |
 |---|---|---|
-| **Outbound** — app → any user (verification, password reset, invitations, shore-contact alerts) | **Brevo**, SMTP relay that Flask-Mail points at | Cloudflare has no transactional relay. Its Workers `send_email` binding may only send to addresses pre-verified on the account, which cannot serve an app that mails people it has never seen |
+| **Outbound** — app → any user (verification, password reset, invitations, shore-contact alerts) | **Brevo**, over its HTTP API in production (SMTP everywhere else) | Cloudflare has no transactional relay. Its Workers `send_email` binding may only send to addresses pre-verified on the account, which cannot serve an app that mails people it has never seen |
 | **Inbound** — `privacy@` and friends → a real mailbox | **Cloudflare Email Routing**, free | Brevo is a sending relay; it does not host mailboxes |
 
 ADR-016 already recorded the outbound half as the one acknowledged exception to the self-hosted
 rule, because IP reputation cannot be self-generated. The split also puts the two in different
 failure domains: a Brevo outage stops the app mailing users, but a data subject can still reach
 `privacy@`, which the privacy policy names as the route for GDPR requests.
+
+**Production sends over Brevo's HTTP API, not SMTP — discovered the hard way, 2026-09-06.**
+DigitalOcean blocks outbound SMTP (ports 25, 465, 587) on every droplet, unconditionally; it is
+not a Cloud Firewall setting and not liftable by a support ticket. It went unnoticed until then
+because the droplet had never actually needed to *send* an SMTP connection outward until a
+registration hit the "you're already registered" email path — and the failure mode was ugly: a
+hung `smtplib.SMTP().connect()` has no timeout, so it blocked until Gunicorn's hard 30s worker
+timeout `SIGKILL`ed the process, taking a request down with it rather than failing cleanly. Set
+`BREVO_API_KEY` (`.env`, Brevo dashboard > SMTP & API > API Keys — a different credential from
+the SMTP key `MAIL_PASSWORD` holds) and `Services/mail_service.py` sends over HTTPS instead,
+which nothing blocks. The `MAIL_SERVER`/`MAIL_USERNAME`/`MAIL_PASSWORD` SMTP config stays in
+`.env` regardless — it's what local dev and CI/testing use against `mailpit`, and what
+`send_template_email` falls back to if `BREVO_API_KEY` is ever unset. **A production box with
+`BREVO_API_KEY` unset cannot send mail at all** — this is not an optional upgrade, it is what
+makes outbound mail possible on this host.
 
 ### DNS inventory
 
@@ -446,6 +461,27 @@ restore it.
    string. Note that DO's own managed backups do **not** replace this one: they live inside
    DO, so one suspended account takes the database and its backups together. Keeping the
    dump at a different provider is the entire point of the design.
+
+### R2 objects (photos, avatars, documents)
+
+`scripts/backup-r2.sh` (M25 §2) mirrors R2 into the **same** B2 bucket as the database dump,
+under a `r2-objects/` prefix — one bucket, one credential, one lifecycle policy, rather than
+a second thing to operate. It runs from the same service unit as `backup-db.sh` (a second
+`ExecStart` line in `kayak-backup.service.template`), so nothing new to schedule.
+
+No new credentials needed: it reuses `BACKUP_B2_*` from the database backup and the app's own
+`STORAGE_ENDPOINT`/`STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY` (the same R2 credentials the
+backend already holds) to read from R2.
+
+**`copy`, not `sync`** — the R2→B2 direction never deletes at the B2 side, so a delete inside
+R2 (accidental or malicious) can still be recovered from the mirror. This protects against
+losing the R2/Cloudflare account itself; it does not replace R2 object versioning (still
+open — see the pre-production checklist) as protection against an in-account overwrite.
+
+**Not per-object encrypted**, unlike the database dump: this is a private-bucket mirror
+reachable only by the same restricted B2 application key, not a plaintext export of every
+account leaving the app's control the way the full Postgres dump would be. Revisit if that
+trust boundary changes.
 
 ### Rehearsing a restore
 

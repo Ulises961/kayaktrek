@@ -51,7 +51,7 @@ export function LoginForm() {
       <AuthCardHeading title="Sign in" subtitle="Welcome back" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5" suppressHydrationWarning>
+        <div className="flex flex-col gap-1.5">
           <label htmlFor="mail" className="auth-label">
             Email
           </label>
@@ -59,14 +59,13 @@ export function LoginForm() {
             id="mail"
             type="email"
             autoComplete="email"
-            suppressHydrationWarning
             className="auth-input"
             {...register("mail")}
           />
           {errors.mail && <p className="text-[11px] text-red-600">{errors.mail.message}</p>}
         </div>
 
-        <div className="flex flex-col gap-1.5" suppressHydrationWarning>
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="auth-label">
               Password

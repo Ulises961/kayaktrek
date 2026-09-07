@@ -3,6 +3,11 @@ import { render, screen } from "@testing-library/react"
 import { LegalSection } from "../legal-section"
 
 describe("LegalSection", () => {
+  it("links to the About page", () => {
+    render(<LegalSection />)
+    expect(screen.getByRole("link", { name: /^about$/i })).toHaveAttribute("href", "/about")
+  })
+
   it("links to the Terms of Use", () => {
     render(<LegalSection />)
     expect(screen.getByRole("link", { name: /terms of use/i })).toHaveAttribute("href", "/terms")
@@ -20,7 +25,7 @@ describe("LegalSection", () => {
     render(<LegalSection />)
     expect(screen.getByRole("link", { name: /contact/i })).toHaveAttribute(
       "href",
-      "mailto:privacy@kayaktrek.app",
+      "mailto:support@kayaktrek.app",
     )
   })
 })

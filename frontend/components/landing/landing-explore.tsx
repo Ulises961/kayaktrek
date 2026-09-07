@@ -62,6 +62,12 @@ export function LandingExplore({ initial }: { initial: ExplorePage }) {
       </div>
 
       <footer className="border-border flex items-center justify-end gap-2 border-t px-4 py-3 sm:px-7">
+        <Link href="/about" className={cn(chartLink, "text-[11px]")}>
+          About
+        </Link>
+        <span aria-hidden className={cn(chartLink, "text-[11px] opacity-50")}>
+          ·
+        </span>
         <Link href="/terms" className={cn(chartLink, "text-[11px]")}>
           Terms of Use
         </Link>
