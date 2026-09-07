@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.1] - 2026-09-07
+
+### Fixed
+
+- The register page's "Sign in" link could split across two lines at narrow widths ("Sign" on
+  one line, "in" folding onto the next).
+
 ## [1.0.0] - 2026-09-07
 
 The first 1.0 release. Registration is open to everyone — the closed-beta invite code is off
