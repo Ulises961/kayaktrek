@@ -1,9 +1,9 @@
 ---
 id: mobile-offline
 title: "Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration"
-abstract: The mobile app IS the product (2026-08-23) — PWA tier declined outright, M9 React Native with WatermelonDB sync proceeds without waiting for a validated mutation use case, distributed through official stores (Play first). Expo managed + EAS, MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
+abstract: Backend, web, and mobile are the product together (2026-08-23) — mobile is at parity with web, not a stripped-down companion. M9 (built) is that parity, network-mutate-first, no offline requirement. The offline-native layer this document actually specifies — WatermelonDB sync, device mutation queue, conflict resolution, GPS integration — is its own milestone, M26 (split 2026-09-07), not yet built. Expo managed + EAS, MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
 implementation: not-built
-implementation_note: No mobile/ workspace, no WatermelonDB or MapLibre dependency. The service worker is now declined rather than pending. Design only, awaiting M9 — whose gates (M8, M13) are both cleared as of 2026-08-23, making it next.
+implementation_note: mobile/ exists and ships real, verified code — M9a/M9b/M9b2/M9b3/M9i are built and on real devices. What remains not-built is specifically this document's own subject — no WatermelonDB dependency, no device mutation queue, no sync-down/sync-up implementation anywhere in mobile/package.json. Design only, awaiting M26.
 status: accepted
 date: 2026-06-10
 deciders: []
@@ -12,55 +12,82 @@ tags: [mobile, offline, sync, gps]
 
 # Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration
 
-> **None of this is built.** `implementation: not-built` — there is no `mobile/` workspace, no
-> WatermelonDB or MapLibre dependency in any `package.json`, and no service worker or web app
-> manifest in `frontend/`. Everything below is design awaiting M9.
+> **Split from M9 into its own milestone, M26, on 2026-09-07** — see "Phasing" below for the full
+> reasoning. Before that date this document was M9's design doc; M9 has since been built (M9a,
+> M9b, M9b2, M9b3, M9i — auth, nav, every screen's read/network-mutate surface, full UI parity with
+> web) without ever needing anything this document specifies. What it specifies — WatermelonDB,
+> the device mutation queue, conflict resolution, GPS integration — was never M9's actual
+> justification; it was conflated into M9's number for lack of a second one at the time. It has one
+> now. Read every "M9" reference below dated before 2026-09-07 as "M26."
 >
-> This matters because the document also records, as a settled decision, that the **PWA-offline
-> tier ships first** (Service-Worker-cached web client, frozen route data, pre-downloaded tile
-> corridor) — and that read as done. `plans/M9.md` inherited it as a satisfied prerequisite;
-> M18's planning is what caught that nobody had built it.
+> `implementation: not-built` remains accurate for M26 specifically: there is no WatermelonDB or
+> device-mutation-queue dependency in `mobile/package.json`, and no sync-down/sync-up code
+> anywhere in `mobile/`. Everything below is design awaiting M26, not a description of anything
+> running.
 >
-> **That tier was then declined outright on 2026-08-23** (see the decision log), so the sequencing
-> in the paragraph above is dead: there is no Service Worker step between M18 and this. Every
-> mention of the PWA in the phasing section below survives as history, not as a plan. M18 shipped;
-> M9 is next.
+> Historical note, kept for the record rather than because it still matters operationally: this
+> document also used to record, as a settled decision, that a **PWA-offline tier ships first**
+> (Service-Worker-cached web client, frozen route data, pre-downloaded tile corridor). That tier
+> was **declined outright on 2026-08-23** (see the decision log) — there was never a Service Worker
+> step between M18 and M9/M26. Every PWA mention in the phasing section below survives as history,
+> not as a plan.
 >
-> Treat every mechanism here as a proposal to be checked against the schema and the client as
-> they actually are when M9 starts, not as a description of anything running.
+> Treat every mechanism here as a proposal to be checked against the schema and the client as they
+> actually are when M26 starts, not as a description of anything running.
 
-This document covers the design of the React Native mobile client (M9) — why offline-first is non-negotiable for a maritime app, how the local and server databases are kept in sync, how conflicts are resolved, what gets synced and what doesn't, and how external GPS devices fit into the position-tracking model.
+This document covers the design of the React Native mobile client's offline-native layer (M26) — why offline-first is non-negotiable for a maritime app, how the local and server databases are kept in sync, how conflicts are resolved, what gets synced and what doesn't, and how external GPS devices fit into the position-tracking model.
 
 This is the most architecturally complex milestone in the project. Nothing here should be coded before the WatermelonDB schema is written as a full design document and reviewed against the final server schema.
 
 ---
 
-## Phasing — "bring the plan along" vs "live expedition"
+## Phasing — "bring the plan along" vs "live expedition", and why that line is now the M9/M26 boundary
 
-Mobile offline access addresses two distinct needs that must not be conflated:
+Mobile offline access addresses two distinct needs that must not be conflated — and as of 2026-09-07,
+they are no longer conflated under one milestone number either. The line below was always the real
+seam; M9's own internal structure just didn't reflect it until a full milestone's worth of "read the
+plan" work (M9a/b/b2/b3/i) had already shipped and made the mismatch obvious: those milestones are
+about UI/information-architecture parity with web over the network, not about anything offline-native,
+and lumping them under the same number as WatermelonDB/sync/GPS work implied a permanence to mobile's
+"stripped-down" status that was never true and is now explicitly rejected (see `CLAUDE.md`'s
+"Key Architectural Decisions" — backend, web, and mobile are the product together, mobile at parity
+with web, neither stripped-down nor a replacement).
 
-**1. Read the plan at sea (prototype → beta scope)**
-A paddler wants to view their finalized route, day structure, conditions, and float plan without connectivity. This is a **read-only** need. It is met before a native app exists, via:
-- **PWA offline**: the web client, Service Worker–cached, with frozen route data and OpenSeaMap tiles for the route corridor pre-downloaded. Route data is kilobytes; tile corridor is tens to low hundreds of MB.
-- **GPX export**: the decided `GET /api/itinerary/:id/export?format=gpx` endpoint loads the route onto any chartplotter, OsmAnd, or handheld GPS. Offline by definition.
-- **PDF float plan**: already built; offline by definition.
+**1. Read the plan at sea, and interact with everything else the app has, over the network — M9**
+A paddler wants to view their finalized route, day structure, conditions, and float plan, and
+increasingly (M9i) everything else a trip has — crew, logs, buddies, inventory — with the same
+information architecture as web, not a subset of it. This is met **without WatermelonDB**, purely
+network-mutate-first, the same pattern M9b validated and M9i/M9b2/M9b3 extended. **Already built**
+as of 2026-09-07: auth, nav shell, trip list, itinerary map, day strip, weather/sea display, float
+plan, the Trip Detail hub, non-map feature parity (logs/buddies/inventory) in progress. Two
+interim, non-native paths solved a strict subset of this before the native app existed — kept here
+as history, not current guidance: PWA offline (declined outright 2026-08-23, never built), and GPX
+export / the PDF float plan (both real, both still useful, neither a substitute for the app itself).
 
-These solve "bring the plan along" with zero native app work. Build them first.
+**2. Create, track, and log while on the water — M26**
+A paddler wants to check in at waypoints, adjust the route mid-expedition, track real-time
+position, and auto-generate expedition logs, all of it surviving a total loss of connectivity for
+hours or days. These require **mutations at sea** — data created on the device that must survive
+lost connectivity and sync when reconnected. This is the use case that justifies WatermelonDB, a
+device-side mutation queue, and the full sync protocol this document specifies. **Not yet built.**
 
-**2. Create, track, and log while on the water (M9 scope)**
-A paddler wants to check in at waypoints, adjust the route mid-expedition, track real-time position, and auto-generate expedition logs. These require **mutations at sea** — data created on the device that must survive lost connectivity and sync when reconnected. This is the use case that justifies WatermelonDB, a device-side mutation queue, and the full sync protocol.
-
-**Trigger for building M9**: a real user (or Ulises on a real trip) tries to *create or edit data on the water* and the PWA falls short. Not before. "I wanted to check in at a waypoint while offshore" or "I rerouted a day mid-expedition" are the signals. The plan-reading need is already met by the time that signal arrives.
+**Trigger for building M26**: a real user tries to *create or edit data on the water* and M9's
+network-mutate screens fall short. Not before. "I wanted to check in at a waypoint while offshore"
+or "I rerouted a day mid-expedition" are the signals. **This is the same trigger M9 originally
+carried** — it moved to M26 along with the milestone number, not restated from scratch. M9 itself
+no longer needs a trigger of this kind: its own justification (parity with the web app people
+already use) was satisfied the moment M9a shipped, independent of whether anyone has ever needed
+to mutate data at sea.
 
 ---
 
-## Why offline-first
+## Why offline-first (M26)
 
-Sea kayaking expeditions happen in remote coastal environments where mobile connectivity is intermittent or absent for hours or days at a time. A mobile app that requires a network connection is not useful at sea.
+Sea kayaking expeditions happen in remote coastal environments where mobile connectivity is intermittent or absent for hours or days at a time. A mobile client that requires a network connection for *everything* is not useful at sea — but as of M9, that gap is narrower than it used to be: reading the plan, checking conditions, and reviewing the float plan already work over a connection made before departure, at parity with what web offers. Real offline durability — mutations made with zero connectivity, durably queued and replayed on reconnection — remains M26's job alone.
 
-The mobile client must support the core expedition use cases — viewing the planned route, checking in, updating position, reviewing day conditions — without connectivity. Mutations made offline must be durably queued and replayed when connectivity is restored.
+The mobile client must support the core *live-expedition* use cases — checking in, updating position, reviewing day conditions without a fresh fetch, adjusting a route mid-trip — without connectivity. Mutations made offline must be durably queued and replayed when connectivity is restored.
 
-This is not a "nice to have": it is the primary use case. But "offline-first" for the plan-reading use case is solved by the PWA; the full native sync architecture is justified only by the live-expedition use case (above).
+This is not a "nice to have" for the live-expedition case: it is the primary use case M26 exists for. "Offline-first" for the plan-reading use case is M9's job, already largely met by what's built; the full native sync architecture is justified only by the live-expedition use case (above), which is why it is its own milestone now rather than a phase of M9.
 
 ---
 
