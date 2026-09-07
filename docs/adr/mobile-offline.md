@@ -280,6 +280,44 @@ Android below API 23 (Android 6.0, released 2015) is not supported — hardware-
 
 ---
 
+## Screen structure — mobile mirrors web's information architecture, not a stripped-down shortcut
+
+**Decision (2026-09-06)**: mobile gets a **Trip Detail** hub screen, the same information-architecture
+role `frontend/app/(app)/trips/[id]/page.tsx`'s `TripDetailNav` tabs play on web (Itinerary/Crew/
+Emergency info/Logistics/Items, Live while happening + member). It is reached from the trip list,
+same as web; the itinerary map becomes one destination *from* it, not the screen the trip list
+jumps straight into.
+
+**Context**: M9b/M9b2 built the itinerary map as the trip list's only destination — tapping a trip
+went straight to the map, and screens that are really trip-level (float plan: crew manifest, vessel,
+shore contact) got bolted onto the map screen's day-strip row for lack of anywhere else to put them.
+M9b3 caught this concretely: a "Float plan" chip sat next to the day selector with no logical
+connection to route/day navigation, because the itinerary map was standing in for a trip-detail hub
+it was never designed to be. Web never made this mistake — `float-plan.tsx` isn't even one of
+`TripDetailNav`'s tabs there, it's reached from the trip-detail identity card's own share-and-print
+action, kept deliberately *outside* the tab layout (`itinerary-frontend.md`'s M8 decision log).
+
+**Decision**: mobile's screen graph should read as a stripped-down version of web's, not a
+differently-shaped app that happens to share a backend. Where web has a concept (a trip has a detail
+hub; float plan, crew, logistics live there; the map is the itinerary tab within it), mobile should
+have the same concept, even when a first mobile pass ships fewer of that hub's tabs than web has.
+"Read-only core" (M9b) was the right call for *what* shipped first; it should not have also decided
+*where things live* — those are separable, and conflating them is what produced the chip-on-the-map
+workaround. Concretely: build a Trip Detail screen (even a minimal one — Itinerary link + crew
+manifest + float plan, matching what already exists rather than a v1 of every web tab) as the trip
+list's actual destination, with the itinerary map as a sub-screen it links to.
+
+**Consequences**: `float-plan.tsx` (M9b) is currently unreachable from anywhere in the mobile app as
+of M9b3's WP2 — the chip that linked to it was removed for being on the wrong screen, and no
+replacement link exists yet. This is the concrete, immediate cost of the decision, tracked here so
+it isn't lost: **build the Trip Detail hub before shipping**, not "eventually." Sequencing against
+M9i (non-map feature parity — logs/buddies/inventory, `plans/M9i.md`) and the drawer nav restructure
+it owns is an open question, not decided here — the hub screen and the drawer are adjacent surfaces
+built by different threads of work in the same session, and need to agree on where a trip list's tap
+target lands before either commits to a shape.
+
+---
+
 ## External GPS device integration — two independent tiers
 
 External GPS integration is structured in two independent tiers. They are not mutually exclusive — a paddler may use both simultaneously. The backend is agnostic to all sources: it receives `{ lat, lng, timestamp, trip_id, user_id, source }` regardless of origin.
@@ -368,3 +406,4 @@ These are not optional design work — M9 coding must not begin until each is an
 | Sync protocol specified; five corrections folded back into this document | ADR-015 | 2026-08-30 | `docs/mobile/sync-protocol-spec.md` (M9a WP1) is now the specification for sync-down; this document keeps the intent and defers detail to it. Its §10 listed corrections this file was still asserting wrongly, all now applied: the change column is **`updated`, not `updated_at`**, and it does **not propagate to parents** (moving a `Point` leaves `Day`/`Itinerary` untouched); the `last_synced_at` delta **cannot detect deletions at all**, so tombstones are required (spec §5, the fragile part); `Weather`/`Sea` have **no `updated_at` column** — freshness moves to a new `Weather.fetched_at` with `Sea.recorded_at` bumped on refresh (§6.3); "refresh on reconnection" omitted the **device-initiated** refresh, which §6.4 argues is the highest-value weather moment in the product; and the tile source described "MinIO proxy + titiler (Sentinel-2)" when **`titiler` appears nowhere in the backend** and never did — the proxy serves `osm` and `seamark` only, and its cache is local disk since v0.6.0, never R2. The spec also commits to **eight pieces of backend work before M9c** (§9), now carried into `plans/M9.md` so M9b is sized against them rather than meeting them late |
 | Medical notes parked — the on-device question is moot | — | 2026-09-02 | The feature was parked entirely (`docs/adr/safety-privacy.md` "Parked (2026-09-02)"), so there are no notes to sync and M9c has no medical-notes decision to make. Two consequences for this document: the Data-safety declaration in the 2026-08-23 distribution row no longer includes health data (precise location still applies), and `docs/mobile/sync-protocol-spec.md` §11 is annotated as moot rather than deleted. **Sidestepped, not answered** — if the feature is unparked, WP6's original tension returns unchanged: a leader needs crew notes exactly when there is no connectivity, and that is still at odds with what belongs on a phone that can be lost at sea. |
 | M9b complete — read-only core built and verified on-device; two native/framework pitfalls worth carrying into M9c | `plans/M9b.md` | 2026-09-05 | All six WPs (auth, trip list, itinerary map, day strip, weather/sea, float plan) validated the stack against a real emulator and the live backend. Two gotchas found the hard way, not obvious from either library's docs: (1) **`react-native-safe-area-context`'s `SafeAreaView` silently drops `className`** — `react-native-css`'s auto-interop list only covers core RN components, and its own `react-native-safe-area-context` re-export wraps `SafeAreaProvider` (for CSS custom properties) but never touches `SafeAreaView`. A `Screen` component built on `SafeAreaView` + `className` renders with every Tailwind class silently no-op'd; the fix is a plain `View` for styling with `useSafeAreaInsets()` → inline `style` for the inset padding. (2) **A layout that declares `<Stack.Screen name="x">` for a route expo-router's file-based router already auto-registers duplicate-registers it** (React Navigation logs "`[Layout children]: ... is extraneous`") and navigation to that route silently does nothing — no error, no crash, the `Link`/`router.push` just no-ops. Keep the layout's `<Stack>` bare and set each screen's title via an in-file `<Stack.Screen options={...} />` instead; screen tests then need `expo-router`'s `Stack.Screen` stubbed inert, since it calls `useRoute()` and throws without a real navigator mounted. |
+| **Mobile mirrors web's information architecture — a Trip Detail hub, not a stripped-down shortcut** | — | 2026-09-06 | See "Screen structure" above. Caught by M9b3 removing the "Float plan" chip from the itinerary map screen (it's trip-detail information, doesn't belong on the map, matches how web keeps it outside the Itinerary tab too) — the underlying problem is that mobile never built the trip-detail hub web has, so trip-level screens kept getting bolted onto whichever screen existed. **Immediate cost, not yet resolved**: `float-plan.tsx` is unreachable from anywhere in the app until the hub exists. Sequencing against M9i/the drawer nav restructure is open |

@@ -6,7 +6,8 @@ import {
   Map as MapLibreMap,
   Marker,
 } from "@maplibre/maplibre-react-native"
-import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
+import { BottomSheet } from "@expo/ui"
+import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, ScrollView, View } from "react-native"
 
@@ -15,7 +16,8 @@ import type { Point } from "@shared/dtos/point"
 import { palette } from "@shared/tokens"
 import { walkPoints } from "@shared/itinerary/linked-list"
 
-import { WeatherSeaPanel } from "../../../../../../components/trips/weather-sea-panel"
+import { ConditionsHandle } from "../../../../../../components/trips/conditions-handle"
+import { conditionsTeaser, WeatherSeaPanel } from "../../../../../../components/trips/weather-sea-panel"
 import { ZoomControl } from "../../../../../../components/trips/zoom-control"
 import { Chip } from "../../../../../../components/ui/chip"
 import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
@@ -73,6 +75,7 @@ export default function TripMapScreen() {
   const [error, setError] = useState<string | null>(null)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(10)
+  const [isConditionsOpen, setIsConditionsOpen] = useState(false)
   const cameraRef = useRef<CameraRef>(null)
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export default function TripMapScreen() {
   )
 
   const bounds = useMemo(() => boundsOf(locatedPoints), [locatedPoints])
+  const teaser = conditionsTeaser(selectedDay)
 
   if (error) {
     return (
@@ -135,7 +139,7 @@ export default function TripMapScreen() {
   return (
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: trip.destination ?? "Trip" }} />
-      <Row className="items-center justify-between px-4 py-3">
+      <Row className="items-center px-4 py-3">
         {days.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
             <Stack className="flex-row gap-2">
@@ -153,13 +157,17 @@ export default function TripMapScreen() {
         ) : (
           <View className="flex-1" />
         )}
-
-        <Link href={{ pathname: "/trips/[id]/float-plan", params: { id } }} asChild>
-          <Chip>Float plan</Chip>
-        </Link>
       </Row>
 
-      <WeatherSeaPanel day={selectedDay} />
+      {/* M9b3 WP2: a modal sheet, not a persistently-docked panel — @expo/ui's BottomSheet
+          is isPresented/onDismiss (show/hide), with no "always visible, collapsed to a
+          handle" resting state and no continuous drag-to-height on Android (only 'half'/
+          'full' snap points there). `ConditionsHandle` stands in for the docked handle a
+          JS-driven sheet library would provide natively — it floats over the map, not the
+          day strip, so it reads as attached to the thing it opens. */}
+      <BottomSheet isPresented={isConditionsOpen} onDismiss={() => setIsConditionsOpen(false)}>
+        <WeatherSeaPanel day={selectedDay} />
+      </BottomSheet>
 
       <View style={{ flex: 1 }}>
         <MapLibreMap
@@ -209,6 +217,10 @@ export default function TripMapScreen() {
         </MapLibreMap>
 
         <ZoomControl cameraRef={cameraRef} zoom={zoom} />
+
+        {teaser && (
+          <ConditionsHandle teaser={teaser} onPress={() => setIsConditionsOpen(true)} />
+        )}
       </View>
     </Screen>
   )

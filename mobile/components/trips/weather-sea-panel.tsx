@@ -15,17 +15,42 @@ import { Text } from "../ui/text"
 // `Waves` export web's lucide-react still has; `WavesHorizontal` is the closest
 // equivalent, not a substitute for a shared icon (there is no shared icon set
 // between the two workspaces, only shared color tokens).
-export function WeatherSeaPanel({ day }: { day: Day | null }) {
-  if (!day || (!day.weather && !day.sea)) return null
+// M9b3 WP2: this is now a modal-sheet body (@expo/ui's BottomSheet), not an inline
+// panel docked between the day strip and the map — dropped `border-b`/`bg-card`
+// (a lone bottom border reads as a stray rule with nothing below it inside a
+// sheet, and the sheet paints its own background via `containerColor`).
+export function hasConditions(day: Day | null): boolean {
+  return Boolean(day && (day.weather || day.sea))
+}
 
-  const weatherNow = representativeHour(day.weather?.weatherStates ?? undefined)
-  const seaNow = representativeHour(day.sea?.seaStates ?? undefined)
-  const sea = day.sea
+// Short label for the floating handle that opens the sheet — same "representative
+// hour" selection as the panel body, condensed to one line. Returns null on the
+// same conditions `WeatherSeaPanel` itself would render nothing for, so a caller
+// never shows a handle promising detail there isn't any.
+export function conditionsTeaser(day: Day | null): string | null {
+  if (!hasConditions(day)) return null
+  const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
+  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined)
+  if (!weatherNow && !seaNow) return null
+
+  const parts: string[] = []
+  if (weatherNow?.temperature != null) parts.push(`${Math.round(weatherNow.temperature)}°C`)
+  if (weatherNow?.windForce != null) parts.push(`${Math.round(weatherNow.windForce)} kn`)
+  if (seaNow) parts.push(`${seaNow.waveHeight.toFixed(1)} m`)
+  return parts.length > 0 ? parts.join(" · ") : null
+}
+
+export function WeatherSeaPanel({ day }: { day: Day | null }) {
+  if (!hasConditions(day)) return null
+
+  const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
+  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined)
+  const sea = day?.sea
 
   if (!weatherNow && !seaNow && !sea) return null
 
   return (
-    <Stack className="gap-2 border-b border-border bg-card px-4 py-3">
+    <Stack className="gap-3 px-4 py-4">
       {weatherNow && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
           <Text className="text-sm">
