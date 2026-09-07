@@ -7,6 +7,74 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.0] - 2026-09-07
+
+The first 1.0 release. Registration is open to everyone — the closed-beta invite code is off
+by default — and confirming your email now signs you straight in. Terms of Use and Privacy
+Policy have both been substantially expanded, and outbound mail (verification, password reset,
+crew invitations) is fixed after a production-only delivery failure.
+
+### Added
+
+- **About page**, linked from the landing footer and Settings — the app's version, a link to
+  the developer's GitHub profile, and a support email address. Previously nothing in the app
+  named a contact.
+- **Confirming your email now signs you in.** Clicking the confirmation link and then "Confirm
+  my email" takes you straight to your dashboard — no separate login step afterward.
+- The registration form now shows an invite-code field only when one is actually required. If
+  registration is ever closed again in an emergency (`DEPLOY.md` "Closing registration in a
+  hurry"), visitors see the field instead of a rejected submission with no way to fix it.
+
+### Changed
+
+- **Registration is open by default** — the closed-beta invite code is no longer required to
+  create an account.
+- **Minimum account age raised to 18** (from the GDPR floor of 16/14), reflected in both the
+  Terms of Use and the Privacy Policy — most of what this app asks for (emergency contacts,
+  live position, shore-contact sharing) is safety-adjacent.
+- **Terms of Use, substantially expanded**: using the Service on behalf of an organization (a
+  club, an expedition company), an itemized acceptable-use list (no scraping the public route
+  library, no reverse engineering, no building a competing product from it), account rules (no
+  impersonation, no sharing or transferring an account), a statement that entered safety data
+  is the user's own responsibility, and an explicit license grant describing what right you
+  actually have to use the Service.
+- **Privacy Policy**: legal-basis citations (GDPR Art. 6(1)) next to how your data is used and
+  your rights, and a stated retention window for technical logs (30 days).
+
+### Fixed
+
+- **Outbound email works in production again.** Verification, password reset and crew-invite
+  emails could silently fail to send — DigitalOcean blocks outbound SMTP on every droplet
+  unconditionally, which was undiagnosed until a real registration hung the request until
+  Gunicorn's worker timeout killed it. Mail now goes over Brevo's HTTP API instead of SMTP.
+- The login, register, and reset-password forms no longer briefly show a mismatched/flashing
+  state on first load in some browsers (autofill extensions mutating the form before React
+  finished hydrating it).
+
+### Security
+
+- **Confirming your email now requires an explicit click**, not just opening the emailed link —
+  closes a gap where an email provider's automatic link-scanning could otherwise consume the
+  confirmation link before a user ever saw it.
+
+### Deploy notes
+
+- **`BREVO_API_KEY` is a new environment variable, effectively required.** Without it, production
+  cannot send mail at all under DigitalOcean's SMTP block — this is not a degraded fallback.
+  Get it from the Brevo dashboard (SMTP & API → API Keys — a different key from the SMTP one
+  already configured).
+- **Container log rotation is now configured** for every service (`docker-compose.prod.yml`,
+  10 MB × 3 files). Previously unbounded; existing large log files on the box are not
+  retroactively truncated.
+- R2 object storage (photos, avatars, documents) now has an offsite backup alongside the
+  database, mirrored into the same B2 bucket.
+- `/explore` and public route pages remain excluded from search-engine indexing for now — a
+  deliberate, reversible choice (the public library only has a couple of routes today), not an
+  oversight. See `frontend/lib/seo/robots.ts` for how to reverse it once the library has real
+  content.
+- Mobile (React Native) is not part of this release — it continues in parallel and ships
+  separately once it reaches a store listing.
+
 ## [0.8.0] - 2026-09-04
 
 The signed-out home page is now the public route library instead of a decorative map — the
