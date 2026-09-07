@@ -176,8 +176,8 @@ export function RegisterForm({ inviteCodeRequired }: { inviteCodeRequired: boole
       </p>
 
       <p className="auth-footnote text-center text-sm">
-        Already have an account?{" "}
-        <Link href="/login" className="auth-link">
+        Have an account?{" "}
+        <Link href="/login" className="auth-link whitespace-nowrap">
           Sign in
         </Link>
       </p>
