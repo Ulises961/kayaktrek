@@ -1,6 +1,6 @@
 import { z } from "zod"
-import { TripSchema, type Trip } from "../../../frontend/lib/dtos/trip"
-import { LogisticsSchema, type Logistics } from "../../../frontend/lib/dtos/logistics"
+import { TripSchema, type Trip } from "@shared/dtos/trip"
+import { LogisticsSchema, type Logistics } from "@shared/dtos/logistics"
 
 import { apiGet } from "../api/client"
 import { getSession } from "../auth/session"

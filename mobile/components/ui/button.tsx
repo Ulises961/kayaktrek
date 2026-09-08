@@ -48,8 +48,12 @@ const buttonTextVariants = cva("text-center font-medium", {
 })
 
 export interface ButtonProps
-  extends PressableProps,
+  extends Omit<PressableProps, "children">,
     VariantProps<typeof buttonVariants> {
+  // Narrower than Pressable's own `children`, which also allows a
+  // `(state) => ReactNode` render-prop form this wrapper doesn't support (it always
+  // reads `children` directly as a value, never invokes it).
+  children?: React.ReactNode
   className?: string
   textClassName?: string
 }
@@ -61,12 +65,15 @@ const Button = React.forwardRef<React.ComponentRef<typeof Pressable>, ButtonProp
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     >
-      {typeof children === "string" ? (
+      {React.isValidElement(children) ? (
+        children
+      ) : (
+        // Not just a plain string: a multi-child JSX body (e.g. "Day {n}") compiles to
+        // an array, which a bare `typeof children === "string"` check misses — see the
+        // same fix's comment in chip.tsx for the RN crash that causes.
         <Text className={cn(buttonTextVariants({ variant, size }), textClassName)}>
           {children}
         </Text>
-      ) : (
-        children
       )}
     </Pressable>
   ),

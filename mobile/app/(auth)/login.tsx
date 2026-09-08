@@ -1,6 +1,7 @@
 import { Redirect } from "expo-router"
 import { useState } from "react"
 
+import { BrandLockup } from "../../components/ui/brand-lockup"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
@@ -31,7 +32,8 @@ export default function LoginScreen() {
 
   return (
     <Screen className="items-center justify-center p-6">
-      <Stack className="w-full max-w-sm gap-4">
+      <Stack className="w-full max-w-sm gap-6">
+        <BrandLockup />
         <Text className="text-2xl font-semibold">Sign in</Text>
 
         <Stack className="gap-1.5">

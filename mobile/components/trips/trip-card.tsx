@@ -1,18 +1,20 @@
+import { CalendarIcon, ClockIcon, UsersIcon } from "lucide-react-native"
 import { Link } from "expo-router"
 import { Pressable } from "react-native"
 
-import type { Trip } from "../../../frontend/lib/dtos/trip"
-import { TRIP_STATE_LABELS } from "../../../frontend/lib/dtos/trip"
-import { daysBetween, formatDateRange } from "../../../frontend/lib/trips/format"
+import type { Trip } from "@shared/dtos/trip"
+import { daysBetween, formatDateRange } from "@shared/trips/format"
+import { palette } from "@shared/tokens"
 
-import { Badge } from "../ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
-import { Row, Stack } from "../ui/layout"
+import { Row } from "../ui/layout"
+import { StateBadge } from "../ui/state-badge"
 import { Text } from "../ui/text"
 
 // Mirrors frontend/components/common/trip-card.tsx's field choices (destination as
-// title, state badge, date range, crew count) — not its exact visual treatment (no
-// route thumbnail, no hero ring; this is a plain list row, not the web dashboard grid).
+// title, state badge, date range, crew count, icon meta row) — not its exact visual
+// treatment (no route thumbnail, no hero ring; this is a plain list row, not the web
+// dashboard grid — see plans/M9b2.md WP3 for why the thumbnail is deliberately out).
 // `Link asChild` clones its child and injects onPress/href handling, which only a
 // Pressable-like component honors — `Card` is a plain View, so it wraps a Pressable.
 export function TripCard({ trip }: { trip: Trip }) {
@@ -29,21 +31,32 @@ export function TripCard({ trip }: { trip: Trip }) {
               <CardTitle className="flex-1" numberOfLines={1}>
                 {destination ?? "Untitled trip"}
               </CardTitle>
-              {state && <Badge>{TRIP_STATE_LABELS[state]}</Badge>}
+              {state && <StateBadge state={state} />}
             </Row>
           </CardHeader>
           <CardContent>
-            <Text className="text-sm text-muted-foreground">{formatDateRange(dateFrom, dateTo)}</Text>
-            <Stack className="flex-row gap-3">
-              {days !== null && (
-                <Text className="text-sm text-muted-foreground">
-                  {days} {days === 1 ? "day" : "days"}
-                </Text>
-              )}
-              <Text className="text-sm text-muted-foreground">
-                {crewCount} {crewCount === 1 ? "member" : "members"}
+            <Row className="items-center gap-1.5">
+              <CalendarIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] text-muted-foreground">
+                {formatDateRange(dateFrom, dateTo)}
               </Text>
-            </Stack>
+            </Row>
+            <Row className="flex-wrap gap-x-3 gap-y-1">
+              {days !== null && (
+                <Row className="items-center gap-1">
+                  <ClockIcon size={12} color={palette.ocean500} />
+                  <Text className="text-[11px] tabular-nums text-muted-foreground">
+                    {days} {days === 1 ? "day" : "days"}
+                  </Text>
+                </Row>
+              )}
+              <Row className="items-center gap-1">
+                <UsersIcon size={12} color={palette.ocean500} />
+                <Text className="text-[11px] tabular-nums text-muted-foreground">
+                  {crewCount} {crewCount === 1 ? "member" : "members"}
+                </Text>
+              </Row>
+            </Row>
           </CardContent>
         </Card>
       </Pressable>

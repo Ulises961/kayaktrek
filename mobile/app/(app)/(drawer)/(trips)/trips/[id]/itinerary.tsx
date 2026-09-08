@@ -6,23 +6,26 @@ import {
   Map as MapLibreMap,
   Marker,
 } from "@maplibre/maplibre-react-native"
-import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
+import { BottomSheet } from "@expo/ui"
+import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from "react-native"
+import { ActivityIndicator, ScrollView, View } from "react-native"
 
-import type { Day } from "../../../../../frontend/lib/dtos/day"
-import type { Point } from "../../../../../frontend/lib/dtos/point"
-import { palette } from "../../../../../frontend/lib/tokens"
-import { walkPoints } from "../../../../../frontend/lib/itinerary/linked-list"
+import type { Day } from "@shared/dtos/day"
+import type { Point } from "@shared/dtos/point"
+import { palette } from "@shared/tokens"
+import { walkPoints } from "@shared/itinerary/linked-list"
 
-import { WeatherSeaPanel } from "../../../../components/trips/weather-sea-panel"
-import { ZoomControl } from "../../../../components/trips/zoom-control"
-import { Row, Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { OSM_TILE_URL } from "../../../../lib/map/tiles"
-import { getTrip } from "../../../../lib/trips/actions"
+import { ConditionsHandle } from "../../../../../../components/trips/conditions-handle"
+import { conditionsTeaser, WeatherSeaPanel } from "../../../../../../components/trips/weather-sea-panel"
+import { ZoomControl } from "../../../../../../components/trips/zoom-control"
+import { Chip } from "../../../../../../components/ui/chip"
+import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
+import { Text } from "../../../../../../components/ui/text"
+import { OSM_TILE_URL } from "../../../../../../lib/map/tiles"
+import { getTrip } from "../../../../../../lib/trips/actions"
 
-import type { Trip } from "../../../../../frontend/lib/dtos/trip"
+import type { Trip } from "@shared/dtos/trip"
 
 // A minimal inline style — one raster source pointing at the M8 tile proxy, one layer
 // to render it — rather than a hosted style.json (plans/M9b.md WP3: "no new backend
@@ -72,6 +75,7 @@ export default function TripMapScreen() {
   const [error, setError] = useState<string | null>(null)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(10)
+  const [isConditionsOpen, setIsConditionsOpen] = useState(false)
   const cameraRef = useRef<CameraRef>(null)
 
   useEffect(() => {
@@ -112,6 +116,7 @@ export default function TripMapScreen() {
   )
 
   const bounds = useMemo(() => boundsOf(locatedPoints), [locatedPoints])
+  const teaser = conditionsTeaser(selectedDay)
 
   if (error) {
     return (
@@ -134,44 +139,48 @@ export default function TripMapScreen() {
   return (
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: trip.destination ?? "Trip" }} />
-      <Row className="items-center justify-between px-4 py-3">
+      <Row className="items-center px-4 py-3">
         {days.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
             <Stack className="flex-row gap-2">
-              {days.map((day) => {
-                const active = day.id === selectedDayId
-                return (
-                  <TouchableOpacity
-                    key={day.id}
-                    onPress={() => setSelectedDayId(day.id ?? null)}
-                    className={active ? "rounded-full bg-primary px-4 py-2" : "rounded-full border border-border px-4 py-2"}
-                  >
-                    <Text className={active ? "text-primary-foreground" : "text-foreground"}>
-                      Day {day.dayNumber}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
+              {days.map((day) => (
+                <Chip
+                  key={day.id}
+                  active={day.id === selectedDayId}
+                  onPress={() => setSelectedDayId(day.id ?? null)}
+                >
+                  Day {day.dayNumber}
+                </Chip>
+              ))}
             </Stack>
           </ScrollView>
         ) : (
           <View className="flex-1" />
         )}
-
-        <Link href={{ pathname: "/trips/[id]/float-plan", params: { id } }} asChild>
-          <TouchableOpacity className="rounded-full border border-border px-4 py-2">
-            <Text className="text-sm">Float plan</Text>
-          </TouchableOpacity>
-        </Link>
       </Row>
 
-      <WeatherSeaPanel day={selectedDay} />
+      {/* M9b3 WP2: a modal sheet, not a persistently-docked panel — @expo/ui's BottomSheet
+          is isPresented/onDismiss (show/hide), with no "always visible, collapsed to a
+          handle" resting state and no continuous drag-to-height on Android (only 'half'/
+          'full' snap points there). `ConditionsHandle` stands in for the docked handle a
+          JS-driven sheet library would provide natively — it floats over the map, not the
+          day strip, so it reads as attached to the thing it opens. */}
+      <BottomSheet isPresented={isConditionsOpen} onDismiss={() => setIsConditionsOpen(false)}>
+        <WeatherSeaPanel day={selectedDay} />
+      </BottomSheet>
 
       <View style={{ flex: 1 }}>
         <MapLibreMap
           mapStyle={MAP_STYLE}
           style={{ flex: 1 }}
           onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
+          // Default "surface" renders via Android's GLSurfaceView, a separate hardware
+          // compositing layer outside RN's normal view z-order — this is what caused the
+          // day-strip/weather-panel area above the map to render as a solid black bar
+          // (M9b2 bug report, 2026-09-06). "texture" uses a regular TextureView, which
+          // composites normally within the RN view hierarchy at a real perf cost that's
+          // fine for this static, non-gesture-heavy map.
+          androidView="texture"
         >
           {/* Always mounted — even with no located points, so cameraRef is available for
               the zoom control. Conditionally rendering this on `bounds` left cameraRef
@@ -208,6 +217,10 @@ export default function TripMapScreen() {
         </MapLibreMap>
 
         <ZoomControl cameraRef={cameraRef} zoom={zoom} />
+
+        {teaser && (
+          <ConditionsHandle teaser={teaser} onPress={() => setIsConditionsOpen(true)} />
+        )}
       </View>
     </Screen>
   )

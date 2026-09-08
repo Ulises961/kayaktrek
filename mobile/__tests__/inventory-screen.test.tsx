@@ -1,0 +1,206 @@
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import InventoryScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/items"
+import { getSession } from "../lib/auth/session"
+import {
+  addRequirement,
+  contributeItem,
+  getMyItems,
+  removeRequirement,
+  unclaimRequirement,
+} from "../lib/inventory/actions"
+import {
+  addPackingItem,
+  getPackingItems,
+  removePackingItem,
+  togglePackingItem,
+} from "../lib/inventory/personal-packing-actions"
+import { getTrip } from "../lib/trips/actions"
+
+// Extends jest.setup.ts's global Stack.Screen stub rather than replacing the module —
+// this screen also needs useLocalSearchParams, which no other screen test has needed
+// yet (M9b's map/float-plan screens have no tests, per CLAUDE.md's M9b entry).
+jest.mock("expo-router", () => {
+  const actual = jest.requireActual("expo-router")
+  return {
+    ...actual,
+    Stack: Object.assign(actual.Stack, { Screen: () => null }),
+    useLocalSearchParams: () => ({ id: "trip-1" }),
+  }
+})
+jest.mock("../lib/trips/actions", () => ({
+  getTrip: jest.fn(),
+}))
+jest.mock("../lib/inventory/actions", () => ({
+  getMyItems: jest.fn(),
+  addRequirement: jest.fn(),
+  removeRequirement: jest.fn(),
+  contributeItem: jest.fn(),
+  unclaimRequirement: jest.fn(),
+}))
+jest.mock("../lib/inventory/personal-packing-actions", () => ({
+  getPackingItems: jest.fn(),
+  addPackingItem: jest.fn(),
+  togglePackingItem: jest.fn(),
+  removePackingItem: jest.fn(),
+}))
+jest.mock("../lib/auth/session", () => ({
+  getSession: jest.fn(),
+}))
+
+const mockGetTrip = getTrip as jest.Mock
+const mockGetMyItems = getMyItems as jest.Mock
+const mockAddRequirement = addRequirement as jest.Mock
+const mockRemoveRequirement = removeRequirement as jest.Mock
+const mockContributeItem = contributeItem as jest.Mock
+const mockUnclaimRequirement = unclaimRequirement as jest.Mock
+const mockGetPackingItems = getPackingItems as jest.Mock
+const mockAddPackingItem = addPackingItem as jest.Mock
+const mockTogglePackingItem = togglePackingItem as jest.Mock
+const mockRemovePackingItem = removePackingItem as jest.Mock
+const mockGetSession = getSession as jest.Mock
+
+const ME = { userId: "me-id", email: "me@example.com" }
+const MY_ITEM = { id: "item-1", name: "Spare paddle", status: "owned" }
+
+const NEEDED_REQUIREMENT = {
+  id: "req-1",
+  name: "First aid kit",
+  status: "needed",
+  proposedBy: { id: "member-me", user: { id: ME.userId, username: "me" } },
+  contributions: [],
+}
+const COVERED_BY_ME = {
+  id: "req-2",
+  name: "Spare paddle",
+  status: "covered",
+  proposedBy: { id: "member-other", user: { id: "other-id", username: "ada" } },
+  contributions: [
+    {
+      id: "contrib-1",
+      member: { id: "member-me", user: { id: ME.userId, username: "me" } },
+      item: { id: "item-1", name: "Spare paddle" },
+    },
+  ],
+}
+
+beforeEach(() => {
+  mockGetTrip.mockReset()
+  mockGetMyItems.mockReset()
+  mockAddRequirement.mockReset()
+  mockRemoveRequirement.mockReset()
+  mockContributeItem.mockReset()
+  mockUnclaimRequirement.mockReset()
+  mockGetPackingItems.mockReset()
+  mockAddPackingItem.mockReset()
+  mockTogglePackingItem.mockReset()
+  mockRemovePackingItem.mockReset()
+  mockGetSession.mockReset()
+  mockGetSession.mockResolvedValue(ME)
+  mockGetMyItems.mockResolvedValue([MY_ITEM])
+  mockGetPackingItems.mockResolvedValue([])
+})
+
+describe("InventoryScreen — group requirements", () => {
+  it("shows a needed requirement with a Remove button for its own proposer", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
+    })
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+
+    expect(await findByText("First aid kit")).toBeTruthy()
+    expect(getByText("Needed")).toBeTruthy()
+    expect(getByText("Remove")).toBeTruthy()
+  })
+
+  it("removing a requirement calls removeRequirement and drops it from the list", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
+    })
+    mockRemoveRequirement.mockResolvedValue(undefined)
+
+    const { findByText, getByText, queryByText } = await render(<InventoryScreen />)
+    await findByText("First aid kit")
+
+    await fireEvent.press(getByText("Remove"))
+
+    await waitFor(() => {
+      expect(mockRemoveRequirement).toHaveBeenCalledWith("inv-1", "req-1")
+    })
+    await waitFor(() => {
+      expect(queryByText("First aid kit")).toBeNull()
+    })
+  })
+
+  it("covering a requirement lists owned items and contributes the tapped one", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
+    })
+    mockContributeItem.mockResolvedValue({ ...NEEDED_REQUIREMENT, status: "covered" })
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await findByText("First aid kit")
+
+    await fireEvent.press(getByText("Cover"))
+    expect(await findByText("Spare paddle")).toBeTruthy()
+
+    await fireEvent.press(getByText("Spare paddle"))
+
+    await waitFor(() => {
+      expect(mockContributeItem).toHaveBeenCalledWith("inv-1", "req-1", "item-1")
+    })
+  })
+
+  it("shows Withdraw instead of Cover when the caller already contributed", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      inventory: { id: "inv-1", requirements: [COVERED_BY_ME] },
+    })
+
+    const { findByText, queryByText } = await render(<InventoryScreen />)
+
+    expect(await findByText("Withdraw")).toBeTruthy()
+    expect(queryByText("Cover")).toBeNull()
+  })
+})
+
+describe("InventoryScreen — my kit", () => {
+  it("shows a packed item and toggles it on press", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockGetPackingItems.mockResolvedValueOnce([
+      { id: "entry-1", item: MY_ITEM, checked: false },
+    ])
+    mockTogglePackingItem.mockResolvedValue({ id: "entry-1", item: MY_ITEM, checked: true })
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+
+    expect(await findByText("Spare paddle")).toBeTruthy()
+
+    await fireEvent.press(getByText("Spare paddle"))
+
+    await waitFor(() => {
+      expect(mockTogglePackingItem).toHaveBeenCalledWith("entry-1", true)
+    })
+  })
+
+  it("adds an owned item to the kit", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockGetPackingItems.mockResolvedValueOnce([])
+    mockAddPackingItem.mockResolvedValue({ id: "entry-1", item: MY_ITEM, checked: false })
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+
+    expect(await findByText("Add Spare paddle")).toBeTruthy()
+    await fireEvent.press(getByText("Add Spare paddle"))
+
+    await waitFor(() => {
+      expect(mockAddPackingItem).toHaveBeenCalledWith("trip-1", "item-1")
+    })
+  })
+})

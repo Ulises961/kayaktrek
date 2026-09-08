@@ -41,10 +41,12 @@ export interface BadgeProps extends ViewProps, VariantProps<typeof badgeVariants
 function Badge({ className, textClassName, variant, children, ...props }: BadgeProps) {
   return (
     <View className={cn(badgeVariants({ variant }), className)} {...props}>
-      {typeof children === "string" ? (
-        <Text className={cn(badgeTextVariants({ variant }), textClassName)}>{children}</Text>
-      ) : (
+      {React.isValidElement(children) ? (
         children
+      ) : (
+        // Not just a plain string: see the same fix's comment in chip.tsx for why a
+        // bare `typeof children === "string"` check misses a multi-child JSX body.
+        <Text className={cn(badgeTextVariants({ variant }), textClassName)}>{children}</Text>
       )}
     </View>
   )

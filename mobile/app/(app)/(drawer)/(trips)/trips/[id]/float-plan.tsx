@@ -1,17 +1,19 @@
+import { HeartPulse, Phone, Sailboat, UserRound } from "lucide-react-native"
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
-import type { Logistics } from "../../../../../frontend/lib/dtos/logistics"
-import { TRIP_STATE_LABELS, type Trip } from "../../../../../frontend/lib/dtos/trip"
-import type { TripMember } from "../../../../../frontend/lib/dtos/trip-member"
-import { formatPaddlerName, formatVesselLength } from "../../../../../frontend/lib/user/format"
+import type { Logistics } from "@shared/dtos/logistics"
+import { TRIP_STATE_LABELS, type Trip } from "@shared/dtos/trip"
+import type { TripMember } from "@shared/dtos/trip-member"
+import { palette } from "@shared/tokens"
+import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 
-import { Badge } from "../../../../components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card"
-import { Row, Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { getLogistics, getTrip } from "../../../../lib/trips/actions"
+import { Badge } from "../../../../../../components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "../../../../../../components/ui/card"
+import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
+import { Text } from "../../../../../../components/ui/text"
+import { getLogistics, getTrip } from "../../../../../../lib/trips/actions"
 
 // WP6 (plans/M9b.md): read-only rendering of the same data the printable web float
 // plan shows (frontend/app/(app)/trips/float-plan/[id]/page.tsx) — shore contact +
@@ -75,9 +77,17 @@ export default function FloatPlanScreen() {
           <CardContent>
             {logistics?.shoreContactName ? (
               <Stack className="gap-1">
-                <Text>{logistics.shoreContactName}</Text>
+                <Row className="items-center gap-1.5">
+                  <UserRound size={14} color={palette.ocean500} />
+                  <Text>{logistics.shoreContactName}</Text>
+                </Row>
                 {logistics.shoreContactPhone && (
-                  <Text className="text-sm text-muted-foreground">{logistics.shoreContactPhone}</Text>
+                  <Row className="items-center gap-1.5">
+                    <Phone size={13} color={palette.ocean500} />
+                    <Text className="text-sm text-muted-foreground">
+                      {logistics.shoreContactPhone}
+                    </Text>
+                  </Row>
                 )}
                 {logistics.shoreContactEmail && (
                   <Text className="text-sm text-muted-foreground">{logistics.shoreContactEmail}</Text>
@@ -111,28 +121,34 @@ export default function FloatPlanScreen() {
               <CardContent>
                 <Stack className="gap-1">
                   {(member.vesselMake || member.vesselModel) && (
-                    <Text className="text-sm text-muted-foreground">
-                      {[member.vesselMake, member.vesselModel].filter(Boolean).join(" ")}
-                      {member.vesselLengthCm != null
-                        ? ` · ${formatVesselLength(member.vesselLengthCm)}`
-                        : ""}
-                    </Text>
+                    <Row className="items-center gap-1.5">
+                      <Sailboat size={13} color={palette.ocean500} />
+                      <Text className="text-sm text-muted-foreground">
+                        {[member.vesselMake, member.vesselModel].filter(Boolean).join(" ")}
+                        {member.vesselLengthCm != null
+                          ? ` · ${formatVesselLength(member.vesselLengthCm)}`
+                          : ""}
+                      </Text>
+                    </Row>
                   )}
                   {(member.vesselColorPrimary || member.vesselColorSecondary) && (
-                    <Text className="text-sm text-muted-foreground">
+                    <Text className="pl-[19px] text-sm text-muted-foreground">
                       {[member.vesselColorPrimary, member.vesselColorSecondary]
                         .filter(Boolean)
                         .join(" / ")}
                     </Text>
                   )}
                   {member.emergencyContactName && (
-                    <Text className="text-sm text-muted-foreground">
-                      Emergency: {member.emergencyContactName}
-                      {member.emergencyContactPhone ? ` · ${member.emergencyContactPhone}` : ""}
-                      {member.emergencyContactRelationship
-                        ? ` (${member.emergencyContactRelationship})`
-                        : ""}
-                    </Text>
+                    <Row className="items-center gap-1.5">
+                      <HeartPulse size={13} color={palette.ocean500} />
+                      <Text className="text-sm text-muted-foreground">
+                        {member.emergencyContactName}
+                        {member.emergencyContactPhone ? ` · ${member.emergencyContactPhone}` : ""}
+                        {member.emergencyContactRelationship
+                          ? ` (${member.emergencyContactRelationship})`
+                          : ""}
+                      </Text>
+                    </Row>
                   )}
                 </Stack>
               </CardContent>
