@@ -31,6 +31,7 @@ from Models.travel_document import TravelDocument
 from Models.shuttle_vehicle import ShuttleVehicle
 from Models.tidal_station import TidalStation
 from Models.place import Place
+from Models.wind_diamond import WindDiamond
 from Services.itinerary_service import ItineraryService
 from Services.trip_service import TripService
 
@@ -124,7 +125,8 @@ def require_owner(
 
     Args:
         resource_type: Type of resource ('trip', 'itinerary', 'day', 'sea', 'weather',
-                        'inventory', 'item', 'catalog_item', 'point', 'log', 'image')
+                        'inventory', 'item', 'catalog_item', 'point', 'log', 'image',
+                        'wind_diamond')
         id_param: Name of the parameter containing the resource ID (default: 'id')
         from_body: If True, extract id_param from request body instead of URL (default: False)
         parent_resource: Tuple of (parent_type, parent_id_param) to check parent ownership
@@ -273,6 +275,9 @@ def check_resource_ownership(resource_type: str, resource_id: str, read_only: bo
 
         elif resource_type == "place":
             return _check_place_ownership(g.current_user_id, str(resource_id))
+
+        elif resource_type == "wind_diamond":
+            return _check_wind_diamond_ownership(g.current_user_id, str(resource_id))
 
         else:
             logger.error(f"Unknown resource type: {resource_type}")
@@ -566,3 +571,13 @@ def _check_place_ownership(user_id: str, place_id: str) -> Optional[bool]:
     if place.itinerary_id is None:
         return False
     return _check_itinerary_ownership(user_id, str(place.itinerary_id))
+
+
+def _check_wind_diamond_ownership(user_id: str, wind_diamond_id: str) -> Optional[bool]:
+    """Access to a wind diamond through its itinerary. Wind diamonds are always
+    itinerary-owned (never atlas-seeded), so unlike _check_tidal_diamond_ownership
+    there is no read-only globally-seeded branch."""
+    diamond = db.session.query(WindDiamond).filter_by(id=UUID(wind_diamond_id)).first()
+    if not diamond:
+        return None
+    return _check_itinerary_ownership(user_id, str(diamond.itinerary_id))
