@@ -8,12 +8,15 @@ const BASE_PROPS = {
   swellEnabled: true,
   diamondsEnabled: true,
   hasDiamonds: false,
+  windDiamondsEnabled: true,
+  hasWindDiamonds: false,
   placesEnabled: true,
   hasPlaces: false,
   showConditions: true,
   onWindToggle: vi.fn(),
   onSwellToggle: vi.fn(),
   onDiamondsToggle: vi.fn(),
+  onWindDiamondsToggle: vi.fn(),
   onPlacesToggle: vi.fn(),
 }
 
@@ -114,5 +117,26 @@ describe("LayersControl", () => {
     expect(screen.queryByTestId("wind-toggle")).not.toBeInTheDocument()
     expect(screen.queryByTestId("swell-toggle")).not.toBeInTheDocument()
     expect(screen.getByTestId("places-toggle")).toBeInTheDocument()
+  })
+
+  it("does not render the wind-diamonds-toggle when hasWindDiamonds is false", () => {
+    render(<LayersControl {...BASE_PROPS} hasWindDiamonds={false} />)
+    expect(screen.queryByTestId("wind-diamonds-toggle")).not.toBeInTheDocument()
+  })
+
+  it("renders the wind-diamonds-toggle labelled 'Wind diamonds' when they exist", () => {
+    render(<LayersControl {...BASE_PROPS} hasWindDiamonds />)
+    expect(screen.getByTestId("wind-diamonds-toggle")).toHaveTextContent("Wind diamonds")
+  })
+
+  it("calls onWindDiamondsToggle when wind-diamonds-toggle is clicked", () => {
+    render(<LayersControl {...BASE_PROPS} hasWindDiamonds />)
+    fireEvent.click(screen.getByTestId("wind-diamonds-toggle"))
+    expect(BASE_PROPS.onWindDiamondsToggle).toHaveBeenCalledOnce()
+  })
+
+  it("shows the wind-diamonds-toggle independent of showConditions (day-agnostic, like places)", () => {
+    render(<LayersControl {...BASE_PROPS} showConditions={false} hasWindDiamonds />)
+    expect(screen.getByTestId("wind-diamonds-toggle")).toBeInTheDocument()
   })
 })

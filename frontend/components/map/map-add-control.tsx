@@ -4,14 +4,17 @@ import { Plus, MapPin, Diamond, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type MapAddControlProps = {
-  // Places are itinerary-scoped; diamonds need a selected day (the caller folds
-  // that gate into canAddDiamond).
+  // Places are itinerary-scoped; tidal diamonds need a selected day (the caller
+  // folds that gate into canAddDiamond). Wind diamonds are day-agnostic like
+  // places — canAddWindDiamond needs no day-selection gate.
   canAddPlace: boolean
   canAddDiamond: boolean
+  canAddWindDiamond: boolean
   // Non-null while the user is dropping a pin — the menu collapses to a prompt.
-  placingMode: "place" | "diamond" | null
+  placingMode: "place" | "diamond" | "wind" | null
   onStartPlace: () => void
   onStartDiamond: () => void
+  onStartWindDiamond: () => void
   onCancel: () => void
 }
 
@@ -24,22 +27,25 @@ export type MapAddControlProps = {
 export function MapAddControl({
   canAddPlace,
   canAddDiamond,
+  canAddWindDiamond,
   placingMode,
   onStartPlace,
   onStartDiamond,
+  onStartWindDiamond,
   onCancel,
 }: MapAddControlProps) {
   const [open, setOpen] = useState(false)
 
   if (placingMode) {
+    const prompt = {
+      place: "Click the map to place the spot",
+      diamond: "Click the map to place the diamond",
+      wind: "Click the map to place the wind diamond",
+    }[placingMode]
     return (
       <div className="absolute top-2 left-1/2 z-[1001] -translate-x-1/2">
         <div className="bg-card/95 ring-border/40 flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium shadow-md ring-1 backdrop-blur-sm">
-          <span>
-            {placingMode === "place"
-              ? "Click the map to place the spot"
-              : "Click the map to place the diamond"}
-          </span>
+          <span>{prompt}</span>
           <button
             type="button"
             onClick={onCancel}
@@ -138,6 +144,21 @@ export function MapAddControl({
                 {canAddDiamond
                   ? "Add a manual tide entry for the selected day."
                   : "Select a day first."}
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            data-testid="add-wind-diamond-button"
+            disabled={!canAddWindDiamond}
+            onClick={canAddWindDiamond ? pick(onStartWindDiamond) : undefined}
+            className="hover:enabled:bg-muted/40 flex w-full items-start gap-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Diamond className="text-notice-border mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <span className="flex flex-col">
+              <span className="text-[11px] font-medium">Wind diamond</span>
+              <span className="text-muted-foreground text-[10px]">
+                Flag a place known to originate or accelerate wind.
               </span>
             </span>
           </button>
