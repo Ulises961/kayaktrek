@@ -259,7 +259,7 @@ def test_tidal_station_nearby(client, auth_headers, app):
         _db.session.commit()
         station_id = str(station.id)
     try:
-        resp = client.get("/api/v1/tidal-station/nearby?lat=50.35&lng=-4.15&range=1")
+        resp = client.get("/api/v1/tidal-station/nearby?lat=50.35&lng=-4.15&range=1", headers=auth_headers)
         assert resp.status_code == 200
         names = [s["name"] for s in resp.get_json()]
         assert "Nearby Station Test" in names
@@ -271,8 +271,8 @@ def test_tidal_station_nearby(client, auth_headers, app):
                 _db.session.commit()
 
 
-def test_tidal_station_nearby_excludes_out_of_range(client):
-    resp = client.get("/api/v1/tidal-station/nearby?lat=51.50&lng=-0.10&range=1")
+def test_tidal_station_nearby_excludes_out_of_range(client, auth_headers):
+    resp = client.get("/api/v1/tidal-station/nearby?lat=51.50&lng=-0.10&range=1", headers=auth_headers)
     assert resp.status_code == 200
     # No stations near London — just confirm the endpoint returns an empty list
     assert isinstance(resp.get_json(), list)
