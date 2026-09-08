@@ -15,18 +15,18 @@ import { Text } from "../ui/text"
 // `Waves` export web's lucide-react still has; `WavesHorizontal` is the closest
 // equivalent, not a substitute for a shared icon (there is no shared icon set
 // between the two workspaces, only shared color tokens).
-// M9b3 WP2: this is now a modal-sheet body (@expo/ui's BottomSheet), not an inline
-// panel docked between the day strip and the map — dropped `border-b`/`bg-card`
-// (a lone bottom border reads as a stray rule with nothing below it inside a
-// sheet, and the sheet paints its own background via `containerColor`).
+// M9b3 WP2: this is now `ItinerarySheet`'s body (`@gorhom/bottom-sheet`), not an
+// inline panel docked between the day strip and the map — dropped `border-b`/
+// `bg-card` (a lone bottom border reads as a stray rule with nothing below it
+// inside a sheet, and the sheet paints its own background via `backgroundStyle`).
 export function hasConditions(day: Day | null): boolean {
   return Boolean(day && (day.weather || day.sea))
 }
 
-// Short label for the floating handle that opens the sheet — same "representative
-// hour" selection as the panel body, condensed to one line. Returns null on the
-// same conditions `WeatherSeaPanel` itself would render nothing for, so a caller
-// never shows a handle promising detail there isn't any.
+// Short label shown on the sheet's collapsed day-strip handle (`ItinerarySheet`) —
+// same "representative hour" selection as the panel body, condensed to one line.
+// Returns null on the same conditions `WeatherSeaPanel` itself would render nothing
+// for, so a caller never shows a teaser promising detail there isn't any.
 export function conditionsTeaser(day: Day | null): string | null {
   if (!hasConditions(day)) return null
   const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
