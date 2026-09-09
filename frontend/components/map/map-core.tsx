@@ -102,6 +102,12 @@ export type MapCoreProps = {
   // Crew positions broadcast during Navigate mode (M8). Absent/empty outside a
   // happening trip — MapBuilder only ever populates this while navigateMode is on.
   livePositions?: LivePosition[]
+  // The most recently dropped point, once its create round trip has confirmed a
+  // real id — a stray click is easy to make and used to mean scrolling the
+  // sidebar list to find and delete it. Its marker offers an inline discard
+  // control instead. Null/absent shows no control on any marker.
+  pendingPointId?: string | null
+  onUndoPendingPoint?: () => void
 }
 
 // Module-level constants so options objects are stable across renders.
@@ -351,6 +357,8 @@ type ConnectedMarkerProps = {
   boundaryColors: { left: string; right: string } | null
   draggable?: boolean
   label?: string | null
+  showUndo?: boolean
+  onUndo?: () => void
   onMarkerDragMove: (pointId: string, lat: number, lng: number) => void
   onMarkerDragEnd: (pointId: string, lat: number, lng: number) => void
   onMarkerClick?: (pointId: string) => void
@@ -363,6 +371,8 @@ const ConnectedMarker = memo(function ConnectedMarker({
   boundaryColors,
   draggable = true,
   label,
+  showUndo,
+  onUndo,
   onMarkerDragMove,
   onMarkerDragEnd,
   onMarkerClick,
@@ -406,6 +416,8 @@ const ConnectedMarker = memo(function ConnectedMarker({
       customIcon={customIcon}
       draggable={draggable}
       label={label}
+      showUndo={showUndo}
+      onUndo={onUndo}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
@@ -434,6 +446,8 @@ export default function MapCore({
   onMarkerClick,
   onLegClick,
   livePositions = [],
+  pendingPointId = null,
+  onUndoPendingPoint,
 }: MapCoreProps) {
   // Drives the chart-furniture branch below.
   const isCompactMap = useIsBelowBreakpoint(LG_BREAKPOINT)
@@ -868,6 +882,8 @@ export default function MapCore({
             boundaryColors={point.id ? (boundaryMap[point.id] ?? null) : null}
             draggable={!viewMode}
             label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
+            showUndo={!viewMode && point.id != null && point.id === pendingPointId}
+            onUndo={onUndoPendingPoint}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}
             onMarkerClick={onMarkerClick}

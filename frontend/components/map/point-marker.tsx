@@ -2,6 +2,7 @@
 import { useCallback, useMemo } from "react"
 import { Marker, Tooltip } from "react-leaflet"
 import L from "leaflet"
+import { Undo2Icon } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { ringIcon } from "./ring-icon"
 
@@ -15,6 +16,12 @@ type PointMarkerProps = {
   // Permanent distance label shown above the marker (e.g. a stop's leg in view
   // mode, or the route tip's running total while planning). Null hides it.
   label?: string | null
+  // The point most recently dropped on the map is easy to add by accident —
+  // one misplaced click and the fix used to mean scrolling the sidebar list
+  // to find it. Showing a discard control right on the marker skips that.
+  // Takes over the marker's tooltip slot when true, ahead of `label`.
+  showUndo?: boolean
+  onUndo?: () => void
   onDragMove: (lat: number, lng: number) => void
   onDragEnd: (lat: number, lng: number) => void
   onClick?: () => void
@@ -29,6 +36,8 @@ export function PointMarker({
   customIcon,
   draggable = true,
   label,
+  showUndo = false,
+  onUndo,
   onDragMove,
   onDragEnd,
   onClick,
@@ -76,7 +85,21 @@ export function PointMarker({
 
   return (
     <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers}>
-      {label ? (
+      {showUndo && onUndo ? (
+        <Tooltip permanent interactive direction="top" className="undo-point-tooltip">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onUndo()
+            }}
+            className="text-destructive flex items-center gap-1 text-xs font-medium"
+          >
+            <Undo2Icon className="size-3.5" aria-hidden="true" />
+            Discard point
+          </button>
+        </Tooltip>
+      ) : label ? (
         <Tooltip permanent direction="top" className="distance-label">
           {label}
         </Tooltip>

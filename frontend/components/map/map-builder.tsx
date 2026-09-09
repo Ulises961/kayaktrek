@@ -18,10 +18,12 @@ import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import { initDraftBoundaries, type DraftBoundary } from "@/lib/itinerary/boundaries"
+import { repointDraftAfterPointRemoval } from "@/lib/itinerary/point-removal"
 import type { TripState } from "@/lib/dtos/trip"
 import {
   createPoint,
   updatePoint,
+  deletePoint,
   updateItinerary,
   ensureStagingDay,
   setPointOrder,
@@ -351,6 +353,26 @@ export function MapBuilder({
     [viewMode, state.points],
   )
 
+  // pendingPointId tracks the most recently dropped point, but a still-optimistic
+  // add carries a temp id — undoing it would delete nothing server-side and
+  // orphan the row createPoint is about to persist. Only offer the discard
+  // control once the point has a real, confirmed id.
+  const undoablePendingPointId =
+    state.pendingPointId && !state.pendingPointId.startsWith("tmp-") ? state.pendingPointId : null
+
+  const handleUndoPendingPoint = useCallback(async () => {
+    const pointId = undoablePendingPointId
+    if (!pointId) return
+    if (draft) {
+      setDraft(repointDraftAfterPointRemoval(draft, state.pointOrder, pointId))
+    }
+    setSelectedPointId(null)
+    dispatch({ type: "POINT_REMOVE", id: pointId })
+    dispatch({ type: "SAVING_START" })
+    await deletePoint(pointId)
+    dispatch({ type: "SAVING_END" })
+  }, [undoablePendingPointId, draft, state.pointOrder, dispatch])
+
   const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
     setDistanceUnit(unit)
     setUnitPreference(unit)
@@ -516,6 +538,8 @@ export function MapBuilder({
               onLegClick={handleLegClick}
               avgSpeedKnots={avgSpeedKnots}
               livePositions={navigateMode ? liveStream.positions : []}
+              pendingPointId={undoablePendingPointId}
+              onUndoPendingPoint={handleUndoPendingPoint}
             />
             {viewMode && <PointDetailSheet />}
           </div>

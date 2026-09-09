@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import type { Point } from "@/lib/dtos/point"
 
@@ -134,6 +135,40 @@ describe("PointMarker — dragging", () => {
   it("is not draggable when draggable is explicitly false (e.g. a locked boundary marker)", () => {
     render(<PointMarker {...BASE_PROPS} draggable={false} />)
     expect(lastMarkerProps.draggable).toBe(false)
+  })
+})
+
+describe("PointMarker — undo affordance", () => {
+  it("renders a discard control when showUndo is true", () => {
+    render(<PointMarker {...BASE_PROPS} showUndo onUndo={vi.fn()} />)
+    expect(screen.getByRole("button", { name: /discard/i })).toBeInTheDocument()
+  })
+
+  it("renders no discard control when showUndo is false", () => {
+    render(<PointMarker {...BASE_PROPS} showUndo={false} onUndo={vi.fn()} />)
+    expect(screen.queryByRole("button", { name: /discard/i })).not.toBeInTheDocument()
+  })
+
+  it("calls onUndo when the discard control is clicked", async () => {
+    const onUndo = vi.fn()
+    render(<PointMarker {...BASE_PROPS} showUndo onUndo={onUndo} />)
+    await userEvent.click(screen.getByRole("button", { name: /discard/i }))
+    expect(onUndo).toHaveBeenCalledOnce()
+  })
+
+  it("does not let the discard click bubble into the marker's own click handler", async () => {
+    const onUndo = vi.fn()
+    const onClick = vi.fn()
+    render(<PointMarker {...BASE_PROPS} showUndo onUndo={onUndo} onClick={onClick} />)
+    await userEvent.click(screen.getByRole("button", { name: /discard/i }))
+    expect(onUndo).toHaveBeenCalledOnce()
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it("prefers the discard control over the distance label when both would apply", () => {
+    render(<PointMarker {...BASE_PROPS} showUndo onUndo={vi.fn()} label="6.2 nm · 2h 30min" />)
+    expect(screen.getByRole("button", { name: /discard/i })).toBeInTheDocument()
+    expect(screen.queryByText("6.2 nm · 2h 30min")).not.toBeInTheDocument()
   })
 })
 
