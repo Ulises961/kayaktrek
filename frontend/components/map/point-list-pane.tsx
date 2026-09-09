@@ -13,6 +13,7 @@ import {
   latestDatedSliceDate,
 } from "@/lib/itinerary/boundaries"
 import { getDayColor } from "@/lib/itinerary/colors"
+import { repointDraftAfterPointRemoval } from "@/lib/itinerary/point-removal"
 import { totalDistanceNm, legLabel, dayRouteLegs } from "@/lib/itinerary/distance"
 import { dayRouteGroups } from "@/lib/itinerary/day-points"
 import {
@@ -228,17 +229,8 @@ export function PointListPane() {
 
   const handleDelete = useCallback(
     async (pointId: string) => {
-      // Re-anchor any draft boundary ending on this point to its predecessor, so
-      // the day shrinks by one instead of falling back to resolveDraft's
-      // anchor-loss clamp, which would collapse it to zero length.
       if (draft) {
-        const idx = state.pointOrder.indexOf(pointId)
-        const predecessor = idx > 0 ? state.pointOrder[idx - 1] : null
-        setDraft(
-          draft.map((boundary) =>
-            boundary.endPointId === pointId ? { ...boundary, endPointId: predecessor } : boundary,
-          ),
-        )
+        setDraft(repointDraftAfterPointRemoval(draft, state.pointOrder, pointId))
       }
       setSelectedPointId(null)
       dispatch({ type: "POINT_REMOVE", id: pointId })
