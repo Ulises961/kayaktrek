@@ -17,7 +17,7 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import { initDraftBoundaries, type DraftBoundary } from "@/lib/itinerary/boundaries"
 import type { TripState } from "@/lib/dtos/trip"
 import {
   createPoint,
@@ -226,6 +226,16 @@ export function MapBuilder({
     dispatch({ type: "SET_PENDING", id: tempId })
     dispatch({ type: "SAVING_START" })
 
+    // A point landing in Day 0 is a tail-orphan the last day's boundary already
+    // covers (boundaries.ts's tail rule) — materialize the implicit draft so
+    // Save days lights up without a separate boundary gesture, the same as any
+    // other dirtying edit (M14). Only when a numbered day exists to walk it
+    // into; with none, there's nothing yet for Save days to do.
+    const materializedDraftHere = draft === null && state.days.length > 0
+    if (materializedDraftHere) {
+      setDraft(initDraftBoundaries(state.days, [...state.pointOrder, tempId]))
+    }
+
     const result = await createPoint(stagingDayId, {
       type: "position",
       latitude: lat,
@@ -237,6 +247,7 @@ export function MapBuilder({
       dispatch({ type: "POINT_CONFIRM", tempId, point: { ...result.point, dayId: stagingDayId } })
     } else {
       dispatch({ type: "POINT_ROLLBACK", id: tempId })
+      if (materializedDraftHere) setDraft(null)
     }
   }
 

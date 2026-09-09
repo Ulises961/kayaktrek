@@ -87,9 +87,15 @@ vi.mock("next/dynamic", () => ({
     },
 }))
 
-vi.mock("../point-list-pane", () => ({
-  PointListPane: () => <div data-testid="point-list-pane" />,
-}))
+vi.mock("../point-list-pane", async () => {
+  const { useMapBuilder } = await import("@/lib/itinerary/map-builder-context")
+  return {
+    PointListPane: () => {
+      const { draft } = useMapBuilder()
+      return <div data-testid="point-list-pane" data-draft={draft === null ? "null" : "set"} />
+    },
+  }
+})
 
 vi.mock("../day-rail", () => ({
   DayRail: () => <div data-testid="day-rail" />,
@@ -304,6 +310,69 @@ describe("MapBuilder — dropping a point on the map", () => {
     ...ITINERARY,
     days: [{ dayNumber: 0, id: "day-0", points: [] }],
   }
+
+  it("does not mark the draft dirty when there is no numbered day to walk the point into", async () => {
+    // Day 0 only (bootstrap state) — there is no last day for the tail rule to
+    // extend, so Save days must stay disabled until "Add day" creates one.
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"id":"confirmed-1"/),
+    )
+    expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "null")
+  })
+
+  it("marks the draft dirty as soon as a point lands in day 0 with a numbered day present", async () => {
+    // The point isn't reassigned to the last day server-side until Save — this
+    // only needs to enable the button, via the same implicit-draft mechanism a
+    // boundary drag uses.
+    const withNumberedDay: Itinerary = {
+      ...ITINERARY,
+      days: [
+        { dayNumber: 0, id: "day-0", points: [] },
+        {
+          dayNumber: 1,
+          id: "day-1",
+          startPointId: "p1",
+          endPointId: "p1",
+          points: [{ id: "p1", type: "stop", latitude: 44.0, longitude: 14.0, dayId: "day-1" }],
+        },
+      ],
+    }
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withNumberedDay} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "null")
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "set"),
+    )
+  })
 
   it("confirms the optimistically-added point with the server id on success", async () => {
     vi.mocked(createPoint).mockResolvedValueOnce({
