@@ -6,21 +6,18 @@ import {
   Map as MapLibreMap,
   Marker,
 } from "@maplibre/maplibre-react-native"
-import { BottomSheet } from "@expo/ui"
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, ScrollView, View } from "react-native"
+import { ActivityIndicator, View } from "react-native"
 
 import type { Day } from "@shared/dtos/day"
 import type { Point } from "@shared/dtos/point"
 import { palette } from "@shared/tokens"
 import { walkPoints } from "@shared/itinerary/linked-list"
 
-import { ConditionsHandle } from "../../../../../../components/trips/conditions-handle"
-import { conditionsTeaser, WeatherSeaPanel } from "../../../../../../components/trips/weather-sea-panel"
+import { ItinerarySheet } from "../../../../../../components/trips/itinerary-sheet"
 import { ZoomControl } from "../../../../../../components/trips/zoom-control"
-import { Chip } from "../../../../../../components/ui/chip"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
+import { Screen } from "../../../../../../components/ui/layout"
 import { Text } from "../../../../../../components/ui/text"
 import { OSM_TILE_URL } from "../../../../../../lib/map/tiles"
 import { getTrip } from "../../../../../../lib/trips/actions"
@@ -75,7 +72,6 @@ export default function TripMapScreen() {
   const [error, setError] = useState<string | null>(null)
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(10)
-  const [isConditionsOpen, setIsConditionsOpen] = useState(false)
   const cameraRef = useRef<CameraRef>(null)
 
   useEffect(() => {
@@ -116,7 +112,6 @@ export default function TripMapScreen() {
   )
 
   const bounds = useMemo(() => boundsOf(locatedPoints), [locatedPoints])
-  const teaser = conditionsTeaser(selectedDay)
 
   if (error) {
     return (
@@ -139,36 +134,12 @@ export default function TripMapScreen() {
   return (
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: trip.destination ?? "Trip" }} />
-      <Row className="items-center px-4 py-3">
-        {days.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
-            <Stack className="flex-row gap-2">
-              {days.map((day) => (
-                <Chip
-                  key={day.id}
-                  active={day.id === selectedDayId}
-                  onPress={() => setSelectedDayId(day.id ?? null)}
-                >
-                  Day {day.dayNumber}
-                </Chip>
-              ))}
-            </Stack>
-          </ScrollView>
-        ) : (
-          <View className="flex-1" />
-        )}
-      </Row>
 
-      {/* M9b3 WP2: a modal sheet, not a persistently-docked panel — @expo/ui's BottomSheet
-          is isPresented/onDismiss (show/hide), with no "always visible, collapsed to a
-          handle" resting state and no continuous drag-to-height on Android (only 'half'/
-          'full' snap points there). `ConditionsHandle` stands in for the docked handle a
-          JS-driven sheet library would provide natively — it floats over the map, not the
-          day strip, so it reads as attached to the thing it opens. */}
-      <BottomSheet isPresented={isConditionsOpen} onDismiss={() => setIsConditionsOpen(false)}>
-        <WeatherSeaPanel day={selectedDay} />
-      </BottomSheet>
-
+      {/* M9b3 WP2: full-bleed map — the day strip and weather/sea detail no longer sit
+          in a fixed row above it. `ItinerarySheet` (`@gorhom/bottom-sheet`) docks the day
+          strip as its always-visible handle and reveals weather/sea below it by dragging
+          or tapping — see plans/M9b3.md's library-choice table for why gorhom over the
+          reverted `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
         <MapLibreMap
           mapStyle={MAP_STYLE}
@@ -218,9 +189,12 @@ export default function TripMapScreen() {
 
         <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
-        {teaser && (
-          <ConditionsHandle teaser={teaser} onPress={() => setIsConditionsOpen(true)} />
-        )}
+        <ItinerarySheet
+          days={days}
+          selectedDayId={selectedDayId}
+          onSelectDay={setSelectedDayId}
+          selectedDay={selectedDay}
+        />
       </View>
     </Screen>
   )
