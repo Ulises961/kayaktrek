@@ -7,6 +7,26 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.2] - 2026-09-09
+
+### Changed
+
+- The itinerary map's on-map discard control now always sits on the route's last point rather
+  than only the point you just dropped — deleting it hands the control to the point now
+  underneath, so a run of stray points can be trimmed back-to-front without the sidebar. The
+  control is icon-only (a neutral trash-can icon) and now sits alongside the point's
+  distance/time label instead of replacing it.
+
+### Fixed
+
+- A point dropped into an already-planned trip's staging day didn't mark the day boundaries as
+  changed, so "Save days" stayed disabled with no way to persist it short of an unrelated drag.
+
+### Security
+
+- Bumped a transitive dependency (`js-yaml`, via `logfire`) to clear a high-severity CPU-DoS
+  advisory (GHSA-2883-xcg3-v3hh). No application code was affected.
+
 ## [1.0.1] - 2026-09-07
 
 ### Fixed
