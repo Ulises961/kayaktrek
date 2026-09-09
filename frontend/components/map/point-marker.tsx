@@ -2,7 +2,7 @@
 import { useCallback, useMemo } from "react"
 import { Marker, Tooltip } from "react-leaflet"
 import L from "leaflet"
-import { Undo2Icon } from "lucide-react"
+import { Trash2Icon } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { ringIcon } from "./ring-icon"
 
@@ -16,10 +16,11 @@ type PointMarkerProps = {
   // Permanent distance label shown above the marker (e.g. a stop's leg in view
   // mode, or the route tip's running total while planning). Null hides it.
   label?: string | null
-  // The point most recently dropped on the map is easy to add by accident —
-  // one misplaced click and the fix used to mean scrolling the sidebar list
-  // to find it. Showing a discard control right on the marker skips that.
-  // Takes over the marker's tooltip slot when true, ahead of `label`.
+  // The tail of the route is always the one point safe to remove without
+  // re-anchoring anything after it — showing a discard control there lets a
+  // stray click (or a run of them) be trimmed straight from the map, one point
+  // at a time, without scrolling the sidebar list to find it. Renders inside
+  // the same tooltip as `label`, not instead of it.
   showUndo?: boolean
   onUndo?: () => void
   onDragMove: (lat: number, lng: number) => void
@@ -86,18 +87,21 @@ export function PointMarker({
   return (
     <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers}>
       {showUndo && onUndo ? (
-        <Tooltip permanent interactive direction="top" className="undo-point-tooltip">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onUndo()
-            }}
-            className="text-destructive flex items-center gap-1 text-xs font-medium"
-          >
-            <Undo2Icon className="size-3.5" aria-hidden="true" />
-            Discard point
-          </button>
+        <Tooltip permanent interactive direction="top" className="discard-point-tooltip">
+          <span className="flex items-center gap-1.5">
+            {label}
+            <button
+              type="button"
+              aria-label="Discard point"
+              onClick={(e) => {
+                e.stopPropagation()
+                onUndo()
+              }}
+              className="flex items-center"
+            >
+              <Trash2Icon className="size-3.5" aria-hidden="true" />
+            </button>
+          </span>
         </Tooltip>
       ) : label ? (
         <Tooltip permanent direction="top" className="distance-label">

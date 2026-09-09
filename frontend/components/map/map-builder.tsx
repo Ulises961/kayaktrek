@@ -353,15 +353,18 @@ export function MapBuilder({
     [viewMode, state.points],
   )
 
-  // pendingPointId tracks the most recently dropped point, but a still-optimistic
-  // add carries a temp id — undoing it would delete nothing server-side and
-  // orphan the row createPoint is about to persist. Only offer the discard
-  // control once the point has a real, confirmed id.
-  const undoablePendingPointId =
-    state.pendingPointId && !state.pendingPointId.startsWith("tmp-") ? state.pendingPointId : null
+  // The tail of the route is the one point removable without re-anchoring
+  // anything after it, so the map's discard control always targets it —
+  // deleting it hands the control to the point now underneath, letting a run
+  // of stray clicks be trimmed back-to-front. A still-optimistic add carries
+  // a temp id — undoing it would delete nothing server-side and orphan the
+  // row createPoint is about to persist — so the control withholds itself
+  // until the tail has a real, confirmed id.
+  const lastPointId = state.pointOrder[state.pointOrder.length - 1] ?? null
+  const discardablePointId = lastPointId && !lastPointId.startsWith("tmp-") ? lastPointId : null
 
   const handleUndoPendingPoint = useCallback(async () => {
-    const pointId = undoablePendingPointId
+    const pointId = discardablePointId
     if (!pointId) return
     if (draft) {
       setDraft(repointDraftAfterPointRemoval(draft, state.pointOrder, pointId))
@@ -371,7 +374,7 @@ export function MapBuilder({
     dispatch({ type: "SAVING_START" })
     await deletePoint(pointId)
     dispatch({ type: "SAVING_END" })
-  }, [undoablePendingPointId, draft, state.pointOrder, dispatch])
+  }, [discardablePointId, draft, state.pointOrder, dispatch])
 
   const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
     setDistanceUnit(unit)
@@ -538,7 +541,7 @@ export function MapBuilder({
               onLegClick={handleLegClick}
               avgSpeedKnots={avgSpeedKnots}
               livePositions={navigateMode ? liveStream.positions : []}
-              pendingPointId={undoablePendingPointId}
+              discardablePointId={discardablePointId}
               onUndoPendingPoint={handleUndoPendingPoint}
             />
             {viewMode && <PointDetailSheet />}

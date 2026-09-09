@@ -102,11 +102,13 @@ export type MapCoreProps = {
   // Crew positions broadcast during Navigate mode (M8). Absent/empty outside a
   // happening trip — MapBuilder only ever populates this while navigateMode is on.
   livePositions?: LivePosition[]
-  // The most recently dropped point, once its create round trip has confirmed a
-  // real id — a stray click is easy to make and used to mean scrolling the
-  // sidebar list to find and delete it. Its marker offers an inline discard
-  // control instead. Null/absent shows no control on any marker.
-  pendingPointId?: string | null
+  // The route's tail point, once its create round trip has confirmed a real
+  // id — the one point removable without re-anchoring anything after it. Its
+  // marker offers an inline discard control so trimming a stray click (or a
+  // run of them) never requires the sidebar list. Null/absent shows no
+  // control on any marker; deleting the tail hands the control to the new
+  // tail underneath it.
+  discardablePointId?: string | null
   onUndoPendingPoint?: () => void
 }
 
@@ -446,7 +448,7 @@ export default function MapCore({
   onMarkerClick,
   onLegClick,
   livePositions = [],
-  pendingPointId = null,
+  discardablePointId = null,
   onUndoPendingPoint,
 }: MapCoreProps) {
   // Drives the chart-furniture branch below.
@@ -882,7 +884,7 @@ export default function MapCore({
             boundaryColors={point.id ? (boundaryMap[point.id] ?? null) : null}
             draggable={!viewMode}
             label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
-            showUndo={!viewMode && point.id != null && point.id === pendingPointId}
+            showUndo={!viewMode && point.id != null && point.id === discardablePointId}
             onUndo={onUndoPendingPoint}
             onMarkerDragMove={handleMarkerDragMove}
             onMarkerDragEnd={handleMarkerDragEnd}

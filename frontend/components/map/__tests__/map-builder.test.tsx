@@ -69,14 +69,14 @@ vi.mock("next/dynamic", () => ({
       onMarkerDragEnd?: (pointId: string, lat: number, lng: number) => void
       onLegClick?: (afterPointId: string, lat: number, lng: number) => void
       livePositions?: unknown[]
-      pendingPointId?: string | null
+      discardablePointId?: string | null
       onUndoPendingPoint?: () => void
     }) {
       return (
         <div
           data-testid="map-core"
           data-live-position-count={props.livePositions?.length ?? 0}
-          data-pending-point-id={props.pendingPointId ?? ""}
+          data-discardable-point-id={props.discardablePointId ?? ""}
         >
           {/* Exposes the points MapBuilder is actually rendering so tests can assert on
               optimistic-update outcomes (confirm/rollback/revert), not just that a handler
@@ -422,13 +422,13 @@ describe("MapBuilder — dropping a point on the map", () => {
   })
 })
 
-describe("MapBuilder — undoing the last dropped point", () => {
+describe("MapBuilder — discarding the tail point", () => {
   const withDay0: Itinerary = {
     ...ITINERARY,
     days: [{ dayNumber: 0, id: "day-0", points: [] }],
   }
 
-  it("exposes the confirmed point as pendingPointId so the marker can offer a discard control", async () => {
+  it("exposes the confirmed tail point as discardablePointId so the marker can offer a discard control", async () => {
     vi.mocked(createPoint).mockResolvedValueOnce({
       success: true,
       point: {
@@ -445,13 +445,13 @@ describe("MapBuilder — undoing the last dropped point", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("map-core")).toHaveAttribute(
-        "data-pending-point-id",
+        "data-discardable-point-id",
         "confirmed-1",
       ),
     )
   })
 
-  it("withholds pendingPointId while the point is still an unconfirmed optimistic add", async () => {
+  it("withholds discardablePointId while the tail is still an unconfirmed optimistic add", async () => {
     // Deleting the real point requires its server id — undoing before createPoint
     // resolves would delete nothing and orphan the row createPoint is about to
     // persist, so the discard control must not be offered yet.
@@ -465,7 +465,7 @@ describe("MapBuilder — undoing the last dropped point", () => {
 
     await userEvent.click(screen.getByText("simulate-map-click"))
 
-    expect(screen.getByTestId("map-core")).toHaveAttribute("data-pending-point-id", "")
+    expect(screen.getByTestId("map-core")).toHaveAttribute("data-discardable-point-id", "")
 
     resolveCreate({
       success: true,
@@ -473,10 +473,61 @@ describe("MapBuilder — undoing the last dropped point", () => {
     })
     await waitFor(() =>
       expect(screen.getByTestId("map-core")).toHaveAttribute(
-        "data-pending-point-id",
+        "data-discardable-point-id",
         "confirmed-1",
       ),
     )
+  })
+
+  it("hands the discard control to the new tail once the old tail is removed", async () => {
+    vi.mocked(createPoint)
+      .mockResolvedValueOnce({
+        success: true,
+        point: {
+          id: "confirmed-1",
+          type: "position",
+          latitude: 44.5,
+          longitude: 14.5,
+          dayId: "day-0",
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        point: {
+          id: "confirmed-2",
+          type: "position",
+          latitude: 44.7,
+          longitude: 14.7,
+          dayId: "day-0",
+        },
+      })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-2",
+      ),
+    )
+
+    await userEvent.click(screen.getByText("simulate-undo-pending-point"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+    expect(deletePoint).toHaveBeenCalledWith("confirmed-2")
   })
 
   it("removes the point on the map and deletes it server-side when the discard control is used", async () => {

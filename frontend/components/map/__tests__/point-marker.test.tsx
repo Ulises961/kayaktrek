@@ -165,10 +165,16 @@ describe("PointMarker — undo affordance", () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it("prefers the discard control over the distance label when both would apply", () => {
+  it("shows the discard control alongside the distance label rather than replacing it", () => {
     render(<PointMarker {...BASE_PROPS} showUndo onUndo={vi.fn()} label="6.2 nm · 2h 30min" />)
     expect(screen.getByRole("button", { name: /discard/i })).toBeInTheDocument()
-    expect(screen.queryByText("6.2 nm · 2h 30min")).not.toBeInTheDocument()
+    expect(screen.getByText("6.2 nm · 2h 30min")).toBeInTheDocument()
+  })
+
+  it("carries no visible supporting text, only the discard icon", () => {
+    render(<PointMarker {...BASE_PROPS} showUndo onUndo={vi.fn()} />)
+    const button = screen.getByRole("button", { name: /discard/i })
+    expect(button).toHaveTextContent("")
   })
 })
 
