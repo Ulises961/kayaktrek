@@ -2,7 +2,7 @@ from http import HTTPStatus
 from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, g, jsonify, request
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
 from Schemas.image_schema import ImageSchema, ImageUpdateSchema
@@ -12,6 +12,7 @@ from Services.point_service import PointService
 from Services.image_service import ImageService
 from Services.storage_service import StorageValidationError
 from Api.database import db
+from Api.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 # `interest` PointType in M4e §1.
 @point_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
+@limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point", parent_resource=("day", "dayId"), from_body=True)
 def create_point():
     """
@@ -79,6 +81,7 @@ def create_point():
 
 @point_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
+@limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point")
 def update_point(id: str):
     """

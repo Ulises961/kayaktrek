@@ -2,6 +2,7 @@
 import { useCallback, useMemo } from "react"
 import { Marker, Tooltip } from "react-leaflet"
 import L from "leaflet"
+import { Trash2Icon } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
 import { ringIcon } from "./ring-icon"
 
@@ -15,6 +16,13 @@ type PointMarkerProps = {
   // Permanent distance label shown above the marker (e.g. a stop's leg in view
   // mode, or the route tip's running total while planning). Null hides it.
   label?: string | null
+  // The tail of the route is always the one point safe to remove without
+  // re-anchoring anything after it — showing a discard control there lets a
+  // stray click (or a run of them) be trimmed straight from the map, one point
+  // at a time, without scrolling the sidebar list to find it. Renders inside
+  // the same tooltip as `label`, not instead of it.
+  showUndo?: boolean
+  onUndo?: () => void
   onDragMove: (lat: number, lng: number) => void
   onDragEnd: (lat: number, lng: number) => void
   onClick?: () => void
@@ -29,6 +37,8 @@ export function PointMarker({
   customIcon,
   draggable = true,
   label,
+  showUndo = false,
+  onUndo,
   onDragMove,
   onDragEnd,
   onClick,
@@ -76,7 +86,24 @@ export function PointMarker({
 
   return (
     <Marker position={position} icon={icon} draggable={draggable} eventHandlers={eventHandlers}>
-      {label ? (
+      {showUndo && onUndo ? (
+        <Tooltip permanent interactive direction="top" className="discard-point-tooltip">
+          <span className="flex items-center gap-1.5">
+            {label}
+            <button
+              type="button"
+              aria-label="Discard point"
+              onClick={(e) => {
+                e.stopPropagation()
+                onUndo()
+              }}
+              className="flex items-center"
+            >
+              <Trash2Icon className="size-3.5" aria-hidden="true" />
+            </button>
+          </span>
+        </Tooltip>
+      ) : label ? (
         <Tooltip permanent direction="top" className="distance-label">
           {label}
         </Tooltip>

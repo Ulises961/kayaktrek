@@ -69,9 +69,15 @@ vi.mock("next/dynamic", () => ({
       onMarkerDragEnd?: (pointId: string, lat: number, lng: number) => void
       onLegClick?: (afterPointId: string, lat: number, lng: number) => void
       livePositions?: unknown[]
+      discardablePointId?: string | null
+      onUndoPendingPoint?: () => void
     }) {
       return (
-        <div data-testid="map-core" data-live-position-count={props.livePositions?.length ?? 0}>
+        <div
+          data-testid="map-core"
+          data-live-position-count={props.livePositions?.length ?? 0}
+          data-discardable-point-id={props.discardablePointId ?? ""}
+        >
           {/* Exposes the points MapBuilder is actually rendering so tests can assert on
               optimistic-update outcomes (confirm/rollback/revert), not just that a handler
               prop exists. */}
@@ -82,14 +88,21 @@ vi.mock("next/dynamic", () => ({
             simulate-marker-drag-end
           </button>
           <button onClick={() => props.onLegClick?.("p1", 44.2, 14.2)}>simulate-leg-click</button>
+          <button onClick={() => props.onUndoPendingPoint?.()}>simulate-undo-pending-point</button>
         </div>
       )
     },
 }))
 
-vi.mock("../point-list-pane", () => ({
-  PointListPane: () => <div data-testid="point-list-pane" />,
-}))
+vi.mock("../point-list-pane", async () => {
+  const { useMapBuilder } = await import("@/lib/itinerary/map-builder-context")
+  return {
+    PointListPane: () => {
+      const { draft } = useMapBuilder()
+      return <div data-testid="point-list-pane" data-draft={draft === null ? "null" : "set"} />
+    },
+  }
+})
 
 vi.mock("../day-rail", () => ({
   DayRail: () => <div data-testid="day-rail" />,
@@ -133,7 +146,13 @@ vi.mock("@/lib/profile/actions", () => ({
 import { MapBuilder } from "../map-builder"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { setUnitPreference } from "@/lib/profile/actions"
-import { createPoint, updatePoint, ensureStagingDay, setPointOrder } from "@/lib/itinerary/actions"
+import {
+  createPoint,
+  updatePoint,
+  deletePoint,
+  ensureStagingDay,
+  setPointOrder,
+} from "@/lib/itinerary/actions"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000030"
@@ -305,6 +324,69 @@ describe("MapBuilder — dropping a point on the map", () => {
     days: [{ dayNumber: 0, id: "day-0", points: [] }],
   }
 
+  it("does not mark the draft dirty when there is no numbered day to walk the point into", async () => {
+    // Day 0 only (bootstrap state) — there is no last day for the tail rule to
+    // extend, so Save days must stay disabled until "Add day" creates one.
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"id":"confirmed-1"/),
+    )
+    expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "null")
+  })
+
+  it("marks the draft dirty as soon as a point lands in day 0 with a numbered day present", async () => {
+    // The point isn't reassigned to the last day server-side until Save — this
+    // only needs to enable the button, via the same implicit-draft mechanism a
+    // boundary drag uses.
+    const withNumberedDay: Itinerary = {
+      ...ITINERARY,
+      days: [
+        { dayNumber: 0, id: "day-0", points: [] },
+        {
+          dayNumber: 1,
+          id: "day-1",
+          startPointId: "p1",
+          endPointId: "p1",
+          points: [{ id: "p1", type: "stop", latitude: 44.0, longitude: 14.0, dayId: "day-1" }],
+        },
+      ],
+    }
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withNumberedDay} tripId={TRIP_ID} tripName="Cinque Terre" />)
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "null")
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("point-list-pane")).toHaveAttribute("data-draft", "set"),
+    )
+  })
+
   it("confirms the optimistically-added point with the server id on success", async () => {
     vi.mocked(createPoint).mockResolvedValueOnce({
       success: true,
@@ -337,6 +419,139 @@ describe("MapBuilder — dropping a point on the map", () => {
 
     await waitFor(() => expect(createPoint).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByTestId("map-core-points")).toHaveTextContent("[]"))
+  })
+})
+
+describe("MapBuilder — discarding the tail point", () => {
+  const withDay0: Itinerary = {
+    ...ITINERARY,
+    days: [{ dayNumber: 0, id: "day-0", points: [] }],
+  }
+
+  it("exposes the confirmed tail point as discardablePointId so the marker can offer a discard control", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+  })
+
+  it("withholds discardablePointId while the tail is still an unconfirmed optimistic add", async () => {
+    // Deleting the real point requires its server id — undoing before createPoint
+    // resolves would delete nothing and orphan the row createPoint is about to
+    // persist, so the discard control must not be offered yet.
+    let resolveCreate!: (value: Awaited<ReturnType<typeof createPoint>>) => void
+    vi.mocked(createPoint).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve
+      }),
+    )
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+
+    expect(screen.getByTestId("map-core")).toHaveAttribute("data-discardable-point-id", "")
+
+    resolveCreate({
+      success: true,
+      point: { id: "confirmed-1", type: "position", latitude: 44.5, longitude: 14.5 },
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+  })
+
+  it("hands the discard control to the new tail once the old tail is removed", async () => {
+    vi.mocked(createPoint)
+      .mockResolvedValueOnce({
+        success: true,
+        point: {
+          id: "confirmed-1",
+          type: "position",
+          latitude: 44.5,
+          longitude: 14.5,
+          dayId: "day-0",
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        point: {
+          id: "confirmed-2",
+          type: "position",
+          latitude: 44.7,
+          longitude: 14.7,
+          dayId: "day-0",
+        },
+      })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-2",
+      ),
+    )
+
+    await userEvent.click(screen.getByText("simulate-undo-pending-point"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core")).toHaveAttribute(
+        "data-discardable-point-id",
+        "confirmed-1",
+      ),
+    )
+    expect(deletePoint).toHaveBeenCalledWith("confirmed-2")
+  })
+
+  it("removes the point on the map and deletes it server-side when the discard control is used", async () => {
+    vi.mocked(createPoint).mockResolvedValueOnce({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    render(<MapBuilder itinerary={withDay0} tripId={TRIP_ID} tripName="Cinque Terre" />)
+
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent(/"id":"confirmed-1"/),
+    )
+
+    await userEvent.click(screen.getByText("simulate-undo-pending-point"))
+
+    await waitFor(() => expect(screen.getByTestId("map-core-points")).toHaveTextContent("[]"))
+    expect(deletePoint).toHaveBeenCalledWith("confirmed-1")
   })
 })
 

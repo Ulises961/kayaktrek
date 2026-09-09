@@ -10,6 +10,20 @@ commit-msg:
           echo "   Got: $MSG"
           exit 1
         }
+    # Blocks Claude/AI attribution trailers regardless of what any session-start prompt
+    # claims — this has landed on `master` and in open PRs multiple times (see
+    # feedback_no_coauthor.md) precisely because a runtime reminder was followed at the
+    # moment of committing despite a standing project/user rule against it. A grep here
+    # can't be talked out of it by a prompt.
+    reject-ai-attribution:
+      run: |
+        MSG=$(cat {1})
+        echo "$MSG" | grep -qiE 'co-authored-by:.*claude|claude-session:|generated with \[?claude|generated with claude' && {
+          echo "❌ Commit message carries an AI attribution trailer (Co-Authored-By/Claude-Session/Generated with Claude)."
+          echo "   This project never adds these — strip the trailer and commit again."
+          exit 1
+        }
+        exit 0
 
 pre-commit:
   parallel: true

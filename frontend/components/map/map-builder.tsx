@@ -17,11 +17,13 @@ import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
-import type { DraftBoundary } from "@/lib/itinerary/boundaries"
+import { initDraftBoundaries, type DraftBoundary } from "@/lib/itinerary/boundaries"
+import { repointDraftAfterPointRemoval } from "@/lib/itinerary/point-removal"
 import type { TripState } from "@/lib/dtos/trip"
 import {
   createPoint,
   updatePoint,
+  deletePoint,
   updateItinerary,
   ensureStagingDay,
   setPointOrder,
@@ -226,6 +228,16 @@ export function MapBuilder({
     dispatch({ type: "SET_PENDING", id: tempId })
     dispatch({ type: "SAVING_START" })
 
+    // A point landing in Day 0 is a tail-orphan the last day's boundary already
+    // covers (boundaries.ts's tail rule) — materialize the implicit draft so
+    // Save days lights up without a separate boundary gesture, the same as any
+    // other dirtying edit (M14). Only when a numbered day exists to walk it
+    // into; with none, there's nothing yet for Save days to do.
+    const materializedDraftHere = draft === null && state.days.length > 0
+    if (materializedDraftHere) {
+      setDraft(initDraftBoundaries(state.days, [...state.pointOrder, tempId]))
+    }
+
     const result = await createPoint(stagingDayId, {
       type: "position",
       latitude: lat,
@@ -237,6 +249,7 @@ export function MapBuilder({
       dispatch({ type: "POINT_CONFIRM", tempId, point: { ...result.point, dayId: stagingDayId } })
     } else {
       dispatch({ type: "POINT_ROLLBACK", id: tempId })
+      if (materializedDraftHere) setDraft(null)
     }
   }
 
@@ -339,6 +352,29 @@ export function MapBuilder({
     },
     [viewMode, state.points],
   )
+
+  // The tail of the route is the one point removable without re-anchoring
+  // anything after it, so the map's discard control always targets it —
+  // deleting it hands the control to the point now underneath, letting a run
+  // of stray clicks be trimmed back-to-front. A still-optimistic add carries
+  // a temp id — undoing it would delete nothing server-side and orphan the
+  // row createPoint is about to persist — so the control withholds itself
+  // until the tail has a real, confirmed id.
+  const lastPointId = state.pointOrder[state.pointOrder.length - 1] ?? null
+  const discardablePointId = lastPointId && !lastPointId.startsWith("tmp-") ? lastPointId : null
+
+  const handleUndoPendingPoint = useCallback(async () => {
+    const pointId = discardablePointId
+    if (!pointId) return
+    if (draft) {
+      setDraft(repointDraftAfterPointRemoval(draft, state.pointOrder, pointId))
+    }
+    setSelectedPointId(null)
+    dispatch({ type: "POINT_REMOVE", id: pointId })
+    dispatch({ type: "SAVING_START" })
+    await deletePoint(pointId)
+    dispatch({ type: "SAVING_END" })
+  }, [discardablePointId, draft, state.pointOrder, dispatch])
 
   const handleDistanceUnitChange = useCallback((unit: DistanceUnit) => {
     setDistanceUnit(unit)
@@ -505,6 +541,8 @@ export function MapBuilder({
               onLegClick={handleLegClick}
               avgSpeedKnots={avgSpeedKnots}
               livePositions={navigateMode ? liveStream.positions : []}
+              discardablePointId={discardablePointId}
+              onUndoPendingPoint={handleUndoPendingPoint}
             />
             {viewMode && <PointDetailSheet />}
           </div>
