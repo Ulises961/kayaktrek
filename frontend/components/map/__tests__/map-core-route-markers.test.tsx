@@ -75,7 +75,10 @@ vi.mock("@/lib/map/hazard-positions/actions", () => ({
 
 import MapCore from "../map-core"
 
-const DAYS: Day[] = [{ id: "day-1", order: 1 } as Day, { id: "day-2", order: 2 } as Day]
+const DAYS: Day[] = [
+  { id: "day-1", dayNumber: 1 },
+  { id: "day-2", dayNumber: 2 },
+]
 
 const POINTS: Point[] = [
   { id: "p1", type: "stop", latitude: 43.0, longitude: 13.0, dayId: "day-1", nextId: "p2" },
