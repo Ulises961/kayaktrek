@@ -165,14 +165,13 @@ a:focus-visible, button:focus-visible {
 }
 
 .hero-mark {
-  display: flex;
-  justify-content: center;
+  display: none;
   opacity: 0.92;
 }
 .hero-mark svg { width: min(10rem, 45vw); height: auto; }
 
 @media (min-width: 900px) {
-  .hero-mark { justify-content: flex-end; }
+  .hero-mark { display: flex; justify-content: flex-end; }
 }
 
 .hero-mark .hull-path {
