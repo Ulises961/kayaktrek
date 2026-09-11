@@ -114,6 +114,7 @@ DEFAULT_PLACE_CATEGORIES = [
     {"slug": "freshwater",   "name": "Freshwater",    "icon": "droplet"},
     {"slug": "food",         "name": "Food",          "icon": "utensils"},
     {"slug": "shop",         "name": "Shop",          "icon": "store"},
+    {"slug": "kayak_rental", "name": "Kayak rental",  "icon": "kayak"},
     {"slug": "fuel",         "name": "Fuel",          "icon": "fuel"},
     {"slug": "pub",          "name": "Pub",           "icon": "beer"},
     # Sleep & shelter
