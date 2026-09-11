@@ -4,13 +4,16 @@ import { Marker, Tooltip } from "react-leaflet"
 import L from "leaflet"
 import { Trash2Icon } from "lucide-react"
 import type { Point, PointType } from "@/lib/dtos/point"
-import { ringIcon } from "./ring-icon"
+import { ringIcon, type RouteMarker } from "./ring-icon"
 
 type PointMarkerProps = {
   point: Point & { latitude: number; longitude: number }
   color: string
   type: PointType
   index?: number
+  // The route's overall start/finish, derived from position in the ordered
+  // route — a badge on the existing marker, not a second one at the same spot.
+  routeMarker?: RouteMarker | null
   customIcon?: L.Icon | L.DivIcon
   draggable?: boolean
   // Permanent distance label shown above the marker (e.g. a stop's leg in view
@@ -34,6 +37,7 @@ export function PointMarker({
   color,
   type,
   index,
+  routeMarker,
   customIcon,
   draggable = true,
   label,
@@ -54,8 +58,8 @@ export function PointMarker({
   // detaching Leaflet's drag handlers and producing the jagged "dropped early" effect.
   // customIcon (e.g. splitRingIcon for boundary markers) must also be memoised by the caller.
   const icon = useMemo(
-    () => customIcon ?? ringIcon(color, type, index),
-    [customIcon, color, type, index],
+    () => customIcon ?? ringIcon(color, type, index, routeMarker),
+    [customIcon, color, type, index, routeMarker],
   )
 
   const handleDrag = useCallback(
