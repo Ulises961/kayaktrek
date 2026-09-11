@@ -105,6 +105,28 @@ a:focus-visible, button:focus-visible {
 
 .brand svg { width: 1.75rem; height: 1.75rem; flex: none; }
 
+.brand-subtitle {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  padding-left: 0.1rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--on-ink-muted);
+}
+.brand-subtitle-rule {
+  width: 1px;
+  height: 0.85rem;
+  background: var(--rule-on-ink);
+}
+
+@media (min-width: 480px) {
+  .brand-subtitle { display: inline-flex; }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
