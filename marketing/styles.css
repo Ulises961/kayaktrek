@@ -26,7 +26,7 @@
   --on-ink-muted: #9fb2c6;
   --rule-on-ink: rgba(238, 242, 244, 0.16);
   --rule-on-paper: rgba(22, 40, 63, 0.14);
-  --max: 40rem;
+  --max: 80rem;
   --gutter: 1.5rem;
 }
 
@@ -77,7 +77,7 @@ a:focus-visible, button:focus-visible {
 }
 
 .wrap {
-  max-width: 64rem;
+  max-width: 80rem;
   margin-inline: auto;
   padding-inline: var(--gutter);
 }
@@ -104,6 +104,28 @@ a:focus-visible, button:focus-visible {
 }
 
 .brand svg { width: 1.75rem; height: 1.75rem; flex: none; }
+
+.brand-subtitle {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  padding-left: 0.1rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--on-ink-muted);
+}
+.brand-subtitle-rule {
+  width: 1px;
+  height: 0.85rem;
+  background: var(--rule-on-ink);
+}
+
+@media (min-width: 480px) {
+  .brand-subtitle { display: inline-flex; }
+}
 
 .btn {
   display: inline-flex;
@@ -165,14 +187,13 @@ a:focus-visible, button:focus-visible {
 }
 
 .hero-mark {
-  display: flex;
-  justify-content: center;
+  display: none;
   opacity: 0.92;
 }
-.hero-mark svg { width: min(20rem, 70vw); height: auto; }
+.hero-mark svg { width: clamp(12rem, 16vw, 26rem); height: auto; }
 
 @media (min-width: 900px) {
-  .hero-mark { justify-content: flex-end; }
+  .hero-mark { display: flex; justify-content: flex-end; }
 }
 
 .hero-mark .hull-path {
@@ -201,12 +222,9 @@ a:focus-visible, button:focus-visible {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Paper sections ---- */
-
-.paper {
-  background: var(--paper);
-  color: var(--paper-ink);
-}
+/* ---- Content bands ----
+   Each content section is its own full-bleed band so they can alternate
+   background/tone; .page inside centers the actual content to --max. */
 
 .page {
   max-width: var(--max);
@@ -215,79 +233,136 @@ a:focus-visible, button:focus-visible {
 }
 
 .section {
-  padding-block: 3.25rem;
-  border-top: 1px solid var(--rule-on-paper);
+  padding-block: 3.75rem;
 }
 
-.section > h2 {
-  font-size: 1.5rem;
+.band-light {
+  background: var(--paper);
   color: var(--paper-ink);
+}
+
+.band-dark {
+  background: var(--ink-900);
+  color: var(--on-ink);
+  border-top: 1px solid var(--rule-on-ink);
+}
+
+.page > h2 {
+  font-size: 1.5rem;
   max-width: 24ch;
 }
 
-.section > p.deck {
+.about .page > h2 {
+  max-width: none;
+}
+
+.page > p.deck {
   margin: 0.85rem 0 0;
-  color: var(--paper-muted);
   max-width: 56ch;
+  opacity: 0.75;
 }
 
 .features {
   list-style: none;
-  margin: 2rem 0 0;
+  margin: 2.25rem 0 0;
   padding: 0;
   display: grid;
-  gap: 1.5rem;
+  gap: 1.75rem;
+}
+
+@media (min-width: 700px) {
+  .features { grid-template-columns: repeat(2, 1fr); column-gap: 2.5rem; }
 }
 
 .features li {
   display: grid;
-  grid-template-columns: 1.5rem 1fr;
-  gap: 0.9rem;
-  align-items: baseline;
+  grid-template-columns: 2.75rem 1fr;
+  gap: 1rem;
+  align-items: start;
 }
 
-.features .tick {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 999px;
-  background: var(--foam);
-  margin-top: 0.45rem;
-  justify-self: center;
+.feature-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  border-radius: 0.75rem;
+  background: rgba(42, 168, 160, 0.14);
+  color: var(--foam);
 }
+.feature-icon svg { width: 1.4rem; height: 1.4rem; }
 
 .features h3 {
   font-size: 1.05rem;
   font-family: "DM Sans", sans-serif;
   font-weight: 700;
-  color: var(--paper-ink);
 }
 
 .features p {
   margin: 0.3rem 0 0;
-  color: var(--paper-muted);
+  opacity: 0.75;
 }
 
-.about p { max-width: 56ch; }
-.about p + p { margin-top: 1rem; }
+.about .page > p + p { margin-top: 1rem; }
 
-.disclaimer {
+/* ---- Bug-report band: its own hero, mirroring the top hero's treatment ---- */
+
+.band-bug-hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding-block: 5rem;
+  background: radial-gradient(ellipse 60% 80% at 50% -10%, var(--ink-700), var(--ink-950) 65%);
+  background-attachment: fixed;
+  color: var(--on-ink);
+  border-top: 1px solid var(--rule-on-ink);
+}
+
+.bug-hero-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(13rem, 34vw);
+  height: auto;
+  aspect-ratio: 1;
+  transform: translate(90%, -30%);
+  opacity: 0.14;
+  filter: invert(1);
+  pointer-events: none;
+}
+
+.band-bug-hero .page {
+  position: relative;
+}
+
+.band-bug-hero .page > h2 {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  max-width: 26ch;
+  margin-inline: auto;
+}
+
+.band-bug-hero .page > p.deck {
+  max-width: 42ch;
+  margin-inline: auto;
+}
+
+.contact-ctas {
   margin-top: 1.5rem;
-  padding: 1rem 1.15rem;
-  border: 1px solid var(--rule-on-paper);
-  border-radius: 0.5rem;
-  font-size: 0.92rem;
-  color: var(--paper-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1rem;
 }
-.disclaimer strong { color: var(--paper-ink); }
 
 .contact a.email {
-  display: inline-block;
-  margin-top: 1rem;
   font-family: "Fraunces", serif;
-  font-size: 1.15rem;
-  color: var(--lit-deep);
+  font-size: 1.05rem;
+  color: var(--lit);
   text-decoration: underline;
-  text-decoration-color: var(--rule-on-paper);
+  text-decoration-color: var(--rule-on-ink);
   text-underline-offset: 0.2em;
 }
 .contact a.email:hover { text-decoration-color: currentColor; }
@@ -313,7 +388,6 @@ a:focus-visible, button:focus-visible {
 
 .footer-note {
   margin-top: 1.5rem;
-  max-width: 52ch;
   font-size: 0.82rem;
   color: var(--on-ink-muted);
   border-top: 1px solid var(--rule-on-ink);
