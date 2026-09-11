@@ -7,6 +7,29 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.3] - 2026-09-11
+
+### Added
+
+- Wind diamonds — a static hazard-reminder marker on the map (not a forecast) for noting a
+  known wind pattern at a spot.
+- A "kayak rental" place category for map annotations.
+- The route's overall start and finish are now marked on the map, distinct from individual
+  day-route markers.
+
+### Changed
+
+- Tidal and wind diamonds you've placed on one trip are now visible (position only) on your
+  other trips, so a hazard noted once doesn't need to be re-entered per trip. The diamond's
+  full content (notes, timing) stays trip-private — only its position and type are shared.
+- Mobile: the itinerary viewer's weather/sea and day strip moved off the map's fixed top row
+  onto a persistently-docked bottom sheet, giving the map full-bleed screen space.
+
+### Security
+
+- Closed an unauthenticated endpoint (`/tidal-station/nearby`) that returned full tidal-diamond
+  content rather than just position to anonymous callers.
+
 ## [1.0.2] - 2026-09-09
 
 ### Changed
