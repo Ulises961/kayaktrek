@@ -12,7 +12,7 @@ import { dayRouteGroups } from "@/lib/itinerary/day-points"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { buildBoundaryColorMap, resolveLegDayNumber } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
-import { splitRingIcon } from "./ring-icon"
+import { splitRingIcon, type RouteMarker } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
 import { Graticule, ScaleBar, ForecastCellShell, type ForecastCellLayer } from "./chart"
@@ -374,6 +374,9 @@ type ConnectedMarkerProps = {
   index: number
   dayNum: number
   boundaryColors: { left: string; right: string } | null
+  // The route's overall start/finish (never a boundary point — those are
+  // always mid-route day crossings), null for every other point.
+  routeMarker?: RouteMarker | null
   draggable?: boolean
   label?: string | null
   showUndo?: boolean
@@ -388,6 +391,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
   index,
   dayNum,
   boundaryColors,
+  routeMarker,
   draggable = true,
   label,
   showUndo,
@@ -432,6 +436,7 @@ const ConnectedMarker = memo(function ConnectedMarker({
       color={color}
       type={point.type}
       index={index}
+      routeMarker={routeMarker}
       customIcon={customIcon}
       draggable={draggable}
       label={label}
@@ -873,6 +878,16 @@ export default function MapCore({
     (p): p is ValidPoint => p.latitude != null && p.longitude != null,
   )
 
+  // The route's overall start/finish, not a per-day concept — `points` arrives
+  // pre-ordered as the whole multi-day linked list (MapBuilder's
+  // `state.pointOrder`), so the first/last of `validPoints` is the actual
+  // route start/finish. A single-point route only gets a start badge — with
+  // nothing to finish yet, marking one point both is more confusing than
+  // showing just the one that's true.
+  const routeStartPointId = validPoints[0]?.id ?? null
+  const routeFinishPointId =
+    validPoints.length > 1 ? (validPoints[validPoints.length - 1]?.id ?? null) : null
+
   const segments = buildSegments(validPoints, dayNumberById, boundaryPointIds, dragState)
 
   // On-map distance labels (decided in docs/adr/itinerary-frontend.md): each stop —
@@ -1031,6 +1046,13 @@ export default function MapCore({
             index={point.id ? (pointIndexById.get(point.id) ?? 0) : 0}
             dayNum={dayNumberById.get(point.dayId ?? undefined) ?? 0}
             boundaryColors={point.id ? (boundaryMap[point.id] ?? null) : null}
+            routeMarker={
+              point.id && point.id === routeStartPointId
+                ? "start"
+                : point.id && point.id === routeFinishPointId
+                  ? "finish"
+                  : null
+            }
             draggable={!viewMode}
             label={point.id ? (stopLabelById.get(point.id) ?? null) : null}
             showUndo={!viewMode && point.id != null && point.id === discardablePointId}
