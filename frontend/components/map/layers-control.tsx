@@ -8,14 +8,18 @@ export type LayersControlProps = {
   swellEnabled: boolean
   diamondsEnabled: boolean
   hasDiamonds: boolean
+  windDiamondsEnabled: boolean
+  hasWindDiamonds: boolean
   placesEnabled: boolean
   hasPlaces: boolean
   // Wind/swell/diamonds resolve per selected day; hidden when no day is selected.
-  // Places are itinerary-scoped, so their toggle can show on its own.
+  // Places and wind diamonds are itinerary-scoped, so their toggles can show on
+  // their own.
   showConditions: boolean
   onWindToggle: () => void
   onSwellToggle: () => void
   onDiamondsToggle: () => void
+  onWindDiamondsToggle: () => void
   onPlacesToggle: () => void
 }
 
@@ -64,12 +68,15 @@ export function LayersControl({
   swellEnabled,
   diamondsEnabled,
   hasDiamonds,
+  windDiamondsEnabled,
+  hasWindDiamonds,
   placesEnabled,
   hasPlaces,
   showConditions,
   onWindToggle,
   onSwellToggle,
   onDiamondsToggle,
+  onWindDiamondsToggle,
   onPlacesToggle,
 }: LayersControlProps) {
   const [open, setOpen] = useState(false)
@@ -184,6 +191,21 @@ export function LayersControl({
                 aria-hidden
               />
               Tidal diamonds
+            </Toggle>
+          )}
+
+          {hasWindDiamonds && (
+            <Toggle
+              enabled={windDiamondsEnabled}
+              onClick={onWindDiamondsToggle}
+              testId="wind-diamonds-toggle"
+              aria-checked={windDiamondsEnabled}
+            >
+              <span
+                className="border-notice-border bg-notice-bg inline-block size-2.5 shrink-0 rotate-45 rounded-[2px] border"
+                aria-hidden
+              />
+              Wind diamonds
             </Toggle>
           )}
         </div>

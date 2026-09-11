@@ -6,9 +6,9 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from werkzeug.exceptions import HTTPException
 
-from Schemas.tidal_station_schema import TidalStationSchema, TidalStationUpdateSchema
+from Schemas.tidal_station_schema import TidalStationSchema, TidalStationUpdateSchema, TidalStationPositionSchema
 from Services.Middleware.auth_middleware import JWTService
-from Services.Middleware.privileges_middleware import require_admin
+from Services.Middleware.privileges_middleware import require_admin, check_resource_ownership
 from Services.tidal_station_service import TidalStationService
 
 logger = logging.getLogger(__name__)
@@ -16,13 +16,28 @@ logger = logging.getLogger(__name__)
 tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tidal-station')
 
 
+def _may_see_full_content(station) -> bool:
+    """Atlas-seeded stations (no owning itinerary) are public reference data.
+    A user-created diamond's full content stays gated to the itinerary's own
+    members (M27) — everyone else gets the position-only projection."""
+    if station.itinerary_id is None:
+        return True
+    return bool(check_resource_ownership(
+        resource_type="itinerary", resource_id=str(station.itinerary_id), read_only=True
+    ))
+
+
 @tidal_station_api.route('/nearby', methods=['GET'])
+@JWTService.authenticate_restful
 def get_nearby_stations():
-    """GET /api/tidal-station/nearby?lat=&lng=&range= — no auth required.
+    """GET /api/tidal-station/nearby?lat=&lng=&range=
     ---
     get:
       summary: Find tidal stations near a point
-      description: No auth required.
+      description: >
+        Full content (name/source/notes/hourly table) for atlas-seeded stations
+        and the caller's own itinerary's diamonds; a position-only projection
+        (M27) for other users' user-created diamonds.
       parameters:
         - in: query
           name: lat
@@ -67,7 +82,13 @@ def get_nearby_stations():
             abort(HTTPStatus.BAD_REQUEST, description="range must be between 0 and 100 km")
 
         stations = TidalStationService.get_nearby(lat, lng, range_km)
-        return jsonify(TidalStationSchema(many=True).dump(stations)), HTTPStatus.OK
+        full_schema = TidalStationSchema()
+        position_schema = TidalStationPositionSchema()
+        payload = [
+            full_schema.dump(station) if _may_see_full_content(station) else position_schema.dump(station)
+            for station in stations
+        ]
+        return jsonify(payload), HTTPStatus.OK
     except HTTPException:
         raise
     except Exception as e:

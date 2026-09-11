@@ -55,24 +55,92 @@ def a_station(client, admin_headers):
     client.delete(f"{STATION_ENDPOINT}/{data['id']}", headers=admin_headers)
 
 
-# ── GET /nearby (public) ─────────────────────────────────────────────────────
+# ── GET /nearby (auth required — M27 tightened this from unauthenticated) ────
 
-def test_nearby_missing_coords_returns_400(client):
-    assert client.get(f"{STATION_ENDPOINT}/nearby").status_code == 400
-
-
-def test_nearby_out_of_range_coords_returns_400(client):
-    assert client.get(f"{STATION_ENDPOINT}/nearby?lat=200&lng=10").status_code == 400
-
-
-def test_nearby_bad_range_returns_400(client):
-    assert client.get(f"{STATION_ENDPOINT}/nearby?lat=50&lng=-4&range=500").status_code == 400
-
-
-def test_nearby_happy_returns_200(client):
+def test_nearby_requires_auth(client):
     resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50.3&lng=-4.1&range=5")
+    assert resp.status_code in (401, 403)
+
+
+def test_nearby_missing_coords_returns_400(client, auth_headers):
+    resp = client.get(f"{STATION_ENDPOINT}/nearby", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_nearby_out_of_range_coords_returns_400(client, auth_headers):
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=200&lng=10", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_nearby_bad_range_returns_400(client, auth_headers):
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50&lng=-4&range=500", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_nearby_happy_returns_200(client, auth_headers):
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50.3&lng=-4.1&range=5", headers=auth_headers)
     assert resp.status_code == 200
     assert isinstance(resp.json, list)
+
+
+def test_nearby_atlas_station_returns_full_content_to_anyone(client, auth_headers, a_station):
+    """Atlas-seeded stations (no owning itinerary) are public reference data —
+    every authenticated caller sees the full content, not just position."""
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50.3&lng=-4.1&range=1", headers=auth_headers)
+    assert resp.status_code == 200
+    row = next(r for r in resp.json if r["id"] == a_station["id"])
+    assert row["name"] == "Test Station"
+    assert "meanSpringRangeM" in row
+
+
+def test_nearby_other_users_diamond_returns_position_only(
+    client, auth_headers, auth_headers_2, itinerary
+):
+    """M27: a user-created diamond's full content stays gated to the owning
+    itinerary's members — a non-member sees only id/location/isUserCreated."""
+    created = client.post(
+        "/api/v1/tidal-diamond/create",
+        headers=auth_headers,
+        json={
+            "itineraryId": itinerary["id"],
+            "name": "The Race",
+            "location": _point(-4.1, 50.3),
+            "entryMode": "simple",
+            "maxSpringRateKnots": 3.0,
+            "floodDirectionDegrees": 45,
+            "ebbDirectionDegrees": 225,
+        },
+    ).get_json()
+
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50.3&lng=-4.1&range=1", headers=auth_headers_2)
+    assert resp.status_code == 200
+    row = next(r for r in resp.json if r["id"] == created["id"])
+    assert set(row) == {"id", "location", "isUserCreated"}
+    assert row["isUserCreated"] is True
+    assert "name" not in row
+    assert "tidalStreamEntries" not in row
+
+
+def test_nearby_owners_own_diamond_returns_full_content(client, auth_headers, itinerary):
+    created = client.post(
+        "/api/v1/tidal-diamond/create",
+        headers=auth_headers,
+        json={
+            "itineraryId": itinerary["id"],
+            "name": "The Race",
+            "location": _point(-4.1, 50.3),
+            "entryMode": "simple",
+            "maxSpringRateKnots": 3.0,
+            "floodDirectionDegrees": 45,
+            "ebbDirectionDegrees": 225,
+        },
+    ).get_json()
+
+    resp = client.get(f"{STATION_ENDPOINT}/nearby?lat=50.3&lng=-4.1&range=1", headers=auth_headers)
+    assert resp.status_code == 200
+    row = next(r for r in resp.json if r["id"] == created["id"])
+    assert row["name"] == "The Race"
+    assert len(row["tidalStreamEntries"]) == 13
 
 
 # ── POST /create (admin) ─────────────────────────────────────────────────────

@@ -5,9 +5,11 @@ import { MapAddControl } from "../map-add-control"
 const BASE = {
   canAddPlace: true,
   canAddDiamond: true,
+  canAddWindDiamond: true,
   placingMode: null,
   onStartPlace: vi.fn(),
   onStartDiamond: vi.fn(),
+  onStartWindDiamond: vi.fn(),
   onCancel: vi.fn(),
 }
 
@@ -87,5 +89,29 @@ describe("MapAddControl", () => {
   it("shows the diamond prompt wording while placing a diamond", () => {
     render(<MapAddControl {...BASE} placingMode="diamond" />)
     expect(screen.getByText(/click the map to place the diamond/i)).toBeInTheDocument()
+  })
+
+  it("offers a Wind diamond item alongside Place and Tidal diamond", () => {
+    render(<MapAddControl {...BASE} />)
+    expect(screen.getByTestId("add-wind-diamond-button")).toBeInTheDocument()
+  })
+
+  it("disables the wind-diamond item when it cannot be added", () => {
+    render(<MapAddControl {...BASE} canAddWindDiamond={false} />)
+    expect(screen.getByTestId("add-wind-diamond-button")).toBeDisabled()
+  })
+
+  it("starts wind-diamond placement and closes the menu when Wind diamond is clicked", () => {
+    const onStartWindDiamond = vi.fn()
+    render(<MapAddControl {...BASE} onStartWindDiamond={onStartWindDiamond} />)
+    fireEvent.click(screen.getByTestId("add-button"))
+    fireEvent.click(screen.getByTestId("add-wind-diamond-button"))
+    expect(onStartWindDiamond).toHaveBeenCalledOnce()
+    expect(screen.getByTestId("add-panel")).not.toBeVisible()
+  })
+
+  it("shows the wind-diamond prompt wording while placing one", () => {
+    render(<MapAddControl {...BASE} placingMode="wind" />)
+    expect(screen.getByText(/click the map to place the wind diamond/i)).toBeInTheDocument()
   })
 })

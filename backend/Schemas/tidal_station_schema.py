@@ -1,4 +1,5 @@
 import bleach
+from geoalchemy2.shape import to_shape
 from marshmallow import fields, pre_load, validates, validates_schema, ValidationError, post_load
 
 from Models.tidal_station import StreamEntryMode, TidalStation
@@ -76,6 +77,21 @@ class TidalStationUpdateSchema(BaseSchema):
     def validate_mean_spring_range(self, value, **kwargs):
         if value is not None and value < 0:
             raise ValidationError("mean_spring_range_m cannot be negative")
+
+
+class TidalStationPositionSchema(BaseSchema):
+    """Position-only projection for a user-created station the caller does not
+    own (M27). Withholds name/source/notes/mean_spring_range_m/hourly entries
+    — the content tier that stays trip-private."""
+
+    location = fields.Method("get_location", dump_only=True)
+    is_user_created = fields.Boolean(dump_only=True)
+
+    def get_location(self, station):
+        if station.location is None:
+            return None
+        shape = to_shape(station.location)
+        return {"type": "Point", "coordinates": [shape.x, shape.y]}
 
 
 class _DiamondFieldValidators:

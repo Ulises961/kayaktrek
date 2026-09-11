@@ -520,6 +520,35 @@ tables, and sound seamanship" disclaimer must appear **both in the app UI** (whe
 shown) **and in the Terms of Use** (the TOU is what limits liability; the banner alone does not).
 Tracked on the `CLAUDE.md` Production Readiness checklist and ROADMAP Privacy & Legal.
 
+### Revision (M27): position-only diamond sharing
+
+**What is unchanged.** The 2026-06-22 decision above stands: the app must never publish or vouch
+for a third-party safety *value* — a tidal rate, a direction, a wind strength, anything a paddler
+could rely on and be wrong. Building a trust/moderation system around such values is still what
+manufactures duty-of-care exposure, not the difficulty of building it. Nothing here reopens that.
+
+**What is new.** M27 separates a diamond's bare *position* from its *content*. Sharing "a marker
+exists at this point" makes no claim about what the hazard is, how strong it is, or whether it is
+still valid — it is not a published safety value, it is a location a paddler must still research
+and act on under their own duty of care. This is why the position tier can be shared cross-trip
+without recreating the liability the original decision identified: there is nothing to be wrong
+about, and nothing the app is vouching for. Content — a tidal diamond's rate/direction/hourly
+table, or a wind diamond's name/notes — remains **trip-private**, exactly as before.
+
+**Wind diamonds (new, M27).** A purely static hazard-reminder marker for wind-origination/
+acceleration zones (katabatic/valley-drainage winds and similar terrain-driven effects) —
+explicitly **not** forecast-driven, not fed by or predicting from OpenMeteo, and carries no
+rate/direction/intensity field, ever. A leader drops a pin with an optional name and a free-text
+note. Modelled like `Place`/`TidalStation`: itinerary-scoped, no `Day`/`Sea`/`Weather` coupling,
+and — unlike `TidalStation` — never atlas-seeded, since there is no equivalent official wind atlas
+to seed from.
+
+**Byproduct fix.** `GET /api/v1/tidal-station/nearby` was found unauthenticated, returning full
+`TidalStationSchema` content (name/source/notes/mean_spring_range_m/hourly entries) for every
+station regardless of owning trip — a pre-existing leak of exactly the content tier this revision
+says must stay private. Tightened as part of this same work rather than filed as a separate
+milestone, since the position/content boundary drawn here is what defines "leak."
+
 ## Decision log
 
 | Decision | Original ADR | Date | Notes |
@@ -538,3 +567,4 @@ Tracked on the `CLAUDE.md` Production Readiness checklist and ROADMAP Privacy & 
 | Meals/provisioning groundwork (M12 §Q): **defer all schema work** — the future ration calculator needs its own `Ingredient`/`Meal` entities (divisible units with per-unit gram weight + per-person portion size; meals composed of several ingredients; a day's ration = sum over its meal slots × crew × trip length; perishable vs shelf-stable as a per-ingredient attribute), which does **not** extend the flat `Item`/`TripRequirement` gear-checklist model. Adding a provisioning flag to `Item` now would likely go unused by the real feature, so nothing lands in the schema this phase — the model is captured in ROADMAP.md's "Meals & provisioning" subsection instead. The ingredient-combination *recommender* (tasty/energetic/healthy suggestions) is explicitly a separate, later, possibly-premium feature; the mechanical calculator is the priority. | M12 §Q | 2026-07-14 | Doc-only decision — prevents more inventory UI baking in gear-checklist assumptions the meals model would then have to fight; ROADMAP.md (private, gitignored) holds the full product framing. Plan: `plans/M12-phase9-10.md` |
 | **Photos on a `Place` — declined.** A `Place` already renders a category glyph, a `label` and a `note`; a public `Point` renders only a name (`Point.notes` is private by decision). So a place-photo decorates text already on screen, while the same photo on the nearby route point carries the whole descriptive load — and a `Place` on an itinerary is by construction metres from that route, so the two are interchangeable in practice. Avoided cost is not merely an association table: `Place.images` needs cascade config in **the exact defect class M16 found three production bugs in**, plus a second upload/opt-in path, a public shape with two image sources, and a merge/ordering rule for the gallery. Consequence: the itinerary gallery is **flat and single-source** (opted-in point photos), `Image.caption` is optional and falls back to the point's name + day, and click-to-pan has one implementation because there is one owner. Places still reach the public sidebar as glyph + label + note. **Not "never"** — photos ride with the deferred campsite/launch-spot gazetteer, where the place *is* the browsed unit | M19 §3 | 2026-08-22 | Drops a whole phase from M19 without changing what the milestone delivers. `ROADMAP.md` (Map annotations / Campsite database) carries the product-side note |
 | Expedition log auto-generation landed (supersedes the ADR-021 row above's design-stage framing): dual trigger is the leader's Navigate-mode "close day" button (`POST /live/trip/<id>/close-day`, immediate) and a nightly beat fallback (`crontab(minute=30, hour=0)`, closes yesterday's Day for any happening trip that never got closed manually). Mileage = ping-track haversine sum unless <3 pings or any inter-ping gap >2h, else falls back to the day's own point-to-point itinerary distance, else `null` (stub log, still `source="auto"`). `Trip.timezone_name` resolves from the itinerary's **first located point at the building→happening transition**, not at trip creation as ADR-021 originally implied — no coordinates exist yet at creation; falls back to UTC when unresolved (`trip_today()`). Position pings retained 30 days past a trip's `date_to` before the D3 retention sweep deletes them — the Log's `route_geojson` snapshot is the durable record after that | ADR-021 | 2026-07-21 | `Services/expedition_log_service.py`, `Tasks/expedition_log_task.py`, `Services/Utils/timezone_utils.py`. Plan: `plans/M8.md` §8 |
+| Diamond position/content split (M27): the bare position of a tidal or wind diamond is shared cross-trip/cross-user as an unlabeled pin ("something is known here"); annotation content (rate/direction/hourly table, or a wind diamond's name/notes) stays trip-private. Explicit, recorded revision of the "Community tidal-stream diamonds — DROPPED" line above — the no-vouching-for-a-value principle is preserved, only bare geometry is shared. New `WindDiamond` entity: itinerary-scoped only (never atlas-seeded), no rate/direction/intensity field, a static hazard reminder not a forecast. Also closes a pre-existing, unauthenticated full-content leak on `GET /tidal-station/nearby`. | M7 (Community safety data) | 2026-09-08 | New `WindDiamond` model, `hazard_diamond_resource.py` `GET /hazard-diamond/nearby`, `TidalStationPositionSchema`, `/tidal-station/nearby` auth+redaction fix. Plan: `plans/M27-wind-diamonds-and-shared-hazard-positions.md` |

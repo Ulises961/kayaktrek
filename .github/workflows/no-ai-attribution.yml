@@ -1,0 +1,45 @@
+name: No AI Co-Author Attribution
+
+# Gate: rejects a PR whose commits carry an AI co-author trailer (e.g.
+# `Co-Authored-By: Claude ...`, `Claude-Session:`) or whose description
+# credits an AI coding tool. Complements, not replaces, the local
+# `commit-msg` lefthook hook — that one only runs on a contributor's own
+# machine and is bypassable with `--no-verify`; this one runs on GitHub and,
+# once added to branch protection as a required check, can't be skipped.
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full PR history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Reject commits carrying an AI co-author trailer
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          MATCHES=$(git log --format='--- %H ---%n%B' "$BASE_SHA..$HEAD_SHA" \
+            | grep -iE 'co-authored-by:.*(claude|anthropic|gpt|copilot|codex)|claude-session:' || true)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Commit(s) on this PR carry an AI co-author trailer, which this repo does not accept:"
+            echo "$MATCHES"
+            exit 1
+          fi
+
+      - name: Reject a PR description crediting an AI coding tool
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if echo "$PR_BODY" | grep -iE 'generated with \[claude code\]|claude\.ai/code'; then
+            echo "::error::PR description credits an AI coding tool, which this repo does not accept."
+            exit 1
+          fi

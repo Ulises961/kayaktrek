@@ -23,6 +23,9 @@ import { TidalDiamondMarker } from "./tidal-diamond-marker"
 import { TidalDiamondForm } from "./tidal-diamond-form"
 import { PlaceMarker } from "./place-marker"
 import { PlaceForm } from "./place-form"
+import { WindDiamondMarker } from "./wind-diamond-marker"
+import { WindDiamondForm } from "./wind-diamond-form"
+import { HazardPositionMarker } from "./hazard-position-marker"
 import { MapAddControl } from "./map-add-control"
 import { ResizeHandler } from "./resize-handler"
 import { MapCredits } from "./map-credits"
@@ -48,6 +51,14 @@ import {
   repositionPlace,
   deletePlace,
 } from "@/lib/places/actions"
+import {
+  fetchWindDiamonds,
+  createWindDiamond,
+  updateWindDiamond,
+  repositionWindDiamond,
+  deleteWindDiamond,
+} from "@/lib/wind-diamonds/actions"
+import { fetchNearbyHazardPositions } from "@/lib/map/hazard-positions/actions"
 import type { VelocityGridData } from "@/lib/types/ui"
 import {
   OSM_TILE_URL,
@@ -66,6 +77,12 @@ import {
   type PlaceWithOwnership,
   type PlaceForm as PlaceFormValues,
 } from "@/lib/dtos/place"
+import {
+  windDiamondToFormValues,
+  type WindDiamond,
+  type WindDiamondForm as WindDiamondFormValues,
+} from "@/lib/dtos/wind-diamond"
+import type { HazardDiamondPosition } from "@/lib/dtos/hazard-diamond"
 
 export type FlyToTarget = { id: string; lat: number; lng: number }
 
@@ -493,6 +510,24 @@ export default function MapCore({
   const [placeError, setPlaceError] = useState<string | null>(null)
   const [isPlaceMutating, startPlaceMutation] = useTransition()
 
+  // Wind diamonds are itinerary-scoped and day-agnostic, like places — same
+  // two-flow dialog shape, no rate/direction data to resolve per hour.
+  const [windDiamonds, setWindDiamonds] = useState<WindDiamond[]>([])
+  const [windDiamondsEnabled, setWindDiamondsEnabled] = useState(true)
+  const [placingWind, setPlacingWind] = useState(false)
+  const [windDraft, setWindDraft] = useState<{ lat: number; lng: number } | null>(null)
+  const [editingWind, setEditingWind] = useState<{
+    id: string
+    values: WindDiamondFormValues
+  } | null>(null)
+  const [windError, setWindError] = useState<string | null>(null)
+  const [isWindMutating, startWindMutation] = useTransition()
+
+  // Shared cross-trip "known hazard" positions (M27) — fetched once per
+  // itinerary load, centered on the route's own centroid. Position-only, no
+  // edit affordance, no toggle to disable (mirrors LivePositionLayer).
+  const [hazardPositions, setHazardPositions] = useState<HazardDiamondPosition[]>([])
+
   const selectedDayDate = useMemo(
     () => days.find((d) => d.id === selectedDayId)?.date ?? null,
     [days, selectedDayId],
@@ -704,6 +739,114 @@ export default function MapCore({
     [reloadPlaces],
   )
 
+  // ── Wind diamonds ─────────────────────────────────────────────────────────────
+
+  const reloadWindDiamonds = useCallback(() => {
+    if (!itineraryId) return
+    fetchWindDiamonds(itineraryId).then((r) => setWindDiamonds(r.success ? r.data : []))
+  }, [itineraryId])
+
+  useEffect(() => {
+    reloadWindDiamonds()
+  }, [reloadWindDiamonds])
+
+  const handleWindPlace = useCallback((lat: number, lng: number) => {
+    setPlacingWind(false)
+    setWindError(null)
+    setWindDraft({ lat, lng })
+  }, [])
+
+  const closeWindDialog = useCallback(() => {
+    setWindDraft(null)
+    setEditingWind(null)
+    setWindError(null)
+  }, [])
+
+  const handleWindSubmit = useCallback(
+    (fields: WindDiamondFormValues) => {
+      setWindError(null)
+      startWindMutation(async () => {
+        const result = editingWind
+          ? await updateWindDiamond(editingWind.id, fields)
+          : itineraryId && windDraft
+            ? await createWindDiamond(itineraryId, windDraft.lat, windDraft.lng, fields)
+            : null
+        if (!result) return
+        if (result.success) {
+          closeWindDialog()
+          reloadWindDiamonds()
+        } else {
+          setWindError(result.error)
+        }
+      })
+    },
+    [editingWind, itineraryId, windDraft, reloadWindDiamonds, closeWindDialog],
+  )
+
+  const handleWindDiamondEdit = useCallback(
+    (id: string) => {
+      const diamond = windDiamonds.find((d) => d.id === id)
+      if (!diamond) return
+      setWindError(null)
+      setEditingWind({ id, values: windDiamondToFormValues(diamond) })
+    },
+    [windDiamonds],
+  )
+
+  const handleWindDiamondDragEnd = useCallback(
+    (id: string, lat: number, lng: number) => {
+      repositionWindDiamond(id, lat, lng).then(reloadWindDiamonds)
+    },
+    [reloadWindDiamonds],
+  )
+
+  const handleWindDiamondDelete = useCallback(
+    (id: string) => {
+      deleteWindDiamond(id).then(reloadWindDiamonds)
+    },
+    [reloadWindDiamonds],
+  )
+
+  // ── Hazard positions (M27) ────────────────────────────────────────────────────
+
+  // The itinerary's own route centroid — a reasonable center for a single,
+  // generous-radius query that covers the whole route without depending on
+  // which day is selected. Recomputed only when the route's own points change,
+  // not on every render.
+  const itineraryCentroid = useMemo<{ lat: number; lng: number } | null>(() => {
+    const located = points.filter((p) => p.latitude != null && p.longitude != null)
+    if (located.length === 0) return null
+    const lat = located.reduce((sum, p) => sum + (p.latitude as number), 0) / located.length
+    const lng = located.reduce((sum, p) => sum + (p.longitude as number), 0) / located.length
+    return { lat, lng }
+  }, [points])
+
+  useEffect(() => {
+    if (!itineraryId || !itineraryCentroid) return
+    fetchNearbyHazardPositions(itineraryCentroid.lat, itineraryCentroid.lng, 50).then((r) =>
+      setHazardPositions(r.success ? r.data : []),
+    )
+    // Fires once per itinerary load and once more if the route had no located
+    // points yet (centroid null → available) — not re-run on every point drag,
+    // since the centroid shifting slightly mid-edit isn't worth a request per
+    // gesture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itineraryId, itineraryCentroid !== null])
+
+  // The `/nearby` query is a cross-trip lat/lng search with no itinerary filter,
+  // so it comes back carrying this trip's own diamonds too — drop any position
+  // whose id+kind already has its own full marker rendered above, or the muted
+  // hazard-position pin paints over the diamond it duplicates (both are
+  // react-leaflet Markers in the same pane; DOM order, not the Circle draft
+  // pin, is what decided which one painted on top).
+  const visibleHazardPositions = useMemo(() => {
+    const ownTidalIds = new Set(diamonds.map((d) => d.id))
+    const ownWindIds = new Set(windDiamonds.map((d) => d.id))
+    return hazardPositions.filter((p) =>
+      p.kind === "tidal" ? !ownTidalIds.has(p.id) : !ownWindIds.has(p.id),
+    )
+  }, [hazardPositions, diamonds, windDiamonds])
+
   useEffect(() => {
     if (!selectedDayId || !selectedDayDate) return
     let cancelled = false
@@ -796,17 +939,20 @@ export default function MapCore({
 
   const hasDiamonds = selectedDayId !== null && diamonds.length > 0
   const hasPlaces = places.length > 0
+  const hasWindDiamonds = windDiamonds.length > 0
 
-  // Add-action availability. Places are itinerary-scoped; diamonds resolve per
-  // day, so their entry needs a selected day.
+  // Add-action availability. Places and wind diamonds are itinerary-scoped;
+  // tidal diamonds resolve per day, so their entry needs a selected day.
   const canAddPlace = canManagePlaces
   const canAddDiamond = canManageDiamonds && selectedDayId != null
+  const canAddWindDiamond = canManageDiamonds
 
   return (
     <div
       className={cn(
         "relative h-full w-full",
-        (!viewMode || placing || placingPlace) && "[&_.leaflet-container]:cursor-crosshair",
+        (!viewMode || placing || placingPlace || placingWind) &&
+          "[&_.leaflet-container]:cursor-crosshair",
       )}
     >
       {/* `builder-map` is the hook for the bottom-left zoom rule in globals.css,
@@ -840,9 +986,12 @@ export default function MapCore({
           </>
         )}
 
-        {!viewMode && !placing && !placingPlace && <MapEvents onMapClick={onMapClick} />}
+        {!viewMode && !placing && !placingPlace && !placingWind && (
+          <MapEvents onMapClick={onMapClick} />
+        )}
         {placing && <DiamondPlacer onPlace={handlePlace} />}
         {placingPlace && <DiamondPlacer onPlace={handlePlaceDrop} />}
+        {placingWind && <DiamondPlacer onPlace={handleWindPlace} />}
         <ResizeHandler />
         <MapCredits />
         <FitBoundsController points={validPoints} />
@@ -961,10 +1110,34 @@ export default function MapCore({
             />
           ))}
 
+        {/* Wind diamonds — itinerary-scoped, day-independent static hazard
+            reminders. Any trip member may edit — no creator-only gate. */}
+        {hasWindDiamonds &&
+          windDiamondsEnabled &&
+          windDiamonds.map((d) => (
+            <WindDiamondMarker
+              key={d.id}
+              diamond={d}
+              editable={canManageDiamonds}
+              onDragEnd={(lat, lng) => handleWindDiamondDragEnd(d.id, lat, lng)}
+              onEdit={() => handleWindDiamondEdit(d.id)}
+              onDelete={() => handleWindDiamondDelete(d.id)}
+            />
+          ))}
+
+        {/* Shared cross-trip "known hazard" positions (M27) — position only,
+            never this trip's own diamonds (those render fully above). */}
+        {visibleHazardPositions.map((p) => (
+          <HazardPositionMarker key={`${p.kind}-${p.id}`} position={p} />
+        ))}
+
         {/* Draft pin shown while an entry dialog is open over the chosen spot. */}
-        {(draft || placeDraft) && (
+        {(draft || placeDraft || windDraft) && (
           <Circle
-            center={[(draft ?? placeDraft)!.lat, (draft ?? placeDraft)!.lng]}
+            center={[
+              (draft ?? placeDraft ?? windDraft)!.lat,
+              (draft ?? placeDraft ?? windDraft)!.lng,
+            ]}
             radius={60}
             pathOptions={{ color: "#0ea5e9", weight: 2, fillOpacity: 0.2 }}
             interactive={false}
@@ -974,18 +1147,21 @@ export default function MapCore({
         <LivePositionLayer positions={livePositions} />
       </MapContainer>
 
-      {(selectedDayId || hasPlaces) && (
+      {(selectedDayId || hasPlaces || hasWindDiamonds) && (
         <LayersControl
           windEnabled={windEnabled}
           swellEnabled={swellEnabled}
           diamondsEnabled={diamondsEnabled}
           hasDiamonds={hasDiamonds}
+          windDiamondsEnabled={windDiamondsEnabled}
+          hasWindDiamonds={hasWindDiamonds}
           placesEnabled={placesEnabled}
           hasPlaces={hasPlaces}
           showConditions={selectedDayId != null}
           onWindToggle={() => setWindEnabled((e) => !e)}
           onSwellToggle={() => setSwellEnabled((e) => !e)}
           onDiamondsToggle={() => setDiamondsEnabled((e) => !e)}
+          onWindDiamondsToggle={() => setWindDiamondsEnabled((e) => !e)}
           onPlacesToggle={() => setPlacesEnabled((e) => !e)}
         />
       )}
@@ -993,24 +1169,33 @@ export default function MapCore({
       {/* Drop-a-pin affordances, consolidated into a top-centre "+ Add" disclosure
           (the create-action counterpart to the top-right Overlays control). Clear
           of the top-left zoom control and the bottom point-detail sheet. The
-          diamond entry needs a selected day; places are itinerary-scoped. Arming
-          one disarms the other. */}
-      {itineraryId && (canAddPlace || canAddDiamond) && (
+          tidal-diamond entry needs a selected day; places and wind diamonds are
+          itinerary-scoped. Arming one disarms the others. */}
+      {itineraryId && (canAddPlace || canAddDiamond || canAddWindDiamond) && (
         <MapAddControl
           canAddPlace={canAddPlace}
           canAddDiamond={canAddDiamond}
-          placingMode={placing ? "diamond" : placingPlace ? "place" : null}
+          canAddWindDiamond={canAddWindDiamond}
+          placingMode={placing ? "diamond" : placingPlace ? "place" : placingWind ? "wind" : null}
           onStartPlace={() => {
             setPlacing(false)
             setPlacingPlace(true)
+            setPlacingWind(false)
           }}
           onStartDiamond={() => {
             setPlacingPlace(false)
             setPlacing(true)
+            setPlacingWind(false)
+          }}
+          onStartWindDiamond={() => {
+            setPlacingPlace(false)
+            setPlacing(false)
+            setPlacingWind(true)
           }}
           onCancel={() => {
             setPlacing(false)
             setPlacingPlace(false)
+            setPlacingWind(false)
           }}
         />
       )}
@@ -1060,6 +1245,30 @@ export default function MapCore({
             error={placeError}
             onSubmit={handlePlaceSubmit}
             onCancel={closePlaceDialog}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={windDraft != null || editingWind != null}
+        onOpenChange={(open) => {
+          if (!open) closeWindDialog()
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingWind ? "Edit wind diamond" : "New wind diamond"}</DialogTitle>
+          </DialogHeader>
+          {/* Remount per flow so the fields reset cleanly between create (empty)
+              and edit (prefilled). */}
+          <WindDiamondForm
+            key={editingWind?.id ?? "create"}
+            values={editingWind?.values}
+            submitLabel={editingWind ? "Save changes" : "Save wind diamond"}
+            isPending={isWindMutating}
+            error={windError}
+            onSubmit={handleWindSubmit}
+            onCancel={closeWindDialog}
           />
         </DialogContent>
       </Dialog>
