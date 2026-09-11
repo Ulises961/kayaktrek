@@ -22,17 +22,19 @@
 #
 #   sed -i 's/kayak\.example\.com/<real-domain>/g' kayak-expedition-planner.conf
 #
-# Six server blocks, not one path-based vhost — frontend/backend/SSE are three separate
+# Five server blocks, not one path-based vhost — frontend/backend/SSE are three separate
 # origins by design (frontend/CLAUDE.md, ADR-033: different gunicorn process, separate
 # NEXT_PUBLIC_API_URL/NEXT_PUBLIC_SSE_URL, CORS/CSP built around cross-origin
 # fetch/EventSource calls), so nginx mirrors that instead of introducing a second,
-# path-based routing scheme the app doesn't otherwise assume. Storage exists because
-# public-read avatars/point-images and presigned document downloads are served directly
-# from MinIO's S3 API (`StorageService`, security review HIGH item) — the browser fetches
-# those URLs straight from MinIO, not proxied through Flask, so MinIO needs its own
-# public hostname. Only MinIO's S3 API port (9000) gets a vhost; its admin console (9001)
-# stays 127.0.0.1-only, same as every other admin UI on this box. www. and the
-# redirect-only apex are the two blocks M28 adds — see below.
+# path-based routing scheme the app doesn't otherwise assume. www. and the redirect-only
+# apex are the two blocks M28 adds — see below.
+#
+# The MinIO `storage.` vhost this file used to carry is gone: object storage moved to
+# Cloudflare R2 on 2026-08-26 (root CLAUDE.md "Object storage"), and
+# `docker-compose.prod.yml` says plainly "MinIO is no longer in this file" — there has
+# been nothing on :9000 in production to proxy to since that migration. Drop its DNS
+# route and cert SAN on the box the next time the cert is touched (M28's SAN-list change
+# is that moment); MinIO stays local-dev-only, no vhost needed there.
 #
 # TLS terminates twice: Cloudflare's edge terminates public TLS for the browser, and
 # Cloudflare Tunnel (cloudflared) re-encrypts the hop from itself to nginx on the box's
@@ -46,10 +48,10 @@
 # https://localhost and sets originServerName to match the server_name below so SNI picks
 # the right block.
 #
-# Cert install path on the box: one cert with all six hostnames as SANs, issued via
+# Cert install path on the box: one cert with all five hostnames as SANs, issued via
 #   certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
 #     -d kayak.example.com -d www.kayak.example.com -d app.kayak.example.com \
-#     -d api.kayak.example.com -d live.kayak.example.com -d storage.kayak.example.com
+#     -d api.kayak.example.com -d live.kayak.example.com
 # — lives at /etc/letsencrypt/live/kayak.example.com/{fullchain,privkey}.pem (named
 # after the first -d domain, the apex). A renewal-hooks/deploy script reloads nginx
 # after each renewal since nginx won't notice the files changing on its own.
@@ -167,36 +169,5 @@ server {
         proxy_read_timeout 3600s;
         chunked_transfer_encoding off;
         proxy_set_header Connection '';
-    }
-}
-
-# --- Object storage (MinIO S3 API only — the admin console stays private) ---
-# Serves public-read avatars/point-images and presigned document/private-image downloads
-# directly to the browser (StorageService.presigned_url) — this traffic bypasses Flask
-# entirely, so it needs its own public path through nginx, not just the backend vhost's.
-# client_max_body_size/buffering settings follow MinIO's own documented reverse-proxy
-# guidance: uploads/downloads must pass through unbuffered and unrewritten, and the
-# default nginx body-size cap is far too small for this endpoint (unlike the backend
-# vhost's 20m, which only bounds requests that flow through the Flask app itself).
-server {
-    listen 443 ssl;
-    server_name storage.kayak.example.com;
-
-    ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
-
-    client_max_body_size 0;
-    ignore_invalid_headers off;
-
-    location / {
-        proxy_pass http://127.0.0.1:9000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        chunked_transfer_encoding off;
     }
 }
