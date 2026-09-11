@@ -168,7 +168,7 @@ a:focus-visible, button:focus-visible {
   display: none;
   opacity: 0.92;
 }
-.hero-mark svg { width: min(5rem, 40vw); height: auto; }
+.hero-mark svg { width: clamp(12rem, 16vw, 26rem); height: auto; }
 
 @media (min-width: 900px) {
   .hero-mark { display: flex; justify-content: flex-end; }
