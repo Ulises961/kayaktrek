@@ -204,8 +204,9 @@ sudo nginx -t && sudo systemctl reload nginx
 
 **Since M28** the template also serves the static `marketing/` page from `www.` — copy
 `marketing/` to `/var/www/kayak-marketing` on the box (the template's `www.` block's `root`)
-before reloading, and reissue the cert with `www.` and `app.` added to the SAN list (six `-d`
-flags now, see the template's header comment for the full command). The apex block became
+before reloading, and reissue the cert with `www.` and `app.` added to the SAN list (five `-d`
+flags now, see the template's header comment for the full command — `storage.` drops out of the
+same list, MinIO having left production for R2 back on 2026-08-26). The apex block became
 redirect-only, and the frontend moved from the apex to `app.` — `FRONTEND_URL` must be set to
 `https://app.<domain>` in `.env.prod` for this to be consistent end to end (verify/reset-password
 links, sitemap/robots).
@@ -613,10 +614,13 @@ release" above.
 
 **M28 (planned, not yet cut over as of 2026-09-11):** the "no `app.` subdomain" reasoning above is
 reversed — see the nginx template's header comment and `docs/adr/foundation.md` ADR-034's new row.
-Once WP2/WP3 land, this becomes **five** live hostnames instead of four: `www.kayaktrek.app`
-(static company page, new), `app.kayaktrek.app` (the frontend, moved off the apex),
-`api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` unchanged, and the bare apex
-redirecting to `app.` (path and query preserved) rather than serving the frontend directly.
+Once WP2/WP3 land, this becomes **four** live content hostnames plus a redirect, not five:
+`www.kayaktrek.app` (static company page, new), `app.kayaktrek.app` (the frontend, moved off the
+apex), `api.kayaktrek.app`, `live.kayaktrek.app`, and the bare apex redirecting to `app.` (path and
+query preserved) rather than serving the frontend directly. `storage.kayaktrek.app` is dropped in
+the same pass — MinIO left production for Cloudflare R2 on 2026-08-26, and this cert/DNS/nginx
+touch is the first time anything has revisited the SAN list since, so its now-dead vhost/DNS
+route/cert SAN go with it rather than lingering for another migration to notice.
 Currently paused at the operator's choice while doing further polish — `cloudflared` stopped
 (`sudo systemctl stop cloudflared`), nginx/Docker stack still running on the box for local
 testing; `sudo systemctl start cloudflared` brings it back with no other changes needed.
