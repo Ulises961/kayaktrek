@@ -6,10 +6,19 @@ import { windDiamondLat, windDiamondLng, type WindDiamond } from "@/lib/dtos/win
 
 // Builds the DivIcon markup: a chart-style ◇, tinted with the --notice tokens
 // (a hazard reminder, not live data — distinct from the tidal diamond's
-// rate-coloured glyph). No rate/direction/radius: a wind diamond carries none.
+// rate-coloured glyph), with a wind glyph overlaid unrotated on top so the
+// two diamond types read apart from each other at a glance. No rate/
+// direction/radius: a wind diamond carries none.
 export function windDiamondIconHtml(): string {
   return `<div style="position:relative;width:22px;height:22px;">
     <div style="position:absolute;top:1px;left:1px;width:20px;height:20px;transform:rotate(45deg);background:var(--notice-bg);border:2px solid var(--notice-border);box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--notice-border)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.8 4.4A2 2 0 1 1 11 8H2" />
+        <path d="M17.5 8a2.5 2.5 0 1 1 2 4H2" />
+        <path d="M12.8 19.6A2 2 0 1 0 14 16H2" />
+      </svg>
+    </div>
   </div>`
 }
 
@@ -67,8 +76,11 @@ export function WindDiamondMarker({
     <Marker position={position} icon={icon} draggable={editable} eventHandlers={eventHandlers}>
       <Popup>
         <div className="min-w-44">
-          <p className="text-foreground text-sm font-semibold">{diamond.name || "Wind hazard"}</p>
-          {diamond.notes && <p className="text-foreground mt-1 text-xs">{diamond.notes}</p>}
+          <p className="text-foreground text-sm font-semibold">Katabatic wind</p>
+          {diamond.name && <p className="text-foreground mt-0.5 text-xs">{diamond.name}</p>}
+          {diamond.notes && (
+            <p className="text-muted-foreground mt-1 text-[11px]">{diamond.notes}</p>
+          )}
           {editable && (onEdit || onDelete) && (
             <div className="mt-2 flex gap-1">
               {onEdit && (

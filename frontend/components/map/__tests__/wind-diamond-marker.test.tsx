@@ -43,15 +43,16 @@ const DIAMOND: WindDiamond = {
 }
 
 describe("WindDiamondMarker", () => {
-  it("shows the name and notes in the popup", () => {
+  it("always labels the popup with the hazard type, plus the name and notes", () => {
     render(<WindDiamondMarker diamond={DIAMOND} />)
+    expect(screen.getByText("Katabatic wind")).toBeInTheDocument()
     expect(screen.getByText("Funnel off the ridge")).toBeInTheDocument()
     expect(screen.getByText("Katabatic gusts reported on NW synoptic flow")).toBeInTheDocument()
   })
 
-  it("falls back to a generic label when the diamond has no name", () => {
+  it("still labels the popup with the hazard type when the diamond has no name", () => {
     render(<WindDiamondMarker diamond={{ ...DIAMOND, name: null }} />)
-    expect(screen.getByText(/wind hazard/i)).toBeInTheDocument()
+    expect(screen.getByText("Katabatic wind")).toBeInTheDocument()
   })
 
   it("is read-only by default: not draggable and no delete control", () => {

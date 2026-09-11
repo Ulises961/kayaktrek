@@ -812,6 +812,20 @@ export default function MapCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId, itineraryCentroid !== null])
 
+  // The `/nearby` query is a cross-trip lat/lng search with no itinerary filter,
+  // so it comes back carrying this trip's own diamonds too — drop any position
+  // whose id+kind already has its own full marker rendered above, or the muted
+  // hazard-position pin paints over the diamond it duplicates (both are
+  // react-leaflet Markers in the same pane; DOM order, not the Circle draft
+  // pin, is what decided which one painted on top).
+  const visibleHazardPositions = useMemo(() => {
+    const ownTidalIds = new Set(diamonds.map((d) => d.id))
+    const ownWindIds = new Set(windDiamonds.map((d) => d.id))
+    return hazardPositions.filter((p) =>
+      p.kind === "tidal" ? !ownTidalIds.has(p.id) : !ownWindIds.has(p.id),
+    )
+  }, [hazardPositions, diamonds, windDiamonds])
+
   useEffect(() => {
     if (!selectedDayId || !selectedDayDate) return
     let cancelled = false
@@ -1073,7 +1087,7 @@ export default function MapCore({
 
         {/* Shared cross-trip "known hazard" positions (M27) — position only,
             never this trip's own diamonds (those render fully above). */}
-        {hazardPositions.map((p) => (
+        {visibleHazardPositions.map((p) => (
           <HazardPositionMarker key={`${p.kind}-${p.id}`} position={p} />
         ))}
 
