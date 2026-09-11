@@ -39,6 +39,8 @@ from Resources.float_plan_resource import float_plan_api
 from Resources.sea_resource import sea_api
 from Resources.tidal_station_resource import tidal_station_api
 from Resources.tidal_diamond_resource import tidal_diamond_api
+from Resources.wind_diamond_resource import wind_diamond_api
+from Resources.hazard_diamond_resource import hazard_diamond_api
 from Resources.place_resource import place_api
 from Resources.connection_resource import connection_api
 from Resources.block_resource import block_api
@@ -103,6 +105,8 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(sea_api)
     app.register_blueprint(tidal_station_api)
     app.register_blueprint(tidal_diamond_api)
+    app.register_blueprint(wind_diamond_api)
+    app.register_blueprint(hazard_diamond_api)
     app.register_blueprint(place_api)
     app.register_blueprint(connection_api)
     app.register_blueprint(block_api)

@@ -158,9 +158,13 @@ describe("MapCore — tidal diamond placement", () => {
     expect(screen.queryByTestId("add-diamond-button")).not.toBeInTheDocument()
   })
 
-  it("hides the add affordance until a day is selected", () => {
+  it("disables the tidal-diamond item (but does not hide the whole control) until a day is selected", () => {
+    // Wind diamonds are day-independent, so canManageDiamonds alone is enough
+    // to show the "+ Add" control even with no day selected — only the
+    // tidal-diamond item itself stays disabled, matching MapAddControl's own
+    // "disabled with a reason, never hidden" convention.
     render(<MapCore {...BASE_PROPS} selectedDayId={null} itineraryId="itin-1" canManageDiamonds />)
-    expect(screen.queryByTestId("add-diamond-button")).not.toBeInTheDocument()
+    expect(screen.getByTestId("add-diamond-button")).toBeDisabled()
   })
 
   it("places a pin then creates a diamond at the clicked location", async () => {
