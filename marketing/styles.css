@@ -225,6 +225,11 @@ a:focus-visible, button:focus-visible {
   max-width: 24ch;
 }
 
+.about h2,
+.contact h2 {
+  max-width: none;
+}
+
 .section > p.deck {
   margin: 0.85rem 0 0;
   color: var(--paper-muted);
@@ -267,7 +272,6 @@ a:focus-visible, button:focus-visible {
   color: var(--paper-muted);
 }
 
-.about p { max-width: 56ch; }
 .about p + p { margin-top: 1rem; }
 
 .disclaimer {
@@ -280,11 +284,17 @@ a:focus-visible, button:focus-visible {
 }
 .disclaimer strong { color: var(--paper-ink); }
 
+.contact-ctas {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem;
+}
+
 .contact a.email {
-  display: inline-block;
-  margin-top: 1rem;
   font-family: "Fraunces", serif;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   color: var(--lit-deep);
   text-decoration: underline;
   text-decoration-color: var(--rule-on-paper);
