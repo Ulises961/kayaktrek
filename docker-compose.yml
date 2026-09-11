@@ -295,6 +295,12 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      # Dev/e2e only — production keeps Resources/live_resource.py's conservative
+      # default. Two browser contexts driving the crew SSE stream in
+      # e2e/tests/15-live-expedition.spec.ts share this machine's one IP, and the
+      # production limit (10/min) trips well within a normal test run. Only backend
+      # and sse actually serve the rate-limited routes; harmless no-op elsewhere.
+      LIVE_STREAM_RATE_LIMIT: ${LIVE_STREAM_RATE_LIMIT:-60 per minute}
       # Its own instance, not a DB on the shared one — see the redis-auth service for why.
       # DB 0 because a single-purpose instance has no other tenants to number around.
       #
@@ -380,6 +386,12 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      # Dev/e2e only — production keeps Resources/live_resource.py's conservative
+      # default. Two browser contexts driving the crew SSE stream in
+      # e2e/tests/15-live-expedition.spec.ts share this machine's one IP, and the
+      # production limit (10/min) trips well within a normal test run. Only backend
+      # and sse actually serve the rate-limited routes; harmless no-op elsewhere.
+      LIVE_STREAM_RATE_LIMIT: ${LIVE_STREAM_RATE_LIMIT:-60 per minute}
       # Its own instance, not a DB on the shared one — see the redis-auth service for why.
       # DB 0 because a single-purpose instance has no other tenants to number around.
       #
@@ -490,6 +502,12 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      # Dev/e2e only — production keeps Resources/live_resource.py's conservative
+      # default. Two browser contexts driving the crew SSE stream in
+      # e2e/tests/15-live-expedition.spec.ts share this machine's one IP, and the
+      # production limit (10/min) trips well within a normal test run. Only backend
+      # and sse actually serve the rate-limited routes; harmless no-op elsewhere.
+      LIVE_STREAM_RATE_LIMIT: ${LIVE_STREAM_RATE_LIMIT:-60 per minute}
       # Its own instance, not a DB on the shared one — see the redis-auth service for why.
       # DB 0 because a single-purpose instance has no other tenants to number around.
       #
@@ -563,6 +581,12 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
+      # Dev/e2e only — production keeps Resources/live_resource.py's conservative
+      # default. Two browser contexts driving the crew SSE stream in
+      # e2e/tests/15-live-expedition.spec.ts share this machine's one IP, and the
+      # production limit (10/min) trips well within a normal test run. Only backend
+      # and sse actually serve the rate-limited routes; harmless no-op elsewhere.
+      LIVE_STREAM_RATE_LIMIT: ${LIVE_STREAM_RATE_LIMIT:-60 per minute}
       # Its own instance, not a DB on the shared one — see the redis-auth service for why.
       # DB 0 because a single-purpose instance has no other tenants to number around.
       #

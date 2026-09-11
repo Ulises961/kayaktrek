@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from http import HTTPStatus
 from typing import Optional
@@ -27,6 +28,14 @@ LIVE_ENDPOINT = "/api/v1/live"
 live_api = Blueprint("live", __name__, url_prefix=LIVE_ENDPOINT)
 
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+# Per-IP, since a stream can arrive with no resolved user yet (the ticket path).
+# Configurable because two browser contexts sharing one dev/CI machine's IP hit this
+# limit within a normal test run and then pay ~90s of client-side backoff
+# (frontend/hooks/use-live-positions.ts) before reconnecting — not a bug in the limit
+# itself, which exists for the same reason noted in the frontend: real crews sharing
+# one NAT/WiFi IP hit it too. Production keeps the conservative default.
+_LIVE_STREAM_RATE_LIMIT = os.getenv("LIVE_STREAM_RATE_LIMIT", "10 per minute")
 
 
 @live_api.after_request
@@ -169,7 +178,7 @@ def close_day(id: str):
 
 
 @live_api.route("/story/<string:token>/stream", methods=["GET"])
-@limiter.limit("10 per minute", key_func=get_remote_address)
+@limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
 def story_stream(token: str):
     """Public, unauthenticated live layer on the M7d story share link. 404 no-oracle:
     unknown token, tokenless/standalone itinerary, no trip, or trip not happening are
@@ -235,7 +244,7 @@ def post_stream_ticket(id: str):
 
 
 @live_api.route("/trip/<string:id>/stream", methods=["GET"])
-@limiter.limit("10 per minute", key_func=get_remote_address)
+@limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
 def trip_stream(id: str):
     """Crew stream: accepts either a normal access token (reserved for M9 — the web
     frontend only ever sends a ticket) or a short-lived stream ticket (§D5), checked
