@@ -26,7 +26,7 @@
   --on-ink-muted: #9fb2c6;
   --rule-on-ink: rgba(238, 242, 244, 0.16);
   --rule-on-paper: rgba(22, 40, 63, 0.14);
-  --max: 40rem;
+  --max: 64rem;
   --gutter: 1.5rem;
 }
 
