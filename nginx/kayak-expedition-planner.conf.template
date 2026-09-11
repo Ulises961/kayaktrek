@@ -22,16 +22,17 @@
 #
 #   sed -i 's/kayak\.example\.com/<real-domain>/g' kayak-expedition-planner.conf
 #
-# Four server blocks, not one path-based vhost — frontend/backend/SSE are three separate
+# Six server blocks, not one path-based vhost — frontend/backend/SSE are three separate
 # origins by design (frontend/CLAUDE.md, ADR-033: different gunicorn process, separate
 # NEXT_PUBLIC_API_URL/NEXT_PUBLIC_SSE_URL, CORS/CSP built around cross-origin
 # fetch/EventSource calls), so nginx mirrors that instead of introducing a second,
-# path-based routing scheme the app doesn't otherwise assume. The fourth, storage, exists
-# because public-read avatars/point-images and presigned document downloads are served
-# directly from MinIO's S3 API (`StorageService`, security review HIGH item) — the
-# browser fetches those URLs straight from MinIO, not proxied through Flask, so MinIO
-# needs its own public hostname. Only MinIO's S3 API port (9000) gets a vhost; its admin
-# console (9001) stays 127.0.0.1-only, same as every other admin UI on this box.
+# path-based routing scheme the app doesn't otherwise assume. Storage exists because
+# public-read avatars/point-images and presigned document downloads are served directly
+# from MinIO's S3 API (`StorageService`, security review HIGH item) — the browser fetches
+# those URLs straight from MinIO, not proxied through Flask, so MinIO needs its own
+# public hostname. Only MinIO's S3 API port (9000) gets a vhost; its admin console (9001)
+# stays 127.0.0.1-only, same as every other admin UI on this box. www. and the
+# redirect-only apex are the two blocks M28 adds — see below.
 #
 # TLS terminates twice: Cloudflare's edge terminates public TLS for the browser, and
 # Cloudflare Tunnel (cloudflared) re-encrypts the hop from itself to nginx on the box's
@@ -45,24 +46,59 @@
 # https://localhost and sets originServerName to match the server_name below so SNI picks
 # the right block.
 #
-# Cert install path on the box: one cert with all four hostnames as SANs, issued via
+# Cert install path on the box: one cert with all six hostnames as SANs, issued via
 #   certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
-#     -d kayak.example.com -d api.kayak.example.com -d live.kayak.example.com \
-#     -d storage.kayak.example.com
+#     -d kayak.example.com -d www.kayak.example.com -d app.kayak.example.com \
+#     -d api.kayak.example.com -d live.kayak.example.com -d storage.kayak.example.com
 # — lives at /etc/letsencrypt/live/kayak.example.com/{fullchain,privkey}.pem (named
 # after the first -d domain, the apex). A renewal-hooks/deploy script reloads nginx
 # after each renewal since nginx won't notice the files changing on its own.
 #
-# Frontend lives at the bare apex, not an app. subdomain — there is no separate
-# marketing site here (landing page, auth, and the authenticated dashboard are all
-# the same Next.js deployment), so an app. prefix would just be an extra subdomain
-# for something that isn't actually split out. Cloudflare's CNAME flattening makes
-# the tunnel's route work at the zone apex the same as any subdomain.
+# Frontend used to live at the bare apex, not an app. subdomain — there was no separate
+# marketing site (landing page, auth, and the authenticated dashboard were all the same
+# Next.js deployment), so an app. prefix looked like an extra subdomain for something
+# that wasn't actually split out. **M28 reverses that**: a static www. company page now
+# exists precisely so an anonymous stranger has something to look at before trusting the
+# product with a password (docs/adr/foundation.md ADR-034 decision log has the argument
+# this reverses and why it's different from the two prior "no marketing site" rows). The
+# apex now only 301-redirects to app., preserving path and query, so every link already
+# sent out (float-plan/story tokens, verify/reset-password emails) keeps working.
+# Cloudflare's CNAME flattening makes the tunnel's route work at the zone apex the same
+# as any subdomain, for both the apex redirect and www./app.
+
+# --- Marketing (static company page, M28 — no build pipeline, no app code) ---
+server {
+    listen 443 ssl;
+    server_name www.kayak.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+
+    root /var/www/kayak-marketing;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+
+# --- Apex: redirect-only, preserving path and query (M28) ---
+server {
+    listen 443 ssl;
+    server_name kayak.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+
+    location / {
+        return 301 https://app.kayak.example.com$request_uri;
+    }
+}
 
 # --- Frontend (Next.js) ---
 server {
     listen 443 ssl;
-    server_name kayak.example.com;
+    server_name app.kayak.example.com;
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;

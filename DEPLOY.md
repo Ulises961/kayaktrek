@@ -155,8 +155,9 @@ notification form are both account/credential steps, done once by a human in the
 
    | Name | Type | Target | Why |
    |---|---|---|---|
-   | App — public | HTTP | `https://api.<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. **`api.`, not the apex** — corrected 2026-08-31, this line said `https://<domain>/…` and the apex proxies to the frontend, so it 404s. A monitor built from it sits permanently red and gets dismissed as broken. Verify with `curl` before saving any monitor: the apex answers `/` and `api.` answers `/api/v1/health`. |
+   | App — public | HTTP | `https://api.<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. **`api.`, not the apex** — corrected 2026-08-31, this line said `https://<domain>/…` and the apex proxies to the frontend, so it 404s. A monitor built from it sits permanently red and gets dismissed as broken. Verify with `curl` before saving any monitor: **since M28**, the apex only 301-redirects to `app.` and `api.` still answers `/api/v1/health` directly. |
    | App — local | HTTP | `http://127.0.0.1:5000/api/v1/health` | If only the public one goes red, it's the tunnel, not the app — this pair is the diagnosis. |
+   | Marketing — public | HTTP | `https://www.<domain>/` | Static page, no app behind it — but it's still served through the same tunnel/nginx path, so it can break independently of the app (M28). |
    | RabbitMQ | TCP | `127.0.0.1:5672` | ADR-034's original reason for this container: a silent RabbitMQ death would take the missed-checkpoint shore-contact alert down with it, invisibly. |
    | ~~Backup heartbeat~~ | Push | — | **Declined 2026-08-31.** `BACKUP_HEARTBEAT_URL` stays unset. A *push* monitor needs the droplet to reach Kuma, and Kuma binds to `127.0.0.1:3001` here and is deliberately never tunnelled — so this would need either a second service or a path-scoped ingress rule on this box. Disproportionate, because the heartbeat's rationale was the *home box's* suspend behaviour (`backup-db.sh`'s comment: "the box suspends, so a missed window produces no output anywhere") and the droplet does not suspend. Accepted gap: a backup job that stops running is not alerted on. |
 
@@ -200,6 +201,14 @@ sed 's/kayak\.example\.com/<real-domain>/g' nginx/kayak-expedition-planner.conf.
   | sudo tee /etc/nginx/sites-available/kayak-expedition-planner.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+**Since M28** the template also serves the static `marketing/` page from `www.` — copy
+`marketing/` to `/var/www/kayak-marketing` on the box (the template's `www.` block's `root`)
+before reloading, and reissue the cert with `www.` and `app.` added to the SAN list (six `-d`
+flags now, see the template's header comment for the full command). The apex block became
+redirect-only, and the frontend moved from the apex to `app.` — `FRONTEND_URL` must be set to
+`https://app.<domain>` in `.env.prod` for this to be consistent end to end (verify/reset-password
+links, sitemap/robots).
 
 Copying it *unsubstituted* over a live config replaces a working one with placeholders —
 which happened on 2026-08-24, from a deploy script that both synced this file and printed a
@@ -601,6 +610,13 @@ through Cloudflare → `cloudflared` Tunnel → host nginx (TLS via certbot-dns-
 auto-renewing) → the right container. GHCR images built and pushed on every merge to `master` at
 the time; since 2026-08-02 (PR #100) publishing is driven by version tags instead — see "Cutting a
 release" above.
+
+**M28 (planned, not yet cut over as of 2026-09-11):** the "no `app.` subdomain" reasoning above is
+reversed — see the nginx template's header comment and `docs/adr/foundation.md` ADR-034's new row.
+Once WP2/WP3 land, this becomes **five** live hostnames instead of four: `www.kayaktrek.app`
+(static company page, new), `app.kayaktrek.app` (the frontend, moved off the apex),
+`api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` unchanged, and the bare apex
+redirecting to `app.` (path and query preserved) rather than serving the frontend directly.
 Currently paused at the operator's choice while doing further polish — `cloudflared` stopped
 (`sudo systemctl stop cloudflared`), nginx/Docker stack still running on the box for local
 testing; `sudo systemctl start cloudflared` brings it back with no other changes needed.
