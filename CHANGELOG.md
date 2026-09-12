@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.5] - 2026-09-12
+
+### Fixed
+
+- A route's name could never be changed after creation — the edit dialog only exposed
+  description and difficulty, even though the server has always accepted a name update.
+- The "beach" map-place icon rendered as a generic rain umbrella instead of a beach umbrella.
+- Route authors and fork-source attribution in the route library showed a paddler's chosen
+  display name instead of their username.
+
 ## [1.0.4] - 2026-09-12
 
 ### Fixed
