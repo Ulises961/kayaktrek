@@ -42,8 +42,14 @@ command -v rsync >/dev/null 2>&1 || { echo "ERROR: rsync is not installed" >&2; 
 
 # Everything the box needs from this repo. Add to this list rather than copying something
 # by hand — a file that is not here is a file that will silently drift.
+#
+# docker-compose.monitoring.yml was missing from this list until 2026-09-12 — DEPLOY.md
+# claimed the monitoring stack was "brought up in production on 2026-08-28", which predates
+# the M21 DigitalOcean migration (phases 0-5, done 2026-08-31). It was brought up by hand on
+# the old home box and never carried over; nothing here ever pushed the file to the droplet.
 readonly FILES=(
     docker-compose.prod.yml
+    docker-compose.monitoring.yml
     scripts/backup-db.sh
     scripts/restore-db.sh
 	systemd/kayak-backup.service.template
