@@ -33,14 +33,14 @@ export function EmptyPanel({
     >
       <SvgXml
         xml={CHART_ROSE_XML}
-        width={140}
-        height={140}
+        width={200}
+        height={200}
         style={{
           position: "absolute",
           top: "50%",
-          right: -40,
-          marginTop: -70,
-          opacity: 0.16,
+          right: -50,
+          marginTop: -100,
+          opacity: 0.3,
         }}
       />
       {/* Web's muted-foreground/40 (ocean500 at 40% opacity) — same faded "this is
