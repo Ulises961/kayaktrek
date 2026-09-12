@@ -43,9 +43,11 @@ export function EmptyPanel({
           opacity: 0.3,
         }}
       />
-      {/* Web's muted-foreground/40 (ocean500 at 40% opacity) — same faded "this is
-          decorative, not a real icon button" read as the rest of the panel. */}
-      <Icon size={48} color="rgba(34, 114, 182, 0.4)" strokeWidth={1.5} />
+      {/* Web's muted-foreground/40 — same faded "this is decorative, not a real
+          icon button" read as the rest of the panel. rgba of lightTokens.mutedForeground
+          (#456e8b), not a literal ocean500: that hex was the pre-audit, over-saturated
+          value this token used to (wrongly) equal. */}
+      <Icon size={48} color="rgba(69, 110, 139, 0.4)" strokeWidth={1.5} />
       <Stack className="items-center gap-1">
         <Text className="text-center text-base font-medium text-foreground">{title}</Text>
         {description && (

@@ -96,7 +96,13 @@ export default function TripDetailScreen() {
                 <Card>
                   <CardContent>
                     <Row className="items-center gap-3">
-                      <Icon size={18} color={palette.ocean600} />
+                      {/* Matches the drawer's inactive icon color (ocean900) — this
+                          list has no "current tab" state to distinguish (every row
+                          is just a link, none is "active" the way a nav tab is), so
+                          it reads as the drawer's default resting color rather than
+                          the accent blue a genuinely interactive/live element would
+                          use. */}
+                      <Icon size={18} color={palette.ocean900} />
                       <Text className="flex-1 font-medium">{label}</Text>
                     </Row>
                   </CardContent>

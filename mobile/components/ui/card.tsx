@@ -7,21 +7,31 @@ import { Text } from "./text"
 function Card({ className, style, children, ...props }: ViewProps & { className?: string }) {
   return (
     <View
-      className={cn("overflow-hidden rounded-lg border border-border bg-card", className)}
-      // Same cross-platform shadow shape as zoom-control.tsx's map overlay — a flat
-      // 1px border alone read as a wireframe outline, not a raised surface (M30
-      // identity pass). Kept subtle: this lifts every list/hub card in the app.
-      style={[{ elevation: 2, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4 }, style]}
+      className={cn("overflow-hidden rounded-lg p-4", className)}
+      // The web cartouche itself, not an invented accent: chart-paper background
+      // (oklch(0.966 0.009 92) -> #f7f4ec) + a chart-hairline border at the same
+      // ~26% strength globals.css's `.chart-cartouche` uses (chart-hairline is
+      // oklch(0.43 0.165 243) -> #0053a1; rgba lets RN apply that opacity directly
+      // rather than pre-blending against a specific background). An earlier pass
+      // put a flat, full-strength blue bar across the top of every card instead —
+      // reads as decoration invented for mobile, and made the blue-overload
+      // problem worse rather than better. This is quieter and is what "cartouche"
+      // actually names on web.
+      style={[
+        {
+          backgroundColor: "#f7f4ec",
+          borderWidth: 1,
+          borderColor: "rgba(0, 83, 161, 0.26)",
+          elevation: 2,
+          shadowColor: "#000",
+          shadowOpacity: 0.08,
+          shadowRadius: 4,
+        },
+        style,
+      ]}
       {...props}
     >
-      {/* Flat approximation of web's `.chart-top-rule` (globals.css) — the
-          "chart-signature" accent bar promoted from the auth cartouche, here
-          borrowed to give every card real identity instead of a plain bordered
-          box. Web's version is a three-stop ocean->foam gradient; expo-linear-
-          gradient isn't a dependency yet (WP1's login-hero gradient needs it
-          too), so this is a single-tone stand-in until that's added. */}
-      <View className="h-[3px] bg-ocean-600" />
-      <View className="p-4">{children}</View>
+      {children}
     </View>
   )
 }

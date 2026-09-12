@@ -1,7 +1,7 @@
 import { ArrowDownFromLine, ArrowUpFromLine, Wind, WavesHorizontal } from "lucide-react-native"
 
 import type { Day } from "@shared/dtos/day"
-import { palette } from "@shared/tokens"
+import { lightTokens } from "@shared/tokens"
 import { formatHour, representativeHour } from "@shared/weather/hourly"
 
 import { Row, Stack } from "../ui/layout"
@@ -59,7 +59,7 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
           </Text>
           {weatherNow.windForce != null && (
             <Row className="items-center gap-1">
-              <Wind size={13} color={palette.ocean500} />
+              <Wind size={13} color={lightTokens.mutedForeground} />
               <Text className="text-sm text-muted-foreground">
                 {Math.round(weatherNow.windForce)} kn
                 {weatherNow.windDirection != null
@@ -79,7 +79,7 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
       {seaNow && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
           <Row className="items-center gap-1">
-            <WavesHorizontal size={13} color={palette.ocean500} />
+            <WavesHorizontal size={13} color={lightTokens.mutedForeground} />
             <Text className="text-sm text-muted-foreground">
               {seaNow.waveHeight.toFixed(1)} m @ {Math.round(seaNow.waveDirection)}°
             </Text>
@@ -96,13 +96,13 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
         <Row className="flex-wrap gap-x-4 gap-y-1">
           {sea.highTide && (
             <Row className="items-center gap-1">
-              <ArrowUpFromLine size={13} color={palette.ocean500} />
+              <ArrowUpFromLine size={13} color={lightTokens.mutedForeground} />
               <Text className="text-sm text-muted-foreground">{formatHour(sea.highTide)}</Text>
             </Row>
           )}
           {sea.lowTide && (
             <Row className="items-center gap-1">
-              <ArrowDownFromLine size={13} color={palette.ocean500} />
+              <ArrowDownFromLine size={13} color={lightTokens.mutedForeground} />
               <Text className="text-sm text-muted-foreground">{formatHour(sea.lowTide)}</Text>
             </Row>
           )}
