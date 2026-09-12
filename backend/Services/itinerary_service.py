@@ -565,11 +565,21 @@ class ItineraryService:
 
     @staticmethod
     def update_itinerary(itinerary_id: str, itinerary_data: dict) -> Itinerary:
-        """Partially update an itinerary. Only whitelisted fields are applied."""
+        """Partially update an itinerary. Only whitelisted fields are applied.
+
+        A public itinerary's route (its `days`, and therefore its points) is
+        read-only — fork it to change the path. Everything else (pitch fields,
+        `is_public` itself, `avg_speed_knots`, `trip_id`) stays editable by the
+        owner even while public, since the "Edit pitch" and "Make private"
+        surfaces both patch an itinerary that is, at the time of the request,
+        still public.
+        """
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
 
-        if itinerary.is_public:
-            raise PermissionError("Public itineraries are read-only. Fork it to make changes.")
+        if itinerary.is_public and "days" in itinerary_data:
+            raise PermissionError(
+                "A public itinerary's route is read-only. Fork it to change days or points."
+            )
 
         validated: dict = ItineraryUpdateSchema().load(itinerary_data)
 
