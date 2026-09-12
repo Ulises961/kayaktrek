@@ -92,7 +92,14 @@ export const lightTokens = {
   secondaryForeground: palette.ocean700,
 
   muted: palette.ocean50,
-  mutedForeground: palette.ocean500,
+  // NOT palette.ocean500. globals.css's --muted-foreground is
+  // oklch(0.52 0.065 240), and that comment's "#2272b6 ocean-500" gloss is wrong —
+  // ocean-500 is a flat, saturated hex with no regard for the oklch's low (0.065)
+  // chroma, which renders far more desaturated. #456e8b is the actual sRGB output
+  // of that oklch value, confirmed by conversion, not a redesign — this is a
+  // parity fix (mobile's caption/muted text was a visibly more saturated blue than
+  // web's, which reads close to neutral gray in practice).
+  mutedForeground: "#456e8b",
 
   // The call to action. Sunset, and deliberately rare — creating a trip, a log, a
   // checklist item; mirrors web's `--cta` (frontend/components/common/button-roles.ts).
@@ -155,7 +162,9 @@ export const darkTokens = {
   secondaryForeground: palette.ocean50,
 
   muted: palette.ocean800,
-  mutedForeground: palette.ocean300,
+  // Same correction as lightTokens: oklch(0.73 0.06 225)'s actual sRGB output,
+  // not the ocean-300 hex its globals.css comment claims.
+  mutedForeground: "#7fb0c4",
 
   cta: palette.sunset400,
   ctaForeground: palette.ocean900,
