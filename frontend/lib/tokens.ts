@@ -42,6 +42,12 @@ export const palette = {
   // (cartouche, scale-bar, route halo). The only net-new color the variant adds.
   chartPaper: "#f7f4ec",
 
+  // Sand — the app's own warm-neutral paper white, one step lighter and less saturated
+  // than chartPaper (which stays scoped to chart furniture). Matches web's
+  // globals.css `--background` (oklch(0.986 0.007 88)), which M12 §E nudged toward
+  // chart-paper's warmth — this is the hex equivalent that never made it back here.
+  sand: "#fcfbf7",
+
   // Neutral slate
   slate950: "#020617",
   slate900: "#0f172a",
@@ -70,7 +76,7 @@ export const palette = {
 // Semantic tokens — light mode
 // ---------------------------------------------------------------------------
 export const lightTokens = {
-  background: palette.slate50,
+  background: palette.sand,
   foreground: palette.ocean900,
 
   card: "#ffffff",
@@ -88,8 +94,18 @@ export const lightTokens = {
   muted: palette.ocean50,
   mutedForeground: palette.ocean500,
 
-  accent: palette.sunset500,
-  accentForeground: palette.ocean900,
+  // The call to action. Sunset, and deliberately rare — creating a trip, a log, a
+  // checklist item; mirrors web's `--cta` (frontend/components/common/button-roles.ts).
+  // Split from `accent` (2026-09-12): `accent` used to double as both "the amber CTA"
+  // and shadcn's own quiet hover-surface, which is not what web's globals.css means by
+  // it anymore. `cta` is the only amber token now.
+  cta: palette.sunset500,
+  ctaForeground: palette.ocean900,
+
+  // Shadcn's own meaning: the quiet surface a hovered or highlighted row sits on. Same
+  // value as `secondary` by construction, matching web's globals.css.
+  accent: palette.ocean100,
+  accentForeground: palette.ocean700,
 
   destructive: palette.red600,
   destructiveForeground: palette.slate50,
@@ -141,8 +157,11 @@ export const darkTokens = {
   muted: palette.ocean800,
   mutedForeground: palette.ocean300,
 
-  accent: palette.sunset400,
-  accentForeground: palette.ocean900,
+  cta: palette.sunset400,
+  ctaForeground: palette.ocean900,
+
+  accent: palette.ocean700,
+  accentForeground: palette.ocean50,
 
   destructive: palette.red400,
   destructiveForeground: palette.ocean900,

@@ -1,5 +1,6 @@
 import { Stack as RouterStack, Link } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
+import { Newspaper } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
@@ -12,6 +13,7 @@ import { LogCard } from "../../../../components/logs/log-card"
 import { Button } from "../../../../components/ui/button"
 import { Card, CardContent } from "../../../../components/ui/card"
 import { Chip } from "../../../../components/ui/chip"
+import { EmptyPanel } from "../../../../components/ui/empty-panel"
 import { Row, Screen, Stack } from "../../../../components/ui/layout"
 import { Text } from "../../../../components/ui/text"
 import {
@@ -190,16 +192,22 @@ export default function LogsScreen() {
             </Chip>
           </Row>
           <Link href="/logs/new" asChild>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="cta">
               + New
             </Button>
           </Link>
         </Row>
 
         {shown.length === 0 ? (
-          <Text className="text-center text-muted-foreground">
-            {tab === "mine" ? "No logs yet." : "You haven't endorsed any logs yet."}
-          </Text>
+          <EmptyPanel
+            icon={Newspaper}
+            title={tab === "mine" ? "No logs yet" : "No endorsed logs yet"}
+            description={
+              tab === "mine"
+                ? "Record a paddle and it lands here with its distance, conditions and anyone who was on the water with you."
+                : undefined
+            }
+          />
         ) : (
           <Stack className="gap-3">
             {shown.map((log, index) => (

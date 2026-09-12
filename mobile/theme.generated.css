@@ -34,7 +34,7 @@
   --color-slate-800: #1e293b;
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
-  --color-background: #f8fafc;
+  --color-background: #fcfbf7;
   --color-foreground: #0d1b2e;
   --color-card: #ffffff;
   --color-card-foreground: #0d1b2e;
@@ -46,8 +46,10 @@
   --color-secondary-foreground: #1a3554;
   --color-muted: #f0f8fd;
   --color-muted-foreground: #2272b6;
-  --color-accent: #d97706;
-  --color-accent-foreground: #0d1b2e;
+  --color-cta: #d97706;
+  --color-cta-foreground: #0d1b2e;
+  --color-accent: #dbedf7;
+  --color-accent-foreground: #1a3554;
   --color-destructive: #dc2626;
   --color-destructive-foreground: #f8fafc;
   --color-border: #b3dcf0;
@@ -81,8 +83,10 @@
   --color-dark-secondary-foreground: #f0f8fd;
   --color-dark-muted: #122540;
   --color-dark-muted-foreground: #7ec4e4;
-  --color-dark-accent: #f59e0b;
-  --color-dark-accent-foreground: #0d1b2e;
+  --color-dark-cta: #f59e0b;
+  --color-dark-cta-foreground: #0d1b2e;
+  --color-dark-accent: #1a3554;
+  --color-dark-accent-foreground: #f0f8fd;
   --color-dark-destructive: #f87171;
   --color-dark-destructive-foreground: #0d1b2e;
   --color-dark-border: rgba(255,255,255,0.10);

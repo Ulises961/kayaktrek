@@ -1,23 +1,16 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import TripListScreen from "../app/(app)/(drawer)/(trips)/index"
-import { useAuth } from "../lib/auth/auth-context"
 import { getTrips } from "../lib/trips/actions"
 
-jest.mock("../lib/auth/auth-context", () => ({
-  useAuth: jest.fn(),
-}))
 jest.mock("../lib/trips/actions", () => ({
   getTrips: jest.fn(),
 }))
 
-const mockUseAuth = useAuth as jest.Mock
 const mockGetTrips = getTrips as jest.Mock
 
 describe("TripListScreen", () => {
   beforeEach(() => {
-    mockUseAuth.mockReset()
-    mockUseAuth.mockReturnValue({ status: "authenticated", signOut: jest.fn() })
     mockGetTrips.mockReset()
   })
 
@@ -43,7 +36,7 @@ describe("TripListScreen", () => {
 
     const { findByText } = await render(<TripListScreen />)
 
-    expect(await findByText("No trips yet.")).toBeTruthy()
+    expect(await findByText("No trips yet")).toBeTruthy()
   })
 
   it("surfaces the thrown error message and offers a retry that re-fetches", async () => {

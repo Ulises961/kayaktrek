@@ -203,7 +203,7 @@ export default function InventoryScreen() {
               onChangeText={setNewRequirementName}
               onSubmitEditing={() => void handleAddRequirement()}
             />
-            <Button size="sm" onPress={() => void handleAddRequirement()}>
+            <Button size="sm" variant="cta" onPress={() => void handleAddRequirement()}>
               Add
             </Button>
           </Row>

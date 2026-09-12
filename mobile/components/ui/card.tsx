@@ -4,10 +4,14 @@ import { View, type ViewProps } from "react-native"
 import { cn } from "../../lib/cn"
 import { Text } from "./text"
 
-function Card({ className, ...props }: ViewProps & { className?: string }) {
+function Card({ className, style, ...props }: ViewProps & { className?: string }) {
   return (
     <View
       className={cn("rounded-lg border border-border bg-card p-4", className)}
+      // Same cross-platform shadow shape as zoom-control.tsx's map overlay — a flat
+      // 1px border alone read as a wireframe outline, not a raised surface (M30
+      // identity pass). Kept subtle: this lifts every list/hub card in the app.
+      style={[{ elevation: 2, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4 }, style]}
       {...props}
     />
   )
