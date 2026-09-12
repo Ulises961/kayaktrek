@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { Alert } from "react-native"
 
 import PaddlersScreen from "../app/(app)/(drawer)/(paddlers)/index"
 import { blockPaddler, listBlocks, unblockPaddler } from "../lib/blocks/actions"
@@ -57,6 +58,13 @@ const ACCEPTED = {
   requester: { id: ME.userId, username: "me", name: "Me" },
   addressee: { id: "cy-id", username: "cy", name: "Cy" },
 }
+
+// Block/Unblock confirm via Alert.alert (M9k) — simulate the user tapping the
+// non-Cancel button, same as real usage.
+jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+  const confirmButton = buttons?.find((button) => button.text !== "Cancel")
+  confirmButton?.onPress?.()
+})
 
 beforeEach(() => {
   mockSearchPaddlers.mockReset()
@@ -190,7 +198,7 @@ describe("PaddlersScreen — buddies tab", () => {
     expect(getByText("Block")).toBeTruthy()
   })
 
-  it("blocking a buddy calls blockPaddler and removes the row locally", async () => {
+  it("blocking a buddy asks for confirmation before calling blockPaddler", async () => {
     mockListConnections.mockResolvedValueOnce([ACCEPTED])
     mockBlockPaddler.mockResolvedValue({ id: "block-1", blocked: { username: "cy", name: "Cy" } })
 
@@ -200,6 +208,11 @@ describe("PaddlersScreen — buddies tab", () => {
 
     await fireEvent.press(getByText("Block"))
 
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Block Cy?",
+      expect.any(String),
+      expect.any(Array),
+    )
     await waitFor(() => {
       expect(mockBlockPaddler).toHaveBeenCalledWith({ username: "cy", userId: "cy-id" })
     })
@@ -235,6 +248,11 @@ describe("PaddlersScreen — blocked tab", () => {
     mockListBlocks.mockResolvedValueOnce([])
     await fireEvent.press(getByText("Unblock"))
 
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Unblock Troll?",
+      expect.any(String),
+      expect.any(Array),
+    )
     await waitFor(() => {
       expect(mockUnblockPaddler).toHaveBeenCalledWith("block-1")
     })
