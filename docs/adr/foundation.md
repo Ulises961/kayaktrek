@@ -554,28 +554,46 @@ drifting per-agent interpretations.
 
 ---
 
-## Open source — examined, left undecided (M25)
+## Open source — decided (M25 → decision 2026-09-12)
 
-**Status (2026-09-05): undecided, and deliberately not a gate on 1.0.** Opening the repository was
-proposed as a credibility measure for the release, examined at length, and not settled. It sits in
-`plans/M25-web-1.0-release.md`'s non-goals. **This section records an audit, not a decision** — the
-audit's result is durable, and is what would make the decision cheap whenever it is taken.
+**Status (2026-09-12): decided — open the repository, deliberately as a user-acquisition move,
+not a response to demand.** This reverses the 2026-09-05 "undecided" status recorded below. The
+audit and the "how" decisions (licence direction, brand-not-licence) that follow are unchanged and
+still the basis for execution; what changed is the *why*, and it's worth stating precisely because
+it inverts the original framing: **the operator is not opening the code because a userbase wants
+it open — there is no userbase yet to want anything. The operator needs a userbase, and
+auditability plus a credible community-based-product story is the acquisition pitch used to get
+one.** Practically: open-sourcing and the premium-integration broker (below) are now one move, not
+two sequential ones — the open core is the trust/acquisition surface, and premium sits on top of
+it from the start, sold as the thing that funds keeping the core open rather than as a later
+add-on once self-hosters exist. See the "governing constraint" reasoning in `ROADMAP.md`'s
+Strategy section for the parallel shift on the monetisation side (real hosting cost + a
+near-finished product changed the calculus from "wait for a usage signal" to "have paid features
+ready now").
+
+**The original 2026-09-05 audit and reasoning, kept for the record — the "why" below no longer
+governs the decision, but nothing in it was wrong, and the audit itself still stands:**
 
 **The argument for.** An app that asks strangers for route plans, crew contacts and live position
 can *say* it has no hidden second scope, or it can let anyone check. Auditability is a claim the
 source can back, and no other artifact can.
 
-**The arguments against, which is why it is not settled.**
+**The arguments against, which is why it was not settled at the time.**
 
 - **The audience that would exercise it is not the audience being launched to.** Kayakers arriving
   from a blog post do not read source; the people who audit are developers. The signal is real but
   largely symbolic, and its value scales with how many people are wondering whether to trust the
-  operator — which at 1.0 is nobody yet.
+  operator — which at 1.0 was nobody yet. **Superseded by the 2026-09-12 reasoning above**: the
+  point is no longer to reassure an existing audience, it's to reach the developer-adjacent
+  audience *as* the acquisition channel.
 - **Trust is not what is blocking the launch.** `/explore` served one route on 2026-09-05. What a
-  visitor judges is the library, not the repository.
+  visitor judges is the library, not the repository. Still true of the *library's* content — but
+  no longer the reason to defer opening the repository, since the repository itself is now part of
+  how a userbase gets built, not a response to one already judging the library.
 - **Closed → open is available on any day; open → closed never is.** Deferring costs nothing
   recoverable and spends no irreversible move at the point of least information. This is the same
-  asymmetry that governs licence direction, one level up.
+  asymmetry that governs licence direction, one level up. Still correct as a reason to be careful
+  about licence direction (see below); no longer a reason to defer opening at all.
 
 **A false premise was nearly acted on, in both directions.** The 2026-08-30 row below recommends
 deferring, and gives as its obstacle that untracked planning material sits in the history, so
@@ -615,6 +633,55 @@ made without running it.**
   reserved. This is the arrangement the Android comparison actually describes — AOSP is Apache-2.0
   and entirely clonable, and what Google withholds is Play Services and the trademark, not the
   source terms. Reserving a name is unremarkable and costs no licence compromise.
+
+**The monorepo split — a prerequisite of executing the decision, not a separate milestone
+(surfaced 2026-09-12, while scoping premium mobile GPS/Bluetooth integration; widened the same day
+once the B2B/Pro console was scoped as its own frontend).** The 2026-09-05 audit's finding that "a
+fresh repository is not required — whatever is decided, it is a visibility flip on the repository
+that exists" assumed an all-or-nothing flip. It no longer holds as stated: **mobile stays closed
+source** (forced by a concrete case — Bluetooth GPS watch/satellite-feed integration,
+`docs/adr/mobile-offline.md`'s M9f, has no third-party secret to gate on the way Strava/BYOK do,
+so protecting it requires the *code itself*, not just an entitlement check, to be absent from
+whatever goes public), and **the B2B/Pro admin console is a separate, closed frontend by the same
+logic that already put mobile there** — it's the paid B2B product surface itself, not something
+the consumer-trust pitch needs open. Both move into the existing private **`kayak-premium`** repo
+alongside the Premium Broker BE, rather than either getting its own separate private repo — one
+private home for everything closed (Broker BE + mobile app + B2B console frontend), not three.
+`backend/` and `frontend/` (the consumer web app) go public as **`kayak-core`**; nothing else does.
+Git visibility is per-repository, not per-directory, so one monorepo containing all of this can't
+be half-flipped — the audit's "no fresh repo" conclusion needs a real repo split (mobile and the
+B2B console extracted into `kayak-premium`) before `kayak-core` can actually be published, not
+after. **Open question, not yet decided**: whether Club-admin features (once the missing
+`Club`/`Organization` schema exists) belong on this same B2B console rather than in the consumer
+app — both are "manage a group of paddlers you're responsible for," a different job from personal
+trip planning, so the console may end up the natural home for both Pro and Club-admin, not Pro
+alone.
+
+**Sequencing: tied to when open-sourcing is actually executed, not to a mobile-maturity date.**
+Discussed and left deliberately unpinned — there's no value in guessing a calendar trigger now,
+because nothing is blocked while the monorepo stays private (M9f isn't being built yet, and
+backend/frontend aren't public yet either). The split is a **prerequisite step of whatever plan
+eventually executes the open-source decision**, checked for "is mobile mid-churn right now" at
+the point that plan actually starts, not scheduled independently of it.
+
+**Two separate things not to conflate: repo-split timing vs. console-build timing.** *When the
+repos get split* is gated on the open-source execution date, as above. *When the B2B/Pro console
+actually gets built* is a much larger, independent bet — closer in size to M26 than to BYOK/Strava
+— and per `ROADMAP.md`'s Strategy section, the small integrations (BYOK, then Strava) are
+sequenced first precisely because a console-sized build competes for the same limited capacity.
+The repo structure can and should exist before the console does; building into `kayak-premium`
+from day one avoids ever having to migrate B2B console code out of the consumer frontend later.
+
+**The one real coupling the split has to solve: `frontend/lib/*` reuse.** M9b's own milestone note
+records that mobile reuses `frontend/lib/*` directly for DTOs and pure formatting helpers, on the
+strength of being in the same monorepo. Once split, that becomes a **public npm package** (not
+private) — `frontend/lib` is part of Core and going public regardless of what mobile does, so a
+private registry would add real ongoing operational cost (a paid private npm org, or a
+self-hosted registry to run) for zero actual confidentiality benefit, since the source is visible
+in the public frontend repo either way. Mobile's now-private repo depends on it via an ordinary
+`npm install`, no auth. Worth a quick check when this is actually scoped: confirm nothing in
+`frontend/lib/*` that mobile imports was written assuming "only ever consumed by a private
+frontend" and never re-examined against going public.
 
 **A named risk for the day it is opened.** The candour of these documents is exactly what would be
 published, and the failure mode is that they quietly turn into marketing copy. A decision log that
@@ -686,3 +753,5 @@ the stored preference available to it, so cleaning history without closing that 
 | **Open-sourcing examined and left undecided; the audit behind it stands** | ADR-034 | 2026-09-05 | Revisits the question the row above defers "against the app repo directly" and **does not settle it** — opening is explicitly not a gate on 1.0 (`plans/M25-web-1.0-release.md` non-goals). The argument for: 1.0 asks strangers to trust the app with route plans, crew contacts and live position, so auditability is a claim the source can back and nothing else can. Why it stays open: **the audience that would exercise it is not the audience being launched to** (kayakers arriving from a blog post do not read source), **trust is not the binding constraint** (`/explore` served one route on 2026-09-05 — a visitor judges the library, not the repository), and **closed → open is available any day while open → closed never is**, so deferring spends nothing irreversible at the point of least information. **The deferral's own stated premise was nevertheless false, and was never checked**: it holds that untracked planning material sits in the history so opening needs a fresh repo, but those paths return **zero commits** on any branch — gitignored throughout. *`git log --all -- <path>` is one command; do not claim what history contains without running it.* **Audit, durable whichever way this goes:** no plaintext secret was ever committed (every match is an `.example`, except `secrets/env.prod.sops` — 36 `ENC[AES256_GCM]` values, `age` key never in the repo, values since rotated); and licensing is unencumbered — a second human contributed 66 commits in 2022–23, but full-file blame attributes them **zero surviving lines** (92,101 + 39,047 to the operator, 2,763 to `noreply@anthropic.com`), so the work can be licensed unilaterally whenever the question is answered. Settled about *how*, in advance of the *whether*: **start at the stricter licence end** (relaxing later is unilateral and uncontroversial; tightening splits a community and invites a fork of the last permissive release), **AGPL-3.0** leading because it is OSI open source *and* its network copyleft deters commercial absorption without the project having to say so anywhere — source-available licences (BUSL, PolyForm, Elastic) are rejected because a project pitching auditability cannot afford the one README claim a developer audience would dispute on sight; and **the brand does what the licence should not** (code open, name and mark reserved — the actual Android arrangement, since AOSP is Apache-2.0 and what Google withholds is Play Services and the trademark). **Decided separately, and not contingent on any of this: the `noreply@anthropic.com` commit authorship is to be corrected.** The operator directed the work and holds the copyright; an `author` field naming an assistant claims more than the truth, and it entered the history through an agent acting against an already-stated preference rather than by any decision — so correcting it fixes the record rather than editing it. Scope: **22 commits** authored and committed by that address, plus **18** carrying `Co-Authored-By: Claude` trailers; the **21** dependabot trailers must survive. `filter-repo --mailmap` does both in one pass (a clone-and-rebase would mangle the real merge commits) and rewrites **617 of 1129** hashes, so it wants a moment with no open PRs and no live worktrees. **The source is still open** — a trailer was added on 2026-09-05 itself, so cleaning history without closing that just refills it |
 | **`app.` reinstated, `www.` added — reversing the 2026-07-31 and 2026-08-31 rows, on a different argument than either evaluated** | ADR-034 | 2026-09-11 | Scoped as M28 (`plans/M28-marketing-subdomain.md`). The two prior no-separate-marketing-domain rows both evaluated **pitch quality**: would a dedicated promo site sell the product better than the app's own chart-hero landing does, and both times the answer was no (Komoot/AllTrails/Strava don't run one either; "the product's own root domain is the pitch"). This reverses on a question neither row asked: **whether an anonymous stranger will type a password into an unknown product at all**, before they've seen anything the app offers as proof. A map-and-invite screen is a good pitch to someone who already trusts the site enough to look; it reads as a possible credential-harvesting page to someone who doesn't, and `/explore` serving essentially no content (1 route as of 2026-09-05, M23/M25) makes that worse, not better. A static, obviously-hand-written company page — About, features copy, `support@kayaktrek.app` for bug reports, no login prompt, no other paddler's data — is a legitimacy signal, not a better version of the same pitch, so it isn't foreclosed by either prior row's reasoning. **Cost is low, verified rather than assumed**: cookies need no code change (`setAuthCookies` never sets an explicit `domain`, so they're already host-only and follow the app to `app.` automatically); `FRONTEND_URL` is already the single source every backend-emitted link and the frontend's `sitemap.ts`/`robots.ts` build from, so one env var carries the cutover; there is no CORS layer to update (`api.`/`live.` have been separate origins from the frontend since M8 already); and nginx already runs the multi-SAN/multi-vhost pattern this needs two more of. **What's different from `get.` (2026-08-30/31)**: `get.` bundled a promo pitch with Play compliance boilerplate for two different audiences on one subdomain and was dropped because compliance content already lives safely in the app; `www.` here carries only the promo/trust half, is genuinely static (no framework, no container, no build pipeline — plain HTML/CSS served directly by nginx), and the apex redirects to `app.` (path+query preserved), never to `www.`, so no already-shared float-plan/story/verify link breaks. GitHub/open-source link stays out of the marketing page — that question is still the 2026-09-05 row's, undecided |
 | **`storage.<domain>` vhost actually retired — the 2026-08-26 row claimed it, the template never did it** | amends the 2026-08-26 R2-migration row | 2026-09-11 | The R2-migration row above says plainly "`storage.<domain>` vhost retired." It was not: `nginx/kayak-expedition-planner.conf.template` still carried the full MinIO `storage.` `server` block, its cert SAN, and its place in the six-hostname count three weeks later, found only because M28's own SAN-list edit (the row above) required touching the same file and looking at every entry in it. `docker-compose.prod.yml`'s own comments ("MinIO is no longer in this file") had already said as much for weeks with nobody cross-checking the vhost against it — the same "a claim in one file is not evidence for another" gap `CLAUDE.md`'s `INVITE_CODE` entry already names. Removed in the same pass as the M28 SAN-list change (cheap to fold in, since the cert command was already being edited): the vhost, its cert SAN, and its live entry in `DEPLOY.md`'s Status section. Nothing was serving on `storage.` in production regardless — R2 has held every object since 2026-08-26 — so this was a dead DNS record and an unused nginx block, not a live regression |
+| **Open-sourcing decided — reverses the 2026-09-05 "undecided" row, on a different argument than it evaluated** | ADR-034 | 2026-09-12 | The 2026-09-05 row weighed opening *for* an audience already there to be reassured, and correctly found nobody was there yet to reassure (`/explore` at 1 route). This decides the opposite direction on a premise that row never considered: **open the repository specifically because there is no userbase yet, not despite it** — auditability plus a credible community-based-product story is the acquisition pitch used to build a userbase, not a response to one already asking. The audit and the "how" decisions in the 2026-09-05 row (AGPL-3.0, brand-not-licence, no fresh repo needed) are unchanged and now become the execution basis rather than a durable-if-unused answer. **Tied to the monetisation side of the same decision, recorded in `ROADMAP.md`'s Strategy section**: real hosting cost plus a near-finished product changed the calculus from "wait for a usage signal before building paid features" to "have paid features ready now" — the open core and the premium integration broker (`ROADMAP.md`'s open-core section) are now one launch move, not a self-hosted-trust-signal first and a monetisation-layer added later once self-hosters exist. BYOK and third-party platform integrations (Strava, satellite feed, notification-channel/chatbot) are the first features to gate through the broker, adopted early rather than deferred behind a self-hoster trigger that this decision no longer waits for |
+| **Mobile *and* the new B2B/Pro admin console both stay closed source, consolidated into one `kayak-premium` repo; monorepo split is a prerequisite of executing the open-source decision, not its own milestone** | amends the row above | 2026-09-12 | Forced by scoping mobile GPS/Bluetooth integration (`docs/adr/mobile-offline.md` M9f): BLE-GATT/NMEA and satellite-feed (inReach MapShare etc.) integrations have no third-party secret to gate on the way Strava/BYOK do, so protecting them as premium requires the feature *code* itself to be absent from whatever repo goes public — the existing Core-BE-contains-all-the-logic principle doesn't extend to this feature. **Widened same day**: the B2B/Pro tier was reframed as its own frontend (an admin console for operators/organisers, distinct from the consumer app's information architecture — `ROADMAP.md`'s Strategy section), closed by a different but parallel logic (it's the paid product surface itself, not something the consumer-trust pitch needs open). Both land in the existing private **`kayak-premium`** repo alongside the Premium Broker BE — one closed home for Broker BE + mobile app + B2B console, not three separate private repos. The 2026-09-05 audit's "no fresh repository required, it's a visibility flip" conclusion assumed an all-or-nothing flip and no longer holds: git visibility is per-repository, so `backend/`+`frontend/` (public **`kayak-core`**) and everything closed (`kayak-premium`) need an actual repo split, not a flag flip. **Sequencing deliberately left unpinned to a date** for the split itself — nothing is blocked while the monorepo stays private — but the split (repo structure) and the console *build* are two different clocks: building the console is a large, later bet sized like M26, not like BYOK/Strava, so the repo split should exist before the console is built, not the other way round. **One concrete coupling to solve when the split happens**: M9b's `frontend/lib/*` reuse by mobile becomes a public npm package — private registries were considered and rejected, since `frontend/lib` is part of Core and public either way, so gating the package adds real ongoing operational cost for no confidentiality benefit. **Open question, not yet decided**: whether Club-admin features belong on the same B2B console once the missing `Club`/`Organization` schema exists |
