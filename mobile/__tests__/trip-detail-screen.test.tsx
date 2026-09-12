@@ -30,13 +30,16 @@ describe("TripDetailScreen", () => {
     expect(await findByText("Costa Brava")).toBeTruthy()
   })
 
-  it("links to the itinerary, float plan, and inventory screens", async () => {
+  it("links to every hub destination at web parity (M30 WP2)", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
     const { findByText, getByText } = await render(<TripDetailScreen />)
     await findByText("Costa Brava")
 
+    expect(getByText("Details")).toBeTruthy()
     expect(getByText("Itinerary")).toBeTruthy()
+    expect(getByText("Crew")).toBeTruthy()
+    expect(getByText("Logistics")).toBeTruthy()
     expect(getByText("Float plan")).toBeTruthy()
     expect(getByText("Items")).toBeTruthy()
   })

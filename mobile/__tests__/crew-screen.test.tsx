@@ -1,0 +1,150 @@
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import CrewScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/crew"
+import { getSession } from "../lib/auth/session"
+import { listConnections } from "../lib/connections/actions"
+import { cancelInvitation, getTrip, inviteBuddy, removeMember } from "../lib/trips/actions"
+
+// A plain stub, not requireActual — the real module's own Image usage collides
+// with react-native-css's Image wrapper once this screen's Avatar is also in the
+// module graph ("Cannot convert undefined or null to object" in
+// copyComponentProperties.ts), a Jest-only double-registration this screen is the
+// first to trigger. Every other screen test's requireActual-based mock still works
+// because none of them import Avatar.
+jest.mock("expo-router", () => ({
+  Stack: { Screen: () => null },
+  useLocalSearchParams: () => ({ id: "trip-1" }),
+}))
+jest.mock("../lib/trips/actions", () => ({
+  getTrip: jest.fn(),
+  inviteBuddy: jest.fn(),
+  cancelInvitation: jest.fn(),
+  removeMember: jest.fn(),
+}))
+jest.mock("../lib/auth/session", () => ({
+  getSession: jest.fn(),
+}))
+jest.mock("../lib/connections/actions", () => ({
+  listConnections: jest.fn(),
+}))
+
+const mockGetTrip = getTrip as jest.Mock
+const mockGetSession = getSession as jest.Mock
+const mockListConnections = listConnections as jest.Mock
+const mockInviteBuddy = inviteBuddy as jest.Mock
+const mockCancelInvitation = cancelInvitation as jest.Mock
+const mockRemoveMember = removeMember as jest.Mock
+
+const LEADER = { id: "m-leader", role: "leader", user: { id: "leader-1", name: "Lea", surname: "Der" } }
+const CREW = { id: "m-crew", role: "crew", user: { id: "crew-1", name: "Cara", surname: "Crew" } }
+
+function tripWith(overrides: Partial<{ travellers: unknown[]; pendingTravellers: unknown[] }>) {
+  return {
+    id: "trip-1",
+    destination: "Costa Brava",
+    travellers: overrides.travellers ?? [LEADER, CREW],
+    pendingTravellers: overrides.pendingTravellers ?? [],
+  }
+}
+
+beforeEach(() => {
+  mockGetTrip.mockReset()
+  mockGetSession.mockReset()
+  mockListConnections.mockReset()
+  mockInviteBuddy.mockReset()
+  mockCancelInvitation.mockReset()
+  mockRemoveMember.mockReset()
+})
+
+describe("CrewScreen", () => {
+  it("lists crew with role badges, without leader-only controls for a non-leader", async () => {
+    mockGetSession.mockResolvedValue({ userId: "crew-1" })
+    mockGetTrip.mockResolvedValue(tripWith({}))
+
+    const { findByText, queryByText } = await render(<CrewScreen />)
+
+    expect(await findByText("Lea Der")).toBeTruthy()
+    expect(queryByText("Cara Crew")).toBeTruthy()
+    expect(queryByText("Invite member")).toBeNull()
+    expect(queryByText("Pending invitations")).toBeNull()
+  })
+
+  it("shows an empty panel, not a blank list, when there is no crew", async () => {
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockGetTrip.mockResolvedValue(tripWith({ travellers: [] }))
+
+    const { findByText } = await render(<CrewScreen />)
+
+    expect(await findByText("No crew yet")).toBeTruthy()
+  })
+
+  it("lets the leader invite an accepted buddy and removes them from the picker on success", async () => {
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockGetTrip.mockResolvedValue(tripWith({}))
+    mockListConnections.mockResolvedValue([
+      { requester: { id: "leader-1" }, addressee: { id: "buddy-1", username: "ada", name: "Ada" } },
+    ])
+    mockInviteBuddy.mockResolvedValue(undefined)
+
+    const { findByText, getByText } = await render(<CrewScreen />)
+    await findByText("Lea Der")
+
+    fireEvent.press(getByText("Invite a buddy"))
+    expect(await findByText("Ada")).toBeTruthy()
+
+    fireEvent.press(getByText("Invite"))
+
+    await waitFor(() => {
+      expect(mockInviteBuddy).toHaveBeenCalledWith("trip-1", "buddy-1")
+    })
+    await waitFor(() => {
+      expect(mockGetTrip).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it("cancels a pending invitation and re-fetches the trip", async () => {
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockGetTrip.mockResolvedValue(
+      tripWith({ pendingTravellers: [{ id: "pending-1", name: "Pat", surname: "Pending" }] }),
+    )
+    mockCancelInvitation.mockResolvedValue(undefined)
+
+    const { findByText, getByLabelText } = await render(<CrewScreen />)
+    await findByText("Pat Pending")
+
+    fireEvent.press(getByLabelText(/cancel/i))
+
+    await waitFor(() => {
+      expect(mockCancelInvitation).toHaveBeenCalledWith("trip-1", "pending-1")
+    })
+  })
+
+  it("lets the leader remove a crew member but not the leader", async () => {
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockGetTrip.mockResolvedValue(tripWith({}))
+    mockRemoveMember.mockResolvedValue(undefined)
+
+    const { findByText, getAllByLabelText, queryByLabelText } = await render(<CrewScreen />)
+    await findByText("Cara Crew")
+
+    // Only the non-leader row exposes a remove control.
+    const removeButtons = getAllByLabelText(/remove/i)
+    expect(removeButtons).toHaveLength(1)
+
+    fireEvent.press(removeButtons[0])
+
+    await waitFor(() => {
+      expect(mockRemoveMember).toHaveBeenCalledWith("trip-1", "crew-1")
+    })
+    expect(queryByLabelText(/remove.*lea der/i)).toBeNull()
+  })
+
+  it("surfaces a thrown error from the initial load", async () => {
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+
+    const { findByText } = await render(<CrewScreen />)
+
+    expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+})

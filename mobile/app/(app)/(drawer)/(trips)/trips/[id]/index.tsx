@@ -1,4 +1,11 @@
-import { AnchorIcon, MapPinIcon, PackageIcon } from "lucide-react-native"
+import {
+  AnchorIcon,
+  ClipboardListIcon,
+  InfoIcon,
+  MapPinIcon,
+  PackageIcon,
+  UsersIcon,
+} from "lucide-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, Pressable } from "react-native"
@@ -15,11 +22,10 @@ import { getTrip } from "../../../../../../lib/trips/actions"
 const header = <RouterStack.Screen options={{ title: "Trip" }} />
 
 // The trip list's actual tap target (docs/adr/mobile-offline.md "Screen structure",
-// decided 2026-09-06) — mirrors the role web's TripDetailNav tabs play, minimal per
-// that decision: link out to what already exists (Itinerary, Float plan — which
-// already carries the crew manifest — and Items) rather than a v1 of every web tab.
-// The itinerary map is a destination FROM here now, not the trip list's direct
-// target the way M9b/M9b2 built it.
+// decided 2026-09-06) — mirrors the role web's TripDetailNav tabs play. M30 WP2
+// brought this to full parity with web's tab set (Details, Logistics, Crew added
+// to the original Itinerary/Float plan/Items). The itinerary map is a destination
+// FROM here now, not the trip list's direct target the way M9b/M9b2 built it.
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [trip, setTrip] = useState<Trip | null>(null)
@@ -64,7 +70,10 @@ export default function TripDetailScreen() {
     label: string
     icon: typeof MapPinIcon
   }[] = [
+    { href: `/trips/${id}/details`, label: "Details", icon: InfoIcon },
     { href: `/trips/${id}/itinerary`, label: "Itinerary", icon: MapPinIcon },
+    { href: `/trips/${id}/crew`, label: "Crew", icon: UsersIcon },
+    { href: `/trips/${id}/logistics`, label: "Logistics", icon: ClipboardListIcon },
     { href: `/trips/${id}/float-plan`, label: "Float plan", icon: AnchorIcon },
     { href: `/trips/${id}/items`, label: "Items", icon: PackageIcon },
   ]
