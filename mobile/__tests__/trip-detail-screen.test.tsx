@@ -30,13 +30,32 @@ describe("TripDetailScreen", () => {
     expect(await findByText("Costa Brava")).toBeTruthy()
   })
 
-  it("links to every hub destination at web parity (M30 WP2)", async () => {
+  it("shows trip metadata inline in the identity card, not behind a Details link", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      destination: "Costa Brava",
+      state: "building",
+      difficulty: "moderate",
+      dateFrom: "2026-06-10",
+      dateTo: "2026-06-14",
+      description: "A relaxed week along the coast.",
+    })
+
+    const { findByText, getByText, queryByText } = await render(<TripDetailScreen />)
+    await findByText("Costa Brava")
+
+    expect(getByText("Moderate")).toBeTruthy()
+    expect(getByText("A relaxed week along the coast.")).toBeTruthy()
+    // Web has no "Details" tab either — this is the identity card, not a link out.
+    expect(queryByText("Details")).toBeNull()
+  })
+
+  it("links to every remaining hub destination at web parity (M30 WP2)", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
     const { findByText, getByText } = await render(<TripDetailScreen />)
     await findByText("Costa Brava")
 
-    expect(getByText("Details")).toBeTruthy()
     expect(getByText("Itinerary")).toBeTruthy()
     expect(getByText("Crew")).toBeTruthy()
     expect(getByText("Logistics")).toBeTruthy()
