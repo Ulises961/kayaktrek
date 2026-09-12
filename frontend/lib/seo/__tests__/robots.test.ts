@@ -39,20 +39,18 @@ describe("DISALLOWED_PATHS", () => {
     expect(DISALLOWED_PATHS).toContain("/paddlers")
   })
 
-  // Reversed 2026-09-07, independent of M25 §1's registration change: opening
-  // registration to testers and opening the library to search engines are two different
-  // decisions. /explore isn't populated yet (§5 still open) — indexing and caching a thin
-  // library is a worse, slower-to-reverse first impression than a few more days of
-  // noindex. Reinstate once §5's real routes are live.
-  it("disallows the discovery surface until the library has real content (temporary)", () => {
-    expect(DISALLOWED_PATHS).toContain("/explore")
-    expect(DISALLOWED_PATHS).toContain("/routes")
+  // Reinstated 2026-09-12 once two real, author-pitched routes were published to the
+  // library (§5 of plans/M25-web-1.0-release.md) — the discovery surface is no longer
+  // held back from crawlers.
+  it("allows the discovery surface now that the library has real content", () => {
+    expect(DISALLOWED_PATHS).not.toContain("/explore")
+    expect(DISALLOWED_PATHS).not.toContain("/routes")
   })
 })
 
 describe("INDEXABLE_PATHS", () => {
   it("lists the anonymous-reachable pages that should be crawled", () => {
-    expect(INDEXABLE_PATHS).toEqual(["/", "/about", "/terms", "/privacy"])
+    expect(INDEXABLE_PATHS).toEqual(["/", "/about", "/explore", "/terms", "/privacy"])
   })
 
   it("shares no entry with the disallow list", () => {

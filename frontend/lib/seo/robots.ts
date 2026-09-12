@@ -18,26 +18,24 @@ export const UNLISTED = {
 } as const
 
 // Anonymous-reachable pages worth crawling. `/routes/<id>` is not here because it is
-// enumerated from the live library in `app/sitemap.ts` — while that enumeration is live at
-// all (see DISALLOWED_PATHS below).
-export const INDEXABLE_PATHS = ["/", "/about", "/terms", "/privacy"]
+// enumerated from the live library in `app/sitemap.ts`.
+export const INDEXABLE_PATHS = ["/", "/about", "/explore", "/terms", "/privacy"]
 
 // robots.txt matches by prefix, so each entry covers itself and everything beneath it.
 //
-// Four groups, for four different reasons:
+// Three groups, for three different reasons:
 //   - everything proxy.ts gates: crawling it yields a login redirect, nothing more.
 //   - the tokenised share surfaces: unlisted by design. A float-plan or story link is
 //     pasted into WhatsApp and mail, and an indexed one is a privacy failure, not a
 //     crawl-budget one.
 //   - the token-bearing auth callbacks: single-use links that mean nothing to a crawler.
-//   - the public route library itself, **temporarily** (decided 2026-09-07, independent of
-//     M25 §1's registration change): `/explore` carries the operator's own demo content and
-//     is not populated yet (§5, still open). Opening registration to testers and opening the
-//     library to search engines are two different decisions that M25 §1 had conflated —
-//     indexing and caching a near-thin library is a worse, slower-to-reverse first
-//     impression than a few more days of `noindex`. Remove `/explore` and `/routes` from
-//     this list, and reinstate `/explore`/route ids in `app/sitemap.ts`'s INDEXABLE_PATHS
-//     usage and `publicRouteIds()` call, once §5's real routes are live.
+//
+// `/explore` and `/routes` were temporarily disallowed from 2026-09-07 while the public
+// library held only the operator's own demo content (§5 of `plans/M25-web-1.0-release.md`
+// was still open). Reinstated 2026-09-12 once two real, author-pitched routes were
+// published — text description + difficulty grade was judged enough to be worth crawling;
+// photos and a trip narrative (M7d) are a nice-to-have for future routes, not a gate on
+// these two, since neither exists for trips that predate the app.
 //
 // `/paddlers` covers the gated connections page *and* the public `/paddlers/<username>`
 // profile beneath it. That is deliberate: a profile carries a real person's logs,
@@ -57,7 +55,4 @@ export const DISALLOWED_PATHS = [
   "/reset-password",
   "/cancel-deletion",
   "/download-export",
-  // Temporary — see the comment above INDEXABLE_PATHS.
-  "/explore",
-  "/routes",
 ]
