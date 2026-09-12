@@ -107,33 +107,46 @@ curl http://localhost:5000/api/v1/health
 ## Monitoring / admin tooling
 
 `docker-compose.monitoring.yml` — Portainer (containers), Glances (host CPU/RAM/disk/network),
-pgweb (browse Postgres), Uptime Kuma (health-endpoint monitoring + alert notification — narrows
-the silent-failure gap ADR-034 flagged for the home-hosted RabbitMQ path, but does not close it;
-it runs on the box it watches, so see "What this stack cannot do" below; monitors and
-notification channels are configured post-boot in its own web UI, not declaratively here).
-Independent of the app stack's lifecycle — never touched by the redeploy loop above. **Must be
-brought up after `docker-compose.prod.yml` at least once** — it joins the `kayak_net` network that
-file creates, so pgweb can resolve `postgres` by name; a fresh box without the app stack running
-yet will fail with a "network not found" error.
+pgweb (browse Postgres), and a droplet-local Uptime Kuma service definition (kept in the file,
+**not started** — see below). Independent of the app stack's lifecycle — never touched by the
+redeploy loop above. **Must be brought up after `docker-compose.prod.yml` at least once** — it
+joins the `kayak_net` network that file creates, so pgweb can resolve `postgres` by name; a fresh
+box without the app stack running yet will fail with a "network not found" error.
 
 ```bash
 docker compose -f docker-compose.monitoring.yml pull
-docker compose -f docker-compose.monitoring.yml up -d
+docker compose -f docker-compose.monitoring.yml up -d portainer glances pgweb
 ```
 
-**Brought up in production on 2026-08-28.** Not `--remove-orphans` — both compose files share a
-directory with no explicit `-p` project name, so Compose labels the *other* file's containers
-"orphans" of this one's view; that's a label artifact, not something to clean up, and passing
-`--remove-orphans` here would actually stop the running app stack.
+**Actually running in production only since 2026-09-12.** This line previously claimed
+2026-08-28, which predates the M21 DigitalOcean migration (phases 0-5, done 2026-08-31) — the
+stack was brought up by hand on the old home box (`aspire`) before that move and never carried
+over, and `scripts/deploy-sync.sh`'s `FILES` list never included this compose file either, so
+nothing about it ever reached the droplet through the normal deploy path. Found only by directly
+checking `docker ps` on the box against this doc's claim — the same "a claim in one file is not
+evidence for another" gap the `INVITE_CODE` entry in root `CLAUDE.md` already names. Both are
+fixed now: the file is in `deploy-sync.sh`'s `FILES`, and `portainer`/`glances`/`pgweb` are
+running on `kayak-do`.
+
+**`uptime-kuma` is deliberately not started here**, despite being defined in the compose file.
+The real Uptime Kuma instance runs on the operator's own home box, external to the droplet — the
+one genuine advantage of that placement is that it can watch the droplet die, which a
+droplet-local Kuma structurally cannot (see "What this stack cannot do" below). Starting a second,
+droplet-local instance from this file would duplicate that role, not improve it, and the monitor
+table in the next section (targets like `127.0.0.1:5000`) describes a droplet-local Kuma that was
+never actually configured — treat that table as the design intent for if a droplet-local instance
+is ever wanted, not as current state. Not `--remove-orphans` on the command above — both compose
+files share a directory with no explicit `-p` project name, so Compose labels the *other* file's
+containers "orphans" of this one's view; that's a label artifact, not something to clean up, and
+passing `--remove-orphans` here would actually stop the running app stack.
 
 All on `127.0.0.1` only, same rule as everything else here: Portainer `:9002`, Glances `:61208`,
-pgweb `:8081`, Uptime Kuma `:3001`. None of these are ever routed through the public Cloudflare
-Tunnel domain — a DB browser or container-lifecycle UI reachable from the internet is not an
-acceptable mistake to be one DNS record away from. Reach them from your own machine with one
-tunnel:
+pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunnel domain — a DB
+browser or container-lifecycle UI reachable from the internet is not an acceptable mistake to be
+one DNS record away from. Reach them from your own machine with one tunnel:
 
 ```bash
-ssh -L 3001:127.0.0.1:3001 -L 9002:127.0.0.1:9002 -L 61208:127.0.0.1:61208 -L 8081:127.0.0.1:8081 <box>
+ssh -L 9002:127.0.0.1:9002 -L 61208:127.0.0.1:61208 -L 8081:127.0.0.1:8081 <box>
 ```
 
 ### Uptime Kuma — what to actually configure
@@ -142,6 +155,13 @@ Portainer, Glances and pgweb are pull tools: they answer when you go look, and c
 anything is wrong on their own. Uptime Kuma is the one push tool in this set, and it is the one
 that matters for the root `CLAUDE.md` alerting checklist item (second in that item's cost order,
 after a Logfire error-rate alert).
+
+**This section describes the real, external, home-box Uptime Kuma instance** — not the
+`uptime-kuma` service in `docker-compose.monitoring.yml`, which is defined but deliberately not
+started on the droplet (see above). The `127.0.0.1` targets below therefore do not apply as
+written to that instance; they describe what a droplet-local Kuma's own monitor list would look
+like if one is ever brought up. Confirm what the home-box instance is actually configured to
+watch before trusting this table as current state.
 
 This is deliberately not scripted — first-run admin signup and typing an SMTP password into the
 notification form are both account/credential steps, done once by a human in the web UI:
