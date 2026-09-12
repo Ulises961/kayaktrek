@@ -131,6 +131,7 @@ describe("ItineraryCard — public toggle", () => {
 
     await waitFor(() =>
       expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, {
+        name: BASE.name,
         description: "Two sheltered days.",
         difficulty: null,
         isPublic: true,
@@ -152,6 +153,7 @@ describe("ItineraryCard — public toggle", () => {
 
     await waitFor(() =>
       expect(mockUpdateItinerary).toHaveBeenCalledWith(BASE.id, {
+        name: BASE.name,
         description: "Better pitch.",
         difficulty: null,
       }),

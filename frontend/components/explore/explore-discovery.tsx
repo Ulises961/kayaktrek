@@ -397,12 +397,10 @@ export function ExploreDiscovery({
                           href={`/paddlers/${item.originalAuthor.username}`}
                           className="font-medium hover:underline"
                         >
-                          {item.originalAuthor.name ?? item.originalAuthor.username}
+                          {item.originalAuthor.username}
                         </Link>
                       ) : (
-                        <span className="font-medium">
-                          {item.originalAuthor.name ?? item.originalAuthor.username}
-                        </span>
+                        <span className="font-medium">{item.originalAuthor.username}</span>
                       )}
                     </p>
                   )}

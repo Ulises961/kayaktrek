@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { DaySchema } from "../day"
-import { ItinerarySchema } from "../itinerary"
+import { ItinerarySchema, ItineraryPitchSchema } from "../itinerary"
 import { PointSchema } from "../point"
 
 const POINT_ID_1 = "01952f1a-0000-7000-8000-000000000001"
@@ -217,5 +217,33 @@ describe("ItinerarySchema", () => {
     const { days: _, ...noDays } = ITINERARY_FIXTURE
     const result = ItinerarySchema.safeParse(noDays)
     expect(result.success).toBe(true)
+  })
+})
+
+describe("ItineraryPitchSchema", () => {
+  const PITCH_FIXTURE = { name: "Galicia Coast", description: "A sheltered hop.", difficulty: "" }
+
+  it("parses a name alongside the pitch and grade", () => {
+    const result = ItineraryPitchSchema.safeParse(PITCH_FIXTURE)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.name).toBe("Galicia Coast")
+  })
+
+  it("rejects a blank name", () => {
+    const result = ItineraryPitchSchema.safeParse({ ...PITCH_FIXTURE, name: "" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a name over 255 characters", () => {
+    const result = ItineraryPitchSchema.safeParse({ ...PITCH_FIXTURE, name: "x".repeat(256) })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a name containing HTML tags", () => {
+    const result = ItineraryPitchSchema.safeParse({
+      ...PITCH_FIXTURE,
+      name: "<script>alert(1)</script>",
+    })
+    expect(result.success).toBe(false)
   })
 })

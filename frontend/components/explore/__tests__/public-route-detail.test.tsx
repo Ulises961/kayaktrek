@@ -117,7 +117,7 @@ describe("PublicRouteDetail", () => {
     expect(screen.getByText("Day 1")).toBeInTheDocument()
   })
 
-  it("links to a linkable original author's public profile", () => {
+  it("links to a linkable original author's public profile, by username", () => {
     const author: OriginalAuthor = { username: "captain-jo", name: "Jo", linkable: true }
     render(
       <PublicRouteDetail
@@ -128,7 +128,7 @@ describe("PublicRouteDetail", () => {
         backLabel="All routes"
       />,
     )
-    const link = screen.getByRole("link", { name: "Jo" })
+    const link = screen.getByRole("link", { name: "captain-jo" })
     expect(link).toHaveAttribute("href", "/paddlers/captain-jo")
   })
 
@@ -143,8 +143,8 @@ describe("PublicRouteDetail", () => {
         backLabel="All routes"
       />,
     )
-    expect(screen.queryByRole("link", { name: "Jo" })).not.toBeInTheDocument()
-    expect(screen.getByText("Jo")).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "captain-jo" })).not.toBeInTheDocument()
+    expect(screen.getByText("captain-jo")).toBeInTheDocument()
   })
 
   it("renders the back link with the given href and label", () => {
