@@ -309,7 +309,9 @@ def update_itinerary(id: str):
         replaces the itinerary's day list wholesale. A public itinerary's
         route is read-only — fork it to change days or points — but its
         pitch (name/description/difficulty), `isPublic` itself,
-        `avgSpeedKnots` and `tripId` stay editable by the owner.
+        `avgSpeedKnots` and `tripId` stay editable while public, by its
+        author only (a trip member with itinerary access is not the same
+        as the person who authored the public listing).
       requestBody:
         content:
           application/json:
@@ -325,10 +327,13 @@ def update_itinerary(id: str):
         404:
           description: Itinerary not found
         409:
-          description: The itinerary is public and the request includes `days`, or a database integrity constraint was violated
+          description: >
+            The itinerary is public and the request includes `days`, the
+            caller is not its author, or a database integrity constraint
+            was violated
     """
     try:
-        updated = ItineraryService.update_itinerary(id, request.get_json() or {})
+        updated = ItineraryService.update_itinerary(id, request.get_json() or {}, g.current_user_id)
         return jsonify(ItinerarySchema().dump(updated)), HTTPStatus.OK
 
     except HTTPException:

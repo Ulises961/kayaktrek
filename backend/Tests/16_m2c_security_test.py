@@ -196,7 +196,27 @@ def test_owner_can_edit_pitch_and_visibility_on_public_itinerary(client, auth_he
 
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
-    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+
+def test_crew_member_cannot_edit_pitch_of_public_itinerary_they_do_not_author(
+    client, trip_with_user2_as_crew
+):
+    """A trip member has full itinerary access via the trip (M2's ownership
+    hierarchy), but that is not authorship of the public listing — only the
+    itinerary's own author may edit its pitch or visibility while public.
+    Re-fetch (as the author) to confirm the 409 left the name untouched."""
+    trip = trip_with_user2_as_crew["trip"]
+    itinerary_id = trip["itinerary"]["id"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    crew_headers = trip_with_user2_as_crew["crew_headers"]
+
+    r = client.patch(
+        f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=crew_headers, json={"name": "Hijacked name"}
+    )
+    assert r.status_code == 409
+
+    refetched = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=leader_headers)
+    assert refetched.status_code == 200
+    assert refetched.json["name"] != "Hijacked name"
 
 
 # ---------------------------------------------------------------------------
