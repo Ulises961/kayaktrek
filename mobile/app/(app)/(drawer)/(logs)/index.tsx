@@ -10,6 +10,7 @@ import type { EndorsementRequest } from "@shared/dtos/endorsement-request"
 import { formatDayDate } from "@shared/utils/date"
 
 import { LogCard } from "../../../../components/logs/log-card"
+import { StatsPanel } from "../../../../components/profile/stats-panel"
 import { Button } from "../../../../components/ui/button"
 import { Card, CardContent } from "../../../../components/ui/card"
 import { Chip } from "../../../../components/ui/chip"
@@ -126,26 +127,7 @@ export default function LogsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
-        {stats && stats.logCount > 0 && (
-          <Row className="gap-3">
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Hours</Text>
-              <Text className="text-lg font-semibold tabular-nums">
-                {stats.totalHours.toFixed(1)}
-              </Text>
-            </Card>
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Distance</Text>
-              <Text className="text-lg font-semibold tabular-nums">
-                {stats.totalDistance.toFixed(1)} km
-              </Text>
-            </Card>
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Trips</Text>
-              <Text className="text-lg font-semibold tabular-nums">{stats.tripCount}</Text>
-            </Card>
-          </Row>
-        )}
+        {stats && <StatsPanel stats={stats} />}
 
         {requests.length > 0 && (
           <Stack className="gap-2">
