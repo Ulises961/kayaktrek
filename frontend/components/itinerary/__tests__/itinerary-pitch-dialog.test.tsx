@@ -25,6 +25,7 @@ function renderDialog(props: Partial<React.ComponentProps<typeof ItineraryPitchD
       onOpenChange={onOpenChange}
       onSaved={onSaved}
       publishOnSave={false}
+      name="Outer Sound Traverse"
       {...props}
     />,
   )
@@ -37,19 +38,24 @@ beforeEach(() => {
 })
 
 describe("ItineraryPitchDialog", () => {
-  it("prefills the pitch and grade it was given", () => {
+  it("prefills the name, pitch and grade it was given", () => {
     renderDialog({
+      name: "Outer Sound Traverse",
       description: "Sheltered coast hop.",
       difficulty: DIFFICULTY.MODERATE,
     })
+    expect(screen.getByLabelText(/^name$/i)).toHaveValue("Outer Sound Traverse")
     expect(screen.getByLabelText(/description/i)).toHaveValue("Sheltered coast hop.")
     expect(screen.getByLabelText(/difficulty/i)).toHaveValue(DIFFICULTY.MODERATE)
   })
 
-  it("saves the pitch and grade without publishing when publishOnSave is false", async () => {
+  it("saves the name, pitch and grade without publishing when publishOnSave is false", async () => {
     const user = userEvent.setup()
     renderDialog({ description: "Old pitch." })
 
+    const nameField = screen.getByLabelText(/^name$/i)
+    await user.clear(nameField)
+    await user.type(nameField, "Renamed Passage")
     const field = screen.getByLabelText(/description/i)
     await user.clear(field)
     await user.type(field, "A committing outer passage.")
@@ -58,6 +64,7 @@ describe("ItineraryPitchDialog", () => {
 
     await waitFor(() =>
       expect(mockUpdateItinerary).toHaveBeenCalledWith(ITINERARY_ID, {
+        name: "Renamed Passage",
         description: "A committing outer passage.",
         difficulty: DIFFICULTY.EXPERT,
       }),
@@ -75,6 +82,7 @@ describe("ItineraryPitchDialog", () => {
     // never be briefly public with no pitch on it.
     await waitFor(() => expect(mockUpdateItinerary).toHaveBeenCalledTimes(1))
     expect(mockUpdateItinerary).toHaveBeenCalledWith(ITINERARY_ID, {
+      name: "Outer Sound Traverse",
       description: "Two easy days.",
       difficulty: null,
       isPublic: true,
@@ -88,11 +96,22 @@ describe("ItineraryPitchDialog", () => {
 
     await waitFor(() =>
       expect(mockUpdateItinerary).toHaveBeenCalledWith(ITINERARY_ID, {
+        name: "Outer Sound Traverse",
         description: null,
         difficulty: null,
         isPublic: true,
       }),
     )
+  })
+
+  it("rejects a blank name without calling the server", async () => {
+    const user = userEvent.setup()
+    renderDialog()
+    await user.clear(screen.getByLabelText(/^name$/i))
+    await user.click(screen.getByRole("button", { name: /save/i }))
+
+    expect(await screen.findByText(/name is required/i)).toBeInTheDocument()
+    expect(mockUpdateItinerary).not.toHaveBeenCalled()
   })
 
   it("closes and reports success to its parent once saved", async () => {

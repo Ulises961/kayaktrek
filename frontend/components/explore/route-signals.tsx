@@ -40,10 +40,10 @@ export function RouteSignals({ item, unit }: RouteSignalsProps) {
               href={`/paddlers/${item.author.username}`}
               className="font-medium hover:underline"
             >
-              {item.author.name ?? item.author.username}
+              {item.author.username}
             </Link>
           ) : (
-            <span className="font-medium">{item.author.name ?? item.author.username}</span>
+            <span className="font-medium">{item.author.username}</span>
           )}
         </p>
       )}
