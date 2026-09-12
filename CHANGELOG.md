@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.4] - 2026-09-12
+
+### Fixed
+
+- Registration: a password whose only "special character" was a space or a non-ASCII
+  character (e.g. an accented letter) passed the signup form's validation but was then
+  rejected by the server with a confusing error. The form now checks against the same fixed
+  set of punctuation characters the backend accepts.
+
 ## [1.0.3] - 2026-09-11
 
 ### Added
