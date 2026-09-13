@@ -23,7 +23,7 @@ from Models.trip import Trip
 from Models.user import User
 from Schemas.day_schema import DaySchema
 from Schemas.itinerary_schema import ItinerarySchema, ItineraryUpdateSchema
-from Services.Utils.point_ordering import chain_in_order, walk_linked_list
+from Services.Utils.point_ordering import bump_route_version, chain_in_order, walk_linked_list
 from Services.Utils.rdp import rdp_simplify
 from Services.Utils.route_distance import compute_day_miles, compute_total_miles
 from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
@@ -648,6 +648,7 @@ class ItineraryService:
         The submitted ids must be exactly the itinerary's own points, no more and
         no fewer (see PointOrderMismatchError).
         """
+        itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
         points = ItineraryService.itinerary_points(itinerary_id)
         by_id = {str(point.id): point for point in points}
 
@@ -658,6 +659,7 @@ class ItineraryService:
             )
 
         chain_in_order([by_id[point_id] for point_id in submitted])
+        bump_route_version(itinerary)
         db.session.commit()
 
         logger.info(
@@ -866,6 +868,7 @@ class ItineraryService:
                 if "name" in upd and upd["name"] is not None:
                     point.name = bleach.clean(str(upd["name"]).strip(), tags=[], strip=True)
 
+        bump_route_version(itinerary)
         db.session.commit()
         db.session.refresh(itinerary)
 

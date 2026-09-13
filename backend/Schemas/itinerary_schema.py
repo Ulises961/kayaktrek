@@ -30,6 +30,8 @@ class ItinerarySchema(BaseSchema):
         allow_none=True, validate=lambda x: x is None or (0 <= x <= 50000)
     )
     created_from_id = fields.UUID(allow_none=True, dump_only=True)
+    # Optimistic-concurrency token for mobile sync-down (M9c) — see Models.itinerary.
+    route_version = fields.Integer(dump_only=True)
     days = fields.List(
         fields.Nested(DaySchema),
         allow_none=True,

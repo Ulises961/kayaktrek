@@ -205,7 +205,13 @@ def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerar
     day_id = itinerary["days"][0]["id"]
     mock_result = MagicMock()
     mock_result.id = "mock-celery-task-id"
-    with patch("Resources.sea_resource.fetch_weather") as mock_task:
+    with (
+        patch(
+            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            return_value=True,
+        ),
+        patch("Resources.sea_resource.fetch_weather") as mock_task,
+    ):
         mock_task.delay.return_value = mock_result
         resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
         assert resp.status_code == 202
@@ -216,11 +222,7 @@ def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerar
 
 def test_weather_refresh_403_without_premium_entitlement(client, auth_headers, itinerary):
     day_id = itinerary["days"][1]["id"]
-    with patch(
-        "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
-        return_value=False,
-    ):
-        resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+    resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
     assert resp.status_code == 403
 
 
@@ -228,7 +230,13 @@ def test_weather_refresh_429_within_cooldown(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     mock_result = MagicMock()
     mock_result.id = "mock-celery-task-id"
-    with patch("Resources.sea_resource.fetch_weather") as mock_task:
+    with (
+        patch(
+            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            return_value=True,
+        ),
+        patch("Resources.sea_resource.fetch_weather") as mock_task,
+    ):
         mock_task.delay.return_value = mock_result
         first = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
         assert first.status_code == 202

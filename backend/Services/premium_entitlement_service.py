@@ -6,12 +6,13 @@ class PremiumEntitlementService:
     "interface in Core BE, no-op self-hosted default, real implementation swapped in
     at the hosted deployment" shape as `SatelliteFeedSource`.
 
-    STUB: every entitlement currently returns True — nothing is gated yet. Replace
-    each check's body when the gating strategy for that feature is actually decided
-    and the Premium Broker call exists; do not leave a stub silently gating a feature
-    that was meant to ship free.
+    STUB: every entitlement currently returns False — closed by default until the
+    Premium Broker call exists and a check is deliberately opened. A cost-exposed
+    action (this one triggers metered OpenMeteo calls) must not sit open just because
+    the gating strategy hasn't been decided yet; flip to True only for a feature that
+    is a deliberate, decided free tier.
     """
 
     @staticmethod
     def has_weather_refresh_access(user_id: str) -> bool:
-        return True
+        return False

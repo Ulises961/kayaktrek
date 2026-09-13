@@ -10,6 +10,7 @@ from sqlalchemy.exc import NoResultFound
 
 from Api.database import db
 from Models.day import Day
+from Models.itinerary import Itinerary
 from Models.point import Point, PointType
 from Models.sea import Sea
 from Models.weather import Weather

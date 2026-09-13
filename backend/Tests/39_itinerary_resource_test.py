@@ -324,6 +324,27 @@ def test_point_order_rewrites_the_chain(client, auth_headers, route_of_three):
     assert _chain_ids(client, auth_headers, route_of_three["points"]) == reversed_ids
 
 
+def test_point_order_bumps_route_version(client, auth_headers, route_of_three):
+    before = client.get(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}", headers=auth_headers
+    )
+    assert before.status_code == 200
+    before_version = before.json["routeVersion"]
+
+    [first, second, third] = route_of_three["points"]
+    response = client.post(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}/point-order",
+        headers=auth_headers,
+        json={"order": [third["id"], second["id"], first["id"]]},
+    )
+    assert response.status_code == 200
+
+    after = client.get(
+        f"{ITINERARY_ENDPOINT}/{route_of_three['itinerary_id']}", headers=auth_headers
+    )
+    assert after.json["routeVersion"] == before_version + 1
+
+
 def test_point_order_leaves_the_route_alone_when_the_set_does_not_match(
     client, auth_headers, route_of_three
 ):

@@ -1,6 +1,19 @@
 from typing import Dict, List, Optional, Set
 
+from Models.itinerary import Itinerary
 from Models.point import Point
+
+
+def bump_route_version(itinerary: Itinerary) -> None:
+    """Bump the route's optimistic-concurrency token.
+
+    Call this on every structural route change — point add/delete/reorder, day
+    boundary move — so mobile sync-down (M9c) can detect a diverged route as a
+    single version mismatch rather than diffing every point. See
+    docs/mobile/sync-protocol-spec.md §8.1. Caller is responsible for the
+    session commit, same as chain_in_order below.
+    """
+    itinerary.route_version += 1
 
 
 def walk_linked_list(points: List[Point]) -> List[str]:
