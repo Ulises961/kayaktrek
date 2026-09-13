@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { Alert } from "react-native"
 
 import InventoryScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/items"
 import { getSession } from "../lib/auth/session"
@@ -84,6 +85,13 @@ const COVERED_BY_ME = {
   ],
 }
 
+// Remove confirms via Alert.alert (M9k) — simulate the user tapping the non-Cancel
+// button, same as real usage.
+jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+  const confirmButton = buttons?.find((button) => button.text !== "Cancel")
+  confirmButton?.onPress?.()
+})
+
 beforeEach(() => {
   mockGetTrip.mockReset()
   mockGetMyItems.mockReset()
@@ -127,6 +135,11 @@ describe("InventoryScreen — group requirements", () => {
 
     await fireEvent.press(getByText("Remove"))
 
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Remove this requirement?",
+      expect.any(String),
+      expect.any(Array),
+    )
     await waitFor(() => {
       expect(mockRemoveRequirement).toHaveBeenCalledWith("inv-1", "req-1")
     })
@@ -185,6 +198,28 @@ describe("InventoryScreen — my kit", () => {
 
     await waitFor(() => {
       expect(mockTogglePackingItem).toHaveBeenCalledWith("entry-1", true)
+    })
+  })
+
+  it("removing a kit entry asks for confirmation before calling removePackingItem", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockGetPackingItems.mockResolvedValueOnce([
+      { id: "entry-1", item: MY_ITEM, checked: false },
+    ])
+    mockRemovePackingItem.mockResolvedValue(undefined)
+
+    const { findByText, getByText, queryByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+    await findByText("Spare paddle")
+
+    await fireEvent.press(getByText("Remove"))
+
+    expect(Alert.alert).toHaveBeenCalledWith("Remove from your kit?", undefined, expect.any(Array))
+    await waitFor(() => {
+      expect(mockRemovePackingItem).toHaveBeenCalledWith("entry-1")
+    })
+    await waitFor(() => {
+      expect(queryByText("Spare paddle")).toBeNull()
     })
   })
 

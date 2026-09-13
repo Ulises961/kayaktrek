@@ -1,8 +1,10 @@
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
+import { AwardIcon } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
 import type { PublicUser } from "@shared/dtos/public-profile"
+import { palette } from "@shared/tokens"
 
 import { StatsPanel } from "../../../../components/profile/stats-panel"
 import { Badge } from "../../../../components/ui/badge"
@@ -71,7 +73,10 @@ export default function PublicProfileScreen() {
               <Card key={index}>
                 <CardContent className="gap-1">
                   <Row className="justify-between">
-                    <Text className="font-medium">{cert.award}</Text>
+                    <Row className="items-center gap-1.5">
+                      <AwardIcon size={12} color={palette.ocean500} />
+                      <Text className="font-medium">{cert.award}</Text>
+                    </Row>
                     <Badge variant="secondary">{cert.organization}</Badge>
                   </Row>
                   {cert.validUntil && (
