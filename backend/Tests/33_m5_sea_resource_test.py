@@ -214,6 +214,16 @@ def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerar
         assert mock_task.delay.call_args.kwargs["force_refresh"] is True
 
 
+def test_weather_refresh_403_without_premium_entitlement(client, auth_headers, itinerary):
+    day_id = itinerary["days"][1]["id"]
+    with patch(
+        "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+        return_value=False,
+    ):
+        resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+    assert resp.status_code == 403
+
+
 def test_weather_refresh_429_within_cooldown(client, auth_headers, itinerary):
     day_id = itinerary["days"][0]["id"]
     mock_result = MagicMock()
