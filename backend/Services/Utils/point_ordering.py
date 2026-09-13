@@ -39,6 +39,24 @@ def walk_linked_list(points: List[Point]) -> List[str]:
     return order
 
 
+def assign_order_keys(points_in_order: List[Point]) -> None:
+    """Write a fresh, widely-spaced `order_key` to each point in `points_in_order`.
+
+    Called on every mobile pull (M9c WP4) after walking the current `next_id`
+    chain with `walk_linked_list` — the device never sees `next_id`, only this
+    column (docs/mobile/sync-protocol-spec.md §7.2). Regenerated wholesale each
+    time, so the keys need no fractional-insert support themselves; the wide
+    fixed step (1000) is headroom for the device's OWN local inserts between two
+    synced points before its next pull refreshes the keyspace.
+
+    Zero-padded to a fixed width so lexicographic string order matches the
+    intended numeric order — plain digit strings ("999" > "1000") do not.
+    """
+    width = max(8, len(str((len(points_in_order) + 1) * 1000)))
+    for index, point in enumerate(points_in_order):
+        point.order_key = str((index + 1) * 1000).zfill(width)
+
+
 def chain_in_order(points: List[Point]) -> None:
     """Wire `next_id` so the linked list follows the given list order.
 
@@ -57,3 +75,18 @@ def chain_in_order(points: List[Point]) -> None:
         current.next_id = following.id
     if points:
         points[-1].next_id = None
+
+
+def chain_from_order_keys(points: List[Point]) -> None:
+    """Rebuild the `next_id` chain from each point's `order_key`.
+
+    The inverse of `assign_order_keys`, applied on push (M9c WP4/M9d) — the
+    device sends order keys, never `next_id`, and the server is the only party
+    that converts back to the linked-list storage representation, atomically,
+    in one transaction (§7.2). Ties (two points landing on the same key under
+    concurrent device edits) break deterministically by id, same as
+    `walk_linked_list`'s head-ordering fallback — a cosmetic tie, not a
+    dangling pointer.
+    """
+    ordered = sorted(points, key=lambda point: (point.order_key or "", str(point.id)))
+    chain_in_order(ordered)
