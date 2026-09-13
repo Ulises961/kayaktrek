@@ -6,6 +6,7 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from werkzeug.exceptions import HTTPException
 
+from Api.cache import cache
 from Api.database import db
 from Schemas.sea_schema import SeaSchema, _diamond_schema, _gate_schema
 from Schemas.weather_schema import WeatherSchema
@@ -23,6 +24,10 @@ sea_api = Blueprint('sea', __name__, url_prefix='/api/v1/day')
 
 _schema = SeaSchema()
 _weather_schema = WeatherSchema()
+
+# Order-of-minutes cooldown per docs/mobile/sync-protocol-spec.md §6.4 — guards OpenMeteo
+# instead of serving a stale cache to someone about to launch.
+_WEATHER_REFRESH_COOLDOWN_SECONDS = 300
 
 
 @sea_api.route('/<string:id>/sea', methods=['GET'])
@@ -244,6 +249,56 @@ def trigger_weather_fetch(id: str):
         raise
     except Exception as e:
         logger.error("weather_fetch_trigger_error", extra={"day_id": id, "error": str(e)})
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@sea_api.route('/<string:id>/weather/refresh', methods=['POST'])
+@JWTService.authenticate_restful
+@require_owner('day')
+def trigger_weather_refresh(id: str):
+    """
+    SeaResource POST method. Device-initiated forecast refresh for a paddler about to
+    launch — bypasses OpenMeteo's planning-desk cache (docs/mobile/sync-protocol-spec.md
+    §6.4), guarded by a short per-day cooldown instead of a stale-cache read. Distinct
+    from /weather/fetch, which keeps serving the ordinary 6h cache.
+    ---
+    post:
+      summary: Force-refresh a day's weather/sea forecast, bypassing the planning-desk cache
+      responses:
+        202:
+          description: The refresh task was queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId:
+                    type: string
+        400:
+          description: Day must have a date before fetching weather
+        404:
+          description: Day not found
+        429:
+          description: Refreshed too recently for this day
+    """
+    try:
+        day = DayService.get_day_by_id(id)
+        if not day.date:
+            abort(HTTPStatus.BAD_REQUEST, description="Day must have a date before fetching weather")
+
+        cooldown_key = f"weather_refresh_cooldown:{id}"
+        if cache.get(cooldown_key):
+            abort(HTTPStatus.TOO_MANY_REQUESTS, description="Weather was just refreshed for this day — try again shortly")
+        cache.set(cooldown_key, True, timeout=_WEATHER_REFRESH_COOLDOWN_SECONDS)
+
+        result = fetch_weather.delay(str(day.id), request_id=g.request_id, force_refresh=True)
+        return jsonify({"taskId": result.id}), HTTPStatus.ACCEPTED
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Day not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("weather_refresh_trigger_error", extra={"day_id": id, "error": str(e)})
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 

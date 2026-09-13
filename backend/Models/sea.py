@@ -1,4 +1,4 @@
-from datetime import time as _time
+from datetime import datetime as _datetime, time as _time
 
 from Api.database import Base, db
 from sqlalchemy import UUID, DateTime, Integer, Numeric, String, Time, ForeignKeyConstraint
@@ -33,4 +33,4 @@ class Sea(Base):
     max_neap_rate_knots: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
 
     sea_states: Mapped[List["SeaState"]] = relationship(foreign_keys="SeaState.day_id", cascade='all, delete,save-update')
-    recorded_at: Mapped[DateTime] = mapped_column(DateTime, nullable=False, server_default=db.func.now())
+    recorded_at: Mapped[_datetime] = mapped_column(DateTime, nullable=False, server_default=db.func.now())
