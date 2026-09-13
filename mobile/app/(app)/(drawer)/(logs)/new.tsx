@@ -3,9 +3,9 @@ import { useState } from "react"
 
 import type { LogFields } from "@shared/dtos/log"
 
-import { Screen } from "../../../../components/ui/layout"
-import { LogForm } from "../../../../components/logs/log-form"
-import { createLog } from "../../../../lib/logs/actions"
+import { Screen } from "@mobile/components/ui/layout"
+import { LogForm } from "@mobile/components/logs/log-form"
+import { createLog } from "@mobile/lib/logs/actions"
 
 const header = <RouterStack.Screen options={{ title: "New log" }} />
 

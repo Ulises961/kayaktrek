@@ -7,18 +7,18 @@ import type { Log, LogFields } from "@shared/dtos/log"
 import { beaufortLabel } from "@shared/weather/beaufort"
 import { palette } from "@shared/tokens"
 
-import { Button } from "../../../../components/ui/button"
-import { Row, Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { LogForm } from "../../../../components/logs/log-form"
-import { getSession } from "../../../../lib/auth/session"
+import { Button } from "@mobile/components/ui/button"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { LogForm } from "@mobile/components/logs/log-form"
+import { getSession } from "@mobile/lib/auth/session"
 import {
   deleteLog,
   endorseLog,
   getLog,
   unendorseLog,
   updateLog,
-} from "../../../../lib/logs/actions"
+} from "@mobile/lib/logs/actions"
 
 const header = <RouterStack.Screen options={{ title: "Log" }} />
 

@@ -7,25 +7,25 @@ import type { Block } from "@shared/dtos/block"
 import type { Connection, ConnectionUser } from "@shared/dtos/connection"
 import type { PaddlerSearchResult } from "@shared/dtos/paddler-search"
 
-import { BlockedRow } from "../../../../components/paddlers/blocked-row"
+import { BlockedRow } from "@mobile/components/paddlers/blocked-row"
 import {
   ConnectionRow,
   type ConnectionDirection,
-} from "../../../../components/paddlers/connection-row"
-import { PaddlerResultCard } from "../../../../components/paddlers/paddler-result-card"
-import { Chip } from "../../../../components/ui/chip"
-import { Input } from "../../../../components/ui/input"
-import { Row, Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { getSession } from "../../../../lib/auth/session"
-import { blockPaddler, listBlocks, unblockPaddler } from "../../../../lib/blocks/actions"
+} from "@mobile/components/paddlers/connection-row"
+import { PaddlerResultCard } from "@mobile/components/paddlers/paddler-result-card"
+import { Chip } from "@mobile/components/ui/chip"
+import { Input } from "@mobile/components/ui/input"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getSession } from "@mobile/lib/auth/session"
+import { blockPaddler, listBlocks, unblockPaddler } from "@mobile/lib/blocks/actions"
 import {
   acceptConnection,
   listConnections,
   removeConnection,
   requestConnection,
   searchPaddlers,
-} from "../../../../lib/connections/actions"
+} from "@mobile/lib/connections/actions"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Paddlers"
 // drawer item's root screen, so it supplies its own menu button.

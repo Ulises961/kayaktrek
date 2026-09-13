@@ -8,28 +8,28 @@ import type { TripRequirement } from "@shared/dtos/inventory"
 import type { PersonalPackingItem } from "@shared/dtos/personal-packing"
 import { palette } from "@shared/tokens"
 
-import { Badge } from "../../../../../../components/ui/badge"
-import { Button } from "../../../../../../components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "../../../../../../components/ui/card"
-import { Chip } from "../../../../../../components/ui/chip"
-import { Input } from "../../../../../../components/ui/input"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
-import { Text } from "../../../../../../components/ui/text"
-import { getSession } from "../../../../../../lib/auth/session"
+import { Badge } from "@mobile/components/ui/badge"
+import { Button } from "@mobile/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
+import { Chip } from "@mobile/components/ui/chip"
+import { Input } from "@mobile/components/ui/input"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getSession } from "@mobile/lib/auth/session"
 import {
   addRequirement,
   contributeItem,
   getMyItems,
   removeRequirement,
   unclaimRequirement,
-} from "../../../../../../lib/inventory/actions"
+} from "@mobile/lib/inventory/actions"
 import {
   addPackingItem,
   getPackingItems,
   removePackingItem,
   togglePackingItem,
-} from "../../../../../../lib/inventory/personal-packing-actions"
-import { getTrip } from "../../../../../../lib/trips/actions"
+} from "@mobile/lib/inventory/personal-packing-actions"
+import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Inventory" }} />
 

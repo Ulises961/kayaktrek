@@ -9,11 +9,11 @@ import type { TripMember } from "@shared/dtos/trip-member"
 import { palette } from "@shared/tokens"
 import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 
-import { Badge } from "../../../../../../components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "../../../../../../components/ui/card"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
-import { Text } from "../../../../../../components/ui/text"
-import { getLogistics, getTrip } from "../../../../../../lib/trips/actions"
+import { Badge } from "@mobile/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getLogistics, getTrip } from "@mobile/lib/trips/actions"
 
 // WP6 (plans/M9b.md): read-only rendering of the same data the printable web float
 // plan shows (frontend/app/(app)/trips/float-plan/[id]/page.tsx) — shore contact +
