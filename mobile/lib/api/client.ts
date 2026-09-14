@@ -47,14 +47,27 @@ export class SessionExpiredError extends Error {
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 
-  const res = await fetch(`${API_URL}${versionPath(path)}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${versionPath(path)}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    })
+  } catch {
+    // A transport-level failure (backend unreachable, or a connection reset mid-request
+    // — e.g. Android's OkHttp "unexpected end of stream" when a stopped backend leaves
+    // a stale keep-alive connection behind) never reaches an HTTP response at all; fetch
+    // throws instead of resolving. Left unwrapped, that throw carries whatever the raw
+    // native message happens to be straight into a screen's `err.message` display.
+    // Normalize it here, once, for every apiGet/apiPost/apiPatch/apiDelete call site —
+    // the same thing lib/auth/actions.ts's login() already does for the one call outside
+    // this shared client.
+    throw new Error("Could not reach the server. Please check your connection and try again.")
+  }
 
   if (res.status === 401 && retry) {
     const refreshed = await refreshSession()

@@ -67,4 +67,18 @@ describe("apiGet", () => {
     await expect(apiGet("/api/trip/all")).rejects.toBeInstanceOf(SessionExpiredError)
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
+
+  // A transport-level failure (backend down, connection reset mid-request — Android's
+  // OkHttp "unexpected end of stream" on a stale keep-alive connection is the concrete
+  // case this guards) never produces a Response at all; fetch() rejects instead. Every
+  // screen displays `err.message` directly (see e.g. app/.../trips/index.tsx), so the
+  // raw native message would otherwise leak straight to the user.
+  it("normalizes a network-transport failure into a friendly message", async () => {
+    mockGetAccessToken.mockResolvedValue("stored-token")
+    ;(globalThis.fetch as jest.Mock).mockRejectedValue(new TypeError("Network request failed"))
+
+    await expect(apiGet("/api/trip/all")).rejects.toThrow(
+      "Could not reach the server. Please check your connection and try again.",
+    )
+  })
 })
