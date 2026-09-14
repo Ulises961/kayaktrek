@@ -57,6 +57,12 @@ def test_pull_initial_sync_puts_rows_in_created_bucket(client, trip_with_crew):
     assert len(member_rows) == 2  # leader + crew
     assert changes["trip_members"]["updated"] == []
     assert changes["trip_members"]["deleted"] == []
+    # Carried so an offline float-plan crew manifest can attribute a vessel/
+    # emergency contact to a name, not just an opaque userId (M9c WP6).
+    for row in member_rows:
+        assert row["userName"]
+        assert "userSurname" in row
+        assert row["userUsername"]
 
 
 def test_pull_delta_sync_puts_rows_in_updated_bucket(client, app, trip_with_crew):

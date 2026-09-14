@@ -129,6 +129,12 @@ class MobileSyncService:
                 "id": str(member.id),
                 "tripId": str(member.trip_id),
                 "userId": str(member.user_id),
+                # Not device-writable (frozen list, _TRIP_MEMBER_MUTABLE) — carried so
+                # an offline float-plan crew manifest can attribute a vessel/emergency
+                # contact to a name, not just an opaque userId (M9c WP6).
+                "userName": member.user.name,
+                "userSurname": member.user.surname,
+                "userUsername": member.user.username,
                 "role": member.role.value,
                 "nominatedSuccessor": member.nominated_successor,
                 "vesselMake": member.vessel_make,
