@@ -57,3 +57,14 @@ export async function cancelInvitation(tripId: string, inviteeId: string): Promi
 export async function removeMember(tripId: string, userId: string): Promise<void> {
   await apiDelete(`/api/trip/${tripId}/member/${userId}`)
 }
+
+// POST /api/v1/day/<id>/weather/refresh (backend/Resources/sea_resource.py) — device-
+// initiated forecast refresh (M9c WP5, docs/mobile/sync-protocol-spec.md §6.4). Queues a
+// Celery task; it carries no completion signal, so the caller re-pulls after a short
+// settle delay rather than awaiting this call's own resolution. Gated by
+// PremiumEntitlementService, a closed-by-default self-hosted stub — a 403 here is
+// expected, not exceptional, and its message ("Weather refresh requires a premium plan")
+// is meant to be shown to the user as-is, same as the 429 cooldown message.
+export async function refreshDayWeather(dayId: string): Promise<void> {
+  await apiPost(`/api/day/${dayId}/weather/refresh`, {})
+}

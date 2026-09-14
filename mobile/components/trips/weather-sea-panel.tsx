@@ -1,9 +1,14 @@
-import { ArrowDownFromLine, ArrowUpFromLine, Wind, WavesHorizontal } from "lucide-react-native"
+import { useState } from "react"
+import { ActivityIndicator } from "react-native"
+import { ArrowDownFromLine, ArrowUpFromLine, RefreshCw, Wind, WavesHorizontal } from "lucide-react-native"
 
 import type { Day } from "@shared/dtos/day"
 import { lightTokens } from "@shared/tokens"
+import { formatTimeAgo } from "@shared/utils/date"
 import { formatHour, representativeHour } from "@shared/weather/hourly"
 
+import { refreshDayWeather } from "../../lib/trips/actions"
+import { Button } from "../ui/button"
 import { Row, Stack } from "../ui/layout"
 import { Text } from "../ui/text"
 
@@ -40,7 +45,22 @@ export function conditionsTeaser(day: Day | null): string | null {
   return parts.length > 0 ? parts.join(" · ") : null
 }
 
-export function WeatherSeaPanel({ day }: { day: Day | null }) {
+// M9c WP5 (plans/M9c.md, docs/mobile/sync-protocol-spec.md §6.4): device-initiated
+// refresh, gated by `PremiumEntitlementService` on the backend — a closed-by-default
+// self-hosted stub, so a 403 here is an expected outcome, not a failure state.
+// `refreshDayWeather` only queues the refetch; it carries no completion signal, so
+// `onRefresh` (the caller's re-pull, live or cached) is awaited right after it and is
+// the caller's job to time appropriately for its own data source.
+export function WeatherSeaPanel({
+  day,
+  onRefresh,
+}: {
+  day: Day | null
+  onRefresh?: () => Promise<void>
+}) {
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
   if (!hasConditions(day)) return null
 
   const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
@@ -49,8 +69,49 @@ export function WeatherSeaPanel({ day }: { day: Day | null }) {
 
   if (!weatherNow && !seaNow && !sea) return null
 
+  // "Forecast as of …" is mandatory whenever weather/sea renders (spec §6.3) — never
+  // let cached data appear indistinguishable from live data. Weather's `fetchedAt` and
+  // Sea's `recordedAt` are bumped together by the same refresh, so either stands in for
+  // "when was this trip's conditions data last fetched" when the other is absent.
+  const asOf = day?.weather?.fetchedAt ?? day?.sea?.recordedAt ?? null
+
+  async function handleRefresh() {
+    if (!day?.id) return
+    setRefreshing(true)
+    setRefreshError(null)
+    try {
+      await refreshDayWeather(day.id)
+      await onRefresh?.()
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   return (
     <Stack className="gap-3 px-4 py-4">
+      <Row className="items-center justify-between">
+        <Text className="text-xs text-muted-foreground">Forecast as of {formatTimeAgo(asOf)}</Text>
+        {onRefresh && day?.id && (
+          <Button
+            variant="ghost"
+            size="sm"
+            accessibilityLabel="Refresh forecast"
+            disabled={refreshing}
+            onPress={() => void handleRefresh()}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={lightTokens.mutedForeground} />
+            ) : (
+              <RefreshCw size={14} color={lightTokens.mutedForeground} />
+            )}
+          </Button>
+        )}
+      </Row>
+
+      {refreshError && <Text className="text-xs text-muted-foreground">{refreshError}</Text>}
+
       {weatherNow && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
           <Text className="text-sm">
