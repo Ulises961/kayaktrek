@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from Models.session import Session
     from Models.invitation import Invitation
     from Models.user_certification import UserCertification
+    from Models.satellite_feed import SatelliteFeed
 
 
 class UnitPreferenceType(enum.Enum):
@@ -164,6 +165,9 @@ class User(BaseModel):
     )
     certifications: Mapped[List["UserCertification"]] = relationship(
         "UserCertification", back_populates="user", cascade="all, delete-orphan"
+    )
+    satellite_feeds: Mapped[List["SatelliteFeed"]] = relationship(
+        "SatelliteFeed", back_populates="user", cascade="all, delete-orphan"
     )
     # Buddy connections — directed rows; query both columns for the symmetric view.
     # DB-level ON DELETE CASCADE handles teardown; relationships are viewonly to keep
