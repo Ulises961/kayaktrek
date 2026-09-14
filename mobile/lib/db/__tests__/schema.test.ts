@@ -21,6 +21,7 @@ describe("local sync schema", () => {
 
     const day = await database.write(() =>
       days.create((record) => {
+        record.tripId = "trip-1"
         record.dayNumber = 1
         record.date = "2026-09-14"
       })

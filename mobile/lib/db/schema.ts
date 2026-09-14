@@ -12,16 +12,34 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // decorators) — sync.ts's per-table mappers translate the API's camelCase
 // field names (mobile_sync_service.py / itinerary_route_sync_service.py) to
 // these column names before handing rows to `synchronize()`.
+// Schema migrations aren't wired yet (no SQLiteAdapter `migrations` passed in
+// database.ts) — acceptable while this hasn't shipped to a real device;
+// revisit before the first release that could carry an existing local DB.
 export const appDatabaseSchema = appSchema({
-  version: 1,
+  version: 2,
   tables: [
     tableSchema({
       name: "days",
       columns: [
+        // Not part of the wire format (Services/itinerary_route_sync_service.py's
+        // pull_route response has no tripId per day) — added locally (WP4) so a
+        // wholesale route replace can be scoped to one trip, never wiping every
+        // cached trip's route.
+        { name: "trip_id", type: "string", isIndexed: true },
         { name: "day_number", type: "number" },
         { name: "date", type: "string", isOptional: true },
         { name: "start_point_id", type: "string", isOptional: true },
         { name: "end_point_id", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      name: "route_meta",
+      columns: [
+        // One row per trip — the route_version pulled alongside the last
+        // wholesale replace (spec §8.1). Inert for M9c's read-only case;
+        // M9d's push/divergence-detection needs it as the base version.
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "route_version", type: "number" },
       ],
     }),
     tableSchema({
