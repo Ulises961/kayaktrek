@@ -51,6 +51,7 @@ from Resources.tile_resource import tile_api
 from Resources.live_resource import live_api
 from Resources.session_resource import session_api
 from Resources.mobile_sync_resource import mobile_sync_api
+from Resources.satellite_feed_resource import satellite_feed_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
@@ -59,6 +60,7 @@ from Models.shuttle_vehicle import ShuttleVehicle  # noqa: F401
 from Models.shuttle_passenger import ShuttlePassenger  # noqa: F401
 from Models.position_ping import PositionPing  # noqa: F401
 from Models.sync_tombstone import SyncTombstone  # noqa: F401
+from Models.satellite_feed import SatelliteFeed  # noqa: F401
 
 # Registers ORM after_delete listeners (M9c WP1 item 1) — import for the
 # side effect, same convention as the model imports just above.
@@ -123,6 +125,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(live_api)
     app.register_blueprint(session_api)
     app.register_blueprint(mobile_sync_api)
+    app.register_blueprint(satellite_feed_api)
 
     db.init_app(app)
     mail.init_app(app)
