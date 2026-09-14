@@ -1,11 +1,10 @@
 import { HeartPulse, Phone, Sailboat, UserRound } from "lucide-react-native"
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
 import type { Logistics } from "@shared/dtos/logistics"
-import { TRIP_STATE_LABELS, type Trip } from "@shared/dtos/trip"
-import type { TripMember } from "@shared/dtos/trip-member"
+import { TRIP_STATE_LABELS, type TripState } from "@shared/dtos/trip"
 import { lightTokens } from "@shared/tokens"
 import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 
@@ -13,34 +12,71 @@ import { Badge } from "@mobile/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
+import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
+import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { getLogistics, getTrip } from "@mobile/lib/trips/actions"
 
-// WP6 (plans/M9b.md): read-only rendering of the same data the printable web float
-// plan shows (frontend/app/(app)/trips/float-plan/[id]/page.tsx) — shore contact +
-// crew manifest (vessel, emergency contact). No editing, no PDF generation, no
-// share-link generation — those stay leader-only web actions.
+// The fields this screen actually renders off a crew member — both the live
+// Trip DTO's `travellers` (TripMember[]) and the offline cache's
+// OfflineCrewMember[] (lib/db/offline-float-plan.ts) satisfy this shape
+// structurally, so the render logic below doesn't need to branch on source.
+type CrewMemberView = {
+  id?: string
+  role: string
+  user: { name: string; surname?: string | null; username?: string | null }
+  vesselMake?: string | null
+  vesselModel?: string | null
+  vesselLengthCm?: number | null
+  vesselColorPrimary?: string | null
+  vesselColorSecondary?: string | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
+  emergencyContactRelationship?: string | null
+}
+
+// M9c WP6: live-first, offline-fallback, same shape as the trip list and
+// itinerary map screens. Shore contact (Logistics) has no local cache at
+// all — it's not part of any M9c sync channel — so offline mode can only
+// ever show the crew manifest, never shore contact; the screen says so
+// rather than showing a misleading "No shore contact set."
 export default function FloatPlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [trip, setTrip] = useState<Trip | null>(null)
+  const [state, setState] = useState<TripState | null>(null)
+  const [crew, setCrew] = useState<CrewMemberView[] | null>(null)
   const [logistics, setLogistics] = useState<Logistics | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    Promise.all([getTrip(id), getLogistics(id).catch(() => null)])
-      .then(([t, l]) => {
-        if (cancelled) return
-        setTrip(t)
-        setLogistics(l)
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
+  const load = useCallback(async () => {
+    try {
+      const [trip, fetchedLogistics] = await Promise.all([getTrip(id), getLogistics(id).catch(() => null)])
+      setState(trip.state ?? null)
+      setCrew(trip.travellers ?? [])
+      setLogistics(fetchedLogistics)
+      setIsOffline(false)
+      setError(null)
+    } catch (err) {
+      const [offlineCrew, cachedTrips] = await Promise.all([loadOfflineCrew(id), loadTripListCache()])
+      const cachedTrip = cachedTrips.find((trip) => trip.id === id)
+      if (offlineCrew.length > 0 || cachedTrip) {
+        setState(cachedTrip?.state ?? null)
+        setCrew(offlineCrew)
+        setLogistics(null)
+        setIsOffline(true)
+        setError(null)
+      } else {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-      })
-    return () => {
-      cancelled = true
+      }
     }
   }, [id])
+
+  useEffect(() => {
+    // Fetching on mount is exactly the "sync with an external system" case the rule's
+    // own docs carve out — the setState calls just happen inside `load`'s async body
+    // rather than the effect body itself, which the lint rule can't see through.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [load])
 
   if (error) {
     return (
@@ -51,7 +87,7 @@ export default function FloatPlanScreen() {
     )
   }
 
-  if (!trip) {
+  if (crew === null) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
         <RouterStack.Screen options={{ title: "Float plan" }} />
@@ -60,7 +96,7 @@ export default function FloatPlanScreen() {
     )
   }
 
-  const crew: TripMember[] = [...(trip.travellers ?? [])].sort((a, b) => {
+  const sortedCrew = [...crew].sort((a, b) => {
     if (a.role === "leader") return -1
     if (b.role === "leader") return 1
     return 0
@@ -70,12 +106,19 @@ export default function FloatPlanScreen() {
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: "Float plan" }} />
       <ScrollView contentContainerClassName="gap-4 p-4">
+        {isOffline && (
+          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+            Offline — showing your last synced crew manifest. Shore contact needs a connection.
+          </Text>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Shore contact</CardTitle>
           </CardHeader>
           <CardContent>
-            {logistics?.shoreContactName ? (
+            {isOffline ? (
+              <Text className="text-sm text-muted-foreground">Shore contact needs a connection.</Text>
+            ) : logistics?.shoreContactName ? (
               <Stack className="gap-1">
                 <Row className="items-center gap-1.5">
                   <UserRound size={14} color={lightTokens.mutedForeground} />
@@ -106,8 +149,8 @@ export default function FloatPlanScreen() {
 
         <Stack className="gap-3">
           <Text className="text-lg font-semibold">Crew manifest</Text>
-          {crew.map((member) => (
-            <Card key={member.id}>
+          {sortedCrew.map((member, index) => (
+            <Card key={member.id ?? String(index)}>
               <CardHeader>
                 <Row className="justify-between">
                   <CardTitle className="flex-1" numberOfLines={1}>
@@ -156,9 +199,9 @@ export default function FloatPlanScreen() {
           ))}
         </Stack>
 
-        {trip.state && (
+        {state && (
           <Text className="text-center text-sm text-muted-foreground">
-            Trip status: {TRIP_STATE_LABELS[trip.state]}
+            Trip status: {TRIP_STATE_LABELS[state]}
           </Text>
         )}
       </ScrollView>

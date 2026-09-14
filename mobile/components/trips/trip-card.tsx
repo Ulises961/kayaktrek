@@ -2,24 +2,29 @@ import { CalendarIcon, ClockIcon, UsersIcon } from "lucide-react-native"
 import { Link } from "expo-router"
 import { Pressable } from "react-native"
 
-import type { Trip } from "@shared/dtos/trip"
 import { daysBetween, formatDateRange } from "@shared/trips/format"
 import { lightTokens } from "@shared/tokens"
+
+import type { TripCardData } from "@mobile/lib/db/trip-list-cache"
 
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Row } from "../ui/layout"
 import { StateBadge } from "../ui/state-badge"
 import { Text } from "../ui/text"
 
+// Takes only the fields it renders (TripCardData), not the full Trip DTO —
+// the same shape works whether `trip` came from a live fetch or the local
+// offline cache (lib/db/trip-list-cache.ts, M9c WP6), which never stores the
+// full travellers array, only its count.
+//
 // Mirrors frontend/components/common/trip-card.tsx's field choices (destination as
 // title, state badge, date range, crew count, icon meta row) — not its exact visual
 // treatment (no route thumbnail, no hero ring; this is a plain list row, not the web
 // dashboard grid — see plans/M9b2.md WP3 for why the thumbnail is deliberately out).
 // `Link asChild` clones its child and injects onPress/href handling, which only a
 // Pressable-like component honors — `Card` is a plain View, so it wraps a Pressable.
-export function TripCard({ trip }: { trip: Trip }) {
-  const { destination, state, dateFrom, dateTo, travellers } = trip
-  const crewCount = travellers?.length ?? 0
+export function TripCard({ trip }: { trip: TripCardData }) {
+  const { destination, state, dateFrom, dateTo, travellerCount: crewCount } = trip
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
 
   return (

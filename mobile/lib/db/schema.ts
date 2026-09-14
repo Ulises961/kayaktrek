@@ -16,8 +16,25 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // database.ts) — acceptable while this hasn't shipped to a real device;
 // revisit before the first release that could carry an existing local DB.
 export const appDatabaseSchema = appSchema({
-  version: 2,
+  version: 4,
   tables: [
+    tableSchema({
+      // Not part of docs/mobile/sync-protocol-spec.md §4's aggregate list — that
+      // spec is entirely trip-scoped (every pull endpoint takes a tripId), and
+      // never covered "which trips am I on" at all. This is a much simpler,
+      // separate cache (WP6): whatever GET /trip/<user_id>/all last returned
+      // successfully, wholesale-replaced on every successful fetch, read as a
+      // fallback when that fetch fails (offline). No delta, no tombstones — the
+      // trip list is small and always fetched in full.
+      name: "trips",
+      columns: [
+        { name: "destination", type: "string", isOptional: true },
+        { name: "state", type: "string", isOptional: true },
+        { name: "date_from", type: "string", isOptional: true },
+        { name: "date_to", type: "string", isOptional: true },
+        { name: "traveller_count", type: "number" },
+      ],
+    }),
     tableSchema({
       name: "days",
       columns: [
@@ -59,6 +76,11 @@ export const appDatabaseSchema = appSchema({
       columns: [
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "user_id", type: "string" },
+        // Not device-writable — carried so the offline float-plan crew
+        // manifest (WP6) can show a name, not just an opaque userId.
+        { name: "user_name", type: "string", isOptional: true },
+        { name: "user_surname", type: "string", isOptional: true },
+        { name: "user_username", type: "string", isOptional: true },
         { name: "role", type: "string" },
         { name: "nominated_successor", type: "boolean" },
         { name: "vessel_make", type: "string", isOptional: true },

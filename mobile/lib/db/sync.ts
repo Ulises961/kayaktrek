@@ -12,6 +12,9 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
   trip_members: {
     tripId: "trip_id",
     userId: "user_id",
+    userName: "user_name",
+    userSurname: "user_surname",
+    userUsername: "user_username",
     role: "role",
     nominatedSuccessor: "nominated_successor",
     vesselMake: "vessel_make",
