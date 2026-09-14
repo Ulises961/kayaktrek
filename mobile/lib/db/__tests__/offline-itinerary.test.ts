@@ -71,6 +71,8 @@ describe("loadOfflineTrip", () => {
     const { days } = await loadOfflineTrip("trip-1", database)
     expect(days[0].weather?.model).toBe("open-meteo")
     expect(days[0].sea?.moonPhase).toBe("full")
+    expect(days[0].weather?.fetchedAt).toBe(new Date(1_700_000_000_000).toISOString())
+    expect(days[0].sea?.recordedAt).toBe(new Date(1_700_000_000_000).toISOString())
   })
 
   it("falls back to the cached trip-list destination, and to null when nothing is cached", async () => {
