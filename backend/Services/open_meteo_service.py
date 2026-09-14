@@ -47,6 +47,32 @@ def _float_or_none(val: float) -> float | None:
     return None if np.isnan(val) else float(val)
 
 
+_HOURS_PER_DAY = 24
+
+
+def _reindex_to_hourly_grid(records: list[dict], var_names: list[str]) -> list[dict]:
+    """Guarantee a full, fixed 24-hour grid (00:00..23:00), regardless of how
+    many hourly records the upstream API actually returned.
+
+    _upsert_weather/_upsert_sea (Tasks/weather_fetch_task.py) delete and
+    recreate the WHOLE state set on every refresh, keyed by the derived id
+    f"{day_id}:{time}" (docs/mobile/sync-protocol-spec.md §6.2). The mobile
+    sync channel writes no per-state tombstone for weather_states/sea_states
+    (Services/mobile_sync_service.py — "the parent's covers them"), which is
+    only actually safe if the set of times is stable across refetches. A
+    canonical grid makes that a guarantee rather than a bet on OpenMeteo
+    always returning the same 24 hours."""
+    by_time = {record["time"]: record for record in records}
+    grid = []
+    for hour in range(_HOURS_PER_DAY):
+        time_label = f"{hour:02d}:00"
+        record = by_time.get(time_label)
+        if record is None:
+            record = {"time": time_label, **{name: None for name in var_names}}
+        grid.append(record)
+    return grid
+
+
 def _parse_hourly(response, var_names: list[str]) -> list[dict]:
     hourly = response.Hourly()
     start_ts = hourly.Time()
@@ -61,7 +87,7 @@ def _parse_hourly(response, var_names: list[str]) -> list[dict]:
         for j, name in enumerate(var_names):
             record[name] = _float_or_none(arrays[j][i])
         records.append(record)
-    return records
+    return _reindex_to_hourly_grid(records, var_names)
 
 
 class OpenMeteoService:

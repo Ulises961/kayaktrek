@@ -89,6 +89,14 @@ class MobileSyncService:
         cutoff = _cutoff_from_epoch_ms(last_pulled_at)
         is_initial = cutoff is None
 
+        # Captured BEFORE any query runs, not after. A write committed while
+        # this request is in flight must land at-or-after this snapshot, so
+        # the NEXT pull (whose cutoff is this timestamp) is guaranteed to see
+        # it. Capturing it after the queries would let a mid-request write
+        # slip in with updated < the returned timestamp — invisible to every
+        # future pull's `updated > cutoff` filter, permanently, not just late.
+        snapshot_timestamp = datetime.now(timezone.utc)
+
         changes = {
             "trip_members": _bucket(
                 MobileSyncService._live_trip_members(trip_uuid, cutoff), is_initial
@@ -109,7 +117,7 @@ class MobileSyncService:
                 MobileSyncService._live_sea_states(trip_uuid, cutoff), is_initial
             ) | {"deleted": []},
         }
-        return {"changes": changes, "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000)}
+        return {"changes": changes, "timestamp": _epoch_ms(snapshot_timestamp)}
 
     @staticmethod
     def _live_trip_members(trip_id: UUID, cutoff: Optional[datetime]) -> List[dict]:
