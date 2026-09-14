@@ -9,6 +9,7 @@ import type { Stats } from "@shared/dtos/public-profile"
 import { palette } from "@shared/tokens"
 
 import { StatsPanel } from "@mobile/components/profile/stats-panel"
+import { Avatar } from "@mobile/components/ui/avatar"
 import { Badge } from "@mobile/components/ui/badge"
 import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
@@ -84,23 +85,30 @@ export default function ProfileScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <ScrollView contentContainerClassName="gap-4 p-4">
-        <Stack className="gap-1">
-          <Row className="justify-between">
-            <Text className="text-xl font-semibold">
-              {me.name} {me.surname ?? ""}
-            </Text>
-            <Link href="/profile/edit" asChild>
-              <Button size="sm" variant="outline">
-                Edit
-              </Button>
-            </Link>
+        <Row className="items-start justify-between">
+          <Row className="flex-1 items-center gap-3">
+            <Avatar name={me.name} surname={me.surname} imageUrl={me.avatarUrl} size={56} />
+            <Stack className="flex-1 gap-1">
+              <Text className="text-xl font-semibold">
+                {me.name} {me.surname ?? ""}
+              </Text>
+              <Text className="text-sm text-muted-foreground">@{me.username}</Text>
+            </Stack>
           </Row>
-          <Text className="text-sm text-muted-foreground">@{me.username}</Text>
-          {me.bio && <Text className="text-sm text-foreground">{me.bio}</Text>}
-          {me.homeLocation && (
-            <Text className="text-sm text-muted-foreground">{me.homeLocation}</Text>
-          )}
-        </Stack>
+          <Link href="/profile/edit" asChild>
+            <Button size="sm" variant="outline">
+              Edit
+            </Button>
+          </Link>
+        </Row>
+        {(me.bio || me.homeLocation) && (
+          <Stack className="gap-1">
+            {me.bio && <Text className="text-sm text-foreground">{me.bio}</Text>}
+            {me.homeLocation && (
+              <Text className="text-sm text-muted-foreground">{me.homeLocation}</Text>
+            )}
+          </Stack>
+        )}
 
         {stats && <StatsPanel stats={stats} />}
 

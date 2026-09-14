@@ -35,6 +35,7 @@ export default function NewLogScreen() {
         submitting={submitting}
         error={error}
         onSubmit={(fields) => void handleSubmit(fields)}
+        variant="cta"
       />
     </Screen>
   )

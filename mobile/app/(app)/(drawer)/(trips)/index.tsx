@@ -1,5 +1,6 @@
 import { Stack as RouterStack } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
+import { Kayak } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
@@ -7,9 +8,9 @@ import type { Trip } from "@shared/dtos/trip"
 
 import { TripCard } from "@mobile/components/trips/trip-card"
 import { Button } from "@mobile/components/ui/button"
-import { Screen, Stack } from "@mobile/components/ui/layout"
+import { EmptyPanel } from "@mobile/components/ui/empty-panel"
+import { Screen } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
-import { useAuth } from "@mobile/lib/auth/auth-context"
 import { getTrips } from "@mobile/lib/trips/actions"
 
 // Sets this screen's title on its group's Stack navigator — see (trips)/_layout.tsx's
@@ -28,7 +29,6 @@ const header = (
 // real backend round trip (auth -> trip/<user_id>/all -> TripSchema) rather than
 // building out pagination for a milestone whose whole point is proving the stack works.
 export default function TripListScreen() {
-  const { signOut } = useAuth()
   const [trips, setTrips] = useState<Trip[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -75,12 +75,25 @@ export default function TripListScreen() {
 
   if (trips && trips.length === 0) {
     return (
-      <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
+      <Screen edges={["bottom"]} className="items-center p-6">
         {header}
-        <Text className="text-center text-muted-foreground">No trips yet.</Text>
-        <Button variant="outline" onPress={signOut} testID="sign-out">
-          Sign out
-        </Button>
+        <EmptyPanel
+          className="mt-4"
+          icon={Kayak}
+          title="No trips yet"
+          description="Trips you plan on the web appear here — the itinerary builder is desktop-only for now."
+          action={
+            // Disabled rather than wired to a stand-in destination: the mobile
+            // itinerary builder (create-a-trip) doesn't exist yet, and a CTA that
+            // silently no-ops on tap reads as broken. Web parity for "create/explore
+            // itineraries" is real, separate work (M9's own scope note on map-based
+            // building staying web-only, and the still-unbuilt Explore screen); this
+            // is a placeholder for the day either lands, not a stand-in for one.
+            <Button variant="cta" disabled>
+              Create a trip
+            </Button>
+          }
+        />
       </Screen>
     )
   }
@@ -101,11 +114,6 @@ export default function TripListScreen() {
         {(trips ?? []).map((trip, index) => (
           <TripCard key={trip.id ?? String(index)} trip={trip} />
         ))}
-        <Stack className="items-center py-4">
-          <Button variant="outline" onPress={signOut} testID="sign-out">
-            Sign out
-          </Button>
-        </Stack>
       </ScrollView>
     </Screen>
   )

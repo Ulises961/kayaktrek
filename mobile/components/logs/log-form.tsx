@@ -2,7 +2,7 @@ import { useState } from "react"
 
 import type { Log, LogFields } from "@shared/dtos/log"
 
-import { Button } from "../ui/button"
+import { Button, type ButtonProps } from "../ui/button"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
 import { Stack } from "../ui/layout"
@@ -54,12 +54,17 @@ export function LogForm({
   submitting,
   error,
   onSubmit,
+  // "default" (structure blue) for editing a log that already exists — creating one
+  // is the only path that gets the CTA (M30 identity pass; button-roles.ts's "not for:
+  // saving edits to something that already exists" rule).
+  variant = "default",
 }: {
   initial?: LogFormInitial
   submitLabel: string
   submitting: boolean
   error: string | null
   onSubmit: (fields: LogFields) => void
+  variant?: ButtonProps["variant"]
 }) {
   const [values, setValues] = useState<LogFormValues>(() => toFormValues(initial))
 
@@ -117,7 +122,7 @@ export function LogForm({
         />
       </Stack>
       {error && <Text className="text-sm text-destructive">{error}</Text>}
-      <Button disabled={submitting} onPress={() => onSubmit(toLogFields(values))}>
+      <Button variant={variant} disabled={submitting} onPress={() => onSubmit(toLogFields(values))}>
         {submitting ? "Saving…" : submitLabel}
       </Button>
     </Stack>

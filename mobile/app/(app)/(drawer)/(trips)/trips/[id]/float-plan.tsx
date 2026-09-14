@@ -6,7 +6,7 @@ import { ActivityIndicator, ScrollView } from "react-native"
 import type { Logistics } from "@shared/dtos/logistics"
 import { TRIP_STATE_LABELS, type Trip } from "@shared/dtos/trip"
 import type { TripMember } from "@shared/dtos/trip-member"
-import { palette } from "@shared/tokens"
+import { lightTokens } from "@shared/tokens"
 import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 
 import { Badge } from "@mobile/components/ui/badge"
@@ -78,12 +78,12 @@ export default function FloatPlanScreen() {
             {logistics?.shoreContactName ? (
               <Stack className="gap-1">
                 <Row className="items-center gap-1.5">
-                  <UserRound size={14} color={palette.ocean500} />
+                  <UserRound size={14} color={lightTokens.mutedForeground} />
                   <Text>{logistics.shoreContactName}</Text>
                 </Row>
                 {logistics.shoreContactPhone && (
                   <Row className="items-center gap-1.5">
-                    <Phone size={13} color={palette.ocean500} />
+                    <Phone size={13} color={lightTokens.mutedForeground} />
                     <Text className="text-sm text-muted-foreground">
                       {logistics.shoreContactPhone}
                     </Text>
@@ -122,7 +122,7 @@ export default function FloatPlanScreen() {
                 <Stack className="gap-1">
                   {(member.vesselMake || member.vesselModel) && (
                     <Row className="items-center gap-1.5">
-                      <Sailboat size={13} color={palette.ocean500} />
+                      <Sailboat size={13} color={lightTokens.mutedForeground} />
                       <Text className="text-sm text-muted-foreground">
                         {[member.vesselMake, member.vesselModel].filter(Boolean).join(" ")}
                         {member.vesselLengthCm != null
@@ -140,7 +140,7 @@ export default function FloatPlanScreen() {
                   )}
                   {member.emergencyContactName && (
                     <Row className="items-center gap-1.5">
-                      <HeartPulse size={13} color={palette.ocean500} />
+                      <HeartPulse size={13} color={lightTokens.mutedForeground} />
                       <Text className="text-sm text-muted-foreground">
                         {member.emergencyContactName}
                         {member.emergencyContactPhone ? ` · ${member.emergencyContactPhone}` : ""}

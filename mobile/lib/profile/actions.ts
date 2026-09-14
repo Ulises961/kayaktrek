@@ -1,5 +1,6 @@
 import { UserSchema, type User } from "@shared/dtos/user"
 import { PublicUserSchema, type PublicUser } from "@shared/dtos/public-profile"
+import type { DistanceUnit } from "@shared/itinerary/distance"
 
 import { apiGet, apiPatch } from "../api/client"
 import { getSession } from "../auth/session"
@@ -55,6 +56,18 @@ export async function setProfileVisibility(isPublic: boolean): Promise<User> {
 
   const raw = await apiPatch<unknown>(`/api/user/${session.userId}`, {
     profileIsPublic: isPublic,
+  })
+  return UserSchema.parse(raw)
+}
+
+// Instant single-field toggle, matching web's setUnitPreference
+// (frontend/lib/profile/actions.ts) — same endpoint/payload shape.
+export async function setUnitPreference(unit: DistanceUnit): Promise<User> {
+  const session = await getSession()
+  if (!session) throw new Error("Not signed in")
+
+  const raw = await apiPatch<unknown>(`/api/user/${session.userId}`, {
+    unitPreference: unit,
   })
   return UserSchema.parse(raw)
 }

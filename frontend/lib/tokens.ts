@@ -42,6 +42,12 @@ export const palette = {
   // (cartouche, scale-bar, route halo). The only net-new color the variant adds.
   chartPaper: "#f7f4ec",
 
+  // Sand — the app's own warm-neutral paper white, one step lighter and less saturated
+  // than chartPaper (which stays scoped to chart furniture). Matches web's
+  // globals.css `--background` (oklch(0.986 0.007 88)), which M12 §E nudged toward
+  // chart-paper's warmth — this is the hex equivalent that never made it back here.
+  sand: "#fcfbf7",
+
   // Neutral slate
   slate950: "#020617",
   slate900: "#0f172a",
@@ -69,44 +75,64 @@ export const palette = {
 // ---------------------------------------------------------------------------
 // Semantic tokens — light mode
 // ---------------------------------------------------------------------------
+// Every entry below that isn't a bare `palette.*` reference was audited
+// 2026-09-12 against globals.css's actual `:root` oklch values (not the "#hex
+// palette-name" glosses in that file's own comments, which drift from what the
+// oklch really renders — confirmed by round-tripping each conversion). The
+// palette's named swatches (ocean600, sunset500, etc.) are real colors used
+// elsewhere on their own terms; they just don't happen to equal these specific
+// CSS custom properties, so referencing them here was silently wrong the whole
+// time mobile has existed. Regenerate theme.generated.css after touching this.
 export const lightTokens = {
-  background: palette.slate50,
-  foreground: palette.ocean900,
+  background: palette.sand,
+  foreground: "#000d1c", // oklch(0.155 0.04 245) — palette.ocean900 read 0d1b2e, visibly lighter
+  cardForeground: "#000d1c",
 
   card: "#ffffff",
-  cardForeground: palette.ocean900,
-
   popover: "#ffffff",
-  popoverForeground: palette.ocean900,
+  popoverForeground: "#000d1c",
 
-  primary: palette.ocean600,
-  primaryForeground: palette.slate50,
+  primary: "#0053a1", // oklch(0.43 0.165 243) — palette.ocean600 (1a5c9a) is a different, lighter blue
+  primaryForeground: "#f5fbfe",
 
-  secondary: palette.ocean100,
-  secondaryForeground: palette.ocean700,
+  secondary: "#cceef7", // oklch(0.928 0.038 215) — palette.ocean100 (dbedf7) is close but not equal
+  secondaryForeground: "#002b4f", // oklch(0.28 0.085 243) — palette.ocean700 (1a3554) reads lighter/less saturated
 
-  muted: palette.ocean50,
-  mutedForeground: palette.ocean500,
+  // oklch(0.965 0.006 90) — a warm near-neutral, NOT palette.ocean50 (f0f8fd),
+  // which is blue. The muted *background* had the same hue error the muted-text
+  // fix below corrects for foreground.
+  muted: "#f5f3ef",
+  mutedForeground: "#456e8b", // oklch(0.52 0.065 240) — its low (0.065) chroma renders far more desaturated than palette.ocean500 (2272b6)
 
-  accent: palette.sunset500,
-  accentForeground: palette.ocean900,
+  // The call to action. Sunset, and deliberately rare — creating a trip, a log, a
+  // checklist item; mirrors web's `--cta` (frontend/components/common/button-roles.ts).
+  // Split from `accent` (2026-09-12): `accent` used to double as both "the amber CTA"
+  // and shadcn's own quiet hover-surface, which is not what web's globals.css means by
+  // it anymore. `cta` is the only amber token now.
+  cta: "#dc9822", // oklch(0.73 0.145 75) — a lighter, more yellow amber than palette.sunset500 (d97706)
+  ctaForeground: "#000d1c",
 
-  destructive: palette.red600,
+  // Shadcn's own meaning: the quiet surface a hovered or highlighted row sits on. Same
+  // value as `secondary` by construction, matching web's globals.css.
+  accent: "#cceef7",
+  accentForeground: "#002b4f",
+
+  destructive: "#e7000b", // oklch(0.577 0.245 27.325) — a more vivid red-orange than palette.red600 (dc2626)
   destructiveForeground: palette.slate50,
 
-  border: palette.ocean200,
-  input: palette.ocean200,
-  ring: palette.ocean500,
+  border: "#b5dae5", // oklch(0.865 0.042 218) — close to palette.ocean200 (b3dcf0) but not equal
+  input: "#b5dae5",
+  ring: "#456e8b", // same oklch as mutedForeground
 
   // Sidebar
-  sidebar: palette.ocean50,
-  sidebarForeground: palette.ocean900,
-  sidebarPrimary: palette.ocean600,
-  sidebarPrimaryForeground: palette.slate50,
-  sidebarAccent: palette.ocean100,
-  sidebarAccentForeground: palette.ocean800,
-  sidebarBorder: palette.ocean200,
-  sidebarRing: palette.ocean500,
+  sidebar: "#f5f3ef", // same oklch as muted
+  sidebarForeground: "#000d1c",
+  sidebarPrimary: "#0053a1",
+  sidebarPrimaryForeground: "#f5fbfe",
+  sidebarAccent: "#cceef7",
+  sidebarAccentForeground: "#00182d", // oklch(0.2 0.055 243) — its own distinct value, not accentForeground's
+  sidebarBorder: "#b5dae5",
+  sidebarRing: "#456e8b",
 
   // Trip state badges
   stateDraftBg: palette.slate200,
@@ -123,43 +149,48 @@ export const lightTokens = {
 // Semantic tokens — dark mode
 // ---------------------------------------------------------------------------
 export const darkTokens = {
-  background: palette.ocean900,
-  foreground: palette.ocean50,
+  background: "#000d1c", // oklch(0.155 0.04 245) — same value light's --foreground uses; palette.ocean900 (0d1b2e) reads lighter
+  foreground: "#f5fbfe", // oklch(0.985 0.008 220) — palette.ocean50 (f0f8fd) is close but not equal
 
-  card: palette.ocean800,
-  cardForeground: palette.ocean50,
+  card: "#021526", // oklch(0.19 0.044 247) — notably darker/more saturated than palette.ocean800 (122540)
+  cardForeground: "#f5fbfe",
 
-  popover: palette.ocean800,
-  popoverForeground: palette.ocean50,
+  popover: "#021526",
+  popoverForeground: "#f5fbfe",
 
-  primary: palette.ocean400,
-  primaryForeground: palette.ocean900,
+  primary: "#009bc5", // oklch(0.64 0.125 225) — a richer teal-blue than palette.ocean400 (4fa8d4)
+  primaryForeground: "#000d1c",
 
-  secondary: palette.ocean700,
-  secondaryForeground: palette.ocean50,
+  secondary: "#002843", // oklch(0.265 0.068 243) — darker/more saturated than palette.ocean700 (1a3554)
+  secondaryForeground: "#f5fbfe",
 
-  muted: palette.ocean800,
-  mutedForeground: palette.ocean300,
+  muted: "#021526", // same oklch as card
+  // Same correction as lightTokens: oklch(0.73 0.06 225)'s actual sRGB output,
+  // not the ocean-300 hex its globals.css comment claims.
+  mutedForeground: "#7fb0c4",
 
-  accent: palette.sunset400,
-  accentForeground: palette.ocean900,
+  cta: "#e4a40f", // oklch(0.76 0.155 80) — darker/richer than palette.sunset400 (f59e0b)
+  ctaForeground: "#000d1c",
 
-  destructive: palette.red400,
+  accent: "#002843", // same oklch as secondary
+  accentForeground: "#f5fbfe",
+
+  destructive: "#f94144", // oklch(0.65 0.22 25) — more saturated/orange-red than palette.red400 (f87171)
   destructiveForeground: palette.ocean900,
 
   border: "rgba(255,255,255,0.10)",
   input: "rgba(255,255,255,0.12)",
-  ring: palette.ocean400,
+  ring: "#009bc5", // same oklch as primary
 
   // Sidebar
-  sidebar: palette.ocean800,
-  sidebarForeground: palette.ocean50,
-  sidebarPrimary: palette.ocean400,
-  sidebarPrimaryForeground: palette.ocean900,
-  sidebarAccent: palette.ocean700,
-  sidebarAccentForeground: palette.ocean50,
+  sidebar: "#021526",
+  sidebarForeground: "#f5fbfe",
+  sidebarPrimary: "#009bc5",
+  sidebarPrimaryForeground: "#000d1c",
+  sidebarAccent: "#002843",
+  sidebarAccentForeground: "#f5fbfe",
   sidebarBorder: "rgba(255,255,255,0.08)",
-  sidebarRing: palette.ocean400,
+  sidebarRing: "#009bc5",
 
   // Trip state badges
   stateDraftBg: palette.slate800,

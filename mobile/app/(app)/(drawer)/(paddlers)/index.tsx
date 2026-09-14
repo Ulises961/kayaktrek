@@ -7,6 +7,7 @@ import type { Block } from "@shared/dtos/block"
 import type { Connection, ConnectionUser } from "@shared/dtos/connection"
 import type { PaddlerSearchResult } from "@shared/dtos/paddler-search"
 
+import { UserGroupIcon } from "@mobile/components/icons/heroicons-user-group"
 import { BlockedRow } from "@mobile/components/paddlers/blocked-row"
 import {
   ConnectionRow,
@@ -14,6 +15,7 @@ import {
 } from "@mobile/components/paddlers/connection-row"
 import { PaddlerResultCard } from "@mobile/components/paddlers/paddler-result-card"
 import { Chip } from "@mobile/components/ui/chip"
+import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
@@ -272,7 +274,11 @@ export default function PaddlersScreen() {
             />
           ))}
           {connections?.length === 0 && (
-            <Text className="text-center text-muted-foreground">No connections yet.</Text>
+            <EmptyPanel
+              icon={UserGroupIcon}
+              title="No buddies yet"
+              description="Paddlers you connect with appear here, so you can invite them to a trip without searching each time."
+            />
           )}
         </ScrollView>
       )}
