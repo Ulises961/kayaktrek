@@ -50,6 +50,7 @@ from Resources.health_resource import health_api
 from Resources.tile_resource import tile_api
 from Resources.live_resource import live_api
 from Resources.session_resource import session_api
+from Resources.mobile_sync_resource import mobile_sync_api
 
 # Models without resources — import so SQLAlchemy metadata is complete for drop_all ordering in tests.
 from Models.user_has_profile_picture import userHasProfilePicture  # noqa: F401
@@ -121,6 +122,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     app.register_blueprint(tile_api)
     app.register_blueprint(live_api)
     app.register_blueprint(session_api)
+    app.register_blueprint(mobile_sync_api)
 
     db.init_app(app)
     mail.init_app(app)
