@@ -16,13 +16,21 @@ const config = getDefaultConfig(projectRoot);
 // so its files are visible to the bundler at all.
 config.watchFolders = [...(config.watchFolders ?? []), frontendRoot];
 
-// A `watchFolders` entry alone isn't enough: Metro still resolves modules by walking up
-// from the requesting file's own `node_modules`, so an import from `frontend/lib/...` would
-// otherwise fail to resolve any node_modules dependency it pulls in (e.g. `zod`, used by
-// every DTO). Let it also check `mobile/node_modules`.
+// A `watchFolders` entry alone isn't enough: with multiple roots configured, Metro's
+// hierarchical node_modules walk doesn't reach up from a file's own real directory the way
+// plain Node resolution would — an import from `frontend/lib/...` fails to resolve ANY
+// node_modules dependency it pulls in unless that dependency's node_modules directory is
+// listed here explicitly. Both `mobile/node_modules` (for deps frontend/lib and mobile both
+// need, e.g. `zod`, pinned to the same version in both — see fix/mobile-zod-version-drift)
+// and `frontend/node_modules` itself (for a dependency only frontend/lib uses, e.g.
+// `date-fns` in frontend/lib/trips/format.ts, which broke bundling before this line existed)
+// need to be here — duplicating every such package into mobile's own package.json instead
+// is the same bug shape recurring for a new package every time frontend/lib picks up a new
+// dependency.
 config.resolver.nodeModulesPaths = [
   ...(config.resolver.nodeModulesPaths ?? []),
   path.resolve(projectRoot, "node_modules"),
+  path.resolve(frontendRoot, "node_modules"),
 ];
 
 const finalConfig = withNativewind(config);
