@@ -196,6 +196,44 @@ def test_fetch_weather_replaces_existing_states(app, weather_day):
         assert _db.session.query(SeaState).filter_by(day_id=UUID(day_id)).count() == 12
 
 
+def test_fetch_weather_bumps_fetched_at_and_recorded_at(app, weather_day):
+    day_id = weather_day
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.return_value = _FAKE_WEATHER
+        mock_svc.fetch_marine.return_value = _FAKE_MARINE
+        fetch_weather.run(day_id)
+
+    with app.app_context():
+        first_fetched_at = _db.session.get(Weather, UUID(day_id)).fetched_at
+        first_recorded_at = _db.session.get(Sea, UUID(day_id)).recorded_at
+        assert first_fetched_at is not None
+        assert first_recorded_at is not None
+
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.return_value = _FAKE_WEATHER
+        mock_svc.fetch_marine.return_value = _FAKE_MARINE
+        fetch_weather.run(day_id)
+
+    with app.app_context():
+        second_fetched_at = _db.session.get(Weather, UUID(day_id)).fetched_at
+        second_recorded_at = _db.session.get(Sea, UUID(day_id)).recorded_at
+        assert second_fetched_at >= first_fetched_at
+        assert second_recorded_at >= first_recorded_at
+
+
+def test_fetch_weather_force_refresh_passed_to_open_meteo(app, weather_day):
+    day_id = weather_day
+    with patch("Tasks.weather_fetch_task.OpenMeteoService") as mock_svc:
+        mock_svc.fetch_weather.return_value = _FAKE_WEATHER
+        mock_svc.fetch_marine.return_value = _FAKE_MARINE
+        fetch_weather.run(day_id, force_refresh=True)
+
+    mock_svc.fetch_weather.assert_called_once()
+    mock_svc.fetch_marine.assert_called_once()
+    assert mock_svc.fetch_weather.call_args.kwargs["force_refresh"] is True
+    assert mock_svc.fetch_marine.call_args.kwargs["force_refresh"] is True
+
+
 def test_fetch_weather_skips_when_no_route_points(app, user_1):
     """A day with no coordinate-bearing points produces no Weather/Sea rows."""
     with app.app_context():
@@ -327,6 +365,21 @@ def test_cache_hit_skips_api_call(app):
                 result = OpenMeteoService.fetch_weather(lat, lng, date_str)
             mock_make.assert_not_called()
             assert result == _FAKE_WEATHER
+        finally:
+            cache.delete(cache_key)
+
+
+def test_force_refresh_bypasses_cache_hit(app):
+    lat, lng, date_str = 50.16, -5.06, "2026-08-11"
+    cache_key = f"weather:{lat:.1f}:{lng:.1f}:{date_str}"
+    with app.app_context():
+        cache.set(cache_key, _FAKE_WEATHER)
+        try:
+            with patch("Services.open_meteo_service._make_client") as mock_make:
+                mock_make.return_value.weather_api.side_effect = RuntimeError("should not be reached in this stub")
+                with pytest.raises(RuntimeError):
+                    OpenMeteoService.fetch_weather(lat, lng, date_str, force_refresh=True)
+            mock_make.assert_called_once()
         finally:
             cache.delete(cache_key)
 

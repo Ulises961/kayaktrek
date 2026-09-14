@@ -73,6 +73,23 @@ def points(client, auth_headers, itinerary):
         pass
 
 
+def _route_version(client, auth_headers, itinerary_id):
+    resp = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    return resp.json["routeVersion"]
+
+
+def test_create_point_bumps_route_version(client, auth_headers, itinerary):
+    before = _route_version(client, auth_headers, itinerary["id"])
+    response = client.post(
+        f"{POINT_ENDPOINT}/create",
+        headers=auth_headers,
+        json={"dayId": itinerary["days"][0]["id"], "type": "position"},
+    )
+    assert response.status_code == 201
+    assert _route_version(client, auth_headers, itinerary["id"]) == before + 1
+
+
 def test_update_point(client, points, auth_headers):
     point = points[0]
     point_id = point["id"]
@@ -108,6 +125,25 @@ def test_delete_point(client, auth_headers, points):
     assert response.status_code == 200
     response = client.get(f"{POINT_ENDPOINT}/{point["id"]}", headers=auth_headers)
     assert response.status_code == 404
+
+
+def test_delete_point_bumps_route_version(client, auth_headers, points, itinerary):
+    before = _route_version(client, auth_headers, itinerary["id"])
+    response = client.delete(f"{POINT_ENDPOINT}/{points[0]['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    assert _route_version(client, auth_headers, itinerary["id"]) == before + 1
+
+
+def test_link_points_bumps_route_version(client, auth_headers, points, itinerary):
+    [point, point_2, _, _] = points
+    before = _route_version(client, auth_headers, itinerary["id"])
+    response = client.patch(
+        f"{POINT_ENDPOINT}/{point['id']}",
+        headers=auth_headers,
+        json={"next": point_2},
+    )
+    assert response.status_code == 200
+    assert _route_version(client, auth_headers, itinerary["id"]) == before + 1
 
 
 def test_delete_point_not_found_returns_404(client, auth_headers):

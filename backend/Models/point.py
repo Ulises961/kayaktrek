@@ -39,6 +39,13 @@ class Point(BaseModel):
     next_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey('point.id', ondelete="SET NULL"), nullable=True
     )
+    # Sync-boundary-only representation of route order, never read by the server's
+    # own next_id-based logic. Recomputed fresh on every mobile pull from the
+    # current next_id chain (Services.Utils.point_ordering.assign_order_keys) and
+    # converted back to next_id on push (chain_from_order_keys) — WatermelonDB has
+    # no concept of a multi-record invariant like a linked list, so the device
+    # never sees next_id at all. See docs/mobile/sync-protocol-spec.md §7.2.
+    order_key: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     # passive_deletes=True: next_id already carries ondelete="SET NULL" at the DB
     # level. Without this, SQLAlchemy's unit-of-work tries to order and null out

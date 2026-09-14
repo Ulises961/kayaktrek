@@ -182,6 +182,70 @@ def test_weather_fetch_202_with_date(client, auth_headers, itinerary):
     assert resp.get_json()["taskId"] == "mock-celery-task-id"
 
 
+# ── weather refresh (device-initiated, bypasses the planning-desk cache) ──────
+
+def test_weather_refresh_400_without_date(client, auth_headers, app, itinerary):
+    day_id = itinerary["days"][1]["id"]
+    with app.app_context():
+        day = _db.session.get(Day, UUID(day_id))
+        original_date = day.date
+        day.date = None
+        _db.session.commit()
+    try:
+        resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+        assert resp.status_code == 400
+    finally:
+        with app.app_context():
+            day = _db.session.get(Day, UUID(day_id))
+            day.date = original_date
+            _db.session.commit()
+
+
+def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    mock_result = MagicMock()
+    mock_result.id = "mock-celery-task-id"
+    with (
+        patch(
+            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            return_value=True,
+        ),
+        patch("Resources.sea_resource.fetch_weather") as mock_task,
+    ):
+        mock_task.delay.return_value = mock_result
+        resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+        assert resp.status_code == 202
+        assert resp.get_json()["taskId"] == "mock-celery-task-id"
+        mock_task.delay.assert_called_once()
+        assert mock_task.delay.call_args.kwargs["force_refresh"] is True
+
+
+def test_weather_refresh_403_without_premium_entitlement(client, auth_headers, itinerary):
+    day_id = itinerary["days"][1]["id"]
+    resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+    assert resp.status_code == 403
+
+
+def test_weather_refresh_429_within_cooldown(client, auth_headers, itinerary):
+    day_id = itinerary["days"][0]["id"]
+    mock_result = MagicMock()
+    mock_result.id = "mock-celery-task-id"
+    with (
+        patch(
+            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            return_value=True,
+        ),
+        patch("Resources.sea_resource.fetch_weather") as mock_task,
+    ):
+        mock_task.delay.return_value = mock_result
+        first = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+        assert first.status_code == 202
+        second = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
+    assert second.status_code == 429
+    # Only the first request should have reached the task queue.
+    mock_task.delay.assert_called_once()
+
+
 # ── tidal station admin ───────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module", autouse=False)

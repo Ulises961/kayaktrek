@@ -9,6 +9,7 @@ from Models.sea import Sea
 from Models.trip import Trip, TripStateType
 from Models.weather import Weather
 from Api.database import db
+from Services.Utils.point_ordering import bump_route_version
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import NoResultFound
 from datetime import date, time
@@ -176,6 +177,7 @@ class DayService:
         sea_data = dict_to_snake(day_data["sea"]) if day_data.get("sea") else None
 
         # Update only whitelisted scalar fields
+        boundary_changed = False
         for field in DayService._MUTABLE_FIELDS:
             key = camelcase(field)
             if key in day_data:
@@ -183,6 +185,13 @@ class DayService:
                 if field == "date" and isinstance(value, str):
                     value = date.fromisoformat(value)
                 setattr(existing_day, field, value)
+                if field in ("start_point_id", "end_point_id"):
+                    boundary_changed = True
+
+        if boundary_changed:
+            itinerary = db.session.query(Itinerary).filter_by(id=existing_day.itinerary_id).first()
+            if itinerary:
+                bump_route_version(itinerary)
 
         # Handle weather update/creation
         if has_weather_key:
@@ -233,6 +242,10 @@ class DayService:
             current = db.session.get(PointModel, current.next_id)
         else:
             raise ValueError(f"End point {end_point_id} not reachable from {start_point_id}")
+
+        itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
+        if itinerary:
+            bump_route_version(itinerary)
 
         db.session.commit()
 

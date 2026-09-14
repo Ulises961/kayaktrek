@@ -15,6 +15,7 @@ class WeatherSchema(Schema):
     day_id = fields.UUID(allow_none=False, required=True)
     model = fields.String(allow_none=False, required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)
     weather_states = fields.List(fields.Nested(WeatherStateSchema), allow_none=True, validate=lambda x: x is None or len(x) <= 24)
+    fetched_at = fields.DateTime(dump_only=True)
 
     def on_bind_field(self, field_name, field_obj):
         field_obj.data_key = camelcase(field_obj.data_key or field_name)

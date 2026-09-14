@@ -15,6 +15,7 @@ from Models.trip import Trip, TripStateType
 from Schemas.base_schema import camelcase
 from Schemas.image_schema import ImageSchema
 from Schemas.point_schema import PointSchema
+from Services.Utils.point_ordering import bump_route_version
 from Api.database import db
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,8 @@ class PointService:
         after_point_id = point_data.get("afterPointId")
         if after_point_id:
             PointService._splice_after(point, str(after_point_id), itinerary)
+            if itinerary:
+                bump_route_version(itinerary)
             db.session.commit()
             db.session.refresh(point)
             logger.info(f"Point {point.id} created after {after_point_id}")
@@ -179,6 +182,8 @@ class PointService:
         if tail:
             tail.next_id = point.id
 
+        if itinerary:
+            bump_route_version(itinerary)
         db.session.commit()
         db.session.refresh(point)
         logger.info(f"Point {point.id} created successfully")
@@ -222,6 +227,7 @@ class PointService:
             PointService._sync_geo(existing_point)
 
         # next_id: route ordering — patchable directly; day_id is not (security)
+        next_id_changed = 'nextId' in point_data or 'next' in point_data
         if 'nextId' in point_data:
             existing_point.next_id = UUID(point_data['nextId']) if point_data['nextId'] else None
         elif 'next' in point_data:
@@ -232,6 +238,13 @@ class PointService:
                 existing_point.next_id = UUID(next_val['id'])
             else:
                 existing_point.next_id = UUID(next_val)
+
+        if next_id_changed and existing_point.day_id:
+            day = db.session.query(Day).filter_by(id=existing_point.day_id).first()
+            if day:
+                itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
+                if itinerary:
+                    bump_route_version(itinerary)
 
         # Handle images relationship — nullable sub-collection
         if 'images' in point_data:
@@ -261,6 +274,13 @@ class PointService:
         predecessor = db.session.query(Point).filter_by(next_id=UUID(point_id)).first()
         if predecessor:
             predecessor.next_id = point.next_id
+
+        if point.day_id:
+            day = db.session.query(Day).filter_by(id=point.day_id).first()
+            if day:
+                itinerary = db.session.query(Itinerary).filter_by(id=day.itinerary_id).first()
+                if itinerary:
+                    bump_route_version(itinerary)
 
         db.session.delete(point)
         db.session.commit()

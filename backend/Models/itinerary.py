@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import UUID, Boolean, DateTime, Numeric, ForeignKey, String, Float, Text
+from sqlalchemy import UUID, Boolean, DateTime, Integer, Numeric, ForeignKey, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
@@ -40,6 +40,11 @@ class Itinerary(BaseModel):
     story_share_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Route-level optimistic-concurrency token, bumped on every structural change
+    # (point add/delete/reorder, day boundary move). Lets mobile sync-down (M9c)
+    # detect a diverged route as one version mismatch instead of diffing every
+    # point — see docs/mobile/sync-protocol-spec.md §8.1.
+    route_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     days: Mapped[List["Day"]] = relationship(
         lazy="select", cascade="all, delete,save-update"
     )

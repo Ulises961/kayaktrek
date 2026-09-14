@@ -66,12 +66,13 @@ def _parse_hourly(response, var_names: list[str]) -> list[dict]:
 
 class OpenMeteoService:
     @staticmethod
-    def fetch_weather(lat: float, lng: float, date_str: str) -> list[dict]:
+    def fetch_weather(lat: float, lng: float, date_str: str, force_refresh: bool = False) -> list[dict]:
         cache_key = f"weather:{lat:.1f}:{lng:.1f}:{date_str}"
-        cached = cache.get(cache_key)
-        if cached is not None:
-            logger.info("open_meteo_cache_hit", extra={"cache_key": cache_key})
-            return cached
+        if not force_refresh:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                logger.info("open_meteo_cache_hit", extra={"cache_key": cache_key})
+                return cached
 
         client = _make_client()
         responses = client.weather_api(
@@ -102,12 +103,13 @@ class OpenMeteoService:
         return {"source": "global_weather", "grid": []}
 
     @staticmethod
-    def fetch_marine(lat: float, lng: float, date_str: str) -> list[dict]:
+    def fetch_marine(lat: float, lng: float, date_str: str, force_refresh: bool = False) -> list[dict]:
         cache_key = f"marine:{lat:.1f}:{lng:.1f}:{date_str}"
-        cached = cache.get(cache_key)
-        if cached is not None:
-            logger.info("open_meteo_cache_hit", extra={"cache_key": cache_key})
-            return cached
+        if not force_refresh:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                logger.info("open_meteo_cache_hit", extra={"cache_key": cache_key})
+                return cached
 
         client = _make_client()
         responses = client.weather_api(

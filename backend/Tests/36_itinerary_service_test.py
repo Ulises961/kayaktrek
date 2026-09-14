@@ -260,6 +260,7 @@ def test_apply_boundaries_point_updates_applied(itinerary_with_a_point):
     """point_updates renames and retypes points in the same transaction."""
     itin_id = itinerary_with_a_point["itinerary_id"]
     point_id = itinerary_with_a_point["point_id"]
+    before_version = db.session.query(Itinerary).filter_by(id=UUID(itin_id)).first().route_version
 
     ItineraryService.apply_boundaries(
         itin_id,
@@ -270,6 +271,9 @@ def test_apply_boundaries_point_updates_applied(itinerary_with_a_point):
     point = db.session.query(Point).filter_by(id=UUID(point_id)).first()
     assert point.name == "Renamed"
     assert point.type == PointType.STOP
+
+    after_version = db.session.query(Itinerary).filter_by(id=UUID(itin_id)).first().route_version
+    assert after_version == before_version + 1
 
 
 def test_apply_boundaries_dates_land_on_their_own_day(client, auth_headers, itinerary):
