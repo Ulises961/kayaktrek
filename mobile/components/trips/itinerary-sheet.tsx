@@ -25,11 +25,13 @@ export function ItinerarySheet({
   selectedDayId,
   onSelectDay,
   selectedDay,
+  onRefreshWeather,
 }: {
   days: Day[]
   selectedDayId: string | null
   onSelectDay: (id: string | null) => void
   selectedDay: Day | null
+  onRefreshWeather?: () => Promise<void>
 }) {
   const [expandRequested, setExpandRequested] = useState(false)
   const canExpand = hasConditions(selectedDay)
@@ -68,7 +70,7 @@ export function ItinerarySheet({
       )}
     >
       <BottomSheetView style={{ paddingBottom: 24 }}>
-        <WeatherSeaPanel day={selectedDay} />
+        <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />
       </BottomSheetView>
     </BottomSheet>
   )

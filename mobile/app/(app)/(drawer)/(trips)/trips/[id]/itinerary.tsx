@@ -229,6 +229,7 @@ export default function TripMapScreen() {
           selectedDayId={selectedDayId}
           onSelectDay={setSelectedDayId}
           selectedDay={selectedDay}
+          onRefreshWeather={reload}
         />
       </View>
     </Screen>

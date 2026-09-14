@@ -79,10 +79,7 @@ export async function loadOfflineTrip(tripId: string, database: Database = produ
           ? {
               dayId: weather.dayId,
               model: weather.model,
-              // TODO(M9c WP5): thread fetchedAt through once the frontend
-              // Weather DTO carries it (kayak-expedition-planner-89, in
-              // progress) — the local cache already has it
-              // (weather.fetchedAt, epoch ms).
+              fetchedAt: weather.fetchedAt ? new Date(weather.fetchedAt).toISOString() : null,
               weatherStates: (weatherStatesByDay.get(day.id) ?? []).map((state) => ({
                 dayId: state.dayId,
                 time: state.time,
