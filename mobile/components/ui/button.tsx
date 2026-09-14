@@ -10,6 +10,11 @@ const buttonVariants = cva("flex-row items-center justify-center rounded-md", {
     variant: {
       default: "bg-primary active:opacity-90",
       secondary: "bg-secondary active:opacity-90",
+      // The call to action — bringing something into existence (a trip, a log, a
+      // checklist item), never a save-existing-thing or a dialog confirm. Mirrors
+      // web's `ctaButtonClass` (frontend/components/common/button-roles.ts); one role,
+      // one colour, no exceptions.
+      cta: "bg-cta active:opacity-90",
       destructive: "bg-destructive active:opacity-90",
       outline: "border border-border bg-transparent active:bg-muted",
       ghost: "bg-transparent active:bg-muted",
@@ -31,6 +36,7 @@ const buttonTextVariants = cva("text-center font-medium", {
     variant: {
       default: "text-primary-foreground",
       secondary: "text-secondary-foreground",
+      cta: "text-cta-foreground",
       destructive: "text-destructive-foreground",
       outline: "text-foreground",
       ghost: "text-foreground",
@@ -59,10 +65,15 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<React.ComponentRef<typeof Pressable>, ButtonProps>(
-  ({ className, textClassName, variant, size, children, ...props }, ref) => (
+  ({ className, textClassName, variant, size, disabled, children, ...props }, ref) => (
     <Pressable
       ref={ref}
-      className={cn(buttonVariants({ variant, size }), className)}
+      disabled={disabled}
+      // NativeWind has no `disabled:` variant to key off Pressable's own prop (that's
+      // a CSS pseudo-class, not something RN exposes to the style engine), so a
+      // disabled button rendered identically to an enabled one — this app had no
+      // disabled-button treatment anywhere until now.
+      className={cn(buttonVariants({ variant, size }), disabled && "opacity-50", className)}
       {...props}
     >
       {React.isValidElement(children) ? (

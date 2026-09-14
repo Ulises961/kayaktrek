@@ -4,7 +4,7 @@ import { Pressable } from "react-native"
 
 import type { Trip } from "@shared/dtos/trip"
 import { daysBetween, formatDateRange } from "@shared/trips/format"
-import { palette } from "@shared/tokens"
+import { lightTokens } from "@shared/tokens"
 
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Row } from "../ui/layout"
@@ -36,7 +36,7 @@ export function TripCard({ trip }: { trip: Trip }) {
           </CardHeader>
           <CardContent>
             <Row className="items-center gap-1.5">
-              <CalendarIcon size={12} color={palette.ocean500} />
+              <CalendarIcon size={12} color={lightTokens.mutedForeground} />
               <Text className="text-[11px] text-muted-foreground">
                 {formatDateRange(dateFrom, dateTo)}
               </Text>
@@ -44,14 +44,14 @@ export function TripCard({ trip }: { trip: Trip }) {
             <Row className="flex-wrap gap-x-3 gap-y-1">
               {days !== null && (
                 <Row className="items-center gap-1">
-                  <ClockIcon size={12} color={palette.ocean500} />
+                  <ClockIcon size={12} color={lightTokens.mutedForeground} />
                   <Text className="text-[11px] tabular-nums text-muted-foreground">
                     {days} {days === 1 ? "day" : "days"}
                   </Text>
                 </Row>
               )}
               <Row className="items-center gap-1">
-                <UsersIcon size={12} color={palette.ocean500} />
+                <UsersIcon size={12} color={lightTokens.mutedForeground} />
                 <Text className="text-[11px] tabular-nums text-muted-foreground">
                   {crewCount} {crewCount === 1 ? "member" : "members"}
                 </Text>

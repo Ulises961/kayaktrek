@@ -1,5 +1,6 @@
 import { Stack as RouterStack, Link } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
+import { Newspaper } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
@@ -9,9 +10,11 @@ import type { EndorsementRequest } from "@shared/dtos/endorsement-request"
 import { formatDayDate } from "@shared/utils/date"
 
 import { LogCard } from "../../../../components/logs/log-card"
+import { StatsPanel } from "../../../../components/profile/stats-panel"
 import { Button } from "../../../../components/ui/button"
 import { Card, CardContent } from "../../../../components/ui/card"
 import { Chip } from "../../../../components/ui/chip"
+import { EmptyPanel } from "../../../../components/ui/empty-panel"
 import { Row, Screen, Stack } from "../../../../components/ui/layout"
 import { Text } from "../../../../components/ui/text"
 import {
@@ -124,26 +127,7 @@ export default function LogsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
-        {stats && stats.logCount > 0 && (
-          <Row className="gap-3">
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Hours</Text>
-              <Text className="text-lg font-semibold tabular-nums">
-                {stats.totalHours.toFixed(1)}
-              </Text>
-            </Card>
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Distance</Text>
-              <Text className="text-lg font-semibold tabular-nums">
-                {stats.totalDistance.toFixed(1)} km
-              </Text>
-            </Card>
-            <Card className="flex-1 items-center py-3">
-              <Text className="text-xs uppercase text-muted-foreground">Trips</Text>
-              <Text className="text-lg font-semibold tabular-nums">{stats.tripCount}</Text>
-            </Card>
-          </Row>
-        )}
+        {stats && <StatsPanel stats={stats} />}
 
         {requests.length > 0 && (
           <Stack className="gap-2">
@@ -190,16 +174,22 @@ export default function LogsScreen() {
             </Chip>
           </Row>
           <Link href="/logs/new" asChild>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="cta">
               + New
             </Button>
           </Link>
         </Row>
 
         {shown.length === 0 ? (
-          <Text className="text-center text-muted-foreground">
-            {tab === "mine" ? "No logs yet." : "You haven't endorsed any logs yet."}
-          </Text>
+          <EmptyPanel
+            icon={Newspaper}
+            title={tab === "mine" ? "No logs yet" : "No endorsed logs yet"}
+            description={
+              tab === "mine"
+                ? "Record a paddle and it lands here with its distance, conditions and anyone who was on the water with you."
+                : undefined
+            }
+          />
         ) : (
           <Stack className="gap-3">
             {shown.map((log, index) => (

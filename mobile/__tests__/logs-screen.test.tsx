@@ -63,7 +63,7 @@ describe("LogsScreen", () => {
 
     const { findByText } = await render(<LogsScreen />)
 
-    expect(await findByText("No logs yet.")).toBeTruthy()
+    expect(await findByText("No logs yet")).toBeTruthy()
   })
 
   it("surfaces the thrown error message and offers a retry that re-fetches", async () => {
