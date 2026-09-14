@@ -146,7 +146,13 @@ class RouteSyncService:
                 point = Point(id=UUID(point_id))
                 db.session.add(point)
             if "dayId" in point_data and point_data["dayId"]:
-                point.day_id = UUID(point_data["dayId"])
+                day_id = str(point_data["dayId"])
+                if day_id not in existing_days:
+                    # Never trust a device-supplied dayId at face value — without
+                    # this check a point could be redirected into another trip's
+                    # day the caller merely knows or guessed the id of.
+                    raise ValueError(f"Day {day_id} does not belong to this itinerary")
+                point.day_id = UUID(day_id)
             if "latitude" in point_data:
                 point.latitude = point_data["latitude"]
             if "longitude" in point_data:

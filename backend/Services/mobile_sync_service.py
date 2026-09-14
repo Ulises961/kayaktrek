@@ -311,9 +311,27 @@ class MobileSyncService:
             item_id = record.get("itemId")
             if not requirement_id or not item_id:
                 raise ValueError("requirementId and itemId are required")
+
+            # Never trust a device-supplied requirementId/itemId at face value —
+            # without these two checks a device could contribute an item it
+            # doesn't own, or contribute into a requirement on a trip it isn't
+            # even a member of (mirrors InventoryService._get_trip_member's
+            # join, which confirms both in the ordinary HTTP path).
+            requirement = (
+                db.session.query(TripRequirement)
+                .join(Inventory, TripRequirement.inventory_id == Inventory.id)
+                .filter(TripRequirement.id == UUID(requirement_id), Inventory.trip_id == own_member.trip_id)
+                .first()
+            )
+            if requirement is None:
+                raise ValueError("Requirement does not belong to this trip")
+
             item = db.session.get(Item, UUID(item_id))
-            if item is None or item.status != ItemStatusType.OWNED:
+            if item is None or item.user_id != own_member.user_id:
+                raise ValueError("Item does not belong to the caller")
+            if item.status != ItemStatusType.OWNED:
                 raise ValueError("Only owned items can be contributed")
+
             existing = db.session.query(RequirementContribution).filter_by(
                 requirement_id=UUID(requirement_id), trip_member_id=own_member.id
             ).first()

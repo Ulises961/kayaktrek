@@ -6,6 +6,7 @@ import uuid_extension
 
 from Resources.mobile_sync_resource import MOBILE_SYNC_ENDPOINT
 from Resources.point_resource import POINT_ENDPOINT
+from Resources.trip_resource import TRIP_ENDPOINT
 
 
 def _pull_route(client, headers, trip_id):
@@ -141,6 +142,32 @@ def test_push_route_requires_leader(client, trip_with_crew):
     trip_id = trip_with_crew["trip"]["id"]
     resp = _push_route(client, trip_with_crew["crew_headers"], trip_id, 1, [], [])
     assert resp.status_code == 403
+
+
+def test_push_route_rejects_a_point_pointed_at_another_itinerarys_day(client, auth_headers, itinerary):
+    """A point's dayId must belong to THIS itinerary — otherwise a leader
+    could redirect a point into another trip's day by supplying its id."""
+    _route_of_three(client, auth_headers, itinerary)
+    pulled = _pull_route(client, auth_headers, itinerary["tripId"]).json
+    base_version = pulled["routeVersion"]
+
+    foreign_trip = client.post(
+        f"{TRIP_ENDPOINT}/create",
+        headers=auth_headers,
+        json={"inventory": {}, "itinerary": {"days": [{"dayNumber": 1, "points": []}]}},
+    ).json
+    foreign_day_id = foreign_trip["itinerary"]["days"][0]["id"]
+
+    try:
+        tampered = [{**pulled["points"][0], "dayId": foreign_day_id}] + pulled["points"][1:]
+        resp = _push_route(client, auth_headers, itinerary["tripId"], base_version, pulled["days"], tampered)
+        assert resp.status_code == 400
+
+        # The foreign trip's day must be untouched.
+        foreign_pull = _pull_route(client, auth_headers, foreign_trip["id"]).json
+        assert not any(p["id"] == pulled["points"][0]["id"] for p in foreign_pull["points"])
+    finally:
+        client.delete(f"{TRIP_ENDPOINT}/{foreign_trip['id']}", headers=auth_headers)
 
 
 # ── resolve: human-adjudicated case ─────────────────────────────────────────

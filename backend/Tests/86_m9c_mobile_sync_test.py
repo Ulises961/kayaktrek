@@ -188,6 +188,71 @@ def test_push_creates_and_deletes_own_contribution(client, trip_with_crew):
     client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=headers)
 
 
+def test_push_rejects_contributing_an_item_owned_by_another_user(client, trip_with_crew):
+    """The item a device contributes must belong to the pushing user — otherwise
+    it could claim someone else's owned item as its own contribution."""
+    trip_id = trip_with_crew["trip"]["id"]
+    leader_headers = trip_with_crew["leader_headers"]
+    crew_headers = trip_with_crew["crew_headers"]
+    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
+
+    req_id = json.loads(
+        client.post(
+            f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements",
+            headers=leader_headers,
+            json={"name": "Throw bag", "category": "safety"},
+        ).data
+    )["id"]
+    leaders_item_id = json.loads(
+        client.post(
+            f"{ITEM_ENDPOINT}/create",
+            headers=leader_headers,
+            json={"inventoryId": inventory_id, "name": "bag", "category": "travel", "status": "owned"},
+        ).data
+    )["id"]
+
+    resp = _push(client, crew_headers, trip_id, {
+        "requirement_contributions": {"created": [{"requirementId": req_id, "itemId": leaders_item_id}]}
+    })
+    assert resp.status_code == 400
+
+    client.delete(f"{ITEM_ENDPOINT}/{leaders_item_id}", headers=leader_headers)
+
+
+def test_push_rejects_contributing_to_a_requirement_on_another_trip(client, trip_with_crew, trip_w_o_itinerary):
+    """The requirement a device contributes to must belong to the pushing
+    user's own trip — otherwise a device could write into an unrelated trip's
+    inventory just by knowing/guessing a requirement id."""
+    trip_id = trip_with_crew["trip"]["id"]
+    leader_headers = trip_with_crew["leader_headers"]
+    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
+
+    own_item_id = json.loads(
+        client.post(
+            f"{ITEM_ENDPOINT}/create",
+            headers=leader_headers,
+            json={"inventoryId": inventory_id, "name": "rope", "category": "travel", "status": "owned"},
+        ).data
+    )["id"]
+
+    foreign_inventory_id = trip_w_o_itinerary["inventory"]["id"]
+    foreign_req_id = json.loads(
+        client.post(
+            f"{INVENTORY_ENDPOINT}/{foreign_inventory_id}/requirements",
+            headers=leader_headers,
+            json={"name": "Foreign requirement", "category": "safety"},
+        ).data
+    )["id"]
+
+    resp = _push(client, leader_headers, trip_id, {
+        "requirement_contributions": {"created": [{"requirementId": foreign_req_id, "itemId": own_item_id}]}
+    })
+    assert resp.status_code == 400
+
+    client.delete(f"{INVENTORY_ENDPOINT}/{foreign_inventory_id}/requirements/{foreign_req_id}", headers=leader_headers)
+    client.delete(f"{ITEM_ENDPOINT}/{own_item_id}", headers=leader_headers)
+
+
 def test_push_rejects_deleting_another_members_contribution(client, trip_with_crew):
     trip_id = trip_with_crew["trip"]["id"]
     leader_headers = trip_with_crew["leader_headers"]
