@@ -7,6 +7,7 @@ import { updateItinerary } from "@/lib/itinerary/actions"
 import { ItineraryPitchSchema, type ItineraryPitch } from "@/lib/dtos/itinerary"
 import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/lib/dtos/difficulty"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { FieldLabel, FieldError, NativeSelect } from "@/components/common/form-field"
 import {
@@ -22,6 +23,7 @@ export type ItineraryPitchDialogProps = {
   itineraryId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  name?: string | null
   description?: string | null
   difficulty?: Difficulty | null
   /** Publish in the same request as the pitch, so a route is never briefly public with nothing on it. */
@@ -33,6 +35,7 @@ export function ItineraryPitchDialog({
   itineraryId,
   open,
   onOpenChange,
+  name,
   description,
   difficulty,
   publishOnSave = false,
@@ -45,12 +48,13 @@ export function ItineraryPitchDialog({
     formState: { errors },
   } = useForm<ItineraryPitch>({
     resolver: zodResolver(ItineraryPitchSchema),
-    values: { description: description ?? "", difficulty: difficulty ?? "" },
+    values: { name: name ?? "", description: description ?? "", difficulty: difficulty ?? "" },
   })
 
   function onSubmit(fields: ItineraryPitch) {
     startTransition(async () => {
       const result = await updateItinerary(itineraryId, {
+        name: fields.name.trim(),
         description: fields.description?.trim() || null,
         difficulty: fields.difficulty || null,
         ...(publishOnSave ? { isPublic: true } : {}),
@@ -78,6 +82,12 @@ export function ItineraryPitchDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="itinerary-name">Name</FieldLabel>
+            <Input id="itinerary-name" {...register("name")} />
+            <FieldError message={errors.name?.message} />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <FieldLabel htmlFor="itinerary-pitch">Description</FieldLabel>
             <Textarea

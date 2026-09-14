@@ -1,8 +1,11 @@
 import { Stack as RouterStack, useLocalSearchParams, useRouter } from "expo-router"
+import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator } from "react-native"
+import { ActivityIndicator, Alert } from "react-native"
 
 import type { Log, LogFields } from "@shared/dtos/log"
+import { beaufortLabel } from "@shared/weather/beaufort"
+import { palette } from "@shared/tokens"
 
 import { Button } from "../../../../components/ui/button"
 import { Row, Screen, Stack } from "../../../../components/ui/layout"
@@ -71,6 +74,13 @@ export default function LogDetailScreen() {
     }
   }
 
+  function confirmDelete() {
+    Alert.alert("Delete this log?", "This can't be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void handleDelete() },
+    ])
+  }
+
   async function handleToggleEndorsement(isEndorsedByMe: boolean) {
     setSubmitting(true)
     setError(null)
@@ -114,10 +124,31 @@ export default function LogDetailScreen() {
           <Text className="text-lg font-semibold">{log.date}</Text>
           {log.notes && <Text className="text-sm text-muted-foreground">{log.notes}</Text>}
         </Stack>
-        <Row className="flex-wrap gap-x-4 gap-y-1">
-          {log.hours != null && <Text className="text-sm">{log.hours}h on the water</Text>}
-          {log.distance != null && <Text className="text-sm">{log.distance} km</Text>}
-          {log.avgSea != null && <Text className="text-sm">Sea state B{log.avgSea}</Text>}
+        <Row className="flex-wrap gap-x-3 gap-y-1">
+          {log.hours != null && (
+            <Row className="items-center gap-1">
+              <ClockIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] tabular-nums text-muted-foreground">
+                {log.hours.toFixed(1)}h
+              </Text>
+            </Row>
+          )}
+          {log.distance != null && (
+            <Row className="items-center gap-1">
+              <RouteIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] tabular-nums text-muted-foreground">
+                {log.distance.toFixed(1)} km
+              </Text>
+            </Row>
+          )}
+          {log.avgSea != null && (
+            <Row className="items-center gap-1">
+              <WavesIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] text-muted-foreground">
+                B{log.avgSea} · {beaufortLabel(log.avgSea)}
+              </Text>
+            </Row>
+          )}
         </Row>
         {error && <Text className="text-sm text-destructive">{error}</Text>}
         <Button
@@ -141,7 +172,7 @@ export default function LogDetailScreen() {
         error={error}
         onSubmit={(fields) => void handleUpdate(fields)}
       />
-      <Button variant="destructive" disabled={submitting} onPress={() => void handleDelete()}>
+      <Button variant="destructive" disabled={submitting} onPress={confirmDelete}>
         Delete log
       </Button>
     </Screen>

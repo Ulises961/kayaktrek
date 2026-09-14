@@ -1,20 +1,19 @@
 import { Stack as RouterStack } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
 import { useCallback, useEffect, useState } from "react"
-import { ScrollView } from "react-native"
+import { Alert, ScrollView } from "react-native"
 
 import type { Block } from "@shared/dtos/block"
 import type { Connection, ConnectionUser } from "@shared/dtos/connection"
 import type { PaddlerSearchResult } from "@shared/dtos/paddler-search"
 
 import { UserGroupIcon } from "../../../../components/icons/heroicons-user-group"
+import { BlockedRow } from "../../../../components/paddlers/blocked-row"
 import {
   ConnectionRow,
   type ConnectionDirection,
 } from "../../../../components/paddlers/connection-row"
 import { PaddlerResultCard } from "../../../../components/paddlers/paddler-result-card"
-import { Button } from "../../../../components/ui/button"
-import { Card, CardContent } from "../../../../components/ui/card"
 import { Chip } from "../../../../components/ui/chip"
 import { EmptyPanel } from "../../../../components/ui/empty-panel"
 import { Input } from "../../../../components/ui/input"
@@ -198,6 +197,29 @@ export default function PaddlersScreen() {
     }
   }
 
+  function confirmBlock(connection: Connection) {
+    const counterparty = counterpartyOf(connection, userId)
+    Alert.alert(
+      `Block ${counterparty.name}?`,
+      "They won't be able to see your profile or reconnect with you.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => void handleBlockFromConnection(connection),
+        },
+      ],
+    )
+  }
+
+  function confirmUnblock(block: Block) {
+    Alert.alert(`Unblock ${block.blocked.name}?`, "They'll be able to see your profile again.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unblock", onPress: () => void handleUnblock(block) },
+    ])
+  }
+
   return (
     <Screen edges={["bottom"]}>
       {header}
@@ -248,7 +270,7 @@ export default function PaddlersScreen() {
               busy={busyId === connection.id}
               onAccept={() => void handleAccept(connection)}
               onRemove={() => void handleRemove(connection)}
-              onBlock={() => void handleBlockFromConnection(connection)}
+              onBlock={() => confirmBlock(connection)}
             />
           ))}
           {connections?.length === 0 && (
@@ -265,26 +287,12 @@ export default function PaddlersScreen() {
         <ScrollView contentContainerClassName="gap-3 p-4">
           {blocksError && <Text className="text-sm text-destructive">{blocksError}</Text>}
           {(blocks ?? []).map((block) => (
-            <Card key={block.id}>
-              <CardContent>
-                <Row className="justify-between">
-                  <Stack className="gap-0.5">
-                    <Text className="font-medium">{block.blocked.name}</Text>
-                    <Text className="text-sm text-muted-foreground">
-                      @{block.blocked.username}
-                    </Text>
-                  </Stack>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busyId === block.id}
-                    onPress={() => void handleUnblock(block)}
-                  >
-                    Unblock
-                  </Button>
-                </Row>
-              </CardContent>
-            </Card>
+            <BlockedRow
+              key={block.id}
+              blocked={block.blocked}
+              busy={busyId === block.id}
+              onUnblock={() => confirmUnblock(block)}
+            />
           ))}
           {blocks?.length === 0 && (
             <Text className="text-center text-muted-foreground">No blocked paddlers.</Text>

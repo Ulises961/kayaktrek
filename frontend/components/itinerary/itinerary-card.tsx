@@ -220,6 +220,7 @@ export function ItineraryCard({ itinerary, unit = DISTANCE_UNIT.NM }: ItineraryC
         itineraryId={itinerary.id ?? ""}
         open={showPitchDialog}
         onOpenChange={setShowPitchDialog}
+        name={itinerary.name}
         description={itinerary.description}
         difficulty={itinerary.difficulty}
         publishOnSave={!itinerary.isPublic}

@@ -564,12 +564,30 @@ class ItineraryService:
         return itinerary
 
     @staticmethod
-    def update_itinerary(itinerary_id: str, itinerary_data: dict) -> Itinerary:
-        """Partially update an itinerary. Only whitelisted fields are applied."""
+    def update_itinerary(itinerary_id: str, itinerary_data: dict, user_id: str) -> Itinerary:
+        """Partially update an itinerary. Only whitelisted fields are applied.
+
+        A public itinerary's route (its `days`, and therefore its points) is
+        always read-only — fork it to change the path. Its pitch fields,
+        `is_public` itself, `avg_speed_knots` and `trip_id` stay editable while
+        public, but **only by its author** (`itinerary.user_id`): `@require_owner`
+        also admits a trip member with no pitch-authoring role at all (M2's
+        ownership hierarchy grants a trip member full itinerary access), and
+        that person having trip access is not the same as having written the
+        public listing — they haven't forked it, and shouldn't be able to edit
+        or unpublish someone else's route just by being on the same trip.
+        """
         itinerary = ItineraryService.get_itinerary_by_id(itinerary_id)
 
         if itinerary.is_public:
-            raise PermissionError("Public itineraries are read-only. Fork it to make changes.")
+            if "days" in itinerary_data:
+                raise PermissionError(
+                    "A public itinerary's route is read-only. Fork it to change days or points."
+                )
+            if str(itinerary.user_id) != str(user_id):
+                raise PermissionError(
+                    "Only the author can edit a public itinerary's pitch or visibility."
+                )
 
         validated: dict = ItineraryUpdateSchema().load(itinerary_data)
 

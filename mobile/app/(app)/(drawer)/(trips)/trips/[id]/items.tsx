@@ -1,10 +1,12 @@
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
+import { PackageCheckIcon, PackageIcon } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
-import { ScrollView } from "react-native"
+import { Alert, ScrollView } from "react-native"
 
 import type { Item } from "@shared/dtos/item"
 import type { TripRequirement } from "@shared/dtos/inventory"
 import type { PersonalPackingItem } from "@shared/dtos/personal-packing"
+import { palette } from "@shared/tokens"
 
 import { Badge } from "../../../../../../components/ui/badge"
 import { Button } from "../../../../../../components/ui/button"
@@ -108,6 +110,21 @@ export default function InventoryScreen() {
     }
   }
 
+  function confirmRemoveRequirement(requirement: TripRequirement) {
+    Alert.alert(
+      "Remove this requirement?",
+      "Any contributions to it will be lost.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => void handleRemoveRequirement(requirement),
+        },
+      ],
+    )
+  }
+
   async function handleContribute(requirement: TripRequirement, item: Item) {
     if (!inventoryId || !requirement.id || !item.id) return
     setBusyId(requirement.id)
@@ -161,6 +178,13 @@ export default function InventoryScreen() {
     } finally {
       setBusyId(null)
     }
+  }
+
+  function confirmRemovePacking(entry: PersonalPackingItem) {
+    Alert.alert("Remove from your kit?", undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => void handleRemovePacking(entry) },
+    ])
   }
 
   async function handleAddPacking(item: Item) {
@@ -219,9 +243,16 @@ export default function InventoryScreen() {
                     <CardTitle className="flex-1" numberOfLines={1}>
                       {requirement.name}
                     </CardTitle>
-                    <Badge variant={requirement.status === "covered" ? "default" : "secondary"}>
-                      {requirement.status === "covered" ? "Covered" : "Needed"}
-                    </Badge>
+                    <Row className="items-center gap-1.5">
+                      {requirement.status === "covered" ? (
+                        <PackageCheckIcon size={12} color={palette.ocean500} />
+                      ) : (
+                        <PackageIcon size={12} color={palette.ocean500} />
+                      )}
+                      <Badge variant={requirement.status === "covered" ? "default" : "secondary"}>
+                        {requirement.status === "covered" ? "Covered" : "Needed"}
+                      </Badge>
+                    </Row>
                   </Row>
                 </CardHeader>
                 <CardContent className="gap-2">
@@ -240,7 +271,7 @@ export default function InventoryScreen() {
                         size="sm"
                         variant="outline"
                         disabled={busyId === requirement.id}
-                        onPress={() => void handleRemoveRequirement(requirement)}
+                        onPress={() => confirmRemoveRequirement(requirement)}
                       >
                         Remove
                       </Button>
@@ -311,7 +342,7 @@ export default function InventoryScreen() {
                     size="sm"
                     variant="destructive"
                     disabled={busyId === entry.id}
-                    onPress={() => void handleRemovePacking(entry)}
+                    onPress={() => confirmRemovePacking(entry)}
                   >
                     Remove
                   </Button>

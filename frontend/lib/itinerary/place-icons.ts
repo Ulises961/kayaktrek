@@ -19,7 +19,7 @@ import {
   Cross,
   Signal,
   Eye,
-  Umbrella,
+  Parasol,
   Bird,
   Toilet,
   MapPin,
@@ -50,7 +50,10 @@ const ICON_BY_NAME: Record<string, LucideIcon> = {
   cross: Cross,
   signal: Signal,
   eye: Eye,
-  umbrella: Umbrella,
+  // Named "umbrella" in seeded data (backend/Api/seed.py, "Beach" category) — mapped
+  // to lucide's dedicated beach-umbrella glyph, not the generic rain-umbrella one,
+  // which is what the icon name would suggest if read literally.
+  umbrella: Parasol,
   bird: Bird,
   toilet: Toilet,
   "map-pin": MapPin,

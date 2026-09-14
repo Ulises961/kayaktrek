@@ -7,6 +7,41 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.6] - 2026-09-12
+
+### Changed
+
+- The public route library (`/explore`) and individual public route pages are now crawlable
+  by search engines, now that the library has real, author-pitched routes rather than only
+  the operator's own demo content.
+
+### Fixed
+
+- A route's owner could no longer edit its name, description, difficulty, or make it private
+  again once the route had been published to the public library — any change at all was
+  rejected. Editing those now works again; only the route's actual path (its days and points)
+  stays locked once published, and only the route's own author (not merely a trip member with
+  access to it) can make these changes.
+
+## [1.0.5] - 2026-09-12
+
+### Fixed
+
+- A route's name could never be changed after creation — the edit dialog only exposed
+  description and difficulty, even though the server has always accepted a name update.
+- The "beach" map-place icon rendered as a generic rain umbrella instead of a beach umbrella.
+- Route authors and fork-source attribution in the route library showed a paddler's chosen
+  display name instead of their username.
+
+## [1.0.4] - 2026-09-12
+
+### Fixed
+
+- Registration: a password whose only "special character" was a space or a non-ASCII
+  character (e.g. an accented letter) passed the signup form's validation but was then
+  rejected by the server with a confusing error. The form now checks against the same fixed
+  set of punctuation characters the backend accepts.
+
 ## [1.0.3] - 2026-09-11
 
 ### Added

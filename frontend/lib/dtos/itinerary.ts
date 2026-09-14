@@ -30,6 +30,11 @@ export const ItinerariesSchema = z.array(ItinerarySchema)
 // own limits (2000 chars, markup stripped in the schema layer) so the author is told
 // before the round trip rather than by a 400.
 export const ItineraryPitchSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Name is required.")
+    .max(255, "Name must be at most 255 characters.")
+    .refine(noHtmlTags.check, noHtmlTags.message),
   description: z
     .string()
     .max(2000, "Description must be at most 2000 characters.")

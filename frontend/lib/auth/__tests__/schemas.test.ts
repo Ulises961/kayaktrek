@@ -136,6 +136,20 @@ describe("RegisterSchema", () => {
     it("accepts a password satisfying all rules", () => {
       expect(RegisterSchema.safeParse({ ...valid, password: STRONG_PASSWORD }).success).toBe(true)
     })
+
+    // A space or a non-ASCII character is "special" under a naive [^a-zA-Z0-9] class but is not
+    // in the backend's fixed punctuation set (backend/Schemas/user_schema.py validate_pwd) — a
+    // password that only satisfies the special-character rule via one of these passes here and
+    // 422s at the server.
+    it("rejects a password whose only 'special' character is a space", () => {
+      const result = RegisterSchema.safeParse({ ...valid, password: "Expedition 424" })
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a password whose only 'special' character is non-ASCII", () => {
+      const result = RegisterSchema.safeParse({ ...valid, password: "Expedition424é" })
+      expect(result.success).toBe(false)
+    })
   })
 })
 

@@ -178,7 +178,7 @@ describe("ExploreDiscovery", () => {
     expect(screen.getByText("Aegean loop")).toBeInTheDocument()
   })
 
-  it("links the attribution to a public author", () => {
+  it("links the attribution to a public author, by username", () => {
     render(
       <ExploreDiscovery
         initial={page([
@@ -189,7 +189,7 @@ describe("ExploreDiscovery", () => {
         ])}
       />,
     )
-    expect(screen.getByRole("link", { name: "Maren" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "seapaddler" })).toHaveAttribute(
       "href",
       "/paddlers/seapaddler",
     )
@@ -206,8 +206,8 @@ describe("ExploreDiscovery", () => {
         ])}
       />,
     )
-    expect(screen.getByText("Maren")).toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: "Maren" })).not.toBeInTheDocument()
+    expect(screen.getByText("seapaddler")).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "seapaddler" })).not.toBeInTheDocument()
   })
 })
 

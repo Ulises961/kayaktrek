@@ -1,10 +1,12 @@
 import { Stack as RouterStack, Link } from "expo-router"
+import { AwardIcon } from "lucide-react-native"
 import { DrawerToggleButton } from "expo-router/drawer"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView, Switch } from "react-native"
 
 import type { User } from "@shared/dtos/user"
 import type { Stats } from "@shared/dtos/public-profile"
+import { palette } from "@shared/tokens"
 
 import { StatsPanel } from "../../../../components/profile/stats-panel"
 import { Avatar } from "../../../../components/ui/avatar"
@@ -135,7 +137,10 @@ export default function ProfileScreen() {
               <Card key={cert.id ?? String(index)}>
                 <CardContent className="gap-1">
                   <Row className="justify-between">
-                    <Text className="font-medium">{cert.award}</Text>
+                    <Row className="items-center gap-1.5">
+                      <AwardIcon size={12} color={palette.ocean500} />
+                      <Text className="font-medium">{cert.award}</Text>
+                    </Row>
                     <Badge variant="secondary">{cert.organization}</Badge>
                   </Row>
                   {cert.validUntil && (

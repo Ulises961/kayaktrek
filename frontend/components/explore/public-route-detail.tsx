@@ -113,10 +113,10 @@ export function PublicRouteDetail({
                 href={`/paddlers/${author.username}`}
                 className="text-foreground font-medium hover:underline"
               >
-                {author.name ?? author.username}
+                {author.username}
               </Link>
             ) : (
-              <span className="text-foreground font-medium">{author.name ?? author.username}</span>
+              <span className="text-foreground font-medium">{author.username}</span>
             )}
           </p>
         )}

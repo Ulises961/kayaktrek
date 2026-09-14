@@ -157,19 +157,66 @@ def test_non_member_cannot_patch_public_itinerary(client, outsider_headers, auth
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
 
-def test_owner_cannot_patch_public_itinerary(client, auth_headers):
-    """Even the owner cannot PATCH a public (frozen) itinerary — must clone first.
-    Re-fetch to confirm the 409 actually left totalMiles untouched."""
+def test_owner_cannot_replace_days_on_public_itinerary(client, auth_headers):
+    """The owner cannot replace a public (frozen) itinerary's route — must fork first.
+    Re-fetch to confirm the 409 actually left the day list untouched."""
     trip_id, itinerary_id = _create_public_itinerary(client, auth_headers)
+    before = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
+    day_ids_before = [day["id"] for day in before.json["days"]]
 
-    r = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers, json={"totalMiles": 99})
+    r = client.patch(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers, json={"days": []})
     assert r.status_code == 409
 
     refetched = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers)
     assert refetched.status_code == 200
-    assert json.loads(refetched.data)["totalMiles"] == 0
+    assert [day["id"] for day in refetched.json["days"]] == day_ids_before
 
     client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+
+
+def test_owner_can_edit_pitch_and_visibility_on_public_itinerary(client, auth_headers):
+    """Pitch fields and is_public itself stay editable while public — "Edit pitch"
+    and "Make private" both patch an itinerary that is public at request time."""
+    trip_id, itinerary_id = _create_public_itinerary(client, auth_headers)
+
+    r = client.patch(
+        f"{ITINERARY_ENDPOINT}/{itinerary_id}",
+        headers=auth_headers,
+        json={"name": "Renamed route", "description": "Updated pitch.", "avgSpeedKnots": 3.0},
+    )
+    assert r.status_code == 200
+    assert r.json["name"] == "Renamed route"
+    assert r.json["description"] == "Updated pitch."
+
+    r = client.patch(
+        f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=auth_headers, json={"isPublic": False}
+    )
+    assert r.status_code == 200
+    assert r.json["isPublic"] is False
+
+    client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+
+
+def test_crew_member_cannot_edit_pitch_of_public_itinerary_they_do_not_author(
+    client, trip_with_user2_as_crew
+):
+    """A trip member has full itinerary access via the trip (M2's ownership
+    hierarchy), but that is not authorship of the public listing — only the
+    itinerary's own author may edit its pitch or visibility while public.
+    Re-fetch (as the author) to confirm the 409 left the name untouched."""
+    trip = trip_with_user2_as_crew["trip"]
+    itinerary_id = trip["itinerary"]["id"]
+    leader_headers = trip_with_user2_as_crew["leader_headers"]
+    crew_headers = trip_with_user2_as_crew["crew_headers"]
+
+    r = client.patch(
+        f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=crew_headers, json={"name": "Hijacked name"}
+    )
+    assert r.status_code == 409
+
+    refetched = client.get(f"{ITINERARY_ENDPOINT}/{itinerary_id}", headers=leader_headers)
+    assert refetched.status_code == 200
+    assert refetched.json["name"] != "Hijacked name"
 
 
 # ---------------------------------------------------------------------------

@@ -79,14 +79,14 @@ describe("RouteSignals", () => {
   })
 
   describe("author", () => {
-    it("links to a paddler whose profile is public", () => {
+    it("links to a paddler whose profile is public, by username", () => {
       render(
         <RouteSignals
           item={item({ author: { username: "ada", name: "Ada", linkable: true } })}
           unit={DISTANCE_UNIT.NM}
         />,
       )
-      expect(screen.getByRole("link", { name: "Ada" })).toHaveAttribute("href", "/paddlers/ada")
+      expect(screen.getByRole("link", { name: "ada" })).toHaveAttribute("href", "/paddlers/ada")
     })
 
     it("names but does not link a paddler whose profile is private", () => {
@@ -96,18 +96,19 @@ describe("RouteSignals", () => {
           unit={DISTANCE_UNIT.NM}
         />,
       )
-      expect(screen.getByText("Ada")).toBeInTheDocument()
+      expect(screen.getByText("ada")).toBeInTheDocument()
       expect(screen.queryByRole("link")).not.toBeInTheDocument()
     })
 
-    it("falls back to the username when no display name is set", () => {
+    it("uses the username even when a display name is set", () => {
       render(
         <RouteSignals
-          item={item({ author: { username: "ada", name: null, linkable: true } })}
+          item={item({ author: { username: "ada", name: "Ada Paddler", linkable: true } })}
           unit={DISTANCE_UNIT.NM}
         />,
       )
       expect(screen.getByRole("link", { name: "ada" })).toBeInTheDocument()
+      expect(screen.queryByText("Ada Paddler")).not.toBeInTheDocument()
     })
 
     it("renders nothing when the route has no author", () => {
