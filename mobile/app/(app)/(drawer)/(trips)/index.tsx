@@ -4,13 +4,12 @@ import { Kayak } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
-import type { Trip } from "@shared/dtos/trip"
-
 import { TripCard } from "@mobile/components/trips/trip-card"
 import { Button } from "@mobile/components/ui/button"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Screen } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
+import { type TripCardData, loadTripListCache, saveTripListCache, toTripCardData } from "@mobile/lib/db/trip-list-cache"
 import { getTrips } from "@mobile/lib/trips/actions"
 
 // Sets this screen's title on its group's Stack navigator — see (trips)/_layout.tsx's
@@ -25,22 +24,36 @@ const header = (
   />
 )
 
-// WP2 (plans/M9b.md): page 1 only, no offline fallback (that's M9c) — validates the
-// real backend round trip (auth -> trip/<user_id>/all -> TripSchema) rather than
-// building out pagination for a milestone whose whole point is proving the stack works.
+// M9c WP6: reads/writes lib/db/trip-list-cache.ts's local NitromelonDB cache
+// (wholesale-replaced on every successful fetch — spec §4 never covered a
+// top-level Trip aggregate, so this is a simple cache, not delta sync). A
+// failed fetch falls back to the cache rather than showing an error, as long
+// as the cache has something to show; `isOffline` flags that fallback so the
+// list doesn't read as silently authoritative.
 export default function TripListScreen() {
-  const [trips, setTrips] = useState<Trip[] | null>(null)
+  const [trips, setTrips] = useState<TripCardData[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isOffline, setIsOffline] = useState(false)
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true)
-    setError(null)
     try {
       const page = await getTrips()
-      setTrips(page.items)
+      const cardData = page.items.map(toTripCardData)
+      setTrips(cardData)
+      setError(null)
+      setIsOffline(false)
+      await saveTripListCache(page.items)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      const cached = await loadTripListCache()
+      if (cached.length > 0) {
+        setTrips(cached)
+        setIsOffline(true)
+        setError(null)
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      }
     } finally {
       if (isRefresh) setIsRefreshing(false)
     }
@@ -101,6 +114,11 @@ export default function TripListScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
+      {isOffline && (
+        <Text className="bg-muted px-4 py-1.5 text-center text-[11px] text-muted-foreground">
+          Offline — showing your last synced trips
+        </Text>
+      )}
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
           the read-only "validate the stack" milestone, not the place to chase a
           FlatList/VirtualizedList context crash under this RN/jest pairing. Revisit if
@@ -112,7 +130,7 @@ export default function TripListScreen() {
         }
       >
         {(trips ?? []).map((trip, index) => (
-          <TripCard key={trip.id ?? String(index)} trip={trip} />
+          <TripCard key={trip.id || String(index)} trip={trip} />
         ))}
       </ScrollView>
     </Screen>

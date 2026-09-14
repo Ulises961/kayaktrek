@@ -16,8 +16,25 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // database.ts) — acceptable while this hasn't shipped to a real device;
 // revisit before the first release that could carry an existing local DB.
 export const appDatabaseSchema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
+    tableSchema({
+      // Not part of docs/mobile/sync-protocol-spec.md §4's aggregate list — that
+      // spec is entirely trip-scoped (every pull endpoint takes a tripId), and
+      // never covered "which trips am I on" at all. This is a much simpler,
+      // separate cache (WP6): whatever GET /trip/<user_id>/all last returned
+      // successfully, wholesale-replaced on every successful fetch, read as a
+      // fallback when that fetch fails (offline). No delta, no tombstones — the
+      // trip list is small and always fetched in full.
+      name: "trips",
+      columns: [
+        { name: "destination", type: "string", isOptional: true },
+        { name: "state", type: "string", isOptional: true },
+        { name: "date_from", type: "string", isOptional: true },
+        { name: "date_to", type: "string", isOptional: true },
+        { name: "traveller_count", type: "number" },
+      ],
+    }),
     tableSchema({
       name: "days",
       columns: [
