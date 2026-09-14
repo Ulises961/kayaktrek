@@ -35,6 +35,12 @@ class Config:
     # See docs/adr/safety-privacy.md "Parked" and Api/features.py.
     MEDICAL_NOTES_ENABLED = os.getenv("MEDICAL_NOTES_ENABLED", "").lower() in {"1", "true", "yes"}
     CACHE_TYPE = "RedisCache"
+    # M29 satellite feed credential encryption key (Services/Utils/server_secret_crypto.py).
+    # Not read into Config as a class attribute — the beat task's worker process reads it
+    # directly from the environment on every poll, same reasoning as CHECKPOINT_ALERT_HOURS
+    # in Tasks/checkpoint_beat_task.py (beat carries no configuration; every task body,
+    # scheduled or request-triggered, runs on the worker). Listed here only as documentation
+    # of where it belongs; see .env.example.
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
 

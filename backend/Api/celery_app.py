@@ -45,6 +45,7 @@ celery_app = Celery(
         "Tasks.expedition_log_task",
         "Tasks.session_cleanup_task",
         "Tasks.tile_cache_task",
+        "Tasks.satellite_feed_beat_task",
     ],
 )
 
@@ -88,6 +89,12 @@ celery_app.conf.update(
         "tile-cache-prune": {
             "task": "Tasks.tile_cache_task.prune_tile_cache",
             "schedule": crontab(minute=15, hour=4),
+        },
+        # ~10 minutes, matching inReach's own typical tracking interval
+        # (satellite-feed-spec.md §3.1). M29 — Garmin inReach only for v1.
+        "satellite-feed-poll": {
+            "task": "Tasks.satellite_feed_beat_task.poll_satellite_feeds",
+            "schedule": crontab(minute="*/10"),
         },
     },
 )
