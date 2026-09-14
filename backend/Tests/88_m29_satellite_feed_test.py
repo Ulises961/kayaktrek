@@ -135,5 +135,7 @@ def test_delete_someone_elses_feed_returns_404(client, auth_headers, auth_header
 # ── auth ─────────────────────────────────────────────────────────────────────
 
 def test_endpoints_require_auth(client):
-    assert client.get(f"{FEED_BASE}/all").status_code == 403
-    assert client.post(f"{FEED_BASE}/create", json=_body()).status_code == 403
+    # 401 (invalid/missing token) vs 403 (missing token entirely) — Tests/12_security_test.py
+    # accepts either for this boundary; JWTService's own behavior is the source of truth.
+    assert client.get(f"{FEED_BASE}/all").status_code in (401, 403)
+    assert client.post(f"{FEED_BASE}/create", json=_body()).status_code in (401, 403)

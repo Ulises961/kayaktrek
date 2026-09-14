@@ -2,6 +2,7 @@ import base64
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from flask import current_app
 
 # Unattended, server-decryptable at-rest encryption for secrets the app must read
 # without a user present (satellite feed passwords, decrypted on every Celery beat
@@ -10,26 +11,24 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 # password. Here the server is the only party that ever decrypts, so the key is a
 # plain application secret, not user-derived (satellite-feed-spec.md §2.6).
 #
-# Read per call, not cached at import: matches the CHECKPOINT_ALERT_HOURS pattern in
-# Tasks/checkpoint_beat_task.py — a module-level read fixes the value when the worker
-# process starts, so rotating the key would need a worker restart either way, but a
-# per-call read at least keeps this module import-safe before the env is configured
-# (e.g. at Alembic/CLI import time).
-
-
-_TEST_DEFAULT_KEY_HEX = "00" * 32
+# Read via current_app.config, not a module-level constant: every caller (the
+# Resources layer and Tasks/satellite_feed_beat_task.py's ContextTask) always runs
+# inside a Flask app context, so this picks up TestingConfig's safe test default
+# (Api/config.py) without sniffing CONFIG_MODE directly — that env var reflects
+# whatever a contributor's own .env sets it to, not what createApp() was actually
+# built with, and the two can (and did) diverge in practice. Falls back to a bare
+# env read for the rare caller with no app context (e.g. a standalone script).
 
 
 def _key() -> bytes:
-    key_hex = os.getenv("FEED_CREDENTIAL_KEY")
+    try:
+        key_hex = current_app.config.get("FEED_CREDENTIAL_KEY")
+    except RuntimeError:
+        key_hex = None
     if not key_hex:
-        # Same fallback shape as TestingConfig.SECRET_KEY in Api/config.py — required
-        # everywhere else, but the test suite shouldn't need every contributor to add
-        # a real secret to their local .env just to exercise M29.
-        if os.getenv("CONFIG_MODE") == "testing":
-            key_hex = _TEST_DEFAULT_KEY_HEX
-        else:
-            raise KeyError("FEED_CREDENTIAL_KEY")
+        key_hex = os.getenv("FEED_CREDENTIAL_KEY")
+    if not key_hex:
+        raise KeyError("FEED_CREDENTIAL_KEY")
     key = bytes.fromhex(key_hex)
     if len(key) != 32:
         raise ValueError("FEED_CREDENTIAL_KEY must be 32 bytes (64 hex chars)")

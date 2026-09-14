@@ -35,12 +35,12 @@ class Config:
     # See docs/adr/safety-privacy.md "Parked" and Api/features.py.
     MEDICAL_NOTES_ENABLED = os.getenv("MEDICAL_NOTES_ENABLED", "").lower() in {"1", "true", "yes"}
     CACHE_TYPE = "RedisCache"
-    # M29 satellite feed credential encryption key (Services/Utils/server_secret_crypto.py).
-    # Not read into Config as a class attribute — the beat task's worker process reads it
-    # directly from the environment on every poll, same reasoning as CHECKPOINT_ALERT_HOURS
-    # in Tasks/checkpoint_beat_task.py (beat carries no configuration; every task body,
-    # scheduled or request-triggered, runs on the worker). Listed here only as documentation
-    # of where it belongs; see .env.example.
+    # M29 satellite feed credential encryption key (Services/Utils/server_secret_crypto.py) —
+    # a plain application secret, not user-derived (the beat task decrypts unattended, no
+    # user present to supply a passphrase). Empty by default: satellite feeds are opt-in, so
+    # an environment that hasn't configured this shouldn't be blocked from booting over it —
+    # the key is only required at the point a feed is actually created/polled.
+    FEED_CREDENTIAL_KEY = os.getenv("FEED_CREDENTIAL_KEY", "")
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
 
@@ -72,6 +72,10 @@ class TestingConfig(Config):
     # quietly stop testing it. The flag-off path has its own file
     # (Tests/80_medical_notes_parked_test.py), which overrides this back to False.
     MEDICAL_NOTES_ENABLED = True
+    # Same reasoning as SECRET_KEY/JWT_SECRET_KEY above — a real value can come from a
+    # local .env, but the test suite must not require every contributor to add one just
+    # to exercise M29.
+    FEED_CREDENTIAL_KEY = os.getenv("FEED_CREDENTIAL_KEY", "00" * 32)
 
 
 class StagingConfig(Config):
