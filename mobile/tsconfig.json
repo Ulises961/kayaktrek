@@ -18,9 +18,16 @@
     // `@/*` rather than reusing it: `@/` means "frontend's own root" inside frontend's
     // files, and mobile code importing the same alias for a different root would be
     // ambiguous about which workspace it points to.
+    //
+    // `@mobile/*` is a THIRD alias, for mobile's own root — neither `@/*` nor `@shared/*`
+    // covers it (both point at frontend/). Without it, screens nested under
+    // `app/(app)/(drawer)/...` reach mobile's own `components/`/`lib/` via 4-to-6-level
+    // deep relative imports. Same babel-preset-expo `paths`-reading mechanism as the two
+    // aliases above, no separate Metro/babel config needed.
     "paths": {
       "@/*": ["../frontend/*"],
-      "@shared/*": ["../frontend/lib/*"]
+      "@shared/*": ["../frontend/lib/*"],
+      "@mobile/*": ["./*"]
     }
   }
 }

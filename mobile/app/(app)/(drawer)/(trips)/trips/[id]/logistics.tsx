@@ -12,7 +12,7 @@ import type { ShuttleVehicle } from "@shared/dtos/shuttle-vehicle"
 import type { Trip } from "@shared/dtos/trip"
 import { formatDayDate } from "@shared/utils/date"
 
-import { getSession } from "../../../../../../lib/auth/session"
+import { getSession } from "@mobile/lib/auth/session"
 import {
   addShuttlePassenger,
   createShuttleVehicle,
@@ -22,17 +22,17 @@ import {
   getShuttleVehicles,
   getTravelDocuments,
   removeShuttlePassenger,
-} from "../../../../../../lib/logistics/actions"
-import { getTrip } from "../../../../../../lib/trips/actions"
-import { Badge } from "../../../../../../components/ui/badge"
-import { Button } from "../../../../../../components/ui/button"
-import { Card, CardContent } from "../../../../../../components/ui/card"
-import { Chip } from "../../../../../../components/ui/chip"
-import { EmptyPanel } from "../../../../../../components/ui/empty-panel"
-import { Input } from "../../../../../../components/ui/input"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
-import { SectionLabel } from "../../../../../../components/ui/section-label"
-import { Text } from "../../../../../../components/ui/text"
+} from "@mobile/lib/logistics/actions"
+import { getTrip } from "@mobile/lib/trips/actions"
+import { Badge } from "@mobile/components/ui/badge"
+import { Button } from "@mobile/components/ui/button"
+import { Card, CardContent } from "@mobile/components/ui/card"
+import { Chip } from "@mobile/components/ui/chip"
+import { EmptyPanel } from "@mobile/components/ui/empty-panel"
+import { Input } from "@mobile/components/ui/input"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { SectionLabel } from "@mobile/components/ui/section-label"
+import { Text } from "@mobile/components/ui/text"
 
 const header = <RouterStack.Screen options={{ title: "Logistics" }} />
 

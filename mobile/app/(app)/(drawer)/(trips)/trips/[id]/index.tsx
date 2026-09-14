@@ -14,12 +14,12 @@ import type { Trip } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
-import { Card, CardContent } from "../../../../../../components/ui/card"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
-import { SectionLabel } from "../../../../../../components/ui/section-label"
-import { StateBadge } from "../../../../../../components/ui/state-badge"
-import { Text } from "../../../../../../components/ui/text"
-import { getTrip } from "../../../../../../lib/trips/actions"
+import { Card, CardContent } from "@mobile/components/ui/card"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { SectionLabel } from "@mobile/components/ui/section-label"
+import { StateBadge } from "@mobile/components/ui/state-badge"
+import { Text } from "@mobile/components/ui/text"
+import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Trip" }} />
 

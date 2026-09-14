@@ -15,12 +15,12 @@ import type { Point } from "@shared/dtos/point"
 import { palette } from "@shared/tokens"
 import { walkPoints } from "@shared/itinerary/linked-list"
 
-import { ItinerarySheet } from "../../../../../../components/trips/itinerary-sheet"
-import { ZoomControl } from "../../../../../../components/trips/zoom-control"
-import { Screen } from "../../../../../../components/ui/layout"
-import { Text } from "../../../../../../components/ui/text"
-import { OSM_TILE_URL } from "../../../../../../lib/map/tiles"
-import { getTrip } from "../../../../../../lib/trips/actions"
+import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet"
+import { ZoomControl } from "@mobile/components/trips/zoom-control"
+import { Screen } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { OSM_TILE_URL } from "@mobile/lib/map/tiles"
+import { getTrip } from "@mobile/lib/trips/actions"
 
 import type { Trip } from "@shared/dtos/trip"
 

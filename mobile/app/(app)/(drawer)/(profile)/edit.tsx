@@ -2,12 +2,12 @@ import { Stack as RouterStack, useRouter } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator } from "react-native"
 
-import { Button } from "../../../../components/ui/button"
-import { Input } from "../../../../components/ui/input"
-import { Label } from "../../../../components/ui/label"
-import { Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { getMe, updateProfile, type ProfileEditFields } from "../../../../lib/profile/actions"
+import { Button } from "@mobile/components/ui/button"
+import { Input } from "@mobile/components/ui/input"
+import { Label } from "@mobile/components/ui/label"
+import { Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getMe, updateProfile, type ProfileEditFields } from "@mobile/lib/profile/actions"
 
 const header = <RouterStack.Screen options={{ title: "Edit profile" }} />
 

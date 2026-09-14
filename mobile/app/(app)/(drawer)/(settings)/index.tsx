@@ -7,11 +7,11 @@ import { ActivityIndicator, Linking } from "react-native"
 import type { User } from "@shared/dtos/user"
 import { DISTANCE_UNIT, type DistanceUnit } from "@shared/itinerary/distance"
 
-import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card"
-import { Chip } from "../../../../components/ui/chip"
-import { Row, Screen, Stack } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { getMe, setUnitPreference } from "../../../../lib/profile/actions"
+import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
+import { Chip } from "@mobile/components/ui/chip"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getMe, setUnitPreference } from "@mobile/lib/profile/actions"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Settings" drawer
 // item's root screen, so it supplies its own menu button.

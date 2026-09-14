@@ -3,8 +3,8 @@ import { Kayak, Newspaper, Settings } from "lucide-react-native"
 
 import { palette } from "@shared/tokens"
 
-import { UserGroupIcon } from "../../../components/icons/heroicons-user-group"
-import { AppDrawerContent } from "../../../components/navigation/app-drawer-content"
+import { UserGroupIcon } from "@mobile/components/icons/heroicons-user-group"
+import { AppDrawerContent } from "@mobile/components/navigation/app-drawer-content"
 
 // KNOWN ISSUE (M30 WP0, unresolved): login was landing on Logs instead of Trips —
 // Expo Router resolves a route group's initial screen from `unstable_settings.anchor`/

@@ -6,12 +6,12 @@ import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 
 import type { Trip } from "@shared/dtos/trip"
 
-import { TripCard } from "../../../../components/trips/trip-card"
-import { Button } from "../../../../components/ui/button"
-import { EmptyPanel } from "../../../../components/ui/empty-panel"
-import { Screen } from "../../../../components/ui/layout"
-import { Text } from "../../../../components/ui/text"
-import { getTrips } from "../../../../lib/trips/actions"
+import { TripCard } from "@mobile/components/trips/trip-card"
+import { Button } from "@mobile/components/ui/button"
+import { EmptyPanel } from "@mobile/components/ui/empty-panel"
+import { Screen } from "@mobile/components/ui/layout"
+import { Text } from "@mobile/components/ui/text"
+import { getTrips } from "@mobile/lib/trips/actions"
 
 // Sets this screen's title on its group's Stack navigator — see (trips)/_layout.tsx's
 // comment on why the title is declared here rather than in the parent layout.

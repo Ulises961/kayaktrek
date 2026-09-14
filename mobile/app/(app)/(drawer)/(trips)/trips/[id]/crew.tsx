@@ -8,23 +8,23 @@ import type { Trip } from "@shared/dtos/trip"
 import type { TripMember } from "@shared/dtos/trip-member"
 import { formatPaddlerName } from "@shared/user/format"
 
-import { listConnections } from "../../../../../../lib/connections/actions"
-import { getSession } from "../../../../../../lib/auth/session"
+import { listConnections } from "@mobile/lib/connections/actions"
+import { getSession } from "@mobile/lib/auth/session"
 import {
   cancelInvitation,
   getTrip,
   inviteBuddy,
   removeMember,
-} from "../../../../../../lib/trips/actions"
-import { Avatar } from "../../../../../../components/ui/avatar"
-import { Badge } from "../../../../../../components/ui/badge"
-import { Button } from "../../../../../../components/ui/button"
-import { Card, CardContent } from "../../../../../../components/ui/card"
-import { EmptyPanel } from "../../../../../../components/ui/empty-panel"
-import { Input } from "../../../../../../components/ui/input"
-import { Row, Screen, Stack } from "../../../../../../components/ui/layout"
-import { SectionLabel } from "../../../../../../components/ui/section-label"
-import { Text } from "../../../../../../components/ui/text"
+} from "@mobile/lib/trips/actions"
+import { Avatar } from "@mobile/components/ui/avatar"
+import { Badge } from "@mobile/components/ui/badge"
+import { Button } from "@mobile/components/ui/button"
+import { Card, CardContent } from "@mobile/components/ui/card"
+import { EmptyPanel } from "@mobile/components/ui/empty-panel"
+import { Input } from "@mobile/components/ui/input"
+import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { SectionLabel } from "@mobile/components/ui/section-label"
+import { Text } from "@mobile/components/ui/text"
 
 const header = <RouterStack.Screen options={{ title: "Crew" }} />
 
