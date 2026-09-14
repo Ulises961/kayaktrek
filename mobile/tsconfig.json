@@ -3,6 +3,11 @@
   "compilerOptions": {
     "strict": true,
     "types": ["jest"],
+    // nitromelondb's @field/@children decorators (lib/db/models/*.ts) are typed
+    // against the legacy decorator signature — without this, tsc evaluates them
+    // as TC39 standard decorators (the default once experimentalDecorators is
+    // unset) and fails with "Unable to resolve signature of property decorator".
+    "experimentalDecorators": true,
     // frontend/tsconfig.json's own "@/*": ["./*"] alias — needed here too because tsc
     // type-checks frontend/lib/**/*.ts files directly as part of mobile's program
     // (Metro's watchFolders proof, plans/M9a.md WP5), and those files use `@/...`

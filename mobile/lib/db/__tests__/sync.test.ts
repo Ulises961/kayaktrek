@@ -1,0 +1,116 @@
+import { Database } from "nitromelondb"
+import LokiJSAdapter from "nitromelondb/adapters/lokijs"
+
+import { apiGet } from "../../api/client"
+import { modelClasses, TripMember, Weather } from "../models"
+import { appDatabaseSchema } from "../schema"
+import { syncTrip } from "../sync"
+
+jest.mock("../../api/client", () => ({ apiGet: jest.fn() }))
+// database.ts eagerly constructs a native SQLiteAdapter at import time — never
+// usable under Jest. syncTrip always takes an explicit test database below,
+// so the production export just needs to import cleanly.
+jest.mock("../database", () => ({ database: {} }))
+
+const mockedApiGet = apiGet as jest.MockedFunction<typeof apiGet>
+
+function createTestDatabase() {
+  const adapter = new LokiJSAdapter({
+    schema: appDatabaseSchema,
+    useWebWorker: false,
+    useIncrementalIndexedDB: false,
+  })
+  return new Database({ adapter, modelClasses })
+}
+
+describe("syncTrip", () => {
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it("requests the trip's pull endpoint and applies camelCase rows under their snake_case columns", async () => {
+    mockedApiGet.mockResolvedValueOnce({
+      changes: {
+        trip_members: {
+          created: [
+            {
+              id: "member-1",
+              tripId: "trip-1",
+              userId: "user-1",
+              role: "leader",
+              nominatedSuccessor: false,
+              vesselMake: "Valley",
+              vesselModel: null,
+              vesselLengthCm: null,
+              vesselColorPrimary: null,
+              vesselColorSecondary: null,
+              emergencyContactName: "Jane Doe",
+              emergencyContactPhone: null,
+              emergencyContactRelationship: null,
+              floatPlanConfirmedAt: null,
+            },
+          ],
+          updated: [],
+          deleted: [],
+        },
+        requirement_contributions: { created: [], updated: [], deleted: [] },
+        weather: {
+          created: [{ id: "day-1", dayId: "day-1", model: "open-meteo", fetchedAt: 1_700_000_000_000 }],
+          updated: [],
+          deleted: [],
+        },
+        weather_states: { created: [], updated: [], deleted: [] },
+        sea: { created: [], updated: [], deleted: [] },
+        sea_states: { created: [], updated: [], deleted: [] },
+      },
+      timestamp: 1_700_000_000_500,
+    })
+
+    const database = createTestDatabase()
+    await syncTrip("trip-1", database)
+
+    expect(mockedApiGet).toHaveBeenCalledWith("/api/sync/trip/trip-1/pull")
+
+    const tripMembers = database.collections.get<TripMember>("trip_members")
+    const member = await tripMembers.find("member-1")
+    expect(member.tripId).toBe("trip-1")
+    expect(member.vesselMake).toBe("Valley")
+    expect(member.emergencyContactName).toBe("Jane Doe")
+
+    const weather = database.collections.get<Weather>("weather")
+    const weatherRow = await weather.find("day-1")
+    expect(weatherRow.model).toBe("open-meteo")
+    expect(weatherRow.fetchedAt).toBe(1_700_000_000_000)
+  })
+
+  it("passes lastPulledAt through on a subsequent sync", async () => {
+    mockedApiGet.mockResolvedValueOnce({
+      changes: {
+        trip_members: { created: [], updated: [], deleted: [] },
+        requirement_contributions: { created: [], updated: [], deleted: [] },
+        weather: { created: [], updated: [], deleted: [] },
+        weather_states: { created: [], updated: [], deleted: [] },
+        sea: { created: [], updated: [], deleted: [] },
+        sea_states: { created: [], updated: [], deleted: [] },
+      },
+      timestamp: 1_700_000_000_000,
+    })
+    const database = createTestDatabase()
+    await syncTrip("trip-1", database)
+
+    mockedApiGet.mockResolvedValueOnce({
+      changes: {
+        trip_members: { created: [], updated: [], deleted: [] },
+        requirement_contributions: { created: [], updated: [], deleted: [] },
+        weather: { created: [], updated: [], deleted: [] },
+        weather_states: { created: [], updated: [], deleted: [] },
+        sea: { created: [], updated: [], deleted: [] },
+        sea_states: { created: [], updated: [], deleted: [] },
+      },
+      timestamp: 1_700_000_001_000,
+    })
+    await syncTrip("trip-1", database)
+
+    expect(mockedApiGet).toHaveBeenNthCalledWith(2, "/api/sync/trip/trip-1/pull?lastPulledAt=1700000000000")
+  })
+})

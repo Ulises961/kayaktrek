@@ -83,6 +83,40 @@ def test_pull_delta_sync_puts_rows_in_updated_bucket(client, app, trip_with_crew
     assert any(row["vesselMake"] == "Valley" for row in member_changes["updated"])
 
 
+def test_pull_timestamp_is_captured_before_the_queries_run(client, trip_with_crew, monkeypatch):
+    """Regression: the returned `timestamp` used to be captured via a fresh
+    `datetime.now()` AFTER all six queries ran. A write landing in that
+    window (updated between the queries and the stale timestamp) would have
+    an `updated` strictly less than the next pull's cutoff — permanently
+    invisible to every future `updated > cutoff` filter, not just delayed.
+    Capturing the snapshot before any query runs closes that window: this
+    test pins the snapshot to the FIRST `datetime.now()` call the service
+    makes, not a later one."""
+    import Services.mobile_sync_service as sync_module
+
+    real_datetime = sync_module.datetime
+    calls = []
+
+    class _SpyDateTime:
+        @staticmethod
+        def now(tz=None):
+            value = real_datetime.now(tz)
+            calls.append(value)
+            return value
+
+        @staticmethod
+        def fromtimestamp(*args, **kwargs):
+            return real_datetime.fromtimestamp(*args, **kwargs)
+
+    monkeypatch.setattr(sync_module, "datetime", _SpyDateTime)
+
+    trip_id = trip_with_crew["trip"]["id"]
+    resp = _pull(client, trip_with_crew["leader_headers"], trip_id)
+    assert resp.status_code == 200
+    assert len(calls) >= 1
+    assert int(calls[0].timestamp() * 1000) == resp.json["timestamp"]
+
+
 def test_pull_reports_deleted_trip_member(client, app, trip_with_crew):
     trip_id = trip_with_crew["trip"]["id"]
     first = _pull(client, trip_with_crew["leader_headers"], trip_id)

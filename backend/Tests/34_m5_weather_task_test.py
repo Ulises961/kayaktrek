@@ -384,6 +384,48 @@ def test_force_refresh_bypasses_cache_hit(app):
             cache.delete(cache_key)
 
 
+def test_fetch_weather_reindexes_a_partial_response_onto_the_full_24_hour_grid(app):
+    """OpenMeteo can return fewer than 24 hourly records (forecast-horizon
+    edge cases, a degraded upstream response). _upsert_weather deletes and
+    recreates the WHOLE state set on every refresh keyed by the derived id
+    f"{day_id}:{time}" (docs/mobile/sync-protocol-spec.md §6.2) — if the set
+    of times ever shrinks between refreshes, the mobile sync channel has no
+    way to tell a device those hours were removed (Services/mobile_sync_service.py
+    writes no per-state tombstone, relying on "the parent covers them").
+    OpenMeteoService must therefore always return a full, fixed 24-hour grid
+    (00:00..23:00) — missing hours as null-valued rows, not absent ones — so
+    the id set is stable by construction rather than by upstream luck."""
+    mock_hourly = MagicMock()
+    mock_hourly.Time.return_value = 1755216000  # 2026-08-15 00:00 UTC
+    mock_hourly.Interval.return_value = 3600
+    mock_var = MagicMock()
+    mock_var.ValuesAsNumpy.return_value = np.array([15.0] * 18)  # only 18 of 24 hours
+    mock_hourly.Variables.return_value = mock_var
+
+    mock_response = MagicMock()
+    mock_response.Hourly.return_value = mock_hourly
+
+    mock_client = MagicMock()
+    mock_client.weather_api.return_value = [mock_response]
+
+    with app.app_context():
+        # Distinct coordinates from test_cache_miss_calls_api, on purpose —
+        # both tests run in this file's single worker in order (backend/CLAUDE.md),
+        # and sharing a cache key lets one test's leftover entry silently
+        # short-circuit the other's "calls the API" assertion.
+        cache.delete("weather:51.2:-6.2:2026-08-16")
+        try:
+            with patch("Services.open_meteo_service._make_client", return_value=mock_client):
+                result = OpenMeteoService.fetch_weather(51.25, -6.15, "2026-08-16")
+            assert len(result) == 24
+            assert [record["time"] for record in result] == [f"{h:02d}:00" for h in range(24)]
+            assert result[17]["temperature_2m"] == 15.0
+            assert result[18]["temperature_2m"] is None
+            assert result[23]["temperature_2m"] is None
+        finally:
+            cache.delete("weather:51.2:-6.2:2026-08-16")
+
+
 def test_cache_miss_calls_api(app):
     mock_hourly = MagicMock()
     mock_hourly.Time.return_value = 1755216000  # 2026-08-15 00:00 UTC
