@@ -16,7 +16,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // database.ts) — acceptable while this hasn't shipped to a real device;
 // revisit before the first release that could carry an existing local DB.
 export const appDatabaseSchema = appSchema({
-  version: 3,
+  version: 4,
   tables: [
     tableSchema({
       // Not part of docs/mobile/sync-protocol-spec.md §4's aggregate list — that
@@ -76,6 +76,11 @@ export const appDatabaseSchema = appSchema({
       columns: [
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "user_id", type: "string" },
+        // Not device-writable — carried so the offline float-plan crew
+        // manifest (WP6) can show a name, not just an opaque userId.
+        { name: "user_name", type: "string", isOptional: true },
+        { name: "user_surname", type: "string", isOptional: true },
+        { name: "user_username", type: "string", isOptional: true },
         { name: "role", type: "string" },
         { name: "nominated_successor", type: "boolean" },
         { name: "vessel_make", type: "string", isOptional: true },
