@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.7] - 2026-09-15
+
+### Removed
+
+- The always-present "demo" route that used to guarantee a non-empty public route library is
+  gone — the library now has two genuine, author-published routes, so the placeholder is no
+  longer needed.
+
 ## [1.0.6] - 2026-09-12
 
 ### Changed
