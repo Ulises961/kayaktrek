@@ -42,14 +42,18 @@ export function LandingExplore({ initial }: { initial: ExplorePage }) {
       <ChartHeaderBar
         className="sticky top-0 z-[1001]"
         nav={
-          <>
+          // Its own gap, wider than the header nav's default gap-1/sm:gap-3 —
+          // that spacing also separates this group from ThemeToggle, and
+          // widening it there would nudge every ChartHeaderBar caller's toggle
+          // rather than just space these two CTAs apart from each other.
+          <div className="flex items-center gap-3 sm:gap-4">
             <Link href="/login" className={chartLink}>
               Log in
             </Link>
             <Button asChild size="sm" className={cn(chartCta, ctaButtonClass)}>
               <Link href="/register">Sign up</Link>
             </Button>
-          </>
+          </div>
         }
       />
 
