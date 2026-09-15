@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.8] - 2026-09-15
+
+### Fixed
+
+- The anonymous route library's header logo didn't reset an active search — clicking it while
+  already on the page looked like a dead link, since the search box's state lived only in the
+  browser and never in the URL. It now takes you back to a clean, unfiltered library.
+- The "no results" panel on the anonymous route library could overflow past the right edge of
+  the screen on narrower viewports.
+
+### Changed
+
+- More breathing room between the "Log in" and "Sign up" buttons in the anonymous route
+  library's header.
+
 ## [1.0.7] - 2026-09-15
 
 ### Removed
