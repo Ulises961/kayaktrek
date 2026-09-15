@@ -1,6 +1,9 @@
+"use client"
+
 import Link from "next/link"
 import { BrandMark } from "@/components/common/brand-mark"
 import { cn } from "@/lib/utils"
+import { forceNavigate } from "@/lib/utils/navigation"
 
 interface BrandLockupProps {
   // "/" from the public surfaces; the authenticated shell points it at the
@@ -32,7 +35,26 @@ export function BrandLockup({
   subtitleClassName = "sm:inline-flex",
 }: BrandLockupProps) {
   return (
-    <Link href={href} className={cn("flex items-center gap-2.5", className)}>
+    <Link
+      href={href}
+      className={cn("flex items-center gap-2.5", className)}
+      onClick={(e) => {
+        // Next's client router treats a Link to the current URL as a no-op — on
+        // the anonymous root (`LandingExplore`) that left `ExploreDiscovery`'s
+        // search/filter state (client-only, never synced to the URL) untouched,
+        // so clicking the logo while already home looked like a dead link. Force
+        // a real navigation in that one case so the destination page remounts
+        // fresh, same as landing on it from anywhere else would. Reads
+        // `window.location` directly (not `usePathname()`) so this stays a plain
+        // click-time check instead of a hook every render needs an app-router
+        // context for — `BrandLockup` renders in several server-component trees
+        // that tests exercise with no router mock.
+        if (typeof window !== "undefined" && window.location.pathname === href) {
+          e.preventDefault()
+          forceNavigate(href)
+        }
+      }}
+    >
       <BrandMark size={size} />
       {/* No descriptor by default. This sits in a slim chart-publication strip beside
           a 26px mark and has to hold at the 320px floor, which is exactly where a

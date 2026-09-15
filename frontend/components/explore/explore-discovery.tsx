@@ -312,14 +312,19 @@ export function ExploreDiscovery({
             // size, the promise that content will arrive on its own is not.
             activeFilterCount === 0 && debouncedName.trim() === "" ? (
               <EmptyState
-                className="m-4"
+                // Vertical only: EmptyState's panel is `w-full`, and a horizontal margin
+                // stacked on a `width: 100%` element isn't subtracted the way a block
+                // element's `auto` width would be — it overflows the results column by
+                // 2x the margin below `xl`, where the column has no overflow-x clipping.
+                // `my-4` gives the same breathing room without the overflow.
+                className="my-4"
                 title="No routes have been shared yet."
                 description="This library is built by the people who paddle it. Publish a route you know and it will show up here."
                 ghostRows={0}
               />
             ) : (
               <EmptyState
-                className="m-4"
+                className="my-4"
                 title="No public routes match these filters."
                 description="Widen the search, or clear a filter to see the full library."
                 ghostRows={0}
