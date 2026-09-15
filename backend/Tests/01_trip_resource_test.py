@@ -5,6 +5,7 @@ from Resources.point_resource import POINT_ENDPOINT
 from Models.day import Day
 from Models.invitation import Invitation
 from Models.itinerary import Itinerary
+from Models.trip import Trip
 from Models.user import User
 from Services.itinerary_service import ItineraryService
 from Services.Utils.point_ordering import walk_linked_list
@@ -181,6 +182,20 @@ def test_get_trip_by_id(client, auth_headers):
     data = _create_trip(client, auth_headers)
     response = client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers)
     assert response.status_code == 200
+
+
+def test_get_trip_bumps_last_accessed_at(client, auth_headers):
+    """Drives the weather-fetch beat tasks' attention gate (docs/adr/features.md
+    §1a, M32) — a real page view must not leave last_accessed_at null forever."""
+    data = _create_trip(client, auth_headers)
+    trip = _db.session.get(Trip, UUID(data["id"]))
+    assert trip.last_accessed_at is None
+
+    response = client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers)
+    assert response.status_code == 200
+
+    _db.session.refresh(trip)
+    assert trip.last_accessed_at is not None
 
 # --- State machine ---
 

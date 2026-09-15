@@ -55,6 +55,7 @@ def get_trip(id: str):
     try:
         logger.info(f"Retrieving trip with id {id}")
         trip = TripService.get_trip_by_id(id)
+        TripService.touch_last_accessed(trip)
         data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
 
         current_user_id = str(g.current_user_id)

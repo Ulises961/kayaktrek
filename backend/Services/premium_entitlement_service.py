@@ -16,3 +16,15 @@ class PremiumEntitlementService:
     @staticmethod
     def has_weather_refresh_access(user_id: str) -> bool:
         return False
+
+    @staticmethod
+    def has_extended_forecast_access(user_id: str) -> bool:
+        """Gates a forecast horizon wider than FORECAST_HORIZON_DAYS (10, a
+        confidence cutoff — not an Open-Meteo technical limit; see
+        docs/adr/features.md §1a). Not a built feature — this stub exists only so
+        Tasks/weather_beat_task.py's horizon gate is already wired through an
+        entitlement check rather than a bare constant, the same "closed by
+        default, real implementation swapped in later" shape as
+        has_weather_refresh_access above.
+        """
+        return False

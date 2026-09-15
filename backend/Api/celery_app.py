@@ -72,6 +72,13 @@ celery_app.conf.update(
             "task": "Tasks.weather_beat_task.refresh_upcoming_weather",
             "schedule": 86400,
         },
+        # M32 (docs/adr/features.md §1a): narrow sweep for happening/imminent trips
+        # only — a much smaller candidate set than the daily sweep above, so the
+        # added frequency costs little.
+        "weather-refresh-urgent": {
+            "task": "Tasks.weather_beat_task.refresh_urgent_weather",
+            "schedule": 21600,
+        },
         "checkpoint-alerts": {
             "task": "Tasks.checkpoint_beat_task.check_missed_checkpoints",
             "schedule": crontab(minute=0),
