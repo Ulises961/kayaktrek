@@ -1,6 +1,7 @@
-import { render } from "@testing-library/react-native"
+import { render, waitFor } from "@testing-library/react-native"
 
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
+import { startSyncTrigger } from "../lib/db/sync-trigger"
 import { getTrip } from "../lib/trips/actions"
 
 jest.mock("expo-router", () => {
@@ -14,11 +15,17 @@ jest.mock("expo-router", () => {
 jest.mock("../lib/trips/actions", () => ({
   getTrip: jest.fn(),
 }))
+jest.mock("../lib/db/sync-trigger", () => ({
+  startSyncTrigger: jest.fn(),
+}))
 
 const mockGetTrip = getTrip as jest.Mock
+const mockStartSyncTrigger = startSyncTrigger as jest.Mock
 
 beforeEach(() => {
   mockGetTrip.mockReset()
+  mockStartSyncTrigger.mockReset()
+  mockStartSyncTrigger.mockReturnValue(jest.fn())
 })
 
 describe("TripDetailScreen", () => {
@@ -69,5 +76,26 @@ describe("TripDetailScreen", () => {
     const { findByText } = await render(<TripDetailScreen />)
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+
+  it("starts the sync-down trigger for this trip so weather/sea/crew/inventory populate offline caches", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+
+    const { findByText } = await render(<TripDetailScreen />)
+    await findByText("Costa Brava")
+
+    expect(mockStartSyncTrigger).toHaveBeenCalledWith("trip-1")
+  })
+
+  it("stops the sync-down trigger on unmount", async () => {
+    const stop = jest.fn()
+    mockStartSyncTrigger.mockReturnValue(stop)
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+
+    const { findByText, unmount } = await render(<TripDetailScreen />)
+    await findByText("Costa Brava")
+    unmount()
+
+    await waitFor(() => expect(stop).toHaveBeenCalled())
   })
 })
