@@ -80,7 +80,6 @@ class TestSeedCliCommand:
         from Api.database import db as _db
         from Models.item_category import ItemCategory
         from Models.place_category import PlaceCategory
-        from Models.itinerary import Itinerary
 
         runner = app.test_cli_runner()
 
@@ -90,18 +89,12 @@ class TestSeedCliCommand:
 
         assert _db.session.query(ItemCategory).count() > 0
         assert _db.session.query(PlaceCategory).count() > 0
-        demo_count_after_first = (
-            _db.session.query(Itinerary).filter(Itinerary.user_id.is_(None)).count()
-        )
-        assert demo_count_after_first > 0
+        category_count_after_first = _db.session.query(ItemCategory).count()
 
-        # Idempotent — running it again must not duplicate the demo itinerary or error.
+        # Idempotent — running it again must not duplicate the reference data or error.
         result2 = runner.invoke(args=["seed"])
         assert result2.exit_code == 0, result2.output
-        demo_count_after_second = (
-            _db.session.query(Itinerary).filter(Itinerary.user_id.is_(None)).count()
-        )
-        assert demo_count_after_second == demo_count_after_first
+        assert _db.session.query(ItemCategory).count() == category_count_after_first
 
 
 # ---------------------------------------------------------------------------

@@ -321,9 +321,8 @@ def test_preview_positions_simplified_and_capped(client, make_itinerary):
 
 def test_sort_by_distance_ascending(client, make_itinerary):
     # Scoped by a shared name prefix so this ordering check is immune to any other
-    # public itinerary in the worker's schema (e.g. the ownerless demo seed from
-    # Api.seed.seed_demo_itinerary, which persists for the whole test session and
-    # would otherwise contend for the unfiltered listing's page-1 slots).
+    # public itinerary in the worker's schema, which would otherwise contend for
+    # the unfiltered listing's page-1 slots.
     far = make_itinerary("SortDist Far", [(1, None, [MED, MED_LONG_END])])
     near = make_itinerary("SortDist Near", [(1, None, [MED, MED_SHORT_END])])
     r = client.get(f"{EXPLORE}?sort=distance&name=SortDist")

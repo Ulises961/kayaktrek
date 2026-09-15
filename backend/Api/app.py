@@ -15,7 +15,7 @@ from Api.logging_config import setup_logging
 from Api.observability import setup_logfire
 from Api.openapi import setup_openapi
 from Api.error_handlers import register_error_handlers
-from Api.seed import seed_item_categories, seed_place_categories, seed_demo_itinerary
+from Api.seed import seed_item_categories, seed_place_categories
 from Api.celery_app import init_celery
 from Services.Utils.json_encoder import CustomJSONProvider
 
@@ -141,7 +141,6 @@ def createApp(config_mode: str, *, schema: str | None = None):
         createApp()), racing identical inserts at cold start (M11 §4)."""
         seed_item_categories()
         seed_place_categories()
-        seed_demo_itinerary()
         click.echo("Seed complete.")
 
     migrate = Migrate()
