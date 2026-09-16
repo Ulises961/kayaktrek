@@ -65,6 +65,25 @@ def test_pull_initial_sync_puts_rows_in_created_bucket(client, trip_with_crew):
         assert row["userUsername"]
 
 
+def test_pull_bumps_trip_last_accessed_at(client, app, trip_with_crew):
+    """A pullChanges request is the mobile half of the weather-fetch beat
+    tasks' attention gate (docs/adr/features.md §1a, M32) — every pull is a
+    real foreground/reconnect event, so it must bump the trip's
+    last_accessed_at, not just leave it null forever."""
+    trip_id = trip_with_crew["trip"]["id"]
+
+    with app.app_context():
+        trip = db.session.get(Trip, UUID(trip_id))
+        assert trip.last_accessed_at is None
+
+    resp = _pull(client, trip_with_crew["leader_headers"], trip_id)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        trip = db.session.get(Trip, UUID(trip_id))
+        assert trip.last_accessed_at is not None
+
+
 def test_pull_delta_sync_puts_rows_in_updated_bucket(client, app, trip_with_crew):
     """Writes directly via `db.session` (no nested app_context) — the `app`
     fixture already keeps one session-scoped context open for the whole

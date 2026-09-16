@@ -114,6 +114,13 @@ class Trip(BaseModel):
         nullable=True,
     )
     last_checkpoint_alert_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bumped by any web page load of the trip or mobile pullChanges referencing it
+    # (docs/adr/features.md §1a, M32) — drives the weather-fetch beat tasks' attention
+    # gate. Null means "no access ever recorded" (every trip on migration, or brand
+    # new) and is treated as NOT stale — a trip nobody has had the chance to view
+    # yet must not be starved of weather before anyone could have viewed it. Only
+    # an explicit, aged timestamp counts as evidence of abandonment.
+    last_accessed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # IANA zone name (e.g. "Europe/London"), resolved from the itinerary's first point on the
     # building→happening transition — no coordinates exist yet at trip creation (ADR-021 deviation).
     timezone_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

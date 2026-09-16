@@ -4,7 +4,7 @@ Trip Service - Business logic for trip operations.
 
 import logging
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, List, Optional
 from flask import g
 from sqlalchemy.exc import NoResultFound, IntegrityError
@@ -68,6 +68,17 @@ class TripService:
             logger.warning(f"Trip with id {id} not found")
             raise NoResultFound(f"Trip {id} not found in database")
         return trip
+
+    @staticmethod
+    def touch_last_accessed(trip: Trip) -> None:
+        """Bump Trip.last_accessed_at — drives the weather-fetch beat tasks'
+        attention gate (docs/adr/features.md §1a, M32). Called only from an
+        actual view (the GET /trip/<id> resource, mobile pullChanges) — never
+        from get_trip_by_id itself, which privileges_middleware also calls on
+        every authorization check for an unrelated mutation.
+        """
+        trip.last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.session.commit()
 
     @staticmethod
     def get_trips_by_user(

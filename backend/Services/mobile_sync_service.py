@@ -22,6 +22,7 @@ from Models.item import Item, ItemStatusType
 from Models.requirement_contribution import RequirementContribution
 from Models.sea import Sea
 from Models.sync_tombstone import SyncTombstone
+from Models.trip import Trip
 from Models.trip_member import TripMember
 from Models.trip_requirement import TripRequirement
 from Models.weather import Weather
@@ -96,6 +97,15 @@ class MobileSyncService:
         # slip in with updated < the returned timestamp — invisible to every
         # future pull's `updated > cutoff` filter, permanently, not just late.
         snapshot_timestamp = datetime.now(timezone.utc)
+
+        # Bumps the weather-fetch beat tasks' attention gate (docs/adr/features.md
+        # §1a, M32) — a pullChanges call is always a real foreground/reconnect event
+        # (mobile has no periodic background poll, docs/adr/mobile-offline.md), so
+        # this never fires from an automated ping with nobody actually looking.
+        db.session.query(Trip).filter(Trip.id == trip_uuid).update(
+            {Trip.last_accessed_at: snapshot_timestamp.replace(tzinfo=None)}
+        )
+        db.session.commit()
 
         changes = {
             "trip_members": _bucket(

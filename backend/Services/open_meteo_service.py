@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 
 import numpy as np
@@ -10,8 +11,18 @@ from Api.cache import cache
 
 logger = logging.getLogger(__name__)
 
-_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
-_MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
+# Commercial-use correction (docs/adr/features.md §1a, M32): Open-Meteo's free tier
+# is scoped to non-commercial use regardless of call volume, and this app is a
+# commercial deployment the moment any premium feature (weather refresh, extended
+# forecast — both PremiumEntitlementService stubs, closed by default) is real, not
+# only once one has a paying user. Unset (the default — every environment until
+# this is actually flipped on in production) keeps today's free-tier hosts exactly
+# as before; setting OPEN_METEO_WEATHER_BASE_URL/OPEN_METEO_MARINE_BASE_URL to
+# `customer-api.open-meteo.com`'s endpoints plus OPEN_METEO_API_KEY switches to the
+# paid API Standard plan. Config/env change only — no fetch-logic change.
+_WEATHER_URL = os.environ.get("OPEN_METEO_WEATHER_BASE_URL", "https://api.open-meteo.com/v1/forecast")
+_MARINE_URL = os.environ.get("OPEN_METEO_MARINE_BASE_URL", "https://marine-api.open-meteo.com/v1/marine")
+_API_KEY = os.environ.get("OPEN_METEO_API_KEY")
 
 # Global background grid: 10° resolution, -80→80°N, -170→170°E = 17×35 = 595 points.
 _GLOBAL_LAT_STEP = 10
@@ -36,6 +47,12 @@ _MARINE_VARS = [
     "ocean_current_velocity",
     "ocean_current_direction",
 ]
+
+
+def _with_api_key(params: dict) -> dict:
+    if _API_KEY:
+        return {**params, "apikey": _API_KEY}
+    return params
 
 
 def _make_client() -> openmeteo_requests.Client:
@@ -103,14 +120,14 @@ class OpenMeteoService:
         client = _make_client()
         responses = client.weather_api(
             _WEATHER_URL,
-            params={
+            params=_with_api_key({
                 "latitude": lat,
                 "longitude": lng,
                 "hourly": _WEATHER_VARS,
                 "start_date": date_str,
                 "end_date": date_str,
                 "timezone": "UTC",
-            },
+            }),
         )
         data = _parse_hourly(responses[0], _WEATHER_VARS)
         cache.set(cache_key, data)
@@ -140,14 +157,14 @@ class OpenMeteoService:
         client = _make_client()
         responses = client.weather_api(
             _MARINE_URL,
-            params={
+            params=_with_api_key({
                 "latitude": lat,
                 "longitude": lng,
                 "hourly": _MARINE_VARS,
                 "start_date": date_str,
                 "end_date": date_str,
                 "timezone": "UTC",
-            },
+            }),
         )
         data = _parse_hourly(responses[0], _MARINE_VARS)
         cache.set(cache_key, data)
