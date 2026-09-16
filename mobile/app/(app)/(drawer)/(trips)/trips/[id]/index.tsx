@@ -19,6 +19,7 @@ import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
+import { startSyncTrigger } from "@mobile/lib/db/sync-trigger"
 import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Trip" }} />
@@ -51,6 +52,16 @@ export default function TripDetailScreen() {
     return () => {
       cancelled = true
     }
+  }, [id])
+
+  // The Trip Detail hub is the real entry point every trip visit passes through
+  // (docs/adr/mobile-offline.md "Screen structure"), so it's the natural place to
+  // start the weather/sea/crew/inventory sync-down trigger — without this, those
+  // WatermelonDB tables never populate at all (startSyncTrigger existed since M9c
+  // but nothing ever called it), and the itinerary/float-plan screens' offline
+  // fallbacks have nothing to read.
+  useEffect(() => {
+    return startSyncTrigger(id)
   }, [id])
 
   if (error) {

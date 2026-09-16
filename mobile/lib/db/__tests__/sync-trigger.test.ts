@@ -20,9 +20,18 @@ describe("startSyncTrigger", () => {
     mockedNetInfoAddEventListener.mockReturnValue(jest.fn())
   })
 
+  it("runs an immediate sync when started, so a first-time trip view populates the local cache", () => {
+    const sync = jest.fn().mockResolvedValue(undefined)
+    startSyncTrigger("trip-1", sync)
+
+    expect(sync).toHaveBeenCalledWith("trip-1")
+  })
+
   it("syncs when the app comes to the foreground", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
+    await Promise.resolve()
+    sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
     await appStateHandler("active")
@@ -33,6 +42,8 @@ describe("startSyncTrigger", () => {
   it("does not sync on a foreground event that isn't 'active'", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
+    await Promise.resolve()
+    sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
     await appStateHandler("background")
@@ -43,6 +54,8 @@ describe("startSyncTrigger", () => {
   it("syncs on a disconnected-to-connected transition, not on an already-connected update", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
+    await Promise.resolve()
+    sync.mockClear()
 
     const netInfoHandler = mockedNetInfoAddEventListener.mock.calls[0][0] as (state: { isConnected: boolean | null }) => void
     netInfoHandler({ isConnected: false })
@@ -59,6 +72,10 @@ describe("startSyncTrigger", () => {
     let resolveSync: () => void = () => {}
     const sync = jest.fn(() => new Promise<void>((resolve) => { resolveSync = resolve }))
     startSyncTrigger("trip-1", sync)
+    // Flush the immediate on-start sync before exercising the overlap case below.
+    resolveSync()
+    await Promise.resolve()
+    sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
     void appStateHandler("active")
@@ -77,7 +94,7 @@ describe("startSyncTrigger", () => {
     mockedAppStateAddEventListener.mockReturnValue({ remove: removeAppState })
     mockedNetInfoAddEventListener.mockReturnValue(removeNetInfo)
 
-    const stop = startSyncTrigger("trip-1", jest.fn())
+    const stop = startSyncTrigger("trip-1", jest.fn().mockResolvedValue(undefined))
     stop()
 
     expect(removeAppState).toHaveBeenCalled()
