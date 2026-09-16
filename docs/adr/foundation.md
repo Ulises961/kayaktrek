@@ -634,6 +634,22 @@ made without running it.**
   and entirely clonable, and what Google withholds is Play Services and the trademark, not the
   source terms. Reserving a name is unremarkable and costs no licence compromise.
 
+**Dual-license option on `kayak-core` — deferred, but the CLA decision must land before it's
+foreclosed (raised 2026-09-14).** The B2B console is not part of this question — it lives in
+`kayak-premium` from day one and is never public, so there is nothing to "dual" there, it is
+simply closed. The live option is a `kayak-core` dual-license (the MySQL/Qt/pre-SSPL-MongoDB
+pattern): free under AGPL, or a paid commercial licence for a company that wants to embed/host it
+without AGPL's network-copyleft disclosure obligation — a legitimate, proven revenue shape,
+distinct from both the B2C and B2B rails mapped in `ROADMAP.md` and worth its own line there if
+it's ever pursued. **Costs nothing to keep open today**: the audit already established clean,
+unencumbered copyright on `kayak-core` (the one prior contributor's code was entirely rewritten
+out), so the operator can offer both licences unilaterally right now. **That stops being true the
+moment an external contribution is accepted** — an AGPL-only contributor's patch can't be
+relicensed commercially without their consent, so a **CLA** (granting the right to relicense) must
+be required on any external PR *before* the first one is merged, not retrofitted after. Not being
+built now; recorded so the CLA question is decided deliberately when M32 execution starts, rather
+than discovered after the option has already been lost.
+
 **The monorepo split — a prerequisite of executing the decision, not a separate milestone
 (surfaced 2026-09-12, while scoping premium mobile GPS/Bluetooth integration; widened the same day
 once the B2B/Pro console was scoped as its own frontend).** The 2026-09-05 audit's finding that "a

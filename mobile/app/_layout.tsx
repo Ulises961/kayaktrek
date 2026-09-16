@@ -4,6 +4,7 @@ import { Slot } from "expo-router"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
+import { OfflineBanner } from "../components/ui/offline-banner"
 import { AuthProvider } from "../lib/auth/auth-context"
 
 // Root layout — the one place `global.css` (NativeWind's stylesheet) is imported, and the
@@ -24,6 +25,7 @@ export default function RootLayout() {
         <AuthProvider>
           <Slot />
         </AuthProvider>
+        <OfflineBanner />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
