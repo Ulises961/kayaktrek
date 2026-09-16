@@ -28,6 +28,8 @@ import {
   requestConnection,
   searchPaddlers,
 } from "@mobile/lib/connections/actions"
+import { loadBlocksCache, loadConnectionsCache, saveBlocksCache, saveConnectionsCache } from "@mobile/lib/db/paddlers-cache"
+import { OFFLINE_ERROR_MESSAGE } from "@mobile/lib/api/client"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Paddlers"
 // drawer item's root screen, so it supplies its own menu button.
@@ -61,9 +63,11 @@ export default function PaddlersScreen() {
 
   const [connections, setConnections] = useState<Connection[] | null>(null)
   const [connectionsError, setConnectionsError] = useState<string | null>(null)
+  const [connectionsOffline, setConnectionsOffline] = useState(false)
 
   const [blocks, setBlocks] = useState<Block[] | null>(null)
   const [blocksError, setBlocksError] = useState<string | null>(null)
+  const [blocksOffline, setBlocksOffline] = useState(false)
 
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -81,23 +85,45 @@ export default function PaddlersScreen() {
     }
   }, [query])
 
+  // Live-first, cache-fallback — same shape as the trip list / itinerary
+  // screens (M9c WP6). Buddies/blocks have no delta sync (no per-row
+  // invariant worth a WatermelonDB channel for), so this is a plain
+  // wholesale-replace cache, same as the trip list's.
   const loadConnections = useCallback(async () => {
     setConnectionsError(null)
     try {
-      setConnections(await listConnections())
+      const fetched = await listConnections()
+      setConnections(fetched)
+      setConnectionsOffline(false)
+      void saveConnectionsCache(fetched)
     } catch (err) {
-      setConnectionsError(
-        err instanceof Error ? err.message : "Something went wrong. Please try again.",
-      )
+      const cached = await loadConnectionsCache()
+      if (cached.length > 0) {
+        setConnections(cached)
+        setConnectionsOffline(true)
+      } else {
+        setConnectionsError(
+          err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        )
+      }
     }
   }, [])
 
   const loadBlocks = useCallback(async () => {
     setBlocksError(null)
     try {
-      setBlocks(await listBlocks())
+      const fetched = await listBlocks()
+      setBlocks(fetched)
+      setBlocksOffline(false)
+      void saveBlocksCache(fetched)
     } catch (err) {
-      setBlocksError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      const cached = await loadBlocksCache()
+      if (cached.length > 0) {
+        setBlocks(cached)
+        setBlocksOffline(true)
+      } else {
+        setBlocksError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      }
     }
   }, [])
 
@@ -244,7 +270,14 @@ export default function PaddlersScreen() {
             onSubmitEditing={() => void runSearch()}
             autoCapitalize="none"
           />
-          {searchError && <Text className="text-sm text-destructive">{searchError}</Text>}
+          {searchError &&
+            (searchError === OFFLINE_ERROR_MESSAGE ? (
+              <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+                Search needs a connection — you&rsquo;re offline.
+              </Text>
+            ) : (
+              <Text className="text-sm text-destructive">{searchError}</Text>
+            ))}
           <ScrollView contentContainerClassName="gap-3">
             {(results ?? []).map((paddler) => (
               <PaddlerResultCard
@@ -261,13 +294,18 @@ export default function PaddlersScreen() {
 
       {tab === "buddies" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
+          {connectionsOffline && (
+            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+              Offline — showing your last synced buddies. Accept/remove needs a connection.
+            </Text>
+          )}
           {connectionsError && <Text className="text-sm text-destructive">{connectionsError}</Text>}
           {(connections ?? []).map((connection) => (
             <ConnectionRow
               key={connection.id}
               counterparty={counterpartyOf(connection, userId)}
               direction={directionOf(connection, userId)}
-              busy={busyId === connection.id}
+              busy={busyId === connection.id || connectionsOffline}
               onAccept={() => void handleAccept(connection)}
               onRemove={() => void handleRemove(connection)}
               onBlock={() => confirmBlock(connection)}
@@ -285,12 +323,17 @@ export default function PaddlersScreen() {
 
       {tab === "blocked" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
+          {blocksOffline && (
+            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+              Offline — showing your last synced blocklist. Unblocking needs a connection.
+            </Text>
+          )}
           {blocksError && <Text className="text-sm text-destructive">{blocksError}</Text>}
           {(blocks ?? []).map((block) => (
             <BlockedRow
               key={block.id}
               blocked={block.blocked}
-              busy={busyId === block.id}
+              busy={busyId === block.id || blocksOffline}
               onUnblock={() => confirmUnblock(block)}
             />
           ))}

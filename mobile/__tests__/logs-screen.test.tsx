@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import LogsScreen from "../app/(app)/(drawer)/(logs)/index"
 import { deleteEndorsementRequest, listEndorsementRequests } from "../lib/endorsement-requests/actions"
+import { loadLogsCache } from "../lib/db/logs-cache"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "../lib/logs/actions"
 
 jest.mock("../lib/logs/actions", () => ({
@@ -14,6 +15,10 @@ jest.mock("../lib/endorsement-requests/actions", () => ({
   listEndorsementRequests: jest.fn(),
   deleteEndorsementRequest: jest.fn(),
 }))
+jest.mock("../lib/db/logs-cache", () => ({
+  loadLogsCache: jest.fn(),
+  saveLogsCache: jest.fn(),
+}))
 
 const mockGetLogs = getLogs as jest.Mock
 const mockGetEndorsedLogs = getEndorsedLogs as jest.Mock
@@ -21,6 +26,7 @@ const mockGetLogStats = getLogStats as jest.Mock
 const mockEndorseLog = endorseLog as jest.Mock
 const mockListRequests = listEndorsementRequests as jest.Mock
 const mockDeleteRequest = deleteEndorsementRequest as jest.Mock
+const mockLoadLogsCache = loadLogsCache as jest.Mock
 
 const EMPTY_STATS = {
   totalDistance: 0,
@@ -42,6 +48,7 @@ beforeEach(() => {
   mockGetEndorsedLogs.mockResolvedValue({ items: [], total: 0, page: 1, pages: 1 })
   mockGetLogStats.mockResolvedValue(EMPTY_STATS)
   mockListRequests.mockResolvedValue([])
+  mockLoadLogsCache.mockReset().mockResolvedValue([])
 })
 
 describe("LogsScreen", () => {
@@ -79,6 +86,19 @@ describe("LogsScreen", () => {
     await waitFor(() => {
       expect(mockGetLogs).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it("falls back to cached logs when offline, disabling + New", async () => {
+    mockGetLogs.mockRejectedValue(new Error("Could not reach the server."))
+    mockGetEndorsedLogs.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadLogsCache.mockImplementation((kind: string) =>
+      Promise.resolve(kind === "mine" ? [{ id: "log-1", date: "2026-06-01", hours: 3 }] : []),
+    )
+
+    const { findByText, getByText } = await render(<LogsScreen />)
+
+    expect(await findByText("1 Jun 2026")).toBeTruthy()
+    expect(getByText(/offline.*last synced logs/i)).toBeTruthy()
   })
 
   it("shows an incoming endorsement request and removes it locally once accepted", async () => {

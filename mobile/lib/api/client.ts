@@ -44,6 +44,12 @@ export class SessionExpiredError extends Error {
   }
 }
 
+// Exported so a screen can tell "the device has no connection" apart from any
+// other thrown error message, without a live NetInfo subscription of its own —
+// e.g. to show a specific "search needs a connection" line instead of a bare
+// error banner.
+export const OFFLINE_ERROR_MESSAGE = "Could not reach the server. Please check your connection and try again."
+
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 
@@ -66,7 +72,7 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
     // Normalize it here, once, for every apiGet/apiPost/apiPatch/apiDelete call site —
     // the same thing lib/auth/actions.ts's login() already does for the one call outside
     // this shared client.
-    throw new Error("Could not reach the server. Please check your connection and try again.")
+    throw new Error(OFFLINE_ERROR_MESSAGE)
   }
 
   if (res.status === 401 && retry) {
