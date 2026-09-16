@@ -60,12 +60,24 @@ export function LandingExplore({ initial }: { initial: ExplorePage }) {
       <DiscoveryIntro />
 
       {/* The library itself. Unwrapped (no border/padding), same as
-          `(app)/explore/page.tsx` — a full-bleed map is the page, not a padded panel. */}
-      <div className="min-h-0 flex-1">
+          `(app)/explore/page.tsx` — a full-bleed map is the page, not a padded panel.
+          `pb-11 sm:pb-12 xl:pb-0` reserves exactly the fixed footer's height below it
+          — see the footer's own comment for why it needs the reservation at all. */}
+      <div className="min-h-0 flex-1 pb-11 sm:pb-12 xl:pb-0">
         <ExploreDiscovery initial={initial} unit={DISTANCE_UNIT.NM} chartFurniture />
       </div>
 
-      <footer className="border-border flex items-center justify-end gap-2 border-t px-4 py-3 sm:px-7">
+      {/* Fixed below `xl`, not a flex-flow child — a mobile on-screen keyboard shrinks
+          the visual viewport, and this container's height is `svh`-driven, so a
+          flow-positioned footer got squeezed upward into the results list along with
+          everything else while the keyboard was up, instead of just sitting off-screen
+          under it the way the auth pages' fixed inputs do. `fixed` anchors it to the
+          layout viewport rather than the shrinking visual one, so the keyboard now
+          covers it cleanly. `h-11 sm:h-12` gives it a size the sibling above can
+          reserve space for exactly, instead of guessing at its content-driven height.
+          Reverts to a normal flow child at `xl`, where there's no virtual keyboard to
+          fight and the map behind it deserves the full page height. */}
+      <footer className="border-border bg-background fixed inset-x-0 bottom-0 z-[1001] flex h-11 items-center justify-end gap-2 border-t px-4 sm:h-12 sm:px-7 xl:static xl:inset-auto xl:h-auto xl:py-3">
         <Link href="/about" className={cn(chartLink, "text-[11px]")}>
           About
         </Link>
