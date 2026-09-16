@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.9] - 2026-09-16
+
+### Changed
+
+- Weather forecasts now refresh on a smarter schedule: trips that are currently underway or
+  starting soon get updates every 6 hours instead of waiting for the once-daily sweep, and a
+  trip nobody has opened in a week pauses its refreshes until someone looks at it again.
+- Weather refreshes no longer run for trips that are already over or that haven't started
+  being planned.
+
 ## [1.0.8] - 2026-09-15
 
 ### Fixed
