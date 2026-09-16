@@ -12,9 +12,12 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // decorators) — sync.ts's per-table mappers translate the API's camelCase
 // field names (mobile_sync_service.py / itinerary_route_sync_service.py) to
 // these column names before handing rows to `synchronize()`.
-// Schema migrations aren't wired yet (no SQLiteAdapter `migrations` passed in
-// database.ts) — acceptable while this hasn't shipped to a real device;
-// revisit before the first release that could carry an existing local DB.
+// Migrations are wired (database.ts passes `migrations` from migrations.ts) —
+// every `version` bump here needs a matching migration step there, or a
+// device with an existing local DB throws "no such table"/"no such column" on
+// whatever the bump added. Confirmed the hard way: v4 -> v5 shipped without
+// one, real installs already on v4 immediately hit "no such table:
+// cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
   version: 5,
   tables: [

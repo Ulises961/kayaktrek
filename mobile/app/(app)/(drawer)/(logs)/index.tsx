@@ -62,8 +62,8 @@ export default function LogsScreen() {
       setStats(statsResult)
       setRequests(incoming)
       setIsOffline(false)
-      void saveLogsCache("mine", minePage.items)
-      void saveLogsCache("endorsed", endorsedPage.items)
+      void saveLogsCache("mine", minePage.items).catch(() => undefined)
+      void saveLogsCache("endorsed", endorsedPage.items).catch(() => undefined)
     } catch (err) {
       const [cachedMine, cachedEndorsed] = await Promise.all([
         loadLogsCache("mine"),

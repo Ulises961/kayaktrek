@@ -16,9 +16,15 @@ export function startSyncTrigger(tripId: string, sync: (tripId: string) => Promi
   function runSync() {
     if (inFlight) return
     inFlight = true
-    void sync(tripId).finally(() => {
-      inFlight = false
-    })
+    // Failing offline is the expected case here, not exceptional — this runs
+    // unattended on every foreground/reconnect, with no UI waiting on it, so a
+    // rejection must never surface as an unhandled promise rejection (which
+    // React Native renders as a red-screen crash).
+    void sync(tripId)
+      .catch(() => undefined)
+      .finally(() => {
+        inFlight = false
+      })
   }
 
   runSync()

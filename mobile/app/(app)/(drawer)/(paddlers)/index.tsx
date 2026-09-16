@@ -95,7 +95,7 @@ export default function PaddlersScreen() {
       const fetched = await listConnections()
       setConnections(fetched)
       setConnectionsOffline(false)
-      void saveConnectionsCache(fetched)
+      void saveConnectionsCache(fetched).catch(() => undefined)
     } catch (err) {
       const cached = await loadConnectionsCache()
       if (cached.length > 0) {
@@ -115,7 +115,7 @@ export default function PaddlersScreen() {
       const fetched = await listBlocks()
       setBlocks(fetched)
       setBlocksOffline(false)
-      void saveBlocksCache(fetched)
+      void saveBlocksCache(fetched).catch(() => undefined)
     } catch (err) {
       const cached = await loadBlocksCache()
       if (cached.length > 0) {

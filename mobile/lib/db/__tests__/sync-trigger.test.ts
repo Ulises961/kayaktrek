@@ -10,6 +10,15 @@ jest.mock("../database", () => ({ database: {} }))
 
 const mockedNetInfoAddEventListener = NetInfo.addEventListener as jest.Mock
 
+// runSync() chains sync(tripId).catch(...).finally(...) — the added .catch()
+// (so a failed background sync never becomes an unhandled rejection) costs one
+// extra microtask tick before `inFlight` resets, versus a bare .finally().
+// A single `await Promise.resolve()` no longer flushes it.
+async function flushRunSync() {
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 describe("startSyncTrigger", () => {
   let mockedAppStateAddEventListener: jest.SpyInstance
 
@@ -30,7 +39,7 @@ describe("startSyncTrigger", () => {
   it("syncs when the app comes to the foreground", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
-    await Promise.resolve()
+    await flushRunSync()
     sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
@@ -42,7 +51,7 @@ describe("startSyncTrigger", () => {
   it("does not sync on a foreground event that isn't 'active'", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
-    await Promise.resolve()
+    await flushRunSync()
     sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
@@ -54,7 +63,7 @@ describe("startSyncTrigger", () => {
   it("syncs on a disconnected-to-connected transition, not on an already-connected update", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
     startSyncTrigger("trip-1", sync)
-    await Promise.resolve()
+    await flushRunSync()
     sync.mockClear()
 
     const netInfoHandler = mockedNetInfoAddEventListener.mock.calls[0][0] as (state: { isConnected: boolean | null }) => void
@@ -74,7 +83,7 @@ describe("startSyncTrigger", () => {
     startSyncTrigger("trip-1", sync)
     // Flush the immediate on-start sync before exercising the overlap case below.
     resolveSync()
-    await Promise.resolve()
+    await flushRunSync()
     sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
@@ -83,9 +92,23 @@ describe("startSyncTrigger", () => {
     expect(sync).toHaveBeenCalledTimes(1)
 
     resolveSync()
-    await Promise.resolve()
+    await flushRunSync()
     await appStateHandler("active")
     expect(sync).toHaveBeenCalledTimes(2)
+  })
+
+  it("never lets a failed sync surface as an unhandled promise rejection", async () => {
+    const handler = jest.fn()
+    process.on("unhandledRejection", handler)
+    try {
+      const sync = jest.fn().mockRejectedValue(new Error("Could not reach the server."))
+      startSyncTrigger("trip-1", sync)
+      await flushRunSync()
+
+      expect(handler).not.toHaveBeenCalled()
+    } finally {
+      process.off("unhandledRejection", handler)
+    }
   })
 
   it("stop() unsubscribes both listeners", () => {
