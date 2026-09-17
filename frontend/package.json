@@ -1,6 +1,6 @@
 {
   "name": "kayak-trip-planner-web",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "private": true,
   "scripts": {
     "dev": "next dev",
