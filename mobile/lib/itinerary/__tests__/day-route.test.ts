@@ -28,7 +28,7 @@ describe("buildDayColoredRoute", () => {
     }
   })
 
-  it("colors the connecting leg with the arriving day's color at a shared boundary stop", () => {
+  it("colors both legs around a shared boundary stop when both days' arrays include it", () => {
     const days: Day[] = [
       {
         id: "day-1",
@@ -48,12 +48,44 @@ describe("buildDayColoredRoute", () => {
 
     const { points, legs } = buildDayColoredRoute(days)
 
-    // "b" is shared — walked once per day it belongs to as each day's own
-    // points are walked independently, so it appears twice in the flat list
-    // (once ending day 1, once starting day 2) — this is what lets the
-    // connecting leg exist at all.
-    expect(points.map((p) => p.id)).toEqual(["a", "b", "b", "c"])
-    expect(legs.map((l) => l.properties.dayNum)).toEqual([1, 2, 2])
+    // "b" is deduped to its first (day 1) occurrence, then overridden back to
+    // the departing day regardless — see the real-world case below, where it
+    // only ever appears in day 2's array in the first place.
+    expect(points.map((p) => p.id)).toEqual(["a", "b", "c"])
+    expect(points.find((p) => p.id === "b")?.dayNumber).toBe(1)
+    expect(legs.map((l) => l.properties.dayNum)).toEqual([1, 2])
+    expect(legs[0].properties.color).toBe(getDayColor(1))
+    expect(legs[1].properties.color).toBe(getDayColor(2))
+  })
+
+  it("colors the leg approaching a shared boundary stop even when only the arriving day's array contains it", () => {
+    // Matches the real backend shape: apply_boundaries assigns a point's day_id
+    // per boundary range, processed in day-number order, so a point that's both
+    // day N's endPointId and day N+1's startPointId ends up owned by day N+1 (the
+    // later range wins) — day N's own `points` array never includes it at all.
+    const days: Day[] = [
+      {
+        id: "day-1",
+        dayNumber: 1,
+        startPointId: "a",
+        endPointId: "b",
+        points: [point("a", 0, 0)],
+      },
+      {
+        id: "day-2",
+        dayNumber: 2,
+        startPointId: "b",
+        endPointId: "c",
+        points: [point("b", 0, 1, "c"), point("c", 0, 2)],
+      },
+    ]
+
+    const { points, legs } = buildDayColoredRoute(days)
+
+    expect(points.map((p) => p.id)).toEqual(["a", "b", "c"])
+    expect(points.find((p) => p.id === "b")?.dayNumber).toBe(1)
+    expect(legs.map((l) => l.properties.dayNum)).toEqual([1, 2])
+    expect(legs[0].properties.color).toBe(getDayColor(1))
     expect(legs[1].properties.color).toBe(getDayColor(2))
   })
 
