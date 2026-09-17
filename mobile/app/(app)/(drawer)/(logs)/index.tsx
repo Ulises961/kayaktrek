@@ -22,7 +22,10 @@ import {
   listEndorsementRequests,
 } from "@mobile/lib/endorsement-requests/actions"
 import { loadLogsCache, saveLogsCache } from "@mobile/lib/db/logs-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "@mobile/lib/logs/actions"
+
+type LogLists = { mine: Log[]; endorsed: Log[] }
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Logs" drawer
 // item's root screen, so it supplies its own menu button.
@@ -38,48 +41,59 @@ type Tab = "mine" | "endorsed"
 // panels, not the reason someone opens this screen offline.
 export default function LogsScreen() {
   const [tab, setTab] = useState<Tab>("mine")
-  const [mine, setMine] = useState<Log[] | null>(null)
-  const [endorsed, setEndorsed] = useState<Log[] | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [requests, setRequests] = useState<EndorsementRequest[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [isOffline, setIsOffline] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [actioningRequestId, setActioningRequestId] = useState<string | null>(null)
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setIsRefreshing(true)
-    setError(null)
-    try {
+  // Stats and incoming endorsement requests stay live-only (set as a side
+  // effect of fetchLive, below) — they're small, secondary panels, not the
+  // reason someone opens this screen offline, so they have no cache of their
+  // own and simply keep their last value if the combined fetch fails.
+  const logsCache = useLiveCache<LogLists>({
+    fetchLive: async () => {
       const [minePage, endorsedPage, statsResult, incoming] = await Promise.all([
         getLogs(),
         getEndorsedLogs(),
         getLogStats(),
         listEndorsementRequests("incoming"),
       ])
-      setMine(minePage.items)
-      setEndorsed(endorsedPage.items)
       setStats(statsResult)
       setRequests(incoming)
-      setIsOffline(false)
-      void saveLogsCache("mine", minePage.items).catch(() => undefined)
-      void saveLogsCache("endorsed", endorsedPage.items).catch(() => undefined)
-    } catch (err) {
+      return { mine: minePage.items, endorsed: endorsedPage.items }
+    },
+    loadCache: async () => {
       const [cachedMine, cachedEndorsed] = await Promise.all([
         loadLogsCache("mine"),
         loadLogsCache("endorsed"),
       ])
-      if (cachedMine.length > 0 || cachedEndorsed.length > 0) {
-        setMine(cachedMine)
-        setEndorsed(cachedEndorsed)
-        setIsOffline(true)
-      } else {
-        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      return { mine: cachedMine, endorsed: cachedEndorsed }
+    },
+    saveCache: async (lists) => {
+      await Promise.all([
+        saveLogsCache("mine", lists.mine),
+        saveLogsCache("endorsed", lists.endorsed),
+      ])
+    },
+    isCacheEmpty: (lists) => lists.mine.length === 0 && lists.endorsed.length === 0,
+  })
+  const mine = logsCache.data?.mine ?? null
+  const endorsed = logsCache.data?.endorsed ?? null
+  const error = logsCache.error
+  const isOffline = logsCache.isOffline
+
+  const reloadLogs = logsCache.reload
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setIsRefreshing(true)
+      try {
+        await reloadLogs()
+      } finally {
+        if (isRefresh) setIsRefreshing(false)
       }
-    } finally {
-      if (isRefresh) setIsRefreshing(false)
-    }
-  }, [])
+    },
+    [reloadLogs],
+  )
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -94,7 +108,7 @@ export default function LogsScreen() {
       setRequests((prev) => prev.filter((r) => r.id !== request.id))
       void load(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to endorse log.")
+      logsCache.setError(err instanceof Error ? err.message : "Failed to endorse log.")
     } finally {
       setActioningRequestId(null)
     }
@@ -107,7 +121,7 @@ export default function LogsScreen() {
       await deleteEndorsementRequest(request.id)
       setRequests((prev) => prev.filter((r) => r.id !== request.id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove request.")
+      logsCache.setError(err instanceof Error ? err.message : "Failed to remove request.")
     } finally {
       setActioningRequestId(null)
     }

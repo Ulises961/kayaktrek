@@ -24,4 +24,15 @@ describe("migrations", () => {
       ["cached_blocks", "cached_connections", "cached_logs", "sync_cursors"].sort(),
     )
   })
+
+  it("has a migration step creating cached_requirements at v6", () => {
+    const v6 = migrations.sortedMigrations.find((migration) => migration.toVersion === 6)
+    expect(v6).toBeDefined()
+
+    const createdTables = v6!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables).toEqual(["cached_requirements"])
+  })
 })

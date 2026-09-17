@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
     tableSchema({
       // WatermelonDB's synchronize() persists exactly one `lastPulledAt` cursor,
@@ -210,6 +210,20 @@ export const appDatabaseSchema = appSchema({
         { name: "distance", type: "number", isOptional: true },
         { name: "avg_sea", type: "number", isOptional: true },
         { name: "endorsement_count", type: "number", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // The trip inventory's requirement checklist (Items screen, "Group" tab),
+      // wholesale-replaced per trip on every successful fetch — trip-scoped,
+      // unlike cached_logs/cached_connections/cached_blocks. Only name/status:
+      // who's covering what (contributions, proposedBy) has no offline reader,
+      // same trim as cached_logs dropping notes/geometry/endorsers. Covering,
+      // adding, and removing a requirement all need a connection regardless.
+      name: "cached_requirements",
+      columns: [
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "name", type: "string" },
+        { name: "status", type: "string", isOptional: true },
       ],
     }),
   ],

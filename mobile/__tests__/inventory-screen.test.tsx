@@ -17,6 +17,7 @@ import {
   togglePackingItem,
 } from "../lib/inventory/personal-packing-actions"
 import { getTrip } from "../lib/trips/actions"
+import { loadRequirementsCache } from "../lib/db/requirements-cache"
 
 // Extends jest.setup.ts's global Stack.Screen stub rather than replacing the module —
 // this screen also needs useLocalSearchParams, which no other screen test has needed
@@ -48,6 +49,10 @@ jest.mock("../lib/inventory/personal-packing-actions", () => ({
 jest.mock("../lib/auth/session", () => ({
   getSession: jest.fn(),
 }))
+jest.mock("../lib/db/requirements-cache", () => ({
+  loadRequirementsCache: jest.fn(),
+  saveRequirementsCache: jest.fn(),
+}))
 
 const mockGetTrip = getTrip as jest.Mock
 const mockGetMyItems = getMyItems as jest.Mock
@@ -60,6 +65,7 @@ const mockAddPackingItem = addPackingItem as jest.Mock
 const mockTogglePackingItem = togglePackingItem as jest.Mock
 const mockRemovePackingItem = removePackingItem as jest.Mock
 const mockGetSession = getSession as jest.Mock
+const mockLoadRequirementsCache = loadRequirementsCache as jest.Mock
 
 const ME = { userId: "me-id", email: "me@example.com" }
 const MY_ITEM = { id: "item-1", name: "Spare paddle", status: "owned" }
@@ -107,6 +113,7 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(ME)
   mockGetMyItems.mockResolvedValue([MY_ITEM])
   mockGetPackingItems.mockResolvedValue([])
+  mockLoadRequirementsCache.mockReset().mockResolvedValue([])
 })
 
 describe("InventoryScreen — group requirements", () => {
@@ -178,6 +185,28 @@ describe("InventoryScreen — group requirements", () => {
 
     expect(await findByText("Withdraw")).toBeTruthy()
     expect(queryByText("Cover")).toBeNull()
+  })
+
+  it("falls back to the cached requirements and disables mutation when the fetch fails", async () => {
+    mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadRequirementsCache.mockResolvedValue([{ id: "req-1", name: "First aid kit", status: "needed" }])
+
+    const { findByText, getByText, getByPlaceholderText } = await render(<InventoryScreen />)
+
+    expect(await findByText("First aid kit")).toBeTruthy()
+    expect(getByText(/Offline — showing your last synced requirements/)).toBeTruthy()
+    expect(getByText("Add")).toBeDisabled()
+    expect(getByText("Cover")).toBeDisabled()
+    expect(getByPlaceholderText("Add a requirement").props.editable).toBe(false)
+  })
+
+  it("shows the generic error when the fetch fails and nothing is cached", async () => {
+    mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadRequirementsCache.mockResolvedValue([])
+
+    const { findByText } = await render(<InventoryScreen />)
+
+    expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
 })
 
