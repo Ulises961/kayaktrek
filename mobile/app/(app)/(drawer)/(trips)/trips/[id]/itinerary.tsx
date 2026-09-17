@@ -11,9 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, View } from "react-native"
 
 import type { Day } from "@shared/dtos/day"
-import type { Point } from "@shared/dtos/point"
-import { palette } from "@shared/tokens"
-import { walkPoints } from "@shared/itinerary/linked-list"
+import { getDayColor } from "@shared/itinerary/colors"
 
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet"
 import { ZoomControl } from "@mobile/components/trips/zoom-control"
@@ -21,6 +19,7 @@ import { Screen } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary"
 import { pullRoute } from "@mobile/lib/db/route-sync"
+import { buildDayColoredRoute, type LocatedRoutePoint } from "@mobile/lib/itinerary/day-route"
 import { OSM_TILE_URL } from "@mobile/lib/map/tiles"
 import { getTrip } from "@mobile/lib/trips/actions"
 
@@ -46,13 +45,7 @@ const MAP_STYLE = {
   layers: [{ id: "osm", type: "raster" as const, source: "osm" }],
 }
 
-type LocatedPoint = Point & { latitude: number; longitude: number }
-
-function isLocated(point: Point): point is LocatedPoint {
-  return typeof point.latitude === "number" && typeof point.longitude === "number"
-}
-
-function boundsOf(points: LocatedPoint[]): [number, number, number, number] | null {
+function boundsOf(points: LocatedRoutePoint[]): [number, number, number, number] | null {
   if (points.length === 0) return null
   let west = points[0].longitude
   let east = points[0].longitude
@@ -119,27 +112,25 @@ export default function TripMapScreen() {
     void reload()
   }, [reload])
 
-  const days: Day[] = trip?.days ?? []
+  const days: Day[] = useMemo(() => trip?.days ?? [], [trip])
   const selectedDay = days.find((d) => d.id === selectedDayId) ?? null
 
-  const locatedPoints = useMemo(() => {
-    const ordered = walkPoints(selectedDay?.points ?? [])
-    return ordered.filter(isLocated)
-  }, [selectedDay])
-
-  const routeGeoJson = useMemo(
-    () => ({
-      type: "Feature" as const,
-      properties: {},
-      geometry: {
-        type: "LineString" as const,
-        coordinates: locatedPoints.map((p) => [p.longitude, p.latitude]),
-      },
-    }),
-    [locatedPoints],
+  // M9l WP1: the whole trip's route, colored per day, always on screen — selecting
+  // a day (ItinerarySheet) no longer changes what's drawn on the map, only what the
+  // sheet shows below it. Mirrors web's map-core.tsx (buildSegments/getDayColor),
+  // adapted for MapLibre's data-driven `line-color` (one Feature per leg, a
+  // precomputed `color` property) instead of Leaflet's per-segment `<Polyline>` list.
+  const { points: routePoints, legs: routeLegs } = useMemo(
+    () => buildDayColoredRoute(days),
+    [days],
   )
 
-  const bounds = useMemo(() => boundsOf(locatedPoints), [locatedPoints])
+  const routeGeoJson = useMemo(
+    () => ({ type: "FeatureCollection" as const, features: routeLegs }),
+    [routeLegs],
+  )
+
+  const bounds = useMemo(() => boundsOf(routePoints), [routePoints])
 
   if (error) {
     return (
@@ -196,24 +187,33 @@ export default function TripMapScreen() {
             initialViewState={bounds ? { bounds } : { center: [0, 20], zoom: 1 }}
           />
 
-          {locatedPoints.length > 1 && (
+          {routeLegs.length > 0 && (
             <GeoJSONSource id="route" data={routeGeoJson}>
+              {/* One Feature per leg, each carrying a precomputed `color` property
+                  (getDayColor resolved ahead of time in day-route.ts) — simpler than
+                  handing MapLibre a `["match", ["get", "dayNum"], ...]` expression,
+                  since DAY_COLORS is a small fixed array. */}
               <Layer
                 id="route-line"
                 type="line"
-                paint={{ "line-color": palette.ocean600, "line-width": 3 }}
+                paint={{ "line-color": ["get", "color"], "line-width": 3 }}
               />
             </GeoJSONSource>
           )}
 
-          {locatedPoints.map((point, index) => (
+          {routePoints.map((point, index) => (
             <Marker key={point.id ?? index} id={point.id ?? String(index)} lngLat={[point.longitude, point.latitude]}>
+              {/* Colored by owning day (getDayColor), not by point type, per M9l WP1 —
+                  the stop-vs-position distinction moves to size/shape instead: stops
+                  are a larger ring, positions a smaller dot. Split-ring boundary
+                  markers (web's two-tone stop at a shared overnight point) are a
+                  flagged follow-up, not this WP's acceptance bar. */}
               <View
                 style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor: point.type === "stop" ? palette.ocean700 : palette.ocean400,
+                  width: point.type === "stop" ? 14 : 8,
+                  height: point.type === "stop" ? 14 : 8,
+                  borderRadius: point.type === "stop" ? 7 : 4,
+                  backgroundColor: getDayColor(point.dayNumber),
                   borderWidth: 2,
                   borderColor: "white",
                 }}
