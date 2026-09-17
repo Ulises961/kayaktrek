@@ -1,5 +1,5 @@
 import enum
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, Enum, String
@@ -116,11 +116,12 @@ class Trip(BaseModel):
     last_checkpoint_alert_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Bumped by any web page load of the trip or mobile pullChanges referencing it
     # (docs/adr/features.md §1a, M32) — drives the weather-fetch beat tasks' attention
-    # gate. Null means "no access ever recorded" (every trip on migration, or brand
-    # new) and is treated as NOT stale — a trip nobody has had the chance to view
-    # yet must not be starved of weather before anyone could have viewed it. Only
-    # an explicit, aged timestamp counts as evidence of abandonment.
-    last_accessed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # gate. Set on insert, so a new trip is fetched from creation and ages out like any
+    # other. The beat sweeps skip a NULL: with no view recorded there is nothing to
+    # measure dormancy from.
+    last_accessed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc)
+    )
     # IANA zone name (e.g. "Europe/London"), resolved from the itinerary's first point on the
     # building→happening transition — no coordinates exist yet at trip creation (ADR-021 deviation).
     timezone_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

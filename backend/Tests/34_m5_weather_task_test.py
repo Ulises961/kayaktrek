@@ -340,7 +340,7 @@ def test_beat_task_dispatch_failure_is_not_swallowed(app, user_1):
         itin = Itinerary(trip_id=trip.id, user_id=user_1.id)
         _db.session.add(itin)
         _db.session.flush()
-        day = Day(day_number=1, itinerary_id=itin.id, date=date.today() + timedelta(days=1))
+        day = Day(day_number=1, itinerary_id=itin.id, date=date.today() + timedelta(days=3))
         _db.session.add(day)
         _db.session.commit()
         trip_id = str(trip.id)
@@ -502,6 +502,9 @@ def test_beat_task_dispatches_only_future_days(app, user_1):
 # ── M32: trip-state, horizon rolling-window, and attention gating ────────────
 
 def _make_trip_with_day(app, user_1, *, state, day_date, last_accessed_at=None):
+    """last_accessed_at defaults to "just viewed"."""
+    if last_accessed_at is None:
+        last_accessed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     with app.app_context():
         trip = Trip(state=state, last_accessed_at=last_accessed_at)
         _db.session.add(trip)
@@ -615,40 +618,111 @@ def test_beat_task_skips_a_dormant_trip_and_resumes_on_next_view(app, user_1):
         _delete_trip(app, trip_id)
 
 
-def test_beat_task_never_accessed_trip_is_not_treated_as_dormant(app, user_1):
-    """last_accessed_at is NULL for every trip on migration and for a brand new
-    trip — must be included, not skipped as stale (Models/trip.py's own
-    comment on the column)."""
+def _dispatched_by(task) -> list[str]:
+    dispatched: list[str] = []
+    with patch("Tasks.weather_beat_task.fetch_weather") as mock_task:
+        mock_task.delay.side_effect = lambda day_id, **kw: dispatched.append(day_id)
+        task.run()
+    return dispatched
+
+
+def test_new_trip_counts_as_viewed_from_creation(app, user_1):
+    """A trip created without an explicit last_accessed_at gets one on insert,
+    so it is fetched from day one and ages out 7 days later like any other."""
     today = date.today()
-    trip_id, day_id = _make_trip_with_day(
-        app, user_1, state=TripStateType.BUILDING, day_date=today + timedelta(days=2), last_accessed_at=None
-    )
+    with app.app_context():
+        trip = Trip(state=TripStateType.BUILDING)
+        _db.session.add(trip)
+        _db.session.flush()
+        itinerary = Itinerary(trip_id=trip.id, user_id=user_1.id)
+        _db.session.add(itinerary)
+        _db.session.flush()
+        day = Day(day_number=1, itinerary_id=itinerary.id, date=today + timedelta(days=2))
+        _db.session.add(day)
+        _db.session.commit()
+        trip_id, day_id = str(trip.id), str(day.id)
+        assert trip.last_accessed_at is not None
     try:
-        dispatched = []
-        with patch("Tasks.weather_beat_task.fetch_weather") as mock_task:
-            mock_task.delay.side_effect = lambda d, **kw: dispatched.append(d)
-            refresh_upcoming_weather.run()
-        assert day_id in dispatched
+        assert day_id in _dispatched_by(refresh_upcoming_weather)
     finally:
         _delete_trip(app, trip_id)
 
 
-def test_urgent_beat_dispatches_happening_trip_regardless_of_horizon(app, user_1):
-    """The 6h sweep covers a happening trip's days even well beyond the
-    forecast horizon — a happening trip is exactly the case the narrow sweep
-    exists for."""
+def test_trip_with_no_recorded_view_is_skipped_by_both_sweeps(app, user_1):
+    """A NULL last_accessed_at has no view to measure dormancy from. Treating it
+    as active meant every trip untouched since the M32 migration was fetched
+    forever, which is exactly the trip attention-gating exists to skip."""
     today = date.today()
-    trip_id, day_id = _make_trip_with_day(
-        app, user_1, state=TripStateType.HAPPENING, day_date=today + timedelta(days=FORECAST_HORIZON_DAYS + 5)
-    )
+    trip_id, day_id = _make_trip_with_day(app, user_1, state=TripStateType.HAPPENING, day_date=today)
     try:
-        dispatched = []
-        with patch("Tasks.weather_beat_task.fetch_weather") as mock_task:
-            mock_task.delay.side_effect = lambda d, **kw: dispatched.append(d)
-            refresh_urgent_weather.run()
-        assert day_id in dispatched
+        # Not via the constructor: the column's insert default fills a None in,
+        # so an aged row from before that default has to be nulled after the fact.
+        with app.app_context():
+            _db.session.query(Trip).filter(Trip.id == UUID(trip_id)).update(
+                {Trip.last_accessed_at: None}
+            )
+            _db.session.commit()
+
+        assert day_id not in _dispatched_by(refresh_upcoming_weather)
+        assert day_id not in _dispatched_by(refresh_urgent_weather)
     finally:
         _delete_trip(app, trip_id)
+
+
+def test_urgent_beat_respects_the_forecast_horizon_for_a_happening_trip(app, user_1):
+    """A long happening expedition is refreshed every 6h only inside the 10-day
+    confidence horizon; later days roll in as today advances, never earlier."""
+    today = date.today()
+    trip_ids = []
+    try:
+        inside_trip_id, inside_day_id = _make_trip_with_day(
+            app, user_1, state=TripStateType.HAPPENING, day_date=today + timedelta(days=FORECAST_HORIZON_DAYS)
+        )
+        trip_ids.append(inside_trip_id)
+        beyond_trip_id, beyond_day_id = _make_trip_with_day(
+            app, user_1, state=TripStateType.HAPPENING, day_date=today + timedelta(days=FORECAST_HORIZON_DAYS + 5)
+        )
+        trip_ids.append(beyond_trip_id)
+
+        dispatched = _dispatched_by(refresh_urgent_weather)
+
+        assert inside_day_id in dispatched
+        assert beyond_day_id not in dispatched
+    finally:
+        for trip_id in trip_ids:
+            _delete_trip(app, trip_id)
+
+
+def test_each_day_belongs_to_exactly_one_sweep(app, user_1):
+    """Happening trips and imminent days are the 6h sweep's; everything else in
+    the horizon is the daily sweep's. A day in both would be fetched twice
+    whenever the two run close together."""
+    today = date.today()
+    trip_ids = []
+    try:
+        cases = {
+            "happening_later": (TripStateType.HAPPENING, today + timedelta(days=5)),
+            "building_today": (TripStateType.BUILDING, today),
+            "building_tomorrow": (TripStateType.BUILDING, today + timedelta(days=1)),
+            "building_later": (TripStateType.BUILDING, today + timedelta(days=5)),
+        }
+        day_ids = {}
+        for name, (state, day_date) in cases.items():
+            trip_id, day_id = _make_trip_with_day(app, user_1, state=state, day_date=day_date)
+            trip_ids.append(trip_id)
+            day_ids[name] = day_id
+
+        daily = set(_dispatched_by(refresh_upcoming_weather))
+        urgent = set(_dispatched_by(refresh_urgent_weather))
+
+        assert daily.isdisjoint(urgent)
+        assert day_ids["happening_later"] in urgent
+        assert day_ids["building_today"] in urgent
+        assert day_ids["building_tomorrow"] in urgent
+        assert day_ids["building_later"] in daily
+    finally:
+        for trip_id in trip_ids:
+            _delete_trip(app, trip_id)
 
 
 def test_urgent_beat_dispatches_imminent_day_for_a_building_trip(app, user_1):

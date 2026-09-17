@@ -248,6 +248,12 @@ services:
       # NEXT_PUBLIC_MEDICAL_NOTES=true, and the privacy policy's health-data section back.
       # Empty/unset — the state this box runs in — 404s all nine endpoints.
       MEDICAL_NOTES_ENABLED: ${MEDICAL_NOTES_ENABLED:-}
+      # Open-Meteo commercial plan (M32). Blank keeps the free-tier hosts; the service reads
+      # these with `or`, so the empty string compose writes for an unset var is safe. Needed
+      # here for the global wind grid, fetched in-request, and on `worker` for per-day fetches.
+      OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
+      OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
+      OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
       # Closed-beta registration gate (PR #160). This line was missing until M25 §1, and
       # `environment:` is the only path into these containers — there is no `env_file:` in
       # this compose file — so the backend has always received an empty INVITE_CODE, and
@@ -506,6 +512,10 @@ services:
       # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
       # this is the actual transport in production. See Services/mail_service.py.
       BREVO_API_KEY: ${BREVO_API_KEY:-}
+      # Open-Meteo commercial plan (M32) — see the matching block on `backend`.
+      OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
+      OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
+      OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing

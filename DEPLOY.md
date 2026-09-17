@@ -603,6 +603,26 @@ Two things worth knowing before relying on it:
   surface (`/`, `/explore`, `/routes/<id>`, share links) stays reachable. If the reason to pull the
   switch is abuse rather than load, Cloudflare is the faster lever.
 
+## Moving weather to Open-Meteo's commercial plan
+
+The free Open-Meteo API is licensed for non-commercial use only (M32, `docs/adr/features.md` §1a).
+Switch before either premium weather entitlement (`Services/premium_entitlement_service.py`) is
+opened for a real user. Leaving all three unset keeps the free-tier hosts.
+
+```bash
+# on the box, in the deploy directory
+cat >> .env <<'ENV'
+OPEN_METEO_WEATHER_BASE_URL=https://customer-api.open-meteo.com/v1/forecast
+OPEN_METEO_MARINE_BASE_URL=https://customer-api.open-meteo.com/v1/marine
+OPEN_METEO_API_KEY=<key from the Open-Meteo customer dashboard>
+ENV
+docker compose -f docker-compose.prod.yml up -d backend worker
+```
+
+**Restart both containers.** `backend` fetches the global wind grid in-request, and `worker` runs
+every per-day forecast fetch. The service reads these values once, at import, so a container that
+wasn't restarted keeps using the free tier.
+
 ## Rolling back
 
 Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:

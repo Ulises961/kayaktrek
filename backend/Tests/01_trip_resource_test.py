@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from Resources.trip_resource import TRIP_ENDPOINT
 from Resources.itinerary_resource import ITINERARY_ENDPOINT
@@ -189,13 +190,16 @@ def test_get_trip_bumps_last_accessed_at(client, auth_headers):
     §1a, M32) — a real page view must not leave last_accessed_at null forever."""
     data = _create_trip(client, auth_headers)
     trip = _db.session.get(Trip, UUID(data["id"]))
-    assert trip.last_accessed_at is None
+    # Stamped on insert, so age it to prove the GET is what moves it forward.
+    aged = datetime.now(timezone.utc) - timedelta(days=3)
+    trip.last_accessed_at = aged
+    _db.session.commit()
 
     response = client.get(f"{TRIP_ENDPOINT}/{data['id']}", headers=auth_headers)
     assert response.status_code == 200
 
     _db.session.refresh(trip)
-    assert trip.last_accessed_at is not None
+    assert trip.last_accessed_at > aged
 
 # --- State machine ---
 
