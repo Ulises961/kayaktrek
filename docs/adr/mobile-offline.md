@@ -117,6 +117,15 @@ On reconnection, the device pulls **full entity snapshots** for its subscribed t
 
 **What triggers a sync**: app foreground and reconnection event. No periodic background polling — battery cost is not justified for a use case where connectivity is binary (you either have it or you don't at sea).
 
+> **Qualified 2026-09-18 — the trigger set is unchanged, the *scope* and the *entry condition* are
+> not.** The paragraph above answers "how often should we wake the radio at sea", and its answer
+> stands. It was silently read as also answering two questions it never addressed: *which* trips a
+> sync covers, and *when* a cached entity is due for a refresh. Sync scope became an artifact of
+> where the trigger got wired (one trip, the one whose hub is mounted), and nothing anywhere
+> expressed staleness at all. Both are corrected by the "Sync scope, priority tiers and staleness
+> budgets" section below. Foreground + reconnect remain the only triggers for everything except
+> tier 1; see that section for the one narrow case that earns true background refresh.
+
 **What gets synced**:
 
 | Data | Synced | Reason |
@@ -147,6 +156,95 @@ On reconnection, the device pulls **full entity snapshots** for its subscribed t
 >   and are the spec's §5 — the fragile part of the whole design.
 > - Delta granularity is **per aggregate, not uniform** (spec §4), and the route does not travel
 >   on this channel at all (spec §8.2).
+
+---
+
+## Sync scope, priority tiers and staleness budgets
+
+Added 2026-09-18. The sync-down section above specifies *what* a sync carries and *when* it fires.
+It never specified **which trips** a sync covers, or **when cached data is due for a refresh** —
+and the consequence of leaving both implicit was a cache that is lazy per *screen*, not per trip.
+
+**The failure this fixes.** A sync only ever ran for the trip whose Detail hub happened to be
+mounted, because `startSyncTrigger(tripId)` lives in that screen's effect; the route travels on its
+own channel (§8.2) and so is populated only by opening the Itinerary tab specifically. The result:
+a trip whose Itinerary tab was never opened while connected has **no route at all** offline — the
+single most important thing to have at sea, gated behind having tapped one particular tab while
+signal lasted. Nothing was decided badly here; the question was never asked, and the trigger's
+placement answered it by default.
+
+### Periodic polling — still declined as a mechanism, replaced by staleness budgets
+
+The "no periodic background polling" line was written about keeping data fresh *during* an
+expedition, where it is plainly right: there is no signal to poll with. The window that actually
+matters is the days *before* departure, on wifi at home, when the cache must be made warm and
+recent against the moment signal disappears. That case is not covered by the original reasoning.
+
+It is still not answered by a background timer. True periodic execution on either platform is
+unreliable by construction — iOS `BGAppRefreshTask` fires at the OS's discretion and degrades with
+infrequent app use, Android WorkManager has a 15-minute floor plus Doze — and it is bought with a
+new config plugin, a background-execution surface on the Play review, and per-app battery
+attribution visible in system settings, which is a poor trade for an app asking strangers to trust
+it with position data.
+
+**Instead: "periodic" means a staleness budget evaluated on the triggers that already exist.** On
+foreground or reconnect, sweep anything past its budget. People open this app; foreground is a
+serviceable poll proxy at zero cost and with no new permissions. Only **tier 1** earns true
+background refresh, where the battery is genuinely repaid.
+
+**Budgets, not queue position, decide entry into a sweep.** A strict priority queue has
+head-of-line blocking: a slow or failing tier 1 on a marginal link means tiers 3 and 4 never run at
+all. Priority orders work *within* a sweep — do the important thing first while signal lasts —
+while budgets decide what enters it. The two do different jobs and both are needed.
+
+### The tiers
+
+Tiering is **trip-state-major, entity-minor**. A flat ranking of entity types produces absurdities
+(a past trip's inventory syncing ahead of next weekend's route). Within state, **time to departure
+outranks state**: a `building` trip leaving tomorrow needs more than a `building` trip in November.
+
+| Tier | Scope | Budget | Background refresh |
+|---|---|---|---|
+| 1 | `happening` trips; `building` trips departing within ~48h | shortest | Yes — the only tier that earns it |
+| 2 | Remaining `building` trips | medium | No — foreground/reconnect only |
+| 3 | The user's own kit and gear library (cross-trip, not trip-scoped) | medium | No |
+| 4 | Profile and settings | long; tiny payload, so tier placement barely matters | No |
+| — | `past`/`archived` trips, explore/public routes | **not synced at all** — see below | No |
+
+Within a trip, entity order follows *what breaks if it is missing* × *how fast it changes*:
+
+1. **Route (days + points)** — catastrophic if absent, changes rarely, and its deltas are empty
+   almost always. First, and nearly free to maintain.
+2. **Weather/sea** — highest value, expires fastest. For a trip departing tomorrow this outranks a
+   `happening` trip's own sync, because a `happening` trip's forecast may already be unrefreshable.
+3. **Crew / float plan** — matters in an emergency, changes rarely, cheap to keep warm.
+4. **Inventory / kit** — matters at packing time, which is pre-departure and on wifi.
+
+**The device computes its own priority.** `state`, `date_from` and `date_to` are already columns on
+the local `trips` table, so the sweep is ordered from the trip-list cache with no server round-trip
+and no new endpoint. The trip list is the sweep index.
+
+### Past trips, archived trips and explore routes are not synced — a cut, not a low tier
+
+Lowest-priority still means *eventually runs, and grows on the device forever*. Explore is a
+discovery surface acted on while connected; past and archived trips are read-later history. Both
+would cost storage and sweep time permanently to serve a case nobody has had. This is consistent
+with the sync table above, which already excludes past trips, and the reason is now recorded rather
+than implied.
+
+### Staleness must be expressed, not implied
+
+The weather section below already requires an always-visible "forecast as of [timestamp]" label.
+**That requirement generalises to every cached entity, and it is a precondition for widening sync
+scope, not a follow-up to it.** Today a screen can only say *you are offline* — a boolean derived
+from a failed fetch — never *this is from Tuesday*. The per-trip `last_pulled_at` needed to say so
+already exists in the device's sync-cursor table and nothing surfaces it.
+
+For crew and inventory, undated stale data is untidy. For **weather and sea state, a three-day-old
+forecast rendered identically to a live one is a safety problem** — precisely the class of thing
+the product's own terms disclaim. Widening sync scope without shipping the age indicator makes that
+failure *more* likely, because far more screens will quietly have something plausible to show. Ship
+the indicator first.
 
 ---
 
@@ -441,4 +539,5 @@ These are not optional design work — M9 coding must not begin until each is an
 | M9b complete — read-only core built and verified on-device; two native/framework pitfalls worth carrying into M9c | `plans/M9b.md` | 2026-09-05 | All six WPs (auth, trip list, itinerary map, day strip, weather/sea, float plan) validated the stack against a real emulator and the live backend. Two gotchas found the hard way, not obvious from either library's docs: (1) **`react-native-safe-area-context`'s `SafeAreaView` silently drops `className`** — `react-native-css`'s auto-interop list only covers core RN components, and its own `react-native-safe-area-context` re-export wraps `SafeAreaProvider` (for CSS custom properties) but never touches `SafeAreaView`. A `Screen` component built on `SafeAreaView` + `className` renders with every Tailwind class silently no-op'd; the fix is a plain `View` for styling with `useSafeAreaInsets()` → inline `style` for the inset padding. (2) **A layout that declares `<Stack.Screen name="x">` for a route expo-router's file-based router already auto-registers duplicate-registers it** (React Navigation logs "`[Layout children]: ... is extraneous`") and navigation to that route silently does nothing — no error, no crash, the `Link`/`router.push` just no-ops. Keep the layout's `<Stack>` bare and set each screen's title via an in-file `<Stack.Screen options={...} />` instead; screen tests then need `expo-router`'s `Stack.Screen` stubbed inert, since it calls `useRoute()` and throws without a real navigator mounted. |
 | **Mobile mirrors web's information architecture — a Trip Detail hub, not a stripped-down shortcut** | — | 2026-09-06, **hub built 2026-09-07** | See "Screen structure" above. Caught by M9b3 removing the "Float plan" chip from the itinerary map screen (it's trip-detail information, doesn't belong on the map, matches how web keeps it outside the Itinerary tab too) — the underlying problem is that mobile never built the trip-detail hub web has, so trip-level screens kept getting bolted onto whichever screen existed. **Resolved**: `trips/[id]/index.tsx` (the map) renamed to `trips/[id]/itinerary.tsx`, content unchanged; a new `trips/[id]/index.tsx` is the trip list's actual tap target now — destination name, `StateBadge`, and three links (Itinerary, Float plan, Items), matching this decision's own "minimal — link to what already exists" scope rather than a v1 of every web `TripDetailNav` tab (Crew folds into Float plan, which already carries the crew manifest; Logistics and the Live tab aren't built yet). Web's actual pattern is a persistent tab bar via a shared `layout.tsx`, not a landing screen you navigate away from — mobile's Stack-based navigation doesn't have an equivalent to a persistent cross-route tab bar, so a hub screen is the faithful translation of the same information-architecture role, not a literal port. `float-plan.tsx` and M9i's new `items.tsx` are both reachable again |
 | **M26's trigger is overridden — development proceeds proactively, not gated on a real at-sea failure** | amends the "Trigger for starting M26" section, `plans/M26.md` | 2026-09-13 | Decided directly by the user: "I don't believe we need to wait for a trigger, proactive development is what drives the creation of this app in the first place." The trigger condition itself (a real user hitting M9's network-mutate ceiling at sea) is **not wrong as a signal**, it's just no longer the gate — M26 starts now on the existing spec (this document + `docs/mobile/sync-protocol-spec.md`), which was already complete, not stubbed. Sequencing is unchanged: M9c (offline DB + sync-down) before M9d (mutation queue) per `plans/M26.md`'s dependency chain; M9e (live position/tracking, reuses M8's backend surface directly, no WatermelonDB dependency) can run in parallel. |
+| **Sync scope, priority tiers and staleness budgets — "no periodic polling" qualified, not reversed** | qualifies this doc's "Sync down" trigger paragraph; extends `plans/M9c.md` (new WP7) | 2026-09-18 | The trigger line ("app foreground and reconnection event, no periodic background polling") was being read as answering two questions it never addressed: which trips a sync covers, and when a cached entity is due to refresh. Scope had become an artifact of wiring — `startSyncTrigger(tripId)` lives in the Trip Detail hub's effect, so only the trip you opened syncs, and the route (on its own §8.2 channel, pulled by `itinerary.tsx`) only populates if you opened that specific tab. A trip whose Itinerary tab was never opened while connected has **no route offline at all**, which is the worst possible thing to have missing at sea. Four decisions. (1) **Periodic polling stays declined as a mechanism** — `BGAppRefreshTask` fires at the OS's discretion, WorkManager has a 15-minute floor plus Doze, and the cost is a config plugin, a Play background-execution review surface and visible per-app battery attribution; but the *reasoning* behind the original line only ever covered freshness at sea, and the window that matters is the pre-departure days on wifi. "Periodic" is reimplemented as a **staleness budget evaluated on the existing foreground/reconnect triggers**, with true background refresh for tier 1 only. (2) **Budgets gate entry to a sweep, priority orders work within it** — a strict priority queue head-of-line blocks, so a failing tier 1 on a marginal link would starve every lower tier. (3) **Tiering is trip-state-major, entity-minor**, with time-to-departure outranking state; a flat entity ranking would sync a past trip's inventory ahead of next weekend's route. The device orders its own sweep from `state`/`date_from`/`date_to`, already columns on the local `trips` table — no new endpoint. (4) **Past/archived trips and explore routes are cut, not demoted** — lowest priority still means "runs eventually and grows forever" for a case nobody has had. Separately: the always-visible "forecast as of" label generalises to **every** cached entity and is a **precondition** for widening scope, not a follow-up — `last_pulled_at` already exists per trip in the sync-cursor table and nothing surfaces it, and a three-day-old forecast rendered identically to a live one is a safety problem, not an untidiness. |
 | **Mobile itinerary editing — split into a cheap form/list tier (build now) and map-canvas drag/create (stays deferred, on its own merits)** | amends root `CLAUDE.md`'s "Web remains the map-based itinerary-*building* surface... permanent" line and `ROADMAP.md`'s M9-direction entry | 2026-09-13 | The "permanent, web-only" framing conflated two different costs. Checked directly: MapLibre RN's `PointAnnotation`/`ViewAnnotation` (already installed, v11.3.8) has **native drag support** (`draggable`, `onDragStart`/`onDrag`/`onDragEnd`) — the screen-to-map projection risk that made a native builder look expensive isn't actually a blocker. What *is* expensive is the state machine web built around dragging across six milestones (M4/M4b/M4c/M4e/M14/M20) — `map-core.tsx` (1277 lines) + `map-builder.tsx` (554) + `boundary-divider.tsx` (263) alone: M14's draft-boundary materialization, M20's client-authoritative point-order re-chaining, live leg/distance recomputation mid-drag. Most of the math underneath (`dayRouteLegs`, `resolveLegDayNumber`, `getDayColor`, etc.) is pure TS, already reusable via `@shared/*` — it's the interaction/state layer that isn't portable and would need a real native rebuild. Decision: ship point add/edit/reorder, day moves, an emergency-stop insert at GPS position, and pause/abort as network-mutate-first mobile features now (M9i's own pattern, no WatermelonDB dependency, no map-canvas drag needed) — see `plans/M31.md`. Map-canvas drag-to-edit stays a separate, later, explicitly-not-yet-committed question, sized once the cheap tier's real usage shows whether anyone reaches for it on a phone. Komoot's own model (recommend larger screens for planning, but don't block editing on mobile) was the reference point raised for this call. |
