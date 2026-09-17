@@ -1,6 +1,7 @@
 import { CachedBlock } from "./CachedBlock"
 import { CachedConnection } from "./CachedConnection"
 import { CachedLog } from "./CachedLog"
+import { CachedRequirement } from "./CachedRequirement"
 import { Day } from "./Day"
 import { Point } from "./Point"
 import { RequirementContribution } from "./RequirementContribution"
@@ -17,6 +18,7 @@ export {
   CachedBlock,
   CachedConnection,
   CachedLog,
+  CachedRequirement,
   Day,
   Point,
   RequirementContribution,
@@ -34,6 +36,7 @@ export const modelClasses = [
   CachedBlock,
   CachedConnection,
   CachedLog,
+  CachedRequirement,
   Day,
   Point,
   RouteMeta,

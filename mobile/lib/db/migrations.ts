@@ -56,5 +56,18 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 6,
+      steps: [
+        createTable({
+          name: "cached_requirements",
+          columns: [
+            { name: "trip_id", type: "string", isIndexed: true },
+            { name: "name", type: "string" },
+            { name: "status", type: "string", isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 })

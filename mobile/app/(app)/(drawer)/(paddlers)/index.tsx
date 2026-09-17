@@ -29,6 +29,7 @@ import {
   searchPaddlers,
 } from "@mobile/lib/connections/actions"
 import { loadBlocksCache, loadConnectionsCache, saveBlocksCache, saveConnectionsCache } from "@mobile/lib/db/paddlers-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { OFFLINE_ERROR_MESSAGE } from "@mobile/lib/api/client"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Paddlers"
@@ -61,15 +62,33 @@ export default function PaddlersScreen() {
   const [results, setResults] = useState<PaddlerSearchResult[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
 
-  const [connections, setConnections] = useState<Connection[] | null>(null)
-  const [connectionsError, setConnectionsError] = useState<string | null>(null)
-  const [connectionsOffline, setConnectionsOffline] = useState(false)
-
-  const [blocks, setBlocks] = useState<Block[] | null>(null)
-  const [blocksError, setBlocksError] = useState<string | null>(null)
-  const [blocksOffline, setBlocksOffline] = useState(false)
-
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Live-first, cache-fallback — same shape as the trip list / itinerary
+  // screens (M9c WP6), extracted into one hook (useLiveCache) since this
+  // exact pattern was duplicated across this screen, the logs screen, and
+  // the Items screen's requirement checklist. Buddies/blocks have no delta
+  // sync (no per-row invariant worth a WatermelonDB channel for), so this is
+  // a plain wholesale-replace cache, same as the trip list's.
+  const connectionsCache = useLiveCache<Connection[]>({
+    fetchLive: listConnections,
+    loadCache: loadConnectionsCache,
+    saveCache: saveConnectionsCache,
+    isCacheEmpty: (data) => data.length === 0,
+  })
+  const connections = connectionsCache.data
+  const connectionsError = connectionsCache.error
+  const connectionsOffline = connectionsCache.isOffline
+
+  const blocksCache = useLiveCache<Block[]>({
+    fetchLive: listBlocks,
+    loadCache: loadBlocksCache,
+    saveCache: saveBlocksCache,
+    isCacheEmpty: (data) => data.length === 0,
+  })
+  const blocks = blocksCache.data
+  const blocksError = blocksCache.error
+  const blocksOffline = blocksCache.isOffline
 
   useEffect(() => {
     void getSession().then((session) => setUserId(session?.userId ?? null))
@@ -85,52 +104,10 @@ export default function PaddlersScreen() {
     }
   }, [query])
 
-  // Live-first, cache-fallback — same shape as the trip list / itinerary
-  // screens (M9c WP6). Buddies/blocks have no delta sync (no per-row
-  // invariant worth a WatermelonDB channel for), so this is a plain
-  // wholesale-replace cache, same as the trip list's.
-  const loadConnections = useCallback(async () => {
-    setConnectionsError(null)
-    try {
-      const fetched = await listConnections()
-      setConnections(fetched)
-      setConnectionsOffline(false)
-      void saveConnectionsCache(fetched).catch(() => undefined)
-    } catch (err) {
-      const cached = await loadConnectionsCache()
-      if (cached.length > 0) {
-        setConnections(cached)
-        setConnectionsOffline(true)
-      } else {
-        setConnectionsError(
-          err instanceof Error ? err.message : "Something went wrong. Please try again.",
-        )
-      }
-    }
-  }, [])
-
-  const loadBlocks = useCallback(async () => {
-    setBlocksError(null)
-    try {
-      const fetched = await listBlocks()
-      setBlocks(fetched)
-      setBlocksOffline(false)
-      void saveBlocksCache(fetched).catch(() => undefined)
-    } catch (err) {
-      const cached = await loadBlocksCache()
-      if (cached.length > 0) {
-        setBlocks(cached)
-        setBlocksOffline(true)
-      } else {
-        setBlocksError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-      }
-    }
-  }, [])
-
   function selectTab(next: Tab) {
     setTab(next)
-    if (next === "buddies") void loadConnections()
-    if (next === "blocked") void loadBlocks()
+    if (next === "buddies") void connectionsCache.reload()
+    if (next === "blocked") void blocksCache.reload()
   }
 
   async function handleConnect(paddler: PaddlerSearchResult) {
@@ -175,9 +152,9 @@ export default function PaddlersScreen() {
     setBusyId(connection.id)
     try {
       await acceptConnection(connection.id)
-      await loadConnections()
+      await connectionsCache.reload()
     } catch (err) {
-      setConnectionsError(err instanceof Error ? err.message : "Failed to accept request.")
+      connectionsCache.setError(err instanceof Error ? err.message : "Failed to accept request.")
     } finally {
       setBusyId(null)
     }
@@ -188,9 +165,9 @@ export default function PaddlersScreen() {
     setBusyId(connection.id)
     try {
       await removeConnection(connection.id)
-      await loadConnections()
+      await connectionsCache.reload()
     } catch (err) {
-      setConnectionsError(err instanceof Error ? err.message : "Failed to remove connection.")
+      connectionsCache.setError(err instanceof Error ? err.message : "Failed to remove connection.")
     } finally {
       setBusyId(null)
     }
@@ -202,9 +179,9 @@ export default function PaddlersScreen() {
     setBusyId(connection.id)
     try {
       await blockPaddler({ username: counterparty.username, userId: counterparty.id })
-      await loadConnections()
+      await connectionsCache.reload()
     } catch (err) {
-      setConnectionsError(err instanceof Error ? err.message : "Failed to block paddler.")
+      connectionsCache.setError(err instanceof Error ? err.message : "Failed to block paddler.")
     } finally {
       setBusyId(null)
     }
@@ -215,9 +192,9 @@ export default function PaddlersScreen() {
     setBusyId(block.id)
     try {
       await unblockPaddler(block.id)
-      await loadBlocks()
+      await blocksCache.reload()
     } catch (err) {
-      setBlocksError(err instanceof Error ? err.message : "Failed to unblock paddler.")
+      blocksCache.setError(err instanceof Error ? err.message : "Failed to unblock paddler.")
     } finally {
       setBusyId(null)
     }

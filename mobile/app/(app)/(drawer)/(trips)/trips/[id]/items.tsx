@@ -16,6 +16,8 @@ import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
+import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/requirements-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import {
   addRequirement,
   contributeItem,
@@ -43,9 +45,7 @@ export default function InventoryScreen() {
   const [userId, setUserId] = useState<string | null>(null)
 
   const [inventoryId, setInventoryId] = useState<string | null>(null)
-  const [requirements, setRequirements] = useState<TripRequirement[] | null>(null)
   const [myItems, setMyItems] = useState<Item[]>([])
-  const [error, setError] = useState<string | null>(null)
 
   const [newRequirementName, setNewRequirementName] = useState("")
   const [coveringId, setCoveringId] = useState<string | null>(null)
@@ -54,18 +54,36 @@ export default function InventoryScreen() {
   const [packingItems, setPackingItems] = useState<PersonalPackingItem[] | null>(null)
   const [kitError, setKitError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setError(null)
-    try {
+  // Live-first, cache-fallback for the "Group" tab's requirement checklist —
+  // same wholesale-replace shape as logs/buddies (M9c WP6), extracted into
+  // useLiveCache. Only name/status survive offline (see requirements-cache.ts's
+  // RequirementCardData); who's covering what, and every mutation
+  // (add/remove/cover/withdraw), need a connection regardless, so `isOffline`
+  // disables them below. "My kit" stays out of scope here — still deferred,
+  // same as Crew/Logistics. inventoryId/myItems/userId are set as a side
+  // effect of fetchLive and simply keep their last value offline, same as
+  // logs.tsx's stats/requests.
+  const requirementsCache = useLiveCache<TripRequirement[]>({
+    fetchLive: async () => {
       const [session, trip, items] = await Promise.all([getSession(), getTrip(id), getMyItems()])
       setUserId(session?.userId ?? null)
       setInventoryId(trip.inventory?.id ?? null)
-      setRequirements(trip.inventory?.requirements ?? [])
       setMyItems(items)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-    }
-  }, [id])
+      return trip.inventory?.requirements ?? []
+    },
+    loadCache: async () => {
+      const session = await getSession()
+      setUserId(session?.userId ?? null)
+      const cached = await loadRequirementsCache(id)
+      return cached.map((r) => ({ id: r.id, name: r.name, status: r.status as never }))
+    },
+    saveCache: (reqs) => saveRequirementsCache(id, reqs),
+    isCacheEmpty: (reqs) => reqs.length === 0,
+  })
+  const requirements = requirementsCache.data
+  const error = requirementsCache.error
+  const isOffline = requirementsCache.isOffline
+  const load = requirementsCache.reload
 
   const loadKit = useCallback(async () => {
     setKitError(null)
@@ -77,7 +95,6 @@ export default function InventoryScreen() {
   }, [id])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [load])
 
@@ -90,10 +107,10 @@ export default function InventoryScreen() {
     if (!inventoryId || !newRequirementName.trim()) return
     try {
       const created = await addRequirement(inventoryId, { name: newRequirementName.trim() })
-      setRequirements((prev) => [...(prev ?? []), created])
+      requirementsCache.setData((prev) => [...(prev ?? []), created])
       setNewRequirementName("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add requirement.")
+      requirementsCache.setError(err instanceof Error ? err.message : "Failed to add requirement.")
     }
   }
 
@@ -102,9 +119,11 @@ export default function InventoryScreen() {
     setBusyId(requirement.id)
     try {
       await removeRequirement(inventoryId, requirement.id)
-      setRequirements((prev) => prev?.filter((r) => r.id !== requirement.id) ?? null)
+      requirementsCache.setData((prev) => prev?.filter((r) => r.id !== requirement.id) ?? null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove requirement.")
+      requirementsCache.setError(
+        err instanceof Error ? err.message : "Failed to remove requirement.",
+      )
     } finally {
       setBusyId(null)
     }
@@ -130,12 +149,12 @@ export default function InventoryScreen() {
     setBusyId(requirement.id)
     try {
       const updated = await contributeItem(inventoryId, requirement.id, item.id)
-      setRequirements(
+      requirementsCache.setData(
         (prev) => prev?.map((r) => (r.id === requirement.id ? updated : r)) ?? null,
       )
       setCoveringId(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to contribute item.")
+      requirementsCache.setError(err instanceof Error ? err.message : "Failed to contribute item.")
     } finally {
       setBusyId(null)
     }
@@ -148,7 +167,9 @@ export default function InventoryScreen() {
       await unclaimRequirement(inventoryId, requirement.id)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to withdraw contribution.")
+      requirementsCache.setError(
+        err instanceof Error ? err.message : "Failed to withdraw contribution.",
+      )
     } finally {
       setBusyId(null)
     }
@@ -219,15 +240,27 @@ export default function InventoryScreen() {
 
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
+          {isOffline && (
+            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+              Offline — showing your last synced requirements. Adding, covering, and removing
+              need a connection.
+            </Text>
+          )}
           <Row className="gap-2">
             <Input
               className="flex-1"
               placeholder="Add a requirement"
               value={newRequirementName}
               onChangeText={setNewRequirementName}
+              editable={!isOffline}
               onSubmitEditing={() => void handleAddRequirement()}
             />
-            <Button size="sm" variant="cta" onPress={() => void handleAddRequirement()}>
+            <Button
+              size="sm"
+              variant="cta"
+              disabled={isOffline}
+              onPress={() => void handleAddRequirement()}
+            >
               Add
             </Button>
           </Row>
@@ -270,7 +303,7 @@ export default function InventoryScreen() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={busyId === requirement.id}
+                        disabled={busyId === requirement.id || isOffline}
                         onPress={() => confirmRemoveRequirement(requirement)}
                       >
                         Remove
@@ -280,7 +313,7 @@ export default function InventoryScreen() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={busyId === requirement.id}
+                        disabled={busyId === requirement.id || isOffline}
                         onPress={() => void handleUnclaim(requirement)}
                       >
                         Withdraw
@@ -288,7 +321,7 @@ export default function InventoryScreen() {
                     ) : (
                       <Button
                         size="sm"
-                        disabled={busyId === requirement.id}
+                        disabled={busyId === requirement.id || isOffline}
                         onPress={() =>
                           setCoveringId(coveringId === requirement.id ? null : (requirement.id ?? null))
                         }
