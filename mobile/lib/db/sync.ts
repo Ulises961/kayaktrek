@@ -1,9 +1,11 @@
 import type { Database } from "nitromelondb"
+import { Q } from "nitromelondb"
 import { synchronize } from "nitromelondb/sync"
 import type { SyncDatabaseChangeSet, SyncPullResult, SyncTableChangeSet } from "nitromelondb/sync"
 
 import { apiGet } from "../api/client"
 import { database as productionDatabase } from "./database"
+import type { SyncCursor } from "./models"
 
 // Backend field name (camelCase, Services/mobile_sync_service.py) -> local
 // WatermelonDB column name (snake_case, schema.ts). "id" is never listed —
@@ -96,6 +98,42 @@ function remapChanges(apiChanges: ApiPullChanges["changes"]): SyncDatabaseChange
   return remapped
 }
 
+// nitromelondb's synchronize() persists exactly one lastPulledAt cursor, keyed
+// to the whole local `database` (not to whatever remote endpoint the caller's
+// pullChanges happens to hit that time). We call synchronize() once per trip
+// against a trip-scoped endpoint, so the library's own bookkeeping doesn't fit:
+// syncing trip A and then trip B would hand trip B's pull the cursor trip A's
+// sync just advanced to, and the backend correctly reports "nothing changed
+// since then" for data it has never sent that trip at all — trip B's weather/
+// sea/crew cache silently never populates (or a previously-populated trip's
+// cache stops refreshing once a different trip is synced after it). Tracked
+// here instead, one row per trip in `sync_cursors`, ignoring the argument
+// synchronize() passes into pullChanges and the value it writes back.
+async function getCursor(tripId: string, database: Database): Promise<number | null> {
+  const row = await database.collections
+    .get<SyncCursor>("sync_cursors")
+    .query(Q.where("trip_id", tripId))
+    .fetch()
+  return row[0]?.lastPulledAt ?? null
+}
+
+async function setCursor(tripId: string, timestamp: number, database: Database): Promise<void> {
+  const collection = database.collections.get<SyncCursor>("sync_cursors")
+  const existing = await collection.query(Q.where("trip_id", tripId)).fetch()
+  await database.write(async () => {
+    if (existing[0]) {
+      await existing[0].update((row) => {
+        row.lastPulledAt = timestamp
+      })
+    } else {
+      await collection.create((row) => {
+        row.tripId = tripId
+        row.lastPulledAt = timestamp
+      })
+    }
+  })
+}
+
 // Pull-only (WP2) — no pushChanges yet. Per-row aggregates only (trip_members,
 // requirement_contributions, weather(+states), sea(+states)); the route
 // (days/points) syncs through its own atomic channel, wired separately in
@@ -103,9 +141,11 @@ function remapChanges(apiChanges: ApiPullChanges["changes"]): SyncDatabaseChange
 export async function syncTrip(tripId: string, database: Database = productionDatabase): Promise<void> {
   await synchronize({
     database,
-    pullChanges: async ({ lastPulledAt }) => {
-      const query = lastPulledAt ? `?lastPulledAt=${lastPulledAt}` : ""
+    pullChanges: async () => {
+      const cursor = await getCursor(tripId, database)
+      const query = cursor ? `?lastPulledAt=${cursor}` : ""
       const response = await apiGet<ApiPullChanges>(`/api/sync/trip/${tripId}/pull${query}`)
+      await setCursor(tripId, response.timestamp, database)
       const result: SyncPullResult = {
         changes: remapChanges(response.changes),
         timestamp: response.timestamp,

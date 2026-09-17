@@ -11,6 +11,7 @@ import {
   requestConnection,
   searchPaddlers,
 } from "../lib/connections/actions"
+import { loadBlocksCache, loadConnectionsCache } from "../lib/db/paddlers-cache"
 
 jest.mock("../lib/connections/actions", () => ({
   searchPaddlers: jest.fn(),
@@ -27,6 +28,12 @@ jest.mock("../lib/blocks/actions", () => ({
 jest.mock("../lib/auth/session", () => ({
   getSession: jest.fn(),
 }))
+jest.mock("../lib/db/paddlers-cache", () => ({
+  loadConnectionsCache: jest.fn(),
+  saveConnectionsCache: jest.fn(),
+  loadBlocksCache: jest.fn(),
+  saveBlocksCache: jest.fn(),
+}))
 
 const mockSearchPaddlers = searchPaddlers as jest.Mock
 const mockListConnections = listConnections as jest.Mock
@@ -37,6 +44,8 @@ const mockListBlocks = listBlocks as jest.Mock
 const mockBlockPaddler = blockPaddler as jest.Mock
 const mockUnblockPaddler = unblockPaddler as jest.Mock
 const mockGetSession = getSession as jest.Mock
+const mockLoadConnectionsCache = loadConnectionsCache as jest.Mock
+const mockLoadBlocksCache = loadBlocksCache as jest.Mock
 
 const ME = { userId: "01958f60-0000-7000-8000-00000000000a", email: "me@example.com" }
 
@@ -79,6 +88,8 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(ME)
   mockListConnections.mockResolvedValue([])
   mockListBlocks.mockResolvedValue([])
+  mockLoadConnectionsCache.mockReset().mockResolvedValue([])
+  mockLoadBlocksCache.mockReset().mockResolvedValue([])
 })
 
 describe("PaddlersScreen — search", () => {
@@ -164,6 +175,20 @@ describe("PaddlersScreen — search", () => {
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
+
+  it("shows an offline-specific message for a transport-level search failure, not a generic error", async () => {
+    mockSearchPaddlers.mockRejectedValue(
+      new Error("Could not reach the server. Please check your connection and try again."),
+    )
+
+    const { getByPlaceholderText, findByText, queryByText } = await render(<PaddlersScreen />)
+
+    await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
+    await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
+
+    expect(await findByText(/search needs a connection/i)).toBeTruthy()
+    expect(queryByText("Could not reach the server. Please check your connection and try again.")).toBeNull()
+  })
 })
 
 describe("PaddlersScreen — buddies tab", () => {
@@ -231,6 +256,20 @@ describe("PaddlersScreen — buddies tab", () => {
     expect(getByText("Cancel")).toBeTruthy()
     expect(queryByText("Accept")).toBeNull()
   })
+
+  it("falls back to the cached buddy list when offline, disabling actions", async () => {
+    mockListConnections.mockRejectedValueOnce(new Error("Could not reach the server."))
+    mockLoadConnectionsCache.mockResolvedValueOnce([ACCEPTED])
+
+    const { findByText, getByText } = await render(<PaddlersScreen />)
+    await fireEvent.press(getByText("Buddies"))
+
+    expect(await findByText("@cy")).toBeTruthy()
+    expect(getByText(/offline.*last synced buddies/i)).toBeTruthy()
+
+    await fireEvent.press(getByText("Remove"))
+    expect(mockRemoveConnection).not.toHaveBeenCalled()
+  })
 })
 
 describe("PaddlersScreen — blocked tab", () => {
@@ -259,5 +298,21 @@ describe("PaddlersScreen — blocked tab", () => {
     await waitFor(() => {
       expect(queryByText("@troll")).toBeNull()
     })
+  })
+
+  it("falls back to the cached blocklist when offline, disabling unblock", async () => {
+    mockListBlocks.mockRejectedValueOnce(new Error("Could not reach the server."))
+    mockLoadBlocksCache.mockResolvedValueOnce([
+      { id: "block-1", blocked: { username: "troll", name: "Troll" } },
+    ])
+
+    const { findByText, getByText } = await render(<PaddlersScreen />)
+    await fireEvent.press(getByText("Blocked"))
+
+    expect(await findByText("@troll")).toBeTruthy()
+    expect(getByText(/offline.*last synced blocklist/i)).toBeTruthy()
+
+    await fireEvent.press(getByText("Unblock"))
+    expect(mockUnblockPaddler).not.toHaveBeenCalled()
   })
 })

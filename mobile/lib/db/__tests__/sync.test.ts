@@ -113,4 +113,31 @@ describe("syncTrip", () => {
 
     expect(mockedApiGet).toHaveBeenNthCalledWith(2, "/api/sync/trip/trip-1/pull?lastPulledAt=1700000000000")
   })
+
+  it("keeps a separate cursor per trip, so syncing trip B never inherits trip A's lastPulledAt", async () => {
+    const empty = {
+      trip_members: { created: [], updated: [], deleted: [] },
+      requirement_contributions: { created: [], updated: [], deleted: [] },
+      weather: { created: [], updated: [], deleted: [] },
+      weather_states: { created: [], updated: [], deleted: [] },
+      sea: { created: [], updated: [], deleted: [] },
+      sea_states: { created: [], updated: [], deleted: [] },
+    }
+    const database = createTestDatabase()
+
+    mockedApiGet.mockResolvedValueOnce({ changes: empty, timestamp: 1_700_000_000_000 })
+    await syncTrip("trip-a", database)
+
+    // A second, never-before-synced trip must still pull from scratch (no
+    // lastPulledAt) — not from trip A's cursor.
+    mockedApiGet.mockResolvedValueOnce({ changes: empty, timestamp: 1_700_000_005_000 })
+    await syncTrip("trip-b", database)
+    expect(mockedApiGet).toHaveBeenNthCalledWith(2, "/api/sync/trip/trip-b/pull")
+
+    // Re-syncing trip A afterwards must still use trip A's own cursor, not
+    // trip B's more recent one.
+    mockedApiGet.mockResolvedValueOnce({ changes: empty, timestamp: 1_700_000_006_000 })
+    await syncTrip("trip-a", database)
+    expect(mockedApiGet).toHaveBeenNthCalledWith(3, "/api/sync/trip/trip-a/pull?lastPulledAt=1700000000000")
+  })
 })

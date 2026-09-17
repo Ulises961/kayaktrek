@@ -21,6 +21,7 @@ import {
   deleteEndorsementRequest,
   listEndorsementRequests,
 } from "@mobile/lib/endorsement-requests/actions"
+import { loadLogsCache, saveLogsCache } from "@mobile/lib/db/logs-cache"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "@mobile/lib/logs/actions"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Logs" drawer
@@ -31,9 +32,10 @@ const header = (
 
 type Tab = "mine" | "endorsed"
 
-// Network-mutate only, no offline cache (M9i, plans/M9i.md WP1) — mirrors M9b's
-// "validate the round trip" scope for a new feature area rather than a new
-// milestone's worth of pagination/filter UI.
+// Live-first, cache-fallback for the two log lists (M9c WP6's shape, extended
+// here) — a wholesale-replace cache per kind, same as the trip list's. Stats
+// and incoming endorsement requests stay live-only: they're small, secondary
+// panels, not the reason someone opens this screen offline.
 export default function LogsScreen() {
   const [tab, setTab] = useState<Tab>("mine")
   const [mine, setMine] = useState<Log[] | null>(null)
@@ -41,6 +43,7 @@ export default function LogsScreen() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [requests, setRequests] = useState<EndorsementRequest[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [actioningRequestId, setActioningRequestId] = useState<string | null>(null)
 
@@ -58,8 +61,21 @@ export default function LogsScreen() {
       setEndorsed(endorsedPage.items)
       setStats(statsResult)
       setRequests(incoming)
+      setIsOffline(false)
+      void saveLogsCache("mine", minePage.items).catch(() => undefined)
+      void saveLogsCache("endorsed", endorsedPage.items).catch(() => undefined)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      const [cachedMine, cachedEndorsed] = await Promise.all([
+        loadLogsCache("mine"),
+        loadLogsCache("endorsed"),
+      ])
+      if (cachedMine.length > 0 || cachedEndorsed.length > 0) {
+        setMine(cachedMine)
+        setEndorsed(cachedEndorsed)
+        setIsOffline(true)
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      }
     } finally {
       if (isRefresh) setIsRefreshing(false)
     }
@@ -127,6 +143,12 @@ export default function LogsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
+        {isOffline && (
+          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+            Offline — showing your last synced logs. Recording a paddle needs a connection.
+          </Text>
+        )}
+
         {stats && <StatsPanel stats={stats} />}
 
         {requests.length > 0 && (
@@ -174,7 +196,7 @@ export default function LogsScreen() {
             </Chip>
           </Row>
           <Link href="/logs/new" asChild>
-            <Button size="sm" variant="cta">
+            <Button size="sm" variant="cta" disabled={isOffline}>
               + New
             </Button>
           </Link>

@@ -12,12 +12,32 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // decorators) — sync.ts's per-table mappers translate the API's camelCase
 // field names (mobile_sync_service.py / itinerary_route_sync_service.py) to
 // these column names before handing rows to `synchronize()`.
-// Schema migrations aren't wired yet (no SQLiteAdapter `migrations` passed in
-// database.ts) — acceptable while this hasn't shipped to a real device;
-// revisit before the first release that could carry an existing local DB.
+// Migrations are wired (database.ts passes `migrations` from migrations.ts) —
+// every `version` bump here needs a matching migration step there, or a
+// device with an existing local DB throws "no such table"/"no such column" on
+// whatever the bump added. Confirmed the hard way: v4 -> v5 shipped without
+// one, real installs already on v4 immediately hit "no such table:
+// cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 4,
+  version: 5,
   tables: [
+    tableSchema({
+      // WatermelonDB's synchronize() persists exactly one `lastPulledAt` cursor,
+      // keyed to the whole local database (`__watermelon_last_pulled_at` — see
+      // nitromelondb/sync/impl/index.js). That's fine for one remote source, but
+      // sync.ts calls synchronize() once per trip against a trip-scoped pull
+      // endpoint — the library's single global cursor was getting stamped by
+      // whichever trip synced most recently, so the next trip's pull sent a
+      // cursor that had nothing to do with its own sync history and the backend
+      // (correctly) reported "nothing changed since" for data it had never sent
+      // that trip at all. One row per trip here, read/written by sync.ts
+      // directly instead of relying on the library's own bookkeeping.
+      name: "sync_cursors",
+      columns: [
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "last_pulled_at", type: "number" },
+      ],
+    }),
     tableSchema({
       // Not part of docs/mobile/sync-protocol-spec.md §4's aggregate list — that
       // spec is entirely trip-scoped (every pull endpoint takes a tripId), and
@@ -147,6 +167,49 @@ export const appDatabaseSchema = appSchema({
         { name: "swell_period", type: "number", isOptional: true },
         { name: "current_speed", type: "number", isOptional: true },
         { name: "current_direction", type: "number", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // Not trip-scoped (unlike everything above) — a paddler's own buddy list,
+      // wholesale-replaced on every successful fetch, same simple "last good
+      // fetch, no delta" shape as `trips`. `id` is the connection id.
+      name: "cached_connections",
+      columns: [
+        { name: "status", type: "string" },
+        { name: "requester_id", type: "string", isOptional: true },
+        { name: "requester_username", type: "string" },
+        { name: "requester_name", type: "string" },
+        { name: "requester_surname", type: "string", isOptional: true },
+        { name: "addressee_id", type: "string", isOptional: true },
+        { name: "addressee_username", type: "string" },
+        { name: "addressee_name", type: "string" },
+        { name: "addressee_surname", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // Same shape as `cached_connections` — `id` is the block id.
+      name: "cached_blocks",
+      columns: [
+        { name: "blocked_id", type: "string", isOptional: true },
+        { name: "blocked_username", type: "string" },
+        { name: "blocked_name", type: "string" },
+        { name: "blocked_surname", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // A paddler's own logs, wholesale-replaced on every successful fetch.
+      // `kind` distinguishes "mine" from "endorsed" — the two are disjoint (a
+      // log can't be both your own and someone else's you endorsed), so a
+      // shared `id` space is safe. Only the fields LogCard actually renders —
+      // full detail (notes, route geometry, endorsers) has no offline reader.
+      name: "cached_logs",
+      columns: [
+        { name: "kind", type: "string", isIndexed: true },
+        { name: "date", type: "string", isOptional: true },
+        { name: "hours", type: "number", isOptional: true },
+        { name: "distance", type: "number", isOptional: true },
+        { name: "avg_sea", type: "number", isOptional: true },
+        { name: "endorsement_count", type: "number", isOptional: true },
       ],
     }),
   ],
