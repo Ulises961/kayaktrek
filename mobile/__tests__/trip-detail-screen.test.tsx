@@ -2,6 +2,7 @@ import { render, waitFor } from "@testing-library/react-native"
 
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
+import { loadTripListCache } from "../lib/db/trip-list-cache"
 import { getTrip } from "../lib/trips/actions"
 
 jest.mock("expo-router", () => {
@@ -18,14 +19,20 @@ jest.mock("../lib/trips/actions", () => ({
 jest.mock("../lib/db/sync-trigger", () => ({
   startSyncTrigger: jest.fn(),
 }))
+jest.mock("../lib/db/trip-list-cache", () => ({
+  loadTripListCache: jest.fn(),
+}))
 
 const mockGetTrip = getTrip as jest.Mock
 const mockStartSyncTrigger = startSyncTrigger as jest.Mock
+const mockLoadTripListCache = loadTripListCache as jest.Mock
 
 beforeEach(() => {
   mockGetTrip.mockReset()
   mockStartSyncTrigger.mockReset()
   mockStartSyncTrigger.mockReturnValue(jest.fn())
+  mockLoadTripListCache.mockReset()
+  mockLoadTripListCache.mockResolvedValue([])
 })
 
 describe("TripDetailScreen", () => {
@@ -70,12 +77,68 @@ describe("TripDetailScreen", () => {
     expect(getByText("Items")).toBeTruthy()
   })
 
-  it("surfaces a thrown error", async () => {
+  it("surfaces a thrown error when the cache has nothing for this trip either", async () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadTripListCache.mockResolvedValue([])
 
     const { findByText } = await render(<TripDetailScreen />)
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+
+  // The hub is the only route to Itinerary/Crew/Logistics/Float plan/Items, so an
+  // error screen here strands every cache those screens already have. Before this
+  // fallback existed, going offline turned the whole trip into a dead end.
+  describe("offline", () => {
+    const cachedTrip = {
+      id: "trip-1",
+      destination: "Costa Brava",
+      state: "building",
+      dateFrom: "2026-06-10",
+      dateTo: "2026-06-14",
+      travellerCount: 3,
+    }
+
+    beforeEach(() => {
+      mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+      mockLoadTripListCache.mockResolvedValue([
+        { id: "trip-other", destination: "Elsewhere", state: "past", dateFrom: null, dateTo: null, travellerCount: 1 },
+        cachedTrip,
+      ])
+    })
+
+    it("falls back to this trip's cached summary instead of an error screen", async () => {
+      const { findByText, queryByText } = await render(<TripDetailScreen />)
+
+      expect(await findByText("Costa Brava")).toBeTruthy()
+      expect(queryByText("Could not reach the server.")).toBeNull()
+      expect(queryByText("Elsewhere")).toBeNull()
+    })
+
+    it("keeps every hub destination reachable", async () => {
+      const { findByText, getByText } = await render(<TripDetailScreen />)
+      await findByText("Costa Brava")
+
+      expect(getByText("Itinerary")).toBeTruthy()
+      expect(getByText("Crew")).toBeTruthy()
+      expect(getByText("Logistics")).toBeTruthy()
+      expect(getByText("Float plan")).toBeTruthy()
+      expect(getByText("Items")).toBeTruthy()
+    })
+
+    it("says the data is cached rather than presenting it as live", async () => {
+      const { findByText } = await render(<TripDetailScreen />)
+
+      expect(await findByText(/Offline — showing your last synced trip/)).toBeTruthy()
+    })
+
+    it("omits difficulty and description, which the trip-list cache does not carry", async () => {
+      const { findByText, queryByText } = await render(<TripDetailScreen />)
+      await findByText("Costa Brava")
+
+      expect(queryByText("Difficulty")).toBeNull()
+      expect(queryByText("Description")).toBeNull()
+    })
   })
 
   it("starts the sync-down trigger for this trip so weather/sea/crew/inventory populate offline caches", async () => {

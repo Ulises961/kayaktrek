@@ -6,11 +6,11 @@ import {
   UsersIcon,
 } from "lucide-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { ActivityIndicator, Pressable } from "react-native"
 
-import { DIFFICULTY_LABELS } from "@shared/dtos/difficulty"
-import type { Trip } from "@shared/dtos/trip"
+import { DIFFICULTY_LABELS, type Difficulty } from "@shared/dtos/difficulty"
+import type { Trip, TripState } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
@@ -20,6 +20,8 @@ import { SectionLabel } from "@mobile/components/ui/section-label"
 import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
 import { startSyncTrigger } from "@mobile/lib/db/sync-trigger"
+import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Trip" }} />
@@ -33,26 +35,62 @@ const header = <RouterStack.Screen options={{ title: "Trip" }} />
 // card below this comment now does instead of a separate details.tsx screen this
 // hub used to link out to. The itinerary map is still a destination FROM here, not
 // the trip list's direct target the way M9b/M9b2 built it.
+// The fields the identity card renders. Both the live Trip DTO and the trip-list
+// cache's TripCardData map into this shape, so the card below doesn't branch on
+// source — same idiom as float-plan.tsx's CrewMemberView. `difficulty` and
+// `description` are null offline: the trip-list cache is card data and carries
+// neither, the same deliberate trim as LogCardData and RequirementCardData.
+type TripHeaderView = {
+  destination: string | null
+  state: TripState | null
+  dateFrom: string | null
+  dateTo: string | null
+  difficulty: Difficulty | null
+  description: string | null
+}
+
+function toHeaderView(trip: Trip): TripHeaderView {
+  return {
+    destination: trip.destination ?? null,
+    state: trip.state ?? null,
+    dateFrom: trip.dateFrom ?? null,
+    dateTo: trip.dateTo ?? null,
+    difficulty: trip.difficulty ?? null,
+    description: trip.description ?? null,
+  }
+}
+
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [trip, setTrip] = useState<Trip | null>(null)
-  const [error, setError] = useState<string | null>(null)
+
+  // This hub is the only route to Itinerary/Crew/Logistics/Float plan/Items, so
+  // failing to an error screen here stranded every cache those screens already
+  // had — offline, a trip became a dead end at its own front door. It reads the
+  // trip-list cache rather than one of its own: the summary it needs is exactly
+  // TripCardData, and float-plan.tsx already reaches for the same rows.
+  const {
+    data: trip,
+    error,
+    isOffline,
+    reload,
+  } = useLiveCache<TripHeaderView | null>({
+    fetchLive: async () => toHeaderView(await getTrip(id)),
+    loadCache: async () => {
+      const cached = await loadTripListCache()
+      const row = cached.find((entry) => entry.id === id)
+      return row ? { ...row, difficulty: null, description: null } : null
+    },
+    // Deliberately a no-op: saveTripListCache replaces the whole table, so
+    // writing this one trip back would destroy every other trip's cached row.
+    // The trip list owns populating that cache, and M9c WP7's sweep will take
+    // the job over from it entirely.
+    saveCache: async () => undefined,
+    isCacheEmpty: (cached) => cached === null,
+  })
 
   useEffect(() => {
-    let cancelled = false
-    getTrip(id)
-      .then((t) => {
-        if (cancelled) return
-        setTrip(t)
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [id])
+    void reload()
+  }, [reload])
 
   // The Trip Detail hub is the real entry point every trip visit passes through
   // (docs/adr/mobile-offline.md "Screen structure"), so it's the natural place to
@@ -98,6 +136,12 @@ export default function TripDetailScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <Stack className="gap-4 p-4">
+        {isOffline && (
+          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+            Offline — showing your last synced trip summary. Each screen below shows whatever it
+            last synced.
+          </Text>
+        )}
         <Card>
           <CardContent className="gap-3">
             <Row className="justify-between">
