@@ -7,6 +7,31 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.10] - 2026-09-17
+
+### Fixed
+
+- Weather forecasts now actually refresh on the schedule 1.0.9 described. The daily refresh
+  could be skipped entirely on any day the server was updated; trips underway refreshed about
+  half as often as intended; forecasts were fetched twice for the same day; long trips fetched
+  days beyond the 10-day forecast window; and trips nobody had opened kept refreshing forever
+  instead of pausing after a week.
+- The mobile app keeps your paddlers, logs and blocked list readable offline, and no longer
+  crashes its background sync when the connection drops. Cached trip data is now kept per trip,
+  so opening one trip can no longer show another's stale data.
+- The mobile app shows a persistent banner while offline, and network problems now read as a
+  plain message instead of a raw error.
+- On phones, the footer on the explore page no longer covers the list of routes.
+
+### Deploy notes
+
+- Migration `92fbca47995b` fills in a last-viewed date for existing trips, taken from when each
+  was last edited. After it runs, **a trip nobody has opened or edited in 7 days stops fetching
+  forecasts until someone views it** — expect weather API calls to drop noticeably.
+- `OPEN_METEO_WEATHER_BASE_URL`, `OPEN_METEO_MARINE_BASE_URL` and `OPEN_METEO_API_KEY` now reach
+  the `backend` and `worker` containers. All three stay unset here, which keeps the free
+  Open-Meteo tier exactly as before; see `DEPLOY.md` for switching to the paid plan.
+
 ## [1.0.9] - 2026-09-16
 
 ### Changed
