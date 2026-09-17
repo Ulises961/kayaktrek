@@ -68,16 +68,18 @@ celery_app.conf.update(
             "task": "Tasks.erasure.run_erasure",
             "schedule": 86400,
         },
+        # M32 (docs/adr/features.md §1a). crontab, not a seconds interval: beat's
+        # schedule file lives in /tmp, so an interval's countdown restarts on every
+        # deploy and a 24h one never fires on a box released more often than daily.
+        # The two sweeps own disjoint days (Tasks/weather_beat_task.py), and run at
+        # :20 to stay clear of the hourly checkpoint alerts.
         "weather-refresh": {
             "task": "Tasks.weather_beat_task.refresh_upcoming_weather",
-            "schedule": 86400,
+            "schedule": crontab(minute=20, hour=3),
         },
-        # M32 (docs/adr/features.md §1a): narrow sweep for happening/imminent trips
-        # only — a much smaller candidate set than the daily sweep above, so the
-        # added frequency costs little.
         "weather-refresh-urgent": {
             "task": "Tasks.weather_beat_task.refresh_urgent_weather",
-            "schedule": 21600,
+            "schedule": crontab(minute=20, hour="*/6"),
         },
         "checkpoint-alerts": {
             "task": "Tasks.checkpoint_beat_task.check_missed_checkpoints",

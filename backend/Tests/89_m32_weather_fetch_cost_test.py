@@ -12,8 +12,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+from celery.schedules import crontab
 
 import Services.open_meteo_service as open_meteo_service
+from Api.celery_app import celery_app
 from Services.premium_entitlement_service import PremiumEntitlementService
 from Tasks.weather_beat_task import FORECAST_HORIZON_DAYS, effective_horizon_days
 
@@ -79,6 +81,21 @@ def test_open_meteo_defaults_to_free_tier_hosts_when_env_unset(monkeypatch):
     assert fresh._API_KEY is None
 
 
+def test_open_meteo_treats_blank_env_as_unset(monkeypatch):
+    """docker-compose.prod.yml passes these as ${VAR:-}, which sets an empty string
+    rather than leaving the variable out — blank must still mean the free tier."""
+    monkeypatch.setenv("OPEN_METEO_WEATHER_BASE_URL", "")
+    monkeypatch.setenv("OPEN_METEO_MARINE_BASE_URL", "")
+    monkeypatch.setenv("OPEN_METEO_API_KEY", "")
+
+    fresh = _reimport_open_meteo_service()
+
+    assert fresh._WEATHER_URL == "https://api.open-meteo.com/v1/forecast"
+    assert fresh._MARINE_URL == "https://marine-api.open-meteo.com/v1/marine"
+    assert fresh._API_KEY is None
+    assert "apikey" not in fresh._with_api_key({"latitude": 1.0})
+
+
 def test_open_meteo_reads_commercial_plan_config_from_env(monkeypatch):
     monkeypatch.setenv("OPEN_METEO_WEATHER_BASE_URL", "https://customer-api.open-meteo.com/v1/forecast")
     monkeypatch.setenv("OPEN_METEO_MARINE_BASE_URL", "https://customer-api.open-meteo.com/v1/marine")
@@ -118,6 +135,36 @@ def test_open_meteo_appends_api_key_to_request_params_when_set(app):
 
     called_params = mock_client.weather_api.call_args.kwargs["params"]
     assert called_params["apikey"] == "secret-key"
+
+
+def test_weather_sweeps_run_at_fixed_wall_clock_times():
+    """A fixed-interval beat entry restarts its countdown whenever beat starts
+    (the schedule file lives in /tmp), so a 24h interval never fires on a box
+    deployed more often than daily. crontab entries fire at a set time instead."""
+    schedule = celery_app.conf.beat_schedule
+
+    daily = schedule["weather-refresh"]["schedule"]
+    urgent = schedule["weather-refresh-urgent"]["schedule"]
+
+    assert isinstance(daily, crontab)
+    assert isinstance(urgent, crontab)
+    assert len(daily.hour) == 1
+    assert sorted(urgent.hour) == [0, 6, 12, 18]
+
+
+def test_forecast_cache_expires_well_before_the_next_urgent_sweep(app):
+    """The result cache only dedupes identical calls within one sweep. If it
+    outlived the 6h sweep interval, each sweep would read the previous sweep's
+    cached forecast and refresh nothing, halving the real cadence."""
+    mock_client = _mock_weather_client()
+    with app.app_context():
+        with patch.object(open_meteo_service, "_make_client", return_value=mock_client), \
+             patch.object(open_meteo_service.cache, "get", return_value=None), \
+             patch.object(open_meteo_service.cache, "set") as mock_set:
+            open_meteo_service.OpenMeteoService.fetch_weather(54.0, -9.0, "2026-09-22")
+
+    timeout = mock_set.call_args.kwargs["timeout"]
+    assert 0 < timeout <= 60 * 60
 
 
 def test_open_meteo_omits_api_key_param_when_unset(app):

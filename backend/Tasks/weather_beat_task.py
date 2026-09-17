@@ -42,6 +42,36 @@ def _attention_cutoff() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=ATTENTION_TIMEOUT_DAYS)
 
 
+def _due_days(today: date):
+    """Every day either sweep may fetch: a building/happening trip viewed within
+    ATTENTION_TIMEOUT_DAYS, dated inside the forecast horizon. A NULL
+    last_accessed_at is skipped — there is no view to measure dormancy from.
+
+    effective_horizon_days(None): a sweep has no single requesting user, so it
+    always gets the free default.
+    """
+    horizon_cutoff = today + timedelta(days=effective_horizon_days(None))
+    return (
+        db.session.query(Day)
+        .join(Itinerary, Day.itinerary_id == Itinerary.id)
+        .join(Trip, Itinerary.trip_id == Trip.id)
+        .filter(
+            Day.date.isnot(None),
+            Day.date >= today,
+            Day.date <= horizon_cutoff,
+            Trip.state.in_([TripStateType.BUILDING, TripStateType.HAPPENING]),
+            Trip.last_accessed_at >= _attention_cutoff(),
+        )
+    )
+
+
+def _is_urgent(today: date):
+    """A happening trip, or a day today or tomorrow. Day.date has no time, so
+    "within 48h" rounds down to whole days: a day two dates out can be as much
+    as ~72h away."""
+    return (Trip.state == TripStateType.HAPPENING) | (Day.date <= today + timedelta(days=1))
+
+
 def _dispatch(days: list[Day], request_id: Optional[str]) -> int:
     for day in days:
         fetch_weather.delay(str(day.id), request_id=request_id)
@@ -50,72 +80,21 @@ def _dispatch(days: list[Day], request_id: Optional[str]) -> int:
 
 @celery_app.task(name="Tasks.weather_beat_task.refresh_upcoming_weather", bind=True)
 def refresh_upcoming_weather(self, request_id: Optional[str] = None) -> None:
-    """Once-daily broad sweep — building/happening trips, inside the horizon,
-    not dormant. docs/adr/features.md §1a."""
+    """Once-daily sweep of the due days the 6h sweep doesn't own, so no day is
+    fetched by both. docs/adr/features.md §1a."""
     today = date.today()
-    # No single "requesting user" for a beat sweep — effective_horizon_days(None)
-    # is always the free FORECAST_HORIZON_DAYS default. Called through the function
-    # rather than the constant directly so a future per-trip extended-range check
-    # (once has_extended_forecast_access is real) slots in here without touching
-    # this query.
-    cutoff = today + timedelta(days=effective_horizon_days(None))
-    attention_cutoff = _attention_cutoff()
-
-    days = (
-        db.session.query(Day)
-        .join(Itinerary, Day.itinerary_id == Itinerary.id)
-        .join(Trip, Itinerary.trip_id == Trip.id)
-        .filter(
-            Day.date.isnot(None),
-            Day.date >= today,
-            Day.date <= cutoff,
-            Trip.state.in_([TripStateType.BUILDING, TripStateType.HAPPENING]),
-            (Trip.last_accessed_at.is_(None)) | (Trip.last_accessed_at >= attention_cutoff),
-        )
-        .all()
-    )
+    days = _due_days(today).filter(~_is_urgent(today)).all()
 
     count = _dispatch(days, request_id)
-    logger.info(
-        "weather_beat_dispatched",
-        extra={"count": count, "today": str(today), "cutoff": str(cutoff)},
-    )
+    logger.info("weather_beat_dispatched", extra={"count": count, "today": str(today)})
 
 
 @celery_app.task(name="Tasks.weather_beat_task.refresh_urgent_weather", bind=True)
 def refresh_urgent_weather(self, request_id: Optional[str] = None) -> None:
-    """Every-6h narrow sweep — happening trips, or any day within 48h, not
-    dormant. A much smaller candidate set than the daily sweep, so the added
-    beat frequency costs little. docs/adr/features.md §1a."""
+    """Every-6h sweep of due days on happening trips or dated today/tomorrow.
+    docs/adr/features.md §1a."""
     today = date.today()
-    # Day.date has no time component, so "within 48h" is expressed in whole days —
-    # today or tomorrow, never today+2, since a Day dated two calendar days out
-    # could be as little as ~24h away (e.g. dispatched at 23:00) or as much as
-    # ~72h away; rounding down keeps this sweep from silently widening into the
-    # daily sweep's job.
-    imminent_cutoff = today + timedelta(days=1)
-    attention_cutoff = _attention_cutoff()
-
-    days = (
-        db.session.query(Day)
-        .join(Itinerary, Day.itinerary_id == Itinerary.id)
-        .join(Trip, Itinerary.trip_id == Trip.id)
-        .filter(
-            Day.date.isnot(None),
-            Day.date >= today,
-            # A past/archived trip must never be dispatched by either schedule —
-            # the OR below only decides WHICH building/happening days qualify as
-            # "urgent," it must never be able to admit a past/archived trip on its
-            # own via the Day.date <= imminent_cutoff arm.
-            Trip.state.in_([TripStateType.BUILDING, TripStateType.HAPPENING]),
-            (Trip.state == TripStateType.HAPPENING) | (Day.date <= imminent_cutoff),
-            (Trip.last_accessed_at.is_(None)) | (Trip.last_accessed_at >= attention_cutoff),
-        )
-        .all()
-    )
+    days = _due_days(today).filter(_is_urgent(today)).all()
 
     count = _dispatch(days, request_id)
-    logger.info(
-        "weather_beat_urgent_dispatched",
-        extra={"count": count, "today": str(today)},
-    )
+    logger.info("weather_beat_urgent_dispatched", extra={"count": count, "today": str(today)})

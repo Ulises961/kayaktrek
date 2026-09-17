@@ -22,7 +22,7 @@ from Models.weather_state import WeatherState
 from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
 from Resources.mobile_sync_resource import MOBILE_SYNC_ENDPOINT
-from datetime import time
+from datetime import datetime, time, timedelta, timezone
 
 
 def _pull(client, headers, trip_id, last_pulled_at=None):
@@ -72,16 +72,19 @@ def test_pull_bumps_trip_last_accessed_at(client, app, trip_with_crew):
     last_accessed_at, not just leave it null forever."""
     trip_id = trip_with_crew["trip"]["id"]
 
+    # Stamped on insert, so age it to prove the pull is what moves it forward.
+    aged = datetime.now(timezone.utc) - timedelta(days=3)
     with app.app_context():
         trip = db.session.get(Trip, UUID(trip_id))
-        assert trip.last_accessed_at is None
+        trip.last_accessed_at = aged
+        db.session.commit()
 
     resp = _pull(client, trip_with_crew["leader_headers"], trip_id)
     assert resp.status_code == 200
 
     with app.app_context():
         trip = db.session.get(Trip, UUID(trip_id))
-        assert trip.last_accessed_at is not None
+        assert trip.last_accessed_at > aged
 
 
 def test_pull_delta_sync_puts_rows_in_updated_bucket(client, app, trip_with_crew):

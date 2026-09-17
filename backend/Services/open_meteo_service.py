@@ -20,9 +20,16 @@ logger = logging.getLogger(__name__)
 # as before; setting OPEN_METEO_WEATHER_BASE_URL/OPEN_METEO_MARINE_BASE_URL to
 # `customer-api.open-meteo.com`'s endpoints plus OPEN_METEO_API_KEY switches to the
 # paid API Standard plan. Config/env change only — no fetch-logic change.
-_WEATHER_URL = os.environ.get("OPEN_METEO_WEATHER_BASE_URL", "https://api.open-meteo.com/v1/forecast")
-_MARINE_URL = os.environ.get("OPEN_METEO_MARINE_BASE_URL", "https://marine-api.open-meteo.com/v1/marine")
-_API_KEY = os.environ.get("OPEN_METEO_API_KEY")
+# Read with `or`, not a get() default: compose passes an unset variable as an
+# empty string, and blank has to mean the free tier too.
+_WEATHER_URL = os.environ.get("OPEN_METEO_WEATHER_BASE_URL") or "https://api.open-meteo.com/v1/forecast"
+_MARINE_URL = os.environ.get("OPEN_METEO_MARINE_BASE_URL") or "https://marine-api.open-meteo.com/v1/marine"
+_API_KEY = os.environ.get("OPEN_METEO_API_KEY") or None
+
+# Per-day forecast cache: long enough to dedupe identical coordinate/date calls
+# within one beat sweep, short enough that the next 6h sweep refetches instead of
+# re-reading the previous sweep's result.
+_FORECAST_CACHE_TTL_SECONDS = 60 * 60
 
 # Global background grid: 10° resolution, -80→80°N, -170→170°E = 17×35 = 595 points.
 _GLOBAL_LAT_STEP = 10
@@ -130,7 +137,7 @@ class OpenMeteoService:
             }),
         )
         data = _parse_hourly(responses[0], _WEATHER_VARS)
-        cache.set(cache_key, data)
+        cache.set(cache_key, data, timeout=_FORECAST_CACHE_TTL_SECONDS)
         logger.info("open_meteo_weather_fetched", extra={"lat": lat, "lng": lng, "date": date_str})
         return data
 
@@ -167,6 +174,6 @@ class OpenMeteoService:
             }),
         )
         data = _parse_hourly(responses[0], _MARINE_VARS)
-        cache.set(cache_key, data)
+        cache.set(cache_key, data, timeout=_FORECAST_CACHE_TTL_SECONDS)
         logger.info("open_meteo_marine_fetched", extra={"lat": lat, "lng": lng, "date": date_str})
         return data
