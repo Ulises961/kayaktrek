@@ -4,20 +4,6 @@ import type { WeatherState } from "@shared/dtos/weather";
 
 import { WeatherHourGrid } from "../weather-hour-grid";
 
-// @gorhom/bottom-sheet drives everything through native Reanimated worklets,
-// which jest has no binding for (same class of failure itinerary-sheet.test.tsx
-// already documents) — BottomSheetScrollView is used here only so the horizontal
-// scroll composes correctly with the sheet's own pan gesture on-device (found on
-// real device: a plain RN ScrollView nested in the sheet capped the scroll to
-// the first ~5-6 items instead of scrolling the full hourly series). A plain RN
-// ScrollView stands in fine for this test — it's the sheet's gesture composition
-// under test elsewhere, not this component's own content or logic.
-jest.mock("@gorhom/bottom-sheet", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { ScrollView } = require("react-native");
-  return { __esModule: true, BottomSheetScrollView: ScrollView };
-});
-
 const states: WeatherState[] = [
   {
     dayId: "day-1",

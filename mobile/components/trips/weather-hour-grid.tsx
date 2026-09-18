@@ -6,7 +6,7 @@ import {
   Sun,
 } from "lucide-react-native";
 import { View } from "react-native"
-import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { ScrollView } from "react-native-gesture-handler";
 
 import type { WeatherState } from "@shared/dtos/weather";
 import { lightTokens, palette } from "@shared/tokens";
@@ -48,7 +48,7 @@ export function WeatherHourGrid({ states }: { states: WeatherState[] }) {
       <Text className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Wind &amp; weather
       </Text>
-      <BottomSheetScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Row className="gap-1.5">
           {states.map((s) => {
             const force =
@@ -105,7 +105,7 @@ export function WeatherHourGrid({ states }: { states: WeatherState[] }) {
             );
           })}
         </Row>
-      </BottomSheetScrollView>
+      </ScrollView>
     </Stack>
   );
 }

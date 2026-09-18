@@ -49,15 +49,6 @@ jest.mock("@gorhom/bottom-sheet", () => {
     }: {
       children?: React.ReactNode;
     }) => <View {...props}>{children}</View>,
-    // WeatherHourGrid/SeaHourGrid use this for real-device gesture composition
-    // with the sheet's own pan gesture — a plain View stands in fine for this
-    // test, same reasoning as BottomSheetView above.
-    BottomSheetScrollView: ({
-      children,
-      ...props
-    }: {
-      children?: React.ReactNode;
-    }) => <View {...props}>{children}</View>,
   };
 });
 
