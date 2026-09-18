@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Alert } from "react-native"
 
-import LogDetailScreen from "../app/(app)/(drawer)/(logs)/[id]"
+import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
 import { getSession } from "../lib/auth/session"
 import { loadCachedLog } from "../lib/db/logs-cache"
 import { deleteLog, endorseLog, getLog, unendorseLog } from "../lib/logs/actions"
