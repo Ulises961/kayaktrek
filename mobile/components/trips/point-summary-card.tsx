@@ -72,8 +72,11 @@ export function PointSummaryCard({
       {/* Icon-row micro-typography (M9b2's TripCard/LogCard convention): 12px icon,
           lightTokens.mutedForeground, 11px tabular-nums for measured values — not
           the bare uppercase-caption tiles this card started with. A visible border
-          (not just a muted fill) gives each tile a defined edge at this size. */}
-      <Row className="flex-wrap gap-2">
+          (not just a muted fill) gives each tile a defined edge at this size.
+          `items-stretch` overrides Row's own `items-center` default — without it
+          each tile sizes to its own content (Leg has up to 3 lines, Notes/Images
+          have 1), so the three didn't match heights as siblings in the same row. */}
+      <Row className="flex-wrap items-stretch gap-2">
         <View className="w-[31%] min-w-[90px] gap-1 rounded-lg border border-border px-2.5 py-2">
           <Row className="items-center gap-1">
             <RouteIcon size={12} color={lightTokens.mutedForeground} />
