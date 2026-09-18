@@ -5,6 +5,16 @@ import { getDayColor } from "@shared/itinerary/colors";
 
 import { DayRail } from "../day-rail";
 
+// DayRail imports weather-sea-panel.tsx for conditionsTeaser, which transitively
+// imports sea-hour-grid.tsx's BottomSheetScrollView — jest can't load the real
+// @gorhom/bottom-sheet module (native Reanimated worklets). See
+// weather-hour-grid.test.tsx's identical mock.
+jest.mock("@gorhom/bottom-sheet", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ScrollView } = require("react-native");
+  return { __esModule: true, BottomSheetScrollView: ScrollView };
+});
+
 const days: Day[] = [
   { id: "day-1", dayNumber: 1 },
   { id: "day-2", dayNumber: 2 },

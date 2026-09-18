@@ -9,6 +9,16 @@ jest.mock("../../../lib/trips/actions", () => ({
   refreshDayWeather: jest.fn(),
 }))
 
+// See weather-hour-grid.test.tsx's identical mock: WeatherSeaPanel renders
+// WeatherHourGrid/SeaHourGrid, which use BottomSheetScrollView (real-device
+// gesture-composition fix), and jest can't load the real @gorhom/bottom-sheet
+// module (native Reanimated worklets).
+jest.mock("@gorhom/bottom-sheet", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ScrollView } = require("react-native")
+  return { __esModule: true, BottomSheetScrollView: ScrollView }
+})
+
 const mockRefreshDayWeather = refreshDayWeather as jest.Mock
 
 const DAY_ID = "01998e2a-0000-7000-8000-000000000001"

@@ -1,5 +1,6 @@
 import { Navigation2, Waves } from "lucide-react-native";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
+import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 
 import type { SeaState } from "@shared/dtos/sea";
 import { lightTokens, palette } from "@shared/tokens";
@@ -28,7 +29,7 @@ export function SeaHourGrid({ states }: { states: SeaState[] }) {
       <Text className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Sea &amp; swell
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <BottomSheetScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Row className="gap-1.5">
           {states.map((s) => (
             <View
@@ -85,7 +86,7 @@ export function SeaHourGrid({ states }: { states: SeaState[] }) {
             </View>
           ))}
         </Row>
-      </ScrollView>
+      </BottomSheetScrollView>
     </Stack>
   );
 }

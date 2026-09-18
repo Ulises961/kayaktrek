@@ -4,6 +4,16 @@ import type { SeaState } from "@shared/dtos/sea";
 
 import { SeaHourGrid } from "../sea-hour-grid";
 
+// See weather-hour-grid.test.tsx's identical mock for why: BottomSheetScrollView
+// avoids a real-device gesture conflict (a plain RN ScrollView nested in the
+// sheet capped horizontal scrolling to the first ~5-6 items), and jest can't
+// load the real @gorhom/bottom-sheet module (native Reanimated worklets).
+jest.mock("@gorhom/bottom-sheet", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ScrollView } = require("react-native");
+  return { __esModule: true, BottomSheetScrollView: ScrollView };
+});
+
 const states: SeaState[] = [
   {
     dayId: "day-1",
