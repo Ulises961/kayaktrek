@@ -1,16 +1,22 @@
-import { useState } from "react"
-import { ActivityIndicator } from "react-native"
-import { ArrowDownFromLine, ArrowUpFromLine, RefreshCw, Wind, WavesHorizontal } from "lucide-react-native"
+import { useState } from "react";
+import { ActivityIndicator } from "react-native";
+import {
+  ArrowDownFromLine,
+  ArrowUpFromLine,
+  RefreshCw,
+} from "lucide-react-native";
 
-import type { Day } from "@shared/dtos/day"
-import { lightTokens } from "@shared/tokens"
-import { formatTimeAgo } from "@shared/utils/date"
-import { formatHour, representativeHour } from "@shared/weather/hourly"
+import type { Day } from "@shared/dtos/day";
+import { lightTokens } from "@shared/tokens";
+import { formatTimeAgo } from "@shared/utils/date";
+import { formatHour, representativeHour } from "@shared/weather/hourly";
 
-import { refreshDayWeather } from "../../lib/trips/actions"
-import { Button } from "../ui/button"
-import { Row, Stack } from "../ui/layout"
-import { Text } from "../ui/text"
+import { refreshDayWeather } from "../../lib/trips/actions";
+import { Button } from "../ui/button";
+import { Row, Stack } from "../ui/layout";
+import { Text } from "../ui/text";
+import { SeaHourGrid } from "./sea-hour-grid";
+import { WeatherHourGrid } from "./weather-hour-grid";
 
 // WP5 (plans/M9b.md): pure display, no rule-of-twelfths interactivity — the web
 // builder's tidal-gate calculator is explicitly out of scope for this milestone.
@@ -25,7 +31,7 @@ import { Text } from "../ui/text"
 // `bg-card` (a lone bottom border reads as a stray rule with nothing below it
 // inside a sheet, and the sheet paints its own background via `backgroundStyle`).
 export function hasConditions(day: Day | null): boolean {
-  return Boolean(day && (day.weather || day.sea))
+  return Boolean(day && (day.weather || day.sea));
 }
 
 // Short label shown on the sheet's collapsed day-strip handle (`ItinerarySheet`) —
@@ -33,16 +39,20 @@ export function hasConditions(day: Day | null): boolean {
 // Returns null on the same conditions `WeatherSeaPanel` itself would render nothing
 // for, so a caller never shows a teaser promising detail there isn't any.
 export function conditionsTeaser(day: Day | null): string | null {
-  if (!hasConditions(day)) return null
-  const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
-  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined)
-  if (!weatherNow && !seaNow) return null
+  if (!hasConditions(day)) return null;
+  const weatherNow = representativeHour(
+    day?.weather?.weatherStates ?? undefined,
+  );
+  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined);
+  if (!weatherNow && !seaNow) return null;
 
-  const parts: string[] = []
-  if (weatherNow?.temperature != null) parts.push(`${Math.round(weatherNow.temperature)}°C`)
-  if (weatherNow?.windForce != null) parts.push(`${Math.round(weatherNow.windForce)} kn`)
-  if (seaNow) parts.push(`${seaNow.waveHeight.toFixed(1)} m`)
-  return parts.length > 0 ? parts.join(" · ") : null
+  const parts: string[] = [];
+  if (weatherNow?.temperature != null)
+    parts.push(`${Math.round(weatherNow.temperature)}°C`);
+  if (weatherNow?.windForce != null)
+    parts.push(`${Math.round(weatherNow.windForce)} kn`);
+  if (seaNow) parts.push(`${seaNow.waveHeight.toFixed(1)} m`);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 // M9c WP5 (plans/M9c.md, docs/mobile/sync-protocol-spec.md §6.4): device-initiated
@@ -55,44 +65,52 @@ export function WeatherSeaPanel({
   day,
   onRefresh,
 }: {
-  day: Day | null
-  onRefresh?: () => Promise<void>
+  day: Day | null;
+  onRefresh?: () => Promise<void>;
 }) {
-  const [refreshing, setRefreshing] = useState(false)
-  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
-  if (!hasConditions(day)) return null
+  if (!hasConditions(day)) return null;
 
-  const weatherNow = representativeHour(day?.weather?.weatherStates ?? undefined)
-  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined)
-  const sea = day?.sea
+  const weatherNow = representativeHour(
+    day?.weather?.weatherStates ?? undefined,
+  );
+  const seaNow = representativeHour(day?.sea?.seaStates ?? undefined);
+  const sea = day?.sea;
 
-  if (!weatherNow && !seaNow && !sea) return null
+  if (!weatherNow && !seaNow && !sea) return null;
 
   // "Forecast as of …" is mandatory whenever weather/sea renders (spec §6.3) — never
   // let cached data appear indistinguishable from live data. Weather's `fetchedAt` and
   // Sea's `recordedAt` are bumped together by the same refresh, so either stands in for
   // "when was this trip's conditions data last fetched" when the other is absent.
-  const asOf = day?.weather?.fetchedAt ?? day?.sea?.recordedAt ?? null
+  const asOf = day?.weather?.fetchedAt ?? day?.sea?.recordedAt ?? null;
 
   async function handleRefresh() {
-    if (!day?.id) return
-    setRefreshing(true)
-    setRefreshError(null)
+    if (!day?.id) return;
+    setRefreshing(true);
+    setRefreshError(null);
     try {
-      await refreshDayWeather(day.id)
-      await onRefresh?.()
+      await refreshDayWeather(day.id);
+      await onRefresh?.();
     } catch (err) {
-      setRefreshError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      setRefreshError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
   }
 
   return (
     <Stack className="gap-3 px-4 py-4">
       <Row className="items-center justify-between">
-        <Text className="text-xs text-muted-foreground">Forecast as of {formatTimeAgo(asOf)}</Text>
+        <Text className="text-xs text-muted-foreground">
+          Forecast as of {formatTimeAgo(asOf)}
+        </Text>
         {onRefresh && day?.id && (
           <Button
             variant="ghost"
@@ -102,7 +120,10 @@ export function WeatherSeaPanel({
             onPress={() => void handleRefresh()}
           >
             {refreshing ? (
-              <ActivityIndicator size="small" color={lightTokens.mutedForeground} />
+              <ActivityIndicator
+                size="small"
+                color={lightTokens.mutedForeground}
+              />
             ) : (
               <RefreshCw size={14} color={lightTokens.mutedForeground} />
             )}
@@ -110,68 +131,45 @@ export function WeatherSeaPanel({
         )}
       </Row>
 
-      {refreshError && <Text className="text-xs text-muted-foreground">{refreshError}</Text>}
-
-      {weatherNow && (
-        <Row className="flex-wrap gap-x-4 gap-y-1">
-          <Text className="text-sm">
-            {formatHour(weatherNow.time)} ·{" "}
-            {weatherNow.temperature != null ? `${Math.round(weatherNow.temperature)}°C` : "—"}
-          </Text>
-          {weatherNow.windForce != null && (
-            <Row className="items-center gap-1">
-              <Wind size={13} color={lightTokens.mutedForeground} />
-              <Text className="text-sm text-muted-foreground">
-                {Math.round(weatherNow.windForce)} kn
-                {weatherNow.windDirection != null
-                  ? ` @ ${Math.round(weatherNow.windDirection)}°`
-                  : ""}
-              </Text>
-            </Row>
-          )}
-          {weatherNow.precipitation != null && (
-            <Text className="text-sm text-muted-foreground">
-              {weatherNow.precipitation.toFixed(1)} mm
-            </Text>
-          )}
-        </Row>
+      {refreshError && (
+        <Text className="text-xs text-muted-foreground">{refreshError}</Text>
       )}
 
-      {seaNow && (
-        <Row className="flex-wrap gap-x-4 gap-y-1">
-          <Row className="items-center gap-1">
-            <WavesHorizontal size={13} color={lightTokens.mutedForeground} />
-            <Text className="text-sm text-muted-foreground">
-              {seaNow.waveHeight.toFixed(1)} m @ {Math.round(seaNow.waveDirection)}°
-            </Text>
-          </Row>
-          {seaNow.swellWaveHeight != null && (
-            <Text className="text-sm text-muted-foreground">
-              Swell {seaNow.swellWaveHeight.toFixed(1)} m
-            </Text>
-          )}
-        </Row>
-      )}
+      {/* M9l WP4: the full hourly series, not just one representative hour — this
+          plan's own analysis had wrongly deferred these as if they were the
+          TidalEntryForm/RuleOfTwelfthsTable editing widgets, when they're pure
+          display (see plans/M9l.md's corrected table row). */}
+      <WeatherHourGrid states={day?.weather?.weatherStates ?? []} />
+      <SeaHourGrid states={day?.sea?.seaStates ?? []} />
 
       {sea && (sea.highTide || sea.lowTide) && (
         <Row className="flex-wrap gap-x-4 gap-y-1">
           {sea.highTide && (
             <Row className="items-center gap-1">
               <ArrowUpFromLine size={13} color={lightTokens.mutedForeground} />
-              <Text className="text-sm text-muted-foreground">{formatHour(sea.highTide)}</Text>
+              <Text className="text-sm text-muted-foreground">
+                {formatHour(sea.highTide)}
+              </Text>
             </Row>
           )}
           {sea.lowTide && (
             <Row className="items-center gap-1">
-              <ArrowDownFromLine size={13} color={lightTokens.mutedForeground} />
-              <Text className="text-sm text-muted-foreground">{formatHour(sea.lowTide)}</Text>
+              <ArrowDownFromLine
+                size={13}
+                color={lightTokens.mutedForeground}
+              />
+              <Text className="text-sm text-muted-foreground">
+                {formatHour(sea.lowTide)}
+              </Text>
             </Row>
           )}
           {sea.tidalRangeM != null && (
-            <Text className="text-sm text-muted-foreground">Range {sea.tidalRangeM.toFixed(1)} m</Text>
+            <Text className="text-sm text-muted-foreground">
+              Range {sea.tidalRangeM.toFixed(1)} m
+            </Text>
           )}
         </Row>
       )}
     </Stack>
-  )
+  );
 }

@@ -85,7 +85,14 @@ const daysWithPoint: Day[] = [
     id: "day-1",
     dayNumber: 1,
     points: [
-      { id: "p1", type: "stop", latitude: 0, longitude: 0, nextId: "p2", name: "Harbour" },
+      {
+        id: "p1",
+        type: "stop",
+        latitude: 0,
+        longitude: 0,
+        nextId: "p2",
+        name: "Harbour",
+      },
       { id: "p2", type: "position", latitude: 0, longitude: 0.1 },
     ],
   },
@@ -127,9 +134,9 @@ describe("ItinerarySheet", () => {
     );
 
     expect(getByTestId("sheet-index").props.children).toBe(1);
-    // WeatherSeaPanel's own body content (the "HH:MM · temp" row) — proves the sheet
-    // body actually renders it, not just asking for index 1.
-    expect(getByText(/12:00 · 18°C/)).toBeTruthy();
+    // WeatherSeaPanel's own body content (WeatherHourGrid's hourly card) — proves
+    // the sheet body actually renders it, not just asking for index 1.
+    expect(getByText("18°")).toBeTruthy();
   });
 
   it("stays collapsed when asked to expand a day with no weather or sea data", async () => {
