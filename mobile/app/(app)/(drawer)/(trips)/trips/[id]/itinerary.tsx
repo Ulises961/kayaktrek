@@ -157,12 +157,28 @@ export default function TripMapScreen() {
   // M9l WP3: tapping a point selects it and expands the sheet to show its summary;
   // tapping empty map space or re-tapping the day strip (handleDayPress, above)
   // returns the sheet to the weather body.
+  //
+  // A point tap fires BOTH Marker's own onPress and the underlying MapLibreMap's
+  // onPress for the same gesture — two independent native tap recognizers, not
+  // event bubbling (confirmed on-device: without this guard, handleMapPress ran
+  // right after handlePointPress and cleared the selection back to null before
+  // the sheet ever rendered it, so the sheet expanded but showed weather instead
+  // of the point). This ref, set synchronously in handlePointPress and consumed
+  // by the very next handleMapPress call, absorbs exactly that one paired call
+  // without guessing at a timing window.
+  const suppressNextMapPress = useRef(false);
+
   function handlePointPress(pointId: string) {
+    suppressNextMapPress.current = true;
     setSelectedPointId(pointId);
     setSheetExpanded(true);
   }
 
   function handleMapPress() {
+    if (suppressNextMapPress.current) {
+      suppressNextMapPress.current = false;
+      return;
+    }
     setSelectedPointId(null);
   }
 
@@ -275,21 +291,35 @@ export default function TripMapScreen() {
                 lngLat={[point.longitude, point.latitude]}
                 onPress={() => point.id && handlePointPress(point.id)}
               >
-                {/* Colored by owning day (getDayColor), not by point type, per M9l WP1 —
-                  the stop-vs-position distinction moves to size/shape instead: stops
-                  are a larger ring, positions a smaller dot. Split-ring boundary
-                  markers (web's two-tone stop at a shared overnight point) are a
-                  flagged follow-up, not this WP's acceptance bar. */}
+                {/* MapLibre's native marker view sizes its tap area to exactly its
+                  children's rendered bounds — no padding/hit-slop of its own (confirmed
+                  by reading Marker.js). The visible dot is 8-14px, unusably small to
+                  tap on a real device (found on-device: taps were landing on nothing),
+                  so the touch target is this 32px box, with the dot centered inside it. */}
                 <View
                   style={{
-                    width: point.type === "stop" ? 14 : 8,
-                    height: point.type === "stop" ? 14 : 8,
-                    borderRadius: point.type === "stop" ? 7 : 4,
-                    backgroundColor: getDayColor(point.dayNumber),
-                    borderWidth: 2,
-                    borderColor: "white",
+                    width: 32,
+                    height: 32,
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                />
+                >
+                  {/* Colored by owning day (getDayColor), not by point type, per M9l WP1 —
+                    the stop-vs-position distinction moves to size/shape instead: stops
+                    are a larger ring, positions a smaller dot. Split-ring boundary
+                    markers (web's two-tone stop at a shared overnight point) are a
+                    flagged follow-up, not this WP's acceptance bar. */}
+                  <View
+                    style={{
+                      width: point.type === "stop" ? 14 : 8,
+                      height: point.type === "stop" ? 14 : 8,
+                      borderRadius: point.type === "stop" ? 7 : 4,
+                      backgroundColor: getDayColor(point.dayNumber),
+                      borderWidth: 2,
+                      borderColor: "white",
+                    }}
+                  />
+                </View>
               </Marker>
             ))}
           </MapLibreMap>
