@@ -1,7 +1,7 @@
 import { Stack as RouterStack, useLocalSearchParams, useRouter } from "expo-router"
 import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert } from "react-native"
+import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
 import type { Log, LogFields } from "@shared/dtos/log"
 import { beaufortLabel } from "@shared/weather/beaufort"
@@ -214,18 +214,32 @@ export default function LogDetailScreen() {
   }
 
   return (
-    <Screen edges={["bottom"]} className="gap-4 p-4">
+    <Screen edges={["bottom"]}>
       {header}
-      <LogForm
-        initial={log}
-        submitLabel="Save changes"
-        submitting={submitting}
-        error={error}
-        onSubmit={(fields) => void handleUpdate(fields)}
-      />
-      <Button variant="destructive" disabled={submitting} onPress={confirmDelete}>
-        Delete log
-      </Button>
+      {/* Scrollable, and keyboard-dismissing on drag — see new.tsx's comment: with
+          the keyboard up, the notes field and both buttons sit under it. */}
+      <ScrollView
+        testID="log-form-scroll"
+        contentContainerClassName="gap-4 p-4"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <LogForm
+          initial={log}
+          submitLabel="Save changes"
+          submitting={submitting}
+          error={error}
+          onSubmit={(fields) => void handleUpdate(fields)}
+        />
+      {/* Quiet rather than the `destructive` fill (user call, 2026-09-18). Two
+          full-width saturated blocks — Save on structure blue, Delete on red —
+          competed for the eye on a screen where saving is the ordinary action and
+          deleting is the rare one. The Alert.alert confirm (M9k) is what actually
+          guards the deletion; the colour was shouting a second time. */}
+        <Button variant="outline" disabled={submitting} onPress={confirmDelete}>
+          Delete log
+        </Button>
+      </ScrollView>
     </Screen>
   )
 }

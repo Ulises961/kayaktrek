@@ -1,4 +1,8 @@
+import { Link } from "expo-router"
+import { Pressable } from "react-native"
+
 import type { ConnectionUser } from "@shared/dtos/connection"
+import { formatPaddlerName } from "@shared/user/format"
 
 import { Button } from "../ui/button"
 import { Card, CardContent } from "../ui/card"
@@ -29,12 +33,19 @@ export function ConnectionRow({
     <Card>
       <CardContent>
         <Row className="justify-between">
-          <Stack className="gap-0.5">
-            <Text className="font-medium">
-              {counterparty.name} {counterparty.surname ?? ""}
-            </Text>
-            <Text className="text-sm text-muted-foreground">@{counterparty.username}</Text>
-          </Stack>
+          {/* Same link treatment as PaddlerResultCard — see its comment on why the
+              link role is declared rather than inherited. */}
+          <Link
+            href={{ pathname: "/paddlers/[username]", params: { username: counterparty.username } }}
+            asChild
+          >
+            <Pressable accessibilityRole="link" accessibilityLabel={formatPaddlerName(counterparty)}>
+              <Stack className="gap-0.5">
+                <Text className="font-medium">{formatPaddlerName(counterparty)}</Text>
+                <Text className="text-sm text-muted-foreground">@{counterparty.username}</Text>
+              </Stack>
+            </Pressable>
+          </Link>
           <Row className="gap-2">
             {direction === "incoming" && (
               <Button size="sm" disabled={busy} onPress={onAccept}>

@@ -1,5 +1,6 @@
 import { Stack as RouterStack, useRouter } from "expo-router"
 import { useState } from "react"
+import { ScrollView } from "react-native"
 
 import type { LogFields } from "@shared/dtos/log"
 
@@ -28,15 +29,26 @@ export default function NewLogScreen() {
   }
 
   return (
-    <Screen edges={["bottom"]} className="p-4">
+    <Screen edges={["bottom"]}>
       {header}
-      <LogForm
-        submitLabel="Create log"
-        submitting={submitting}
-        error={error}
-        onSubmit={(fields) => void handleSubmit(fields)}
-        variant="cta"
-      />
+      {/* Scrollable, and keyboard-dismissing on drag: the form is five fields, a
+          four-line notes box and a submit. With the keyboard up on a phone the
+          last field and the button sit underneath it, and a fixed Screen gives no
+          way to reach them. */}
+      <ScrollView
+        testID="log-form-scroll"
+        contentContainerClassName="p-4"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <LogForm
+          submitLabel="Create log"
+          submitting={submitting}
+          error={error}
+          onSubmit={(fields) => void handleSubmit(fields)}
+          variant="cta"
+        />
+      </ScrollView>
     </Screen>
   )
 }
