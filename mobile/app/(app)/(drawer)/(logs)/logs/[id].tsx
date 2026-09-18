@@ -223,7 +223,12 @@ export default function LogDetailScreen() {
         error={error}
         onSubmit={(fields) => void handleUpdate(fields)}
       />
-      <Button variant="destructive" disabled={submitting} onPress={confirmDelete}>
+      {/* Quiet rather than the `destructive` fill (user call, 2026-09-18). Two
+          full-width saturated blocks — Save on structure blue, Delete on red —
+          competed for the eye on a screen where saving is the ordinary action and
+          deleting is the rare one. The Alert.alert confirm (M9k) is what actually
+          guards the deletion; the colour was shouting a second time. */}
+      <Button variant="outline" disabled={submitting} onPress={confirmDelete}>
         Delete log
       </Button>
     </Screen>
