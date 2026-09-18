@@ -59,6 +59,29 @@ export async function saveLogsCache(
   })
 }
 
+// One cached log by id, for the detail screen. `kind` comes back with it
+// because the cache carries no userId — the list a log was cached under is the
+// only record of whether it is the caller's own, which is what the detail
+// screen branches on to decide between the edit form and the read-only view.
+export async function loadCachedLog(
+  id: string,
+  database: Database = productionDatabase,
+): Promise<(LogCardData & { kind: LogsCacheKind }) | null> {
+  const collection = database.collections.get<CachedLog>("cached_logs")
+  const rows = await collection.query(Q.where("id", id)).fetch()
+  const row = rows[0]
+  if (!row) return null
+  return {
+    id: row.id,
+    kind: row.kind as LogsCacheKind,
+    date: row.date,
+    hours: row.hours,
+    distance: row.distance,
+    avgSea: row.avgSea,
+    endorsementCount: row.endorsementCount,
+  }
+}
+
 export async function loadLogsCache(
   kind: LogsCacheKind,
   database: Database = productionDatabase,

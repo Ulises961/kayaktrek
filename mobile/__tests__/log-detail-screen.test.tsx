@@ -3,6 +3,7 @@ import { Alert } from "react-native"
 
 import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
 import { getSession } from "../lib/auth/session"
+import { loadCachedLog } from "../lib/db/logs-cache"
 import { deleteLog, endorseLog, getLog, unendorseLog } from "../lib/logs/actions"
 
 const mockBack = jest.fn()
@@ -27,12 +28,16 @@ jest.mock("../lib/logs/actions", () => ({
 jest.mock("../lib/auth/session", () => ({
   getSession: jest.fn(),
 }))
+jest.mock("../lib/db/logs-cache", () => ({
+  loadCachedLog: jest.fn(),
+}))
 
 const mockGetLog = getLog as jest.Mock
 const mockDeleteLog = deleteLog as jest.Mock
 const mockGetSession = getSession as jest.Mock
 const mockEndorseLog = endorseLog as jest.Mock
 const mockUnendorseLog = unendorseLog as jest.Mock
+const mockLoadCachedLog = loadCachedLog as jest.Mock
 
 const ME = { userId: "01958f60-0000-7000-8000-00000000000a" }
 const OWN_LOG = {
@@ -68,6 +73,7 @@ beforeEach(() => {
   mockUnendorseLog.mockReset()
   mockBack.mockReset()
   mockGetSession.mockResolvedValue(ME)
+  mockLoadCachedLog.mockReset().mockResolvedValue(null)
 })
 
 describe("LogDetailScreen — owner", () => {
@@ -103,5 +109,79 @@ describe("LogDetailScreen — someone else's log", () => {
     expect(await findByText("3.0h")).toBeTruthy()
     expect(queryByText("Delete log")).toBeNull()
     expect(queryByText("Endorse this log")).toBeTruthy()
+  })
+})
+
+// The logs list caches but the detail screen did not, so offline you got a list
+// of logs none of which would open. Everything on this screen mutates (edit,
+// delete, endorse), so the cached view is read-only by definition — the cache
+// also carries no notes or endorsers, which the banner says rather than showing
+// their absence as fact.
+describe("LogDetailScreen — offline", () => {
+  beforeEach(() => {
+    mockGetLog.mockRejectedValue(new Error("Could not reach the server."))
+  })
+
+  it("falls back to the cached summary instead of an error screen", async () => {
+    mockLoadCachedLog.mockResolvedValue({
+      id: "log-1",
+      kind: "mine",
+      date: "2026-06-01",
+      hours: 3,
+      distance: 12,
+      avgSea: 2,
+      endorsementCount: 1,
+    })
+
+    const { findByText, getByText, queryByText } = await render(<LogDetailScreen />)
+
+    expect(await findByText("2026-06-01")).toBeTruthy()
+    expect(getByText("3.0h")).toBeTruthy()
+    expect(queryByText("Could not reach the server.")).toBeNull()
+  })
+
+  it("offers no mutation on a cached own log — editing and deleting need a connection", async () => {
+    mockLoadCachedLog.mockResolvedValue({
+      id: "log-1",
+      kind: "mine",
+      date: "2026-06-01",
+      hours: 3,
+      distance: null,
+      avgSea: null,
+      endorsementCount: null,
+    })
+
+    const { findByText, queryByText } = await render(<LogDetailScreen />)
+    await findByText("2026-06-01")
+
+    expect(queryByText("Delete log")).toBeNull()
+    expect(queryByText("Save changes")).toBeNull()
+    expect(await findByText(/Offline — showing your last synced log/)).toBeTruthy()
+  })
+
+  it("offers no endorsement toggle on a cached log from the endorsed list", async () => {
+    mockLoadCachedLog.mockResolvedValue({
+      id: "log-1",
+      kind: "endorsed",
+      date: "2026-06-01",
+      hours: 3,
+      distance: null,
+      avgSea: null,
+      endorsementCount: null,
+    })
+
+    const { findByText, queryByText } = await render(<LogDetailScreen />)
+    await findByText("2026-06-01")
+
+    expect(queryByText("Endorse this log")).toBeNull()
+    expect(queryByText("Withdraw endorsement")).toBeNull()
+  })
+
+  it("surfaces the error when the log was never cached", async () => {
+    mockLoadCachedLog.mockResolvedValue(null)
+
+    const { findByText } = await render(<LogDetailScreen />)
+
+    expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
 })

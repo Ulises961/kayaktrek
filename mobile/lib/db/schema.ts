@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
     tableSchema({
       // WatermelonDB's synchronize() persists exactly one `lastPulledAt` cursor,
@@ -224,6 +224,38 @@ export const appDatabaseSchema = appSchema({
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "name", type: "string" },
         { name: "status", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // The user's gear closet (`Item`, user_id-owned) — trip-INDEPENDENT, so
+      // there is no trip_id here and the table replaces wholesale, the same
+      // shape as `trips`. Distinct from cached_packing_items below, which is
+      // the per-trip list drawn FROM this closet.
+      //
+      // Before this existed, getMyItems' result was fetched inside the Items
+      // screen's requirements loader and never restored on the offline path,
+      // so an offline device rendered "No owned gear to contribute yet." — a
+      // silent lie rather than an error, and the exact question ("did I pack
+      // the spare paddle") that gets asked at a put-in with no signal.
+      name: "cached_gear",
+      columns: [
+        { name: "name", type: "string" },
+        { name: "status", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // A member's private per-trip packing list (`PersonalPackingItem`) —
+      // trip-scoped like cached_requirements, and denormalised: the item's
+      // name is copied in rather than joined from cached_gear, so a kit entry
+      // still renders if the closet cache is empty or the gear was deleted.
+      // `checked` is the packed/unpacked state, which is the whole reason to
+      // read this offline at all.
+      name: "cached_packing_items",
+      columns: [
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "item_id", type: "string", isOptional: true },
+        { name: "item_name", type: "string" },
+        { name: "checked", type: "boolean", isOptional: true },
       ],
     }),
   ],

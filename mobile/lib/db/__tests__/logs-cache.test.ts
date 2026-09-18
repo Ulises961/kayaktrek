@@ -2,7 +2,7 @@ import { Database } from "nitromelondb"
 import LokiJSAdapter from "nitromelondb/adapters/lokijs"
 
 import { modelClasses } from "../models"
-import { loadLogsCache, saveLogsCache } from "../logs-cache"
+import { loadCachedLog, loadLogsCache, saveLogsCache } from "../logs-cache"
 import { appDatabaseSchema } from "../schema"
 
 jest.mock("../database", () => ({ database: {} }))
@@ -52,5 +52,35 @@ describe("logs cache", () => {
   it("returns an empty list when nothing has ever been cached", async () => {
     const database = createTestDatabase()
     expect(await loadLogsCache("mine", database)).toEqual([])
+  })
+})
+
+// The list cached but the detail screen did not, so offline you got a list of
+// logs none of which would open. `kind` is what makes a cached detail view
+// possible at all: it is the only record of whether a log is the caller's own,
+// since the cache carries no userId.
+describe("single cached log", () => {
+  it("finds a log by id and reports which list it came from", async () => {
+    const database = createTestDatabase()
+    await saveLogsCache("mine", [{ id: "log-1", date: "2026-09-01", hours: 3 }] as never, database)
+    await saveLogsCache("endorsed", [{ id: "log-2", date: "2026-09-02" }] as never, database)
+
+    expect(await loadCachedLog("log-1", database)).toEqual({
+      id: "log-1",
+      kind: "mine",
+      date: "2026-09-01",
+      hours: 3,
+      distance: null,
+      avgSea: null,
+      endorsementCount: null,
+    })
+    expect((await loadCachedLog("log-2", database))?.kind).toBe("endorsed")
+  })
+
+  it("returns null for a log that was never cached", async () => {
+    const database = createTestDatabase()
+    await saveLogsCache("mine", [{ id: "log-1", date: "2026-09-01" }] as never, database)
+
+    expect(await loadCachedLog("log-missing", database)).toBeNull()
   })
 })
