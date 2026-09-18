@@ -69,5 +69,32 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // Both kit tables in ONE bump on purpose. Every version bump is a window
+      // in which a device can end up stamped at a version whose migration step
+      // was still being written — WatermelonDB never re-runs a migration once
+      // its target version is recorded, so such a device never picks the step
+      // up, even after the code catches up. That cost one `adb shell pm clear`
+      // already; batching related tables into a single bump narrows the window.
+      toVersion: 7,
+      steps: [
+        createTable({
+          name: "cached_gear",
+          columns: [
+            { name: "name", type: "string" },
+            { name: "status", type: "string", isOptional: true },
+          ],
+        }),
+        createTable({
+          name: "cached_packing_items",
+          columns: [
+            { name: "trip_id", type: "string", isIndexed: true },
+            { name: "item_id", type: "string", isOptional: true },
+            { name: "item_name", type: "string" },
+            { name: "checked", type: "boolean", isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 })

@@ -1,6 +1,8 @@
 import { CachedBlock } from "./CachedBlock"
 import { CachedConnection } from "./CachedConnection"
+import { CachedGear } from "./CachedGear"
 import { CachedLog } from "./CachedLog"
+import { CachedPackingItem } from "./CachedPackingItem"
 import { CachedRequirement } from "./CachedRequirement"
 import { Day } from "./Day"
 import { Point } from "./Point"
@@ -17,7 +19,9 @@ import { WeatherState } from "./WeatherState"
 export {
   CachedBlock,
   CachedConnection,
+  CachedGear,
   CachedLog,
+  CachedPackingItem,
   CachedRequirement,
   Day,
   Point,
@@ -35,7 +39,9 @@ export {
 export const modelClasses = [
   CachedBlock,
   CachedConnection,
+  CachedGear,
   CachedLog,
+  CachedPackingItem,
   CachedRequirement,
   Day,
   Point,

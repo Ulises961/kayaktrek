@@ -17,6 +17,8 @@ import {
   togglePackingItem,
 } from "../lib/inventory/personal-packing-actions"
 import { getTrip } from "../lib/trips/actions"
+import { loadGearCache } from "../lib/db/gear-cache"
+import { loadKitCache } from "../lib/db/kit-cache"
 import { loadRequirementsCache } from "../lib/db/requirements-cache"
 
 // Extends jest.setup.ts's global Stack.Screen stub rather than replacing the module —
@@ -49,9 +51,22 @@ jest.mock("../lib/inventory/personal-packing-actions", () => ({
 jest.mock("../lib/auth/session", () => ({
   getSession: jest.fn(),
 }))
+// The save* mocks must RESOLVE, not return undefined: the real functions are
+// async and both useLiveCache and the screen call `.catch()` on what they
+// return. A bare jest.fn() returns undefined, so `.catch` throws a TypeError
+// inside the fetch path and the screen silently takes its offline branch —
+// a mock faithful enough to typecheck but not to behave.
 jest.mock("../lib/db/requirements-cache", () => ({
   loadRequirementsCache: jest.fn(),
-  saveRequirementsCache: jest.fn(),
+  saveRequirementsCache: jest.fn(() => Promise.resolve()),
+}))
+jest.mock("../lib/db/gear-cache", () => ({
+  loadGearCache: jest.fn(),
+  saveGearCache: jest.fn(() => Promise.resolve()),
+}))
+jest.mock("../lib/db/kit-cache", () => ({
+  loadKitCache: jest.fn(),
+  saveKitCache: jest.fn(() => Promise.resolve()),
 }))
 
 const mockGetTrip = getTrip as jest.Mock
@@ -66,6 +81,8 @@ const mockTogglePackingItem = togglePackingItem as jest.Mock
 const mockRemovePackingItem = removePackingItem as jest.Mock
 const mockGetSession = getSession as jest.Mock
 const mockLoadRequirementsCache = loadRequirementsCache as jest.Mock
+const mockLoadGearCache = loadGearCache as jest.Mock
+const mockLoadKitCache = loadKitCache as jest.Mock
 
 const ME = { userId: "me-id", email: "me@example.com" }
 const MY_ITEM = { id: "item-1", name: "Spare paddle", status: "owned" }
@@ -114,6 +131,8 @@ beforeEach(() => {
   mockGetMyItems.mockResolvedValue([MY_ITEM])
   mockGetPackingItems.mockResolvedValue([])
   mockLoadRequirementsCache.mockReset().mockResolvedValue([])
+  mockLoadGearCache.mockReset().mockResolvedValue([])
+  mockLoadKitCache.mockReset().mockResolvedValue([])
 })
 
 describe("InventoryScreen — group requirements", () => {
@@ -266,5 +285,72 @@ describe("InventoryScreen — my kit", () => {
     await waitFor(() => {
       expect(mockAddPackingItem).toHaveBeenCalledWith("trip-1", "item-1")
     })
+  })
+
+  // The kit was fetched only when its tab was tapped, so a device that never
+  // opened the tab while connected cached nothing — the lazy load made the
+  // cache lazy too. Loading on mount is what gives the cache anything to hold.
+  it("loads the kit on mount so it is cached even if the tab is never opened", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+
+    await render(<InventoryScreen />)
+
+    await waitFor(() => expect(mockGetPackingItems).toHaveBeenCalledWith("trip-1"))
+  })
+})
+
+describe("InventoryScreen — offline kit and gear", () => {
+  beforeEach(() => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockGetPackingItems.mockRejectedValue(new Error("Could not reach the server."))
+  })
+
+  it("falls back to the cached kit, keeping the packed state", async () => {
+    mockLoadKitCache.mockResolvedValue([
+      { id: "entry-1", itemId: "item-1", itemName: "Spare paddle", checked: true },
+    ])
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+
+    expect(await findByText("Spare paddle")).toBeTruthy()
+    expect(getByText(/Offline — showing your last synced kit/)).toBeTruthy()
+  })
+
+  it("disables every kit mutation offline", async () => {
+    mockLoadKitCache.mockResolvedValue([
+      { id: "entry-1", itemId: "item-1", itemName: "Spare paddle", checked: false },
+    ])
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+    await findByText("Spare paddle")
+
+    expect(getByText("Spare paddle")).toBeDisabled()
+    expect(getByText("Remove")).toBeDisabled()
+  })
+
+  // Offline, gear is read-only: it answers "what do I own that is not in this
+  // trip's kit" — the spare-paddle question asked at a put-in — while adding
+  // it still needs a connection.
+  it("still lists unpacked gear from the cache, disabled", async () => {
+    mockGetMyItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadKitCache.mockResolvedValue([])
+    mockLoadGearCache.mockResolvedValue([{ id: "item-1", name: "Spare paddle", status: "owned" }])
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+
+    expect(await findByText("Add Spare paddle")).toBeTruthy()
+    expect(getByText("Add Spare paddle")).toBeDisabled()
+  })
+
+  it("surfaces the error when the kit fetch fails and nothing is cached", async () => {
+    mockLoadKitCache.mockResolvedValue([])
+
+    const { findByText, getByText } = await render(<InventoryScreen />)
+    await fireEvent.press(getByText("My kit"))
+
+    expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
 })

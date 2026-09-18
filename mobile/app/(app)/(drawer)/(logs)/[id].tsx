@@ -12,6 +12,7 @@ import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { LogForm } from "@mobile/components/logs/log-form"
 import { getSession } from "@mobile/lib/auth/session"
+import { loadCachedLog } from "@mobile/lib/db/logs-cache"
 import {
   deleteLog,
   endorseLog,
@@ -32,6 +33,11 @@ export default function LogDetailScreen() {
   const [userId, setUserId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // A cached log is rendered read-only, never through the branches below: every
+  // control on this screen mutates (edit, delete, endorse), and the cache holds
+  // card data only — no notes, no endorsers. Kept as its own state rather than
+  // faking a Log, so nothing downstream can mistake a summary for a full log.
+  const [cachedLog, setCachedLog] = useState<Awaited<ReturnType<typeof loadCachedLog>>>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -39,8 +45,14 @@ export default function LogDetailScreen() {
       const [session, fetchedLog] = await Promise.all([getSession(), getLog(id)])
       setUserId(session?.userId ?? null)
       setLog(fetchedLog)
+      setCachedLog(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      const cached = await loadCachedLog(id)
+      if (cached) {
+        setCachedLog(cached)
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      }
     }
   }, [id])
 
@@ -93,6 +105,45 @@ export default function LogDetailScreen() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (cachedLog) {
+    return (
+      <Screen edges={["bottom"]} className="gap-4 p-4">
+        {header}
+        <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+          Offline — showing your last synced log. Notes, endorsements, and editing need a
+          connection.
+        </Text>
+        <Text className="text-lg font-semibold">{cachedLog.date}</Text>
+        <Row className="flex-wrap gap-x-3 gap-y-1">
+          {cachedLog.hours != null && (
+            <Row className="items-center gap-1">
+              <ClockIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] tabular-nums text-muted-foreground">
+                {cachedLog.hours.toFixed(1)}h
+              </Text>
+            </Row>
+          )}
+          {cachedLog.distance != null && (
+            <Row className="items-center gap-1">
+              <RouteIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] tabular-nums text-muted-foreground">
+                {cachedLog.distance.toFixed(1)} km
+              </Text>
+            </Row>
+          )}
+          {cachedLog.avgSea != null && (
+            <Row className="items-center gap-1">
+              <WavesIcon size={12} color={palette.ocean500} />
+              <Text className="text-[11px] text-muted-foreground">
+                B{cachedLog.avgSea} · {beaufortLabel(cachedLog.avgSea)}
+              </Text>
+            </Row>
+          )}
+        </Row>
+      </Screen>
+    )
   }
 
   if (!log && !error) {

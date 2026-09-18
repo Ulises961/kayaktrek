@@ -35,4 +35,30 @@ describe("migrations", () => {
 
     expect(createdTables).toEqual(["cached_requirements"])
   })
+
+  // Both kit tables land in ONE version bump on purpose: every bump is a
+  // chance for a device to end up stamped at a version whose migration step
+  // was still being written, which has already cost one `adb shell pm clear`.
+  it("has migration steps creating both gear and kit tables at v7", () => {
+    const v7 = migrations.sortedMigrations.find((migration) => migration.toVersion === 7)
+    expect(v7).toBeDefined()
+
+    const createdTables = v7!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables.sort()).toEqual(["cached_gear", "cached_packing_items"].sort())
+  })
+
+  // The guard that would have caught the original v4 -> v5 miss, stated once
+  // for every version rather than as one test per bump.
+  it("has a migration for every version schema.ts has reached", () => {
+    const covered = migrations.sortedMigrations.map((migration) => migration.toVersion).sort()
+    const expected = Array.from(
+      { length: appDatabaseSchema.version - 4 },
+      (_unused, index) => index + 5,
+    )
+
+    expect(covered).toEqual(expected)
+  })
 })
