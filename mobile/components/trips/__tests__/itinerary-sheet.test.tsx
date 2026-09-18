@@ -1,6 +1,7 @@
 import { fireEvent, render } from "@testing-library/react-native"
 
 import type { Day } from "@shared/dtos/day"
+import { getDayColor } from "@shared/itinerary/colors"
 
 import { ItinerarySheet } from "../itinerary-sheet"
 
@@ -52,11 +53,6 @@ const days: Day[] = [
 
 const DAY_ID = "01998e2a-0000-7000-8000-000000000001"
 
-// Same dayNumber (1) as `days[0]`, but with `id: DAY_ID` so it's the day the day-strip chip
-// for "Day 1" actually is — needed for the toggle-on-reselect tests below, which rely on
-// pressing "Day 1" while it's already `selectedDayId`.
-const daysWithConditions: Day[] = [{ id: DAY_ID, dayNumber: 1 }, days[1]]
-
 const dayWithConditions: Day = {
   id: DAY_ID,
   dayNumber: 1,
@@ -71,6 +67,13 @@ const dayWithConditions: Day = {
     seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: 0.8, waveDirection: 210 }],
   },
 }
+
+// Same dayNumber (1) as `days[0]`, but with `id: DAY_ID` so it's the day the day-strip card
+// for "Day 1" actually is — needed for the toggle-on-reselect tests below, which rely on
+// pressing "Day 1" while it's already `selectedDayId`. Carries its own weather/sea (unlike
+// the bare `days` fixture) so the day-strip's own conditions-teaser rendering (independent
+// of which day is selected) has something to show.
+const daysWithConditions: Day[] = [dayWithConditions, days[1]]
 
 describe("ItinerarySheet", () => {
   it("renders a chip per day and selects one on press", async () => {
@@ -140,5 +143,54 @@ describe("ItinerarySheet", () => {
     await fireEvent.press(getByText("Day 1"))
 
     expect(onSelectDay).toHaveBeenCalledWith("day-1")
+  })
+
+  // M9l WP2: the day strip is a richer card per day (color swatch, date,
+  // conditions teaser), not a plain "Day N" Chip — restyling the card, not the
+  // interaction model the tests above already cover.
+  it("colors each day's swatch with getDayColor, keyed by dayNumber not array index", async () => {
+    const { getByTestId } = await render(
+      <ItinerarySheet days={days} selectedDayId="day-1" onSelectDay={jest.fn()} selectedDay={null} />,
+    )
+
+    expect(getByTestId("day-swatch-day-1").props.style).toMatchObject({
+      backgroundColor: getDayColor(1),
+    })
+    expect(getByTestId("day-swatch-day-2").props.style).toMatchObject({
+      backgroundColor: getDayColor(2),
+    })
+  })
+
+  it("shows the day's date when it has one", async () => {
+    const datedDays: Day[] = [{ id: "day-1", dayNumber: 1, date: "2026-07-14" }]
+    const { getByText } = await render(
+      <ItinerarySheet days={datedDays} selectedDayId="day-1" onSelectDay={jest.fn()} selectedDay={null} />,
+    )
+
+    expect(getByText("14 Jul 2026")).toBeTruthy()
+  })
+
+  it("shows a conditions teaser when the day has weather or sea data, nothing when it doesn't", async () => {
+    const { getByText, queryByText } = await render(
+      <ItinerarySheet
+        days={daysWithConditions}
+        selectedDayId={DAY_ID}
+        onSelectDay={jest.fn()}
+        selectedDay={dayWithConditions}
+      />,
+    )
+
+    // The handle renders every day's own card independent of which is selected —
+    // dayWithConditions is DAY_ID's data, days[1] ("Day 2") has none.
+    expect(getByText("18°C · 12 kn · 0.8 m")).toBeTruthy()
+    expect(queryByText(/No forecast/)).toBeNull()
+  })
+
+  it("shows no point count on the day card", async () => {
+    const { queryByText } = await render(
+      <ItinerarySheet days={days} selectedDayId="day-1" onSelectDay={jest.fn()} selectedDay={null} />,
+    )
+
+    expect(queryByText(/point/i)).toBeNull()
   })
 })

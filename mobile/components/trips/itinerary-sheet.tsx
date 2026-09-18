@@ -1,13 +1,16 @@
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet"
 import { useMemo, useState } from "react"
-import { ScrollView, View } from "react-native"
+import { Pressable, ScrollView, View } from "react-native"
 
 import type { Day } from "@shared/dtos/day"
+import { getDayColor } from "@shared/itinerary/colors"
 import { lightTokens } from "@shared/tokens"
+import { formatDayDate } from "@shared/utils/date"
 
-import { hasConditions, WeatherSeaPanel } from "./weather-sea-panel"
-import { Chip } from "../ui/chip"
+import { conditionsTeaser, hasConditions, WeatherSeaPanel } from "./weather-sea-panel"
+import { cn } from "../../lib/cn"
 import { Stack } from "../ui/layout"
+import { Text } from "../ui/text"
 
 // M9b3 WP2: `@gorhom/bottom-sheet` (see plans/M9b3.md's library-choice table) — a
 // non-modal, persistently-docked panel, unlike the reverted `@expo/ui` prototype. The
@@ -94,17 +97,58 @@ function SheetHandle({
             {days
               .filter((day) => day.id)
               .map((day) => (
-                <Chip
+                <DayCard
                   key={day.id}
+                  day={day}
                   active={day.id === selectedDayId}
                   onPress={() => onDayPress(day.id as string)}
-                >
-                  Day {day.dayNumber}
-                </Chip>
+                />
               ))}
           </Stack>
         </ScrollView>
       )}
     </View>
+  )
+}
+
+// M9l WP2: replaces the plain "Day N" Chip with a richer card — color swatch, date,
+// conditions teaser — matching web's DayRail content (frontend/components/map/day-rail.tsx),
+// sized for a phone-width horizontal strip rather than a literal port of its 96px column
+// card (which also has to become a vertical rail from `md`, a constraint mobile never has).
+// Point count is dropped, matching web's own base-breakpoint choice, not an oversight.
+function DayCard({
+  day,
+  active,
+  onPress,
+}: {
+  day: Day
+  active: boolean
+  onPress: () => void
+}) {
+  const date = formatDayDate(day.date)
+  const teaser = conditionsTeaser(day)
+  return (
+    <Pressable
+      onPress={onPress}
+      className={cn(
+        "w-24 gap-1 rounded-lg border px-2 py-1.5",
+        active ? "border-primary bg-primary/10" : "border-border bg-transparent",
+      )}
+    >
+      <View
+        testID={`day-swatch-${day.id}`}
+        className="h-1 w-full rounded-full"
+        style={{ backgroundColor: getDayColor(day.dayNumber) }}
+      />
+      <Text className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>
+        Day {day.dayNumber}
+      </Text>
+      <Text className="text-[11px] text-muted-foreground">{date}</Text>
+      {teaser && (
+        <Text className="text-[11px] text-muted-foreground" numberOfLines={1}>
+          {teaser}
+        </Text>
+      )}
+    </Pressable>
   )
 }
