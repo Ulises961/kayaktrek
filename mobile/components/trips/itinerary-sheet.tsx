@@ -1,110 +1,92 @@
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet"
-import { useMemo, useState } from "react"
-import { ScrollView, View } from "react-native"
+import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { useMemo } from "react";
+import { View } from "react-native";
 
-import type { Day } from "@shared/dtos/day"
-import { lightTokens } from "@shared/tokens"
+import type { Day } from "@shared/dtos/day";
+import { lightTokens } from "@shared/tokens";
 
-import { hasConditions, WeatherSeaPanel } from "./weather-sea-panel"
-import { Chip } from "../ui/chip"
-import { Stack } from "../ui/layout"
+import { PointSummaryCard } from "./point-summary-card";
+import { hasConditions, WeatherSeaPanel } from "./weather-sea-panel";
 
 // M9b3 WP2: `@gorhom/bottom-sheet` (see plans/M9b3.md's library-choice table) — a
-// non-modal, persistently-docked panel, unlike the reverted `@expo/ui` prototype. The
-// day strip is the sheet's `handleComponent` (its always-visible, collapsed-state
-// header), not a fixed row above the map — dragging it, or tapping a day chip,
-// reveals `WeatherSeaPanel` underneath. There is deliberately no `ConditionsHandle`
-// floating pill and no separate expand toggle: the day strip itself is the
-// affordance, since a dedicated chevron next to it duplicated the handle's own
-// drag-to-expand gesture.
-const COLLAPSED_SNAP_POINT = "13%"
-const EXPANDED_SNAP_POINT = "45%"
+// non-modal, persistently-docked panel, unlike the reverted `@expo/ui` prototype.
+// M9l WP2 (revised): the day strip used to live in this sheet's handle; it's now
+// `DayRail`, a separate bar above the map (matching web's actual layout — see
+// day-rail.tsx's own comment). This sheet is purely the weather/sea panel now,
+// `expanded` driven by the parent screen (day selection lives there too, since
+// tapping an already-selected day in the rail toggles this sheet without the rail
+// itself needing to know anything about sheet state).
+// M9l WP3: a selected point swaps the body to PointSummaryCard instead — "one
+// sheet, one body, swapped by selection state," the plan's own WP3 call, avoiding
+// two gorhom instances fighting for the same screen edge (web solves the same
+// problem by making Point a fourth tab of the same FeatureDrawer, not a second
+// sheet). A point always has *something* to show (Start at minimum), so it can
+// expand the sheet even on a day with no weather/sea data — canExpand is `true`
+// whenever a point is selected, not just when the day has conditions.
+const COLLAPSED_SNAP_POINT = "13%";
+const EXPANDED_SNAP_POINT = "45%";
 
 export function ItinerarySheet({
-  days,
-  selectedDayId,
-  onSelectDay,
   selectedDay,
+  selectedPointId,
+  days,
+  avgSpeedKnots,
+  onClosePoint,
+  expanded,
+  onExpandedChange,
   onRefreshWeather,
 }: {
-  days: Day[]
-  selectedDayId: string | null
-  onSelectDay: (id: string | null) => void
-  selectedDay: Day | null
-  onRefreshWeather?: () => Promise<void>
+  selectedDay: Day | null;
+  selectedPointId: string | null;
+  days: Day[];
+  avgSpeedKnots: number;
+  onClosePoint: () => void;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  onRefreshWeather?: () => Promise<void>;
 }) {
-  const [expandRequested, setExpandRequested] = useState(false)
-  const canExpand = hasConditions(selectedDay)
-  // Derived, not effect-driven: switching to a day with no weather/sea data
-  // collapses the sheet automatically (there's nothing to show expanded, and
-  // leaving it open would strand the user looking at an empty panel over the
-  // map), and switching back to a day that has data restores whatever the user
-  // last asked for.
-  const expanded = expandRequested && canExpand
+  const showingPoint = selectedPointId != null;
+  const canExpand = showingPoint || hasConditions(selectedDay);
+  // A day with no weather/sea data (and no point selected) has nothing to show
+  // expanded — leaving the sheet open would strand the user looking at an empty
+  // panel over the map.
+  const actuallyExpanded = expanded && canExpand;
 
   const snapPoints = useMemo(
-    () => (canExpand ? [COLLAPSED_SNAP_POINT, EXPANDED_SNAP_POINT] : [COLLAPSED_SNAP_POINT]),
+    () =>
+      canExpand
+        ? [COLLAPSED_SNAP_POINT, EXPANDED_SNAP_POINT]
+        : [COLLAPSED_SNAP_POINT],
     [canExpand],
-  )
-
-  function handleDayPress(dayId: string) {
-    if (dayId === selectedDayId) {
-      setExpandRequested((v) => !v)
-      return
-    }
-    onSelectDay(dayId)
-    setExpandRequested(true)
-  }
+  );
 
   return (
     <BottomSheet
-      index={expanded ? 1 : 0}
+      index={actuallyExpanded ? 1 : 0}
       snapPoints={snapPoints}
-      onChange={(i) => setExpandRequested(i > 0)}
+      onChange={(i) => onExpandedChange(i > 0)}
       enableContentPanningGesture={canExpand}
       enableHandlePanningGesture={canExpand}
       backgroundStyle={{ backgroundColor: lightTokens.card }}
       handleIndicatorStyle={{ backgroundColor: lightTokens.border }}
       handleComponent={() => (
-        <SheetHandle days={days} selectedDayId={selectedDayId} onDayPress={handleDayPress} />
+        <View className="items-center border-b border-border bg-card px-4 pb-2 pt-2">
+          <View className="h-1 w-9 rounded-full bg-border" />
+        </View>
       )}
     >
       <BottomSheetView style={{ paddingBottom: 24 }}>
-        <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />
+        {selectedPointId ? (
+          <PointSummaryCard
+            pointId={selectedPointId}
+            days={days}
+            avgSpeedKnots={avgSpeedKnots}
+            onClose={onClosePoint}
+          />
+        ) : (
+          <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />
+        )}
       </BottomSheetView>
     </BottomSheet>
-  )
-}
-
-function SheetHandle({
-  days,
-  selectedDayId,
-  onDayPress,
-}: {
-  days: Day[]
-  selectedDayId: string | null
-  onDayPress: (dayId: string) => void
-}) {
-  return (
-    <View className="border-b border-border bg-card px-4 pb-3 pt-2">
-      <View className="mb-2 h-1 w-9 self-center rounded-full bg-border" />
-      {days.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Stack className="flex-row gap-2">
-            {days
-              .filter((day) => day.id)
-              .map((day) => (
-                <Chip
-                  key={day.id}
-                  active={day.id === selectedDayId}
-                  onPress={() => onDayPress(day.id as string)}
-                >
-                  Day {day.dayNumber}
-                </Chip>
-              ))}
-          </Stack>
-        </ScrollView>
-      )}
-    </View>
-  )
+  );
 }

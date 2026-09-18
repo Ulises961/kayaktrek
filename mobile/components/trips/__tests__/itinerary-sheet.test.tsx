@@ -1,8 +1,8 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native";
 
-import type { Day } from "@shared/dtos/day"
+import type { Day } from "@shared/dtos/day";
 
-import { ItinerarySheet } from "../itinerary-sheet"
+import { ItinerarySheet } from "../itinerary-sheet";
 
 // @gorhom/bottom-sheet drives everything through native Reanimated worklets, which jest
 // has no binding for (same class of failure jest.setup.ts already documents for
@@ -14,9 +14,9 @@ import { ItinerarySheet } from "../itinerary-sheet"
 // ItinerarySheet asked to expand/collapse without a real native sheet to look at.
 jest.mock("@gorhom/bottom-sheet", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const React = require("react")
+  const React = require("react");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Text, View } = require("react-native")
+  const { Text, View } = require("react-native");
 
   const MockBottomSheet = React.forwardRef(
     (
@@ -24,7 +24,11 @@ jest.mock("@gorhom/bottom-sheet", () => {
         index,
         handleComponent: Handle,
         children,
-      }: { index?: number; handleComponent?: () => React.ReactNode; children?: React.ReactNode },
+      }: {
+        index?: number;
+        handleComponent?: () => React.ReactNode;
+        children?: React.ReactNode;
+      },
       _ref: unknown,
     ) => (
       <View>
@@ -33,29 +37,22 @@ jest.mock("@gorhom/bottom-sheet", () => {
         {children}
       </View>
     ),
-  )
-  MockBottomSheet.displayName = "MockBottomSheet"
+  );
+  MockBottomSheet.displayName = "MockBottomSheet";
 
   return {
     __esModule: true,
     default: MockBottomSheet,
-    BottomSheetView: ({ children, ...props }: { children?: React.ReactNode }) => (
-      <View {...props}>{children}</View>
-    ),
-  }
-})
+    BottomSheetView: ({
+      children,
+      ...props
+    }: {
+      children?: React.ReactNode;
+    }) => <View {...props}>{children}</View>,
+  };
+});
 
-const days: Day[] = [
-  { id: "day-1", dayNumber: 1 },
-  { id: "day-2", dayNumber: 2 },
-]
-
-const DAY_ID = "01998e2a-0000-7000-8000-000000000001"
-
-// Same dayNumber (1) as `days[0]`, but with `id: DAY_ID` so it's the day the day-strip chip
-// for "Day 1" actually is — needed for the toggle-on-reselect tests below, which rely on
-// pressing "Day 1" while it's already `selectedDayId`.
-const daysWithConditions: Day[] = [{ id: DAY_ID, dayNumber: 1 }, days[1]]
+const DAY_ID = "01998e2a-0000-7000-8000-000000000001";
 
 const dayWithConditions: Day = {
   id: DAY_ID,
@@ -63,82 +60,144 @@ const dayWithConditions: Day = {
   weather: {
     dayId: DAY_ID,
     weatherStates: [
-      { dayId: DAY_ID, time: "12:00:00", temperature: 18, windForce: 12, windDirection: 270, precipitation: 0 },
+      {
+        dayId: DAY_ID,
+        time: "12:00:00",
+        temperature: 18,
+        windForce: 12,
+        windDirection: 270,
+        precipitation: 0,
+      },
     ],
   },
   sea: {
     dayId: DAY_ID,
-    seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: 0.8, waveDirection: 210 }],
+    seaStates: [
+      { dayId: DAY_ID, time: "12:00:00", waveHeight: 0.8, waveDirection: 210 },
+    ],
   },
-}
+};
 
+const dayWithoutConditions: Day = { id: "day-2", dayNumber: 2 };
+
+const daysWithPoint: Day[] = [
+  {
+    id: "day-1",
+    dayNumber: 1,
+    points: [
+      { id: "p1", type: "stop", latitude: 0, longitude: 0, nextId: "p2", name: "Harbour" },
+      { id: "p2", type: "position", latitude: 0, longitude: 0.1 },
+    ],
+  },
+];
+
+// M9l WP2 (revised): day selection/toggle now lives in the parent screen (via
+// `DayRail`, a separate top bar) — ItinerarySheet is purely a controlled weather/sea
+// panel. See day-rail.test.tsx for the day-strip's own tests.
+// M9l WP3: a selected point replaces the weather body with PointSummaryCard — "one
+// sheet, one body, swapped by selection state," per the plan's own WP3 call.
 describe("ItinerarySheet", () => {
-  it("renders a chip per day and selects one on press", async () => {
-    const onSelectDay = jest.fn()
-    const { getByText } = await render(
-      <ItinerarySheet days={days} selectedDayId="day-1" onSelectDay={onSelectDay} selectedDay={null} />,
-    )
-
-    await fireEvent.press(getByText("Day 2"))
-
-    expect(onSelectDay).toHaveBeenCalledWith("day-2")
-  })
-
-  it("stays collapsed when tapping the selected day has no weather or sea data", async () => {
-    const { getByText, getByTestId } = await render(
-      <ItinerarySheet days={days} selectedDayId="day-1" onSelectDay={jest.fn()} selectedDay={days[0]} />,
-    )
-
-    await fireEvent.press(getByText("Day 1"))
-
-    expect(getByTestId("sheet-index").props.children).toBe(0)
-  })
-
-  it("expands when tapping the selected day that has conditions", async () => {
-    const { getByText, getByTestId } = await render(
+  it("collapses when the caller asks it to, even if the day has conditions", async () => {
+    const { getByTestId } = await render(
       <ItinerarySheet
-        days={daysWithConditions}
-        selectedDayId={DAY_ID}
-        onSelectDay={jest.fn()}
         selectedDay={dayWithConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={false}
+        onExpandedChange={jest.fn()}
       />,
-    )
+    );
 
-    expect(getByTestId("sheet-index").props.children).toBe(0)
+    expect(getByTestId("sheet-index").props.children).toBe(0);
+  });
 
-    await fireEvent.press(getByText("Day 1"))
+  it("expands when the caller asks it to and the day has conditions", async () => {
+    const { getByTestId, getByText } = await render(
+      <ItinerarySheet
+        selectedDay={dayWithConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
 
-    expect(getByTestId("sheet-index").props.children).toBe(1)
+    expect(getByTestId("sheet-index").props.children).toBe(1);
     // WeatherSeaPanel's own body content (the "HH:MM · temp" row) — proves the sheet
-    // body actually renders it, not just the handle's condensed day strip.
-    expect(getByText(/12:00 · 18°C/)).toBeTruthy()
-  })
+    // body actually renders it, not just asking for index 1.
+    expect(getByText(/12:00 · 18°C/)).toBeTruthy();
+  });
 
-  it("collapses again when tapping the already-expanded day a second time", async () => {
-    const { getByText, getByTestId } = await render(
+  it("stays collapsed when asked to expand a day with no weather or sea data", async () => {
+    const { getByTestId } = await render(
       <ItinerarySheet
-        days={daysWithConditions}
-        selectedDayId={DAY_ID}
-        onSelectDay={jest.fn()}
-        selectedDay={dayWithConditions}
+        selectedDay={dayWithoutConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={true}
+        onExpandedChange={jest.fn()}
       />,
-    )
+    );
 
-    await fireEvent.press(getByText("Day 1"))
-    expect(getByTestId("sheet-index").props.children).toBe(1)
+    expect(getByTestId("sheet-index").props.children).toBe(0);
+  });
 
-    await fireEvent.press(getByText("Day 1"))
-    expect(getByTestId("sheet-index").props.children).toBe(0)
-  })
+  it("stays collapsed with no selected day at all", async () => {
+    const { getByTestId } = await render(
+      <ItinerarySheet
+        selectedDay={null}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
 
-  it("switching to a different day still calls onSelectDay", async () => {
-    const onSelectDay = jest.fn()
-    const { getByText } = await render(
-      <ItinerarySheet days={days} selectedDayId="day-2" onSelectDay={onSelectDay} selectedDay={days[1]} />,
-    )
+    expect(getByTestId("sheet-index").props.children).toBe(0);
+  });
 
-    await fireEvent.press(getByText("Day 1"))
+  it("shows the point summary instead of weather when a point is selected, and expands even without conditions", async () => {
+    const { getByTestId, getByText, queryByText } = await render(
+      <ItinerarySheet
+        selectedDay={dayWithoutConditions}
+        selectedPointId="p1"
+        days={daysWithPoint}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
 
-    expect(onSelectDay).toHaveBeenCalledWith("day-1")
-  })
-})
+    expect(getByTestId("sheet-index").props.children).toBe(1);
+    expect(getByText("Harbour")).toBeTruthy();
+    expect(queryByText(/12:00/)).toBeNull();
+  });
+
+  it("calls onClosePoint from the point summary's close button", async () => {
+    const onClosePoint = jest.fn();
+    const { getByLabelText } = await render(
+      <ItinerarySheet
+        selectedDay={dayWithoutConditions}
+        selectedPointId="p1"
+        days={daysWithPoint}
+        avgSpeedKnots={2.5}
+        onClosePoint={onClosePoint}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
+
+    await fireEvent.press(getByLabelText("Close"));
+
+    expect(onClosePoint).toHaveBeenCalled();
+  });
+});
