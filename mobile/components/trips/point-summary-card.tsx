@@ -1,8 +1,15 @@
-import { Anchor, CircleDot, X } from "lucide-react-native";
+import {
+  Anchor,
+  CircleDot,
+  Image as ImageIcon,
+  Route as RouteIcon,
+  StickyNote,
+  X,
+} from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import type { Day } from "@shared/dtos/day";
-import { palette } from "@shared/tokens";
+import { lightTokens, palette } from "@shared/tokens";
 
 import { pointLegSummary } from "@mobile/lib/itinerary/point-summary";
 import { Row, Stack } from "../ui/layout";
@@ -62,15 +69,27 @@ export function PointSummaryCard({
         </Pressable>
       </Row>
 
-      <Row className="flex-wrap gap-2">
-        <View className="w-[31%] min-w-[90px] gap-0.5 rounded-lg bg-muted/40 px-2.5 py-2">
-          <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-            Leg
-          </Text>
+      {/* Icon-row micro-typography (M9b2's TripCard/LogCard convention): 12px icon,
+          lightTokens.mutedForeground, 11px tabular-nums for measured values — not
+          the bare uppercase-caption tiles this card started with. A visible border
+          (not just a muted fill) gives each tile a defined edge at this size.
+          `items-stretch` overrides Row's own `items-center` default — without it
+          each tile sizes to its own content (Leg has up to 3 lines, Notes/Images
+          have 1), so the three didn't match heights as siblings in the same row. */}
+      <Row className="flex-wrap items-stretch gap-2">
+        <View className="w-[31%] min-w-[90px] gap-1 rounded-lg border border-border px-2.5 py-2">
+          <Row className="items-center gap-1">
+            <RouteIcon size={12} color={lightTokens.mutedForeground} />
+            <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+              Leg
+            </Text>
+          </Row>
           {leg ? (
             <>
-              <Text className="text-[11px] font-medium">{leg.legText}</Text>
-              <Text className="text-[9px] text-muted-foreground/70">
+              <Text className="text-[11px] font-medium tabular-nums">
+                {leg.legText}
+              </Text>
+              <Text className="text-[9px] tabular-nums text-muted-foreground/70">
                 {leg.totalText}
               </Text>
             </>
@@ -79,10 +98,13 @@ export function PointSummaryCard({
           )}
         </View>
 
-        <View className="w-[31%] min-w-[90px] gap-0.5 rounded-lg bg-muted/40 px-2.5 py-2">
-          <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-            Notes
-          </Text>
+        <View className="w-[31%] min-w-[90px] gap-1 rounded-lg border border-border px-2.5 py-2">
+          <Row className="items-center gap-1">
+            <StickyNote size={12} color={lightTokens.mutedForeground} />
+            <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+              Notes
+            </Text>
+          </Row>
           <Text
             className={
               point.notes
@@ -95,15 +117,18 @@ export function PointSummaryCard({
           </Text>
         </View>
 
-        <View className="w-[31%] min-w-[90px] gap-0.5 rounded-lg bg-muted/40 px-2.5 py-2">
-          <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-            Images
-          </Text>
+        <View className="w-[31%] min-w-[90px] gap-1 rounded-lg border border-border px-2.5 py-2">
+          <Row className="items-center gap-1">
+            <ImageIcon size={12} color={lightTokens.mutedForeground} />
+            <Text className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+              Images
+            </Text>
+          </Row>
           <Text
             className={
               imageCount > 0
-                ? "text-[11px] font-medium text-primary"
-                : "text-[11px] font-medium text-muted-foreground"
+                ? "text-[11px] font-medium tabular-nums text-primary"
+                : "text-[11px] font-medium tabular-nums text-muted-foreground"
             }
           >
             {imageCount}

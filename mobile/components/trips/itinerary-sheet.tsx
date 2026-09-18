@@ -24,7 +24,12 @@ import { hasConditions, WeatherSeaPanel } from "./weather-sea-panel";
 // expand the sheet even on a day with no weather/sea data — canExpand is `true`
 // whenever a point is selected, not just when the day has conditions.
 const COLLAPSED_SNAP_POINT = "13%";
-const EXPANDED_SNAP_POINT = "45%";
+// M9l WP4 grew the expanded body substantially (two full hourly grids plus the
+// tide row, where there used to be one representative-hour line) — 45% capped
+// it well before that content fit, found in manual on-device testing. 80% gives
+// real room without going edge-to-edge (the map stays partly visible above the
+// sheet, matching this sheet's whole "docked over the map" design).
+const EXPANDED_SNAP_POINT = "80%";
 
 export function ItinerarySheet({
   selectedDay,
