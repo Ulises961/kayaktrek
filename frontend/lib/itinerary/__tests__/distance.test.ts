@@ -5,6 +5,7 @@ import {
   toKm,
   toNm,
   formatDistance,
+  formatDistanceForInput,
   estimatedTime,
   formatTime,
   legLabel,
@@ -80,6 +81,32 @@ describe("formatDistance", () => {
   it("converts to km and formats with 1 decimal", () => {
     // 10 nm × 1.852 = 18.520 → "18.5"
     expect(formatDistance(10, "km")).toBe("18.5")
+  })
+})
+
+describe("formatDistanceForInput", () => {
+  // A log auto-generated from an expedition carries the full float the haversine
+  // sum produced. Bound straight into an editable field it rendered as
+  // "0.6568740073199207" — sub-millimetre precision, in a box a person is meant
+  // to read and correct.
+  it("trims a computed distance to something a person can edit", () => {
+    expect(formatDistanceForInput(0.6568740073199207)).toBe("0.66")
+  })
+
+  it("drops trailing zeros rather than padding to a fixed width", () => {
+    expect(formatDistanceForInput(12)).toBe("12")
+    expect(formatDistanceForInput(6.1)).toBe("6.1")
+    expect(formatDistanceForInput(6.4)).toBe("6.4")
+  })
+
+  it("keeps 10-metre resolution, which 1 decimal would lose on a short paddle", () => {
+    expect(formatDistanceForInput(0.65)).toBe("0.65")
+    expect(formatDistanceForInput(0.649)).toBe("0.65")
+  })
+
+  it("handles zero and very small distances without scientific notation", () => {
+    expect(formatDistanceForInput(0)).toBe("0")
+    expect(formatDistanceForInput(0.0001)).toBe("0")
   })
 })
 

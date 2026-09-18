@@ -43,6 +43,24 @@ export function formatDistance(nm: number, unit: DistanceUnit): string {
   return value.toFixed(1)
 }
 
+/**
+ * A distance for an editable field, already in the caller's display unit.
+ *
+ * Distinct from `formatDistance`, which is for reading: that pads to a fixed
+ * width, which is right in a card and wrong in an input a person edits and saves
+ * back. Two decimals keeps 10-metre resolution — enough for a short paddle, where
+ * one decimal would round 0.65 to 0.7 — and trailing zeros are dropped so a whole
+ * number stays "12".
+ *
+ * The value it replaces is the raw float a computed log carries (an expedition
+ * log's haversine sum), which rendered in the field as "0.6568740073199207".
+ * Saving persists what is shown, so a distance the user did not touch settles at
+ * the precision they were shown rather than silently keeping digits they never saw.
+ */
+export function formatDistanceForInput(value: number): string {
+  return String(Number(value.toFixed(2)))
+}
+
 export function estimatedTime(
   distanceNm: number,
   speedKnots: number,
