@@ -1,6 +1,7 @@
 import { useState } from "react"
 
 import type { Log, LogFields } from "@shared/dtos/log"
+import { formatDistanceForInput } from "@shared/itinerary/distance"
 
 import { Button, type ButtonProps } from "../ui/button"
 import { Input } from "../ui/input"
@@ -26,7 +27,10 @@ export function toFormValues(fields?: LogFormInitial): LogFormValues {
     date: fields.date ?? "",
     hours: fields.hours != null ? String(fields.hours) : "",
     avgSea: fields.avgSea != null ? String(fields.avgSea) : "",
-    distance: fields.distance != null ? String(fields.distance) : "",
+    // Not String() like the fields above: a log generated from an expedition
+    // carries the haversine sum's full float, which reached the input as
+    // "0.6568740073199207".
+    distance: fields.distance != null ? formatDistanceForInput(fields.distance) : "",
     notes: fields.notes ?? "",
   }
 }
