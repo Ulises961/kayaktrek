@@ -32,7 +32,15 @@ import { getTrip } from "@mobile/lib/trips/actions";
 // `Trip` DTO — a lighter local type than importing `Trip` avoids fabricating
 // every other field (medical, logistics, ...) for the offline-reconstructed
 // case, which has no equivalent to supply them.
-type ScreenTrip = { destination: string | null; days: Day[] };
+type ScreenTrip = {
+  destination: string | null;
+  days: Day[];
+  avgSpeedKnots: number;
+};
+
+// Same fallback web's builder uses (map-builder.tsx) when the itinerary has never
+// had a speed set — kept as one named constant rather than repeating the literal.
+const DEFAULT_AVG_SPEED_KNOTS = 2.5;
 
 // A minimal inline style — one raster source pointing at the M8 tile proxy, one layer
 // to render it — rather than a hosted style.json (plans/M9b.md WP3: "no new backend
@@ -78,6 +86,7 @@ export default function TripMapScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [zoom, setZoom] = useState(10);
   const cameraRef = useRef<CameraRef>(null);
@@ -90,7 +99,11 @@ export default function TripMapScreen() {
     try {
       const t = await getTrip(id);
       const days = t.itinerary?.days ?? [];
-      setTrip({ destination: t.destination ?? null, days });
+      setTrip({
+        destination: t.destination ?? null,
+        days,
+        avgSpeedKnots: t.itinerary?.avgSpeedKnots ?? DEFAULT_AVG_SPEED_KNOTS,
+      });
       setIsOffline(false);
       setError(null);
       setSelectedDayId((current) => current ?? days[0]?.id ?? null);
@@ -101,7 +114,9 @@ export default function TripMapScreen() {
     } catch (err) {
       const offline = await loadOfflineTrip(id);
       if (offline.days.length > 0 || offline.destination !== null) {
-        setTrip(offline);
+        // The cache has no speed setting of its own — same default as a live
+        // itinerary that's never had one set.
+        setTrip({ ...offline, avgSpeedKnots: DEFAULT_AVG_SPEED_KNOTS });
         setIsOffline(true);
         setError(null);
         setSelectedDayId((current) => current ?? offline.days[0]?.id ?? null);
@@ -130,12 +145,25 @@ export default function TripMapScreen() {
   // (a separate top bar, M9l WP2 revised) and ItinerarySheet (purely the weather/sea
   // panel now) don't know about each other, only about this screen's state.
   function handleDayPress(dayId: string) {
+    setSelectedPointId(null);
     if (dayId === selectedDayId) {
       setSheetExpanded((v) => !v);
       return;
     }
     setSelectedDayId(dayId);
     setSheetExpanded(true);
+  }
+
+  // M9l WP3: tapping a point selects it and expands the sheet to show its summary;
+  // tapping empty map space or re-tapping the day strip (handleDayPress, above)
+  // returns the sheet to the weather body.
+  function handlePointPress(pointId: string) {
+    setSelectedPointId(pointId);
+    setSheetExpanded(true);
+  }
+
+  function handleMapPress() {
+    setSelectedPointId(null);
   }
 
   // M9l WP1: the whole trip's route, colored per day, always on screen — selecting
@@ -207,6 +235,7 @@ export default function TripMapScreen() {
             mapStyle={MAP_STYLE}
             style={{ flex: 1 }}
             onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
+            onPress={handleMapPress}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
             // compositing layer outside RN's normal view z-order — this is what caused the
             // day-strip/weather-panel area above the map to render as a solid black bar
@@ -244,6 +273,7 @@ export default function TripMapScreen() {
                 key={point.id ?? index}
                 id={point.id ?? String(index)}
                 lngLat={[point.longitude, point.latitude]}
+                onPress={() => point.id && handlePointPress(point.id)}
               >
                 {/* Colored by owning day (getDayColor), not by point type, per M9l WP1 —
                   the stop-vs-position distinction moves to size/shape instead: stops
@@ -268,6 +298,10 @@ export default function TripMapScreen() {
 
           <ItinerarySheet
             selectedDay={selectedDay}
+            selectedPointId={selectedPointId}
+            days={days}
+            avgSpeedKnots={trip.avgSpeedKnots}
+            onClosePoint={() => setSelectedPointId(null)}
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}
             onRefreshWeather={reload}

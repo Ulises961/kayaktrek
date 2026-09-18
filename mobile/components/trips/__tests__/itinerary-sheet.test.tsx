@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import type { Day } from "@shared/dtos/day";
 
@@ -80,14 +80,31 @@ const dayWithConditions: Day = {
 
 const dayWithoutConditions: Day = { id: "day-2", dayNumber: 2 };
 
+const daysWithPoint: Day[] = [
+  {
+    id: "day-1",
+    dayNumber: 1,
+    points: [
+      { id: "p1", type: "stop", latitude: 0, longitude: 0, nextId: "p2", name: "Harbour" },
+      { id: "p2", type: "position", latitude: 0, longitude: 0.1 },
+    ],
+  },
+];
+
 // M9l WP2 (revised): day selection/toggle now lives in the parent screen (via
 // `DayRail`, a separate top bar) — ItinerarySheet is purely a controlled weather/sea
 // panel. See day-rail.test.tsx for the day-strip's own tests.
+// M9l WP3: a selected point replaces the weather body with PointSummaryCard — "one
+// sheet, one body, swapped by selection state," per the plan's own WP3 call.
 describe("ItinerarySheet", () => {
   it("collapses when the caller asks it to, even if the day has conditions", async () => {
     const { getByTestId } = await render(
       <ItinerarySheet
         selectedDay={dayWithConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
         expanded={false}
         onExpandedChange={jest.fn()}
       />,
@@ -100,6 +117,10 @@ describe("ItinerarySheet", () => {
     const { getByTestId, getByText } = await render(
       <ItinerarySheet
         selectedDay={dayWithConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -115,6 +136,10 @@ describe("ItinerarySheet", () => {
     const { getByTestId } = await render(
       <ItinerarySheet
         selectedDay={dayWithoutConditions}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -127,11 +152,52 @@ describe("ItinerarySheet", () => {
     const { getByTestId } = await render(
       <ItinerarySheet
         selectedDay={null}
+        selectedPointId={null}
+        days={[]}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
     );
 
     expect(getByTestId("sheet-index").props.children).toBe(0);
+  });
+
+  it("shows the point summary instead of weather when a point is selected, and expands even without conditions", async () => {
+    const { getByTestId, getByText, queryByText } = await render(
+      <ItinerarySheet
+        selectedDay={dayWithoutConditions}
+        selectedPointId="p1"
+        days={daysWithPoint}
+        avgSpeedKnots={2.5}
+        onClosePoint={jest.fn()}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId("sheet-index").props.children).toBe(1);
+    expect(getByText("Harbour")).toBeTruthy();
+    expect(queryByText(/12:00/)).toBeNull();
+  });
+
+  it("calls onClosePoint from the point summary's close button", async () => {
+    const onClosePoint = jest.fn();
+    const { getByLabelText } = await render(
+      <ItinerarySheet
+        selectedDay={dayWithoutConditions}
+        selectedPointId="p1"
+        days={daysWithPoint}
+        avgSpeedKnots={2.5}
+        onClosePoint={onClosePoint}
+        expanded={true}
+        onExpandedChange={jest.fn()}
+      />,
+    );
+
+    await fireEvent.press(getByLabelText("Close"));
+
+    expect(onClosePoint).toHaveBeenCalled();
   });
 });
