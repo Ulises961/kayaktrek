@@ -1,6 +1,6 @@
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { PackageCheckIcon, PackageIcon } from "lucide-react-native"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Alert, ScrollView } from "react-native"
 
 import type { Item } from "@shared/dtos/item"
@@ -16,6 +16,8 @@ import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
+import { loadGearCache, saveGearCache } from "@mobile/lib/db/gear-cache"
+import { loadKitCache, saveKitCache } from "@mobile/lib/db/kit-cache"
 import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/requirements-cache"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import {
@@ -37,6 +39,15 @@ const header = <RouterStack.Screen options={{ title: "Inventory" }} />
 
 type Tab = "group" | "kit"
 
+// The fields this screen reads off a piece of gear. Both the live `Item` DTO and
+// gear-cache.ts's GearCardData satisfy it, so the render below doesn't branch on
+// source — same idiom as float-plan.tsx's CrewMemberView.
+type GearView = {
+  id?: string
+  name?: string | null
+  status?: string | null
+}
+
 // Sovereignty rule (M6b): you may remove only what you proposed, and act only on
 // your own contribution — no leader-override branch, mirroring the backend exactly.
 export default function InventoryScreen() {
@@ -45,30 +56,25 @@ export default function InventoryScreen() {
   const [userId, setUserId] = useState<string | null>(null)
 
   const [inventoryId, setInventoryId] = useState<string | null>(null)
-  const [myItems, setMyItems] = useState<Item[]>([])
 
   const [newRequirementName, setNewRequirementName] = useState("")
   const [coveringId, setCoveringId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-
-  const [packingItems, setPackingItems] = useState<PersonalPackingItem[] | null>(null)
-  const [kitError, setKitError] = useState<string | null>(null)
 
   // Live-first, cache-fallback for the "Group" tab's requirement checklist —
   // same wholesale-replace shape as logs/buddies (M9c WP6), extracted into
   // useLiveCache. Only name/status survive offline (see requirements-cache.ts's
   // RequirementCardData); who's covering what, and every mutation
   // (add/remove/cover/withdraw), need a connection regardless, so `isOffline`
-  // disables them below. "My kit" stays out of scope here — still deferred,
-  // same as Crew/Logistics. inventoryId/myItems/userId are set as a side
-  // effect of fetchLive and simply keep their last value offline, same as
-  // logs.tsx's stats/requests.
+  // disables them below. inventoryId/userId are set as a side effect of
+  // fetchLive and simply keep their last value offline, same as logs.tsx's
+  // stats/requests.
+  //
   const requirementsCache = useLiveCache<TripRequirement[]>({
     fetchLive: async () => {
-      const [session, trip, items] = await Promise.all([getSession(), getTrip(id), getMyItems()])
+      const [session, trip] = await Promise.all([getSession(), getTrip(id)])
       setUserId(session?.userId ?? null)
       setInventoryId(trip.inventory?.id ?? null)
-      setMyItems(items)
       return trip.inventory?.requirements ?? []
     },
     loadCache: async () => {
@@ -85,22 +91,66 @@ export default function InventoryScreen() {
   const isOffline = requirementsCache.isOffline
   const load = requirementsCache.reload
 
-  const loadKit = useCallback(async () => {
-    setKitError(null)
-    try {
-      setPackingItems(await getPackingItems(id))
-    } catch (err) {
-      setKitError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-    }
-  }, [id])
+  // Gear gets its own cache rather than riding along with the requirements
+  // fetch, because it is the one thing on this screen that is NOT trip-scoped:
+  // `Item` is the user's own closet, referenced by a trip only through a
+  // requirement contribution or a packing entry. Folding it in gave it no
+  // offline state of its own, so a device with cached gear but no cached
+  // requirements showed the gear with its actions still enabled — and tapping
+  // one failed against the network.
+  const gearCache = useLiveCache<GearView[]>({
+    fetchLive: () => getMyItems(),
+    loadCache: () => loadGearCache(),
+    saveCache: (items) => saveGearCache(items as Item[]),
+    isCacheEmpty: (items) => items.length === 0,
+  })
+  const myItems = gearCache.data ?? []
+  const isGearOffline = gearCache.isOffline
+  const loadGear = gearCache.reload
+
+  // The kit resolves independently of the requirements above: it is a different
+  // endpoint (personal packing, not the trip inventory), so one can be cached
+  // while the other is live.
+  const kitCache = useLiveCache<PersonalPackingItem[]>({
+    fetchLive: () => getPackingItems(id),
+    loadCache: async () => {
+      const cached = await loadKitCache(id)
+      // Rebuilt into the DTO shape the render below already reads, same as the
+      // requirement cache does — keeps one render path for both sources.
+      return cached.map((entry) => ({
+        id: entry.id,
+        checked: entry.checked,
+        item: { id: entry.itemId ?? undefined, name: entry.itemName },
+      })) as PersonalPackingItem[]
+    },
+    saveCache: (entries) => saveKitCache(id, entries),
+    isCacheEmpty: (entries) => entries.length === 0,
+  })
+  const packingItems = kitCache.data
+  const kitError = kitCache.error
+  const isKitOffline = kitCache.isOffline
+  const loadKit = kitCache.reload
+  const setPackingItems = kitCache.setData
+  const setKitError = kitCache.setError
 
   useEffect(() => {
     void load()
   }, [load])
 
+  useEffect(() => {
+    void loadGear()
+  }, [loadGear])
+
+  // Loaded on mount, not on first tab press. The kit used to be fetched only
+  // when its tab was opened, which made its cache lazy too: a device that never
+  // tapped "My kit" while connected had nothing to show once it went offline —
+  // and "did I pack the spare paddle" is asked at the put-in, not at home.
+  useEffect(() => {
+    void loadKit()
+  }, [loadKit])
+
   function selectTab(next: Tab) {
     setTab(next)
-    if (next === "kit" && packingItems === null) void loadKit()
   }
 
   async function handleAddRequirement() {
@@ -144,7 +194,7 @@ export default function InventoryScreen() {
     )
   }
 
-  async function handleContribute(requirement: TripRequirement, item: Item) {
+  async function handleContribute(requirement: TripRequirement, item: GearView) {
     if (!inventoryId || !requirement.id || !item.id) return
     setBusyId(requirement.id)
     try {
@@ -208,7 +258,7 @@ export default function InventoryScreen() {
     ])
   }
 
-  async function handleAddPacking(item: Item) {
+  async function handleAddPacking(item: GearView) {
     if (!item.id) return
     setBusyId(item.id)
     try {
@@ -359,6 +409,12 @@ export default function InventoryScreen() {
 
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
+          {isKitOffline && (
+            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+              Offline — showing your last synced kit. Packing, adding, and removing need a
+              connection.
+            </Text>
+          )}
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}
           {(packingItems ?? []).map((entry) => (
             <Card key={entry.id}>
@@ -366,7 +422,7 @@ export default function InventoryScreen() {
                 <Row className="justify-between">
                   <Button
                     variant={entry.checked ? "secondary" : "outline"}
-                    disabled={busyId === entry.id}
+                    disabled={busyId === entry.id || isKitOffline}
                     onPress={() => void handleTogglePacking(entry)}
                   >
                     {entry.item?.name ?? "Item"}
@@ -374,7 +430,7 @@ export default function InventoryScreen() {
                   <Button
                     size="sm"
                     variant="destructive"
-                    disabled={busyId === entry.id}
+                    disabled={busyId === entry.id || isKitOffline}
                     onPress={() => confirmRemovePacking(entry)}
                   >
                     Remove
@@ -385,13 +441,16 @@ export default function InventoryScreen() {
           ))}
           {unpackedOwnedItems.length > 0 && (
             <Stack className="gap-2 pt-2">
+              {/* Kept visible offline on purpose: "what do I own that isn't in
+                  this trip's kit" is exactly the question asked at a put-in,
+                  even though acting on the answer needs a connection. */}
               <Text className="text-sm font-semibold text-foreground">Add from your gear</Text>
               {unpackedOwnedItems.map((item) => (
                 <Button
                   key={item.id}
                   size="sm"
                   variant="outline"
-                  disabled={busyId === item.id}
+                  disabled={busyId === item.id || isGearOffline || isKitOffline}
                   onPress={() => void handleAddPacking(item)}
                 >
                   Add {item.name}
