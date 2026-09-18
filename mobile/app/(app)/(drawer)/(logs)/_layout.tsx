@@ -1,6 +1,10 @@
 import { Stack } from "expo-router"
 
-// Bare Stack, no Stack.Screen children — see (trips)/_layout.tsx's comment for why.
+import { stackScreenOptions } from "@mobile/lib/navigation-theme"
+
+// No Stack.Screen children — see (trips)/_layout.tsx's comment for why. The
+// shared screenOptions carry the header's appearance only; each screen still
+// sets its own title in-file.
 export default function LogsStackLayout() {
-  return <Stack />
+  return <Stack screenOptions={stackScreenOptions} />
 }
