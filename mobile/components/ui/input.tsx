@@ -3,6 +3,8 @@ import { TextInput, type TextInputProps } from "react-native"
 
 import { cn } from "../../lib/cn"
 
+import { lightTokens } from "@shared/tokens"
+
 const Input = React.forwardRef<TextInput, TextInputProps & { className?: string }>(
   ({ className, multiline, ...props }, ref) => (
     <TextInput
@@ -19,7 +21,9 @@ const Input = React.forwardRef<TextInput, TextInputProps & { className?: string 
       )}
       textAlignVertical={multiline ? "top" : "center"}
       multiline={multiline}
-      placeholderTextColor="#94a3b8"
+      // A slate the palette has no name for; --muted-foreground is the role for
+      // secondary text, and it is what web's input placeholder resolves to.
+      placeholderTextColor={lightTokens.mutedForeground}
       {...props}
     />
   ),

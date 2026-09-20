@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { WifiOff, X } from "lucide-react-native"
 
-import { palette } from "@shared/tokens"
+import { lightTokens, palette } from "@shared/tokens"
 
 import { useIsOffline } from "../../lib/network/use-is-offline"
 import { Text } from "./text"
@@ -39,7 +39,7 @@ export function OfflineBanner() {
         className="absolute right-3 z-50 items-center justify-center rounded-full bg-sunset-500 p-2 shadow-sm"
         style={{ top: insets.top + 8 }}
       >
-        <WifiOff size={16} color="#ffffff" />
+        <WifiOff size={16} color={lightTokens.destructiveForeground} />
       </Pressable>
     )
   }
