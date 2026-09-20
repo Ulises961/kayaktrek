@@ -24,6 +24,7 @@ import {
   buildDayColoredRoute,
   type LocatedRoutePoint,
 } from "@mobile/lib/itinerary/day-route";
+import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
 
@@ -83,7 +84,9 @@ export default function TripMapScreen() {
   const reload = useCallback(async () => {
     try {
       const t = await getTrip(id);
-      const days = t.itinerary?.days ?? [];
+      // Filtered at ingestion, not at render: Day 0 sorts first, so leaving it in the
+      // array also made it the default selection below.
+      const days = numberedDays(t.itinerary?.days ?? []);
       setTrip({
         destination: t.destination ?? null,
         days,
@@ -99,12 +102,17 @@ export default function TripMapScreen() {
     } catch (err) {
       const offline = await loadOfflineTrip(id);
       if (offline.days.length > 0 || offline.destination !== null) {
+        const offlineDays = numberedDays(offline.days);
         // The cache has no speed setting of its own — same default as a live
         // itinerary that's never had one set.
-        setTrip({ ...offline, avgSpeedKnots: DEFAULT_AVG_SPEED_KNOTS });
+        setTrip({
+          ...offline,
+          days: offlineDays,
+          avgSpeedKnots: DEFAULT_AVG_SPEED_KNOTS,
+        });
         setIsOffline(true);
         setError(null);
-        setSelectedDayId((current) => current ?? offline.days[0]?.id ?? null);
+        setSelectedDayId((current) => current ?? offlineDays[0]?.id ?? null);
       } else {
         setError(
           err instanceof Error

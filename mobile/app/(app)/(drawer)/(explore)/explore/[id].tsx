@@ -13,6 +13,7 @@ import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { fetchPublicItineraryDetail } from "@mobile/lib/explore/actions"
+import { numberedDays } from "@mobile/lib/itinerary/numbered-days"
 import { MAP_STYLE } from "@mobile/lib/map/tiles"
 import { getMe } from "@mobile/lib/profile/actions"
 
@@ -52,8 +53,12 @@ export default function PublicRouteScreen() {
 
   // A published route can carry points that were never placed on the map, so the
   // coordinates are filtered before anything derives a bounding box from them.
+  // Day 0 is the staging area for unassigned points, not an itinerary day — web's
+  // public-routes.ts drops it from every published route for the same reason.
+  const days = useMemo(() => numberedDays(route?.days ?? []), [route])
+
   const points = useMemo<LocatedPoint[]>(() => {
-    return (route?.days ?? []).flatMap((day) =>
+    return days.flatMap((day) =>
       day.points
         .filter(
           (point): point is PublicPoint & { latitude: number; longitude: number } =>
@@ -61,7 +66,7 @@ export default function PublicRouteScreen() {
         )
         .map((point) => ({ ...point, dayNumber: day.dayNumber })),
     )
-  }, [route])
+  }, [days])
 
   // [west, south, east, north] — the same tuple the itinerary screen's `boundsOf` builds.
   const bounds = useMemo<[number, number, number, number] | null>(() => {
@@ -149,9 +154,9 @@ export default function PublicRouteScreen() {
                 {formatDistance(route.totalMiles, unit)} {unit}
               </Text>
             )}
-            {route?.days && route.days.length > 0 && (
+            {days.length > 0 && (
               <Text className="text-[11px] tabular-nums text-muted-foreground">
-                {route.days.length} {route.days.length === 1 ? "day" : "days"}
+                {days.length} {days.length === 1 ? "day" : "days"}
               </Text>
             )}
           </Stack>
