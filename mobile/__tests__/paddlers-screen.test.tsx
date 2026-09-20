@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Alert } from "react-native"
 
-import PaddlersScreen from "../app/(app)/(drawer)/(paddlers)/index"
+import PaddlersScreen from "../app/(app)/(drawer)/(paddlers)/paddlers/index"
 import { blockPaddler, listBlocks, unblockPaddler } from "../lib/blocks/actions"
 import { getSession } from "../lib/auth/session"
 import {
