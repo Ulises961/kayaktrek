@@ -11,6 +11,7 @@ import {
 import type { ShuttleVehicle } from "@shared/dtos/shuttle-vehicle"
 import type { Trip } from "@shared/dtos/trip"
 import { formatDayDate } from "@shared/utils/date"
+import { lightTokens } from "@shared/tokens"
 
 import { getSession } from "@mobile/lib/auth/session"
 import {
@@ -232,7 +233,7 @@ export default function LogisticsScreen() {
             {isMember && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
                 accessibilityLabel="Add travel document"
                 onPress={() => setDocFormOpen((v) => !v)}
               >
@@ -305,12 +306,12 @@ export default function LogisticsScreen() {
                       <Row className="justify-end pt-1">
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon-sm"
                           accessibilityLabel={`Delete ${doc.name}`}
                           disabled={busyId === doc.id}
                           onPress={() => void removeDocument(doc.id!)}
                         >
-                          <TrashIcon size={14} color="#dc2626" />
+                          <TrashIcon size={14} color={lightTokens.destructive} />
                         </Button>
                       </Row>
                     )}
@@ -328,7 +329,7 @@ export default function LogisticsScreen() {
             {isMember && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
                 accessibilityLabel="Add vehicle"
                 onPress={() => setVehicleFormOpen((v) => !v)}
               >
@@ -410,11 +411,11 @@ export default function LogisticsScreen() {
                         {canManage && vehicle.id && (
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon-sm"
                             disabled={busyId === vehicle.id}
                             onPress={() => void removeVehicle(vehicle.id!)}
                           >
-                            <TrashIcon size={14} color="#dc2626" />
+                            <TrashIcon size={14} color={lightTokens.destructive} />
                           </Button>
                         )}
                       </Row>

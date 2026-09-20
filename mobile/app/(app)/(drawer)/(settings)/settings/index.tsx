@@ -343,11 +343,9 @@ function AccountCard({
             className="self-start"
             onPress={() => setPasswordOpen(true)}
             testID="password-open"
+            icon={<LockIcon size={14} color={palette.ocean700} />}
           >
-            <Row className="items-center gap-1.5">
-              <LockIcon size={14} color={palette.ocean700} />
-              <Text>Change password</Text>
-            </Row>
+            Change password
           </Button>
         )}
       </Stack>
@@ -579,28 +577,34 @@ function LegalCard() {
   // and a copy bundled in an app binary goes stale the moment the hosted one changes.
   return (
     <SectionCard icon={ScaleIcon} title="Legal">
-      <Stack className="gap-2">
-        <Text
-          className="text-sm text-primary underline"
+      <Stack className="items-start gap-1">
+        <Button
+          variant="link"
+          size="sm"
+          className="px-0"
           onPress={() => void Linking.openURL(`${WEB_ORIGIN}/terms`)}
           testID="legal-terms"
         >
           Terms of Use
-        </Text>
-        <Text
-          className="text-sm text-primary underline"
+        </Button>
+        <Button
+          variant="link"
+          size="sm"
+          className="px-0"
           onPress={() => void Linking.openURL(`${WEB_ORIGIN}/privacy`)}
           testID="legal-privacy"
         >
           Privacy Policy
-        </Text>
-        <Text
-          className="text-sm text-primary underline"
+        </Button>
+        <Button
+          variant="link"
+          size="sm"
+          className="px-0"
           onPress={() => void Linking.openURL("mailto:support@kayaktrek.app")}
           testID="legal-contact"
         >
           Contact
-        </Text>
+        </Button>
       </Stack>
     </SectionCard>
   )
