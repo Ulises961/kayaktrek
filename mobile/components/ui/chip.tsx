@@ -13,7 +13,9 @@ const chipVariants = cva("rounded-full px-4 py-2", {
   variants: {
     active: {
       true: "bg-primary",
-      false: "border border-border bg-transparent",
+      // Same surface as the outline button: an unselected chip is an outline control,
+      // and transparent left it indistinguishable from the card behind it.
+      false: "border border-border bg-background",
     },
   },
   defaultVariants: {

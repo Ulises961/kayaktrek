@@ -33,6 +33,20 @@ describe("buttonVariants", () => {
     })
   })
 
+  it("gives the outline role a surface, so it is visible on a white card", () => {
+    // Web's outline is `bg-background shadow-xs`, not transparent. Mobile had it
+    // transparent, which was invisible as a control the moment cards went white: the
+    // button took the card's own colour and only its border distinguished it.
+    expect(buttonVariants({ variant: "outline" })).toMatch(/\bbg-background\b/)
+  })
+
+  it("leaves ghost and link without a surface, which is what makes them quiet", () => {
+    // These two are deliberately transparent on web too — giving them a fill would
+    // make every toolbar icon read as a raised control.
+    expect(buttonVariants({ variant: "ghost" })).toMatch(/\bbg-transparent\b/)
+    expect(buttonVariants({ variant: "link" })).toMatch(/\bbg-transparent\b/)
+  })
+
   it("draws the link role as text, not as a filled control", () => {
     const className = buttonVariants({ variant: "link" })
 

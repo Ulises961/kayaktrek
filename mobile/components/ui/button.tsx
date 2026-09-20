@@ -19,7 +19,10 @@ const buttonVariants = cva("flex-row items-center justify-center gap-2 rounded-m
       // one colour, no exceptions.
       cta: "bg-cta active:opacity-90",
       destructive: "bg-destructive active:opacity-90",
-      outline: "border border-border bg-transparent active:bg-muted",
+      // `bg-background`, not transparent — this mirrors web's outline
+      // (`border bg-background shadow-xs`). Transparent made the button take whatever
+      // it sat on, which on a white card left only the border to say it was a control.
+      outline: "border border-border bg-background active:bg-muted",
       ghost: "bg-transparent active:bg-muted",
       // Mirrors web's `link` role: a text action that still wants a button's hit area
       // and disabled handling. Its absence is why link-styled actions were hand-rolled
