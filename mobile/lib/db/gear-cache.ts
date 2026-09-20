@@ -2,6 +2,7 @@ import type { Database } from "nitromelondb"
 
 import type { Item } from "@shared/dtos/item"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { CachedGear } from "./models"
 
@@ -46,6 +47,7 @@ export async function saveGearCache(items: Item[], database: Database = producti
         })
     )
   })
+  await markCacheFresh(CACHE_KEY.gear, database)
 }
 
 export async function loadGearCache(database: Database = productionDatabase): Promise<GearCardData[]> {

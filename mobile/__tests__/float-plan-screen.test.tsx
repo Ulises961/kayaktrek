@@ -23,6 +23,14 @@ jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 const mockGetTrip = getTrip as jest.Mock
 const mockGetLogistics = getLogistics as jest.Mock
 const mockLoadOfflineCrew = loadOfflineCrew as jest.Mock
@@ -63,6 +71,7 @@ describe("FloatPlanScreen", () => {
     expect(await findByText("Cached Paddler")).toBeTruthy()
     expect(await findByText("Shore contact needs a connection.")).toBeTruthy()
     expect(await findByText(/Offline/)).toBeTruthy()
+    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
   })
 
   it("surfaces the error when there is nothing cached to fall back to", async () => {

@@ -10,6 +10,14 @@ jest.mock("../lib/trips/actions", () => ({
   getTrips: jest.fn(),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 // database.ts eagerly constructs a native SQLiteAdapter at import time — never
 // usable under Jest (see lib/db/__tests__/sync.test.ts for the same pattern).
 // Needed here because trip-list-cache's mock below pulls in the real module
@@ -86,7 +94,20 @@ describe("TripListScreen", () => {
     const { findByText } = await render(<TripListScreen />)
 
     expect(await findByText("Cached Fjord")).toBeTruthy()
-    expect(await findByText("Offline — showing your last synced trips")).toBeTruthy()
+    expect(await findByText(/Offline — showing your last synced trips/)).toBeTruthy()
+  })
+
+  // M9c WP7: "offline" alone never said whether the list was from an hour ago
+  // or from last month, which is the difference between usable and misleading.
+  it("says how old the cached list is, not just that it is cached", async () => {
+    mockGetTrips.mockRejectedValue(new Error("Network request failed"))
+    mockLoadTripListCache.mockResolvedValue([
+      { id: "t1", destination: "Cached Fjord", state: "building", dateFrom: null, dateTo: null, travellerCount: 1 },
+    ])
+
+    const { findByText } = await render(<TripListScreen />)
+
+    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
   })
 
   describe("grouping", () => {

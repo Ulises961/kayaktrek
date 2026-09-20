@@ -3,6 +3,7 @@ import type { Database } from "nitromelondb"
 import type { Block } from "@shared/dtos/block"
 import type { Connection } from "@shared/dtos/connection"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { CachedBlock, CachedConnection } from "./models"
 
@@ -33,6 +34,7 @@ export async function saveConnectionsCache(
         ),
     )
   })
+  await markCacheFresh(CACHE_KEY.connections, database)
 }
 
 export async function loadConnectionsCache(database: Database = productionDatabase): Promise<Connection[]> {
@@ -75,6 +77,7 @@ export async function saveBlocksCache(blocks: Block[], database: Database = prod
         ),
     )
   })
+  await markCacheFresh(CACHE_KEY.blocks, database)
 }
 
 export async function loadBlocksCache(database: Database = productionDatabase): Promise<Block[]> {

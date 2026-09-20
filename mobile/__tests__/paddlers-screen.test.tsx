@@ -35,6 +35,14 @@ jest.mock("../lib/db/paddlers-cache", () => ({
   saveBlocksCache: jest.fn(),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 const mockSearchPaddlers = searchPaddlers as jest.Mock
 const mockListConnections = listConnections as jest.Mock
 const mockRequestConnection = requestConnection as jest.Mock
@@ -266,6 +274,7 @@ describe("PaddlersScreen — buddies tab", () => {
 
     expect(await findByText("@cy")).toBeTruthy()
     expect(getByText(/offline.*last synced buddies/i)).toBeTruthy()
+    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
 
     await fireEvent.press(getByText("Remove"))
     expect(mockRemoveConnection).not.toHaveBeenCalled()
@@ -311,6 +320,7 @@ describe("PaddlersScreen — blocked tab", () => {
 
     expect(await findByText("@troll")).toBeTruthy()
     expect(getByText(/offline.*last synced blocklist/i)).toBeTruthy()
+    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
 
     await fireEvent.press(getByText("Unblock"))
     expect(mockUnblockPaddler).not.toHaveBeenCalled()

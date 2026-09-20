@@ -16,9 +16,11 @@ import { formatDateRange } from "@shared/trips/format"
 
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { startSyncTrigger } from "@mobile/lib/db/sync-trigger"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
@@ -72,6 +74,7 @@ export default function TripDetailScreen() {
     data: trip,
     error,
     isOffline,
+    cachedAt,
     reload,
   } = useLiveCache<TripHeaderView | null>({
     fetchLive: async () => toHeaderView(await getTrip(id)),
@@ -86,6 +89,9 @@ export default function TripDetailScreen() {
     // the job over from it entirely.
     saveCache: async () => undefined,
     isCacheEmpty: (cached) => cached === null,
+    // The trip-list cache's key, because that is the cache this reads — the
+    // age shown here is the age of the row it actually rendered.
+    cacheKey: CACHE_KEY.tripList,
   })
 
   useEffect(() => {
@@ -136,12 +142,10 @@ export default function TripDetailScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <Stack className="gap-4 p-4">
-        {isOffline && (
-          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-            Offline — showing your last synced trip summary. Each screen below shows whatever it
-            last synced.
-          </Text>
-        )}
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
+          Offline — showing your last synced trip summary. Each screen below shows whatever it
+          last synced.
+        </OfflineNotice>
         <Card>
           <CardContent className="gap-3">
             <Row className="justify-between">

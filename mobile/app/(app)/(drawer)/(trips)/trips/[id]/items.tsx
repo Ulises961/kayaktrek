@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/
 import { Chip } from "@mobile/components/ui/chip"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
 import { loadGearCache, saveGearCache } from "@mobile/lib/db/gear-cache"
 import { loadKitCache, saveKitCache } from "@mobile/lib/db/kit-cache"
 import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/requirements-cache"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import {
   addRequirement,
@@ -85,6 +87,7 @@ export default function InventoryScreen() {
     },
     saveCache: (reqs) => saveRequirementsCache(id, reqs),
     isCacheEmpty: (reqs) => reqs.length === 0,
+    cacheKey: CACHE_KEY.tripRequirements(id),
   })
   const requirements = requirementsCache.data
   const error = requirementsCache.error
@@ -103,6 +106,7 @@ export default function InventoryScreen() {
     loadCache: () => loadGearCache(),
     saveCache: (items) => saveGearCache(items as Item[]),
     isCacheEmpty: (items) => items.length === 0,
+    cacheKey: CACHE_KEY.gear,
   })
   const myItems = gearCache.data ?? []
   const isGearOffline = gearCache.isOffline
@@ -125,6 +129,7 @@ export default function InventoryScreen() {
     },
     saveCache: (entries) => saveKitCache(id, entries),
     isCacheEmpty: (entries) => entries.length === 0,
+    cacheKey: CACHE_KEY.tripKit(id),
   })
   const packingItems = kitCache.data
   const kitError = kitCache.error
@@ -290,12 +295,10 @@ export default function InventoryScreen() {
 
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          {isOffline && (
-            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-              Offline — showing your last synced requirements. Adding, covering, and removing
-              need a connection.
-            </Text>
-          )}
+          <OfflineNotice visible={isOffline} cachedAt={requirementsCache.cachedAt}>
+            Offline — showing your last synced requirements. Adding, covering, and removing
+            need a connection.
+          </OfflineNotice>
           <Row className="gap-2">
             <Input
               className="flex-1"
@@ -409,12 +412,10 @@ export default function InventoryScreen() {
 
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          {isKitOffline && (
-            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-              Offline — showing your last synced kit. Packing, adding, and removing need a
-              connection.
-            </Text>
-          )}
+          <OfflineNotice visible={isKitOffline} cachedAt={kitCache.cachedAt}>
+            Offline — showing your last synced kit. Packing, adding, and removing need a
+            connection.
+          </OfflineNotice>
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}
           {(packingItems ?? []).map((entry) => (
             <Card key={entry.id}>

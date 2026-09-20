@@ -3,6 +3,7 @@ import type { Database } from "nitromelondb"
 import type { Trip, TripState } from "@shared/dtos/trip"
 import { TRIP_STATES } from "@shared/dtos/trip"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { TripSummary } from "./models"
 
@@ -54,6 +55,10 @@ export async function saveTripListCache(trips: Trip[], database: Database = prod
         )
     )
   })
+  // Recorded inside the save, not by the caller — every cached surface owes an
+  // age to whatever renders it (M9c WP7), and a caller that forgets produces a
+  // screen that silently shows undated stale data.
+  await markCacheFresh(CACHE_KEY.tripList, database)
 }
 
 export async function loadTripListCache(database: Database = productionDatabase): Promise<TripCardData[]> {

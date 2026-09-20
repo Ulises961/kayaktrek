@@ -3,6 +3,7 @@ import { Q } from "nitromelondb"
 
 import type { TripRequirement } from "@shared/dtos/inventory"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { CachedRequirement } from "./models"
 
@@ -50,6 +51,7 @@ export async function saveRequirementsCache(
         }),
     )
   })
+  await markCacheFresh(CACHE_KEY.tripRequirements(tripId), database)
 }
 
 export async function loadRequirementsCache(

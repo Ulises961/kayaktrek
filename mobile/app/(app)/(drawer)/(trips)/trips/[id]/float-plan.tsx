@@ -11,7 +11,9 @@ import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 import { Badge } from "@mobile/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { getLogistics, getTrip } from "@mobile/lib/trips/actions"
@@ -46,6 +48,7 @@ export default function FloatPlanScreen() {
   const [logistics, setLogistics] = useState<Logistics | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isOffline, setIsOffline] = useState(false)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +57,7 @@ export default function FloatPlanScreen() {
       setCrew(trip.travellers ?? [])
       setLogistics(fetchedLogistics)
       setIsOffline(false)
+      setCachedAt(null)
       setError(null)
     } catch (err) {
       const [offlineCrew, cachedTrips] = await Promise.all([loadOfflineCrew(id), loadTripListCache()])
@@ -64,6 +68,10 @@ export default function FloatPlanScreen() {
         setLogistics(null)
         setIsOffline(true)
         setError(null)
+        // The crew manifest comes from the trip's delta sync (trip_members),
+        // not from the trip-list cache the state above falls back to — so the
+        // age shown is the sync's, which is what the list on screen is.
+        setCachedAt(await readCachedAt(CACHE_KEY.tripSync(id)))
       } else {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
       }
@@ -106,11 +114,9 @@ export default function FloatPlanScreen() {
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: "Float plan" }} />
       <ScrollView contentContainerClassName="gap-4 p-4">
-        {isOffline && (
-          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-            Offline — showing your last synced crew manifest. Shore contact needs a connection.
-          </Text>
-        )}
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
+          Offline — showing your last synced crew manifest. Shore contact needs a connection.
+        </OfflineNotice>
         <Card>
           <CardHeader>
             <CardTitle>Shore contact</CardTitle>

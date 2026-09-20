@@ -8,8 +8,10 @@ import { TripCard } from "@mobile/components/trips/trip-card"
 import { Button } from "@mobile/components/ui/button"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { type TripCardData, loadTripListCache, saveTripListCache, toTripCardData } from "@mobile/lib/db/trip-list-cache"
 import { groupTrips } from "@mobile/lib/trips/group-trips"
 import { getTrips } from "@mobile/lib/trips/actions"
@@ -37,6 +39,7 @@ export default function TripListScreen() {
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isOffline, setIsOffline] = useState(false)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true)
@@ -46,6 +49,7 @@ export default function TripListScreen() {
       setTrips(cardData)
       setError(null)
       setIsOffline(false)
+      setCachedAt(null)
       await saveTripListCache(page.items)
     } catch (err) {
       const cached = await loadTripListCache()
@@ -53,6 +57,7 @@ export default function TripListScreen() {
         setTrips(cached)
         setIsOffline(true)
         setError(null)
+        setCachedAt(await readCachedAt(CACHE_KEY.tripList))
       } else {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
       }
@@ -116,11 +121,13 @@ export default function TripListScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
-      {isOffline && (
-        <Text className="bg-muted px-4 py-1.5 text-center text-[11px] text-muted-foreground">
-          Offline — showing your last synced trips
-        </Text>
-      )}
+      <OfflineNotice
+        visible={isOffline}
+        cachedAt={cachedAt}
+        className="rounded-none px-4"
+      >
+        Offline — showing your last synced trips.
+      </OfflineNotice>
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
           the read-only "validate the stack" milestone, not the place to chase a
           FlatList/VirtualizedList context crash under this RN/jest pairing. Revisit if

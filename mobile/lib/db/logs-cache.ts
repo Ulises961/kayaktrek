@@ -3,6 +3,7 @@ import { Q } from "nitromelondb"
 
 import type { Log } from "@shared/dtos/log"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { CachedLog } from "./models"
 
@@ -57,6 +58,10 @@ export async function saveLogsCache(
         }),
     )
   })
+  // One key for both kinds: the logs screen fetches "mine" and "endorsed" in a
+  // single load, so they are never meaningfully different ages, and two age
+  // lines on one screen would be noise.
+  await markCacheFresh(CACHE_KEY.logs, database)
 }
 
 // One cached log by id, for the detail screen. `kind` comes back with it

@@ -23,6 +23,14 @@ jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 const mockGetTrip = getTrip as jest.Mock
 const mockStartSyncTrigger = startSyncTrigger as jest.Mock
 const mockLoadTripListCache = loadTripListCache as jest.Mock
@@ -130,6 +138,7 @@ describe("TripDetailScreen", () => {
       const { findByText } = await render(<TripDetailScreen />)
 
       expect(await findByText(/Offline — showing your last synced trip/)).toBeTruthy()
+      expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
     })
 
     it("omits difficulty and description, which the trip-list cache does not carry", async () => {

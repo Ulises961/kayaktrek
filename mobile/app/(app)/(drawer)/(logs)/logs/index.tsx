@@ -17,12 +17,14 @@ import { Chip } from "@mobile/components/ui/chip"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
 import {
   deleteEndorsementRequest,
   listEndorsementRequests,
 } from "@mobile/lib/endorsement-requests/actions"
 import { loadLogsCache, saveLogsCache } from "@mobile/lib/db/logs-cache"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "@mobile/lib/logs/actions"
 
@@ -77,6 +79,7 @@ export default function LogsScreen() {
       ])
     },
     isCacheEmpty: (lists) => lists.mine.length === 0 && lists.endorsed.length === 0,
+    cacheKey: CACHE_KEY.logs,
   })
   const mine = logsCache.data?.mine ?? null
   const endorsed = logsCache.data?.endorsed ?? null
@@ -158,11 +161,9 @@ export default function LogsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
-        {isOffline && (
-          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-            Offline — showing your last synced logs. Recording a paddle needs a connection.
-          </Text>
-        )}
+        <OfflineNotice visible={isOffline} cachedAt={logsCache.cachedAt}>
+          Offline — showing your last synced logs. Recording a paddle needs a connection.
+        </OfflineNotice>
 
         {stats && (
           <Stack className="gap-2">

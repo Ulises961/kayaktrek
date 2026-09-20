@@ -69,6 +69,14 @@ jest.mock("../lib/db/kit-cache", () => ({
   saveKitCache: jest.fn(() => Promise.resolve()),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 const mockGetTrip = getTrip as jest.Mock
 const mockGetMyItems = getMyItems as jest.Mock
 const mockAddRequirement = addRequirement as jest.Mock
@@ -214,6 +222,7 @@ describe("InventoryScreen — group requirements", () => {
 
     expect(await findByText("First aid kit")).toBeTruthy()
     expect(getByText(/Offline — showing your last synced requirements/)).toBeTruthy()
+    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
     expect(getByText("Add")).toBeDisabled()
     expect(getByText("Cover")).toBeDisabled()
     expect(getByPlaceholderText("Add a requirement").props.editable).toBe(false)
@@ -315,6 +324,7 @@ describe("InventoryScreen — offline kit and gear", () => {
 
     expect(await findByText("Spare paddle")).toBeTruthy()
     expect(getByText(/Offline — showing your last synced kit/)).toBeTruthy()
+    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
   })
 
   it("disables every kit mutation offline", async () => {

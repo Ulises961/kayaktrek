@@ -9,9 +9,11 @@ import { lightTokens, palette } from "@shared/tokens"
 
 import { Button } from "@mobile/components/ui/button"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
 import { LogForm } from "@mobile/components/logs/log-form"
 import { getSession } from "@mobile/lib/auth/session"
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { loadCachedLog } from "@mobile/lib/db/logs-cache"
 import {
   deleteLog,
@@ -38,6 +40,7 @@ export default function LogDetailScreen() {
   // card data only — no notes, no endorsers. Kept as its own state rather than
   // faking a Log, so nothing downstream can mistake a summary for a full log.
   const [cachedLog, setCachedLog] = useState<Awaited<ReturnType<typeof loadCachedLog>>>(null)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -50,6 +53,7 @@ export default function LogDetailScreen() {
       const cached = await loadCachedLog(id)
       if (cached) {
         setCachedLog(cached)
+        setCachedAt(await readCachedAt(CACHE_KEY.logs))
       } else {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
       }
@@ -111,10 +115,10 @@ export default function LogDetailScreen() {
     return (
       <Screen edges={["bottom"]} className="gap-4 p-4">
         {header}
-        <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+        <OfflineNotice cachedAt={cachedAt}>
           Offline — showing your last synced log. Notes, endorsements, and editing need a
           connection.
-        </Text>
+        </OfflineNotice>
         <Text className="text-lg font-semibold">{cachedLog.date}</Text>
         <Row className="flex-wrap gap-x-3 gap-y-1">
           {cachedLog.hours != null && (

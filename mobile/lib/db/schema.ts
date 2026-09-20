@@ -19,8 +19,31 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 7,
+  version: 8,
   tables: [
+    tableSchema({
+      // When each cached surface was last successfully refreshed from the
+      // network — one row per key (CACHE_KEY in cache-freshness.ts), upserted.
+      // Deliberately NOT folded into `sync_cursors` below: that column is a
+      // protocol value sent back to the server on the next delta pull, while
+      // this one is a display value answering "how old is what I'm looking
+      // at". Most cached surfaces (trip list, logs, buddies, gear, kit,
+      // requirements, the route) are wholesale replaces with no delta cursor
+      // at all, so they have nothing in `sync_cursors` to read in the first
+      // place.
+      //
+      // M9c WP7 makes this a precondition for widening sync scope rather than
+      // a follow-up to it (docs/adr/mobile-offline.md, "Staleness must be
+      // expressed, not implied"): a screen could previously only say *you are
+      // offline*, never *this is from Tuesday*, and a three-day-old forecast
+      // that renders identically to a live one is a safety problem, not an
+      // untidiness.
+      name: "cache_freshness",
+      columns: [
+        { name: "key", type: "string", isIndexed: true },
+        { name: "cached_at", type: "number" },
+      ],
+    }),
     tableSchema({
       // WatermelonDB's synchronize() persists exactly one `lastPulledAt` cursor,
       // keyed to the whole local database (`__watermelon_last_pulled_at` — see
