@@ -1,5 +1,5 @@
 import { Drawer } from "expo-router/drawer"
-import { Kayak, Newspaper, Settings } from "lucide-react-native"
+import { Compass, Kayak, Newspaper, Settings } from "lucide-react-native"
 
 import { palette } from "@shared/tokens"
 
@@ -74,6 +74,13 @@ export default function DrawerLayout() {
           // Web's UserGroupIcon is a Heroicons SVG, not a lucide icon — ported verbatim
           // rather than substituted with lucide's Users (a visibly different glyph).
           drawerIcon: ({ color, size }) => <UserGroupIcon color={color} size={size} />,
+        }}
+      />
+      <Drawer.Screen
+        name="(explore)"
+        options={{
+          drawerLabel: "Explore",
+          drawerIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Drawer.Screen
