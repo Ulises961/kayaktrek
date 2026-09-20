@@ -64,10 +64,12 @@ describe("GearScreen", () => {
   })
 
   it("groups gear under its category", async () => {
-    const { findByText } = await render(<GearScreen />)
+    // By testID: each category name now appears twice — as a filter chip and as this
+    // heading — so a by-text query matches two nodes.
+    const { findByTestId } = await render(<GearScreen />)
 
-    expect(await findByText("Paddling")).toBeTruthy()
-    expect(await findByText("Camping")).toBeTruthy()
+    expect(await findByTestId("section-Paddling")).toBeTruthy()
+    expect(await findByTestId("section-Camping")).toBeTruthy()
   })
 
   it("still shows an item that has no category", async () => {
@@ -96,6 +98,87 @@ describe("GearScreen", () => {
     await fireEvent.press(getByTestId("gear-retry"))
 
     expect(await findByText("Werner Camano")).toBeTruthy()
+  })
+
+  describe("category filters", () => {
+    it("offers a filter chip per category the closet actually uses", async () => {
+      // Driven by the items on hand, not the full category list: a chip that filters
+      // to an empty closet is a dead control.
+      const { findByTestId } = await render(<GearScreen />)
+
+      expect(await findByTestId(`filter-${PADDLE.category.slug}`)).toBeTruthy()
+      expect(await findByTestId(`filter-${TENT.category.slug}`)).toBeTruthy()
+    })
+
+    it("offers a chip for uncategorised gear when there is some", async () => {
+      const { findByTestId } = await render(<GearScreen />)
+
+      expect(await findByTestId("filter-uncategorised")).toBeTruthy()
+    })
+
+    it("offers no uncategorised chip when everything is filed", async () => {
+      mockGetItems.mockResolvedValue([PADDLE, TENT])
+
+      const { queryByTestId, findByText } = await render(<GearScreen />)
+      await findByText("Werner Camano")
+
+      expect(queryByTestId("filter-uncategorised")).toBeNull()
+    })
+
+    it("shows only the chosen category once one is picked", async () => {
+      const { findByTestId, queryByText, findByText } = await render(<GearScreen />)
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+
+      expect(await findByText("Hilleberg Soulo")).toBeTruthy()
+      expect(queryByText("Werner Camano")).toBeNull()
+      expect(queryByText("Spare cag")).toBeNull()
+    })
+
+    it("adds to the selection rather than replacing it", async () => {
+      // Multi-select, like Explore's seasons — "paddling and camping" is a real
+      // question to ask of a kit list.
+      const { findByTestId, findByText } = await render(<GearScreen />)
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+      await fireEvent.press(await findByTestId(`filter-${PADDLE.category.slug}`))
+
+      expect(await findByText("Hilleberg Soulo")).toBeTruthy()
+      expect(await findByText("Werner Camano")).toBeTruthy()
+    })
+
+    it("clears the filter when the same chip is tapped again", async () => {
+      const { findByTestId, findByText } = await render(<GearScreen />)
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+
+      expect(await findByText("Werner Camano")).toBeTruthy()
+      expect(await findByText("Spare cag")).toBeTruthy()
+    })
+
+    it("clears every filter from the All chip", async () => {
+      const { findByTestId, findByText } = await render(<GearScreen />)
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+      await fireEvent.press(await findByTestId("filter-all"))
+
+      expect(await findByText("Werner Camano")).toBeTruthy()
+      expect(await findByText("Spare cag")).toBeTruthy()
+    })
+
+    it("says so when a filter outlives the gear it matched", async () => {
+      // The only way to an empty filtered list: the chips are derived from the gear on
+      // hand, so a selected category always has something in it — until the last item
+      // in it is deleted and the closet reloads with the filter still set. "No gear
+      // yet" would be a lie there; the kit is present, the filter is hiding it.
+      const { findByTestId, findByText } = await render(<GearScreen />)
+      await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
+      await findByText("Hilleberg Soulo")
+
+      mockDelete.mockResolvedValue(undefined)
+      mockGetItems.mockResolvedValue([PADDLE, UNFILED])
+      await fireEvent.press(await findByTestId(`delete-${TENT.id}`))
+      confirmAlert("Delete")
+
+      expect(await findByText(/nothing in those categories/i)).toBeTruthy()
+    })
   })
 
   describe("adding gear", () => {

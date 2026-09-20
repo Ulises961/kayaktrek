@@ -31,6 +31,7 @@ const header = (
 )
 
 const UNCATEGORISED = "Uncategorised"
+const UNCATEGORISED_SLUG = "uncategorised"
 
 // Mobile's cut of web's gear closet (frontend/components/inventory/gear-closet.tsx):
 // the paddler's own kit, grouped by category, with M10's default-pack flag on each
@@ -42,6 +43,10 @@ export default function GearScreen() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Multi-select, mirroring Explore's season chips: "paddling and camping" is a real
+  // question to ask of a kit list, and a single-select row cannot answer it.
+  const [activeSlugs, setActiveSlugs] = useState<string[]>([])
 
   const [addOpen, setAddOpen] = useState(false)
   const [name, setName] = useState("")
@@ -68,19 +73,52 @@ export default function GearScreen() {
       .catch(() => {})
   }, [load])
 
+  // Built from the gear on hand rather than the full category list: a chip that
+  // filters down to an empty closet is a dead control. Uncategorised earns a chip only
+  // when something is actually unfiled.
+  const filters = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const item of items ?? []) {
+      if (item.category?.slug) seen.set(item.category.slug, item.category.name)
+      else seen.set(UNCATEGORISED_SLUG, UNCATEGORISED)
+    }
+    return [...seen.entries()]
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) =>
+        a.slug === UNCATEGORISED_SLUG
+          ? 1
+          : b.slug === UNCATEGORISED_SLUG
+            ? -1
+            : a.name.localeCompare(b.name),
+      )
+  }, [items])
+
+  const visible = useMemo(() => {
+    if (activeSlugs.length === 0) return items ?? []
+    return (items ?? []).filter((item) =>
+      activeSlugs.includes(item.category?.slug ?? UNCATEGORISED_SLUG),
+    )
+  }, [items, activeSlugs])
+
   // Grouped by category name, with uncategorised gear kept rather than dropped —
   // `category` is nullish on the DTO, and an item vanishing from the closet because
   // nobody filed it is worse than a catch-all heading.
   const grouped = useMemo(() => {
     const groups = new Map<string, Item[]>()
-    for (const item of items ?? []) {
+    for (const item of visible) {
       const key = item.category?.name ?? UNCATEGORISED
       groups.set(key, [...(groups.get(key) ?? []), item])
     }
     return [...groups.entries()].sort(([a], [b]) =>
       a === UNCATEGORISED ? 1 : b === UNCATEGORISED ? -1 : a.localeCompare(b),
     )
-  }, [items])
+  }, [visible])
+
+  function toggleFilter(slug: string) {
+    setActiveSlugs((current) =>
+      current.includes(slug) ? current.filter((entry) => entry !== slug) : [...current, slug],
+    )
+  }
 
   async function submitNewItem() {
     if (!name.trim()) return
@@ -165,6 +203,36 @@ export default function GearScreen() {
           </Button>
         )}
 
+        {/* Same idiom as Explore's sort row: a horizontal chip rail that is visible at
+            rest rather than hidden behind a filter sheet. A kit list is short enough
+            that the filter belongs on screen beside what it filters. */}
+        {filters.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-2 pr-4"
+            className="max-h-11 grow-0"
+          >
+            <Chip
+              active={activeSlugs.length === 0}
+              onPress={() => setActiveSlugs([])}
+              testID="filter-all"
+            >
+              All
+            </Chip>
+            {filters.map((filter) => (
+              <Chip
+                key={filter.slug}
+                active={activeSlugs.includes(filter.slug)}
+                onPress={() => toggleFilter(filter.slug)}
+                testID={`filter-${filter.slug}`}
+              >
+                {filter.name}
+              </Chip>
+            ))}
+          </ScrollView>
+        )}
+
         {addOpen ? (
           <Card>
             <CardContent className="gap-3">
@@ -222,10 +290,20 @@ export default function GearScreen() {
             title="No gear yet"
             description="Add the kit you own and it can be suggested onto future trips automatically."
           />
+        ) : visible.length === 0 ? (
+          // Not "No gear yet" — the kit is there, the filter is hiding it, and telling
+          // someone their closet is empty when it is not is the worse error.
+          <EmptyPanel
+            icon={PocketKnifeIcon}
+            title="Nothing in those categories"
+            description="Clear a filter to see the rest of your closet."
+          />
         ) : (
           grouped.map(([category, categoryItems]) => (
             <Stack key={category} className="gap-2">
-              <SectionLabel>{category}</SectionLabel>
+              {/* testID because a category name now appears twice on screen — once as a
+                  filter chip, once as this heading — so a by-text query is ambiguous. */}
+              <SectionLabel testID={`section-${category}`}>{category}</SectionLabel>
               {categoryItems.map((item) => (
                 <Card key={item.id}>
                   <CardContent className="gap-2">
