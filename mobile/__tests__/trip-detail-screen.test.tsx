@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react-native"
+import { render } from "@testing-library/react-native"
 
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
@@ -150,24 +150,15 @@ describe("TripDetailScreen", () => {
     })
   })
 
-  it("starts the sync-down trigger for this trip so weather/sea/crew/inventory populate offline caches", async () => {
+  // The sync trigger used to be started here, scoped to this one trip. It moved
+  // to the authenticated app root in M9c WP7 (see __tests__/app-layout.test.tsx)
+  // — sync scope should not be a side effect of which screen someone opened.
+  it("does not start a sync trigger of its own", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
     const { findByText } = await render(<TripDetailScreen />)
     await findByText("Costa Brava")
 
-    expect(mockStartSyncTrigger).toHaveBeenCalledWith("trip-1")
-  })
-
-  it("stops the sync-down trigger on unmount", async () => {
-    const stop = jest.fn()
-    mockStartSyncTrigger.mockReturnValue(stop)
-    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
-
-    const { findByText, unmount } = await render(<TripDetailScreen />)
-    await findByText("Costa Brava")
-    unmount()
-
-    await waitFor(() => expect(stop).toHaveBeenCalled())
+    expect(mockStartSyncTrigger).not.toHaveBeenCalled()
   })
 })

@@ -21,7 +21,6 @@ import { SectionLabel } from "@mobile/components/ui/section-label"
 import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
-import { startSyncTrigger } from "@mobile/lib/db/sync-trigger"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { getTrip } from "@mobile/lib/trips/actions"
@@ -97,16 +96,6 @@ export default function TripDetailScreen() {
   useEffect(() => {
     void reload()
   }, [reload])
-
-  // The Trip Detail hub is the real entry point every trip visit passes through
-  // (docs/adr/mobile-offline.md "Screen structure"), so it's the natural place to
-  // start the weather/sea/crew/inventory sync-down trigger — without this, those
-  // WatermelonDB tables never populate at all (startSyncTrigger existed since M9c
-  // but nothing ever called it), and the itinerary/float-plan screens' offline
-  // fallbacks have nothing to read.
-  useEffect(() => {
-    return startSyncTrigger(id)
-  }, [id])
 
   if (error) {
     return (
