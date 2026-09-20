@@ -24,23 +24,27 @@ jest.mock("expo-router", () => {
     useLocalSearchParams: () => ({ id: "itin-1" }),
   }
 })
-// MapLibre ships untranspiled ESM and is not in jest's transform allowlist. Stubbed to
-// plain views: this screen's assertions are about the route summary, and a real GL map
-// renders nothing a query could reach anyway. This is the first test in the suite to
-// render a map at all — the itinerary screen has never had one.
 jest.mock("@maplibre/maplibre-react-native", () => {
   // Host-string elements rather than react-native's View: requiring react-native inside
   // a mock factory re-enters react-native-css's component wrapper before it is ready and
   // throws from copyComponentProperties.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const react = require("react") as typeof import("react")
+  // Forwards testID so a test can assert a given map layer is in the tree; a stub that
+  // swallowed props would make every such assertion silently unreachable.
   const stub = (name: string) => {
-    const Stub = ({ children }: { children?: React.ReactNode }) =>
-      react.createElement(name, null, children)
+    const Stub = ({ children, testID }: { children?: React.ReactNode; testID?: string }) =>
+      react.createElement(name, { testID }, children)
     Stub.displayName = name
     return Stub
   }
-  return { Camera: stub("Camera"), Map: stub("Map"), Marker: stub("Marker") }
+  return {
+    Camera: stub("Camera"),
+    Map: stub("Map"),
+    Marker: stub("Marker"),
+    GeoJSONSource: stub("GeoJSONSource"),
+    Layer: stub("Layer"),
+  }
 })
 
 const mockFetch = fetchPublicItineraryDetail as jest.Mock
@@ -48,21 +52,35 @@ const mockGetMe = getMe as jest.Mock
 
 const UNIT = DISTANCE_UNIT.NM
 
+// Two stops a measurable distance apart, so the day's leg distance is a real number
+// rather than zero.
+const DAY_ONE = {
+  dayNumber: 1,
+  date: "2026-07-01",
+  points: [
+    { id: "p1", latitude: 57.0, longitude: -6.0, type: "stop", name: "Elgol", images: [] },
+    { id: "p2", latitude: 57.1, longitude: -6.0, type: "position", name: null, images: [] },
+    { id: "p3", latitude: 57.2, longitude: -6.0, type: "stop", name: "Loch Coruisk", images: [] },
+  ],
+}
+
+const DAY_TWO = {
+  dayNumber: 2,
+  date: "2026-07-02",
+  points: [
+    { id: "p3", latitude: 57.2, longitude: -6.0, type: "stop", name: "Loch Coruisk", images: [] },
+    { id: "p4", latitude: 57.35, longitude: -6.0, type: "stop", name: "Soay", images: [] },
+  ],
+}
+
 const DETAIL = {
   id: "itin-1",
   name: "Skye circuit",
-  description: "Three days around the Cuillin coast.",
+  description: "Three days around the Cuillin coast, launching from Elgol.",
   difficulty: DIFFICULTIES[1],
   totalMiles: 42.5,
-  days: [
-    {
-      dayNumber: 1,
-      points: [
-        { id: "p1", latitude: 57.2, longitude: -6.3, type: "stop", images: [] },
-        { id: "p2", latitude: 57.3, longitude: -6.1, type: "position", images: [] },
-      ],
-    },
-  ],
+  avgSpeedKnots: 3,
+  days: [DAY_ONE, DAY_TWO],
   places: [],
 }
 
@@ -79,8 +97,17 @@ describe("PublicRouteScreen", () => {
     const { findByText } = await render(<PublicRouteScreen />)
 
     expect(await findByText("Skye circuit")).toBeTruthy()
-    expect(await findByText("Three days around the Cuillin coast.")).toBeTruthy()
+    expect(await findByText(DETAIL.description)).toBeTruthy()
     expect(await findByText(DIFFICULTY_LABELS[DIFFICULTIES[1]])).toBeTruthy()
+  })
+
+  it("shows the description in full rather than clamping it like the listing card", async () => {
+    // This is the screen someone opened in order to read the pitch.
+    mockFetch.mockResolvedValue(DETAIL)
+
+    const { findByTestId } = await render(<PublicRouteScreen />)
+
+    expect((await findByTestId("route-pitch")).props.numberOfLines).toBeUndefined()
   })
 
   it("shows the total distance in the viewer's own unit", async () => {
@@ -88,9 +115,7 @@ describe("PublicRouteScreen", () => {
 
     const { findByText } = await render(<PublicRouteScreen />)
 
-    expect(
-      await findByText(new RegExp(formatDistance(DETAIL.totalMiles, UNIT))),
-    ).toBeTruthy()
+    expect(await findByText(new RegExp(formatDistance(DETAIL.totalMiles, UNIT)))).toBeTruthy()
   })
 
   it("fetches the route named in the route params", async () => {
@@ -99,6 +124,66 @@ describe("PublicRouteScreen", () => {
     await render(<PublicRouteScreen />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("itin-1"))
+  })
+
+  describe("daily breakdown", () => {
+    it("lists every day of the route", async () => {
+      mockFetch.mockResolvedValue(DETAIL)
+
+      const { findByText } = await render(<PublicRouteScreen />)
+
+      expect(await findByText("Day 1")).toBeTruthy()
+      expect(await findByText("Day 2")).toBeTruthy()
+    })
+
+    it("names the stops so the route reads as places, not coordinates", async () => {
+      mockFetch.mockResolvedValue(DETAIL)
+
+      const { findByText, findAllByText } = await render(<PublicRouteScreen />)
+
+      expect(await findByText("Elgol")).toBeTruthy()
+      // Loch Coruisk ends day 1 and starts day 2.
+      expect((await findAllByText("Loch Coruisk")).length).toBeGreaterThan(0)
+      expect(await findByText("Soay")).toBeTruthy()
+    })
+
+    it("gives each day its own distance, not just the route total", async () => {
+      mockFetch.mockResolvedValue(DETAIL)
+
+      const { findByTestId } = await render(<PublicRouteScreen />)
+
+      const dayOne = await findByTestId("day-distance-1")
+      const dayTwo = await findByTestId("day-distance-2")
+      // Day 2 spans 0.15° of latitude against day 1's 0.2°, so they must differ — a
+      // breakdown that prints the same number for every day is showing the total.
+      expect(dayOne.props.children).not.toEqual(dayTwo.props.children)
+    })
+
+    it("falls back to a bare distance when the route has no planning speed", async () => {
+      // legLabel divides by avgSpeedKnots; an older route may never have had one set.
+      mockFetch.mockResolvedValue({ ...DETAIL, avgSpeedKnots: null })
+
+      const { findByTestId } = await render(<PublicRouteScreen />)
+
+      expect(await findByTestId("day-distance-1")).toBeTruthy()
+    })
+
+    it("says so when a published route carries no days at all", async () => {
+      mockFetch.mockResolvedValue({ ...DETAIL, days: [] })
+
+      const { findByText } = await render(<PublicRouteScreen />)
+
+      expect(await findByText(/no route detail/i)).toBeTruthy()
+    })
+  })
+
+  it("draws the route as a connected line, not just loose markers", async () => {
+    mockFetch.mockResolvedValue(DETAIL)
+
+    const { findByTestId } = await render(<PublicRouteScreen />)
+
+    // Markers alone leave a reader to guess the order the points join in.
+    expect(await findByTestId("route-line")).toBeTruthy()
   })
 
   it("shows the error rather than an empty map when the fetch fails", async () => {
