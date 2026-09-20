@@ -5,7 +5,10 @@ import { Pressable, type PressableProps } from "react-native"
 import { cn } from "../../lib/cn"
 import { Text } from "./text"
 
-const buttonVariants = cva("flex-row items-center justify-center rounded-md", {
+// `gap-2` lives on the base so an icon beside a label is spaced by the button itself.
+// Without it every icon+label call site wrapped its own <Row>, which put the spacing
+// decision in ~10 screens instead of here.
+const buttonVariants = cva("flex-row items-center justify-center gap-2 rounded-md", {
   variants: {
     variant: {
       default: "bg-primary active:opacity-90",
@@ -16,13 +19,26 @@ const buttonVariants = cva("flex-row items-center justify-center rounded-md", {
       // one colour, no exceptions.
       cta: "bg-cta active:opacity-90",
       destructive: "bg-destructive active:opacity-90",
-      outline: "border border-border bg-transparent active:bg-muted",
+      // `bg-background`, not transparent — this mirrors web's outline
+      // (`border bg-background shadow-xs`). Transparent made the button take whatever
+      // it sat on, which on a white card left only the border to say it was a control.
+      outline: "border border-border bg-background active:bg-muted",
       ghost: "bg-transparent active:bg-muted",
+      // Mirrors web's `link` role: a text action that still wants a button's hit area
+      // and disabled handling. Its absence is why link-styled actions were hand-rolled
+      // as `<Text onPress>` with no touch target and no disabled state.
+      link: "bg-transparent active:opacity-70",
     },
     size: {
+      // 44px is both platforms' minimum tap target, so the scale starts a step above
+      // web's h-9 default rather than matching it pixel for pixel.
       default: "h-11 px-4",
       sm: "h-9 px-3",
       lg: "h-12 px-6",
+      // Square, for a button whose whole content is one icon. `sm`-with-an-icon used
+      // to stand in for these and rendered a rectangle.
+      icon: "h-11 w-11 px-0",
+      "icon-sm": "h-9 w-9 px-0",
     },
   },
   defaultVariants: {
@@ -40,11 +56,14 @@ const buttonTextVariants = cva("text-center font-medium", {
       destructive: "text-destructive-foreground",
       outline: "text-foreground",
       ghost: "text-foreground",
+      link: "text-primary underline",
     },
     size: {
       default: "text-base",
       sm: "text-sm",
       lg: "text-lg",
+      icon: "text-base",
+      "icon-sm": "text-sm",
     },
   },
   defaultVariants: {
@@ -62,10 +81,15 @@ export interface ButtonProps
   children?: React.ReactNode
   className?: string
   textClassName?: string
+  // Rendered before the label, spaced by the base `gap-2`. A slot rather than a child
+  // because the child path wraps anything non-element in <Text>: passing an icon and a
+  // string together makes `children` an array, which fails that check and puts a View
+  // inside a Text. Every icon+label button used to hand-roll its own <Row> to dodge it.
+  icon?: React.ReactNode
 }
 
 const Button = React.forwardRef<React.ComponentRef<typeof Pressable>, ButtonProps>(
-  ({ className, textClassName, variant, size, disabled, children, ...props }, ref) => (
+  ({ className, textClassName, variant, size, disabled, icon, children, ...props }, ref) => (
     <Pressable
       ref={ref}
       disabled={disabled}
@@ -76,9 +100,10 @@ const Button = React.forwardRef<React.ComponentRef<typeof Pressable>, ButtonProp
       className={cn(buttonVariants({ variant, size }), disabled && "opacity-50", className)}
       {...props}
     >
+      {icon}
       {React.isValidElement(children) ? (
         children
-      ) : (
+      ) : children == null ? null : (
         // Not just a plain string: a multi-child JSX body (e.g. "Day {n}") compiles to
         // an array, which a bare `typeof children === "string"` check misses — see the
         // same fix's comment in chip.tsx for the RN crash that causes.

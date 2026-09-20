@@ -84,14 +84,21 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
   return res
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const res = await apiFetch(path)
+// `headers` exists for the elevated-token flow: re-authenticating returns a short-lived
+// token that the sensitive endpoints (email change) want on the request itself, not in
+// the body, matching frontend/lib/profile/actions.ts's "X-Elevated-Token".
+export async function apiGet<T>(path: string, headers?: Record<string, string>): Promise<T> {
+  const res = await apiFetch(path, { headers })
   if (!res.ok) throw new Error(await errorMessage("GET", path, res))
   return res.json() as Promise<T>
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body) })
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body), headers })
   if (!res.ok) throw new Error(await errorMessage("POST", path, res))
   const text = await res.text()
   return (text ? JSON.parse(text) : null) as T

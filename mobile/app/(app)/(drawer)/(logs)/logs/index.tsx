@@ -14,6 +14,7 @@ import { StatsPanel } from "@mobile/components/profile/stats-panel"
 import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Chip } from "@mobile/components/ui/chip"
+import { SectionLabel } from "@mobile/components/ui/section-label"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
@@ -163,7 +164,12 @@ export default function LogsScreen() {
           </Text>
         )}
 
-        {stats && <StatsPanel stats={stats} />}
+        {stats && (
+          <Stack className="gap-2">
+            <SectionLabel>Paddling</SectionLabel>
+            <StatsPanel stats={stats} />
+          </Stack>
+        )}
 
         {requests.length > 0 && (
           <Stack className="gap-2">

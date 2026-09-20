@@ -14,6 +14,12 @@ mark's *dark* colourway, because the email header band is navy regardless of the
 CC0 means this raster carries no notice of its own; it is listed here only so the tree and this
 file stay in step.
 
+The mobile app uses the same mark twice over: `mobile/components/ui/brand-mark.tsx` renders it
+live (a port of the web component, mapped to shared palette swatches), and `mobile/assets/*.png`
+— launcher icon, the three Android adaptive layers, splash and favicon — are cut from `icon.svg`
+by `scripts/build-mobile-icons.sh`, the light colourway on a chart-paper ground. Same reasoning
+as the mail raster: rasters generated from the one source, never hand-drawn copies that drift.
+
 Two modifications to the original: the enclosing ring and the fleur-de-lys crown are dropped, and
 every fill is rebound to our own `--mark-*` tokens. Only the 24 point paths are used, under the
 single flattened transform they all shared.

@@ -1,5 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { TRIP_STATE } from "@shared/dtos/trip"
+
 import TripListScreen from "../app/(app)/(drawer)/(trips)/index"
 import { getTrips } from "../lib/trips/actions"
 import { loadTripListCache, saveTripListCache } from "../lib/db/trip-list-cache"
@@ -85,5 +87,69 @@ describe("TripListScreen", () => {
 
     expect(await findByText("Cached Fjord")).toBeTruthy()
     expect(await findByText("Offline — showing your last synced trips")).toBeTruthy()
+  })
+
+  describe("grouping", () => {
+    // Headings only. The ordering within and between groups is groupTrips' job and is
+    // covered directly in lib/trips/__tests__/group-trips.test.ts — asserting it here
+    // as well would need a test-only element rendering the order, which is a worse
+    // trade than testing the pure function that decides it.
+    // getTrips returns a paginated page, not a bare array.
+    const page = (items: unknown[]) => ({ items, total: items.length, page: 1, pages: 1 })
+
+    const HAPPENING = {
+      id: "t-happening",
+      destination: "Skye",
+      state: TRIP_STATE.HAPPENING,
+      dateFrom: "2026-09-19",
+      dateTo: "2026-09-24",
+      travellers: [],
+    }
+    const SOON = {
+      id: "t-soon",
+      destination: "Arran",
+      state: TRIP_STATE.BUILDING,
+      dateFrom: "2026-10-01",
+      dateTo: "2026-10-04",
+      travellers: [],
+    }
+    const OLD = {
+      id: "t-old",
+      destination: "Jura",
+      state: TRIP_STATE.PAST,
+      dateFrom: "2026-05-01",
+      dateTo: "2026-05-03",
+      travellers: [],
+    }
+
+    it("heads each group the trips actually fall into", async () => {
+      mockGetTrips.mockResolvedValue(page([OLD, SOON, HAPPENING]))
+
+      const { findByTestId } = await render(<TripListScreen />)
+
+      expect(await findByTestId("group-happening")).toBeTruthy()
+      expect(await findByTestId("group-building")).toBeTruthy()
+      expect(await findByTestId("group-past")).toBeTruthy()
+    })
+
+    it("omits a heading for a group with no trips in it", async () => {
+      // A paddler with nothing under way should not be shown an empty "On the water".
+      mockGetTrips.mockResolvedValue(page([SOON]))
+
+      const { findByTestId, queryByTestId } = await render(<TripListScreen />)
+      await findByTestId("group-building")
+
+      expect(queryByTestId("group-happening")).toBeNull()
+      expect(queryByTestId("group-past")).toBeNull()
+    })
+
+    it("still lists a trip whose state the backend left null", async () => {
+      // `state` is nullish on the DTO. Dropping such a trip would lose it silently.
+      mockGetTrips.mockResolvedValue(page([{ ...SOON, id: "t-stateless", state: null }]))
+
+      const { findByText } = await render(<TripListScreen />)
+
+      expect(await findByText("Arran")).toBeTruthy()
+    })
   })
 })

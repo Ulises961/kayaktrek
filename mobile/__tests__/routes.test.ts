@@ -82,13 +82,24 @@ describe("route tree", () => {
   })
 
   it("keeps a real path segment for each section, so its screens get distinct URLs", () => {
+    // Nothing may share a URL, "/" included. This previously exempted "/" on the
+    // reasoning that each drawer item's root screen legitimately sits there — but
+    // that WAS the bug: (logs), (paddlers), (profile), (settings) and (trips) all
+    // put their list screen at their group root, a parenthesised segment adds
+    // nothing to the URL, so all five resolved to "/". The router matched the
+    // first one registered, so login landed on Logs, and /logs, /paddlers,
+    // /profile and /settings were not real URLs at all — any href to them was
+    // unmatched. Only trips claims "/" now; the rest own a segment.
     const routes = routePatterns()
 
-    // Several sections legitimately share "/" — each drawer item's own root
-    // screen. What must not happen is a section's CHILD screens collapsing to
-    // the root too, which is what a group with no real directory segment does.
-    const nonRoot = routes.filter((route) => route !== "/")
-    expect(new Set(nonRoot).size).toBe(nonRoot.length)
+    const byPattern = new Map<string, number>()
+    for (const route of routes) byPattern.set(route, (byPattern.get(route) ?? 0) + 1)
+
+    const collisions = [...byPattern.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([route, count]) => `${route} claimed by ${count} files`)
+
+    expect(collisions).toEqual([])
   })
 
   // The subtler half of the same bug: two dynamic routes sharing a parent match

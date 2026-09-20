@@ -70,7 +70,10 @@ function DayCard({
         "w-24 gap-1 rounded-lg border px-2 py-1.5",
         active
           ? "border-primary bg-primary/10"
-          : "border-border bg-transparent",
+          : // Same surface as Chip's unselected state and the outline button. This pill
+            // is a taller, two-line variant of a chip, so it follows the same rule
+            // rather than being transparent against whatever sits behind the rail.
+            "border-border bg-background",
       )}
     >
       <View

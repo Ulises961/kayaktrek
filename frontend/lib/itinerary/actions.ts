@@ -28,6 +28,7 @@ import type {
   ExplorePage,
   ExploreFilters,
 } from "@/lib/dtos/itinerary"
+import { exploreQueryString } from "./explore-params"
 import { extractRouteData } from "./public-routes"
 import type { RouteData } from "./public-routes"
 import type { BoundaryApplyPayload } from "./boundaries"
@@ -394,30 +395,9 @@ export async function importGpx(formData: FormData): Promise<ItineraryActionResu
   }
 }
 
-function buildExploreParams(filters: ExploreFilters): URLSearchParams {
-  const params = new URLSearchParams()
-  if (filters.name?.trim()) params.set("name", filters.name.trim())
-  for (const season of filters.seasons ?? []) params.append("season", season)
-  if (filters.minMiles != null) params.set("minMiles", String(filters.minMiles))
-  if (filters.maxMiles != null) params.set("maxMiles", String(filters.maxMiles))
-  if (filters.minDays != null) params.set("minDays", String(filters.minDays))
-  if (filters.maxDays != null) params.set("maxDays", String(filters.maxDays))
-  // bbox is all-or-nothing — only sent when the full viewport box is known.
-  if (filters.bbox) {
-    params.set("minLat", String(filters.bbox.minLat))
-    params.set("minLng", String(filters.bbox.minLng))
-    params.set("maxLat", String(filters.bbox.maxLat))
-    params.set("maxLng", String(filters.bbox.maxLng))
-  }
-  if (filters.sort) params.set("sort", filters.sort)
-  if (filters.page != null) params.set("page", String(filters.page))
-  if (filters.perPage != null) params.set("per_page", String(filters.perPage))
-  return params
-}
-
 export async function searchPublicItineraries(filters: ExploreFilters = {}): Promise<ExplorePage> {
   try {
-    const query = buildExploreParams(filters).toString()
+    const query = exploreQueryString(filters)
     const raw = await apiGetPublic<unknown>(`/api/itinerary/explore${query ? `?${query}` : ""}`)
     return ExplorePageSchema.parse(raw)
   } catch {

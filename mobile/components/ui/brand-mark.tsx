@@ -118,12 +118,26 @@ const POINTS: { tone: keyof typeof TONE; d: string }[] = [
   },
 ]
 
-export function BrandMark({ size = 28 }: { size?: number }) {
+/**
+ * `color` collapses the three inks to one — the `compass-mono.svg` variant
+ * docs/brand/compass-mark-brief.md asks for, "needed for dark surfaces and for anywhere
+ * the mark must tint to context". `opacity` lands on the root `Svg`, never per-path:
+ * the compass points overlap, so per-path alpha would print seams where they cross.
+ */
+export function BrandMark({
+  size = 28,
+  color,
+  opacity,
+}: {
+  size?: number
+  color?: string
+  opacity?: number
+}) {
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${BOX} ${BOX}`}>
+    <Svg width={size} height={size} viewBox={`0 0 ${BOX} ${BOX}`} opacity={opacity}>
       <G transform={FLATTEN}>
         {POINTS.map(({ tone, d }, index) => (
-          <Path key={index} d={d} fill={TONE[tone]} />
+          <Path key={index} d={d} fill={color ?? TONE[tone]} />
         ))}
       </G>
     </Svg>

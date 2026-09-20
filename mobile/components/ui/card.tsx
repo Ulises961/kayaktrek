@@ -1,6 +1,8 @@
 import * as React from "react"
 import { View, type ViewProps } from "react-native"
 
+import { lightTokens } from "@shared/tokens"
+
 import { cn } from "../../lib/cn"
 import { Text } from "./text"
 
@@ -8,20 +10,20 @@ function Card({ className, style, children, ...props }: ViewProps & { className?
   return (
     <View
       className={cn("overflow-hidden rounded-lg p-4", className)}
-      // The web cartouche itself, not an invented accent: chart-paper background
-      // (oklch(0.966 0.009 92) -> #f7f4ec) + a chart-hairline border at the same
-      // ~26% strength globals.css's `.chart-cartouche` uses (chart-hairline is
-      // oklch(0.43 0.165 243) -> #0053a1; rgba lets RN apply that opacity directly
-      // rather than pre-blending against a specific background). An earlier pass
-      // put a flat, full-strength blue bar across the top of every card instead —
-      // reads as decoration invented for mobile, and made the blue-overload
-      // problem worse rather than better. This is quieter and is what "cartouche"
-      // actually names on web.
+      // The same surface web's Card has: `--card` (white) on the app's warm `--background`,
+      // with the `--border` hairline. It carried chart paper (#f7f4ec) and a blue
+      // cartouche border instead — the chart-cartouche treatment, which on web is scoped
+      // to chart furniture rather than applied to every card. Two consequences on a
+      // phone, where almost every surface is a card: the card sat ~2 points from `--muted`
+      // (#f5f3ef), so a card and the controls resting on it read as one flat field, and
+      // the blue border pushed further into an app already heavy with blue.
       style={[
         {
-          backgroundColor: "#f7f4ec",
+          backgroundColor: lightTokens.card,
           borderWidth: 1,
-          borderColor: "rgba(0, 83, 161, 0.26)",
+          borderColor: lightTokens.border,
+          // Web's `shadow-sm`. This is what separates a white card from the warm
+          // background now that the border is a quiet neutral rather than a blue rule.
           elevation: 2,
           shadowColor: "#000",
           shadowOpacity: 0.08,

@@ -59,3 +59,23 @@ export async function logout(): Promise<void> {
   }
   await clearTokens()
 }
+
+// Ends EVERY session, this device included — the mobile equivalent of frontend's
+// logoutEverywhere(). The backend bumps token_version and revokes every session, so every
+// outstanding access/refresh token on every device dies at once (M17). Local tokens are
+// cleared the same best-effort way logout() clears them: the server call having failed
+// does not make the tokens on this device worth keeping.
+export async function logoutEverywhere(): Promise<void> {
+  const accessToken = await getAccessToken()
+  if (accessToken) {
+    try {
+      await fetch(`${API_URL}${API_PREFIX}/auth/logout-all`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      // ignore — tokens are cleared below regardless
+    }
+  }
+  await clearTokens()
+}

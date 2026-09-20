@@ -14,12 +14,15 @@ import { Text } from "./text"
 export function SectionLabel({
   children,
   className,
+  testID,
 }: {
   children: ReactNode
   className?: string
+  testID?: string
 }) {
   return (
     <Text
+      testID={testID}
       className={cn(
         "text-sm font-semibold uppercase tracking-wide text-slate-500",
         className,

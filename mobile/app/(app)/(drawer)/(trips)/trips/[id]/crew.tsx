@@ -7,6 +7,7 @@ import type { ConnectionUser } from "@shared/dtos/connection"
 import type { Trip } from "@shared/dtos/trip"
 import type { TripMember } from "@shared/dtos/trip-member"
 import { formatPaddlerName } from "@shared/user/format"
+import { lightTokens } from "@shared/tokens"
 
 import { listConnections } from "@mobile/lib/connections/actions"
 import { getSession } from "@mobile/lib/auth/session"
@@ -164,12 +165,12 @@ export default function CrewScreen() {
                         {canRemove && (
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon-sm"
                             accessibilityLabel={`Remove ${displayName}`}
                             disabled={actioningId === member.user.id}
                             onPress={() => member.user.id && void remove(member.user.id)}
                           >
-                            <UserMinusIcon size={16} color="#dc2626" />
+                            <UserMinusIcon size={16} color={lightTokens.destructive} />
                           </Button>
                         )}
                       </Row>
@@ -247,12 +248,12 @@ export default function CrewScreen() {
                       </Text>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon-sm"
                         accessibilityLabel="Cancel invitation"
                         disabled={actioningId === user.id}
                         onPress={() => user.id && void cancel(user.id)}
                       >
-                        <XIcon size={16} color="#64748b" />
+                        <XIcon size={16} color={lightTokens.mutedForeground} />
                       </Button>
                     </Row>
                   </CardContent>

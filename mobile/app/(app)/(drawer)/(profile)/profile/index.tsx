@@ -13,6 +13,7 @@ import { Avatar } from "@mobile/components/ui/avatar"
 import { Badge } from "@mobile/components/ui/badge"
 import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
+import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { getLogStats } from "@mobile/lib/logs/actions"
@@ -110,7 +111,12 @@ export default function ProfileScreen() {
           </Stack>
         )}
 
-        {stats && <StatsPanel stats={stats} />}
+        {stats && (
+          <Stack className="gap-2">
+            <SectionLabel>Paddling</SectionLabel>
+            <StatsPanel stats={stats} />
+          </Stack>
+        )}
 
         <Card>
           <CardHeader>
@@ -132,7 +138,7 @@ export default function ProfileScreen() {
 
         {!!me.certifications?.length && (
           <Stack className="gap-2">
-            <Text className="text-sm font-semibold text-foreground">Certifications</Text>
+            <SectionLabel>Certifications</SectionLabel>
             {me.certifications.map((cert, index) => (
               <Card key={cert.id ?? String(index)}>
                 <CardContent className="gap-1">

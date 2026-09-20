@@ -114,7 +114,7 @@ export function WeatherSeaPanel({
         {onRefresh && day?.id && (
           <Button
             variant="ghost"
-            size="sm"
+            size="icon-sm"
             accessibilityLabel="Refresh forecast"
             disabled={refreshing}
             onPress={() => void handleRefresh()}

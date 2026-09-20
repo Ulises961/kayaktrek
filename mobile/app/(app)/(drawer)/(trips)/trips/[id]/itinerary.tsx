@@ -24,7 +24,8 @@ import {
   buildDayColoredRoute,
   type LocatedRoutePoint,
 } from "@mobile/lib/itinerary/day-route";
-import { OSM_TILE_URL } from "@mobile/lib/map/tiles";
+import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
+import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
 
 // M9c WP6: the same live-first, cache-fallback shape as the trip list screen.
@@ -41,21 +42,6 @@ type ScreenTrip = {
 // Same fallback web's builder uses (map-builder.tsx) when the itinerary has never
 // had a speed set — kept as one named constant rather than repeating the literal.
 const DEFAULT_AVG_SPEED_KNOTS = 2.5;
-
-// A minimal inline style — one raster source pointing at the M8 tile proxy, one layer
-// to render it — rather than a hosted style.json (plans/M9b.md WP3: "no new backend
-// work needed", and we don't have a style-hosting concern to solve here either).
-const MAP_STYLE = {
-  version: 8 as const,
-  sources: {
-    osm: {
-      type: "raster" as const,
-      tiles: [OSM_TILE_URL],
-      tileSize: 256,
-    },
-  },
-  layers: [{ id: "osm", type: "raster" as const, source: "osm" }],
-};
 
 function boundsOf(
   points: LocatedRoutePoint[],
@@ -98,7 +84,9 @@ export default function TripMapScreen() {
   const reload = useCallback(async () => {
     try {
       const t = await getTrip(id);
-      const days = t.itinerary?.days ?? [];
+      // Filtered at ingestion, not at render: Day 0 sorts first, so leaving it in the
+      // array also made it the default selection below.
+      const days = numberedDays(t.itinerary?.days ?? []);
       setTrip({
         destination: t.destination ?? null,
         days,
@@ -114,12 +102,17 @@ export default function TripMapScreen() {
     } catch (err) {
       const offline = await loadOfflineTrip(id);
       if (offline.days.length > 0 || offline.destination !== null) {
+        const offlineDays = numberedDays(offline.days);
         // The cache has no speed setting of its own — same default as a live
         // itinerary that's never had one set.
-        setTrip({ ...offline, avgSpeedKnots: DEFAULT_AVG_SPEED_KNOTS });
+        setTrip({
+          ...offline,
+          days: offlineDays,
+          avgSpeedKnots: DEFAULT_AVG_SPEED_KNOTS,
+        });
         setIsOffline(true);
         setError(null);
-        setSelectedDayId((current) => current ?? offline.days[0]?.id ?? null);
+        setSelectedDayId((current) => current ?? offlineDays[0]?.id ?? null);
       } else {
         setError(
           err instanceof Error

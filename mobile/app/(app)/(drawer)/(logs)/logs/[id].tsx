@@ -1,11 +1,11 @@
 import { Stack as RouterStack, useLocalSearchParams, useRouter } from "expo-router"
-import { ClockIcon, RouteIcon, WavesIcon } from "lucide-react-native"
+import { ClockIcon, RouteIcon, Trash2Icon, WavesIcon } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
 import type { Log, LogFields } from "@shared/dtos/log"
 import { beaufortLabel } from "@shared/weather/beaufort"
-import { palette } from "@shared/tokens"
+import { lightTokens, palette } from "@shared/tokens"
 
 import { Button } from "@mobile/components/ui/button"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
@@ -231,14 +231,24 @@ export default function LogDetailScreen() {
           error={error}
           onSubmit={(fields) => void handleUpdate(fields)}
         />
-      {/* Quiet rather than the `destructive` fill (user call, 2026-09-18). Two
-          full-width saturated blocks — Save on structure blue, Delete on red —
-          competed for the eye on a screen where saving is the ordinary action and
-          deleting is the rare one. The Alert.alert confirm (M9k) is what actually
-          guards the deletion; the colour was shouting a second time. */}
-        <Button variant="outline" disabled={submitting} onPress={confirmDelete}>
-          Delete log
-        </Button>
+        {/* Destructive role, per M30 WP1's resolution: a destructive action with a
+            text label takes the red fill, and only a self-explanatory icon in a dense
+            row may go quiet. The original objection to red here was real but was about
+            weight, not hue — Save and Delete were both full-width saturated blocks
+            competing for the eye. Delete sits inset and right-aligned instead, so
+            saving stays the obvious action while deleting still reads as destructive.
+            The Alert.alert confirm (M9k) remains what actually guards it. */}
+        <Row className="justify-end border-t border-border pt-4">
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={submitting}
+            onPress={confirmDelete}
+            icon={<Trash2Icon size={14} color={lightTokens.destructiveForeground} />}
+          >
+            Delete log
+          </Button>
+        </Row>
       </ScrollView>
     </Screen>
   )

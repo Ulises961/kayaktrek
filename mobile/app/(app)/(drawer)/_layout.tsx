@@ -1,24 +1,22 @@
 import { Drawer } from "expo-router/drawer"
-import { Kayak, Newspaper, Settings } from "lucide-react-native"
+import { Compass, Kayak, Newspaper, PocketKnife, Settings } from "lucide-react-native"
 
 import { palette } from "@shared/tokens"
 
 import { UserGroupIcon } from "@mobile/components/icons/heroicons-user-group"
 import { AppDrawerContent } from "@mobile/components/navigation/app-drawer-content"
 
-// KNOWN ISSUE (M30 WP0, unresolved): login was landing on Logs instead of Trips —
-// Expo Router resolves a route group's initial screen from `unstable_settings.anchor`/
-// `initialRouteName` (getRoutesCore.js) when routes are auto-generated, but this layout
-// declares all 4 screens explicitly via <Drawer.Screen>, and useScreens.js's
-// getSortedChildren only consults that anchor for auto-generated "leftover" screens —
-// with an explicit list it orders purely by JSX declaration order (already (trips)
-// first) and never feeds the anchor into the real navigator's `initialRouteName` prop.
-// Both fixes below are the textbook-correct API per Expo Router's docs, confirmed
-// loaded at runtime (module evaluates, unstable_settings has the right value), but the
-// app still opens on Logs on a fresh install + fresh login. Left in place since they're
-// the semantically-correct fix and harmless; the actual default-tab behavior needs a
-// follow-up investigation (possibly an expo-router 57.0.19-specific regression) rather
-// than a workaround bolted on here.
+// Login used to land on Logs instead of Trips. It was never an expo-router bug, and
+// never about this anchor: every drawer group put its list screen at its own group
+// root, a parenthesised segment contributes nothing to a URL, so all five resolved to
+// "/" and the router matched whichever registered first — (logs), alphabetically.
+// `initialRouteName` orders a navigator's children; it does not decide what a URL
+// resolves to, so no value here could have fixed it. Each group owns a real segment
+// now (/logs, /paddlers, /profile, /settings) and only trips claims "/".
+// __tests__/routes.test.ts fails if two files ever claim one URL again.
+//
+// The anchor stays because it is still the correct declaration of which child is the
+// drawer's root, which is what expo-router reads it for.
 export const unstable_settings = {
   initialRouteName: "(trips)",
 }
@@ -70,12 +68,28 @@ export default function DrawerLayout() {
         }}
       />
       <Drawer.Screen
+        name="(gear)"
+        options={{
+          drawerLabel: "Gear",
+          // Web's navigation-items.tsx uses PocketKnifeIcon for this destination —
+          // same nav item, same glyph on both platforms.
+          drawerIcon: ({ color, size }) => <PocketKnife color={color} size={size} />,
+        }}
+      />
+      <Drawer.Screen
         name="(paddlers)"
         options={{
           drawerLabel: "Paddlers",
           // Web's UserGroupIcon is a Heroicons SVG, not a lucide icon — ported verbatim
           // rather than substituted with lucide's Users (a visibly different glyph).
           drawerIcon: ({ color, size }) => <UserGroupIcon color={color} size={size} />,
+        }}
+      />
+      <Drawer.Screen
+        name="(explore)"
+        options={{
+          drawerLabel: "Explore",
+          drawerIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Drawer.Screen
