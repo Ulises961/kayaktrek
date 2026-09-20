@@ -1,5 +1,5 @@
 import { Drawer } from "expo-router/drawer"
-import { Compass, Kayak, Newspaper, Settings } from "lucide-react-native"
+import { Compass, Kayak, Newspaper, PocketKnife, Settings } from "lucide-react-native"
 
 import { palette } from "@shared/tokens"
 
@@ -65,6 +65,15 @@ export default function DrawerLayout() {
         options={{
           drawerLabel: "Logs",
           drawerIcon: ({ color, size }) => <Newspaper color={color} size={size} />,
+        }}
+      />
+      <Drawer.Screen
+        name="(gear)"
+        options={{
+          drawerLabel: "Gear",
+          // Web's navigation-items.tsx uses PocketKnifeIcon for this destination —
+          // same nav item, same glyph on both platforms.
+          drawerIcon: ({ color, size }) => <PocketKnife color={color} size={size} />,
         }}
       />
       <Drawer.Screen
