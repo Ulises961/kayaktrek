@@ -2,7 +2,7 @@ import { UserSchema, type User } from "@shared/dtos/user"
 import { PublicUserSchema, type PublicUser } from "@shared/dtos/public-profile"
 import type { DistanceUnit } from "@shared/itinerary/distance"
 
-import { apiGet, apiPatch } from "../api/client"
+import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client"
 import { getSession } from "../auth/session"
 
 // GET /api/v1/user/me
@@ -70,4 +70,48 @@ export async function setUnitPreference(unit: DistanceUnit): Promise<User> {
     unitPreference: unit,
   })
   return UserSchema.parse(raw)
+}
+
+// Single-field phone update for Settings, mirroring web's setPhone
+// (frontend/lib/profile/actions.ts). Cleared as null, not "" — an empty string is a
+// value the column would store, where the backend's validator expects an absence.
+export async function setPhone(phone: string): Promise<User> {
+  const session = await getSession()
+  if (!session) throw new Error("Not signed in")
+
+  const raw = await apiPatch<unknown>(`/api/user/${session.userId}`, {
+    phone: phone.trim() || null,
+  })
+  return UserSchema.parse(raw)
+}
+
+// No `rewrappedKey` argument, unlike web's changePassword. That parameter carries the
+// medical-notes private key re-encrypted under the new password (M22), and medical notes
+// are parked (M24) — mobile has no keypair to rewrap and no surface that could produce
+// one. The backend only requires it when the account actually has a keypair.
+export async function changePassword(currentPwd: string, newPwd: string): Promise<void> {
+  await apiPatch("/api/user/me/password", { currentPwd, newPwd })
+}
+
+// Exchanges the password for a short-lived elevated token, which the sensitive endpoints
+// want as an X-Elevated-Token header.
+export async function reAuthenticate(password: string): Promise<string> {
+  const data = await apiPost<{ elevatedToken: string }>("/api/user/me/re-auth", { password })
+  return data.elevatedToken
+}
+
+// Does not change the address: it sends a confirmation link to the new one, and the
+// change lands when that link is followed. `pendingMail` on the user reflects the wait.
+export async function requestEmailChange(elevatedToken: string, newMail: string): Promise<void> {
+  await apiPost("/api/user/me/email-change", { newMail }, { "X-Elevated-Token": elevatedToken })
+}
+
+export async function requestDataExport(): Promise<void> {
+  await apiPost("/api/user/me/data-export", {})
+}
+
+// Requests deletion rather than performing it — the account enters a 30-day window in
+// which it can be cancelled by signing in again (GDPR erasure task).
+export async function requestAccountDeletion(): Promise<void> {
+  await apiDelete("/api/user/me")
 }
