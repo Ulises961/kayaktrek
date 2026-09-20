@@ -7,9 +7,11 @@ import { ActivityIndicator, RefreshControl, ScrollView } from "react-native"
 import { TripCard } from "@mobile/components/trips/trip-card"
 import { Button } from "@mobile/components/ui/button"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
-import { Screen } from "@mobile/components/ui/layout"
+import { Screen, Stack } from "@mobile/components/ui/layout"
+import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 import { type TripCardData, loadTripListCache, saveTripListCache, toTripCardData } from "@mobile/lib/db/trip-list-cache"
+import { groupTrips } from "@mobile/lib/trips/group-trips"
 import { getTrips } from "@mobile/lib/trips/actions"
 
 // Sets this screen's title on its group's Stack navigator — see (trips)/_layout.tsx's
@@ -129,8 +131,13 @@ export default function TripListScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
-        {(trips ?? []).map((trip, index) => (
-          <TripCard key={trip.id || String(index)} trip={trip} />
+        {groupTrips(trips ?? []).map((group) => (
+          <Stack key={group.state} className="gap-3">
+            <SectionLabel testID={`group-${group.state}`}>{group.title}</SectionLabel>
+            {group.trips.map((trip, index) => (
+              <TripCard key={trip.id || String(index)} trip={trip} />
+            ))}
+          </Stack>
         ))}
       </ScrollView>
     </Screen>
