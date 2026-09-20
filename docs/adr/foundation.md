@@ -554,6 +554,59 @@ drifting per-agent interpretations.
 
 ---
 
+## Deploy availability — maintenance mode and rolling replacement, not blue/green (M33)
+
+**Context (2026-09-20).** M25 opened registration and real users started joining. `scripts/
+deploy.sh` recreates `backend`, `frontend` and `sse` in place, so every deploy is a window in
+which a visitor gets a connection error. That was free when the operator was the only user; it
+is not free now. The question posed was maintenance mode *or* blue/green.
+
+**Decision: neither as posed — maintenance mode as the foundation, per-service rolling
+replacement on top of it, and blue/green rejected.** Scoped as `plans/M33-deploy-availability.md`.
+
+**Why blue/green is rejected — measured, not estimated.** Taken on `kayak-do` on the date of
+this decision:
+
+- A parallel serving tier is `backend` 768M + `sse` 512M + `frontend` 512M = **1792M**, against
+  **2064M available** with 220M already in swap. It fits only by consuming the ~2147M of page
+  cache Postgres is using as its working set. That trades deploy downtime for a database that
+  degrades on every deploy — a worse bargain than the one being fixed.
+- `kayak_sse` is at **95.8%** of its limit and `kayak_backend` at **90.1%**. There is no slack to
+  borrow even temporarily. (Both figures are also a standalone concern, deliberately *not*
+  folded into M33 — see its non-goals.)
+- **`beat` is a singleton that schedules the missed-checkpoint shore-contact email.** Two beats
+  means a real shore contact receives duplicate safety alerts. So beat must be excluded from any
+  parallel stack and cut over separately — which removes most of blue/green's conceptual
+  simplicity, independently of the memory argument. This is a safety constraint, not an
+  efficiency one.
+
+**What makes the chosen path cheap.** nginx runs on the host, outside the compose lifecycle, and
+is therefore a switch point that survives the containers being replaced. It currently has no
+`upstream` blocks — `proxy_pass http://127.0.0.1:5000` is hardcoded — so adding them is the
+enabling refactor for everything else and is nearly free.
+
+**The expensive prerequisite turned out to be already met.** Rolling replacement means old and
+new code briefly run against the same schema, which demands expand-only migrations. An audit of
+the last 15 migrations' `upgrade()` paths (not their `downgrade()` paths — the first pass of this
+audit read the inverse operations autogenerate writes there and briefly overstated the problem)
+found them additive except one `drop_constraint`. Expand-only already holds by habit; M33 WP4
+writes it down as a rule, since rolling replacement makes it load-bearing rather than incidental.
+
+**Maintenance mode is not the lesser alternative — it is the base layer.** A schema-breaking
+migration genuinely requires old code to stop before the new schema lands, and no traffic-
+switching scheme changes that. So maintenance mode is both the first increment (it converts a
+deploy from a connection error into an honest 503 page) and the permanent fallback for the class
+of deploys rolling replacement cannot serve.
+
+**Deliberately not decided here:** whether `sse` ever joins the rolling path. `EventSource`
+reconnects on its own, so dropping those connections costs a reconnect; M33 WP3 decides it, with
+"exclude it and say so" the expected outcome.
+
+**Unmeasured, and gating:** the *current* downtime window has never been timed. M33 WP0 exists to
+do that before WP2/WP3 are built, and may well conclude that WP1 alone is the whole milestone.
+
+---
+
 ## Open source — decided (M25 → decision 2026-09-12)
 
 **Status (2026-09-12): decided — open the repository, deliberately as a user-acquisition move,
@@ -771,3 +824,4 @@ the stored preference available to it, so cleaning history without closing that 
 | **`storage.<domain>` vhost actually retired — the 2026-08-26 row claimed it, the template never did it** | amends the 2026-08-26 R2-migration row | 2026-09-11 | The R2-migration row above says plainly "`storage.<domain>` vhost retired." It was not: `nginx/kayak-expedition-planner.conf.template` still carried the full MinIO `storage.` `server` block, its cert SAN, and its place in the six-hostname count three weeks later, found only because M28's own SAN-list edit (the row above) required touching the same file and looking at every entry in it. `docker-compose.prod.yml`'s own comments ("MinIO is no longer in this file") had already said as much for weeks with nobody cross-checking the vhost against it — the same "a claim in one file is not evidence for another" gap `CLAUDE.md`'s `INVITE_CODE` entry already names. Removed in the same pass as the M28 SAN-list change (cheap to fold in, since the cert command was already being edited): the vhost, its cert SAN, and its live entry in `DEPLOY.md`'s Status section. Nothing was serving on `storage.` in production regardless — R2 has held every object since 2026-08-26 — so this was a dead DNS record and an unused nginx block, not a live regression |
 | **Open-sourcing decided — reverses the 2026-09-05 "undecided" row, on a different argument than it evaluated** | ADR-034 | 2026-09-12 | The 2026-09-05 row weighed opening *for* an audience already there to be reassured, and correctly found nobody was there yet to reassure (`/explore` at 1 route). This decides the opposite direction on a premise that row never considered: **open the repository specifically because there is no userbase yet, not despite it** — auditability plus a credible community-based-product story is the acquisition pitch used to build a userbase, not a response to one already asking. The audit and the "how" decisions in the 2026-09-05 row (AGPL-3.0, brand-not-licence, no fresh repo needed) are unchanged and now become the execution basis rather than a durable-if-unused answer. **Tied to the monetisation side of the same decision, recorded in `ROADMAP.md`'s Strategy section**: real hosting cost plus a near-finished product changed the calculus from "wait for a usage signal before building paid features" to "have paid features ready now" — the open core and the premium integration broker (`ROADMAP.md`'s open-core section) are now one launch move, not a self-hosted-trust-signal first and a monetisation-layer added later once self-hosters exist. BYOK and third-party platform integrations (Strava, satellite feed, notification-channel/chatbot) are the first features to gate through the broker, adopted early rather than deferred behind a self-hoster trigger that this decision no longer waits for |
 | **Mobile *and* the new B2B/Pro admin console both stay closed source, consolidated into one `kayak-premium` repo; monorepo split is a prerequisite of executing the open-source decision, not its own milestone** | amends the row above | 2026-09-12 | Forced by scoping mobile GPS/Bluetooth integration (`docs/adr/mobile-offline.md` M9f): BLE-GATT/NMEA and satellite-feed (inReach MapShare etc.) integrations have no third-party secret to gate on the way Strava/BYOK do, so protecting them as premium requires the feature *code* itself to be absent from whatever repo goes public — the existing Core-BE-contains-all-the-logic principle doesn't extend to this feature. **Widened same day**: the B2B/Pro tier was reframed as its own frontend (an admin console for operators/organisers, distinct from the consumer app's information architecture — `ROADMAP.md`'s Strategy section), closed by a different but parallel logic (it's the paid product surface itself, not something the consumer-trust pitch needs open). Both land in the existing private **`kayak-premium`** repo alongside the Premium Broker BE — one closed home for Broker BE + mobile app + B2B console, not three separate private repos. The 2026-09-05 audit's "no fresh repository required, it's a visibility flip" conclusion assumed an all-or-nothing flip and no longer holds: git visibility is per-repository, so `backend/`+`frontend/` (public **`kayak-core`**) and everything closed (`kayak-premium`) need an actual repo split, not a flag flip. **Sequencing deliberately left unpinned to a date** for the split itself — nothing is blocked while the monorepo stays private — but the split (repo structure) and the console *build* are two different clocks: building the console is a large, later bet sized like M26, not like BYOK/Strava, so the repo split should exist before the console is built, not the other way round. **One concrete coupling to solve when the split happens**: M9b's `frontend/lib/*` reuse by mobile becomes a public npm package — private registries were considered and rejected, since `frontend/lib` is part of Core and public either way, so gating the package adds real ongoing operational cost for no confidentiality benefit. **Open question, not yet decided**: whether Club-admin features belong on the same B2B console once the missing `Club`/`Organization` schema exists |
+| **Deploy availability — maintenance mode + per-service rolling replacement; blue/green rejected** | ADR-034 | 2026-09-20 | Scoped as `plans/M33-deploy-availability.md`; full reasoning in "Deploy availability" above. Triggered by M25's open registration putting real users on the app, not by a measured outage — the current downtime window has never been timed, and M33 WP0 gates the rest of the plan on measuring it. Blue/green rejected on three measured grounds: a parallel serving tier is 1792M against 2064M available (220M already swapped), so it fits only by eating the page cache Postgres works from; `sse` and `backend` already sit at 95.8% and 90.1% of their limits with no slack to borrow; and `beat` is a singleton scheduling the missed-checkpoint shore-contact email, so duplicating it sends a real shore contact duplicate safety alerts — a safety constraint that forces beat out of any parallel stack regardless of memory. Chosen path is cheap because nginx runs on the host, outside the compose lifecycle, and is therefore a switch point that survives container replacement; it has no `upstream` blocks today (`proxy_pass` hardcoded), so adding them is the enabling refactor. **Maintenance mode is the base layer, not the lesser option** — a schema-breaking migration requires old code to stop before the new schema lands, which no traffic-switching scheme changes, so it is both the first increment and the permanent fallback. The expensive prerequisite for rolling deploys (expand-only migrations) was found already met: the last 15 migrations' `upgrade()` paths are additive but for one `drop_constraint` — note the first pass of that audit read `downgrade()` bodies and overstated the problem, so audit `upgrade()` only. M33 WP4 promotes expand-only from habit to written rule since rolling replacement makes it load-bearing. Explicitly out of scope: a second droplet or load balancer (revisit under this ADR's redundancy-tier ladder), and the `sse`/`backend` memory pressure, which is real but its own problem |
