@@ -13,6 +13,7 @@ import { Row } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 
 import { RoutePreview } from "./route-preview"
+import { SeasonBadge } from "./season-badge"
 
 // Mirrors the field choices of web's explore card plus RouteSignals
 // (frontend/components/explore/route-signals.tsx): the signals the backend derives from
@@ -38,7 +39,10 @@ export function RouteCard({ item, unit }: { item: ExploreItem; unit: DistanceUni
               <CardTitle className="flex-1" numberOfLines={1}>
                 {item.name ?? "Untitled route"}
               </CardTitle>
-              {item.difficulty && <Badge>{DIFFICULTY_LABELS[item.difficulty]}</Badge>}
+              <Row className="shrink-0 gap-1.5">
+                {item.difficulty && <Badge>{DIFFICULTY_LABELS[item.difficulty]}</Badge>}
+                <SeasonBadge season={item.season} />
+              </Row>
             </Row>
           </CardHeader>
 
@@ -95,6 +99,14 @@ export function RouteCard({ item, unit }: { item: ExploreItem; unit: DistanceUni
                   By {item.author.username}
                 </Text>
               </Row>
+            )}
+
+            {/* Fork attribution (M7c): who wrote the route this one was cloned from,
+                which is a different person from `author` above. */}
+            {item.originalAuthor && (
+              <Text className="text-[11px] text-muted-foreground">
+                Cloned from {item.originalAuthor.username}
+              </Text>
             )}
           </CardContent>
         </Card>
