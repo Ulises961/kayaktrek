@@ -3,9 +3,18 @@
 # `docker compose -f docker-compose.prod.yml pull && up -d` app redeploy never touches
 # this stack (or vice versa). Bring up with:
 #   docker compose -f docker-compose.prod.yml up -d      # creates the shared `kayak_net` first
-#   docker compose -f docker-compose.monitoring.yml up -d
+#   docker compose -f docker-compose.monitoring.yml up -d portainer glances pgweb
 # All UIs stay on 127.0.0.1 only, same as every other infra service in this repo — none
 # of these are ever routed through the public Cloudflare Tunnel domain.
+
+# The separate lifecycle above was only ever a claim, not a fact, until this `name:` existed.
+# Both compose files live in the same directory on the box with no `-p`, so Compose derived
+# the SAME project name (`kayak-planner`, from the directory) for both — which makes each
+# file's services "orphans" of the other's view. `scripts/deploy.sh` runs the app stack with
+# `up -d --remove-orphans`, so every single deploy silently DELETED portainer/glances/pgweb.
+# Observed 2026-09-20: all three containers gone from `docker ps -a` after the prior deploy,
+# with the app stack healthy. An explicit project name is what actually isolates the two.
+name: kayak-monitoring
 
 services:
 
@@ -62,7 +71,11 @@ services:
       - uptime_kuma_data:/app/data
 
 volumes:
+  # Pinned to the name the old `kayak-planner` project gave it, so renaming the project
+  # adopts the existing volume instead of starting a blank one — Portainer's admin account
+  # lives in here, and it survived the deploy that removed the containers themselves.
   portainer_data:
+    name: kayak-planner_portainer_data
   uptime_kuma_data:
 
 networks:

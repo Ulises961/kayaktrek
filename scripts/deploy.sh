@@ -45,6 +45,12 @@ echo ">>> [2/3] Pulling ${IMAGE_TAG} and starting the stack"
 # was not. See deploy-sync.sh's trailing comment for the MinIO-removal incident this
 # guards against. `migrate` re-runs `alembic upgrade head && flask seed` on every `up`;
 # both are idempotent, so this is safe on every deploy, not just the first one.
+#
+# The flag's blast radius is the *project*, not the file: until 2026-09-20 it also deleted
+# the operator tooling, because docker-compose.monitoring.yml shared this stack's
+# directory-derived project name and so looked like a pile of orphans on every deploy. That
+# file now sets `name: kayak-monitoring`. Keep it that way — if a third compose file is ever
+# added beside these, give it its own `name:` before the first deploy runs, not after.
 ssh "$HOST" "
     set -e
     cd ${REMOTE_PATH}

@@ -135,10 +135,43 @@ droplet-local Kuma structurally cannot (see "What this stack cannot do" below). 
 droplet-local instance from this file would duplicate that role, not improve it, and the monitor
 table in the next section (targets like `127.0.0.1:5000`) describes a droplet-local Kuma that was
 never actually configured — treat that table as the design intent for if a droplet-local instance
-is ever wanted, not as current state. Not `--remove-orphans` on the command above — both compose
-files share a directory with no explicit `-p` project name, so Compose labels the *other* file's
-containers "orphans" of this one's view; that's a label artifact, not something to clean up, and
-passing `--remove-orphans` here would actually stop the running app stack.
+is ever wanted, not as current state.
+
+**Never pass `--remove-orphans` to the command above.** This file declares `uptime-kuma` but the
+command starts only the other three, so Compose sees Kuma as an orphan of its own project and the
+flag would delete it — and on a box where a droplet-local Kuma *was* ever started, that takes its
+data volume's container with it. Start services by name here, without the flag.
+
+**The two stacks are only isolated because `docker-compose.monitoring.yml` sets `name:
+kayak-monitoring`** (added 2026-09-20). Before that they were not: both files sit in the same
+directory on the box with no explicit `-p`, so Compose derived the same directory-based project
+name (`kayak-planner`) for both, and each file's services were "orphans" of the other's view.
+That is not a harmless label artifact — `scripts/deploy.sh` brings the app stack up with
+`up -d --remove-orphans`, so **every app deploy silently destroyed portainer/glances/pgweb**.
+Found 2026-09-20 when all three had vanished from `docker ps -a` (not stopped — removed) while
+the app stack was healthy, surfacing as `connection refused` on the operator SSH tunnel below.
+This doc previously described only the mirror-image hazard (the monitoring file removing app
+containers), which is the direction that never actually fired, because nothing runs this file
+with that flag. `kayak-planner_portainer_data` outlived the deletions, and the volume keeps that
+pinned name under the new project so Portainer's admin account carries over.
+
+**One-time cutover, required the first time the renamed file reaches a box that is already
+running these containers under the old project.** Every service here sets an explicit
+`container_name`, and Docker names are global — so `up -d` under the new project tries to create
+`kayak_portainer` while a `kayak-planner`-labelled container still holds that name, and Docker
+refuses: `Conflict. The container name "/kayak_portainer" is already in use`. Compose does not
+re-label containers across a project rename. Remove the old ones by name first — the data lives
+in the volume, not the container:
+
+```bash
+docker rm -f kayak_portainer kayak_glances kayak_pgweb
+docker compose -f docker-compose.monitoring.yml up -d portainer glances pgweb
+docker ps --filter name=kayak_portainer --filter name=kayak_glances --filter name=kayak_pgweb
+```
+
+Only needed once per box. Verify Portainer still knows your admin account afterwards; if it
+offers first-run signup instead, the volume pin above did not take and the old volume is still
+sitting there under its original name.
 
 All on `127.0.0.1` only, same rule as everything else here: Portainer `:9002`, Glances `:61208`,
 pgweb `:8081`. None of these are ever routed through the public Cloudflare Tunnel domain — a DB
