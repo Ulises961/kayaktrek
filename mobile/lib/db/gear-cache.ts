@@ -10,13 +10,22 @@ import { CachedGear } from "./models"
 // requirement caches, so the whole table replaces wholesale on every
 // successful fetch — same shape as trip-list-cache, no trip to scope by.
 //
-// Only what the Items screen renders off a piece of gear: its name, and the
-// `status` that decides whether it can be added to a kit ("owned") or is just
-// a suggestion. Category and default_pack have no offline reader.
+// What the two offline readers render off a piece of gear. The Items screen's
+// contribute list needs the name and the `status` that decides whether it can
+// be added to a kit ("owned") or is only a suggestion; M30 WP5's Gear screen
+// additionally groups by category and renders M10's default-pack flag.
+//
+// Those last two were originally dropped as having no offline reader — true
+// when written, false once the Gear screen shipped. Without them that screen
+// showed every item as unfiled and not-default regardless of what it is, which
+// for default-pack is a misrepresentation of what the next trip will look like
+// rather than a missing detail.
 export type GearCardData = {
   id: string
   name: string
   status: string | null
+  categoryName: string | null
+  defaultPack: boolean
 }
 
 function toGearCardData(item: Item): GearCardData {
@@ -24,6 +33,10 @@ function toGearCardData(item: Item): GearCardData {
     id: item.id ?? "",
     name: item.name ?? "",
     status: item.status ?? null,
+    categoryName: item.category?.name ?? null,
+    // Coerced rather than carried as nullable: absent must read as off, never
+    // as "unknown" that a chip then renders indistinguishably from on.
+    defaultPack: item.defaultPack ?? false,
   }
 }
 
@@ -43,6 +56,8 @@ export async function saveGearCache(items: Item[], database: Database = producti
             id: card.id,
             name: card.name,
             status: card.status,
+            category_name: card.categoryName,
+            default_pack: card.defaultPack,
           })
         })
     )
@@ -57,5 +72,7 @@ export async function loadGearCache(database: Database = productionDatabase): Pr
     id: row.id,
     name: row.name,
     status: row.status ?? null,
+    categoryName: row.categoryName ?? null,
+    defaultPack: row.defaultPack ?? false,
   }))
 }

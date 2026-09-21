@@ -1,4 +1,4 @@
-import { createTable, schemaMigrations } from "nitromelondb/Schema/migrations"
+import { addColumns, createTable, schemaMigrations } from "nitromelondb/Schema/migrations"
 
 // database.ts's SQLiteAdapter never had `migrations` wired ("acceptable while
 // this hasn't shipped to a real device" — schema.ts's own comment, written
@@ -107,6 +107,22 @@ export const migrations = schemaMigrations({
           columns: [
             { name: "key", type: "string", isIndexed: true },
             { name: "cached_at", type: "number" },
+          ],
+        }),
+      ],
+    },
+    {
+      // M30 WP5's Gear screen became a second offline reader of `cached_gear`,
+      // and needs two fields the original cache dropped as having no reader.
+      // Both nullable, so existing rows survive the migration and simply read
+      // as unfiled/not-default until the next sweep refills them.
+      toVersion: 9,
+      steps: [
+        addColumns({
+          table: "cached_gear",
+          columns: [
+            { name: "category_name", type: "string", isOptional: true },
+            { name: "default_pack", type: "boolean", isOptional: true },
           ],
         }),
       ],

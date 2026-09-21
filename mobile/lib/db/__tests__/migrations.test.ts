@@ -61,6 +61,17 @@ describe("migrations", () => {
     expect(createdTables).toEqual(["cache_freshness"])
   })
 
+  it("adds the Gear screen's two columns at v9", () => {
+    const v9 = migrations.sortedMigrations.find((migration) => migration.toVersion === 9)
+    expect(v9).toBeDefined()
+
+    const added = v9!.steps
+      .filter((step) => step.type === "add_columns")
+      .flatMap((step) => (step.type === "add_columns" ? step.columns.map((c) => c.name) : []))
+
+    expect(added.sort()).toEqual(["category_name", "default_pack"])
+  })
+
   // The guard that would have caught the original v4 -> v5 miss, stated once
   // for every version rather than as one test per bump.
   it("has a migration for every version schema.ts has reached", () => {

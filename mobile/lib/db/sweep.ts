@@ -1,6 +1,10 @@
+import { getMyItems } from "../inventory/actions"
+import { getPackingItems } from "../inventory/personal-packing-actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
+import { saveGearCache } from "./gear-cache"
+import { saveKitCache } from "./kit-cache"
 import { pullRoute } from "./route-sync"
-import { planSweep, type SweepTrip } from "./sync-scope"
+import { GEAR_STALENESS_BUDGET_MS, planSweep, type SweepTrip } from "./sync-scope"
 import { syncTrip } from "./sync"
 import { loadTripListCache } from "./trip-list-cache"
 
@@ -37,11 +41,31 @@ async function freshnessOf(tripId: string): Promise<string | undefined> {
 }
 
 async function syncOneTrip(tripId: string): Promise<void> {
-  // Settled, not all: the two channels are independent, and a failure on
-  // either must not cost the other. Isolating per trip matters for the same
-  // reason — one trip failing is exactly how a trip ends up with nothing
-  // cached, which is the failure this exists to close.
-  await Promise.allSettled([syncTrip(tripId), pullRoute(tripId)])
+  // Settled, not all: the channels are independent, and a failure on one must
+  // not cost the others. Isolating per trip matters for the same reason — one
+  // trip failing is exactly how a trip ends up with nothing cached, which is
+  // the failure this exists to close.
+  //
+  // The kit rides the trip's own tier rather than a schedule of its own, so a
+  // trip leaving tomorrow gets its packing list warmed at tier 1 urgency.
+  // Packing happens before departure, which is when that trip is most urgent
+  // anyway — "did I pack the spare paddle" is asked at the put-in.
+  await Promise.allSettled([syncTrip(tripId), pullRoute(tripId), warmKit(tripId)])
+}
+
+async function warmKit(tripId: string): Promise<void> {
+  await saveKitCache(tripId, await getPackingItems(tripId))
+}
+
+// Tier 3's other half, and the reason it is not part of syncOneTrip: the gear
+// closet is the paddler's own (`Item`, user-owned), referenced by a trip only
+// through a contribution or a packing entry. Fetching it per trip would be the
+// same request N times, and gating it on having a syncable trip would leave a
+// paddler with no upcoming trip unable to read their own gear offline.
+async function warmGearCloset(): Promise<void> {
+  const cachedAt = await readCachedAt(CACHE_KEY.gear)
+  if (cachedAt && Date.now() - Date.parse(cachedAt) < GEAR_STALENESS_BUDGET_MS) return
+  await saveGearCache(await getMyItems())
 }
 
 /**
@@ -72,6 +96,13 @@ export async function runSweep(): Promise<void> {
       const batch = due.slice(index, index + MAX_CONCURRENT_TRIPS)
       await Promise.all(batch.map((item) => syncOneTrip(item.tripId)))
     }
+
+    // Last, and never allowed to cost the trips anything: a paddler's gear
+    // library matters at packing time, the trips matter at sea. Its own
+    // rejection is swallowed here rather than by the outer catch, which would
+    // otherwise be reached only after the trips had already run — true today,
+    // but only by accident of ordering.
+    await warmGearCloset().catch(() => undefined)
   } catch {
     // Reading the local cache can fail too (a migration mid-flight, a device
     // stamped at a schema version whose table doesn't exist yet). Same rule:

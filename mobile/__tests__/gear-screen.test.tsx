@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Alert } from "react-native"
 
 import GearScreen from "../app/(app)/(drawer)/(gear)/gear/index"
+import { loadGearCache, saveGearCache } from "../lib/db/gear-cache"
 import {
   createItem,
   deleteItem,
@@ -17,12 +18,22 @@ jest.mock("../lib/inventory/actions", () => ({
   setDefaultPack: jest.fn(),
   deleteItem: jest.fn(),
 }))
+jest.mock("../lib/db/gear-cache", () => ({
+  loadGearCache: jest.fn(),
+  saveGearCache: jest.fn(),
+}))
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
 
 const mockGetItems = getMyItems as jest.Mock
 const mockGetCategories = getItemCategories as jest.Mock
 const mockCreate = createItem as jest.Mock
 const mockSetDefault = setDefaultPack as jest.Mock
 const mockDelete = deleteItem as jest.Mock
+const mockLoadGearCache = loadGearCache as jest.Mock
+const mockSaveGearCache = saveGearCache as jest.Mock
 
 const PADDLE = {
   id: "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01",
@@ -52,6 +63,8 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockGetItems.mockResolvedValue([PADDLE, TENT, UNFILED])
   mockGetCategories.mockResolvedValue(CATEGORIES)
+  mockLoadGearCache.mockResolvedValue([])
+  mockSaveGearCache.mockResolvedValue(undefined)
   jest.spyOn(Alert, "alert").mockImplementation(() => {})
 })
 
@@ -254,5 +267,83 @@ describe("GearScreen", () => {
       confirmAlert("Delete")
       await waitFor(() => expect(mockDelete).toHaveBeenCalledWith(TENT.id))
     })
+  })
+})
+
+// M9c WP7 tier 3. This screen shipped with no offline handling at all: a failed
+// fetch set an error string, even though `cached_gear` already existed and the
+// Items screen was already reading it. "Did I pack the spare paddle" is asked at
+// the put-in, which is exactly where there is no signal.
+describe("GearScreen — offline", () => {
+  const CACHED = [
+    { id: PADDLE.id, name: "Werner Camano", status: "owned", categoryName: "Paddling", defaultPack: true },
+    { id: TENT.id, name: "Hilleberg Soulo", status: "owned", categoryName: "Camping", defaultPack: false },
+  ]
+
+  it("falls back to the cached closet instead of an error", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByText, queryByText } = await render(<GearScreen />)
+
+    expect(await findByText("Werner Camano")).toBeTruthy()
+    expect(queryByText("Could not reach the server.")).toBeNull()
+  })
+
+  it("says the closet is cached, and how old it is", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByText } = await render(<GearScreen />)
+
+    expect(await findByText(/Offline — showing your last synced gear/)).toBeTruthy()
+    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+  })
+
+  // The category grouping and the default-pack flag are why the cache grew two
+  // columns at schema v9 — without them every item rendered as unfiled and
+  // not-default, and for default-pack that misstates what the next trip packs.
+  it("keeps the category grouping and the default-pack flag offline", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByTestId } = await render(<GearScreen />)
+
+    expect(await findByTestId("section-Paddling")).toBeTruthy()
+    expect(await findByTestId("section-Camping")).toBeTruthy()
+    expect(await findByTestId(`default-pack-${PADDLE.id}`)).toBeTruthy()
+  })
+
+  it("disables every mutation while the closet is cached", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByText, getByTestId } = await render(<GearScreen />)
+    await findByText("Werner Camano")
+
+    // Adding, deleting and toggling default-pack all need a connection; a
+    // control that looks live and then fails is worse than one that is plainly
+    // unavailable.
+    await fireEvent.press(getByTestId(`default-pack-${PADDLE.id}`))
+    expect(mockSetDefault).not.toHaveBeenCalled()
+
+    await fireEvent.press(getByTestId(`delete-${PADDLE.id}`))
+    expect(Alert.alert).not.toHaveBeenCalled()
+  })
+
+  it("still surfaces the error when nothing was ever cached", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue([])
+
+    const { findByText } = await render(<GearScreen />)
+
+    expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+
+  it("saves a successful fetch to the cache so the next offline open has it", async () => {
+    const { findByText } = await render(<GearScreen />)
+    await findByText("Werner Camano")
+
+    await waitFor(() => expect(mockSaveGearCache).toHaveBeenCalledWith([PADDLE, TENT, UNFILED]))
   })
 })

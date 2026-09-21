@@ -6,4 +6,6 @@ export class CachedGear extends Model {
 
   @field("name") name!: string
   @field("status") status!: string | null
+  @field("category_name") categoryName!: string | null
+  @field("default_pack") defaultPack!: boolean | null
 }
