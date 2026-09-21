@@ -96,5 +96,20 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // M9c WP7's age indicator. One table serving every cached surface, so
+      // this is a single bump rather than one per surface — the same batching
+      // argument as v7 above.
+      toVersion: 8,
+      steps: [
+        createTable({
+          name: "cache_freshness",
+          columns: [
+            { name: "key", type: "string", isIndexed: true },
+            { name: "cached_at", type: "number" },
+          ],
+        }),
+      ],
+    },
   ],
 })

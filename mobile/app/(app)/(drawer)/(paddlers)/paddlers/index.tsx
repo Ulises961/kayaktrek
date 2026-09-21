@@ -18,6 +18,7 @@ import { Chip } from "@mobile/components/ui/chip"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
 import { blockPaddler, listBlocks, unblockPaddler } from "@mobile/lib/blocks/actions"
@@ -29,6 +30,7 @@ import {
   searchPaddlers,
 } from "@mobile/lib/connections/actions"
 import { loadBlocksCache, loadConnectionsCache, saveBlocksCache, saveConnectionsCache } from "@mobile/lib/db/paddlers-cache"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { OFFLINE_ERROR_MESSAGE } from "@mobile/lib/api/client"
 
@@ -75,6 +77,7 @@ export default function PaddlersScreen() {
     loadCache: loadConnectionsCache,
     saveCache: saveConnectionsCache,
     isCacheEmpty: (data) => data.length === 0,
+    cacheKey: CACHE_KEY.connections,
   })
   const connections = connectionsCache.data
   const connectionsError = connectionsCache.error
@@ -85,6 +88,7 @@ export default function PaddlersScreen() {
     loadCache: loadBlocksCache,
     saveCache: saveBlocksCache,
     isCacheEmpty: (data) => data.length === 0,
+    cacheKey: CACHE_KEY.blocks,
   })
   const blocks = blocksCache.data
   const blocksError = blocksCache.error
@@ -271,11 +275,9 @@ export default function PaddlersScreen() {
 
       {tab === "buddies" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          {connectionsOffline && (
-            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-              Offline — showing your last synced buddies. Accept/remove needs a connection.
-            </Text>
-          )}
+          <OfflineNotice visible={connectionsOffline} cachedAt={connectionsCache.cachedAt}>
+            Offline — showing your last synced buddies. Accept/remove needs a connection.
+          </OfflineNotice>
           {connectionsError && <Text className="text-sm text-destructive">{connectionsError}</Text>}
           {(connections ?? []).map((connection) => (
             <ConnectionRow
@@ -300,11 +302,9 @@ export default function PaddlersScreen() {
 
       {tab === "blocked" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          {blocksOffline && (
-            <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-              Offline — showing your last synced blocklist. Unblocking needs a connection.
-            </Text>
-          )}
+          <OfflineNotice visible={blocksOffline} cachedAt={blocksCache.cachedAt}>
+            Offline — showing your last synced blocklist. Unblocking needs a connection.
+          </OfflineNotice>
           {blocksError && <Text className="text-sm text-destructive">{blocksError}</Text>}
           {(blocks ?? []).map((block) => (
             <BlockedRow

@@ -17,7 +17,9 @@ import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
 import { Screen } from "@mobile/components/ui/layout";
+import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import {
@@ -71,6 +73,7 @@ export default function TripMapScreen() {
   const [trip, setTrip] = useState<ScreenTrip | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
@@ -93,6 +96,7 @@ export default function TripMapScreen() {
         avgSpeedKnots: t.itinerary?.avgSpeedKnots ?? DEFAULT_AVG_SPEED_KNOTS,
       });
       setIsOffline(false);
+      setCachedAt(null);
       setError(null);
       setSelectedDayId((current) => current ?? days[0]?.id ?? null);
       // Refresh the route cache in the background so the next offline fallback
@@ -112,6 +116,11 @@ export default function TripMapScreen() {
         });
         setIsOffline(true);
         setError(null);
+        setCachedAt(await readCachedAt(CACHE_KEY.tripRoute(id)));
+        // offlineDays, not offline.days — the cache stores Day 0 deliberately
+        // (it is the staging area for points no boundary owns), so the
+        // selection must be seeded from the filtered list or the screen opens
+        // on the staging day.
         setSelectedDayId((current) => current ?? offlineDays[0]?.id ?? null);
       } else {
         setError(
@@ -225,13 +234,13 @@ export default function TripMapScreen() {
           see plans/M9b3.md's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
-        {isOffline && (
-          <View className="bg-muted px-4 py-1.5">
-            <Text className="text-center text-[11px] text-muted-foreground">
-              Offline — showing your last synced route
-            </Text>
-          </View>
-        )}
+        <OfflineNotice
+          visible={isOffline}
+          cachedAt={cachedAt}
+          className="rounded-none px-4"
+        >
+          Offline — showing your last synced route.
+        </OfflineNotice>
 
         <DayRail
           days={days}

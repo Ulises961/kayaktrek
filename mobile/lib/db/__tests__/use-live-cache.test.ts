@@ -1,6 +1,24 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
+import { CACHE_KEY, readCachedAt } from "../cache-freshness"
 import { useLiveCache } from "../use-live-cache"
+
+// cache-freshness.ts imports the production database, which builds a real
+// SQLiteAdapter at module load and needs a native module jest doesn't have.
+// Every other lib/db test stubs it the same way.
+jest.mock("../database", () => ({ database: {} }))
+
+jest.mock("../cache-freshness", () => ({
+  ...jest.requireActual("../cache-freshness"),
+  readCachedAt: jest.fn(),
+}))
+
+const mockReadCachedAt = readCachedAt as jest.Mock
+
+beforeEach(() => {
+  mockReadCachedAt.mockReset()
+  mockReadCachedAt.mockResolvedValue(null)
+})
 
 // The live-first/cache-fallback shape duplicated across items.tsx, the
 // paddlers screen (connections/blocks), and the logs screen (mine/endorsed)
@@ -95,5 +113,72 @@ describe("useLiveCache", () => {
     await act(() => result.current.reload())
     expect(result.current.error).toBeNull()
     expect(result.current.data).toEqual(["a"])
+  })
+
+  // M9c WP7: a screen falling back to cache must be able to say how old the
+  // cache is, not just that it is offline.
+  it("reports when the cache it fell back to was last refreshed", async () => {
+    mockReadCachedAt.mockResolvedValue("2026-09-18T06:00:00.000Z")
+    const fetchLive = jest.fn().mockRejectedValue(new Error("Could not reach the server."))
+
+    const { result } = await renderHook(() =>
+      useLiveCache({
+        fetchLive,
+        loadCache: async () => ["cached"],
+        saveCache: async () => undefined,
+        isCacheEmpty: (d: string[]) => d.length === 0,
+        cacheKey: CACHE_KEY.logs,
+      }),
+    )
+
+    await act(() => result.current.reload())
+
+    expect(result.current.isOffline).toBe(true)
+    expect(result.current.cachedAt).toBe("2026-09-18T06:00:00.000Z")
+    expect(mockReadCachedAt).toHaveBeenCalledWith(CACHE_KEY.logs)
+  })
+
+  it("reports no age for a live fetch, even after a previous fallback set one", async () => {
+    mockReadCachedAt.mockResolvedValue("2026-09-18T06:00:00.000Z")
+    const fetchLive = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Could not reach the server."))
+      .mockResolvedValueOnce(["live"])
+
+    const { result } = await renderHook(() =>
+      useLiveCache({
+        fetchLive,
+        loadCache: async () => ["cached"],
+        saveCache: async () => undefined,
+        isCacheEmpty: (d: string[]) => d.length === 0,
+        cacheKey: CACHE_KEY.logs,
+      }),
+    )
+
+    await act(() => result.current.reload())
+    expect(result.current.cachedAt).toBe("2026-09-18T06:00:00.000Z")
+
+    await act(() => result.current.reload())
+    expect(result.current.data).toEqual(["live"])
+    expect(result.current.cachedAt).toBeNull()
+  })
+
+  it("does not read a cache age when no key is given", async () => {
+    const fetchLive = jest.fn().mockRejectedValue(new Error("Could not reach the server."))
+
+    const { result } = await renderHook(() =>
+      useLiveCache({
+        fetchLive,
+        loadCache: async () => ["cached"],
+        saveCache: async () => undefined,
+        isCacheEmpty: (d: string[]) => d.length === 0,
+      }),
+    )
+
+    await act(() => result.current.reload())
+
+    expect(result.current.isOffline).toBe(true)
+    expect(result.current.cachedAt).toBeNull()
+    expect(mockReadCachedAt).not.toHaveBeenCalled()
   })
 })

@@ -50,6 +50,17 @@ describe("migrations", () => {
     expect(createdTables.sort()).toEqual(["cached_gear", "cached_packing_items"].sort())
   })
 
+  it("has a migration step creating cache_freshness at v8", () => {
+    const v8 = migrations.sortedMigrations.find((migration) => migration.toVersion === 8)
+    expect(v8).toBeDefined()
+
+    const createdTables = v8!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables).toEqual(["cache_freshness"])
+  })
+
   // The guard that would have caught the original v4 -> v5 miss, stated once
   // for every version rather than as one test per bump.
   it("has a migration for every version schema.ts has reached", () => {
@@ -60,5 +71,33 @@ describe("migrations", () => {
     )
 
     expect(covered).toEqual(expected)
+  })
+
+  // Stronger than the version check above, which only proves *a* migration
+  // exists at each version — not that it creates the table the bump actually
+  // added. A bump carrying a migration for the wrong table would pass that
+  // test and still throw "no such table" on every already-installed device.
+  it("can build every table in the schema from the v4 baseline plus migrations", () => {
+    // The tables that predate migrations.ts — anything installed before v5 got
+    // these from a from-scratch schema build, so no migration step creates them.
+    const v4Baseline = [
+      "trips",
+      "days",
+      "route_meta",
+      "points",
+      "trip_members",
+      "requirement_contributions",
+      "weather",
+      "weather_states",
+      "sea",
+      "sea_states",
+    ]
+    const migrated = migrations.sortedMigrations.flatMap((migration) =>
+      migration.steps
+        .filter((step) => step.type === "create_table")
+        .map((step) => (step.type === "create_table" ? step.schema.name : "")),
+    )
+
+    expect([...v4Baseline, ...migrated].sort()).toEqual(Object.keys(appDatabaseSchema.tables).sort())
   })
 })

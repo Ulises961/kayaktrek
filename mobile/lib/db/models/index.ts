@@ -1,3 +1,4 @@
+import { CacheFreshness } from "./CacheFreshness"
 import { CachedBlock } from "./CachedBlock"
 import { CachedConnection } from "./CachedConnection"
 import { CachedGear } from "./CachedGear"
@@ -17,6 +18,7 @@ import { Weather } from "./Weather"
 import { WeatherState } from "./WeatherState"
 
 export {
+  CacheFreshness,
   CachedBlock,
   CachedConnection,
   CachedGear,
@@ -37,6 +39,7 @@ export {
 }
 
 export const modelClasses = [
+  CacheFreshness,
   CachedBlock,
   CachedConnection,
   CachedGear,

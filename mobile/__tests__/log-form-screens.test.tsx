@@ -23,6 +23,14 @@ jest.mock("../lib/logs/actions", () => ({
   unendorseLog: jest.fn(),
   createLog: jest.fn(),
 }))
+
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
 jest.mock("../lib/auth/session", () => ({ getSession: jest.fn() }))
 jest.mock("../lib/db/logs-cache", () => ({ loadCachedLog: jest.fn() }))
 

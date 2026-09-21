@@ -4,8 +4,9 @@ import NetInfo from "@react-native-community/netinfo"
 import { startSyncTrigger } from "../sync-trigger"
 
 jest.mock("@react-native-community/netinfo", () => ({ addEventListener: jest.fn() }))
-// sync.ts -> database.ts eagerly constructs a native SQLiteAdapter at import
-// time — never usable under Jest (see sync.test.ts for the same pattern).
+// sweep.ts -> sync.ts -> database.ts eagerly constructs a native SQLiteAdapter
+// at import time — never usable under Jest (see sync.test.ts for the same
+// pattern).
 jest.mock("../database", () => ({ database: {} }))
 
 const mockedNetInfoAddEventListener = NetInfo.addEventListener as jest.Mock
@@ -29,28 +30,28 @@ describe("startSyncTrigger", () => {
     mockedNetInfoAddEventListener.mockReturnValue(jest.fn())
   })
 
-  it("runs an immediate sync when started, so a first-time trip view populates the local cache", () => {
+  it("runs an immediate sweep when started, so a cold cache populates without waiting for a transition", () => {
     const sync = jest.fn().mockResolvedValue(undefined)
-    startSyncTrigger("trip-1", sync)
+    startSyncTrigger(sync)
 
-    expect(sync).toHaveBeenCalledWith("trip-1")
+    expect(sync).toHaveBeenCalled()
   })
 
   it("syncs when the app comes to the foreground", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
-    startSyncTrigger("trip-1", sync)
+    startSyncTrigger(sync)
     await flushRunSync()
     sync.mockClear()
 
     const appStateHandler = mockedAppStateAddEventListener.mock.calls[0][1] as (state: string) => void
     await appStateHandler("active")
 
-    expect(sync).toHaveBeenCalledWith("trip-1")
+    expect(sync).toHaveBeenCalled()
   })
 
   it("does not sync on a foreground event that isn't 'active'", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
-    startSyncTrigger("trip-1", sync)
+    startSyncTrigger(sync)
     await flushRunSync()
     sync.mockClear()
 
@@ -62,7 +63,7 @@ describe("startSyncTrigger", () => {
 
   it("syncs on a disconnected-to-connected transition, not on an already-connected update", async () => {
     const sync = jest.fn().mockResolvedValue(undefined)
-    startSyncTrigger("trip-1", sync)
+    startSyncTrigger(sync)
     await flushRunSync()
     sync.mockClear()
 
@@ -80,7 +81,7 @@ describe("startSyncTrigger", () => {
   it("does not start a second overlapping sync while one is in flight", async () => {
     let resolveSync: () => void = () => {}
     const sync = jest.fn(() => new Promise<void>((resolve) => { resolveSync = resolve }))
-    startSyncTrigger("trip-1", sync)
+    startSyncTrigger(sync)
     // Flush the immediate on-start sync before exercising the overlap case below.
     resolveSync()
     await flushRunSync()
@@ -102,7 +103,7 @@ describe("startSyncTrigger", () => {
     process.on("unhandledRejection", handler)
     try {
       const sync = jest.fn().mockRejectedValue(new Error("Could not reach the server."))
-      startSyncTrigger("trip-1", sync)
+      startSyncTrigger(sync)
       await flushRunSync()
 
       expect(handler).not.toHaveBeenCalled()
@@ -117,7 +118,7 @@ describe("startSyncTrigger", () => {
     mockedAppStateAddEventListener.mockReturnValue({ remove: removeAppState })
     mockedNetInfoAddEventListener.mockReturnValue(removeNetInfo)
 
-    const stop = startSyncTrigger("trip-1", jest.fn().mockResolvedValue(undefined))
+    const stop = startSyncTrigger(jest.fn().mockResolvedValue(undefined))
     stop()
 
     expect(removeAppState).toHaveBeenCalled()

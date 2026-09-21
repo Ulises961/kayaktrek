@@ -3,6 +3,7 @@ import { Q } from "nitromelondb"
 
 import type { PersonalPackingItem } from "@shared/dtos/personal-packing"
 
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import { CachedPackingItem } from "./models"
 
@@ -57,6 +58,7 @@ export async function saveKitCache(
         })
     )
   })
+  await markCacheFresh(CACHE_KEY.tripKit(tripId), database)
 }
 
 export async function loadKitCache(

@@ -4,6 +4,7 @@ import { synchronize } from "nitromelondb/sync"
 import type { SyncDatabaseChangeSet, SyncPullResult, SyncTableChangeSet } from "nitromelondb/sync"
 
 import { apiGet } from "../api/client"
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 import type { SyncCursor } from "./models"
 
@@ -153,4 +154,9 @@ export async function syncTrip(tripId: string, database: Database = productionDa
       return result
     },
   })
+
+  // Marked after synchronize() resolves, not inside pullChanges: a pull whose
+  // changes fail to apply locally has not refreshed anything, and dating the
+  // cache from it would overstate how current the crew/weather/sea rows are.
+  await markCacheFresh(CACHE_KEY.tripSync(tripId), database)
 }

@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react-native"
+import { render } from "@testing-library/react-native"
 
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
@@ -21,6 +21,14 @@ jest.mock("../lib/db/sync-trigger", () => ({
 }))
 jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
+}))
+
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
 }))
 
 const mockGetTrip = getTrip as jest.Mock
@@ -130,6 +138,7 @@ describe("TripDetailScreen", () => {
       const { findByText } = await render(<TripDetailScreen />)
 
       expect(await findByText(/Offline — showing your last synced trip/)).toBeTruthy()
+      expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
     })
 
     it("omits difficulty and description, which the trip-list cache does not carry", async () => {
@@ -141,24 +150,15 @@ describe("TripDetailScreen", () => {
     })
   })
 
-  it("starts the sync-down trigger for this trip so weather/sea/crew/inventory populate offline caches", async () => {
+  // The sync trigger used to be started here, scoped to this one trip. It moved
+  // to the authenticated app root in M9c WP7 (see __tests__/app-layout.test.tsx)
+  // — sync scope should not be a side effect of which screen someone opened.
+  it("does not start a sync trigger of its own", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
     const { findByText } = await render(<TripDetailScreen />)
     await findByText("Costa Brava")
 
-    expect(mockStartSyncTrigger).toHaveBeenCalledWith("trip-1")
-  })
-
-  it("stops the sync-down trigger on unmount", async () => {
-    const stop = jest.fn()
-    mockStartSyncTrigger.mockReturnValue(stop)
-    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
-
-    const { findByText, unmount } = await render(<TripDetailScreen />)
-    await findByText("Costa Brava")
-    unmount()
-
-    await waitFor(() => expect(stop).toHaveBeenCalled())
+    expect(mockStartSyncTrigger).not.toHaveBeenCalled()
   })
 })

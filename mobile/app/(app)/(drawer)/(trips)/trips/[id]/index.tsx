@@ -16,10 +16,11 @@ import { formatDateRange } from "@shared/trips/format"
 
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
-import { startSyncTrigger } from "@mobile/lib/db/sync-trigger"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { getTrip } from "@mobile/lib/trips/actions"
@@ -72,6 +73,7 @@ export default function TripDetailScreen() {
     data: trip,
     error,
     isOffline,
+    cachedAt,
     reload,
   } = useLiveCache<TripHeaderView | null>({
     fetchLive: async () => toHeaderView(await getTrip(id)),
@@ -86,21 +88,14 @@ export default function TripDetailScreen() {
     // the job over from it entirely.
     saveCache: async () => undefined,
     isCacheEmpty: (cached) => cached === null,
+    // The trip-list cache's key, because that is the cache this reads — the
+    // age shown here is the age of the row it actually rendered.
+    cacheKey: CACHE_KEY.tripList,
   })
 
   useEffect(() => {
     void reload()
   }, [reload])
-
-  // The Trip Detail hub is the real entry point every trip visit passes through
-  // (docs/adr/mobile-offline.md "Screen structure"), so it's the natural place to
-  // start the weather/sea/crew/inventory sync-down trigger — without this, those
-  // WatermelonDB tables never populate at all (startSyncTrigger existed since M9c
-  // but nothing ever called it), and the itinerary/float-plan screens' offline
-  // fallbacks have nothing to read.
-  useEffect(() => {
-    return startSyncTrigger(id)
-  }, [id])
 
   if (error) {
     return (
@@ -136,12 +131,10 @@ export default function TripDetailScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <Stack className="gap-4 p-4">
-        {isOffline && (
-          <Text className="rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-            Offline — showing your last synced trip summary. Each screen below shows whatever it
-            last synced.
-          </Text>
-        )}
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
+          Offline — showing your last synced trip summary. Each screen below shows whatever it
+          last synced.
+        </OfflineNotice>
         <Card>
           <CardContent className="gap-3">
             <Row className="justify-between">

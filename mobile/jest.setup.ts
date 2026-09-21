@@ -63,3 +63,15 @@ jest.mock("react-native-gesture-handler/lib/module/v3/components/GestureComponen
   const { FlatList, RefreshControl, ScrollView, Switch, TextInput } = require("react-native")
   return { __esModule: true, FlatList, RefreshControl, ScrollView, Switch, TextInput }
 })
+
+// lib/db/database.ts builds a real SQLiteAdapter at module load, which needs
+// react-native-nitro-modules and throws outright under jest. Suites that want
+// a real local DB build their own LokiJS one and pass it in explicitly (every
+// lib/db/__tests__ file does), so nothing legitimately needs the production
+// instance — but any module importing it transitively used to take a whole
+// screen suite down with it. That became routine once M9c WP7's cache-age
+// lookup (lib/db/cache-freshness.ts) reached the read screens: eight screen
+// suites failed at import, none of them for a reason about the screen.
+// Stubbed once here rather than re-mocked in every suite that happens to pull
+// a db module into its graph.
+jest.mock("./lib/db/database", () => ({ database: {} }))

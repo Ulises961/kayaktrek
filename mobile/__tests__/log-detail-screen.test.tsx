@@ -32,6 +32,14 @@ jest.mock("../lib/db/logs-cache", () => ({
   loadCachedLog: jest.fn(),
 }))
 
+// M9c WP7: every offline branch below now reads how old its cache is. The real
+// lookup needs a database; the age itself is asserted as a relative offset so
+// the expectation can't rot into an absolute date as the suite gets older.
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
+
 const mockGetLog = getLog as jest.Mock
 const mockDeleteLog = deleteLog as jest.Mock
 const mockGetSession = getSession as jest.Mock
@@ -157,6 +165,7 @@ describe("LogDetailScreen — offline", () => {
     expect(queryByText("Delete log")).toBeNull()
     expect(queryByText("Save changes")).toBeNull()
     expect(await findByText(/Offline — showing your last synced log/)).toBeTruthy()
+    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
   })
 
   it("offers no endorsement toggle on a cached log from the endorsed list", async () => {

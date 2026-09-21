@@ -1,6 +1,7 @@
 import { Database, Q } from "nitromelondb"
 
 import { apiGet } from "../api/client"
+import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
 
 type ApiRouteDay = {
@@ -88,4 +89,6 @@ export async function pullRoute(tripId: string, database: Database = productionD
     )
     await database.batch(...newDays, ...newPoints, newMeta)
   })
+
+  await markCacheFresh(CACHE_KEY.tripRoute(tripId), database)
 }
