@@ -322,3 +322,123 @@ describe("runSweep — tier 3, kit and gear", () => {
     expect(mockGetMyItems).not.toHaveBeenCalled()
   })
 })
+
+// A sweep that fails silently was right for the paddler and wrong for anyone
+// diagnosing it: on-device testing found one trip missing its crew sync and
+// another missing its route, with no way to tell why. Nothing surfaces to the
+// UI — this only has to leave a trace a developer can read.
+describe("runSweep — failure reporting", () => {
+  let warn: jest.SpyInstance
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warn.mockRestore()
+  })
+
+  it("names the trip and the channel when one fails", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+    mockPullRoute.mockRejectedValue(new Error("No itinerary for trip"))
+
+    await runSweep()
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("trip-7"),
+      expect.objectContaining({ message: "No itinerary for trip" }),
+    )
+    expect(warn.mock.calls.some(([label]) => String(label).includes("route"))).toBe(true)
+  })
+
+  it("reports each failing channel separately rather than collapsing them", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+    mockSyncTrip.mockRejectedValue(new Error("sync boom"))
+    mockPullRoute.mockRejectedValue(new Error("route boom"))
+
+    await runSweep()
+
+    const labels = warn.mock.calls.map(([label]) => String(label))
+    expect(labels.some((label) => label.includes("sync"))).toBe(true)
+    expect(labels.some((label) => label.includes("route"))).toBe(true)
+  })
+
+  it("reports a failing gear closet under its own name, not a trip's", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockGetMyItems.mockRejectedValue(new Error("closet boom"))
+
+    await runSweep()
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("gear closet"),
+      expect.objectContaining({ message: "closet boom" }),
+    )
+  })
+
+  it("stays quiet when everything succeeds", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+
+    await runSweep()
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+// Found on a real device, not by these tests: with two trips swept at once,
+// one of them came back with no crew and no freshness, and the logged reason
+// was "[Sync] Concurrent synchronization is not allowed. More than one
+// synchronize() call was running at the same time, and the later one was
+// aborted". `synchronize()` is global to the local database, not scoped to the
+// trip whose endpoint it pulls, so the sweep's own concurrency bound was
+// silently costing every batch one trip's aggregates.
+//
+// These tests exist because the earlier ones mocked `syncTrip` as an
+// independent promise and so could never have caught it.
+describe("runSweep — synchronize() is not concurrency-safe", () => {
+  it("never overlaps two syncTrip calls, even while sweeping trips in parallel", async () => {
+    mockLoadTripListCache.mockResolvedValue(
+      Array.from({ length: 4 }, (_unused, index) => cachedTrip({ id: `t${index}` })),
+    )
+    let inFlight = 0
+    let peak = 0
+    mockSyncTrip.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setImmediate(resolve))
+      inFlight -= 1
+    })
+
+    await runSweep()
+
+    expect(peak).toBe(1)
+    expect(mockSyncTrip).toHaveBeenCalledTimes(4)
+  })
+
+  it("keeps the route and kit channels concurrent, which have no such constraint", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t0" }), cachedTrip({ id: "t1" })])
+    let peak = 0
+    let inFlight = 0
+    mockPullRoute.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setImmediate(resolve))
+      inFlight -= 1
+    })
+
+    await runSweep()
+
+    // Serialising everything would have been the easy fix and would have made
+    // a cold multi-trip sweep needlessly slow on the marginal link it is most
+    // likely to run on.
+    expect(peak).toBe(2)
+  })
+
+  it("releases the sync lock when a trip's sync throws, so later trips still sync", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t0" }), cachedTrip({ id: "t1" })])
+    mockSyncTrip.mockRejectedValueOnce(new Error("boom"))
+
+    await runSweep()
+
+    expect(mockSyncTrip).toHaveBeenCalledTimes(2)
+  })
+})

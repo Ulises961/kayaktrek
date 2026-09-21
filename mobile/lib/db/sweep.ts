@@ -40,6 +40,48 @@ async function freshnessOf(tripId: string): Promise<string | undefined> {
   return Date.parse(syncedAt) <= Date.parse(routeAt) ? syncedAt : routeAt
 }
 
+// The sweep must never surface a failure to the paddler — it runs unattended,
+// failing offline is its expected case, and a red screen for it would be wrong.
+// But "never surfaces" had become "leaves no trace at all": on-device testing
+// found one trip missing its crew sync and another missing its route, and
+// neither the app nor the logs could say why, because every rejection was
+// dropped on the floor. In development the reason is now logged, which Metro
+// and `adb logcat` both pick up; in production this stays silent.
+function reportSweepFailure(what: string, reason: unknown): void {
+  if (!__DEV__) return
+  console.warn(`[sweep] ${what} failed:`, reason)
+}
+
+function reportSettled(what: string, results: PromiseSettledResult<unknown>[]): void {
+  for (const result of results) {
+    if (result.status === "rejected") reportSweepFailure(what, result.reason)
+  }
+}
+
+// `synchronize()` is global to the local database, not scoped to the trip whose
+// endpoint it happens to pull, and it refuses to run twice at once — the second
+// call aborts before committing ("[Sync] Concurrent synchronization is not
+// allowed"). Sweeping two trips in parallel therefore cost one of them its
+// entire aggregate channel: no crew, no weather, no sea, and no freshness row
+// to show anything was missing.
+//
+// Found on a device, not in tests, because the tests mocked `syncTrip` as an
+// independent promise. Only this one channel is serialised: the route and kit
+// have no such constraint, and serialising everything would make a cold
+// multi-trip sweep needlessly slow on exactly the marginal link it runs on.
+let syncChain: Promise<unknown> = Promise.resolve()
+
+function syncTripSerially(tripId: string): Promise<void> {
+  // Chained off the previous call's settlement, not its result, so one trip's
+  // failure cannot break the chain for every trip queued behind it.
+  const next = syncChain.then(
+    () => syncTrip(tripId),
+    () => syncTrip(tripId),
+  )
+  syncChain = next.catch(() => undefined)
+  return next
+}
+
 async function syncOneTrip(tripId: string): Promise<void> {
   // Settled, not all: the channels are independent, and a failure on one must
   // not cost the others. Isolating per trip matters for the same reason — one
@@ -50,7 +92,14 @@ async function syncOneTrip(tripId: string): Promise<void> {
   // trip leaving tomorrow gets its packing list warmed at tier 1 urgency.
   // Packing happens before departure, which is when that trip is most urgent
   // anyway — "did I pack the spare paddle" is asked at the put-in.
-  await Promise.allSettled([syncTrip(tripId), pullRoute(tripId), warmKit(tripId)])
+  const [sync, route, kit] = await Promise.allSettled([
+    syncTripSerially(tripId),
+    pullRoute(tripId),
+    warmKit(tripId),
+  ])
+  reportSettled(`trip ${tripId} sync`, [sync])
+  reportSettled(`trip ${tripId} route`, [route])
+  reportSettled(`trip ${tripId} kit`, [kit])
 }
 
 async function warmKit(tripId: string): Promise<void> {
@@ -102,11 +151,12 @@ export async function runSweep(): Promise<void> {
     // rejection is swallowed here rather than by the outer catch, which would
     // otherwise be reached only after the trips had already run — true today,
     // but only by accident of ordering.
-    await warmGearCloset().catch(() => undefined)
-  } catch {
+    await warmGearCloset().catch((reason) => reportSweepFailure("gear closet", reason))
+  } catch (reason) {
     // Reading the local cache can fail too (a migration mid-flight, a device
     // stamped at a schema version whose table doesn't exist yet). Same rule:
     // nothing is waiting on this.
+    reportSweepFailure("sweep", reason)
   } finally {
     sweepInFlight = false
   }

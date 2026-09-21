@@ -140,13 +140,26 @@ async function setCursor(tripId: string, timestamp: number, database: Database):
 // (days/points) syncs through its own atomic channel, wired separately in
 // WP4, never through this generic delta engine (spec §7.1/§8.2).
 export async function syncTrip(tripId: string, database: Database = productionDatabase): Promise<void> {
+  // Captured in pullChanges, written only once synchronize() has committed.
+  // Writing it inside pullChanges — where it used to be — advanced the cursor
+  // for data that had not landed yet: if applying the changes then failed, the
+  // next pull asked "what changed since then?" and the backend correctly
+  // answered "nothing" for rows it had never delivered, so that delta was
+  // skipped permanently. Found on a device, where a trip reported a successful
+  // sync, recorded a freshness timestamp, and had no crew at all.
+  //
+  // Same class of bug as b181d85a's per-trip cursor fix: a cursor advancing for
+  // data that never arrived. There the cursor was wrong; here it was right and
+  // written at the wrong moment.
+  let pulledAt: number | null = null
+
   await synchronize({
     database,
     pullChanges: async () => {
       const cursor = await getCursor(tripId, database)
       const query = cursor ? `?lastPulledAt=${cursor}` : ""
       const response = await apiGet<ApiPullChanges>(`/api/sync/trip/${tripId}/pull${query}`)
-      await setCursor(tripId, response.timestamp, database)
+      pulledAt = response.timestamp
       const result: SyncPullResult = {
         changes: remapChanges(response.changes),
         timestamp: response.timestamp,
@@ -154,6 +167,8 @@ export async function syncTrip(tripId: string, database: Database = productionDa
       return result
     },
   })
+
+  if (pulledAt !== null) await setCursor(tripId, pulledAt, database)
 
   // Marked after synchronize() resolves, not inside pullChanges: a pull whose
   // changes fail to apply locally has not refreshed anything, and dating the
