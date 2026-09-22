@@ -656,6 +656,29 @@ docker compose -f docker-compose.prod.yml up -d backend worker
 every per-day forecast fetch. The service reads these values once, at import, so a container that
 wasn't restarted keeps using the free tier.
 
+## Satellite feed credentials (M29)
+
+Only needed for a feed that carries a password. A Garmin inReach MapShare feed does not — it is a
+user-pasted URL with no auth — so an install polling only inReach feeds can leave this unset and
+nothing breaks. It matters for a password-protected feed (SPOT, when that lands), where
+`Services/Utils/server_secret_crypto.py` encrypts the password at rest under this key.
+
+`FEED_CREDENTIAL_KEY` is a 32-byte key, hex-encoded (64 characters):
+
+```bash
+# on the dev machine — generate once, then deliver with scripts/deploy-sync.sh
+python3 -c 'import os; print(os.urandom(32).hex())'
+```
+
+Add it to `.env.prod`, sync, and restart `backend` and `worker` — `backend` encrypts on
+create/update, `worker` decrypts on every poll. `beat` only dispatches the task name and does not
+need it.
+
+**Losing this key loses the stored passwords**, not the feeds: `feed_url` is plaintext, so a feed
+keeps polling and only a password-protected provider needs re-entry. Keep it in the password
+manager alongside `JWT_SECRET_KEY`. Rotating it invalidates every stored password, so rotate only
+with re-entry in mind.
+
 ## Rolling back
 
 Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:
