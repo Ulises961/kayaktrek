@@ -331,6 +331,33 @@ describe("GearScreen — offline", () => {
     expect(Alert.alert).not.toHaveBeenCalled()
   })
 
+  // Swallowing the press was not enough: every control still looked live, so
+  // the paddler tapped and nothing happened, with no sign why. They now say
+  // they are unavailable, which the notice above them explains.
+  it("shows the mutation controls as disabled, not merely inert", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByText, getByTestId } = await render(<GearScreen />)
+    await findByText("Werner Camano")
+
+    expect(getByTestId("gear-add-open")).toBeDisabled()
+    expect(getByTestId(`delete-${PADDLE.id}`)).toBeDisabled()
+    expect(getByTestId(`default-pack-${PADDLE.id}`)).toBeDisabled()
+  })
+
+  it("does not open the add form while offline", async () => {
+    mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadGearCache.mockResolvedValue(CACHED)
+
+    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />)
+    await findByText("Werner Camano")
+
+    await fireEvent.press(getByTestId("gear-add-open"))
+
+    expect(queryByTestId("gear-name")).toBeNull()
+  })
+
   it("still surfaces the error when nothing was ever cached", async () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue([])

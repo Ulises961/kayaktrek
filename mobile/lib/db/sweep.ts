@@ -1,8 +1,10 @@
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
+import { getTrip } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
+import { saveRequirementsCache } from "./requirements-cache"
 import { pullRoute } from "./route-sync"
 import { GEAR_STALENESS_BUDGET_MS, planSweep, type SweepTrip } from "./sync-scope"
 import { syncTrip } from "./sync"
@@ -92,18 +94,29 @@ async function syncOneTrip(tripId: string): Promise<void> {
   // trip leaving tomorrow gets its packing list warmed at tier 1 urgency.
   // Packing happens before departure, which is when that trip is most urgent
   // anyway — "did I pack the spare paddle" is asked at the put-in.
-  const [sync, route, kit] = await Promise.allSettled([
+  const [sync, route, kit, requirements] = await Promise.allSettled([
     syncTripSerially(tripId),
     pullRoute(tripId),
     warmKit(tripId),
+    warmRequirements(tripId),
   ])
   reportSettled(`trip ${tripId} sync`, [sync])
   reportSettled(`trip ${tripId} route`, [route])
   reportSettled(`trip ${tripId} kit`, [kit])
+  reportSettled(`trip ${tripId} requirements`, [requirements])
 }
 
 async function warmKit(tripId: string): Promise<void> {
   await saveKitCache(tripId, await getPackingItems(tripId))
+}
+
+// The Group checklist only arrives inside the full trip detail — there is no
+// lighter endpoint — so this is the heaviest request in a trip's sweep. Paid
+// anyway: the alternative is the same hole the route had, a trip whose Items
+// screen was never opened while connected having no requirements offline.
+async function warmRequirements(tripId: string): Promise<void> {
+  const trip = await getTrip(tripId)
+  await saveRequirementsCache(tripId, trip.inventory?.requirements ?? [])
 }
 
 // Tier 3's other half, and the reason it is not part of syncOneTrip: the gear

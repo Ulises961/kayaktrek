@@ -5,7 +5,9 @@ import { getPackingItems } from "../../inventory/personal-packing-actions"
 import { CACHE_KEY, readCachedAt } from "../cache-freshness"
 import { saveGearCache } from "../gear-cache"
 import { saveKitCache } from "../kit-cache"
+import { saveRequirementsCache } from "../requirements-cache"
 import { pullRoute } from "../route-sync"
+import { getTrip } from "../../trips/actions"
 import { runSweep } from "../sweep"
 import { syncTrip } from "../sync"
 import { loadTripListCache } from "../trip-list-cache"
@@ -16,6 +18,8 @@ jest.mock("../../inventory/actions", () => ({ getMyItems: jest.fn() }))
 jest.mock("../../inventory/personal-packing-actions", () => ({ getPackingItems: jest.fn() }))
 jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
 jest.mock("../kit-cache", () => ({ saveKitCache: jest.fn() }))
+jest.mock("../requirements-cache", () => ({ saveRequirementsCache: jest.fn() }))
+jest.mock("../../trips/actions", () => ({ getTrip: jest.fn() }))
 jest.mock("../cache-freshness", () => ({
   ...jest.requireActual("../cache-freshness"),
   readCachedAt: jest.fn(),
@@ -31,6 +35,8 @@ const mockGetMyItems = getMyItems as jest.Mock
 const mockGetPackingItems = getPackingItems as jest.Mock
 const mockSaveGearCache = saveGearCache as jest.Mock
 const mockSaveKitCache = saveKitCache as jest.Mock
+const mockGetTrip = getTrip as jest.Mock
+const mockSaveRequirementsCache = saveRequirementsCache as jest.Mock
 
 function cachedTrip(overrides: Record<string, unknown> = {}) {
   return {
@@ -63,6 +69,8 @@ beforeEach(() => {
   mockGetPackingItems.mockResolvedValue([])
   mockSaveGearCache.mockResolvedValue(undefined)
   mockSaveKitCache.mockResolvedValue(undefined)
+  mockGetTrip.mockResolvedValue({ inventory: { requirements: [] } })
+  mockSaveRequirementsCache.mockResolvedValue(undefined)
 })
 
 describe("runSweep", () => {
@@ -309,6 +317,61 @@ describe("runSweep — tier 3, kit and gear", () => {
 
     expect(mockPullRoute).toHaveBeenCalledWith("t1")
     expect(mockSaveKitCache).not.toHaveBeenCalled()
+  })
+
+  // The trip's Group checklist. It only arrives inside the full trip detail —
+  // there is no lighter endpoint — but the alternative is the same hole the
+  // route had: a trip whose Items screen was never opened while connected has
+  // no requirements offline at all.
+  it("warms each swept trip's requirements from its trip detail", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" }), cachedTrip({ id: "t2" })])
+    mockGetTrip.mockImplementation(async (tripId: string) => ({
+      id: tripId,
+      inventory: { requirements: [{ id: `req-${tripId}`, name: "VHF radio" }] },
+    }))
+
+    await runSweep()
+
+    expect(mockGetTrip.mock.calls.map(([id]) => id).sort()).toEqual(["t1", "t2"])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [
+      { id: "req-t1", name: "VHF radio" },
+    ])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t2", [
+      { id: "req-t2", name: "VHF radio" },
+    ])
+  })
+
+  // An empty checklist is a real answer and must replace a stale one, not be
+  // mistaken for "nothing to save" — a requirement removed on web would
+  // otherwise linger in the offline copy forever.
+  it("caches an empty checklist for a trip with no inventory", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockResolvedValue({ id: "t1", inventory: null })
+
+    await runSweep()
+
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [])
+  })
+
+  it("does not fetch requirements for a trip the sweep skipped", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "past", state: TRIP_STATE.PAST, dateFrom: "2020-01-01" }),
+    ])
+
+    await runSweep()
+
+    expect(mockGetTrip).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failing requirements fetch from costing that trip its route and kit", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockPullRoute).toHaveBeenCalledWith("t1")
+    expect(mockSaveKitCache).toHaveBeenCalledWith("t1", [])
+    expect(mockSaveRequirementsCache).not.toHaveBeenCalled()
   })
 
   it("skips the closet while it is inside its own budget", async () => {

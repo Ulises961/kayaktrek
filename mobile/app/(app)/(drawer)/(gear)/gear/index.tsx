@@ -318,6 +318,7 @@ export default function GearScreen() {
           <Button
             variant="cta"
             className="self-start"
+            disabled={isOffline}
             onPress={() => setAddOpen(true)}
             testID="gear-add-open"
             icon={<PlusIcon size={16} color={palette.sand} />}
@@ -357,6 +358,7 @@ export default function GearScreen() {
                         variant="ghost"
                         size="icon-sm"
                         accessibilityLabel={`Delete ${item.name}`}
+                        disabled={isOffline}
                         onPress={() => confirmDelete(item)}
                         testID={`delete-${item.id}`}
                         icon={<Trash2Icon size={14} color={lightTokens.destructive} />}
@@ -368,7 +370,7 @@ export default function GearScreen() {
                         labelled control rather than a bare icon. */}
                     <Chip
                       active={!!item.defaultPack}
-                      disabled={busyId === item.id}
+                      disabled={isOffline || busyId === item.id}
                       onPress={() => void toggleDefault(item)}
                       testID={`default-pack-${item.id}`}
                       className="self-start"
