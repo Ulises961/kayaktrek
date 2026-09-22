@@ -104,6 +104,22 @@ export default function PublicRouteScreen() {
 
   const hasLine = routeGeoJson.features.length > 0
 
+  // One marker per point. An overnight stop ends one day and starts the next, so it
+  // sits in both days' segments; drawn per day, it gave two Markers the same key and
+  // id and crashed the screen. The first occurrence wins — the day that ends there,
+  // which is also the day that owns the stop in storage — so it takes that day's colour.
+  const markers = useMemo(() => {
+    const seen = new Set<string>()
+    return days.flatMap((day) =>
+      day.points.flatMap((point, index) => {
+        const markerId = point.id ?? `${day.dayNumber}-${index}`
+        if (seen.has(markerId)) return []
+        seen.add(markerId)
+        return [{ markerId, point, color: day.color }]
+      }),
+    )
+  }, [days])
+
   // [west, south, east, north] — the same tuple the itinerary screen's `boundsOf` builds.
   const bounds = useMemo<[number, number, number, number] | null>(() => {
     const positions = route?.positions ?? []
@@ -159,26 +175,20 @@ export default function PublicRouteScreen() {
             </GeoJSONSource>
           )}
 
-          {days.flatMap((day) =>
-            day.points.map((point, index) => (
-              <Marker
-                key={point.id ?? `${day.dayNumber}-${index}`}
-                id={point.id ?? `${day.dayNumber}-${index}`}
-                lngLat={[point.lon, point.lat]}
-              >
-                <View
-                  style={{
-                    width: point.type === POINT_TYPE.STOP ? 14 : 8,
-                    height: point.type === POINT_TYPE.STOP ? 14 : 8,
-                    borderRadius: point.type === POINT_TYPE.STOP ? 7 : 4,
-                    backgroundColor: day.color,
-                    borderWidth: 2,
-                    borderColor: "white",
-                  }}
-                />
-              </Marker>
-            )),
-          )}
+          {markers.map(({ markerId, point, color }) => (
+            <Marker key={markerId} id={markerId} lngLat={[point.lon, point.lat]}>
+              <View
+                style={{
+                  width: point.type === POINT_TYPE.STOP ? 14 : 8,
+                  height: point.type === POINT_TYPE.STOP ? 14 : 8,
+                  borderRadius: point.type === POINT_TYPE.STOP ? 7 : 4,
+                  backgroundColor: color,
+                  borderWidth: 2,
+                  borderColor: "white",
+                }}
+              />
+            </Marker>
+          ))}
         </MapLibreMap>
       </View>
 
