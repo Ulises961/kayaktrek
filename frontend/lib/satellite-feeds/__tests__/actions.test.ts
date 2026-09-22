@@ -68,6 +68,7 @@ describe("saveSatelliteFeed", () => {
     const result = await saveSatelliteFeed(null, {
       provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: A_FEED.feedUrl,
+      setPassword: false,
     })
 
     expect(apiPost).toHaveBeenCalledWith(
@@ -83,6 +84,7 @@ describe("saveSatelliteFeed", () => {
     await saveSatelliteFeed(A_FEED.id, {
       provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: A_FEED.feedUrl,
+      setPassword: false,
     })
 
     expect(apiPatch).toHaveBeenCalledWith(
@@ -98,6 +100,7 @@ describe("saveSatelliteFeed", () => {
     await saveSatelliteFeed(null, {
       provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: `  ${A_FEED.feedUrl}  `,
+      setPassword: false,
     })
 
     expect(apiPost).toHaveBeenCalledWith(
@@ -110,39 +113,76 @@ describe("saveSatelliteFeed", () => {
     const result = await saveSatelliteFeed(null, {
       provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: "http://share.garmin.com/feed/Share/paddler",
+      setPassword: false,
     })
 
     expect(result).toEqual({ success: false, error: "Feed URL must use https://" })
     expect(apiPost).not.toHaveBeenCalled()
   })
 
-  it("omits the password entirely when left blank, rather than sending an empty one", async () => {
-    // An empty string would overwrite a stored password with nothing on an update.
-    vi.mocked(apiPatch).mockResolvedValue(A_FEED)
+  describe("the password switch", () => {
+    it("sends null, never an empty string, while the switch is off", async () => {
+      // An empty string is the one value that reads as "clear it" on the way in but as
+      // "leave it" nowhere — null is what the backend's update guard ignores.
+      vi.mocked(apiPatch).mockResolvedValue(A_FEED)
 
-    await saveSatelliteFeed(A_FEED.id, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: A_FEED.feedUrl,
-      feedPassword: "",
+      await saveSatelliteFeed(A_FEED.id, {
+        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+        feedUrl: A_FEED.feedUrl,
+        setPassword: false,
+      })
+
+      const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
+      expect(body.feedPassword).toBeNull()
     })
 
-    const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
-    expect(body).not.toHaveProperty("feedPassword")
-  })
+    it("ignores a typed password the user then switched off", async () => {
+      // The switch is the intent; the field is only where the value was typed. Without
+      // this, turning the switch off would look like it worked and still change the
+      // stored password.
+      vi.mocked(apiPatch).mockResolvedValue(A_FEED)
 
-  it("sends the password when one is given", async () => {
-    vi.mocked(apiPost).mockResolvedValue(A_FEED)
+      await saveSatelliteFeed(A_FEED.id, {
+        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+        feedUrl: A_FEED.feedUrl,
+        setPassword: false,
+        feedPassword: "typed-then-thought-better-of-it",
+      })
 
-    await saveSatelliteFeed(null, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: A_FEED.feedUrl,
-      feedPassword: "s3cret",
+      const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
+      expect(body.feedPassword).toBeNull()
     })
 
-    expect(apiPost).toHaveBeenCalledWith(
-      "/api/satellite-feeds/create",
-      expect.objectContaining({ feedPassword: "s3cret" }),
-    )
+    it("sends the password when the switch is on", async () => {
+      vi.mocked(apiPost).mockResolvedValue(A_FEED)
+
+      await saveSatelliteFeed(null, {
+        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+        feedUrl: A_FEED.feedUrl,
+        setPassword: true,
+        feedPassword: "s3cret",
+      })
+
+      expect(apiPost).toHaveBeenCalledWith(
+        "/api/satellite-feeds/create",
+        expect.objectContaining({ feedPassword: "s3cret" }),
+      )
+    })
+
+    it("refuses a switch turned on with nothing typed, without calling the API", async () => {
+      const result = await saveSatelliteFeed(A_FEED.id, {
+        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+        feedUrl: A_FEED.feedUrl,
+        setPassword: true,
+        feedPassword: "",
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: "Enter the password, or turn this off to leave the stored one alone",
+      })
+      expect(apiPatch).not.toHaveBeenCalled()
+    })
   })
 
   it("surfaces the server's message rather than a generic failure", async () => {
@@ -151,6 +191,7 @@ describe("saveSatelliteFeed", () => {
     const result = await saveSatelliteFeed(null, {
       provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: A_FEED.feedUrl,
+      setPassword: false,
     })
 
     expect(result).toEqual({ success: false, error: "Feed URL must use https://" })

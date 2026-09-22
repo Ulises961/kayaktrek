@@ -3,11 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { SatelliteDishIcon, TrashIcon } from "lucide-react"
 import { useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   SATELLITE_PROVIDER,
   SATELLITE_PROVIDER_LABELS,
@@ -151,15 +152,21 @@ function SatelliteFeedForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<SatelliteFeedFormValues>({
     resolver: zodResolver(SatelliteFeedFormSchema),
     defaultValues: {
       provider: feed?.provider ?? SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: feed?.feedUrl ?? "",
+      // Off on every open, including an edit of a feed that has a password: the safe
+      // default is the one where saving changes nothing the user did not ask to change.
+      setPassword: false,
       feedPassword: "",
     },
   })
+
+  const setPassword = useWatch({ control, name: "setPassword" })
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -179,20 +186,42 @@ function SatelliteFeedForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="feedPassword">MapShare password (optional)</Label>
-        <Input
-          id="feedPassword"
-          type="password"
-          autoComplete="off"
-          placeholder={feed ? "Unchanged" : ""}
-          {...register("feedPassword")}
-        />
-        {/* Deliberately not prefilled, and blank means "leave as-is": the server never
-            returns a stored password, so there is nothing truthful to prefill with. */}
+        <div className="flex items-center gap-2">
+          <Controller
+            name="setPassword"
+            control={control}
+            render={({ field }) => (
+              <Switch
+                id="setPassword"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                aria-label="Set a MapShare password"
+              />
+            )}
+          />
+          <Label htmlFor="setPassword">Set a MapShare password</Label>
+        </div>
         <p className="text-muted-foreground text-xs">
-          Only if your MapShare page is password-protected. Leave blank to keep the current one.
+          {feed
+            ? "Leave this off to keep the stored password exactly as it is."
+            : "Only if your MapShare page is password-protected."}
         </p>
       </div>
+
+      {setPassword && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="feedPassword">MapShare password</Label>
+          <Input
+            id="feedPassword"
+            type="password"
+            autoComplete="off"
+            {...register("feedPassword")}
+          />
+          {errors.feedPassword && (
+            <p className="text-destructive text-sm">{errors.feedPassword.message}</p>
+          )}
+        </div>
+      )}
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 

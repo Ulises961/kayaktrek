@@ -48,11 +48,16 @@ export async function saveSatelliteFeed(
     return { success: false, error: parsed.error.issues[0]?.message ?? "Check the feed details." }
   }
 
-  const { provider, feedUrl, feedPassword } = parsed.data
-  const body: Record<string, unknown> = { provider, feedUrl }
-  // Omitted when blank rather than sent as "": on an update an empty string would
-  // overwrite a stored password with nothing, silently un-authenticating the feed.
-  if (feedPassword) body.feedPassword = feedPassword
+  const { provider, feedUrl, setPassword, feedPassword } = parsed.data
+  // null, never "": the backend's update guard ignores a null and keeps the stored
+  // password, where an empty string would overwrite it with nothing and silently
+  // un-authenticate a working feed. The switch is what decides — a value typed and then
+  // switched off is not sent, so changing one's mind costs nothing.
+  const body: Record<string, unknown> = {
+    provider,
+    feedUrl,
+    feedPassword: setPassword ? feedPassword : null,
+  }
 
   try {
     const raw = id

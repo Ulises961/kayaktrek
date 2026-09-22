@@ -48,15 +48,25 @@ export const SatelliteFeedsSchema = z.array(SatelliteFeedSchema)
 // Mirrors the backend's own validation (Schemas/satellite_feed_schema.py): non-empty,
 // at most 500 characters, and https only. Checked here so a typo is rejected without a
 // round trip, not instead of the server check.
-export const SatelliteFeedFormSchema = z.object({
-  provider: z.enum(SATELLITE_PROVIDERS),
-  feedUrl: z
-    .string()
-    .trim()
-    .min(1, "Enter your feed URL")
-    .max(500, "That URL is too long")
-    .refine((value) => value.toLowerCase().startsWith("https://"), "Feed URL must use https://"),
-  feedPassword: z.string().optional(),
-})
+export const SatelliteFeedFormSchema = z
+  .object({
+    provider: z.enum(SATELLITE_PROVIDERS),
+    feedUrl: z
+      .string()
+      .trim()
+      .min(1, "Enter your feed URL")
+      .max(500, "That URL is too long")
+      .refine((value) => value.toLowerCase().startsWith("https://"), "Feed URL must use https://"),
+    // The switch carries the intent; `feedPassword` only carries the typed value. They
+    // are separate fields because the server never echoes a stored password back, so
+    // there is nothing for the user to compare against — the request has to say what was
+    // meant rather than leave it to be inferred from an empty box.
+    setPassword: z.boolean(),
+    feedPassword: z.string().optional(),
+  })
+  .refine((values) => !values.setPassword || (values.feedPassword ?? "").length > 0, {
+    message: "Enter the password, or turn this off to leave the stored one alone",
+    path: ["feedPassword"],
+  })
 
 export type SatelliteFeedFormValues = z.infer<typeof SatelliteFeedFormSchema>

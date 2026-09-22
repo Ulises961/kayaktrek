@@ -69,6 +69,65 @@ describe("SatelliteFeedSection", () => {
     expect(saveSatelliteFeed).not.toHaveBeenCalled()
   })
 
+  describe("the password switch", () => {
+    it("hides the password field until the switch is turned on", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[]} />)
+
+      await user.click(screen.getByRole("button", { name: /add a feed/i }))
+      expect(screen.queryByLabelText(/^mapshare password$/i)).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole("switch", { name: /password/i }))
+      expect(screen.getByLabelText(/^mapshare password$/i)).toBeInTheDocument()
+    })
+
+    it("starts off when editing, so saving cannot disturb a stored password", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+
+      expect(screen.getByRole("switch", { name: /password/i })).not.toBeChecked()
+      await user.click(screen.getByRole("button", { name: /^save feed$/i }))
+
+      await waitFor(() => {
+        expect(saveSatelliteFeed).toHaveBeenCalledWith(
+          FEED.id,
+          expect.objectContaining({ setPassword: false }),
+        )
+      })
+    })
+
+    it("passes the switch and the typed password through together", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+      await user.click(screen.getByRole("switch", { name: /password/i }))
+      await user.type(screen.getByLabelText(/^mapshare password$/i), "s3cret")
+      await user.click(screen.getByRole("button", { name: /^save feed$/i }))
+
+      await waitFor(() => {
+        expect(saveSatelliteFeed).toHaveBeenCalledWith(
+          FEED.id,
+          expect.objectContaining({ setPassword: true, feedPassword: "s3cret" }),
+        )
+      })
+    })
+
+    it("will not save a switch turned on with nothing typed", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+      await user.click(screen.getByRole("switch", { name: /password/i }))
+      await user.click(screen.getByRole("button", { name: /^save feed$/i }))
+
+      expect(await screen.findByText(/enter the password, or turn this off/i)).toBeInTheDocument()
+      expect(saveSatelliteFeed).not.toHaveBeenCalled()
+    })
+  })
+
   it("edits an existing feed in place, passing its id", async () => {
     const user = userEvent.setup()
     render(<SatelliteFeedSection feeds={[FEED]} />)
