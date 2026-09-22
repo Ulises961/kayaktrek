@@ -27,6 +27,7 @@ import {
   getMyItems,
   setDefaultPack,
 } from "@mobile/lib/inventory/actions"
+import { useIsOffline } from "@mobile/lib/network/use-is-offline"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Gear" drawer
 // item's root screen, so it supplies its own menu button.
@@ -75,7 +76,13 @@ export default function GearScreen() {
   })
   const items = gearCache.data
   const error = gearCache.error
-  const isOffline = gearCache.isOffline
+  // Two different facts. `isShowingCache` is about the data on screen; the
+  // device's connectivity is about whether acting on it can work. Only the
+  // first used to disable the controls, so a closet loaded with signal kept
+  // offering "Add gear" after airplane mode went on — found on a device.
+  const isShowingCache = gearCache.isOffline
+  const isDeviceOffline = useIsOffline()
+  const isOffline = isShowingCache || isDeviceOffline
   const setError = gearCache.setError
 
   // Multi-select, mirroring Explore's season chips: "paddling and camping" is a real
@@ -230,7 +237,7 @@ export default function GearScreen() {
           />
         }
       >
-        <OfflineNotice visible={isOffline} cachedAt={gearCache.cachedAt}>
+        <OfflineNotice visible={isShowingCache} cachedAt={gearCache.cachedAt}>
           Offline — showing your last synced gear. Adding, deleting and changing default pack
           need a connection.
         </OfflineNotice>
@@ -302,7 +309,7 @@ export default function GearScreen() {
               <Row className="gap-2">
                 <Button
                   variant="cta"
-                  disabled={adding}
+                  disabled={adding || isOffline}
                   onPress={() => void submitNewItem()}
                   testID="gear-add-submit"
                 >

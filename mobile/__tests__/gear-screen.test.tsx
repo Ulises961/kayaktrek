@@ -10,6 +10,7 @@ import {
   getMyItems,
   setDefaultPack,
 } from "../lib/inventory/actions"
+import { useIsOffline } from "../lib/network/use-is-offline"
 
 jest.mock("../lib/inventory/actions", () => ({
   getMyItems: jest.fn(),
@@ -22,6 +23,7 @@ jest.mock("../lib/db/gear-cache", () => ({
   loadGearCache: jest.fn(),
   saveGearCache: jest.fn(),
 }))
+jest.mock("../lib/network/use-is-offline", () => ({ useIsOffline: jest.fn(() => false) }))
 jest.mock("../lib/db/cache-freshness", () => ({
   ...jest.requireActual("../lib/db/cache-freshness"),
   readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
@@ -34,6 +36,7 @@ const mockSetDefault = setDefaultPack as jest.Mock
 const mockDelete = deleteItem as jest.Mock
 const mockLoadGearCache = loadGearCache as jest.Mock
 const mockSaveGearCache = saveGearCache as jest.Mock
+const mockUseIsOffline = useIsOffline as jest.Mock
 
 const PADDLE = {
   id: "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01",
@@ -65,6 +68,7 @@ beforeEach(() => {
   mockGetCategories.mockResolvedValue(CATEGORIES)
   mockLoadGearCache.mockResolvedValue([])
   mockSaveGearCache.mockResolvedValue(undefined)
+  mockUseIsOffline.mockReturnValue(false)
   jest.spyOn(Alert, "alert").mockImplementation(() => {})
 })
 
@@ -344,6 +348,24 @@ describe("GearScreen — offline", () => {
     expect(getByTestId("gear-add-open")).toBeDisabled()
     expect(getByTestId(`delete-${PADDLE.id}`)).toBeDisabled()
     expect(getByTestId(`default-pack-${PADDLE.id}`)).toBeDisabled()
+  })
+
+  // Found on a device: the closet loaded live, then airplane mode went on, and
+  // "Add gear" still opened a form that could only fail. Loading from the cache
+  // was the only thing that disabled the controls, so a screen opened with
+  // signal stayed "online" however long the signal had been gone.
+  it("disables mutations when the device drops offline after a live load", async () => {
+    mockUseIsOffline.mockReturnValue(true)
+
+    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />)
+    await findByText("Werner Camano")
+
+    expect(getByTestId("gear-add-open")).toBeDisabled()
+    expect(getByTestId(`delete-${PADDLE.id}`)).toBeDisabled()
+    expect(getByTestId(`default-pack-${PADDLE.id}`)).toBeDisabled()
+
+    await fireEvent.press(getByTestId("gear-add-open"))
+    expect(queryByTestId("gear-name")).toBeNull()
   })
 
   it("does not open the add form while offline", async () => {
