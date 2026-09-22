@@ -18,7 +18,8 @@ import { Chip } from "@mobile/components/ui/chip"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
-import { OfflineNotice } from "@mobile/components/ui/offline-notice"
+import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
+import { OFFLINE_ERROR_MESSAGE, isOfflineError } from "@mobile/lib/api/client"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
 import { blockPaddler, listBlocks, unblockPaddler } from "@mobile/lib/blocks/actions"
@@ -32,7 +33,6 @@ import {
 import { loadBlocksCache, loadConnectionsCache, saveBlocksCache, saveConnectionsCache } from "@mobile/lib/db/paddlers-cache"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
-import { OFFLINE_ERROR_MESSAGE } from "@mobile/lib/api/client"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Paddlers"
 // drawer item's root screen, so it supplies its own menu button.
@@ -76,7 +76,8 @@ export default function PaddlersScreen() {
     fetchLive: listConnections,
     loadCache: loadConnectionsCache,
     saveCache: saveConnectionsCache,
-    isCacheEmpty: (data) => data.length === 0,
+    // Synced and empty is an answer — no buddies yet — not a missing cache.
+    isCacheEmpty: (data, cachedAt) => data.length === 0 && cachedAt === null,
     cacheKey: CACHE_KEY.connections,
   })
   const connections = connectionsCache.data
@@ -87,7 +88,7 @@ export default function PaddlersScreen() {
     fetchLive: listBlocks,
     loadCache: loadBlocksCache,
     saveCache: saveBlocksCache,
-    isCacheEmpty: (data) => data.length === 0,
+    isCacheEmpty: (data, cachedAt) => data.length === 0 && cachedAt === null,
     cacheKey: CACHE_KEY.blocks,
   })
   const blocks = blocksCache.data
@@ -278,7 +279,14 @@ export default function PaddlersScreen() {
           <OfflineNotice visible={connectionsOffline} cachedAt={connectionsCache.cachedAt}>
             Buddies: accepting and removing need a connection.
           </OfflineNotice>
-          {connectionsError && <Text className="text-sm text-destructive">{connectionsError}</Text>}
+          {/* Nothing ever synced and no connection: expected at sea, so the
+              banner says it rather than a red network error. */}
+          <NeedsConnectionNotice visible={isOfflineError(connectionsError)}>
+            Buddies need a connection.
+          </NeedsConnectionNotice>
+          {connectionsError && !isOfflineError(connectionsError) && (
+            <Text className="text-sm text-destructive">{connectionsError}</Text>
+          )}
           {(connections ?? []).map((connection) => (
             <ConnectionRow
               key={connection.id}
@@ -305,7 +313,12 @@ export default function PaddlersScreen() {
           <OfflineNotice visible={blocksOffline} cachedAt={blocksCache.cachedAt}>
             Blocklist: unblocking needs a connection.
           </OfflineNotice>
-          {blocksError && <Text className="text-sm text-destructive">{blocksError}</Text>}
+          <NeedsConnectionNotice visible={isOfflineError(blocksError)}>
+            The blocklist needs a connection.
+          </NeedsConnectionNotice>
+          {blocksError && !isOfflineError(blocksError) && (
+            <Text className="text-sm text-destructive">{blocksError}</Text>
+          )}
           {(blocks ?? []).map((block) => (
             <BlockedRow
               key={block.id}

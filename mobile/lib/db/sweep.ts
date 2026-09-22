@@ -1,12 +1,20 @@
+import { listBlocks } from "../blocks/actions"
+import { listConnections } from "../connections/actions"
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
 import { getTrip } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
+import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveRequirementsCache } from "./requirements-cache"
 import { pullRoute } from "./route-sync"
-import { GEAR_STALENESS_BUDGET_MS, planSweep, type SweepTrip } from "./sync-scope"
+import {
+  GEAR_STALENESS_BUDGET_MS,
+  PADDLERS_STALENESS_BUDGET_MS,
+  planSweep,
+  type SweepTrip,
+} from "./sync-scope"
 import { syncTrip } from "./sync"
 import { loadTripListCache } from "./trip-list-cache"
 
@@ -125,9 +133,32 @@ async function warmRequirements(tripId: string): Promise<void> {
 // same request N times, and gating it on having a syncable trip would leave a
 // paddler with no upcoming trip unable to read their own gear offline.
 async function warmGearCloset(): Promise<void> {
-  const cachedAt = await readCachedAt(CACHE_KEY.gear)
-  if (cachedAt && Date.now() - Date.parse(cachedAt) < GEAR_STALENESS_BUDGET_MS) return
+  if (await isWithinBudget(CACHE_KEY.gear, GEAR_STALENESS_BUDGET_MS)) return
   await saveGearCache(await getMyItems())
+}
+
+// The buddy list and the blocklist: the paddler's own, like the closet, and
+// just as lazy until now — the Paddlers screen was the only thing that filled
+// them, so a device that never opened it while connected had nothing there
+// offline. Two independent fetches; one failing must not cost the other.
+async function warmPaddlers(): Promise<void> {
+  const [connections, blocks] = await Promise.allSettled([
+    (async () => {
+      if (await isWithinBudget(CACHE_KEY.connections, PADDLERS_STALENESS_BUDGET_MS)) return
+      await saveConnectionsCache(await listConnections())
+    })(),
+    (async () => {
+      if (await isWithinBudget(CACHE_KEY.blocks, PADDLERS_STALENESS_BUDGET_MS)) return
+      await saveBlocksCache(await listBlocks())
+    })(),
+  ])
+  reportSettled("buddy list", [connections])
+  reportSettled("blocklist", [blocks])
+}
+
+async function isWithinBudget(key: string, budgetMs: number): Promise<boolean> {
+  const cachedAt = await readCachedAt(key)
+  return !!cachedAt && Date.now() - Date.parse(cachedAt) < budgetMs
 }
 
 /**
@@ -165,6 +196,7 @@ export async function runSweep(): Promise<void> {
     // otherwise be reached only after the trips had already run — true today,
     // but only by accident of ordering.
     await warmGearCloset().catch((reason) => reportSweepFailure("gear closet", reason))
+    await warmPaddlers()
   } catch (reason) {
     // Reading the local cache can fail too (a migration mid-flight, a device
     // stamped at a schema version whose table doesn't exist yet). Same rule:

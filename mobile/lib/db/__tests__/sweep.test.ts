@@ -6,6 +6,9 @@ import { CACHE_KEY, readCachedAt } from "../cache-freshness"
 import { saveGearCache } from "../gear-cache"
 import { saveKitCache } from "../kit-cache"
 import { saveRequirementsCache } from "../requirements-cache"
+import { saveBlocksCache, saveConnectionsCache } from "../paddlers-cache"
+import { listConnections } from "../../connections/actions"
+import { listBlocks } from "../../blocks/actions"
 import { pullRoute } from "../route-sync"
 import { getTrip } from "../../trips/actions"
 import { runSweep } from "../sweep"
@@ -19,6 +22,9 @@ jest.mock("../../inventory/personal-packing-actions", () => ({ getPackingItems: 
 jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
 jest.mock("../kit-cache", () => ({ saveKitCache: jest.fn() }))
 jest.mock("../requirements-cache", () => ({ saveRequirementsCache: jest.fn() }))
+jest.mock("../paddlers-cache", () => ({ saveConnectionsCache: jest.fn(), saveBlocksCache: jest.fn() }))
+jest.mock("../../connections/actions", () => ({ listConnections: jest.fn() }))
+jest.mock("../../blocks/actions", () => ({ listBlocks: jest.fn() }))
 jest.mock("../../trips/actions", () => ({ getTrip: jest.fn() }))
 jest.mock("../cache-freshness", () => ({
   ...jest.requireActual("../cache-freshness"),
@@ -37,6 +43,10 @@ const mockSaveGearCache = saveGearCache as jest.Mock
 const mockSaveKitCache = saveKitCache as jest.Mock
 const mockGetTrip = getTrip as jest.Mock
 const mockSaveRequirementsCache = saveRequirementsCache as jest.Mock
+const mockListConnections = listConnections as jest.Mock
+const mockListBlocks = listBlocks as jest.Mock
+const mockSaveConnectionsCache = saveConnectionsCache as jest.Mock
+const mockSaveBlocksCache = saveBlocksCache as jest.Mock
 
 function cachedTrip(overrides: Record<string, unknown> = {}) {
   return {
@@ -71,6 +81,10 @@ beforeEach(() => {
   mockSaveKitCache.mockResolvedValue(undefined)
   mockGetTrip.mockResolvedValue({ inventory: { requirements: [] } })
   mockSaveRequirementsCache.mockResolvedValue(undefined)
+  mockListConnections.mockResolvedValue([])
+  mockListBlocks.mockResolvedValue([])
+  mockSaveConnectionsCache.mockResolvedValue(undefined)
+  mockSaveBlocksCache.mockResolvedValue(undefined)
 })
 
 describe("runSweep", () => {
@@ -372,6 +386,44 @@ describe("runSweep — tier 3, kit and gear", () => {
     expect(mockPullRoute).toHaveBeenCalledWith("t1")
     expect(mockSaveKitCache).toHaveBeenCalledWith("t1", [])
     expect(mockSaveRequirementsCache).not.toHaveBeenCalled()
+  })
+
+  // The same per-screen laziness as the gear closet had: Paddlers only filled
+  // its caches when opened online, so a device that never opened it while
+  // connected showed nothing there offline.
+  it("warms the buddy list and the blocklist, which are not scoped to any trip", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockListConnections.mockResolvedValue([{ id: "conn-1" }])
+    mockListBlocks.mockResolvedValue([{ id: "block-1" }])
+
+    await runSweep()
+
+    expect(mockSaveConnectionsCache).toHaveBeenCalledWith([{ id: "conn-1" }])
+    expect(mockSaveBlocksCache).toHaveBeenCalledWith([{ id: "block-1" }])
+  })
+
+  it("keeps a failing buddy fetch from costing the blocklist or the closet", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockListConnections.mockRejectedValue(new Error("Could not reach the server."))
+    mockListBlocks.mockResolvedValue([])
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveBlocksCache).toHaveBeenCalledWith([])
+    expect(mockSaveGearCache).toHaveBeenCalled()
+    expect(mockSaveConnectionsCache).not.toHaveBeenCalled()
+  })
+
+  it("skips the buddy list and blocklist while each is inside its budget", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockReadCachedAt.mockImplementation(async (key: string) =>
+      key === CACHE_KEY.connections || key === CACHE_KEY.blocks ? new Date().toISOString() : null,
+    )
+
+    await runSweep()
+
+    expect(mockListConnections).not.toHaveBeenCalled()
+    expect(mockListBlocks).not.toHaveBeenCalled()
   })
 
   it("skips the closet while it is inside its own budget", async () => {

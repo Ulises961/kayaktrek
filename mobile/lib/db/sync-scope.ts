@@ -47,6 +47,11 @@ export const STALENESS_BUDGET_MS: Record<SyncTier, number> = {
 // which is rare, and it is read at packing time rather than on the water.
 export const GEAR_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
 
+// The buddy list and blocklist, on the same reasoning: the paddler's own, not
+// trip-scoped, and changed by a request being accepted rather than by the
+// trip clock. A day old is fine for "who can I invite", which is its reader.
+export const PADDLERS_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
+
 export type SweepTrip = {
   id: string
   state: TripState | null

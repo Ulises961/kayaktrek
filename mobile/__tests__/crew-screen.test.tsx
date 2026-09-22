@@ -7,6 +7,7 @@ import CrewScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/crew"
 import { getSession } from "../lib/auth/session"
 import { listConnections } from "../lib/connections/actions"
 import { cancelInvitation, getTrip, inviteBuddy, removeMember } from "../lib/trips/actions"
+import { loadOfflineCrew } from "../lib/db/offline-float-plan"
 
 // A plain stub, not requireActual — the real module's own Image usage collides
 // with react-native-css's Image wrapper once this screen's Avatar is also in the
@@ -31,6 +32,11 @@ jest.mock("../lib/auth/session", () => ({
 jest.mock("../lib/connections/actions", () => ({
   listConnections: jest.fn(),
 }))
+jest.mock("../lib/db/offline-float-plan", () => ({ loadOfflineCrew: jest.fn() }))
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
 
 const mockGetTrip = getTrip as jest.Mock
 const mockGetSession = getSession as jest.Mock
@@ -38,6 +44,7 @@ const mockListConnections = listConnections as jest.Mock
 const mockInviteBuddy = inviteBuddy as jest.Mock
 const mockCancelInvitation = cancelInvitation as jest.Mock
 const mockRemoveMember = removeMember as jest.Mock
+const mockLoadOfflineCrew = loadOfflineCrew as jest.Mock
 
 const LEADER = { id: "m-leader", role: "leader", user: { id: "leader-1", name: "Lea", surname: "Der" } }
 const CREW = { id: "m-crew", role: "crew", user: { id: "crew-1", name: "Cara", surname: "Crew" } }
@@ -58,6 +65,7 @@ beforeEach(() => {
   mockInviteBuddy.mockReset()
   mockCancelInvitation.mockReset()
   mockRemoveMember.mockReset()
+  mockLoadOfflineCrew.mockReset().mockResolvedValue([])
 })
 
 describe("CrewScreen", () => {
@@ -153,9 +161,9 @@ describe("CrewScreen", () => {
   })
 })
 
-// No cached copy of this screen: offline is the expected state at sea, so the
-// banner says what needs a connection instead of the screen printing the raw
-// network error in red — and "No crew yet" would be a false answer.
+// Nothing synced for this trip yet: offline is still the expected state at
+// sea, so the banner says what needs a connection instead of the screen
+// printing the raw network error in red — and "No crew yet" would be false.
 describe("CrewScreen — offline", () => {
   it("leaves the network error to the banner and claims no empty crew", async () => {
     mockGetTrip.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
@@ -165,5 +173,46 @@ describe("CrewScreen — offline", () => {
     expect(await findByText("Crew needs a connection.")).toBeTruthy()
     expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
     expect(queryByText("No crew yet")).toBeNull()
+  })
+})
+
+// The members are already on the device: every trip sync pulls trip_members,
+// and the float plan reads them offline. This screen used to ignore them and
+// show nothing at all without a connection.
+describe("CrewScreen — cached crew", () => {
+  const CACHED = [
+    { id: "m-leader", role: "leader", user: { name: "Lea", surname: "Der", username: null } },
+    { id: "m-crew", role: "crew", user: { name: "Cara", surname: "Crew", username: null } },
+  ]
+
+  it("falls back to the synced crew, with its age in the banner", async () => {
+    mockGetTrip.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockLoadOfflineCrew.mockResolvedValue(CACHED)
+
+    const { findByText, getByText, queryByText } = await render(<CrewScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+
+    expect(await findByText("Lea Der")).toBeTruthy()
+    expect(getByText("Cara Crew")).toBeTruthy()
+    expect(getByText("Last synced 2 days ago.")).toBeTruthy()
+    expect(queryByText("Crew needs a connection.")).toBeNull()
+  })
+
+  // Membership changes and invitations need the server, and pending invitations
+  // are not cached — so the cached view is the list itself, read-only.
+  it("offers no invite or remove while showing the cached crew", async () => {
+    mockGetTrip.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    mockGetSession.mockResolvedValue({ userId: "leader-1" })
+    mockLoadOfflineCrew.mockResolvedValue(CACHED)
+
+    const { findByText, queryByText, queryByLabelText } = await render(<CrewScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+    await findByText("Lea Der")
+
+    expect(queryByText("Invite a buddy")).toBeNull()
+    expect(queryByLabelText("Remove Cara Crew")).toBeNull()
   })
 })

@@ -13,7 +13,12 @@ export type UseLiveCacheOptions<T> = {
   fetchLive: () => Promise<T>
   loadCache: () => Promise<T>
   saveCache: (data: T) => Promise<void>
-  isCacheEmpty: (data: T) => boolean
+  // `cachedAt` lets a caller tell "never synced" from "synced, and the answer
+  // was an empty list" (no buddies yet): the second is data to show, not a
+  // missing cache. Left to the caller because it is not always true — a cache
+  // that is a projection (the trip hub reading one trip out of the trip list)
+  // can be synced and still not hold what this screen needs.
+  isCacheEmpty: (data: T, cachedAt: string | null) => boolean
   // CACHE_KEY entry for this surface (cache-freshness.ts). Optional only
   // because a caller may be rendering something with no age worth showing;
   // anything a paddler could act on offline should pass one.
@@ -51,26 +56,38 @@ export function useLiveCache<T>(options: UseLiveCacheOptions<T>): UseLiveCacheRe
 
   const reload = useCallback(async () => {
     setError(null)
+    let result: T
     try {
-      const result = await optionsRef.current.fetchLive()
-      setData(result)
-      setIsOffline(false)
-      // Cleared rather than left behind: this render is live data, and a stale
-      // "from 2 days ago" line surviving a successful refresh would be exactly
-      // the misreport the age indicator exists to prevent.
-      setCachedAt(null)
-      void optionsRef.current.saveCache(result).catch(() => undefined)
+      result = await optionsRef.current.fetchLive()
     } catch (err) {
-      const cached = await optionsRef.current.loadCache()
-      if (!optionsRef.current.isCacheEmpty(cached)) {
+      const { cacheKey } = optionsRef.current
+      const [cached, cacheCachedAt] = await Promise.all([
+        optionsRef.current.loadCache(),
+        cacheKey ? readCachedAt(cacheKey) : Promise.resolve(null),
+      ])
+      if (!optionsRef.current.isCacheEmpty(cached, cacheCachedAt)) {
         setData(cached)
         setIsOffline(true)
-        const { cacheKey } = optionsRef.current
-        setCachedAt(cacheKey ? await readCachedAt(cacheKey) : null)
+        setCachedAt(cacheCachedAt)
       } else {
         setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
       }
+      return
     }
+
+    setData(result)
+    setIsOffline(false)
+    // Cleared rather than left behind: this render is live data, and a stale
+    // "from 2 days ago" line surviving a successful refresh would be exactly
+    // the misreport the age indicator exists to prevent.
+    setCachedAt(null)
+    // Outside the fetch's try, deliberately: a failing save used to land in
+    // the fetch's catch and fall back to the cache, overwriting the live data
+    // just set with an older copy. Saving is best effort and must never
+    // change what the screen shows.
+    void Promise.resolve()
+      .then(() => optionsRef.current.saveCache(result))
+      .catch(() => undefined)
   }, [])
 
   return { data, error, isOffline, cachedAt, reload, setData, setError }

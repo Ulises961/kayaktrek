@@ -1,6 +1,8 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
+import { readCachedAt } from "../lib/db/cache-freshness"
 import { Alert } from "react-native"
 
 import PaddlersScreen from "../app/(app)/(drawer)/(paddlers)/paddlers/index"
@@ -56,6 +58,7 @@ const mockUnblockPaddler = unblockPaddler as jest.Mock
 const mockGetSession = getSession as jest.Mock
 const mockLoadConnectionsCache = loadConnectionsCache as jest.Mock
 const mockLoadBlocksCache = loadBlocksCache as jest.Mock
+const mockReadCachedAt = readCachedAt as jest.Mock
 
 const ME = { userId: "01958f60-0000-7000-8000-00000000000a", email: "me@example.com" }
 
@@ -100,6 +103,7 @@ beforeEach(() => {
   mockListBlocks.mockResolvedValue([])
   mockLoadConnectionsCache.mockReset().mockResolvedValue([])
   mockLoadBlocksCache.mockReset().mockResolvedValue([])
+  mockReadCachedAt.mockResolvedValue(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
 })
 
 describe("PaddlersScreen — search", () => {
@@ -280,6 +284,36 @@ describe("PaddlersScreen — buddies tab", () => {
 
     await fireEvent.press(getByText("Remove"))
     expect(mockRemoveConnection).not.toHaveBeenCalled()
+  })
+
+  // A synced empty list is an answer: no buddies yet. It used to be read as
+  // "nothing cached" and shown as an error, offline, indefinitely.
+  it("shows a synced empty buddy list offline as empty, not as an error", async () => {
+    mockListConnections.mockRejectedValueOnce(new Error(OFFLINE_ERROR_MESSAGE))
+    mockLoadConnectionsCache.mockResolvedValueOnce([])
+
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+    await fireEvent.press(getByText("Buddies"))
+
+    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
+    expect(queryByText("Buddies need a connection.")).toBeNull()
+  })
+
+  it("leaves the network error to the banner when nothing was ever synced", async () => {
+    mockReadCachedAt.mockResolvedValue(null)
+    mockListConnections.mockRejectedValueOnce(new Error(OFFLINE_ERROR_MESSAGE))
+    mockLoadConnectionsCache.mockResolvedValueOnce([])
+
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+    await fireEvent.press(getByText("Buddies"))
+
+    expect(await findByText("Buddies need a connection.")).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
   })
 })
 
