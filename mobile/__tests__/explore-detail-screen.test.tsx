@@ -1,5 +1,8 @@
 import { render, waitFor } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
+
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "@shared/dtos/difficulty"
 import { DISTANCE_UNIT, formatDistance } from "@shared/itinerary/distance"
 
@@ -22,6 +25,7 @@ jest.mock("expo-router", () => {
     ...actual,
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useLocalSearchParams: () => ({ id: "itin-1" }),
+    useIsFocused: () => true,
   }
 })
 jest.mock("@maplibre/maplibre-react-native", () => {
@@ -94,7 +98,7 @@ describe("PublicRouteScreen", () => {
   it("shows the route's name, pitch and grade", async () => {
     mockFetch.mockResolvedValue(DETAIL)
 
-    const { findByText } = await render(<PublicRouteScreen />)
+    const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Skye circuit")).toBeTruthy()
     expect(await findByText(DETAIL.description)).toBeTruthy()
@@ -105,7 +109,7 @@ describe("PublicRouteScreen", () => {
     // This is the screen someone opened in order to read the pitch.
     mockFetch.mockResolvedValue(DETAIL)
 
-    const { findByTestId } = await render(<PublicRouteScreen />)
+    const { findByTestId } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     expect((await findByTestId("route-pitch")).props.numberOfLines).toBeUndefined()
   })
@@ -113,7 +117,7 @@ describe("PublicRouteScreen", () => {
   it("shows the total distance in the viewer's own unit", async () => {
     mockFetch.mockResolvedValue(DETAIL)
 
-    const { findByText } = await render(<PublicRouteScreen />)
+    const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText(new RegExp(formatDistance(DETAIL.totalMiles, UNIT)))).toBeTruthy()
   })
@@ -121,7 +125,7 @@ describe("PublicRouteScreen", () => {
   it("fetches the route named in the route params", async () => {
     mockFetch.mockResolvedValue(DETAIL)
 
-    await render(<PublicRouteScreen />)
+    await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("itin-1"))
   })
@@ -130,7 +134,7 @@ describe("PublicRouteScreen", () => {
     it("lists every day of the route", async () => {
       mockFetch.mockResolvedValue(DETAIL)
 
-      const { findByText } = await render(<PublicRouteScreen />)
+      const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByText("Day 1")).toBeTruthy()
       expect(await findByText("Day 2")).toBeTruthy()
@@ -139,7 +143,7 @@ describe("PublicRouteScreen", () => {
     it("names the stops so the route reads as places, not coordinates", async () => {
       mockFetch.mockResolvedValue(DETAIL)
 
-      const { findByText, findAllByText } = await render(<PublicRouteScreen />)
+      const { findByText, findAllByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByText("Elgol")).toBeTruthy()
       // Loch Coruisk ends day 1 and starts day 2.
@@ -150,7 +154,7 @@ describe("PublicRouteScreen", () => {
     it("gives each day its own distance, not just the route total", async () => {
       mockFetch.mockResolvedValue(DETAIL)
 
-      const { findByTestId } = await render(<PublicRouteScreen />)
+      const { findByTestId } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
       const dayOne = await findByTestId("day-distance-1")
       const dayTwo = await findByTestId("day-distance-2")
@@ -163,7 +167,7 @@ describe("PublicRouteScreen", () => {
       // legLabel divides by avgSpeedKnots; an older route may never have had one set.
       mockFetch.mockResolvedValue({ ...DETAIL, avgSpeedKnots: null })
 
-      const { findByTestId } = await render(<PublicRouteScreen />)
+      const { findByTestId } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByTestId("day-distance-1")).toBeTruthy()
     })
@@ -171,7 +175,7 @@ describe("PublicRouteScreen", () => {
     it("says so when a published route carries no days at all", async () => {
       mockFetch.mockResolvedValue({ ...DETAIL, days: [] })
 
-      const { findByText } = await render(<PublicRouteScreen />)
+      const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByText(/no route detail/i)).toBeTruthy()
     })
@@ -180,7 +184,7 @@ describe("PublicRouteScreen", () => {
   it("draws the route as a connected line, not just loose markers", async () => {
     mockFetch.mockResolvedValue(DETAIL)
 
-    const { findByTestId } = await render(<PublicRouteScreen />)
+    const { findByTestId } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     // Markers alone leave a reader to guess the order the points join in.
     expect(await findByTestId("route-line")).toBeTruthy()
@@ -189,7 +193,7 @@ describe("PublicRouteScreen", () => {
   it("shows the error rather than an empty map when the fetch fails", async () => {
     mockFetch.mockRejectedValue(new Error("Could not reach the server."))
 
-    const { findByText } = await render(<PublicRouteScreen />)
+    const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -202,8 +206,21 @@ describe("PublicRouteScreen", () => {
       days: [{ dayNumber: 1, points: [{ id: "p1", latitude: null, longitude: null, images: [] }] }],
     })
 
-    const { findByText } = await render(<PublicRouteScreen />)
+    const { findByText } = await render(<PublicRouteScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Skye circuit")).toBeTruthy()
+  })
+})
+
+describe("PublicRouteScreen — offline", () => {
+  it("leaves the network error to the banner", async () => {
+    mockFetch.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+
+    const { findByText, queryByText } = await render(<PublicRouteScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+
+    expect(await findByText("Explore needs a connection.")).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
   })
 })

@@ -1,4 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
 import { Alert } from "react-native"
 
 import InventoryScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/items"
@@ -31,6 +33,7 @@ jest.mock("expo-router", () => {
     ...actual,
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useLocalSearchParams: () => ({ id: "trip-1" }),
+    useIsFocused: () => true,
   }
 })
 jest.mock("../lib/trips/actions", () => ({
@@ -161,7 +164,7 @@ describe("InventoryScreen — device drops offline after a live load", () => {
       inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT, COVERED_BY_ME] },
     })
 
-    const { findByText, getByText, getByPlaceholderText } = await render(<InventoryScreen />)
+    const { findByText, getByText, getByPlaceholderText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await findByText("First aid kit")
 
     expect(getByText("Add")).toBeDisabled()
@@ -177,7 +180,7 @@ describe("InventoryScreen — device drops offline after a live load", () => {
       { id: "entry-1", item: { id: "item-2", name: "Bilge pump" }, checked: false },
     ])
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
     await findByText("Bilge pump")
 
@@ -195,10 +198,10 @@ describe("InventoryScreen — device drops offline after a live load", () => {
       inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
     })
 
-    const { findByText, queryByText } = await render(<InventoryScreen />)
+    const { findByText, queryByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await findByText("First aid kit")
 
-    expect(queryByText(/Offline — showing your last synced/)).toBeNull()
+    expect(queryByText(/Last synced/)).toBeNull()
   })
 })
 
@@ -209,7 +212,7 @@ describe("InventoryScreen — group requirements", () => {
       inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
     })
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("First aid kit")).toBeTruthy()
     expect(getByText("Needed")).toBeTruthy()
@@ -223,7 +226,7 @@ describe("InventoryScreen — group requirements", () => {
     })
     mockRemoveRequirement.mockResolvedValue(undefined)
 
-    const { findByText, getByText, queryByText } = await render(<InventoryScreen />)
+    const { findByText, getByText, queryByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await findByText("First aid kit")
 
     await fireEvent.press(getByText("Remove"))
@@ -248,7 +251,7 @@ describe("InventoryScreen — group requirements", () => {
     })
     mockContributeItem.mockResolvedValue({ ...NEEDED_REQUIREMENT, status: "covered" })
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await findByText("First aid kit")
 
     await fireEvent.press(getByText("Cover"))
@@ -267,7 +270,7 @@ describe("InventoryScreen — group requirements", () => {
       inventory: { id: "inv-1", requirements: [COVERED_BY_ME] },
     })
 
-    const { findByText, queryByText } = await render(<InventoryScreen />)
+    const { findByText, queryByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Withdraw")).toBeTruthy()
     expect(queryByText("Cover")).toBeNull()
@@ -277,11 +280,11 @@ describe("InventoryScreen — group requirements", () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadRequirementsCache.mockResolvedValue([{ id: "req-1", name: "First aid kit", status: "needed" }])
 
-    const { findByText, getByText, getByPlaceholderText } = await render(<InventoryScreen />)
+    const { findByText, getByText, getByPlaceholderText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("First aid kit")).toBeTruthy()
-    expect(getByText(/Offline — showing your last synced requirements/)).toBeTruthy()
-    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(getByText(/Can't reach the server\./)).toBeTruthy()
+    expect(getByText(/Last synced 2 days ago/)).toBeTruthy()
     expect(getByText("Add")).toBeDisabled()
     expect(getByText("Cover")).toBeDisabled()
     expect(getByPlaceholderText("Add a requirement").props.editable).toBe(false)
@@ -291,7 +294,7 @@ describe("InventoryScreen — group requirements", () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadRequirementsCache.mockResolvedValue([])
 
-    const { findByText } = await render(<InventoryScreen />)
+    const { findByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -308,7 +311,7 @@ describe("InventoryScreen — my kit", () => {
     ])
     mockTogglePackingItem.mockResolvedValue({ id: "entry-1", item: MY_ITEM, checked: true })
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Spare paddle")).toBeTruthy()
@@ -327,7 +330,7 @@ describe("InventoryScreen — my kit", () => {
     mockGetPackingItems.mockResolvedValueOnce([{ id: "entry-1", item: MY_ITEM, checked: true }])
     mockTogglePackingItem.mockResolvedValue({ id: "entry-1", item: MY_ITEM, checked: false })
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Packed")).toBeTruthy()
@@ -346,7 +349,7 @@ describe("InventoryScreen — my kit", () => {
     ])
     mockRemovePackingItem.mockResolvedValue(undefined)
 
-    const { findByText, getByText, queryByText } = await render(<InventoryScreen />)
+    const { findByText, getByText, queryByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
     await findByText("Spare paddle")
 
@@ -366,7 +369,7 @@ describe("InventoryScreen — my kit", () => {
     mockGetPackingItems.mockResolvedValueOnce([])
     mockAddPackingItem.mockResolvedValue({ id: "entry-1", item: MY_ITEM, checked: false })
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Add Spare paddle")).toBeTruthy()
@@ -383,7 +386,7 @@ describe("InventoryScreen — my kit", () => {
   it("loads the kit on mount so it is cached even if the tab is never opened", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
 
-    await render(<InventoryScreen />)
+    await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
 
     await waitFor(() => expect(mockGetPackingItems).toHaveBeenCalledWith("trip-1"))
   })
@@ -400,13 +403,13 @@ describe("InventoryScreen — offline kit and gear", () => {
       { id: "entry-1", itemId: "item-1", itemName: "Spare paddle", checked: true },
     ])
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Spare paddle")).toBeTruthy()
     expect(getByText("Packed")).toBeTruthy()
-    expect(getByText(/Offline — showing your last synced kit/)).toBeTruthy()
-    expect(getByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(getByText(/Can't reach the server\./)).toBeTruthy()
+    expect(getByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
   it("disables every kit mutation offline", async () => {
@@ -414,7 +417,7 @@ describe("InventoryScreen — offline kit and gear", () => {
       { id: "entry-1", itemId: "item-1", itemName: "Spare paddle", checked: false },
     ])
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
     await findByText("Spare paddle")
 
@@ -430,7 +433,7 @@ describe("InventoryScreen — offline kit and gear", () => {
     mockLoadKitCache.mockResolvedValue([])
     mockLoadGearCache.mockResolvedValue([{ id: "item-1", name: "Spare paddle", status: "owned" }])
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Add Spare paddle")).toBeTruthy()
@@ -440,7 +443,7 @@ describe("InventoryScreen — offline kit and gear", () => {
   it("surfaces the error when the kit fetch fails and nothing is cached", async () => {
     mockLoadKitCache.mockResolvedValue([])
 
-    const { findByText, getByText } = await render(<InventoryScreen />)
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithOfflineBanner })
     await fireEvent.press(getByText("My kit"))
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()

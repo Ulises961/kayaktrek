@@ -17,10 +17,25 @@ jest.mock("react-native-safe-area-context", () => {
 // hood, which throws "Couldn't find a route object" without a real navigator, and
 // none of these screen tests mount one. Stub it inert; tests assert screen content,
 // not the native header title.
+// useIsFocused reads the navigator the same way, and throws without one. A screen
+// under test is the one in front, so it is focused — OfflineNotice keys on it to
+// report only the focused screen's cached data to the banner.
 jest.mock("expo-router", () => {
   const actual = jest.requireActual("expo-router")
-  return { ...actual, Stack: Object.assign(actual.Stack, { Screen: () => null }) }
+  return {
+    ...actual,
+    Stack: Object.assign(actual.Stack, { Screen: () => null }),
+    useIsFocused: () => true,
+  }
 })
+
+// The package's own jest mock (online, reachable). Screen tests now render the
+// app-root OfflineBanner through test-utils/with-offline-banner.tsx, which reads
+// connectivity; tests about connectivity itself still mock this per file.
+jest.mock("@react-native-community/netinfo", () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("@react-native-community/netinfo/jest/netinfo-mock.js"),
+)
 
 // expo-router/drawer transitively requires react-native-drawer-layout ->
 // react-native-reanimated -> react-native-worklets, which tries to load a native

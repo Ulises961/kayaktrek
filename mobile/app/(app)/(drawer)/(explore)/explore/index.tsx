@@ -19,8 +19,11 @@ import { Chip } from "@mobile/components/ui/chip"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
+import { isOfflineError } from "@mobile/lib/api/client"
 import { searchPublicItineraries } from "@mobile/lib/explore/actions"
+import { useIsOffline } from "@mobile/lib/network/use-is-offline"
 import { getMe } from "@mobile/lib/profile/actions"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Explore" drawer
@@ -124,6 +127,20 @@ export default function ExploreScreen() {
     void runSearch(1, { append: false })
   }, [runSearch])
 
+  // Offline, the screen offers no retry — it could only fail again — so the
+  // search re-runs by itself on the transition back to connected. Only on that
+  // transition, and only if the last search failed for want of a connection.
+  const isDeviceOffline = useIsOffline()
+  const wasDeviceOffline = useRef(isDeviceOffline)
+  useEffect(() => {
+    const reconnected = wasDeviceOffline.current && !isDeviceOffline
+    wasDeviceOffline.current = isDeviceOffline
+    if (reconnected && isOfflineError(error)) {
+      setLoading(true)
+      void runSearch(1, { append: false })
+    }
+  }, [isDeviceOffline, error, runSearch])
+
   useEffect(() => {
     // The unit preference only changes how distances read, so a failure here must not
     // fail the screen — it falls back to the default rather than showing an error.
@@ -204,16 +221,28 @@ export default function ExploreScreen() {
           <ActivityIndicator />
         ) : error ? (
           <Stack className="gap-3">
-            <Text className="text-sm text-destructive">{error}</Text>
-            <Button
-              onPress={() => {
-                setLoading(true)
-                void runSearch(1, { append: false })
-              }}
-              testID="explore-retry"
-            >
-              Try again
-            </Button>
+            {/* Explore is deliberately not cached: it is a discovery surface acted
+                on while connected. Offline is therefore expected, and the banner
+                says so; only a genuine server error is shown here. */}
+            <NeedsConnectionNotice visible={isOfflineError(error)}>
+              Explore needs a connection.
+            </NeedsConnectionNotice>
+            {/* No retry offline: it could only fail again, and the search re-runs
+                by itself on reconnect (see the effect above). */}
+            {!isOfflineError(error) && (
+              <>
+                <Text className="text-sm text-destructive">{error}</Text>
+                <Button
+                  onPress={() => {
+                    setLoading(true)
+                    void runSearch(1, { append: false })
+                  }}
+                  testID="explore-retry"
+                >
+                  Try again
+                </Button>
+              </>
+            )}
           </Stack>
         ) : (
           <ScrollView

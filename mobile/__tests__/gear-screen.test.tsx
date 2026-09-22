@@ -1,4 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
 import { Alert } from "react-native"
 
 import GearScreen from "../app/(app)/(drawer)/(gear)/gear/index"
@@ -74,7 +76,7 @@ beforeEach(() => {
 
 describe("GearScreen", () => {
   it("lists the paddler's own gear", async () => {
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Werner Camano")).toBeTruthy()
     expect(await findByText("Hilleberg Soulo")).toBeTruthy()
@@ -83,7 +85,7 @@ describe("GearScreen", () => {
   it("groups gear under its category", async () => {
     // By testID: each category name now appears twice — as a filter chip and as this
     // heading — so a by-text query matches two nodes.
-    const { findByTestId } = await render(<GearScreen />)
+    const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByTestId("section-Paddling")).toBeTruthy()
     expect(await findByTestId("section-Camping")).toBeTruthy()
@@ -92,7 +94,7 @@ describe("GearScreen", () => {
   it("still shows an item that has no category", async () => {
     // Category is nullish on the DTO, and an uncategorised item silently vanishing
     // from the closet is worse than an "Uncategorised" heading.
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Spare cag")).toBeTruthy()
   })
@@ -100,7 +102,7 @@ describe("GearScreen", () => {
   it("says the closet is empty rather than rendering nothing", async () => {
     mockGetItems.mockResolvedValue([])
 
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText(/no gear yet/i)).toBeTruthy()
   })
@@ -108,7 +110,7 @@ describe("GearScreen", () => {
   it("shows the server's error and can retry", async () => {
     mockGetItems.mockRejectedValueOnce(new Error("Could not reach the server."))
 
-    const { findByText, getByTestId } = await render(<GearScreen />)
+    const { findByText, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     expect(await findByText("Could not reach the server.")).toBeTruthy()
 
     mockGetItems.mockResolvedValue([PADDLE])
@@ -121,14 +123,14 @@ describe("GearScreen", () => {
     it("offers a filter chip per category the closet actually uses", async () => {
       // Driven by the items on hand, not the full category list: a chip that filters
       // to an empty closet is a dead control.
-      const { findByTestId } = await render(<GearScreen />)
+      const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByTestId(`filter-${PADDLE.category.slug}`)).toBeTruthy()
       expect(await findByTestId(`filter-${TENT.category.slug}`)).toBeTruthy()
     })
 
     it("offers a chip for uncategorised gear when there is some", async () => {
-      const { findByTestId } = await render(<GearScreen />)
+      const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByTestId("filter-uncategorised")).toBeTruthy()
     })
@@ -136,14 +138,14 @@ describe("GearScreen", () => {
     it("offers no uncategorised chip when everything is filed", async () => {
       mockGetItems.mockResolvedValue([PADDLE, TENT])
 
-      const { queryByTestId, findByText } = await render(<GearScreen />)
+      const { queryByTestId, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await findByText("Werner Camano")
 
       expect(queryByTestId("filter-uncategorised")).toBeNull()
     })
 
     it("shows only the chosen category once one is picked", async () => {
-      const { findByTestId, queryByText, findByText } = await render(<GearScreen />)
+      const { findByTestId, queryByText, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
 
       expect(await findByText("Hilleberg Soulo")).toBeTruthy()
@@ -154,7 +156,7 @@ describe("GearScreen", () => {
     it("adds to the selection rather than replacing it", async () => {
       // Multi-select, like Explore's seasons — "paddling and camping" is a real
       // question to ask of a kit list.
-      const { findByTestId, findByText } = await render(<GearScreen />)
+      const { findByTestId, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
       await fireEvent.press(await findByTestId(`filter-${PADDLE.category.slug}`))
 
@@ -163,7 +165,7 @@ describe("GearScreen", () => {
     })
 
     it("clears the filter when the same chip is tapped again", async () => {
-      const { findByTestId, findByText } = await render(<GearScreen />)
+      const { findByTestId, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
 
@@ -172,7 +174,7 @@ describe("GearScreen", () => {
     })
 
     it("clears every filter from the All chip", async () => {
-      const { findByTestId, findByText } = await render(<GearScreen />)
+      const { findByTestId, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
       await fireEvent.press(await findByTestId("filter-all"))
 
@@ -185,7 +187,7 @@ describe("GearScreen", () => {
       // hand, so a selected category always has something in it — until the last item
       // in it is deleted and the closet reloads with the filter still set. "No gear
       // yet" would be a lie there; the kit is present, the filter is hiding it.
-      const { findByTestId, findByText } = await render(<GearScreen />)
+      const { findByTestId, findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`filter-${TENT.category.slug}`))
       await findByText("Hilleberg Soulo")
 
@@ -202,7 +204,7 @@ describe("GearScreen", () => {
     it("creates an item with the chosen category", async () => {
       mockCreate.mockResolvedValue(undefined)
 
-      const { findByTestId, getByTestId } = await render(<GearScreen />)
+      const { findByTestId, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId("gear-add-open"))
       await fireEvent.changeText(getByTestId("gear-name"), "Drysuit")
       // By testID, not text: a category name is both a chip here and a section
@@ -218,7 +220,7 @@ describe("GearScreen", () => {
     })
 
     it("will not create gear with no name", async () => {
-      const { findByTestId, getByTestId } = await render(<GearScreen />)
+      const { findByTestId, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId("gear-add-open"))
       await fireEvent.changeText(getByTestId("gear-name"), "   ")
       await fireEvent.press(getByTestId("gear-add-submit"))
@@ -229,7 +231,7 @@ describe("GearScreen", () => {
     it("reloads the closet so the new item appears without a manual refresh", async () => {
       mockCreate.mockResolvedValue(undefined)
 
-      const { findByTestId, getByTestId } = await render(<GearScreen />)
+      const { findByTestId, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await waitFor(() => expect(mockGetItems).toHaveBeenCalledTimes(1))
 
       await fireEvent.press(await findByTestId("gear-add-open"))
@@ -244,7 +246,7 @@ describe("GearScreen", () => {
     it("toggles an item onto future trips", async () => {
       mockSetDefault.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<GearScreen />)
+      const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`default-pack-${TENT.id}`))
 
       await waitFor(() => expect(mockSetDefault).toHaveBeenCalledWith(TENT.id, true))
@@ -253,7 +255,7 @@ describe("GearScreen", () => {
     it("toggles an already-default item back off", async () => {
       mockSetDefault.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<GearScreen />)
+      const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`default-pack-${PADDLE.id}`))
 
       await waitFor(() => expect(mockSetDefault).toHaveBeenCalledWith(PADDLE.id, false))
@@ -264,7 +266,7 @@ describe("GearScreen", () => {
     it("asks before deleting", async () => {
       mockDelete.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<GearScreen />)
+      const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
       await fireEvent.press(await findByTestId(`delete-${TENT.id}`))
 
       expect(mockDelete).not.toHaveBeenCalled()
@@ -288,7 +290,7 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByText, queryByText } = await render(<GearScreen />)
+    const { findByText, queryByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Werner Camano")).toBeTruthy()
     expect(queryByText("Could not reach the server.")).toBeNull()
@@ -298,10 +300,10 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
-    expect(await findByText(/Offline — showing your last synced gear/)).toBeTruthy()
-    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(await findByText(/Can't reach the server\./)).toBeTruthy()
+    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
   // The category grouping and the default-pack flag are why the cache grew two
@@ -311,7 +313,7 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByTestId } = await render(<GearScreen />)
+    const { findByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByTestId("section-Paddling")).toBeTruthy()
     expect(await findByTestId("section-Camping")).toBeTruthy()
@@ -322,7 +324,7 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByText, getByTestId } = await render(<GearScreen />)
+    const { findByText, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     await findByText("Werner Camano")
 
     // Adding, deleting and toggling default-pack all need a connection; a
@@ -342,7 +344,7 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByText, getByTestId } = await render(<GearScreen />)
+    const { findByText, getByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     await findByText("Werner Camano")
 
     expect(getByTestId("gear-add-open")).toBeDisabled()
@@ -357,7 +359,7 @@ describe("GearScreen — offline", () => {
   it("disables mutations when the device drops offline after a live load", async () => {
     mockUseIsOffline.mockReturnValue(true)
 
-    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />)
+    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     await findByText("Werner Camano")
 
     expect(getByTestId("gear-add-open")).toBeDisabled()
@@ -372,7 +374,7 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue(CACHED)
 
-    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />)
+    const { findByText, getByTestId, queryByTestId } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     await findByText("Werner Camano")
 
     await fireEvent.press(getByTestId("gear-add-open"))
@@ -384,13 +386,13 @@ describe("GearScreen — offline", () => {
     mockGetItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadGearCache.mockResolvedValue([])
 
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
 
   it("saves a successful fetch to the cache so the next offline open has it", async () => {
-    const { findByText } = await render(<GearScreen />)
+    const { findByText } = await render(<GearScreen />, { wrapper: WithOfflineBanner })
     await findByText("Werner Camano")
 
     await waitFor(() => expect(mockSaveGearCache).toHaveBeenCalledWith([PADDLE, TENT, UNFILED]))

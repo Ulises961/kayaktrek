@@ -276,7 +276,7 @@ export default function PaddlersScreen() {
       {tab === "buddies" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={connectionsOffline} cachedAt={connectionsCache.cachedAt}>
-            Offline — showing your last synced buddies. Accept/remove needs a connection.
+            Buddies: accepting and removing need a connection.
           </OfflineNotice>
           {connectionsError && <Text className="text-sm text-destructive">{connectionsError}</Text>}
           {(connections ?? []).map((connection) => (
@@ -303,7 +303,7 @@ export default function PaddlersScreen() {
       {tab === "blocked" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={blocksOffline} cachedAt={blocksCache.cachedAt}>
-            Offline — showing your last synced blocklist. Unblocking needs a connection.
+            Blocklist: unblocking needs a connection.
           </OfflineNotice>
           {blocksError && <Text className="text-sm text-destructive">{blocksError}</Text>}
           {(blocks ?? []).map((block) => (

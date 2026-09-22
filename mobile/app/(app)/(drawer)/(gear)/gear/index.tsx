@@ -238,8 +238,7 @@ export default function GearScreen() {
         }
       >
         <OfflineNotice visible={isShowingCache} cachedAt={gearCache.cachedAt}>
-          Offline — showing your last synced gear. Adding, deleting and changing default pack
-          need a connection.
+          Adding, deleting and changing default pack need a connection.
         </OfflineNotice>
         {error && <Text className="text-sm text-destructive">{error}</Text>}
         {error && items === null && (

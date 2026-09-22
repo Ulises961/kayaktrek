@@ -234,13 +234,7 @@ export default function TripMapScreen() {
           see plans/M9b3.md's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
-        <OfflineNotice
-          visible={isOffline}
-          cachedAt={cachedAt}
-          className="rounded-none px-4"
-        >
-          Offline — showing your last synced route.
-        </OfflineNotice>
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
 
         <DayRail
           days={days}

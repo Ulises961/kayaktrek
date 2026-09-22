@@ -121,12 +121,8 @@ export default function TripListScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
-      <OfflineNotice
-        visible={isOffline}
-        cachedAt={cachedAt}
-        className="rounded-none px-4"
-      >
-        Offline — showing your last synced trips.
+      <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
+        These are your trips as last synced. Pull down to refresh once you are back online.
       </OfflineNotice>
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is
           the read-only "validate the stack" milestone, not the place to chase a

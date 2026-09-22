@@ -303,8 +303,7 @@ export default function InventoryScreen() {
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={requirementsCache.isOffline} cachedAt={requirementsCache.cachedAt}>
-            Offline — showing your last synced requirements. Adding, covering, and removing
-            need a connection.
+            Adding, covering, and removing need a connection.
           </OfflineNotice>
           <Row className="gap-2">
             <Input
@@ -421,8 +420,7 @@ export default function InventoryScreen() {
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={kitCache.isOffline} cachedAt={kitCache.cachedAt}>
-            Offline — showing your last synced kit. Packing, adding, and removing need a
-            connection.
+            Packing, adding, and removing need a connection.
           </OfflineNotice>
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}
           {/* Same shape as a Group requirement card: the name as the title, the

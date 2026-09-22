@@ -9,6 +9,7 @@ import type { TripMember } from "@shared/dtos/trip-member"
 import { formatPaddlerName } from "@shared/user/format"
 import { lightTokens } from "@shared/tokens"
 
+import { isOfflineError } from "@mobile/lib/api/client"
 import { listConnections } from "@mobile/lib/connections/actions"
 import { getSession } from "@mobile/lib/auth/session"
 import {
@@ -23,6 +24,7 @@ import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
+import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
@@ -123,6 +125,12 @@ export default function CrewScreen() {
     }
   }
 
+  // Offline is the expected state at sea, not a fault: the banner says it, and
+  // the raw network error stays out of the screen. With nothing ever loaded,
+  // "No crew yet" below would be a false answer, so the body stays empty.
+  const needsConnection = isOfflineError(error)
+  const notice = <NeedsConnectionNotice visible={needsConnection}>Crew needs a connection.</NeedsConnectionNotice>
+
   if (!trip && !error) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
@@ -132,11 +140,21 @@ export default function CrewScreen() {
     )
   }
 
+  if (!trip && needsConnection) {
+    return (
+      <Screen edges={["bottom"]}>
+        {header}
+        {notice}
+      </Screen>
+    )
+  }
+
   return (
     <Screen edges={["bottom"]}>
       {header}
+      {notice}
       <ScrollView contentContainerClassName="gap-5 p-4">
-        {error && <Text className="text-center text-destructive">{error}</Text>}
+        {error && !needsConnection && <Text className="text-center text-destructive">{error}</Text>}
 
         <Stack className="gap-3">
           <SectionLabel>Crew ({travellers.length})</SectionLabel>

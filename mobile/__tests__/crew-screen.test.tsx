@@ -1,5 +1,8 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
+
 import CrewScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/crew"
 import { getSession } from "../lib/auth/session"
 import { listConnections } from "../lib/connections/actions"
@@ -14,6 +17,7 @@ import { cancelInvitation, getTrip, inviteBuddy, removeMember } from "../lib/tri
 jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
   useLocalSearchParams: () => ({ id: "trip-1" }),
+  useIsFocused: () => true,
 }))
 jest.mock("../lib/trips/actions", () => ({
   getTrip: jest.fn(),
@@ -61,7 +65,7 @@ describe("CrewScreen", () => {
     mockGetSession.mockResolvedValue({ userId: "crew-1" })
     mockGetTrip.mockResolvedValue(tripWith({}))
 
-    const { findByText, queryByText } = await render(<CrewScreen />)
+    const { findByText, queryByText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Lea Der")).toBeTruthy()
     expect(queryByText("Cara Crew")).toBeTruthy()
@@ -73,7 +77,7 @@ describe("CrewScreen", () => {
     mockGetSession.mockResolvedValue({ userId: "leader-1" })
     mockGetTrip.mockResolvedValue(tripWith({ travellers: [] }))
 
-    const { findByText } = await render(<CrewScreen />)
+    const { findByText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("No crew yet")).toBeTruthy()
   })
@@ -86,7 +90,7 @@ describe("CrewScreen", () => {
     ])
     mockInviteBuddy.mockResolvedValue(undefined)
 
-    const { findByText, getByText } = await render(<CrewScreen />)
+    const { findByText, getByText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
     await findByText("Lea Der")
 
     fireEvent.press(getByText("Invite a buddy"))
@@ -109,7 +113,7 @@ describe("CrewScreen", () => {
     )
     mockCancelInvitation.mockResolvedValue(undefined)
 
-    const { findByText, getByLabelText } = await render(<CrewScreen />)
+    const { findByText, getByLabelText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
     await findByText("Pat Pending")
 
     fireEvent.press(getByLabelText(/cancel/i))
@@ -124,7 +128,7 @@ describe("CrewScreen", () => {
     mockGetTrip.mockResolvedValue(tripWith({}))
     mockRemoveMember.mockResolvedValue(undefined)
 
-    const { findByText, getAllByLabelText, queryByLabelText } = await render(<CrewScreen />)
+    const { findByText, getAllByLabelText, queryByLabelText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
     await findByText("Cara Crew")
 
     // Only the non-leader row exposes a remove control.
@@ -143,8 +147,23 @@ describe("CrewScreen", () => {
     mockGetSession.mockResolvedValue({ userId: "leader-1" })
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
 
-    const { findByText } = await render(<CrewScreen />)
+    const { findByText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+})
+
+// No cached copy of this screen: offline is the expected state at sea, so the
+// banner says what needs a connection instead of the screen printing the raw
+// network error in red — and "No crew yet" would be a false answer.
+describe("CrewScreen — offline", () => {
+  it("leaves the network error to the banner and claims no empty crew", async () => {
+    mockGetTrip.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+
+    const { findByText, queryByText } = await render(<CrewScreen />, { wrapper: WithOfflineBanner })
+
+    expect(await findByText("Crew needs a connection.")).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
+    expect(queryByText("No crew yet")).toBeNull()
   })
 })

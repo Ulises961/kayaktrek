@@ -1,5 +1,7 @@
 import { render } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
 import { loadTripListCache } from "../lib/db/trip-list-cache"
@@ -11,6 +13,7 @@ jest.mock("expo-router", () => {
     ...actual,
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useLocalSearchParams: () => ({ id: "trip-1" }),
+    useIsFocused: () => true,
   }
 })
 jest.mock("../lib/trips/actions", () => ({
@@ -47,7 +50,7 @@ describe("TripDetailScreen", () => {
   it("shows the trip's destination and state once loaded", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
-    const { findByText } = await render(<TripDetailScreen />)
+    const { findByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Costa Brava")).toBeTruthy()
   })
@@ -63,7 +66,7 @@ describe("TripDetailScreen", () => {
       description: "A relaxed week along the coast.",
     })
 
-    const { findByText, getByText, queryByText } = await render(<TripDetailScreen />)
+    const { findByText, getByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("Costa Brava")
 
     expect(getByText("Moderate")).toBeTruthy()
@@ -75,7 +78,7 @@ describe("TripDetailScreen", () => {
   it("links to every remaining hub destination at web parity (M30 WP2)", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
-    const { findByText, getByText } = await render(<TripDetailScreen />)
+    const { findByText, getByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("Costa Brava")
 
     expect(getByText("Itinerary")).toBeTruthy()
@@ -89,7 +92,7 @@ describe("TripDetailScreen", () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadTripListCache.mockResolvedValue([])
 
-    const { findByText } = await render(<TripDetailScreen />)
+    const { findByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -116,7 +119,7 @@ describe("TripDetailScreen", () => {
     })
 
     it("falls back to this trip's cached summary instead of an error screen", async () => {
-      const { findByText, queryByText } = await render(<TripDetailScreen />)
+      const { findByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByText("Costa Brava")).toBeTruthy()
       expect(queryByText("Could not reach the server.")).toBeNull()
@@ -124,7 +127,7 @@ describe("TripDetailScreen", () => {
     })
 
     it("keeps every hub destination reachable", async () => {
-      const { findByText, getByText } = await render(<TripDetailScreen />)
+      const { findByText, getByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
       await findByText("Costa Brava")
 
       expect(getByText("Itinerary")).toBeTruthy()
@@ -135,14 +138,14 @@ describe("TripDetailScreen", () => {
     })
 
     it("says the data is cached rather than presenting it as live", async () => {
-      const { findByText } = await render(<TripDetailScreen />)
+      const { findByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
 
-      expect(await findByText(/Offline — showing your last synced trip/)).toBeTruthy()
-      expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+      expect(await findByText(/Can't reach the server\./)).toBeTruthy()
+      expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
     })
 
     it("omits difficulty and description, which the trip-list cache does not carry", async () => {
-      const { findByText, queryByText } = await render(<TripDetailScreen />)
+      const { findByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
       await findByText("Costa Brava")
 
       expect(queryByText("Difficulty")).toBeNull()
@@ -156,7 +159,7 @@ describe("TripDetailScreen", () => {
   it("does not start a sync trigger of its own", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 
-    const { findByText } = await render(<TripDetailScreen />)
+    const { findByText } = await render(<TripDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("Costa Brava")
 
     expect(mockStartSyncTrigger).not.toHaveBeenCalled()

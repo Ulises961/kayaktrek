@@ -162,7 +162,7 @@ export default function LogsScreen() {
         }
       >
         <OfflineNotice visible={isOffline} cachedAt={logsCache.cachedAt}>
-          Offline — showing your last synced logs. Recording a paddle needs a connection.
+          Recording a paddle needs a connection.
         </OfflineNotice>
 
         {stats && (

@@ -13,6 +13,7 @@ import type { Trip } from "@shared/dtos/trip"
 import { formatDayDate } from "@shared/utils/date"
 import { lightTokens } from "@shared/tokens"
 
+import { isOfflineError } from "@mobile/lib/api/client"
 import { getSession } from "@mobile/lib/auth/session"
 import {
   addShuttlePassenger,
@@ -32,6 +33,7 @@ import { Chip } from "@mobile/components/ui/chip"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 
@@ -201,7 +203,22 @@ export default function LogisticsScreen() {
     }
   }
 
+  // Offline is the expected state at sea, not a fault: the banner says it, and
+  // the raw network error stays out of the screen.
+  const needsConnection = isOfflineError(error)
+  const notice = (
+    <NeedsConnectionNotice visible={needsConnection}>Logistics needs a connection.</NeedsConnectionNotice>
+  )
+
   if (!trip || documents === null || vehicles === null) {
+    if (needsConnection) {
+      return (
+        <Screen edges={["bottom"]}>
+          {header}
+          {notice}
+        </Screen>
+      )
+    }
     if (error) {
       return (
         <Screen edges={["bottom"]} className="items-center justify-center gap-4 p-6">
@@ -223,8 +240,9 @@ export default function LogisticsScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
+      {notice}
       <ScrollView contentContainerClassName="gap-5 p-4">
-        {error && <Text className="text-center text-destructive">{error}</Text>}
+        {error && !needsConnection && <Text className="text-center text-destructive">{error}</Text>}
 
         {/* Travel documents */}
         <Stack className="gap-3">

@@ -25,6 +25,8 @@ import { Chip } from "@mobile/components/ui/chip"
 import { Input } from "@mobile/components/ui/input"
 import { Label } from "@mobile/components/ui/label"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
+import { isOfflineError } from "@mobile/lib/api/client"
 import { Text } from "@mobile/components/ui/text"
 import { logoutEverywhere } from "@mobile/lib/auth/actions"
 import {
@@ -84,6 +86,8 @@ export default function SettingsScreen() {
     void loadSessions()
   }, [load, loadSessions])
 
+  const needsConnection = !me && isOfflineError(error)
+
   return (
     <Screen edges={["bottom"]}>
       {header}
@@ -94,7 +98,13 @@ export default function SettingsScreen() {
         </Stack>
       ) : (
         <ScrollView contentContainerClassName="gap-4 p-4">
-          {error && <Text className="text-sm text-destructive">{error}</Text>}
+          {/* Not cached until M9c WP7's tier 4, so offline is expected here: the
+              banner says what needs a connection, and the cards that would only
+              fail (account, devices, data export) stay out of the way. */}
+          <NeedsConnectionNotice visible={needsConnection}>
+            Settings need a connection.
+          </NeedsConnectionNotice>
+          {error && !needsConnection && <Text className="text-sm text-destructive">{error}</Text>}
           {notice && <Text className="text-sm text-muted-foreground">{notice}</Text>}
 
           {me && (
@@ -104,13 +114,17 @@ export default function SettingsScreen() {
             </>
           )}
 
-          <SecurityCard
-            sessions={sessions}
-            loadError={sessionsError}
-            onRevoked={loadSessions}
-          />
+          {!needsConnection && (
+            <>
+              <SecurityCard
+                sessions={sessions}
+                loadError={sessionsError}
+                onRevoked={loadSessions}
+              />
 
-          <DataCard onNotice={setNotice} />
+              <DataCard onNotice={setNotice} />
+            </>
+          )}
           <LegalCard />
 
           <Stack className="items-center pt-2">
