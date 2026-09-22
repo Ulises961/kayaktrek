@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
 import { listSessions } from "@/lib/sessions/actions"
+import { listSatelliteFeeds } from "@/lib/satellite-feeds/actions"
 import { UserSchema } from "@/lib/dtos/user"
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
 import { Button } from "@/components/ui/button"
@@ -14,9 +15,18 @@ import { DeleteAccountButton } from "@/components/profile/delete-account-button"
 import { DataExportButton } from "@/components/profile/data-export-button"
 import { SignOutEverywhereButton } from "@/components/profile/sign-out-everywhere-button"
 import { DeviceSessions } from "@/components/settings/device-sessions"
+import { SatelliteFeedSection } from "@/components/settings/satellite-feed-section"
 import { LegalSection } from "@/components/settings/legal-section"
 import { PageHeading } from "@/components/common/page-heading"
-import { LockIcon, RulerIcon, MailIcon, ShieldIcon, DownloadIcon, ScaleIcon } from "lucide-react"
+import {
+  LockIcon,
+  RulerIcon,
+  MailIcon,
+  ShieldIcon,
+  DownloadIcon,
+  ScaleIcon,
+  SatelliteDishIcon,
+} from "lucide-react"
 
 export default async function SettingsPage() {
   let user
@@ -31,6 +41,10 @@ export default async function SettingsPage() {
   // Best effort: a failed device lookup degrades to a message in the Security card
   // rather than taking the whole settings page down with it.
   const sessionsResult = await listSessions()
+
+  // Degrades to an empty list rather than throwing, same as the device lookup above —
+  // one failing card must not take the page down.
+  const satelliteFeeds = await listSatelliteFeeds()
 
   return (
     <>
@@ -116,6 +130,19 @@ export default async function SettingsPage() {
             </p>
             <SignOutEverywhereButton />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Satellite tracking */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <SatelliteDishIcon className="size-4" />
+            Satellite tracking
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SatelliteFeedSection feeds={satelliteFeeds} />
         </CardContent>
       </Card>
 
