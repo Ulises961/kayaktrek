@@ -52,6 +52,11 @@ export const GEAR_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
 // trip clock. A day old is fine for "who can I invite", which is its reader.
 export const PADDLERS_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
 
+// Tier 4, the paddler's own record and log stats: the ADR's "long" budget. A
+// profile changes when its owner edits it, which refreshes the screen live
+// anyway, and log stats move once per logged paddle.
+export const PROFILE_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
+
 export type SweepTrip = {
   id: string
   state: TripState | null

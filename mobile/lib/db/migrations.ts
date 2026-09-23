@@ -144,5 +144,19 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // Tier 4 — the paddler's own profile and log stats. Profile, Settings
+      // and the drawer header had no cache. A new table, like v10.
+      toVersion: 11,
+      steps: [
+        createTable({
+          name: "cached_profile",
+          columns: [
+            { name: "kind", type: "string", isIndexed: true },
+            { name: "payload", type: "string" },
+          ],
+        }),
+      ],
+    },
   ],
 })

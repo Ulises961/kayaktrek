@@ -4,12 +4,16 @@ import type { DrawerContentComponentProps } from "expo-router/drawer"
 import { AppDrawerContent } from "../app-drawer-content"
 import { useAuth } from "../../../lib/auth/auth-context"
 import { getMe } from "../../../lib/profile/actions"
+import { loadMeCache } from "../../../lib/db/profile-cache"
 
 jest.mock("../../../lib/auth/auth-context", () => ({
   useAuth: jest.fn(),
 }))
 jest.mock("../../../lib/profile/actions", () => ({
   getMe: jest.fn(),
+}))
+jest.mock("../../../lib/db/profile-cache", () => ({
+  loadMeCache: jest.fn(),
 }))
 // The real DrawerContentScrollView/DrawerItemList need a live navigation tree this unit
 // test has no reason to stand up — this component's own job is the header/footer around
@@ -21,6 +25,7 @@ jest.mock("expo-router/drawer", () => ({
 
 const mockUseAuth = useAuth as jest.Mock
 const mockGetMe = getMe as jest.Mock
+const mockLoadMeCache = loadMeCache as jest.Mock
 
 const mockNavigate = jest.fn()
 const mockCloseDrawer = jest.fn()
@@ -34,6 +39,8 @@ describe("AppDrawerContent", () => {
     mockUseAuth.mockReturnValue({ status: "authenticated", signOut: jest.fn() })
     mockGetMe.mockReset()
     mockGetMe.mockResolvedValue({ name: "Tester One", username: "tester" })
+    mockLoadMeCache.mockReset()
+    mockLoadMeCache.mockResolvedValue(null)
     mockNavigate.mockReset()
     mockCloseDrawer.mockReset()
   })
@@ -57,6 +64,16 @@ describe("AppDrawerContent", () => {
     const { findByTestId } = await render(<AppDrawerContent {...fakeProps} />)
 
     expect(await findByTestId("sign-out")).toBeTruthy()
+  })
+
+  // Tier 4: offline, the header reads the cached record instead of going blank.
+  it("falls back to the cached identity when the profile fetch fails", async () => {
+    mockGetMe.mockRejectedValue(new Error("network error"))
+    mockLoadMeCache.mockResolvedValue({ name: "Cached Paddler", username: "cached" })
+
+    const { findByText } = await render(<AppDrawerContent {...fakeProps} />)
+
+    expect(await findByText("@cached")).toBeTruthy()
   })
 
   it("calls signOut when the footer button is pressed", async () => {

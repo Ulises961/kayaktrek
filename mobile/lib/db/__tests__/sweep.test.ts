@@ -11,6 +11,9 @@ import { saveLogisticsCache } from "../logistics-cache"
 import { getShuttleVehicles, getTravelDocuments } from "../../logistics/actions"
 import { listConnections } from "../../connections/actions"
 import { listBlocks } from "../../blocks/actions"
+import { getLogStats } from "../../logs/actions"
+import { getMe } from "../../profile/actions"
+import { saveLogStatsCache, saveMeCache } from "../profile-cache"
 import { pullRoute } from "../route-sync"
 import { getTrip, getTrips } from "../../trips/actions"
 import { runSweep } from "../sweep"
@@ -32,6 +35,9 @@ jest.mock("../../logistics/actions", () => ({
 }))
 jest.mock("../../connections/actions", () => ({ listConnections: jest.fn() }))
 jest.mock("../../blocks/actions", () => ({ listBlocks: jest.fn() }))
+jest.mock("../../profile/actions", () => ({ getMe: jest.fn() }))
+jest.mock("../../logs/actions", () => ({ getLogStats: jest.fn() }))
+jest.mock("../profile-cache", () => ({ saveMeCache: jest.fn(), saveLogStatsCache: jest.fn() }))
 jest.mock("../../trips/actions", () => ({ getTrip: jest.fn(), getTrips: jest.fn() }))
 jest.mock("../cache-freshness", () => ({
   ...jest.requireActual("../cache-freshness"),
@@ -59,6 +65,10 @@ const mockSaveBlocksCache = saveBlocksCache as jest.Mock
 const mockSaveLogisticsCache = saveLogisticsCache as jest.Mock
 const mockGetTravelDocuments = getTravelDocuments as jest.Mock
 const mockGetShuttleVehicles = getShuttleVehicles as jest.Mock
+const mockGetMe = getMe as jest.Mock
+const mockGetLogStats = getLogStats as jest.Mock
+const mockSaveMeCache = saveMeCache as jest.Mock
+const mockSaveLogStatsCache = saveLogStatsCache as jest.Mock
 
 function cachedTrip(overrides: Record<string, unknown> = {}) {
   return {
@@ -102,6 +112,10 @@ beforeEach(() => {
   mockSaveLogisticsCache.mockResolvedValue(undefined)
   mockGetTravelDocuments.mockResolvedValue([])
   mockGetShuttleVehicles.mockResolvedValue([])
+  mockGetMe.mockResolvedValue({ username: "ana" })
+  mockGetLogStats.mockResolvedValue({ logCount: 0 })
+  mockSaveMeCache.mockResolvedValue(undefined)
+  mockSaveLogStatsCache.mockResolvedValue(undefined)
 })
 
 // Found on a device: after clearing app data, the first sweep synced no trips
@@ -509,6 +523,45 @@ describe("runSweep — tier 3, kit and gear", () => {
     await runSweep()
 
     expect(mockGetMyItems).not.toHaveBeenCalled()
+  })
+})
+
+// Tier 4: the paddler's own record and log stats, for Profile, Settings and
+// the drawer header. Last in the sweep — tiny, slow-changing, never at sea.
+describe("runSweep — tier 4, profile", () => {
+  it("warms the paddler's own record and log stats", async () => {
+    await runSweep()
+
+    expect(mockSaveMeCache).toHaveBeenCalledWith({ username: "ana" })
+    expect(mockSaveLogStatsCache).toHaveBeenCalledWith({ logCount: 0 })
+  })
+
+  it("keeps a failing stats fetch from costing the record", async () => {
+    mockGetLogStats.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveMeCache).toHaveBeenCalled()
+    expect(mockSaveLogStatsCache).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failing profile fetch from costing the buddy list", async () => {
+    mockGetMe.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveConnectionsCache).toHaveBeenCalled()
+  })
+
+  it("skips the record and stats while each is inside its budget", async () => {
+    mockReadCachedAt.mockImplementation(async (key: string) =>
+      key === CACHE_KEY.me || key === CACHE_KEY.logStats ? new Date().toISOString() : null,
+    )
+
+    await runSweep()
+
+    expect(mockGetMe).not.toHaveBeenCalled()
+    expect(mockGetLogStats).not.toHaveBeenCalled()
   })
 })
 

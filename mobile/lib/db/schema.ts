@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 10,
+  version: 11,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -304,6 +304,17 @@ export const appDatabaseSchema = appSchema({
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "kind", type: "string" },
         { name: "position", type: "number" },
+        { name: "payload", type: "string" },
+      ],
+    }),
+    tableSchema({
+      // Tier 4: the paddler's own record (/user/me) and log stats, for
+      // Profile, Settings and the drawer header. One row per `kind`, stored
+      // whole as JSON for the same reason as cached_logistics — read-only
+      // offline, parsed back through the shared schema.
+      name: "cached_profile",
+      columns: [
+        { name: "kind", type: "string", isIndexed: true },
         { name: "payload", type: "string" },
       ],
     }),

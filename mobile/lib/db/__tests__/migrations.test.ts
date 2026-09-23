@@ -83,6 +83,17 @@ describe("migrations", () => {
     expect(createdTables).toEqual(["cached_logistics"])
   })
 
+  it("has a migration step creating cached_profile at v11", () => {
+    const v11 = migrations.sortedMigrations.find((migration) => migration.toVersion === 11)
+    expect(v11).toBeDefined()
+
+    const createdTables = v11!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables).toEqual(["cached_profile"])
+  })
+
   // The guard that would have caught the original v4 -> v5 miss, stated once
   // for every version rather than as one test per bump.
   it("has a migration for every version schema.ts has reached", () => {
