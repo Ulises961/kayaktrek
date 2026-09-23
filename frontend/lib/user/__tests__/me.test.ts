@@ -11,7 +11,7 @@ vi.mock("@/lib/api/client", async () => {
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { isRedirectError } from "@/lib/api/client"
-import { getMe, getViewer } from "../me"
+import { getMe, getViewer, hasLiveSession } from "../me"
 
 const cookieStore = { get: vi.fn() }
 
@@ -137,5 +137,41 @@ describe("getViewer", () => {
     apiGet.mockRejectedValue(new Error("500 from the API"))
 
     await expect(getViewer()).resolves.toBeNull()
+  })
+})
+
+describe("hasLiveSession", () => {
+  it("is false for a fully anonymous visitor", async () => {
+    withCookies([])
+
+    await expect(hasLiveSession()).resolves.toBe(false)
+    expect(apiGet).not.toHaveBeenCalled()
+  })
+
+  it("is true for a visitor with a working session", async () => {
+    withCookies(["access_token"])
+    apiGet.mockResolvedValue(VALID_USER)
+
+    await expect(hasLiveSession()).resolves.toBe(true)
+  })
+
+  it("is FALSE when the credentials are dead, not merely present", async () => {
+    // The bug this closes. A 30-day-expired refresh token, a revoked device, or a pre-M17
+    // cookie is a visitor the app cannot recognise — and dressing the shell as signed-in
+    // offered them Dashboard, Trips, Gear, Logs and Paddlers, every one of which leads
+    // only to /login. M23 §1 is the rule; this is the case that escaped it.
+    withDeadSession()
+
+    await expect(hasLiveSession()).resolves.toBe(false)
+  })
+
+  it("stays TRUE when /api/user/me merely failed", async () => {
+    // The distinction worth keeping, and why this is not simply `getViewer() !== null`: a
+    // 500 says nothing about the session. Flipping that visitor to anonymous would take
+    // Sign out away from someone who is still signed in, and tell them so falsely.
+    withCookies(["access_token"])
+    apiGet.mockRejectedValue(new Error("500 from the API"))
+
+    await expect(hasLiveSession()).resolves.toBe(true)
   })
 })
