@@ -68,6 +68,12 @@ def login_user():
                     type: string
                   refresh_token:
                     type: string
+                  has_keypair:
+                    type: boolean
+                    description: >-
+                      Whether the account has an X25519 keypair stored. False after a
+                      password reset, which clears it; the client uses this to regenerate
+                      one while it still holds the password.
         401:
           description: Invalid credentials
         403:
@@ -102,7 +108,12 @@ def login_user():
                     "status": "success",
                     "message": "Successfully logged in",
                     "access_token": access_token,
-                    "refresh_token": refresh_token
+                    "refresh_token": refresh_token,
+                    # Lets the client backfill a missing X25519 keypair while it still holds
+                    # the password (M22 keeps key derivation in the browser, so sign-in is the
+                    # only moment it can). False for accounts whose keypair a password reset
+                    # cleared; the user row is already loaded here, so reporting it is free.
+                    "has_keypair": user.public_key is not None,
                 }
                 return jsonify(response_object), HTTPStatus.OK
 

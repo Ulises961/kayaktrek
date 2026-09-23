@@ -13,7 +13,10 @@ import {
 } from "@/lib/auth/schemas"
 
 export type AuthResult =
-  | { success: true }
+  // `needsKeypair` asks the caller to rebuild the account's X25519 keypair before moving on.
+  // It is only ever set on login, because that is the one moment the browser holds the
+  // password the private key has to be wrapped under.
+  | { success: true; needsKeypair?: boolean }
   | {
       success: false
       error: string
@@ -86,8 +89,14 @@ export async function login(
     return { success: false, error: "Something went wrong. Please try again." }
   }
 
-  const { access_token, refresh_token } = await res.json()
+  const { access_token, refresh_token, has_keypair } = await res.json()
   await setAuthCookies(access_token, refresh_token)
+  // Registration generates a keypair for every account, but a password reset clears it — the
+  // private key is wrapped under the old password and is undecryptable afterwards. Rebuilding
+  // one needs the password, which only the browser has, so hand control back to the form
+  // rather than redirecting and unmounting it. Strictly `=== false`: a response without the
+  // field redirects as before rather than waiting for a step nobody asked for.
+  if (has_keypair === false) return { success: true, needsKeypair: true }
   redirect("/dashboard")
 }
 
