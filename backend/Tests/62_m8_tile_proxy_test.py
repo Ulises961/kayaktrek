@@ -73,6 +73,21 @@ def test_cache_hit_skips_upstream(monkeypatch):
     assert content_type == "image/png"
 
 
+def test_a_tile_months_old_is_still_served_from_cache(monkeypatch):
+    """Base-map and seamark tiles change slowly, and every refetch is a request to the
+    volunteer-run OSM and OpenSeaMap servers. A tile stays fresh for about three months."""
+    _cache_tile("osm", 3, 4, 2, b"cached-bytes", age=timedelta(days=80))
+
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError("upstream should not be called within the freshness window")
+
+    monkeypatch.setattr(tile_service.requests, "get", _fail_if_called)
+
+    data, _ = TileService.get_tile("osm", 3, 4, 2)
+    assert data == b"cached-bytes"
+    assert tile_service.FRESHNESS == timedelta(days=90)
+
+
 def test_cache_miss_fetches_and_stores(monkeypatch):
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"fresh-bytes")
@@ -89,7 +104,7 @@ def test_cache_miss_fetches_and_stores(monkeypatch):
 
 
 def test_stale_cache_is_refreshed_from_upstream(monkeypatch):
-    _cache_tile("seamark", 3, 4, 2, b"old-bytes", age=timedelta(days=8))
+    _cache_tile("seamark", 3, 4, 2, b"old-bytes", age=tile_service.FRESHNESS + timedelta(days=1))
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"new-bytes")
     )
@@ -114,7 +129,7 @@ def test_upstream_failure_with_no_cache_raises_upstream_unavailable(monkeypatch)
 
 
 def test_upstream_failure_with_stale_cache_serves_stale(monkeypatch):
-    _cache_tile("osm", 3, 4, 2, b"stale-bytes", age=timedelta(days=8))
+    _cache_tile("osm", 3, 4, 2, b"stale-bytes", age=tile_service.FRESHNESS + timedelta(days=1))
     monkeypatch.setattr(
         tile_service.requests, "get", lambda url, headers, timeout: _FakeResponse(b"", status=502)
     )
@@ -133,7 +148,8 @@ def test_get_tile_route_no_auth_required(client, monkeypatch):
 
     assert r.status_code == 200
     assert r.mimetype == "image/png"
-    assert r.headers["Cache-Control"] == "public, max-age=86400"
+    # A week: browsers and the phone's map reuse a tile they hold without asking again.
+    assert r.headers["Cache-Control"] == "public, max-age=604800"
     assert r.data == b"png-bytes"
 
 
