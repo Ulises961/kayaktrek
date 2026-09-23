@@ -16,8 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { PasswordInput } from "@/components/common/password-input"
 import { Label } from "@/components/ui/label"
-import { reAuth, storeKeypair } from "@/lib/profile/actions"
-import { generateKeypair } from "@/lib/crypto/medical"
+import { backfillKeypair } from "@/lib/crypto/keypair-backfill"
 import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 
 const Schema = z.object({ password: z.string().min(1, "Password is required") })
@@ -48,14 +47,7 @@ export function KeypairPromptBanner({ hasKeypair }: KeypairPromptBannerProps) {
   // anything is sent (M22). Re-auth is what proves to the server that this is the account
   // holder, since the password itself no longer travels.
   async function onSubmit(values: FormValues) {
-    const authResult = await reAuth(values.password)
-    if (!authResult.success) {
-      setError("password", { message: authResult.error })
-      return
-    }
-
-    const keypair = await generateKeypair(values.password)
-    const result = await storeKeypair(authResult.elevatedToken, keypair)
+    const result = await backfillKeypair(values.password)
     if (result.success) {
       setDone(true)
       setOpen(false)

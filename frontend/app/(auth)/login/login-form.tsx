@@ -1,10 +1,11 @@
 "use client"
 
-import { useActionState, useTransition } from "react"
+import { useActionState, useEffect, useRef, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { login } from "@/lib/auth/actions"
+import { backfillKeypair } from "@/lib/crypto/keypair-backfill"
 import { LoginSchema, type LoginInput } from "@/lib/auth/schemas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +16,7 @@ import Link from "next/link"
 export function LoginForm() {
   const [serverState, formAction] = useActionState(login, null)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered") === "1"
   const passwordReset = searchParams.get("reset") === "1"
@@ -22,11 +24,42 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
     mode: "onBlur",
   })
+
+  // Sign-in succeeded but the account has no X25519 keypair — a password reset clears it,
+  // and only the browser can rebuild one, because the private half is wrapped under a key
+  // derived from the password. This is the last moment that password exists anywhere, so the
+  // work happens here rather than behind a prompt the parked medical-notes flag hides.
+  //
+  // Deliberately silent and best-effort: the user is already signed in by the time this runs,
+  // so the navigation is in a `finally` and a failure costs nothing but another attempt at
+  // the next sign-in. The ref guards against a second run, since an effect keyed on
+  // serverState would otherwise fire again on re-render (and twice over in Strict Mode).
+  const needsKeypair = serverState?.success === true && serverState.needsKeypair === true
+  const backfillStarted = useRef(false)
+
+  useEffect(() => {
+    if (!needsKeypair || backfillStarted.current) return
+    backfillStarted.current = true
+
+    const finish = async () => {
+      try {
+        await backfillKeypair(getValues("password"))
+      } catch {
+        // Swallowed, not just survived: the user is signed in regardless, and letting this
+        // reject would surface a console error about a step they never asked for. The next
+        // sign-in tries again.
+      } finally {
+        router.replace("/dashboard")
+      }
+    }
+    void finish()
+  }, [needsKeypair, getValues, router])
 
   const onSubmit = handleSubmit((data) => {
     const fd = new FormData()
@@ -102,8 +135,10 @@ export function LoginForm() {
             </p>
           ))}
 
-        <Button type="submit" disabled={isPending} className="auth-btn mt-1">
-          {isPending ? "Signing in…" : "Sign in"}
+        {/* The backfill runs after the action resolves, so isPending alone would drop the
+            button back to idle while the page is still about to navigate. */}
+        <Button type="submit" disabled={isPending || needsKeypair} className="auth-btn mt-1">
+          {isPending || needsKeypair ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 

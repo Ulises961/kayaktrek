@@ -64,6 +64,46 @@ describe("login", () => {
     expect(redirect).toHaveBeenCalledWith("/dashboard")
   })
 
+  it("hands control back instead of redirecting when the account has no keypair", async () => {
+    // A password reset clears the keypair, and only the browser can rebuild one — the
+    // private key is wrapped under a key derived from the password, which never reaches the
+    // server. Redirecting here would unmount the form holding the password and lose the one
+    // moment the backfill is possible.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "acc", refresh_token: "ref", has_keypair: false }),
+      }),
+    )
+
+    const result = await login(null, formData({ mail: "a@b.com", password: "correct" }))
+
+    expect(result).toEqual({ success: true, needsKeypair: true })
+    expect(redirect).not.toHaveBeenCalled()
+    // Signed in either way — the backfill is best-effort and must never gate access.
+    expect(mockCookieStore.set).toHaveBeenCalledWith("access_token", "acc", expect.any(Object))
+  })
+
+  it("redirects normally when the response says nothing about a keypair", async () => {
+    // Only an explicit false asks for a backfill. A response without the field (an older
+    // backend) must not strand the user on the login page waiting for a step it never asked
+    // for.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "acc", refresh_token: "ref" }),
+      }),
+    )
+
+    await login(null, formData({ mail: "a@b.com", password: "correct" }))
+
+    expect(redirect).toHaveBeenCalledWith("/dashboard")
+  })
+
   it("returns a distinct, actionable error when the account is scheduled for deletion (403)", async () => {
     vi.stubGlobal(
       "fetch",

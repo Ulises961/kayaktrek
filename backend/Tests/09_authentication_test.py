@@ -316,6 +316,52 @@ class TestAuthenticationEndpoints:
         refresh_payload = JWTService.decode_token(data['refresh_token'])
         assert refresh_payload['token_type'] == 'refresh'
 
+    def test_login_reports_whether_the_account_needs_a_keypair(self, client):
+        """The client backfills a missing keypair silently at sign-in, which it can only do
+        while it still holds the password. Reporting this on the login response costs nothing
+        — the user row is already loaded to check the password — and saves every sign-in an
+        extra /me round trip just to learn something that is false for almost every account.
+
+        A password *reset* is what empties the keypair (AuthService.reset_password clears all
+        four fields, since the private key is wrapped under the forgotten password), so this
+        is not a hypothetical state.
+        """
+        unique_suffix = uuid.uuid4().hex[:8]
+        user_data = {
+            "username": f"keypairuser_{unique_suffix}",
+            "mail": f"keypair_{unique_suffix}@example.com",
+            "pwd": "LoginPass123!",
+            "phone": f"+555555{random.randint(1000, 9999)}",
+            "name": "Keypair",
+            "publicKey": "cHVibGlj",
+            "privateKeyCiphertext": "Y2lwaGVy",
+            "privateKeyNonce": "bm9uY2U=",
+            "privateKeySalt": "c2FsdA==",
+        }
+        assert client.post('/api/v1/auth/register', json=user_data).status_code == 201
+
+        user = User.query.filter_by(mail=user_data['mail']).first()
+        user.active = True
+        db.session.commit()
+
+        login_data = {"mail": user_data['mail'], "pwd": user_data['pwd']}
+        with_keypair = client.post('/api/v1/auth/login', json=login_data)
+        assert with_keypair.status_code == 200
+        assert with_keypair.get_json()['has_keypair'] is True
+
+        # What a reset leaves behind.
+        user.public_key = None
+        user.private_key_ciphertext = None
+        user.private_key_nonce = None
+        user.private_key_salt = None
+        db.session.commit()
+
+        without_keypair = client.post('/api/v1/auth/login', json=login_data)
+        assert without_keypair.status_code == 200
+        assert without_keypair.get_json()['has_keypair'] is False
+        # Still a normal sign-in — the backfill is best-effort and must never gate access.
+        assert 'access_token' in without_keypair.get_json()
+
     def test_login_invalid_password(self, client):
         """Test login with wrong password"""
         # Register user
