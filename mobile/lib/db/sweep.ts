@@ -2,10 +2,12 @@ import { listBlocks } from "../blocks/actions"
 import { listConnections } from "../connections/actions"
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
-import { getTrip } from "../trips/actions"
+import { getShuttleVehicles, getTravelDocuments } from "../logistics/actions"
+import { getTrip, getTrips } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
+import { saveLogisticsCache } from "./logistics-cache"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveRequirementsCache } from "./requirements-cache"
 import { pullRoute } from "./route-sync"
@@ -16,7 +18,7 @@ import {
   type SweepTrip,
 } from "./sync-scope"
 import { syncTrip } from "./sync"
-import { loadTripListCache } from "./trip-list-cache"
+import { loadTripListCache, saveTripListCache } from "./trip-list-cache"
 
 // One pass over everything worth having offline, ordered by tier (sync-scope.ts).
 //
@@ -102,16 +104,29 @@ async function syncOneTrip(tripId: string): Promise<void> {
   // trip leaving tomorrow gets its packing list warmed at tier 1 urgency.
   // Packing happens before departure, which is when that trip is most urgent
   // anyway — "did I pack the spare paddle" is asked at the put-in.
-  const [sync, route, kit, requirements] = await Promise.allSettled([
+  const [sync, route, kit, requirements, logistics] = await Promise.allSettled([
     syncTripSerially(tripId),
     pullRoute(tripId),
     warmKit(tripId),
     warmRequirements(tripId),
+    warmLogistics(tripId),
   ])
   reportSettled(`trip ${tripId} sync`, [sync])
   reportSettled(`trip ${tripId} route`, [route])
   reportSettled(`trip ${tripId} kit`, [kit])
   reportSettled(`trip ${tripId} requirements`, [requirements])
+  reportSettled(`trip ${tripId} logistics`, [logistics])
+}
+
+// Travel documents and shuttle vehicles: "which van am I in, and where is the
+// pickup" is asked on the morning of departure, when this trip is at its most
+// urgent — so they ride the trip's own tier rather than a schedule of their own.
+async function warmLogistics(tripId: string): Promise<void> {
+  const [documents, vehicles] = await Promise.all([
+    getTravelDocuments(tripId),
+    getShuttleVehicles(tripId),
+  ])
+  await saveLogisticsCache(tripId, { documents, vehicles })
 }
 
 async function warmKit(tripId: string): Promise<void> {
@@ -156,6 +171,22 @@ async function warmPaddlers(): Promise<void> {
   reportSettled("blocklist", [blocks])
 }
 
+// The trip-list cache is the sweep's index — but only the trip list screen
+// used to fill it, so a sweep that ran first (a fresh install, cleared app
+// data, or a trip created on web since) planned against an empty or stale
+// index and synced nothing for those trips until the next trigger. Found on a
+// device: the itinerary stayed empty until the connection was toggled.
+// Refreshed here on every sweep — one small request — and a failure just
+// leaves the cached index in place, which is the offline case.
+async function refreshTripIndex(): Promise<void> {
+  try {
+    const page = await getTrips()
+    await saveTripListCache(page.items)
+  } catch (reason) {
+    reportSweepFailure("trip list", reason)
+  }
+}
+
 async function isWithinBudget(key: string, budgetMs: number): Promise<boolean> {
   const cachedAt = await readCachedAt(key)
   return !!cachedAt && Date.now() - Date.parse(cachedAt) < budgetMs
@@ -173,6 +204,7 @@ export async function runSweep(): Promise<void> {
   if (sweepInFlight) return
   sweepInFlight = true
   try {
+    await refreshTripIndex()
     const cached = await loadTripListCache()
     const trips: SweepTrip[] = cached.map((trip) => ({
       id: trip.id,

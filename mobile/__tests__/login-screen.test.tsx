@@ -1,4 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { processColor } from "react-native"
 
 import { palette } from "@shared/tokens"
@@ -21,7 +23,7 @@ describe("LoginScreen", () => {
     const signIn = jest.fn().mockResolvedValue({ success: true })
     mockUseAuth.mockReturnValue({ status: "unauthenticated", signIn, signOut: jest.fn() })
 
-    const { getByTestId } = await render(<LoginScreen />)
+    const { getByTestId } = await render(<LoginScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByTestId("login-email"), "paddler@example.com")
     await fireEvent.changeText(getByTestId("login-password"), "correct-horse")
@@ -39,7 +41,7 @@ describe("LoginScreen", () => {
     })
     mockUseAuth.mockReturnValue({ status: "unauthenticated", signIn, signOut: jest.fn() })
 
-    const { getByTestId, findByText } = await render(<LoginScreen />)
+    const { getByTestId, findByText } = await render(<LoginScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByTestId("login-email"), "paddler@example.com")
     await fireEvent.changeText(getByTestId("login-password"), "wrong")
@@ -58,13 +60,13 @@ describe("LoginScreen", () => {
     })
 
     it("renders the ocean hero behind the form", async () => {
-      const { getByTestId } = await render(<LoginScreen />)
+      const { getByTestId } = await render(<LoginScreen />, { wrapper: WithCachedSurfaces })
 
       expect(getByTestId("login-hero")).toBeTruthy()
     })
 
     it("draws the watermark in a single ink so it cannot compete with the form", async () => {
-      const { getByTestId } = await render(<LoginScreen />)
+      const { getByTestId } = await render(<LoginScreen />, { wrapper: WithCachedSurfaces })
       const watermark = getByTestId("login-hero-watermark")
 
       // The three-tone mark (including sunset500) at watermark scale would read as a
@@ -87,7 +89,7 @@ describe("LoginScreen", () => {
       const signIn = jest.fn().mockResolvedValue({ success: true })
       mockUseAuth.mockReturnValue({ status: "unauthenticated", signIn, signOut: jest.fn() })
 
-      const { getByTestId } = await render(<LoginScreen />)
+      const { getByTestId } = await render(<LoginScreen />, { wrapper: WithCachedSurfaces })
 
       await fireEvent.changeText(getByTestId("login-email"), "paddler@example.com")
       await fireEvent.changeText(getByTestId("login-password"), "correct-horse")

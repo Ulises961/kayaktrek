@@ -33,7 +33,10 @@ import { Chip } from "@mobile/components/ui/chip"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
-import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
+import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
+import { loadLogisticsCache } from "@mobile/lib/db/logistics-cache"
+import { loadOfflineCrew, type OfflineCrewMember } from "@mobile/lib/db/offline-float-plan"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 
@@ -61,6 +64,15 @@ export default function LogisticsScreen() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
+  // Offline, the sweep's cached copy (logistics-cache.ts), read-only: no
+  // current user and no trip, so every membership-gated control below —
+  // add, delete, join, leave — stays hidden. Passenger names come from the
+  // crew the trip sync already stores, since the cached vehicles only carry
+  // member ids.
+  const [isShowingCache, setIsShowingCache] = useState(false)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
+  const [cachedCrew, setCachedCrew] = useState<OfflineCrewMember[]>([])
+
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -74,7 +86,24 @@ export default function LogisticsScreen() {
       setDocuments(docs)
       setVehicles(vehs)
       setCurrentUserId(session?.userId ?? null)
+      setIsShowingCache(false)
     } catch (err) {
+      const [cached, syncedAt, crew] = await Promise.all([
+        loadLogisticsCache(id),
+        readCachedAt(CACHE_KEY.tripLogistics(id)),
+        loadOfflineCrew(id),
+      ])
+      // Synced and empty is an answer (no documents, no vehicles yet), so a
+      // recorded sync time counts as a cache even with nothing in it.
+      if (cached.documents.length > 0 || cached.vehicles.length > 0 || syncedAt !== null) {
+        setDocuments(cached.documents)
+        setVehicles(cached.vehicles)
+        setCachedCrew(crew)
+        setCachedAt(syncedAt)
+        setCurrentUserId(null)
+        setIsShowingCache(true)
+        return
+      }
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
     }
   }, [id])
@@ -210,7 +239,7 @@ export default function LogisticsScreen() {
     <NeedsConnectionNotice visible={needsConnection}>Logistics needs a connection.</NeedsConnectionNotice>
   )
 
-  if (!trip || documents === null || vehicles === null) {
+  if ((!trip && !isShowingCache) || documents === null || vehicles === null) {
     if (needsConnection) {
       return (
         <Screen edges={["bottom"]}>
@@ -235,12 +264,19 @@ export default function LogisticsScreen() {
     )
   }
 
-  const memberById = new Map(travellers.map((m) => [m.id, m]))
+  const memberById = new Map<string | undefined, { user: { name?: string | null; surname?: string | null } }>(
+    isShowingCache
+      ? cachedCrew.map((m) => [m.id, m])
+      : travellers.map((m) => [m.id, m]),
+  )
 
   return (
     <Screen edges={["bottom"]}>
       {header}
       {notice}
+      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt}>
+        Adding and removing documents or vehicles, and joining a vehicle, need a connection.
+      </OfflineNotice>
       <ScrollView contentContainerClassName="gap-5 p-4">
         {error && !needsConnection && <Text className="text-center text-destructive">{error}</Text>}
 

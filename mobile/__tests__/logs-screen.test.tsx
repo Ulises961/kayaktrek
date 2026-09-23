@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 import LogsScreen from "../app/(app)/(drawer)/(logs)/logs/index"
 import { deleteEndorsementRequest, listEndorsementRequests } from "../lib/endorsement-requests/actions"
@@ -70,7 +70,7 @@ describe("LogsScreen", () => {
       pages: 1,
     })
 
-    const { findByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("1 Jun 2026")).toBeTruthy()
   })
@@ -78,7 +78,7 @@ describe("LogsScreen", () => {
   it("shows an empty state, not a blank list, when there are no logs", async () => {
     mockGetLogs.mockResolvedValue({ items: [], total: 0, page: 1, pages: 1 })
 
-    const { findByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("No logs yet")).toBeTruthy()
   })
@@ -87,7 +87,7 @@ describe("LogsScreen", () => {
     mockGetLogs.mockRejectedValueOnce(new Error("Could not reach the server."))
     mockGetLogs.mockResolvedValueOnce({ items: [], total: 0, page: 1, pages: 1 })
 
-    const { findByText, getByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
 
@@ -105,7 +105,7 @@ describe("LogsScreen", () => {
       Promise.resolve(kind === "mine" ? [{ id: "log-1", date: "2026-06-01", hours: 3 }] : []),
     )
 
-    const { findByText, getByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("1 Jun 2026")).toBeTruthy()
     expect(getByText(/Can't reach the server\./)).toBeTruthy()
@@ -126,7 +126,7 @@ describe("LogsScreen", () => {
     mockListRequests.mockResolvedValue([])
     mockEndorseLog.mockResolvedValue(undefined)
 
-    const { findByText, getByText, queryByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText(/asked you to endorse/)).toBeTruthy()
 
@@ -153,7 +153,7 @@ describe("LogsScreen", () => {
     ])
     mockDeleteRequest.mockResolvedValue(undefined)
 
-    const { findByText, getByText, queryByText } = await render(<LogsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<LogsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText(/asked you to endorse/)).toBeTruthy()
 

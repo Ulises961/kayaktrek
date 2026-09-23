@@ -3,6 +3,7 @@ import { CachedBlock } from "./CachedBlock"
 import { CachedConnection } from "./CachedConnection"
 import { CachedGear } from "./CachedGear"
 import { CachedLog } from "./CachedLog"
+import { CachedLogisticsItem } from "./CachedLogisticsItem"
 import { CachedPackingItem } from "./CachedPackingItem"
 import { CachedRequirement } from "./CachedRequirement"
 import { Day } from "./Day"
@@ -23,6 +24,7 @@ export {
   CachedConnection,
   CachedGear,
   CachedLog,
+  CachedLogisticsItem,
   CachedPackingItem,
   CachedRequirement,
   Day,
@@ -44,6 +46,7 @@ export const modelClasses = [
   CachedConnection,
   CachedGear,
   CachedLog,
+  CachedLogisticsItem,
   CachedPackingItem,
   CachedRequirement,
   Day,

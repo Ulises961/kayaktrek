@@ -22,6 +22,11 @@ export type CachedSurfaceReport = {
 type CachedSurfacesValue = {
   reports: CachedSurfaceReport[]
   report: (id: string, entry: CachedSurfaceReport | null) => void
+  // Whether the paddler collapsed the offline banner. Here rather than in the
+  // banner because every Screen renders its own banner: held per instance, a
+  // dismissal would come straight back on the next navigation.
+  dismissed: boolean
+  setDismissed: (dismissed: boolean) => void
 }
 
 const CachedSurfacesContext = createContext<CachedSurfacesValue | null>(null)
@@ -39,7 +44,12 @@ export function CachedSurfacesProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const value = useMemo(() => ({ reports: [...entries.values()], report }), [entries, report])
+  const [dismissed, setDismissed] = useState(false)
+
+  const value = useMemo(
+    () => ({ reports: [...entries.values()], report, dismissed, setDismissed }),
+    [entries, report, dismissed],
+  )
 
   return <CachedSurfacesContext.Provider value={value}>{children}</CachedSurfacesContext.Provider>
 }

@@ -72,10 +72,25 @@ describe("migrations", () => {
     expect(added.sort()).toEqual(["category_name", "default_pack"])
   })
 
+  it("has a migration step creating cached_logistics at v10", () => {
+    const v10 = migrations.sortedMigrations.find((migration) => migration.toVersion === 10)
+    expect(v10).toBeDefined()
+
+    const createdTables = v10!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables).toEqual(["cached_logistics"])
+  })
+
   // The guard that would have caught the original v4 -> v5 miss, stated once
   // for every version rather than as one test per bump.
   it("has a migration for every version schema.ts has reached", () => {
-    const covered = migrations.sortedMigrations.map((migration) => migration.toVersion).sort()
+    // Numeric sort: the default compares as strings, which put 10 before 5
+    // the moment the schema reached a two-digit version.
+    const covered = migrations.sortedMigrations
+      .map((migration) => migration.toVersion)
+      .sort((a, b) => a - b)
     const expected = Array.from(
       { length: appDatabaseSchema.version - 4 },
       (_unused, index) => index + 5,

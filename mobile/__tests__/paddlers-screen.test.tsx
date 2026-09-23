@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 import { readCachedAt } from "../lib/db/cache-freshness"
 import { Alert } from "react-native"
@@ -115,7 +115,7 @@ describe("PaddlersScreen — search", () => {
       pages: 1,
     })
 
-    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
     await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
@@ -138,7 +138,7 @@ describe("PaddlersScreen — search", () => {
       addressee: { id: "ada-id", username: "ada", name: "Ada" },
     })
 
-    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
     await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
@@ -167,7 +167,7 @@ describe("PaddlersScreen — search", () => {
     })
     mockRemoveConnection.mockResolvedValue(undefined)
 
-    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { getByPlaceholderText, findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
     await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
@@ -182,7 +182,7 @@ describe("PaddlersScreen — search", () => {
   it("surfaces a thrown search error", async () => {
     mockSearchPaddlers.mockRejectedValue(new Error("Could not reach the server."))
 
-    const { getByPlaceholderText, findByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { getByPlaceholderText, findByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
     await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
@@ -195,7 +195,7 @@ describe("PaddlersScreen — search", () => {
       new Error("Could not reach the server. Please check your connection and try again."),
     )
 
-    const { getByPlaceholderText, findByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { getByPlaceholderText, findByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.changeText(getByPlaceholderText("Search paddlers"), "ada")
     await fireEvent(getByPlaceholderText("Search paddlers"), "submitEditing")
@@ -210,7 +210,7 @@ describe("PaddlersScreen — buddies tab", () => {
     mockListConnections.mockResolvedValueOnce([INCOMING])
     mockAcceptConnection.mockResolvedValue({ ...INCOMING, status: "accepted" })
 
-    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Buddies"))
 
     expect(await findByText("@ada")).toBeTruthy()
@@ -229,7 +229,7 @@ describe("PaddlersScreen — buddies tab", () => {
   it("shows an accepted buddy with Remove and Block", async () => {
     mockListConnections.mockResolvedValueOnce([ACCEPTED])
 
-    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Buddies"))
 
     expect(await findByText("@cy")).toBeTruthy()
@@ -241,7 +241,7 @@ describe("PaddlersScreen — buddies tab", () => {
     mockListConnections.mockResolvedValueOnce([ACCEPTED])
     mockBlockPaddler.mockResolvedValue({ id: "block-1", blocked: { username: "cy", name: "Cy" } })
 
-    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Buddies"))
     await findByText("@cy")
 
@@ -263,7 +263,7 @@ describe("PaddlersScreen — buddies tab", () => {
   it("shows Cancel for an outgoing request, not Accept", async () => {
     mockListConnections.mockResolvedValueOnce([OUTGOING])
 
-    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Buddies"))
 
     expect(await findByText("@bo")).toBeTruthy()
@@ -275,7 +275,7 @@ describe("PaddlersScreen — buddies tab", () => {
     mockListConnections.mockRejectedValueOnce(new Error("Could not reach the server."))
     mockLoadConnectionsCache.mockResolvedValueOnce([ACCEPTED])
 
-    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Buddies"))
 
     expect(await findByText("@cy")).toBeTruthy()
@@ -293,7 +293,7 @@ describe("PaddlersScreen — buddies tab", () => {
     mockLoadConnectionsCache.mockResolvedValueOnce([])
 
     const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
     await fireEvent.press(getByText("Buddies"))
 
@@ -308,7 +308,7 @@ describe("PaddlersScreen — buddies tab", () => {
     mockLoadConnectionsCache.mockResolvedValueOnce([])
 
     const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
     await fireEvent.press(getByText("Buddies"))
 
@@ -324,7 +324,7 @@ describe("PaddlersScreen — blocked tab", () => {
     ])
     mockUnblockPaddler.mockResolvedValue(undefined)
 
-    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Blocked"))
 
     expect(await findByText("@troll")).toBeTruthy()
@@ -351,7 +351,7 @@ describe("PaddlersScreen — blocked tab", () => {
       { id: "block-1", blocked: { username: "troll", name: "Troll" } },
     ])
 
-    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<PaddlersScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("Blocked"))
 
     expect(await findByText("@troll")).toBeTruthy()

@@ -1,5 +1,7 @@
 import { render, waitFor } from "@testing-library/react-native"
 
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
+
 import AppLayout from "../app/(app)/_layout"
 import { useAuth } from "../lib/auth/auth-context"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
@@ -43,7 +45,7 @@ describe("AppLayout", () => {
   it("shows a loading indicator while auth status is unresolved", async () => {
     mockUseAuth.mockReturnValue({ status: "loading" })
 
-    const { getByTestId, queryByText } = await render(<AppLayout />)
+    const { getByTestId, queryByText } = await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(getByTestId("app-layout-loading")).toBeTruthy()
     expect(queryByText("redirect:/login")).toBeNull()
@@ -53,7 +55,7 @@ describe("AppLayout", () => {
   it("redirects to /login when unauthenticated", async () => {
     mockUseAuth.mockReturnValue({ status: "unauthenticated" })
 
-    const { getByText, queryByText } = await render(<AppLayout />)
+    const { getByText, queryByText } = await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(getByText("redirect:/login")).toBeTruthy()
     expect(queryByText("drawer-content")).toBeNull()
@@ -62,7 +64,7 @@ describe("AppLayout", () => {
   it("hands off to the drawer navigator when authenticated", async () => {
     mockUseAuth.mockReturnValue({ status: "authenticated" })
 
-    const { getByText, queryByText } = await render(<AppLayout />)
+    const { getByText, queryByText } = await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(getByText("drawer-content")).toBeTruthy()
     expect(queryByText(/^redirect:/)).toBeNull()
@@ -73,7 +75,7 @@ describe("AppLayout", () => {
   it("starts the offline sweep once authenticated", async () => {
     mockUseAuth.mockReturnValue({ status: "authenticated" })
 
-    await render(<AppLayout />)
+    await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(mockStartSyncTrigger).toHaveBeenCalled()
   })
@@ -81,7 +83,7 @@ describe("AppLayout", () => {
   it("does not sweep before there is a session to sync with", async () => {
     mockUseAuth.mockReturnValue({ status: "loading" })
 
-    await render(<AppLayout />)
+    await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     // Every sync call needs a token; sweeping here would just burn a pass on 401s.
     expect(mockStartSyncTrigger).not.toHaveBeenCalled()
@@ -90,7 +92,7 @@ describe("AppLayout", () => {
   it("does not sweep when unauthenticated", async () => {
     mockUseAuth.mockReturnValue({ status: "unauthenticated" })
 
-    await render(<AppLayout />)
+    await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(mockStartSyncTrigger).not.toHaveBeenCalled()
   })
@@ -100,7 +102,7 @@ describe("AppLayout", () => {
     mockStartSyncTrigger.mockReturnValue(stop)
     mockUseAuth.mockReturnValue({ status: "authenticated" })
 
-    const { unmount } = await render(<AppLayout />)
+    const { unmount } = await render(<AppLayout />, { wrapper: WithCachedSurfaces })
     unmount()
 
     await waitFor(() => expect(stop).toHaveBeenCalled())
