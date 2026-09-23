@@ -7,6 +7,45 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.11] - 2026-09-24
+
+### Added
+
+- **Satellite tracking, in Settings.** Register a Garmin inReach MapShare feed and your
+  position is picked up automatically about every ten minutes while a trip is under way, so
+  crew and shore contact can follow along without anyone reaching for a phone. Your device's
+  SOS button is unaffected — it goes straight to Garmin, never through this app.
+
+### Changed
+
+- **A shared link now shows a proper preview card** — the compass mark over the Kayaktrek
+  name and what the app is — instead of a bare favicon.
+- **Map tiles are kept for 90 days instead of 7, and the least recently used are dropped
+  first.** Fewer trips out to the OpenStreetMap and OpenSeaMap servers, and a map region
+  downloads at full speed. Tiles your browser already holds are reused for a week.
+
+### Fixed
+
+- **A password reset no longer leaves an account without its encryption keys.** Resetting
+  clears them of necessity — they are locked with the password you forgot — but nothing
+  built new ones afterwards, so the account simply stayed without. They are now regenerated
+  quietly the next time you sign in.
+- **A saved MapShare password can be removed again.** Turning the password switch off clears
+  the stored one; before this the only way to drop it was to delete the feed and register it
+  a second time.
+
+### Deploy notes
+
+- **No migrations.** Nothing here changes the database schema.
+- **`FEED_CREDENTIAL_KEY` now reaches the containers.** It is wired into
+  `docker-compose.prod.yml` for `backend` and `worker` — not `beat` or `sse`, which never
+  touch feed credentials. Blank-defaulted, so a deploy without it still succeeds; but a
+  MapShare feed that is password-protected will fail to poll until it is set, and the
+  credential helper raises rather than failing quietly. Generate it once and deliver it with
+  `scripts/deploy-sync.sh` — see `DEPLOY.md` "Satellite feed credentials".
+- **Tiles already cached on the box are unaffected.** Existing files keep their original
+  fetch time, so there is no cache to wipe and nothing to clear by hand.
+
 ## [1.0.10] - 2026-09-17
 
 ### Fixed
