@@ -125,4 +125,30 @@ describe("route tree", () => {
 
     expect(ambiguous).toEqual([])
   })
+
+  // Found on a device: opening Logs from the drawer landed on "New log", with
+  // no list behind it and so no back arrow. Since each group moved its list
+  // screen into its own segment (logs/index, not index), no group has an index
+  // at its root, and a Stack with no index falls back to its first child route
+  // — for Logs, `new`; for Profile, `edit`. A group with more than one screen
+  // must name its list screen as the stack's initial route.
+  it("opens every drawer group's stack on its list screen", () => {
+    const drawerDir = join(APP_DIR, "(app)", "(drawer)")
+    const groups = readdirSync(drawerDir).filter((entry) => /^\(.+\)$/.test(entry))
+
+    const missing = groups.flatMap((group) => {
+      const groupDir = join(drawerDir, group)
+      const screens = walk(groupDir).filter(
+        (file) => file.endsWith(".tsx") && !file.endsWith("_layout.tsx"),
+      )
+      const hasRootIndex = screens.some((file) => relative(groupDir, file) === "index.tsx")
+      if (hasRootIndex || screens.length < 2) return []
+
+      const segment = group.slice(1, -1)
+      const layout = readFileSync(join(groupDir, "_layout.tsx"), "utf8")
+      return layout.includes(`initialRouteName: "${segment}/index"`) ? [] : [group]
+    })
+
+    expect(missing).toEqual([])
+  })
 })
