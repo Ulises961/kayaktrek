@@ -3,17 +3,21 @@ import { listConnections } from "../connections/actions"
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
 import { getShuttleVehicles, getTravelDocuments } from "../logistics/actions"
+import { getLogStats } from "../logs/actions"
+import { getMe } from "../profile/actions"
 import { getTrip, getTrips } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
 import { saveLogisticsCache } from "./logistics-cache"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
+import { saveLogStatsCache, saveMeCache } from "./profile-cache"
 import { saveRequirementsCache } from "./requirements-cache"
 import { pullRoute } from "./route-sync"
 import {
   GEAR_STALENESS_BUDGET_MS,
   PADDLERS_STALENESS_BUDGET_MS,
+  PROFILE_STALENESS_BUDGET_MS,
   planSweep,
   type SweepTrip,
 } from "./sync-scope"
@@ -171,6 +175,23 @@ async function warmPaddlers(): Promise<void> {
   reportSettled("blocklist", [blocks])
 }
 
+// Tier 4: the paddler's own record (Profile, Settings, the drawer header) and
+// log stats (Profile). Each on its own budget and failure, like the paddlers.
+async function warmProfile(): Promise<void> {
+  const [me, stats] = await Promise.allSettled([
+    (async () => {
+      if (await isWithinBudget(CACHE_KEY.me, PROFILE_STALENESS_BUDGET_MS)) return
+      await saveMeCache(await getMe())
+    })(),
+    (async () => {
+      if (await isWithinBudget(CACHE_KEY.logStats, PROFILE_STALENESS_BUDGET_MS)) return
+      await saveLogStatsCache(await getLogStats())
+    })(),
+  ])
+  reportSettled("profile", [me])
+  reportSettled("log stats", [stats])
+}
+
 // The trip-list cache is the sweep's index — but only the trip list screen
 // used to fill it, so a sweep that ran first (a fresh install, cleared app
 // data, or a trip created on web since) planned against an empty or stale
@@ -229,6 +250,7 @@ export async function runSweep(): Promise<void> {
     // but only by accident of ordering.
     await warmGearCloset().catch((reason) => reportSweepFailure("gear closet", reason))
     await warmPaddlers()
+    await warmProfile()
   } catch (reason) {
     // Reading the local cache can fail too (a migration mid-flight, a device
     // stamped at a schema version whose table doesn't exist yet). Same rule:

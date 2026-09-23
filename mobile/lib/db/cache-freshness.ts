@@ -24,6 +24,8 @@ export const CACHE_KEY = {
   connections: "connections",
   blocks: "blocks",
   gear: "gear",
+  me: "me",
+  logStats: "log-stats",
   // No separate key for the trip hub's summary: it reads the trip-list cache
   // rather than one of its own (see trips/[id]/index.tsx), so `tripList` is
   // already the honest age for it.

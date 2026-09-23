@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { User } from "@shared/dtos/user"
 
+import { loadMeCache } from "../../lib/db/profile-cache"
 import { getMe } from "../../lib/profile/actions"
 import { useAuth } from "../../lib/auth/auth-context"
 import { Avatar } from "../ui/avatar"
@@ -30,8 +31,11 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
   useEffect(() => {
     let cancelled = false
     getMe()
+      // Offline, the record the sweep cached (tier 4) — a name and handle a
+      // day old are still the right ones.
+      .catch(() => loadMeCache())
       .then((user) => {
-        if (!cancelled) setIdentity(user)
+        if (!cancelled && user) setIdentity(user)
       })
       .catch(() => {
         // Best effort — the drawer still works with just the brand strip.

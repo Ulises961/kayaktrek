@@ -25,10 +25,14 @@ import { Chip } from "@mobile/components/ui/chip"
 import { Input } from "@mobile/components/ui/input"
 import { Label } from "@mobile/components/ui/label"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
-import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
+import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { isOfflineError } from "@mobile/lib/api/client"
 import { Text } from "@mobile/components/ui/text"
 import { logoutEverywhere } from "@mobile/lib/auth/actions"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
+import { loadMeCache, saveMeCache } from "@mobile/lib/db/profile-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import { useIsOffline } from "@mobile/lib/network/use-is-offline"
 import {
   changePassword,
   getMe,
@@ -54,20 +58,35 @@ function message(err: unknown, fallback: string): string {
 }
 
 export default function SettingsScreen() {
-  const [me, setMe] = useState<User | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [sessionsError, setSessionsError] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    try {
-      setMe(await getMe())
-      setError(null)
-    } catch (err) {
-      setError(message(err, "Something went wrong. Please try again."))
-    }
-  }, [])
+  // M9c WP7 tier 4: offline, the account record the sweep cached, read-only.
+  const meCache = useLiveCache<User | null>({
+    fetchLive: getMe,
+    loadCache: loadMeCache,
+    saveCache: async (user) => {
+      if (user) await saveMeCache(user)
+    },
+    isCacheEmpty: (user) => user === null,
+    cacheKey: CACHE_KEY.me,
+  })
+  const { data: me, error, reload: load, setData } = meCache
+  const isShowingCache = meCache.isOffline
+  const isDeviceOffline = useIsOffline()
+  const isOffline = isShowingCache || isDeviceOffline
+
+  // Every change returns the updated record. Cached as well as shown, or a
+  // unit changed online would read back as the old one offline until the
+  // sweep's day-long budget ran out.
+  const handleSaved = useCallback(
+    (user: User) => {
+      setData(user)
+      void saveMeCache(user).catch(() => undefined)
+    },
+    [setData],
+  )
 
   const loadSessions = useCallback(async () => {
     try {
@@ -81,8 +100,8 @@ export default function SettingsScreen() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSessions()
   }, [load, loadSessions])
 
@@ -98,9 +117,12 @@ export default function SettingsScreen() {
         </Stack>
       ) : (
         <ScrollView contentContainerClassName="gap-4 p-4">
-          {/* Not cached until M9c WP7's tier 4, so offline is expected here: the
-              banner says what needs a connection, and the cards that would only
-              fail (account, devices, data export) stay out of the way. */}
+          {/* Offline, the banner says what needs a connection. The account
+              shows read-only from the cache, and the cards that would only
+              fail (devices, data export) stay out of the way. */}
+          <OfflineNotice visible={isShowingCache} cachedAt={meCache.cachedAt}>
+            Changing settings needs a connection.
+          </OfflineNotice>
           <NeedsConnectionNotice visible={needsConnection}>
             Settings need a connection.
           </NeedsConnectionNotice>
@@ -109,12 +131,17 @@ export default function SettingsScreen() {
 
           {me && (
             <>
-              <AccountCard me={me} onSaved={setMe} onNotice={setNotice} />
-              <PreferencesCard me={me} onSaved={setMe} />
+              <AccountCard
+                me={me}
+                readOnly={isOffline}
+                onSaved={handleSaved}
+                onNotice={setNotice}
+              />
+              <PreferencesCard me={me} readOnly={isOffline} onSaved={handleSaved} />
             </>
           )}
 
-          {!needsConnection && (
+          {!needsConnection && !isOffline && (
             <>
               <SecurityCard
                 sessions={sessions}
@@ -162,10 +189,12 @@ function SectionCard({
 
 function AccountCard({
   me,
+  readOnly,
   onSaved,
   onNotice,
 }: {
   me: User
+  readOnly: boolean
   onSaved: (user: User) => void
   onNotice: (notice: string) => void
 }) {
@@ -248,7 +277,7 @@ function AccountCard({
             Waiting for confirmation at {me.pendingMail}
           </Text>
         )}
-        {emailOpen ? (
+        {readOnly ? null : emailOpen ? (
           <Stack className="gap-2 pt-2">
             <Input
               value={newMail}
@@ -293,86 +322,102 @@ function AccountCard({
 
       <Stack className="gap-1">
         <Label>Phone</Label>
-        <Input
-          value={phone}
-          onChangeText={setPhoneValue}
-          placeholder="Not set"
-          keyboardType="phone-pad"
-          testID="phone-input"
-        />
-        {phoneError && <Text className="text-sm text-destructive">{phoneError}</Text>}
-        <Button
-          variant="outline"
-          className="self-start"
-          onPress={() => void savePhone()}
-          disabled={phoneBusy}
-          testID="phone-save"
-        >
-          {phoneBusy ? "Saving…" : "Save phone"}
-        </Button>
-      </Stack>
-
-      <Stack className="gap-1">
-        <Label>Password</Label>
-        {passwordOpen ? (
-          <Stack className="gap-2">
-            <Input
-              value={currentPwd}
-              onChangeText={setCurrentPwd}
-              placeholder="Current password"
-              secureTextEntry
-              testID="password-current"
-            />
-            <Input
-              value={newPwd}
-              onChangeText={setNewPwd}
-              placeholder="New password"
-              secureTextEntry
-              testID="password-new"
-            />
-            <Input
-              value={confirmPwd}
-              onChangeText={setConfirmPwd}
-              placeholder="Confirm new password"
-              secureTextEntry
-              testID="password-confirm"
-            />
-            {passwordError && <Text className="text-sm text-destructive">{passwordError}</Text>}
-            <Row className="gap-2">
-              <Button
-                onPress={() => void submitPasswordChange()}
-                disabled={passwordBusy}
-                testID="password-submit"
-              >
-                {passwordBusy ? "Changing…" : "Change password"}
-              </Button>
-              <Button variant="outline" onPress={() => setPasswordOpen(false)}>
-                Cancel
-              </Button>
-            </Row>
-          </Stack>
+        {readOnly ? (
+          <Text className="text-sm">{me.phone || "Not set"}</Text>
         ) : (
-          <Button
-            variant="outline"
-            className="self-start"
-            onPress={() => setPasswordOpen(true)}
-            testID="password-open"
-            icon={<LockIcon size={14} color={palette.ocean700} />}
-          >
-            Change password
-          </Button>
+          <>
+            <Input
+              value={phone}
+              onChangeText={setPhoneValue}
+              placeholder="Not set"
+              keyboardType="phone-pad"
+              testID="phone-input"
+            />
+            {phoneError && <Text className="text-sm text-destructive">{phoneError}</Text>}
+            <Button
+              variant="outline"
+              className="self-start"
+              onPress={() => void savePhone()}
+              disabled={phoneBusy}
+              testID="phone-save"
+            >
+              {phoneBusy ? "Saving…" : "Save phone"}
+            </Button>
+          </>
         )}
       </Stack>
+
+      {!readOnly && (
+        <Stack className="gap-1">
+          <Label>Password</Label>
+          {passwordOpen ? (
+            <Stack className="gap-2">
+              <Input
+                value={currentPwd}
+                onChangeText={setCurrentPwd}
+                placeholder="Current password"
+                secureTextEntry
+                testID="password-current"
+              />
+              <Input
+                value={newPwd}
+                onChangeText={setNewPwd}
+                placeholder="New password"
+                secureTextEntry
+                testID="password-new"
+              />
+              <Input
+                value={confirmPwd}
+                onChangeText={setConfirmPwd}
+                placeholder="Confirm new password"
+                secureTextEntry
+                testID="password-confirm"
+              />
+              {passwordError && <Text className="text-sm text-destructive">{passwordError}</Text>}
+              <Row className="gap-2">
+                <Button
+                  onPress={() => void submitPasswordChange()}
+                  disabled={passwordBusy}
+                  testID="password-submit"
+                >
+                  {passwordBusy ? "Changing…" : "Change password"}
+                </Button>
+                <Button variant="outline" onPress={() => setPasswordOpen(false)}>
+                  Cancel
+                </Button>
+              </Row>
+            </Stack>
+          ) : (
+            <Button
+              variant="outline"
+              className="self-start"
+              onPress={() => setPasswordOpen(true)}
+              testID="password-open"
+              icon={<LockIcon size={14} color={palette.ocean700} />}
+            >
+              Change password
+            </Button>
+          )}
+        </Stack>
+      )}
     </SectionCard>
   )
 }
 
-function PreferencesCard({ me, onSaved }: { me: User; onSaved: (user: User) => void }) {
+function PreferencesCard({
+  me,
+  readOnly,
+  onSaved,
+}: {
+  me: User
+  readOnly: boolean
+  onSaved: (user: User) => void
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function change(next: DistanceUnit) {
-    if (me.unitPreference === next) return
+    if (readOnly || me.unitPreference === next) return
     setBusy(true)
     setError(null)
     try {
@@ -391,7 +436,7 @@ function PreferencesCard({ me, onSaved }: { me: User; onSaved: (user: User) => v
         <Row className="gap-2">
           <Chip
             active={me.unitPreference === DISTANCE_UNIT.NM}
-            disabled={busy}
+            disabled={busy || readOnly}
             onPress={() => void change(DISTANCE_UNIT.NM)}
             testID={`unit-${DISTANCE_UNIT.NM}`}
           >
@@ -399,7 +444,7 @@ function PreferencesCard({ me, onSaved }: { me: User; onSaved: (user: User) => v
           </Chip>
           <Chip
             active={me.unitPreference === DISTANCE_UNIT.KM}
-            disabled={busy}
+            disabled={busy || readOnly}
             onPress={() => void change(DISTANCE_UNIT.KM)}
             testID={`unit-${DISTANCE_UNIT.KM}`}
           >
@@ -568,8 +613,8 @@ function DataCard({ onNotice }: { onNotice: (notice: string) => void }) {
       <Stack className="gap-2 rounded-lg border border-destructive/30 p-4">
         <Text className="text-sm font-medium text-destructive">Danger zone</Text>
         <Text className="text-sm text-muted-foreground">
-          Request deletion of your account. You will have 30 days to cancel before all your
-          personal data is permanently removed.
+          Request deletion of your account. You will have 30 days to cancel before all your personal
+          data is permanently removed.
         </Text>
         <Button
           variant="destructive"

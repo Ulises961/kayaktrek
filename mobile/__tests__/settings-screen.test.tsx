@@ -19,6 +19,8 @@ import {
   setUnitPreference,
 } from "../lib/profile/actions"
 import { listSessions, revokeSession } from "../lib/sessions/actions"
+import { loadMeCache, saveMeCache } from "../lib/db/profile-cache"
+import { useIsOffline } from "../lib/network/use-is-offline"
 
 jest.mock("../lib/profile/actions", () => ({
   getMe: jest.fn(),
@@ -37,6 +39,15 @@ jest.mock("../lib/sessions/actions", () => ({
 jest.mock("../lib/auth/actions", () => ({
   logoutEverywhere: jest.fn(),
 }))
+jest.mock("../lib/db/profile-cache", () => ({
+  loadMeCache: jest.fn(),
+  saveMeCache: jest.fn(),
+}))
+jest.mock("../lib/network/use-is-offline", () => ({ useIsOffline: jest.fn(() => false) }))
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+}))
 
 const mockGetMe = getMe as jest.Mock
 const mockSetUnit = setUnitPreference as jest.Mock
@@ -49,6 +60,9 @@ const mockDeletion = requestAccountDeletion as jest.Mock
 const mockListSessions = listSessions as jest.Mock
 const mockRevokeSession = revokeSession as jest.Mock
 const mockLogoutEverywhere = logoutEverywhere as jest.Mock
+const mockLoadMeCache = loadMeCache as jest.Mock
+const mockSaveMeCache = saveMeCache as jest.Mock
+const mockUseIsOffline = useIsOffline as jest.Mock
 
 const ME = {
   mail: "paddler@example.com",
@@ -85,6 +99,9 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockGetMe.mockResolvedValue(ME)
   mockListSessions.mockResolvedValue([THIS_DEVICE, OTHER_DEVICE])
+  mockLoadMeCache.mockResolvedValue(null)
+  mockSaveMeCache.mockResolvedValue(undefined)
+  mockUseIsOffline.mockReturnValue(false)
   jest.spyOn(Alert, "alert").mockImplementation(() => {})
 })
 
@@ -260,11 +277,55 @@ describe("SettingsScreen", () => {
   })
 })
 
-// Not cached until M9c WP7's tier 4. Offline, the cards that could only fail
-// stay out of the way and the banner says why.
+// M9c WP7 tier 4: the account record is cached, so offline Settings reads it
+// back instead of going blank. Everything that changes something stays out of
+// reach, and the cards that could only fail (devices, data export) stay hidden.
 describe("SettingsScreen — offline", () => {
-  it("leaves the network error to the banner and drops the cards that need it", async () => {
+  beforeEach(() => {
     mockGetMe.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    mockListSessions.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+  })
+
+  it("shows the cached account, with its age in the banner", async () => {
+    mockLoadMeCache.mockResolvedValue(ME)
+
+    const { findByText, getByText, queryByText } = await render(<SettingsScreen />, {
+      wrapper: WithCachedSurfaces,
+    })
+
+    expect(await findByText("paddler@example.com")).toBeTruthy()
+    expect(getByText("Last synced 2 days ago.")).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
+  })
+
+  it("offers no way to change anything while showing the cache", async () => {
+    mockLoadMeCache.mockResolvedValue(ME)
+
+    const { findByText, getByTestId, queryByTestId } = await render(<SettingsScreen />, {
+      wrapper: WithCachedSurfaces,
+    })
+    await findByText("paddler@example.com")
+
+    for (const id of ["email-open", "phone-save", "password-open", "sign-out-everywhere", "data-export"]) {
+      expect(queryByTestId(id)).toBeNull()
+    }
+    await fireEvent.press(getByTestId(`unit-${DISTANCE_UNIT.KM}`))
+    expect(mockSetUnit).not.toHaveBeenCalled()
+  })
+
+  it("shows the phone number as text rather than an editable field", async () => {
+    mockLoadMeCache.mockResolvedValue(ME)
+
+    const { findByText, queryByTestId } = await render(<SettingsScreen />, {
+      wrapper: WithCachedSurfaces,
+    })
+
+    expect(await findByText("+44 7700 900000")).toBeTruthy()
+    expect(queryByTestId("phone-input")).toBeNull()
+  })
+
+  it("says Settings need a connection when nothing was ever cached", async () => {
+    mockLoadMeCache.mockResolvedValue(null)
 
     const { findByText, queryByText } = await render(<SettingsScreen />, {
       wrapper: WithCachedSurfaces,
@@ -273,5 +334,39 @@ describe("SettingsScreen — offline", () => {
     expect(await findByText("Settings need a connection.")).toBeTruthy()
     expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
     expect(queryByText(/Could not load your devices/)).toBeNull()
+  })
+
+  it("locks the controls when the device drops offline after a live load", async () => {
+    mockGetMe.mockResolvedValue(ME)
+    mockUseIsOffline.mockReturnValue(true)
+
+    const { findByText, getByTestId, queryByTestId } = await render(<SettingsScreen />, {
+      wrapper: WithCachedSurfaces,
+    })
+    await findByText("paddler@example.com")
+
+    expect(queryByTestId("phone-save")).toBeNull()
+    await fireEvent.press(getByTestId(`unit-${DISTANCE_UNIT.KM}`))
+    expect(mockSetUnit).not.toHaveBeenCalled()
+  })
+})
+
+describe("SettingsScreen — cache", () => {
+  it("saves a live load so the next offline open has it", async () => {
+    await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+
+    await waitFor(() => expect(mockSaveMeCache).toHaveBeenCalledWith(ME))
+  })
+
+  // Otherwise a unit changed online reads back as the old one offline, until
+  // the sweep's day-long budget runs out.
+  it("saves the record a change returns", async () => {
+    const updated = { ...ME, unitPreference: DISTANCE_UNIT.KM }
+    mockSetUnit.mockResolvedValue(updated)
+
+    const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+    await fireEvent.press(await findByTestId(`unit-${DISTANCE_UNIT.KM}`))
+
+    await waitFor(() => expect(mockSaveMeCache).toHaveBeenCalledWith(updated))
   })
 })
