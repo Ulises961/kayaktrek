@@ -1,5 +1,7 @@
 import { render } from "@testing-library/react-native"
 
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
+
 import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
 import NewLogScreen from "../app/(app)/(drawer)/(logs)/logs/new"
 import { getSession } from "../lib/auth/session"
@@ -56,19 +58,19 @@ beforeEach(() => {
 // pointed at a route that did not exist until PR #265.
 describe("log form screens scroll", () => {
   it("lets the owner reach the submit on the edit screen", async () => {
-    const { findByTestId } = await render(<LogDetailScreen />)
+    const { findByTestId } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByTestId("log-form-scroll")).toBeTruthy()
   })
 
   it("lets the submit be reached on the new-log screen", async () => {
-    const { findByTestId } = await render(<NewLogScreen />)
+    const { findByTestId } = await render(<NewLogScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByTestId("log-form-scroll")).toBeTruthy()
   })
 
   it("still renders the form itself, not just the container", async () => {
-    const { findByText } = await render(<NewLogScreen />)
+    const { findByText } = await render(<NewLogScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Create log")).toBeTruthy()
   })

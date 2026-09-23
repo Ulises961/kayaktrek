@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 import { Alert, Linking } from "react-native"
 
@@ -90,7 +90,7 @@ beforeEach(() => {
 
 describe("SettingsScreen", () => {
   it("shows the signed-in address", async () => {
-    const { findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("paddler@example.com")).toBeTruthy()
   })
@@ -99,7 +99,7 @@ describe("SettingsScreen", () => {
     it("changes the unit preference", async () => {
       mockSetUnit.mockResolvedValue({ ...ME, unitPreference: DISTANCE_UNIT.KM })
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId(`unit-${DISTANCE_UNIT.KM}`))
 
       await waitFor(() => expect(mockSetUnit).toHaveBeenCalledWith(DISTANCE_UNIT.KM))
@@ -110,7 +110,7 @@ describe("SettingsScreen", () => {
     it("saves a changed phone number", async () => {
       mockSetPhone.mockResolvedValue(ME)
 
-      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.changeText(await findByTestId("phone-input"), "+44 7700 900111")
       await fireEvent.press(getByTestId("phone-save"))
 
@@ -120,7 +120,7 @@ describe("SettingsScreen", () => {
     it("changes the password", async () => {
       mockChangePassword.mockResolvedValue(undefined)
 
-      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("password-open"))
       await fireEvent.changeText(getByTestId("password-current"), "old-one")
       await fireEvent.changeText(getByTestId("password-new"), "new-one-long")
@@ -133,7 +133,7 @@ describe("SettingsScreen", () => {
     })
 
     it("refuses a password change whose confirmation does not match", async () => {
-      const { findByTestId, getByTestId, findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId, getByTestId, findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("password-open"))
       await fireEvent.changeText(getByTestId("password-current"), "old-one")
       await fireEvent.changeText(getByTestId("password-new"), "new-one-long")
@@ -150,7 +150,7 @@ describe("SettingsScreen", () => {
       mockReAuth.mockResolvedValue("elevated-abc")
       mockEmailChange.mockResolvedValue(undefined)
 
-      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId, getByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("email-open"))
       await fireEvent.changeText(getByTestId("email-new"), "new@example.com")
       await fireEvent.changeText(getByTestId("email-password"), "correct-horse")
@@ -163,7 +163,7 @@ describe("SettingsScreen", () => {
     it("does not attempt the email change when the password is wrong", async () => {
       mockReAuth.mockRejectedValue(new Error("Password incorrect."))
 
-      const { findByTestId, getByTestId, findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId, getByTestId, findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("email-open"))
       await fireEvent.changeText(getByTestId("email-new"), "new@example.com")
       await fireEvent.changeText(getByTestId("email-password"), "wrong")
@@ -176,14 +176,14 @@ describe("SettingsScreen", () => {
 
   describe("security", () => {
     it("lists the signed-in devices", async () => {
-      const { findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
 
       expect(await findByText(/Pixel 8/)).toBeTruthy()
       expect(await findByText(/Firefox on Linux/)).toBeTruthy()
     })
 
     it("marks which device is this one", async () => {
-      const { findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
 
       expect(await findByText(/this device/i)).toBeTruthy()
     })
@@ -191,7 +191,7 @@ describe("SettingsScreen", () => {
     it("degrades to a message rather than taking the screen down when devices fail to load", async () => {
       mockListSessions.mockRejectedValue(new Error("nope"))
 
-      const { findByText } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
 
       expect(await findByText(/could not load your devices/i)).toBeTruthy()
       // The rest of the screen still rendered.
@@ -201,7 +201,7 @@ describe("SettingsScreen", () => {
     it("revokes another device after confirmation", async () => {
       mockRevokeSession.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId(`revoke-${OTHER_DEVICE.id}`))
       confirmAlert("Sign out")
 
@@ -209,7 +209,7 @@ describe("SettingsScreen", () => {
     })
 
     it("does not revoke when the confirmation is dismissed", async () => {
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId(`revoke-${OTHER_DEVICE.id}`))
 
       expect(mockRevokeSession).not.toHaveBeenCalled()
@@ -218,7 +218,7 @@ describe("SettingsScreen", () => {
     it("signs out everywhere after confirmation", async () => {
       mockLogoutEverywhere.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("sign-out-everywhere"))
       confirmAlert("Sign out everywhere")
 
@@ -230,7 +230,7 @@ describe("SettingsScreen", () => {
     it("requests a data export", async () => {
       mockDataExport.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("data-export"))
 
       await waitFor(() => expect(mockDataExport).toHaveBeenCalled())
@@ -239,7 +239,7 @@ describe("SettingsScreen", () => {
     it("requires confirmation before requesting account deletion", async () => {
       mockDeletion.mockResolvedValue(undefined)
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("delete-account"))
 
       expect(mockDeletion).not.toHaveBeenCalled()
@@ -252,7 +252,7 @@ describe("SettingsScreen", () => {
     it("opens the hosted terms rather than shipping a copy of them", async () => {
       const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
 
-      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithOfflineBanner })
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
       await fireEvent.press(await findByTestId("legal-terms"))
 
       expect(openURL).toHaveBeenCalledWith(expect.stringContaining("/terms"))
@@ -267,7 +267,7 @@ describe("SettingsScreen — offline", () => {
     mockGetMe.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
 
     const { findByText, queryByText } = await render(<SettingsScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
 
     expect(await findByText("Settings need a connection.")).toBeTruthy()

@@ -1,6 +1,6 @@
 import { render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 import FloatPlanScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/float-plan"
 import { getLogistics, getTrip } from "../lib/trips/actions"
@@ -56,7 +56,7 @@ describe("FloatPlanScreen", () => {
     })
     mockGetLogistics.mockResolvedValue({ shoreContactName: "Jo Shore" })
 
-    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Sam Lee")).toBeTruthy()
     expect(await findByText("Jo Shore")).toBeTruthy()
@@ -69,7 +69,7 @@ describe("FloatPlanScreen", () => {
     ])
     mockLoadTripListCache.mockResolvedValue([{ id: "trip-1", state: "happening" }])
 
-    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Cached Paddler")).toBeTruthy()
     expect(await findByText("Shore contact needs a connection.")).toBeTruthy()
@@ -80,7 +80,7 @@ describe("FloatPlanScreen", () => {
   it("surfaces the error when there is nothing cached to fall back to", async () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
 
-    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -91,7 +91,7 @@ describe("FloatPlanScreen", () => {
       { id: "m1", role: "crew", user: { name: "A", surname: "B" } },
     ])
 
-    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithCachedSurfaces })
     await waitFor(() => expect(mockLoadOfflineCrew).toHaveBeenCalledWith("trip-1"))
     expect(await findByText("A B")).toBeTruthy()
   })
