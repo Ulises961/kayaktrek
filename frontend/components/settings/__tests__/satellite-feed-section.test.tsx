@@ -17,6 +17,7 @@ const FEED = {
   provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
   feedUrl: "https://share.garmin.com/feed/Share/paddler",
   feedUsername: null,
+  hasPassword: false,
   needsReauth: false,
   lastPolledAt: "2026-09-21T10:00:00",
   lastIngestedAt: "2026-09-21T09:50:00",
@@ -70,6 +71,8 @@ describe("SatelliteFeedSection", () => {
   })
 
   describe("the password switch", () => {
+    const PROTECTED_FEED = { ...FEED, hasPassword: true }
+
     it("hides the password field until the switch is turned on", async () => {
       const user = userEvent.setup()
       render(<SatelliteFeedSection feeds={[]} />)
@@ -81,18 +84,56 @@ describe("SatelliteFeedSection", () => {
       expect(screen.getByLabelText(/^mapshare password$/i)).toBeInTheDocument()
     })
 
-    it("starts off when editing, so saving cannot disturb a stored password", async () => {
+    it("starts ON for a feed that has a password, so editing the URL cannot clear it", async () => {
+      // The whole reason hasPassword is fetched. A switch that always opened off would
+      // clear a working password the moment someone edited only the feed URL — and with
+      // it, silently stop the feed being polled.
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[PROTECTED_FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+
+      expect(screen.getByRole("switch", { name: /password/i })).toBeChecked()
+      await user.click(screen.getByRole("button", { name: /^save feed$/i }))
+
+      await waitFor(() => {
+        expect(saveSatelliteFeed).toHaveBeenCalledWith(
+          PROTECTED_FEED.id,
+          expect.objectContaining({ setPassword: true, hasStoredPassword: true }),
+        )
+      })
+    })
+
+    it("starts off for a feed that has no password", async () => {
       const user = userEvent.setup()
       render(<SatelliteFeedSection feeds={[FEED]} />)
 
       await user.click(screen.getByRole("button", { name: /edit/i }))
 
       expect(screen.getByRole("switch", { name: /password/i })).not.toBeChecked()
+    })
+
+    it("warns before removing a stored password, rather than clearing silently", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[PROTECTED_FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+      await user.click(screen.getByRole("switch", { name: /password/i }))
+
+      expect(screen.getByText(/saving will remove the stored password/i)).toBeInTheDocument()
+    })
+
+    it("turning the switch off asks to clear the password", async () => {
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[PROTECTED_FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+      await user.click(screen.getByRole("switch", { name: /password/i }))
       await user.click(screen.getByRole("button", { name: /^save feed$/i }))
 
       await waitFor(() => {
         expect(saveSatelliteFeed).toHaveBeenCalledWith(
-          FEED.id,
+          PROTECTED_FEED.id,
           expect.objectContaining({ setPassword: false }),
         )
       })
@@ -115,7 +156,7 @@ describe("SatelliteFeedSection", () => {
       })
     })
 
-    it("will not save a switch turned on with nothing typed", async () => {
+    it("will not save a switch turned on with nothing typed and nothing stored", async () => {
       const user = userEvent.setup()
       render(<SatelliteFeedSection feeds={[FEED]} />)
 
@@ -123,8 +164,29 @@ describe("SatelliteFeedSection", () => {
       await user.click(screen.getByRole("switch", { name: /password/i }))
       await user.click(screen.getByRole("button", { name: /^save feed$/i }))
 
-      expect(await screen.findByText(/enter the password, or turn this off/i)).toBeInTheDocument()
+      expect(
+        await screen.findByText(/enter the password, or turn the switch off/i),
+      ).toBeInTheDocument()
       expect(saveSatelliteFeed).not.toHaveBeenCalled()
+    })
+
+    it("lets a protected feed be saved with the field left blank", async () => {
+      // Editing the URL only. Blank means "keep" here precisely because the switch is
+      // still on — that is what distinguishes it from the clear case above.
+      const user = userEvent.setup()
+      render(<SatelliteFeedSection feeds={[PROTECTED_FEED]} />)
+
+      await user.click(screen.getByRole("button", { name: /edit/i }))
+      await user.clear(screen.getByLabelText(/feed url/i))
+      await user.type(screen.getByLabelText(/feed url/i), "https://share.garmin.com/feed/Share/new")
+      await user.click(screen.getByRole("button", { name: /^save feed$/i }))
+
+      await waitFor(() => {
+        expect(saveSatelliteFeed).toHaveBeenCalledWith(
+          PROTECTED_FEED.id,
+          expect.objectContaining({ setPassword: true, feedPassword: "" }),
+        )
+      })
     })
   })
 

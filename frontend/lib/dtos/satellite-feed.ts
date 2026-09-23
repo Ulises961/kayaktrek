@@ -34,6 +34,10 @@ export const SatelliteFeedSchema = z.object({
   provider: z.enum(SATELLITE_PROVIDERS),
   feedUrl: z.string(),
   feedUsername: z.string().nullish(),
+  // Whether a password is stored, never the password itself. The edit form defaults its
+  // switch from this, and since switching off clears, a form that could not tell "has
+  // one" from "has none" would offer a destructive default.
+  hasPassword: z.boolean(),
   // Set when a poll failed authentication. The feed is skipped entirely until the user
   // re-saves credentials, so this is the one field the UI must surface loudly.
   needsReauth: z.boolean(),
@@ -63,10 +67,19 @@ export const SatelliteFeedFormSchema = z
     // meant rather than leave it to be inferred from an empty box.
     setPassword: z.boolean(),
     feedPassword: z.string().optional(),
+    // Not submitted: it mirrors the feed's own `hasPassword` so validation knows whether
+    // a blank field has something to fall back on.
+    hasStoredPassword: z.boolean(),
   })
-  .refine((values) => !values.setPassword || (values.feedPassword ?? "").length > 0, {
-    message: "Enter the password, or turn this off to leave the stored one alone",
-    path: ["feedPassword"],
-  })
+  // A blank field is only meaningful when there is already a stored password to keep.
+  // On a new feed, or one with none, the switch being on has to mean something typed.
+  .refine(
+    (values) =>
+      !values.setPassword || (values.feedPassword ?? "").length > 0 || values.hasStoredPassword,
+    {
+      message: "Enter the password, or turn the switch off to remove it",
+      path: ["feedPassword"],
+    },
+  )
 
 export type SatelliteFeedFormValues = z.infer<typeof SatelliteFeedFormSchema>

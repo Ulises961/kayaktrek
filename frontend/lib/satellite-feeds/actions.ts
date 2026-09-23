@@ -49,15 +49,15 @@ export async function saveSatelliteFeed(
   }
 
   const { provider, feedUrl, setPassword, feedPassword } = parsed.data
-  // null, never "": the backend's update guard ignores a null and keeps the stored
-  // password, where an empty string would overwrite it with nothing and silently
-  // un-authenticate a working feed. The switch is what decides — a value typed and then
-  // switched off is not sent, so changing one's mind costs nothing.
-  const body: Record<string, unknown> = {
-    provider,
-    feedUrl,
-    feedPassword: setPassword ? feedPassword : null,
-  }
+  const body: Record<string, unknown> = { provider, feedUrl }
+  // Three distinct instructions to the server, and an empty string is none of them:
+  //   switch off            → null, which clears the stored password
+  //   switch on + typed     → the value, which replaces it
+  //   switch on + blank     → the key omitted, which leaves it alone
+  // A value typed and then switched off is deliberately dropped: the switch is the
+  // intent, so changing one's mind must not save a password the user just removed.
+  if (!setPassword) body.feedPassword = null
+  else if (feedPassword) body.feedPassword = feedPassword
 
   try {
     const raw = id

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-import { SATELLITE_PROVIDER } from "@/lib/dtos/satellite-feed"
+import { SATELLITE_PROVIDER, type SatelliteFeedFormValues } from "@/lib/dtos/satellite-feed"
 
 vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
@@ -24,9 +24,22 @@ const A_FEED = {
   feedUrl: "https://share.garmin.com/feed/Share/paddler",
   feedUsername: null,
   needsReauth: false,
+  hasPassword: false,
   lastPolledAt: null,
   lastIngestedAt: null,
   created: "2026-09-21T10:00:00",
+}
+
+// The switch defaults are the safe ones: no password being set, none already stored.
+// Every test states only the fields it is actually about.
+function _form(overrides: Partial<SatelliteFeedFormValues> = {}): SatelliteFeedFormValues {
+  return {
+    provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+    feedUrl: A_FEED.feedUrl,
+    setPassword: false,
+    hasStoredPassword: false,
+    ...overrides,
+  }
 }
 
 beforeEach(() => {
@@ -65,11 +78,7 @@ describe("saveSatelliteFeed", () => {
   it("creates a feed when given no id", async () => {
     vi.mocked(apiPost).mockResolvedValue(A_FEED)
 
-    const result = await saveSatelliteFeed(null, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: A_FEED.feedUrl,
-      setPassword: false,
-    })
+    const result = await saveSatelliteFeed(null, _form())
 
     expect(apiPost).toHaveBeenCalledWith(
       "/api/satellite-feeds/create",
@@ -81,11 +90,7 @@ describe("saveSatelliteFeed", () => {
   it("updates in place when given an id", async () => {
     vi.mocked(apiPatch).mockResolvedValue(A_FEED)
 
-    await saveSatelliteFeed(A_FEED.id, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: A_FEED.feedUrl,
-      setPassword: false,
-    })
+    await saveSatelliteFeed(A_FEED.id, _form())
 
     expect(apiPatch).toHaveBeenCalledWith(
       `/api/satellite-feeds/${A_FEED.id}`,
@@ -97,11 +102,7 @@ describe("saveSatelliteFeed", () => {
   it("trims the URL before sending it", async () => {
     vi.mocked(apiPost).mockResolvedValue(A_FEED)
 
-    await saveSatelliteFeed(null, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: `  ${A_FEED.feedUrl}  `,
-      setPassword: false,
-    })
+    await saveSatelliteFeed(null, _form({ feedUrl: `  ${A_FEED.feedUrl}  ` }))
 
     expect(apiPost).toHaveBeenCalledWith(
       "/api/satellite-feeds/create",
@@ -110,58 +111,62 @@ describe("saveSatelliteFeed", () => {
   })
 
   it("rejects a non-https URL without calling the API", async () => {
-    const result = await saveSatelliteFeed(null, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: "http://share.garmin.com/feed/Share/paddler",
-      setPassword: false,
-    })
+    const result = await saveSatelliteFeed(
+      null,
+      _form({ feedUrl: "http://share.garmin.com/feed/Share/paddler" }),
+    )
 
     expect(result).toEqual({ success: false, error: "Feed URL must use https://" })
     expect(apiPost).not.toHaveBeenCalled()
   })
 
+  // Three outcomes, and the difference between them is the whole feature: null clears a
+  // stored password, an omitted key leaves it alone, a value replaces it. An empty
+  // string is never sent, because the backend cannot tell it from "clear".
   describe("the password switch", () => {
-    it("sends null, never an empty string, while the switch is off", async () => {
-      // An empty string is the one value that reads as "clear it" on the way in but as
-      // "leave it" nowhere — null is what the backend's update guard ignores.
+    it("sends null to clear the stored password when the switch is off", async () => {
       vi.mocked(apiPatch).mockResolvedValue(A_FEED)
 
-      await saveSatelliteFeed(A_FEED.id, {
-        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-        feedUrl: A_FEED.feedUrl,
-        setPassword: false,
-      })
+      await saveSatelliteFeed(A_FEED.id, _form({ setPassword: false, hasStoredPassword: true }))
 
       const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
       expect(body.feedPassword).toBeNull()
     })
 
-    it("ignores a typed password the user then switched off", async () => {
-      // The switch is the intent; the field is only where the value was typed. Without
-      // this, turning the switch off would look like it worked and still change the
-      // stored password.
+    it("ignores a typed password the user then switched off, and still clears", async () => {
+      // The switch is the intent; the field is only where the value was typed. Sending
+      // the typed value here would save a password the user just said to remove.
       vi.mocked(apiPatch).mockResolvedValue(A_FEED)
 
-      await saveSatelliteFeed(A_FEED.id, {
-        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-        feedUrl: A_FEED.feedUrl,
-        setPassword: false,
-        feedPassword: "typed-then-thought-better-of-it",
-      })
+      await saveSatelliteFeed(
+        A_FEED.id,
+        _form({
+          setPassword: false,
+          hasStoredPassword: true,
+          feedPassword: "typed-then-thought-better-of-it",
+        }),
+      )
 
       const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
       expect(body.feedPassword).toBeNull()
     })
 
-    it("sends the password when the switch is on", async () => {
+    it("omits the key entirely when the switch is on and nothing was retyped", async () => {
+      // Editing only the feed URL of a password-protected feed. The server never echoes
+      // the stored password, so there is nothing to resend — absence is what tells the
+      // backend to leave it alone, and it must not collapse into null or "".
+      vi.mocked(apiPatch).mockResolvedValue(A_FEED)
+
+      await saveSatelliteFeed(A_FEED.id, _form({ setPassword: true, hasStoredPassword: true }))
+
+      const body = vi.mocked(apiPatch).mock.calls[0][1] as Record<string, unknown>
+      expect(body).not.toHaveProperty("feedPassword")
+    })
+
+    it("sends the password when the switch is on and one was typed", async () => {
       vi.mocked(apiPost).mockResolvedValue(A_FEED)
 
-      await saveSatelliteFeed(null, {
-        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-        feedUrl: A_FEED.feedUrl,
-        setPassword: true,
-        feedPassword: "s3cret",
-      })
+      await saveSatelliteFeed(null, _form({ setPassword: true, feedPassword: "s3cret" }))
 
       expect(apiPost).toHaveBeenCalledWith(
         "/api/satellite-feeds/create",
@@ -169,30 +174,25 @@ describe("saveSatelliteFeed", () => {
       )
     })
 
-    it("refuses a switch turned on with nothing typed, without calling the API", async () => {
-      const result = await saveSatelliteFeed(A_FEED.id, {
-        provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-        feedUrl: A_FEED.feedUrl,
-        setPassword: true,
-        feedPassword: "",
-      })
+    it("refuses a switch turned on with nothing typed and nothing stored", async () => {
+      // On a new feed there is no stored password for a blank field to mean "keep".
+      const result = await saveSatelliteFeed(
+        null,
+        _form({ setPassword: true, feedPassword: "", hasStoredPassword: false }),
+      )
 
       expect(result).toEqual({
         success: false,
-        error: "Enter the password, or turn this off to leave the stored one alone",
+        error: "Enter the password, or turn the switch off to remove it",
       })
-      expect(apiPatch).not.toHaveBeenCalled()
+      expect(apiPost).not.toHaveBeenCalled()
     })
   })
 
   it("surfaces the server's message rather than a generic failure", async () => {
     vi.mocked(apiPost).mockRejectedValue(new Error("Feed URL must use https://"))
 
-    const result = await saveSatelliteFeed(null, {
-      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
-      feedUrl: A_FEED.feedUrl,
-      setPassword: false,
-    })
+    const result = await saveSatelliteFeed(null, _form())
 
     expect(result).toEqual({ success: false, error: "Feed URL must use https://" })
   })
