@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import NetInfo from "@react-native-community/netinfo"
 
+import { CachedSurfacesProvider } from "../../../lib/network/cached-surfaces"
 import { OfflineBanner } from "../offline-banner"
 
 jest.mock("@react-native-community/netinfo", () => ({ addEventListener: jest.fn() }))
@@ -18,12 +19,12 @@ beforeEach(() => {
 
 describe("OfflineBanner", () => {
   it("renders nothing while online", async () => {
-    const { queryByText } = await render(<OfflineBanner />)
+    const { queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     expect(queryByText(/no internet connection/i)).toBeNull()
   })
 
   it("shows the full banner once the device goes offline", async () => {
-    const { getByText } = await render(<OfflineBanner />)
+    const { getByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     const handler = connectivityHandler()
 
     handler({ isConnected: false })
@@ -32,7 +33,7 @@ describe("OfflineBanner", () => {
   })
 
   it("dismissing collapses the banner to an icon pill, not to nothing", async () => {
-    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />)
+    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     const handler = connectivityHandler()
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
@@ -44,7 +45,7 @@ describe("OfflineBanner", () => {
   })
 
   it("tapping the collapsed pill re-expands the full banner", async () => {
-    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />)
+    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     const handler = connectivityHandler()
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
@@ -57,7 +58,7 @@ describe("OfflineBanner", () => {
   })
 
   it("clears entirely once connectivity returns, even if it had been dismissed", async () => {
-    const { getByText, getByLabelText, queryByText, queryByLabelText } = await render(<OfflineBanner />)
+    const { getByText, getByLabelText, queryByText, queryByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     const handler = connectivityHandler()
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
@@ -71,7 +72,7 @@ describe("OfflineBanner", () => {
   })
 
   it("shows the full banner again (not still collapsed) on the next disconnect", async () => {
-    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />)
+    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
     const handler = connectivityHandler()
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())

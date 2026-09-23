@@ -1,5 +1,8 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
+
 import LogisticsScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/logistics"
 import { getSession } from "../lib/auth/session"
 import {
@@ -17,6 +20,7 @@ jest.mock("expo-router", () => {
     ...actual,
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useLocalSearchParams: () => ({ id: "trip-1" }),
+    useIsFocused: () => true,
   }
 })
 jest.mock("../lib/trips/actions", () => ({
@@ -63,7 +67,7 @@ describe("LogisticsScreen", () => {
     mockGetTravelDocuments.mockResolvedValue([])
     mockGetShuttleVehicles.mockResolvedValue([])
 
-    const { findByText } = await render(<LogisticsScreen />)
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("No travel documents yet")).toBeTruthy()
     expect(await findByText("No vehicles yet")).toBeTruthy()
@@ -84,7 +88,7 @@ describe("LogisticsScreen", () => {
       },
     ])
 
-    const { findByText } = await render(<LogisticsScreen />)
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("National park permit")).toBeTruthy()
     expect(await findByText("Driver: Lea")).toBeTruthy()
@@ -102,6 +106,7 @@ describe("LogisticsScreen", () => {
 
     const { findByText, getByText, getByLabelText, findByPlaceholderText } = await render(
       <LogisticsScreen />,
+      { wrapper: WithOfflineBanner },
     )
     await findByText("No travel documents yet")
 
@@ -124,8 +129,21 @@ describe("LogisticsScreen", () => {
     mockGetTravelDocuments.mockRejectedValue(new Error("Could not reach the server."))
     mockGetShuttleVehicles.mockResolvedValue([])
 
-    const { findByText } = await render(<LogisticsScreen />)
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+})
+
+describe("LogisticsScreen — offline", () => {
+  it("leaves the network error to the banner", async () => {
+    mockGetTravelDocuments.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+
+    const { findByText, queryByText } = await render(<LogisticsScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+
+    expect(await findByText("Logistics needs a connection.")).toBeTruthy()
+    expect(queryByText(OFFLINE_ERROR_MESSAGE)).toBeNull()
   })
 })

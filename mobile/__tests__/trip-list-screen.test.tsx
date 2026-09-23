@@ -1,5 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+
 import { TRIP_STATE } from "@shared/dtos/trip"
 
 import TripListScreen from "../app/(app)/(drawer)/(trips)/index"
@@ -55,7 +57,7 @@ describe("TripListScreen", () => {
       pages: 1,
     })
 
-    const { findByText } = await render(<TripListScreen />)
+    const { findByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Costa Brava")).toBeTruthy()
     expect(await findByText("Anglesey")).toBeTruthy()
@@ -65,7 +67,7 @@ describe("TripListScreen", () => {
   it("shows an empty state, not a blank list, when there are no trips", async () => {
     mockGetTrips.mockResolvedValue({ items: [], total: 0, page: 1, pages: 0 })
 
-    const { findByText } = await render(<TripListScreen />)
+    const { findByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("No trips yet")).toBeTruthy()
   })
@@ -74,7 +76,7 @@ describe("TripListScreen", () => {
     mockGetTrips.mockRejectedValueOnce(new Error("Could not reach the server."))
     mockGetTrips.mockResolvedValueOnce({ items: [], total: 0, page: 1, pages: 0 })
 
-    const { findByText, getByText } = await render(<TripListScreen />)
+    const { findByText, getByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
 
@@ -91,10 +93,10 @@ describe("TripListScreen", () => {
       { id: "t1", destination: "Cached Fjord", state: "building", dateFrom: null, dateTo: null, travellerCount: 1 },
     ])
 
-    const { findByText } = await render(<TripListScreen />)
+    const { findByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Cached Fjord")).toBeTruthy()
-    expect(await findByText(/Offline — showing your last synced trips/)).toBeTruthy()
+    expect(await findByText(/Can't reach the server\./)).toBeTruthy()
   })
 
   // M9c WP7: "offline" alone never said whether the list was from an hour ago
@@ -105,9 +107,9 @@ describe("TripListScreen", () => {
       { id: "t1", destination: "Cached Fjord", state: "building", dateFrom: null, dateTo: null, travellerCount: 1 },
     ])
 
-    const { findByText } = await render(<TripListScreen />)
+    const { findByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
-    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
   describe("grouping", () => {
@@ -146,7 +148,7 @@ describe("TripListScreen", () => {
     it("heads each group the trips actually fall into", async () => {
       mockGetTrips.mockResolvedValue(page([OLD, SOON, HAPPENING]))
 
-      const { findByTestId } = await render(<TripListScreen />)
+      const { findByTestId } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByTestId("group-happening")).toBeTruthy()
       expect(await findByTestId("group-building")).toBeTruthy()
@@ -157,7 +159,7 @@ describe("TripListScreen", () => {
       // A paddler with nothing under way should not be shown an empty "On the water".
       mockGetTrips.mockResolvedValue(page([SOON]))
 
-      const { findByTestId, queryByTestId } = await render(<TripListScreen />)
+      const { findByTestId, queryByTestId } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
       await findByTestId("group-building")
 
       expect(queryByTestId("group-happening")).toBeNull()
@@ -168,7 +170,7 @@ describe("TripListScreen", () => {
       // `state` is nullish on the DTO. Dropping such a trip would lose it silently.
       mockGetTrips.mockResolvedValue(page([{ ...SOON, id: "t-stateless", state: null }]))
 
-      const { findByText } = await render(<TripListScreen />)
+      const { findByText } = await render(<TripListScreen />, { wrapper: WithOfflineBanner })
 
       expect(await findByText("Arran")).toBeTruthy()
     })

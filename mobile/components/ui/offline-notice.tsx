@@ -1,50 +1,61 @@
-import type { ReactNode } from "react"
+import { useIsFocused } from "expo-router"
+import { useEffect, useId, type ReactNode } from "react"
 
-import { formatTimeAgo } from "@shared/utils/date"
+import { type CachedSurfaceReport, useCachedSurfaces } from "../../lib/network/cached-surfaces"
 
-import { cn } from "../../lib/cn"
-import { Text } from "./text"
+// Report what the focused screen is missing to the app-root OfflineBanner,
+// which is the one place any of it is said. Only while the screen is focused:
+// stacked and drawer screens stay mounted behind the one in front, and the
+// banner must describe the screen the paddler is actually looking at.
+function useReportToBanner(visible: boolean, entry: CachedSurfaceReport) {
+  const id = useId()
+  const isFocused = useIsFocused()
+  const { report } = useCachedSurfaces()
+  const { message, cachedAt } = entry
 
-// The one place a screen says "what you are looking at came from the cache, and
-// here is how old it is". Every read screen hand-rolled the first half of that
-// sentence as its own inline <Text> before M9c WP7; none of them could say the
-// second half at all.
+  useEffect(() => {
+    report(id, visible && isFocused ? { message, cachedAt } : null)
+  }, [id, visible, isFocused, message, cachedAt, report])
+
+  useEffect(() => () => report(id, null), [id, report])
+}
+
+// The screen is showing its cached copy. The banner states how old it is —
+// docs/adr/mobile-offline.md ("Staleness must be expressed, not implied") makes
+// the age mandatory: a three-day-old forecast rendered identically to a live
+// one is a safety problem.
 //
-// Distinct from OfflineBanner, which reports live device connectivity from the
-// app root. This is per-surface and about the *data*: a screen can be showing a
-// week-old cache with four bars of signal (the fetch failed for some other
-// reason), and connectivity alone would call that fine.
-//
-// `docs/adr/mobile-offline.md` ("Staleness must be expressed, not implied")
-// makes the age mandatory rather than decorative: for crew or inventory,
-// undated stale data is untidy, but a three-day-old forecast rendered
-// identically to a live one is a safety problem.
+// Renders nothing itself. This used to be an inline line under the banner, so
+// an offline screen carried two messages about one fact, and the banner — the
+// one the eye lands on — was the one that could not say how old anything was.
 export function OfflineNotice({
   children,
   cachedAt,
   visible = true,
-  now,
-  className,
 }: {
-  children: ReactNode
+  /** What cannot be done with the cached data, shown behind the banner's "Read more",
+   *  e.g. "Adding, covering, and removing need a connection." Omit when the age says it all. */
+  children?: ReactNode
   /** ISO timestamp from `readCachedAt`/`useLiveCache`, or null if never recorded. */
   cachedAt: string | null
   visible?: boolean
-  /** Injectable clock, for tests. */
-  now?: Date
-  className?: string
 }) {
-  if (!visible) return null
+  useReportToBanner(visible, { message: children, cachedAt })
+  return null
+}
 
-  return (
-    <Text
-      className={cn(
-        "rounded-md bg-muted px-3 py-1.5 text-center text-[11px] text-muted-foreground",
-        className,
-      )}
-    >
-      {children}
-      {cachedAt !== null && ` Updated ${formatTimeAgo(cachedAt, now)}.`}
-    </Text>
-  )
+// The screen has no cached copy at all — Explore by choice, Settings until
+// M9c WP7's tier 4 — and its fetch failed for want of a connection. Without
+// this the screen printed the raw network error in red, which read as a fault
+// rather than as the expected state of being offline.
+export function NeedsConnectionNotice({
+  children,
+  visible = true,
+}: {
+  /** e.g. "Explore needs a connection." */
+  children: ReactNode
+  visible?: boolean
+}) {
+  useReportToBanner(visible, { message: children })
+  return null
 }

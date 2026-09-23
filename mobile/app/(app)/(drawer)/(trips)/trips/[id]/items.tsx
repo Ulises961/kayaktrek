@@ -22,6 +22,7 @@ import { loadKitCache, saveKitCache } from "@mobile/lib/db/kit-cache"
 import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/requirements-cache"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import { useIsOffline } from "@mobile/lib/network/use-is-offline"
 import {
   addRequirement,
   contributeItem,
@@ -91,7 +92,13 @@ export default function InventoryScreen() {
   })
   const requirements = requirementsCache.data
   const error = requirementsCache.error
-  const isOffline = requirementsCache.isOffline
+  // Two different facts, same split as the Gear screen. Each cache's
+  // `isOffline` says the data on screen came from the cache and drives its
+  // notice; the device's connectivity says whether acting on it can work.
+  // Only the first used to disable anything, so a screen opened with signal
+  // kept every action live after airplane mode went on.
+  const isDeviceOffline = useIsOffline()
+  const isOffline = requirementsCache.isOffline || isDeviceOffline
   const load = requirementsCache.reload
 
   // Gear gets its own cache rather than riding along with the requirements
@@ -109,7 +116,7 @@ export default function InventoryScreen() {
     cacheKey: CACHE_KEY.gear,
   })
   const myItems = gearCache.data ?? []
-  const isGearOffline = gearCache.isOffline
+  const isGearOffline = gearCache.isOffline || isDeviceOffline
   const loadGear = gearCache.reload
 
   // The kit resolves independently of the requirements above: it is a different
@@ -133,7 +140,7 @@ export default function InventoryScreen() {
   })
   const packingItems = kitCache.data
   const kitError = kitCache.error
-  const isKitOffline = kitCache.isOffline
+  const isKitOffline = kitCache.isOffline || isDeviceOffline
   const loadKit = kitCache.reload
   const setPackingItems = kitCache.setData
   const setKitError = kitCache.setError
@@ -295,9 +302,8 @@ export default function InventoryScreen() {
 
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={isOffline} cachedAt={requirementsCache.cachedAt}>
-            Offline — showing your last synced requirements. Adding, covering, and removing
-            need a connection.
+          <OfflineNotice visible={requirementsCache.isOffline} cachedAt={requirementsCache.cachedAt}>
+            Adding, covering, and removing need a connection.
           </OfflineNotice>
           <Row className="gap-2">
             <Input
@@ -395,6 +401,7 @@ export default function InventoryScreen() {
                             key={item.id}
                             size="sm"
                             variant="outline"
+                            disabled={isOffline}
                             onPress={() => void handleContribute(requirement, item)}
                           >
                             {item.name}
@@ -412,29 +419,50 @@ export default function InventoryScreen() {
 
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={isKitOffline} cachedAt={kitCache.cachedAt}>
-            Offline — showing your last synced kit. Packing, adding, and removing need a
-            connection.
+          <OfflineNotice visible={kitCache.isOffline} cachedAt={kitCache.cachedAt}>
+            Packing, adding, and removing need a connection.
           </OfflineNotice>
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}
+          {/* Same shape as a Group requirement card: the name as the title, the
+              state as an icon and a labelled badge, the actions in a row below.
+              The packed state used to live only in the name button's variant,
+              which nobody could read as "packed" without already knowing. */}
           {(packingItems ?? []).map((entry) => (
             <Card key={entry.id}>
-              <CardContent>
+              <CardHeader>
                 <Row className="justify-between">
-                  <Button
-                    variant={entry.checked ? "secondary" : "outline"}
-                    disabled={busyId === entry.id || isKitOffline}
-                    onPress={() => void handleTogglePacking(entry)}
-                  >
+                  <CardTitle className="flex-1" numberOfLines={1}>
                     {entry.item?.name ?? "Item"}
-                  </Button>
+                  </CardTitle>
+                  <Row className="items-center gap-1.5">
+                    {entry.checked ? (
+                      <PackageCheckIcon size={12} color={palette.ocean500} />
+                    ) : (
+                      <PackageIcon size={12} color={palette.ocean500} />
+                    )}
+                    <Badge variant={entry.checked ? "default" : "secondary"}>
+                      {entry.checked ? "Packed" : "To pack"}
+                    </Badge>
+                  </Row>
+                </Row>
+              </CardHeader>
+              <CardContent>
+                <Row className="gap-2">
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="outline"
                     disabled={busyId === entry.id || isKitOffline}
                     onPress={() => confirmRemovePacking(entry)}
                   >
                     Remove
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={entry.checked ? "outline" : "default"}
+                    disabled={busyId === entry.id || isKitOffline}
+                    onPress={() => void handleTogglePacking(entry)}
+                  >
+                    {entry.checked ? "Unpack" : "Pack"}
                   </Button>
                 </Row>
               </CardContent>

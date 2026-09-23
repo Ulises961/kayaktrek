@@ -40,6 +40,18 @@ export const STALENESS_BUDGET_MS: Record<SyncTier, number> = {
   [SYNC_TIER.PLANNED]: 6 * 60 * 60 * 1000,
 }
 
+// Tier 3 — the paddler's own gear closet. Not in the table above because it is
+// not trip-scoped and so never enters `planSweep`, which reasons entirely about
+// trips; the sweep applies this one directly. Longer than a planned trip's
+// budget: a gear library changes when someone buys or retires a piece of kit,
+// which is rare, and it is read at packing time rather than on the water.
+export const GEAR_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
+
+// The buddy list and blocklist, on the same reasoning: the paddler's own, not
+// trip-scoped, and changed by a request being accepted rather than by the
+// trip clock. A day old is fine for "who can I invite", which is its reader.
+export const PADDLERS_STALENESS_BUDGET_MS = 24 * 60 * 60 * 1000
+
 export type SweepTrip = {
   id: string
   state: TripState | null

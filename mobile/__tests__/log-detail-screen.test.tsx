@@ -1,4 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
+
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
 import { Alert } from "react-native"
 
 import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
@@ -15,6 +17,7 @@ jest.mock("expo-router", () => {
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useLocalSearchParams: () => ({ id: "log-1" }),
     useRouter: () => ({ back: mockBack }),
+    useIsFocused: () => true,
   }
 })
 
@@ -89,7 +92,7 @@ describe("LogDetailScreen — owner", () => {
     mockGetLog.mockResolvedValue(OWN_LOG)
     mockDeleteLog.mockResolvedValue(undefined)
 
-    const { findByText, getByText } = await render(<LogDetailScreen />)
+    const { findByText, getByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("Delete log")
 
     await fireEvent.press(getByText("Delete log"))
@@ -112,7 +115,7 @@ describe("LogDetailScreen — someone else's log", () => {
   it("shows the icon meta row and an endorse toggle, no delete button", async () => {
     mockGetLog.mockResolvedValue(OTHERS_LOG)
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />)
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("3.0h")).toBeTruthy()
     expect(queryByText("Delete log")).toBeNull()
@@ -141,7 +144,7 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: 1,
     })
 
-    const { findByText, getByText, queryByText } = await render(<LogDetailScreen />)
+    const { findByText, getByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("2026-06-01")).toBeTruthy()
     expect(getByText("3.0h")).toBeTruthy()
@@ -159,13 +162,13 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: null,
     })
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />)
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("2026-06-01")
 
     expect(queryByText("Delete log")).toBeNull()
     expect(queryByText("Save changes")).toBeNull()
-    expect(await findByText(/Offline — showing your last synced log/)).toBeTruthy()
-    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(await findByText(/Can't reach the server\./)).toBeTruthy()
+    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
   it("offers no endorsement toggle on a cached log from the endorsed list", async () => {
@@ -179,7 +182,7 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: null,
     })
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />)
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
     await findByText("2026-06-01")
 
     expect(queryByText("Endorse this log")).toBeNull()
@@ -189,7 +192,7 @@ describe("LogDetailScreen — offline", () => {
   it("surfaces the error when the log was never cached", async () => {
     mockLoadCachedLog.mockResolvedValue(null)
 
-    const { findByText } = await render(<LogDetailScreen />)
+    const { findByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })

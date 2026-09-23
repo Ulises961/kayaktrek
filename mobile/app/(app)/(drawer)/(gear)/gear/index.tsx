@@ -15,7 +15,11 @@ import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { SectionLabel } from "@mobile/components/ui/section-label"
+import { OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
+import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
+import { type GearCardData, loadGearCache, saveGearCache } from "@mobile/lib/db/gear-cache"
+import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import {
   createItem,
   deleteItem,
@@ -23,6 +27,7 @@ import {
   getMyItems,
   setDefaultPack,
 } from "@mobile/lib/inventory/actions"
+import { useIsOffline } from "@mobile/lib/network/use-is-offline"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Gear" drawer
 // item's root screen, so it supplies its own menu button.
@@ -33,16 +38,52 @@ const header = (
 const UNCATEGORISED = "Uncategorised"
 const UNCATEGORISED_SLUG = "uncategorised"
 
+// The cache stores a category's name, not the full ItemCategory — so the slug
+// the filter chips key on is derived here. Only internal consistency matters:
+// the chips and the filter both read it off this same array, never off a
+// server-issued slug, so a derived value cannot disagree with anything.
+function toItem(gear: GearCardData): Item {
+  return {
+    id: gear.id,
+    name: gear.name,
+    status: gear.status as Item["status"],
+    defaultPack: gear.defaultPack,
+    category: gear.categoryName
+      ? { name: gear.categoryName, slug: gear.categoryName.toLowerCase() }
+      : null,
+  } as Item
+}
+
 // Mobile's cut of web's gear closet (frontend/components/inventory/gear-closet.tsx):
 // the paddler's own kit, grouped by category, with M10's default-pack flag on each
 // item. Items are personal and never tied to an inventory — a trip requirement points
 // at one, it does not own it.
 export default function GearScreen() {
-  const [items, setItems] = useState<Item[] | null>(null)
   const [categories, setCategories] = useState<ItemCategory[]>([])
-  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // M9c WP7 tier 3: this screen shipped with no offline handling, so a failed
+  // fetch showed an error even though `cached_gear` already existed and the
+  // Items screen was already reading it. "Did I pack the spare paddle" is asked
+  // at the put-in, which is exactly where there is no signal.
+  const gearCache = useLiveCache<Item[]>({
+    fetchLive: getMyItems,
+    loadCache: async () => (await loadGearCache()).map(toItem),
+    saveCache: saveGearCache,
+    isCacheEmpty: (gear) => gear.length === 0,
+    cacheKey: CACHE_KEY.gear,
+  })
+  const items = gearCache.data
+  const error = gearCache.error
+  // Two different facts. `isShowingCache` is about the data on screen; the
+  // device's connectivity is about whether acting on it can work. Only the
+  // first used to disable the controls, so a closet loaded with signal kept
+  // offering "Add gear" after airplane mode went on — found on a device.
+  const isShowingCache = gearCache.isOffline
+  const isDeviceOffline = useIsOffline()
+  const isOffline = isShowingCache || isDeviceOffline
+  const setError = gearCache.setError
 
   // Multi-select, mirroring Explore's season chips: "paddling and camping" is a real
   // question to ask of a kit list, and a single-select row cannot answer it.
@@ -53,19 +94,18 @@ export default function GearScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
 
+  const reload = gearCache.reload
   const load = useCallback(async () => {
-    setError(null)
     try {
-      setItems(await getMyItems())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
+      await reload()
     } finally {
       setRefreshing(false)
     }
-  }, [])
+  }, [reload])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // No set-state-in-effect disable needed here any more: the setState calls
+    // moved inside useLiveCache when this screen took the cache fallback.
     void load()
     // Categories only label and group; a failure here must not fail the closet.
     void getItemCategories()
@@ -121,7 +161,7 @@ export default function GearScreen() {
   }
 
   async function submitNewItem() {
-    if (!name.trim()) return
+    if (!name.trim() || isOffline) return
     setAdding(true)
     setError(null)
     try {
@@ -138,7 +178,11 @@ export default function GearScreen() {
   }
 
   async function toggleDefault(item: Item) {
-    if (!item.id) return
+    // Every mutation on this screen is guarded the same way: the cached closet
+    // is a faithful read of the last sync, but acting on it would fail against
+    // the network, and a control that looks live and then fails is worse than
+    // one that is plainly unavailable.
+    if (!item.id || isOffline) return
     setBusyId(item.id)
     try {
       await setDefaultPack(item.id, !item.defaultPack)
@@ -151,6 +195,7 @@ export default function GearScreen() {
   }
 
   function confirmDelete(item: Item) {
+    if (isOffline) return
     Alert.alert("Delete this gear?", `${item.name} will be removed from your closet.`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -192,6 +237,9 @@ export default function GearScreen() {
           />
         }
       >
+        <OfflineNotice visible={isShowingCache} cachedAt={gearCache.cachedAt}>
+          Adding, deleting and changing default pack need a connection.
+        </OfflineNotice>
         {error && <Text className="text-sm text-destructive">{error}</Text>}
         {error && items === null && (
           <Button
@@ -260,7 +308,7 @@ export default function GearScreen() {
               <Row className="gap-2">
                 <Button
                   variant="cta"
-                  disabled={adding}
+                  disabled={adding || isOffline}
                   onPress={() => void submitNewItem()}
                   testID="gear-add-submit"
                 >
@@ -276,6 +324,7 @@ export default function GearScreen() {
           <Button
             variant="cta"
             className="self-start"
+            disabled={isOffline}
             onPress={() => setAddOpen(true)}
             testID="gear-add-open"
             icon={<PlusIcon size={16} color={palette.sand} />}
@@ -315,6 +364,7 @@ export default function GearScreen() {
                         variant="ghost"
                         size="icon-sm"
                         accessibilityLabel={`Delete ${item.name}`}
+                        disabled={isOffline}
                         onPress={() => confirmDelete(item)}
                         testID={`delete-${item.id}`}
                         icon={<Trash2Icon size={14} color={lightTokens.destructive} />}
@@ -326,7 +376,7 @@ export default function GearScreen() {
                         labelled control rather than a bare icon. */}
                     <Chip
                       active={!!item.defaultPack}
-                      disabled={busyId === item.id}
+                      disabled={isOffline || busyId === item.id}
                       onPress={() => void toggleDefault(item)}
                       testID={`default-pack-${item.id}`}
                       className="self-start"

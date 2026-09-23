@@ -131,10 +131,7 @@ export default function TripDetailScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <Stack className="gap-4 p-4">
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
-          Offline — showing your last synced trip summary. Each screen below shows whatever it
-          last synced.
-        </OfflineNotice>
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
         <Card>
           <CardContent className="gap-3">
             <Row className="justify-between">

@@ -5,10 +5,11 @@ import { ActivityIndicator, ScrollView } from "react-native"
 
 import type { ConnectionUser } from "@shared/dtos/connection"
 import type { Trip } from "@shared/dtos/trip"
-import type { TripMember } from "@shared/dtos/trip-member"
+import type { OfflineCrewMember } from "@mobile/lib/db/offline-float-plan"
 import { formatPaddlerName } from "@shared/user/format"
 import { lightTokens } from "@shared/tokens"
 
+import { isOfflineError } from "@mobile/lib/api/client"
 import { listConnections } from "@mobile/lib/connections/actions"
 import { getSession } from "@mobile/lib/auth/session"
 import {
@@ -23,11 +24,23 @@ import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { EmptyPanel } from "@mobile/components/ui/empty-panel"
 import { Input } from "@mobile/components/ui/input"
+import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
+import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
+import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 
 const header = <RouterStack.Screen options={{ title: "Crew" }} />
+
+// What a crew row reads. Both the live TripMember and the synced
+// OfflineCrewMember satisfy it — the cached one just has no user id, which only
+// the leader-only actions need. Same idiom as float-plan.tsx's CrewMemberView.
+type CrewRow = {
+  id?: string | null
+  role: string
+  user: { id?: string | null; name: string; surname?: string | null; username?: string | null }
+}
 
 // Mobile port of frontend/components/trips/tabs/crew-tab.tsx — member list with
 // roles, leader-only invite (from accepted buddies, mirroring InviteBuddyPicker) and
@@ -45,13 +58,29 @@ export default function CrewScreen() {
   const [buddies, setBuddies] = useState<ConnectionUser[] | null>(null)
   const [term, setTerm] = useState("")
 
+  // The members are already on the device — every trip sync pulls
+  // trip_members, which the float plan reads offline too. Falling back to them
+  // turns "nothing without a connection" into the list itself, read-only:
+  // membership changes and invitations need the server, and pending
+  // invitations are not synced, so neither is offered from the cache.
+  const [cachedCrew, setCachedCrew] = useState<OfflineCrewMember[] | null>(null)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setError(null)
     try {
       const [t, session] = await Promise.all([getTrip(id), getSession()])
       setTrip(t)
+      setCachedCrew(null)
       setCurrentUserId(session?.userId ?? null)
     } catch (err) {
+      const offlineCrew = await loadOfflineCrew(id)
+      if (offlineCrew.length > 0) {
+        setCachedCrew(offlineCrew)
+        // Same age the float plan shows for the same rows: the trip's delta sync.
+        setCachedAt(await readCachedAt(CACHE_KEY.tripSync(id)))
+        return
+      }
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
     }
   }, [id])
@@ -61,10 +90,14 @@ export default function CrewScreen() {
     void load()
   }, [load])
 
-  const travellers = trip?.travellers ?? []
+  const isShowingCache = !trip && cachedCrew !== null
+  const travellers: CrewRow[] = trip?.travellers ?? cachedCrew ?? []
   const pendingTravellers = trip?.pendingTravellers ?? []
   const leader = travellers.find((m) => m.role === "leader")
-  const isLeader = !!currentUserId && !!leader && leader.user.id === currentUserId
+  // Never from the cache: it carries no user ids, and every leader action
+  // needs the server anyway.
+  const isLeader =
+    !isShowingCache && !!currentUserId && !!leader && leader.user.id === currentUserId
 
   async function loadBuddies() {
     setInviteOpen(true)
@@ -123,7 +156,13 @@ export default function CrewScreen() {
     }
   }
 
-  if (!trip && !error) {
+  // Offline is the expected state at sea, not a fault: the banner says it, and
+  // the raw network error stays out of the screen. With nothing ever loaded,
+  // "No crew yet" below would be a false answer, so the body stays empty.
+  const needsConnection = isOfflineError(error)
+  const notice = <NeedsConnectionNotice visible={needsConnection}>Crew needs a connection.</NeedsConnectionNotice>
+
+  if (!trip && !isShowingCache && !error) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
         {header}
@@ -132,11 +171,24 @@ export default function CrewScreen() {
     )
   }
 
+  if (!trip && needsConnection) {
+    return (
+      <Screen edges={["bottom"]}>
+        {header}
+        {notice}
+      </Screen>
+    )
+  }
+
   return (
     <Screen edges={["bottom"]}>
       {header}
+      {notice}
+      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt}>
+        Inviting and removing crew need a connection.
+      </OfflineNotice>
       <ScrollView contentContainerClassName="gap-5 p-4">
-        {error && <Text className="text-center text-destructive">{error}</Text>}
+        {error && !needsConnection && <Text className="text-center text-destructive">{error}</Text>}
 
         <Stack className="gap-3">
           <SectionLabel>Crew ({travellers.length})</SectionLabel>
@@ -148,7 +200,7 @@ export default function CrewScreen() {
             />
           ) : (
             <Stack className="gap-2">
-              {travellers.map((member: TripMember) => {
+              {travellers.map((member) => {
                 const displayName = formatPaddlerName(member.user)
                 const canRemove = isLeader && member.user.id && member.user.id !== leader?.user.id
                 return (

@@ -50,6 +50,11 @@ export class SessionExpiredError extends Error {
 // error banner.
 export const OFFLINE_ERROR_MESSAGE = "Could not reach the server. Please check your connection and try again."
 
+// For screens that hold their error as the message string they display.
+export function isOfflineError(message: string | null): boolean {
+  return message === OFFLINE_ERROR_MESSAGE
+}
+
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 

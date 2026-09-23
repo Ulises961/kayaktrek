@@ -1,13 +1,31 @@
 import { TRIP_STATE } from "@shared/dtos/trip"
 
+import { getMyItems } from "../../inventory/actions"
+import { getPackingItems } from "../../inventory/personal-packing-actions"
 import { CACHE_KEY, readCachedAt } from "../cache-freshness"
+import { saveGearCache } from "../gear-cache"
+import { saveKitCache } from "../kit-cache"
+import { saveRequirementsCache } from "../requirements-cache"
+import { saveBlocksCache, saveConnectionsCache } from "../paddlers-cache"
+import { listConnections } from "../../connections/actions"
+import { listBlocks } from "../../blocks/actions"
 import { pullRoute } from "../route-sync"
+import { getTrip } from "../../trips/actions"
 import { runSweep } from "../sweep"
 import { syncTrip } from "../sync"
 import { loadTripListCache } from "../trip-list-cache"
 
 jest.mock("../database", () => ({ database: {} }))
 jest.mock("../trip-list-cache", () => ({ loadTripListCache: jest.fn() }))
+jest.mock("../../inventory/actions", () => ({ getMyItems: jest.fn() }))
+jest.mock("../../inventory/personal-packing-actions", () => ({ getPackingItems: jest.fn() }))
+jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
+jest.mock("../kit-cache", () => ({ saveKitCache: jest.fn() }))
+jest.mock("../requirements-cache", () => ({ saveRequirementsCache: jest.fn() }))
+jest.mock("../paddlers-cache", () => ({ saveConnectionsCache: jest.fn(), saveBlocksCache: jest.fn() }))
+jest.mock("../../connections/actions", () => ({ listConnections: jest.fn() }))
+jest.mock("../../blocks/actions", () => ({ listBlocks: jest.fn() }))
+jest.mock("../../trips/actions", () => ({ getTrip: jest.fn() }))
 jest.mock("../cache-freshness", () => ({
   ...jest.requireActual("../cache-freshness"),
   readCachedAt: jest.fn(),
@@ -19,6 +37,16 @@ const mockLoadTripListCache = loadTripListCache as jest.Mock
 const mockReadCachedAt = readCachedAt as jest.Mock
 const mockSyncTrip = syncTrip as jest.Mock
 const mockPullRoute = pullRoute as jest.Mock
+const mockGetMyItems = getMyItems as jest.Mock
+const mockGetPackingItems = getPackingItems as jest.Mock
+const mockSaveGearCache = saveGearCache as jest.Mock
+const mockSaveKitCache = saveKitCache as jest.Mock
+const mockGetTrip = getTrip as jest.Mock
+const mockSaveRequirementsCache = saveRequirementsCache as jest.Mock
+const mockListConnections = listConnections as jest.Mock
+const mockListBlocks = listBlocks as jest.Mock
+const mockSaveConnectionsCache = saveConnectionsCache as jest.Mock
+const mockSaveBlocksCache = saveBlocksCache as jest.Mock
 
 function cachedTrip(overrides: Record<string, unknown> = {}) {
   return {
@@ -47,6 +75,16 @@ beforeEach(() => {
   mockReadCachedAt.mockResolvedValue(null)
   mockSyncTrip.mockResolvedValue(undefined)
   mockPullRoute.mockResolvedValue(undefined)
+  mockGetMyItems.mockResolvedValue([])
+  mockGetPackingItems.mockResolvedValue([])
+  mockSaveGearCache.mockResolvedValue(undefined)
+  mockSaveKitCache.mockResolvedValue(undefined)
+  mockGetTrip.mockResolvedValue({ inventory: { requirements: [] } })
+  mockSaveRequirementsCache.mockResolvedValue(undefined)
+  mockListConnections.mockResolvedValue([])
+  mockListBlocks.mockResolvedValue([])
+  mockSaveConnectionsCache.mockResolvedValue(undefined)
+  mockSaveBlocksCache.mockResolvedValue(undefined)
 })
 
 describe("runSweep", () => {
@@ -215,5 +253,307 @@ describe("runSweep", () => {
     // sweep is fire-and-forget and must never block a render.
     expect(peak).toBeLessThanOrEqual(2)
     expect(mockSyncTrip).toHaveBeenCalledTimes(6)
+  })
+})
+
+// Tier 3 — the paddler's own kit and gear library (docs/adr/mobile-offline.md's
+// tier table). Both caches already existed and both read screens already fall
+// back to them; what was missing was anything WARMING them. They only filled if
+// you happened to open the Items screen's "My kit" tab, or the Gear screen,
+// while online — the same per-screen laziness the trip sweep exists to remove.
+describe("runSweep — tier 3, kit and gear", () => {
+  it("warms the gear closet, which is not scoped to any trip", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockGetMyItems.mockResolvedValue([{ id: "item-1", name: "Spare paddle" }])
+
+    await runSweep()
+
+    // No trips at all and it still runs: the closet is the user's, not a
+    // trip's, so it must not be gated on having a syncable trip.
+    expect(mockGetMyItems).toHaveBeenCalled()
+    expect(mockSaveGearCache).toHaveBeenCalledWith([{ id: "item-1", name: "Spare paddle" }])
+  })
+
+  it("fetches the closet once per sweep, not once per trip", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "t1" }),
+      cachedTrip({ id: "t2" }),
+      cachedTrip({ id: "t3" }),
+    ])
+
+    await runSweep()
+
+    expect(mockGetMyItems).toHaveBeenCalledTimes(1)
+  })
+
+  it("warms the per-trip kit for each trip it sweeps", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" }), cachedTrip({ id: "t2" })])
+    mockGetPackingItems.mockImplementation(async (tripId: string) => [
+      { id: `entry-${tripId}`, checked: false },
+    ])
+
+    await runSweep()
+
+    expect(mockGetPackingItems.mock.calls.map(([id]) => id).sort()).toEqual(["t1", "t2"])
+    expect(mockSaveKitCache).toHaveBeenCalledWith("t1", [{ id: "entry-t1", checked: false }])
+    expect(mockSaveKitCache).toHaveBeenCalledWith("t2", [{ id: "entry-t2", checked: false }])
+  })
+
+  // The kit rides the trip's own tier rather than a flat schedule, so a trip
+  // leaving tomorrow gets its packing list warmed at tier 1 urgency — packing
+  // happens before departure, which is exactly when the trip is most urgent.
+  it("does not warm the kit for a trip the sweep skipped", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "past", state: TRIP_STATE.PAST, dateFrom: "2020-01-01" }),
+    ])
+
+    await runSweep()
+
+    expect(mockGetPackingItems).not.toHaveBeenCalled()
+    expect(mockSaveKitCache).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failing closet fetch from costing the trips their sync", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetMyItems.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSyncTrip).toHaveBeenCalledWith("t1")
+    expect(mockSaveGearCache).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failing kit fetch from costing that trip its route", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetPackingItems.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockPullRoute).toHaveBeenCalledWith("t1")
+    expect(mockSaveKitCache).not.toHaveBeenCalled()
+  })
+
+  // The trip's Group checklist. It only arrives inside the full trip detail —
+  // there is no lighter endpoint — but the alternative is the same hole the
+  // route had: a trip whose Items screen was never opened while connected has
+  // no requirements offline at all.
+  it("warms each swept trip's requirements from its trip detail", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" }), cachedTrip({ id: "t2" })])
+    mockGetTrip.mockImplementation(async (tripId: string) => ({
+      id: tripId,
+      inventory: { requirements: [{ id: `req-${tripId}`, name: "VHF radio" }] },
+    }))
+
+    await runSweep()
+
+    expect(mockGetTrip.mock.calls.map(([id]) => id).sort()).toEqual(["t1", "t2"])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [
+      { id: "req-t1", name: "VHF radio" },
+    ])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t2", [
+      { id: "req-t2", name: "VHF radio" },
+    ])
+  })
+
+  // An empty checklist is a real answer and must replace a stale one, not be
+  // mistaken for "nothing to save" — a requirement removed on web would
+  // otherwise linger in the offline copy forever.
+  it("caches an empty checklist for a trip with no inventory", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockResolvedValue({ id: "t1", inventory: null })
+
+    await runSweep()
+
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [])
+  })
+
+  it("does not fetch requirements for a trip the sweep skipped", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "past", state: TRIP_STATE.PAST, dateFrom: "2020-01-01" }),
+    ])
+
+    await runSweep()
+
+    expect(mockGetTrip).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failing requirements fetch from costing that trip its route and kit", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockPullRoute).toHaveBeenCalledWith("t1")
+    expect(mockSaveKitCache).toHaveBeenCalledWith("t1", [])
+    expect(mockSaveRequirementsCache).not.toHaveBeenCalled()
+  })
+
+  // The same per-screen laziness as the gear closet had: Paddlers only filled
+  // its caches when opened online, so a device that never opened it while
+  // connected showed nothing there offline.
+  it("warms the buddy list and the blocklist, which are not scoped to any trip", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockListConnections.mockResolvedValue([{ id: "conn-1" }])
+    mockListBlocks.mockResolvedValue([{ id: "block-1" }])
+
+    await runSweep()
+
+    expect(mockSaveConnectionsCache).toHaveBeenCalledWith([{ id: "conn-1" }])
+    expect(mockSaveBlocksCache).toHaveBeenCalledWith([{ id: "block-1" }])
+  })
+
+  it("keeps a failing buddy fetch from costing the blocklist or the closet", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockListConnections.mockRejectedValue(new Error("Could not reach the server."))
+    mockListBlocks.mockResolvedValue([])
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveBlocksCache).toHaveBeenCalledWith([])
+    expect(mockSaveGearCache).toHaveBeenCalled()
+    expect(mockSaveConnectionsCache).not.toHaveBeenCalled()
+  })
+
+  it("skips the buddy list and blocklist while each is inside its budget", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockReadCachedAt.mockImplementation(async (key: string) =>
+      key === CACHE_KEY.connections || key === CACHE_KEY.blocks ? new Date().toISOString() : null,
+    )
+
+    await runSweep()
+
+    expect(mockListConnections).not.toHaveBeenCalled()
+    expect(mockListBlocks).not.toHaveBeenCalled()
+  })
+
+  it("skips the closet while it is inside its own budget", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockReadCachedAt.mockImplementation(async (key: string) =>
+      key === CACHE_KEY.gear ? new Date().toISOString() : null,
+    )
+
+    await runSweep()
+
+    expect(mockGetMyItems).not.toHaveBeenCalled()
+  })
+})
+
+// A sweep that fails silently was right for the paddler and wrong for anyone
+// diagnosing it: on-device testing found one trip missing its crew sync and
+// another missing its route, with no way to tell why. Nothing surfaces to the
+// UI — this only has to leave a trace a developer can read.
+describe("runSweep — failure reporting", () => {
+  let warn: jest.SpyInstance
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warn.mockRestore()
+  })
+
+  it("names the trip and the channel when one fails", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+    mockPullRoute.mockRejectedValue(new Error("No itinerary for trip"))
+
+    await runSweep()
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("trip-7"),
+      expect.objectContaining({ message: "No itinerary for trip" }),
+    )
+    expect(warn.mock.calls.some(([label]) => String(label).includes("route"))).toBe(true)
+  })
+
+  it("reports each failing channel separately rather than collapsing them", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+    mockSyncTrip.mockRejectedValue(new Error("sync boom"))
+    mockPullRoute.mockRejectedValue(new Error("route boom"))
+
+    await runSweep()
+
+    const labels = warn.mock.calls.map(([label]) => String(label))
+    expect(labels.some((label) => label.includes("sync"))).toBe(true)
+    expect(labels.some((label) => label.includes("route"))).toBe(true)
+  })
+
+  it("reports a failing gear closet under its own name, not a trip's", async () => {
+    mockLoadTripListCache.mockResolvedValue([])
+    mockGetMyItems.mockRejectedValue(new Error("closet boom"))
+
+    await runSweep()
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("gear closet"),
+      expect.objectContaining({ message: "closet boom" }),
+    )
+  })
+
+  it("stays quiet when everything succeeds", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "trip-7" })])
+
+    await runSweep()
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+// Found on a real device, not by these tests: with two trips swept at once,
+// one of them came back with no crew and no freshness, and the logged reason
+// was "[Sync] Concurrent synchronization is not allowed. More than one
+// synchronize() call was running at the same time, and the later one was
+// aborted". `synchronize()` is global to the local database, not scoped to the
+// trip whose endpoint it pulls, so the sweep's own concurrency bound was
+// silently costing every batch one trip's aggregates.
+//
+// These tests exist because the earlier ones mocked `syncTrip` as an
+// independent promise and so could never have caught it.
+describe("runSweep — synchronize() is not concurrency-safe", () => {
+  it("never overlaps two syncTrip calls, even while sweeping trips in parallel", async () => {
+    mockLoadTripListCache.mockResolvedValue(
+      Array.from({ length: 4 }, (_unused, index) => cachedTrip({ id: `t${index}` })),
+    )
+    let inFlight = 0
+    let peak = 0
+    mockSyncTrip.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setImmediate(resolve))
+      inFlight -= 1
+    })
+
+    await runSweep()
+
+    expect(peak).toBe(1)
+    expect(mockSyncTrip).toHaveBeenCalledTimes(4)
+  })
+
+  it("keeps the route and kit channels concurrent, which have no such constraint", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t0" }), cachedTrip({ id: "t1" })])
+    let peak = 0
+    let inFlight = 0
+    mockPullRoute.mockImplementation(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setImmediate(resolve))
+      inFlight -= 1
+    })
+
+    await runSweep()
+
+    // Serialising everything would have been the easy fix and would have made
+    // a cold multi-trip sweep needlessly slow on the marginal link it is most
+    // likely to run on.
+    expect(peak).toBe(2)
+  })
+
+  it("releases the sync lock when a trip's sync throws, so later trips still sync", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t0" }), cachedTrip({ id: "t1" })])
+    mockSyncTrip.mockRejectedValueOnce(new Error("boom"))
+
+    await runSweep()
+
+    expect(mockSyncTrip).toHaveBeenCalledTimes(2)
   })
 })

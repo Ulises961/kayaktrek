@@ -1,5 +1,7 @@
 import { render, waitFor } from "@testing-library/react-native"
 
+import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+
 import FloatPlanScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/float-plan"
 import { getLogistics, getTrip } from "../lib/trips/actions"
 import { loadOfflineCrew } from "../lib/db/offline-float-plan"
@@ -8,6 +10,7 @@ import { loadTripListCache } from "../lib/db/trip-list-cache"
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "trip-1" }),
   Stack: { Screen: () => null },
+  useIsFocused: () => true,
 }))
 
 jest.mock("../lib/trips/actions", () => ({
@@ -53,7 +56,7 @@ describe("FloatPlanScreen", () => {
     })
     mockGetLogistics.mockResolvedValue({ shoreContactName: "Jo Shore" })
 
-    const { findByText } = await render(<FloatPlanScreen />)
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Sam Lee")).toBeTruthy()
     expect(await findByText("Jo Shore")).toBeTruthy()
@@ -66,18 +69,18 @@ describe("FloatPlanScreen", () => {
     ])
     mockLoadTripListCache.mockResolvedValue([{ id: "trip-1", state: "happening" }])
 
-    const { findByText } = await render(<FloatPlanScreen />)
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Cached Paddler")).toBeTruthy()
     expect(await findByText("Shore contact needs a connection.")).toBeTruthy()
-    expect(await findByText(/Offline/)).toBeTruthy()
-    expect(await findByText(/Updated 2 days ago/)).toBeTruthy()
+    expect(await findByText(/Can't reach the server\./)).toBeTruthy()
+    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
   it("surfaces the error when there is nothing cached to fall back to", async () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
 
-    const { findByText } = await render(<FloatPlanScreen />)
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -88,7 +91,7 @@ describe("FloatPlanScreen", () => {
       { id: "m1", role: "crew", user: { name: "A", surname: "B" } },
     ])
 
-    const { findByText } = await render(<FloatPlanScreen />)
+    const { findByText } = await render(<FloatPlanScreen />, { wrapper: WithOfflineBanner })
     await waitFor(() => expect(mockLoadOfflineCrew).toHaveBeenCalledWith("trip-1"))
     expect(await findByText("A B")).toBeTruthy()
   })

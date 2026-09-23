@@ -21,7 +21,9 @@ import { Badge } from "@mobile/components/ui/badge"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
+import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
+import { isOfflineError } from "@mobile/lib/api/client"
 import { fetchPublicItineraryDetail } from "@mobile/lib/explore/actions"
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days"
 import { MAP_STYLE } from "@mobile/lib/map/tiles"
@@ -125,10 +127,15 @@ export default function PublicRouteScreen() {
   }
 
   if (error) {
+    // Not cached by choice (a discovery surface, acted on while connected), so
+    // offline is expected: the banner says so rather than a red network error.
     return (
       <Screen className="p-4" edges={["bottom"]}>
         {header}
-        <Text className="text-sm text-destructive">{error}</Text>
+        <NeedsConnectionNotice visible={isOfflineError(error)}>
+          Explore needs a connection.
+        </NeedsConnectionNotice>
+        {!isOfflineError(error) && <Text className="text-sm text-destructive">{error}</Text>}
       </Screen>
     )
   }

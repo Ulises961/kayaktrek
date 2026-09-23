@@ -116,8 +116,7 @@ export default function LogDetailScreen() {
       <Screen edges={["bottom"]} className="gap-4 p-4">
         {header}
         <OfflineNotice cachedAt={cachedAt}>
-          Offline — showing your last synced log. Notes, endorsements, and editing need a
-          connection.
+          Notes, endorsements, and editing need a connection.
         </OfflineNotice>
         <Text className="text-lg font-semibold">{cachedLog.date}</Text>
         <Row className="flex-wrap gap-x-3 gap-y-1">

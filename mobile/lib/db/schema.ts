@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 8,
+  version: 9,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -264,6 +264,15 @@ export const appDatabaseSchema = appSchema({
       columns: [
         { name: "name", type: "string" },
         { name: "status", type: "string", isOptional: true },
+        // Added at v9, when M30 WP5's Gear screen became a second offline
+        // reader of this cache. The comment above was written when the only
+        // reader was the Items screen's contribute list, which needs a name and
+        // a status; the Gear screen groups by category and renders M10's
+        // default-pack flag, so dropping both left it unable to render
+        // faithfully — an item would have shown as unfiled and not-default
+        // regardless of what it actually is.
+        { name: "category_name", type: "string", isOptional: true },
+        { name: "default_pack", type: "boolean", isOptional: true },
       ],
     }),
     tableSchema({

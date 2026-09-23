@@ -32,9 +32,59 @@ describe("gear cache", () => {
     )
 
     expect(await loadGearCache(database)).toEqual([
-      { id: "item-1", name: "Dry bag", status: "owned" },
-      { id: "item-2", name: "Spare paddle", status: "suggested" },
+      { id: "item-1", name: "Dry bag", status: "owned", categoryName: null, defaultPack: false },
+      {
+        id: "item-2",
+        name: "Spare paddle",
+        status: "suggested",
+        categoryName: null,
+        defaultPack: false,
+      },
     ])
+  })
+
+  // Added when the Gear screen shipped (M30 WP5). This cache was written when
+  // the only offline reader was the Items screen's contribute list, which needs
+  // a name and nothing else — the Gear screen groups by category and renders
+  // M10's default-pack flag, and both were being dropped on the way in.
+  it("carries the category and default-pack flag the Gear screen renders", async () => {
+    const database = createTestDatabase()
+
+    await saveGearCache(
+      [
+        {
+          id: "item-1",
+          name: "Dry bag",
+          status: "owned",
+          category: { id: "cat-1", name: "Storage", slug: "storage" },
+          defaultPack: true,
+        },
+      ] as never,
+      database,
+    )
+
+    expect(await loadGearCache(database)).toEqual([
+      {
+        id: "item-1",
+        name: "Dry bag",
+        status: "owned",
+        categoryName: "Storage",
+        defaultPack: true,
+      },
+    ])
+  })
+
+  // An absent flag must read as false, never as "unknown" rendered like true:
+  // default-pack decides what gets suggested onto a future trip, so a wrong
+  // active state offline would misrepresent what the next trip will look like.
+  it("reads a missing default-pack flag as off rather than unset", async () => {
+    const database = createTestDatabase()
+
+    await saveGearCache([{ id: "item-1", name: "Dry bag" }] as never, database)
+
+    const [gear] = await loadGearCache(database)
+    expect(gear.defaultPack).toBe(false)
+    expect(gear.categoryName).toBeNull()
   })
 
   it("replaces the whole closet rather than accumulating removed gear", async () => {

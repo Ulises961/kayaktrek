@@ -141,3 +141,14 @@ describe("syncTrip", () => {
     expect(mockedApiGet).toHaveBeenNthCalledWith(3, "/api/sync/trip/trip-a/pull?lastPulledAt=1700000000000")
   })
 })
+
+// Found on a real device: a trip reported a successful sync, recorded a
+// freshness timestamp, and had no crew at all. Its cursor had been advanced by
+// an earlier attempt whose changes never reached the local database, so every
+// later pull asked "what changed since then?" and the backend correctly
+// answered "nothing" — for rows it had never delivered. The crew was
+// permanently missing until something changed server-side.
+//
+// This is the same class of bug as the per-trip cursor fix in b181d85a: a
+// cursor that advances for data that never landed. There it was the wrong
+// cursor; here it is the right cursor written at the wrong moment.

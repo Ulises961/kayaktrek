@@ -75,6 +75,61 @@ describe("useLiveCache", () => {
     expect(result.current.error).toBe("Could not reach the server.")
   })
 
+  // No buddies, no blocks: an empty list that was synced is an answer, not a
+  // missing cache. The recorded sync time is handed to isCacheEmpty so a
+  // caller can tell them apart — without it, a paddler with no buddies saw an
+  // error offline, forever.
+  it("lets the caller treat a synced empty list as cached data", async () => {
+    const syncedAt = "2026-09-20T08:00:00.000Z"
+    mockReadCachedAt.mockResolvedValue(syncedAt)
+    const fetchLive = jest.fn().mockRejectedValue(new Error("Could not reach the server."))
+    const loadCache = jest.fn().mockResolvedValue([])
+
+    const { result } = await renderHook(() =>
+      useLiveCache({
+        fetchLive,
+        loadCache,
+        saveCache: jest.fn(),
+        isCacheEmpty: (d: string[], cachedAt) => d.length === 0 && cachedAt === null,
+        cacheKey: CACHE_KEY.connections,
+      }),
+    )
+
+    await act(() => result.current.reload())
+
+    expect(result.current.data).toEqual([])
+    expect(result.current.isOffline).toBe(true)
+    expect(result.current.error).toBeNull()
+    expect(result.current.cachedAt).toBe(syncedAt)
+  })
+
+  // A save that throws (or a save mock that returns nothing) used to land in
+  // the fetch's catch and replace the live data with the cached copy.
+  it("keeps the live data when saving it to the cache fails", async () => {
+    mockReadCachedAt.mockResolvedValue("2026-09-20T08:00:00.000Z")
+    const fetchLive = jest.fn().mockResolvedValue(["live"])
+    const loadCache = jest.fn().mockResolvedValue(["stale"])
+    const saveCache = jest.fn(() => {
+      throw new Error("disk full")
+    })
+
+    const { result } = await renderHook(() =>
+      useLiveCache({
+        fetchLive,
+        loadCache,
+        saveCache,
+        isCacheEmpty: (d: string[]) => d.length === 0,
+        cacheKey: CACHE_KEY.connections,
+      }),
+    )
+
+    await act(() => result.current.reload())
+
+    expect(result.current.data).toEqual(["live"])
+    expect(result.current.isOffline).toBe(false)
+    expect(loadCache).not.toHaveBeenCalled()
+  })
+
   it("keeps reload's identity stable across renders, even with fresh inline options", async () => {
     const { result, rerender } = await renderHook(
       (props: { seed: number }) =>

@@ -114,9 +114,9 @@ export default function FloatPlanScreen() {
     <Screen edges={["bottom"]}>
       <RouterStack.Screen options={{ title: "Float plan" }} />
       <ScrollView contentContainerClassName="gap-4 p-4">
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
-          Offline — showing your last synced crew manifest. Shore contact needs a connection.
-        </OfflineNotice>
+        {/* No detail for the banner: the shore contact card below already says it
+            needs a connection, right where someone looking for it will look. */}
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
         <Card>
           <CardHeader>
             <CardTitle>Shore contact</CardTitle>
