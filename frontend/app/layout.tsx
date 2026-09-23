@@ -4,6 +4,7 @@ import { Geist_Mono, DM_Sans, Fraunces } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { siteOrigin } from "@/lib/seo/origin"
 
 const dmSans = DM_Sans({
   variable: "--font-sans",
@@ -35,6 +36,29 @@ export const metadata: Metadata = {
     template: "%s · Kayaktrek",
   },
   description: "Plan, crew, and navigate your sea-kayak expedition",
+  // Relative image paths in the metadata below resolve against this, so a shared link
+  // carries an absolute URL to the real origin rather than one relative to whatever page
+  // was shared.
+  metadataBase: siteOrigin(),
+  // Without these a link preview has nothing to show and the scraper picks for itself —
+  // usually the favicon, which is the bare compass mark and reads as no brand at all
+  // beside the post. `app/opengraph-image.png` is the file-convention card (mark, wordmark
+  // and the descriptor); Next emits its URL, dimensions and alt text from the file itself.
+  openGraph: {
+    type: "website",
+    siteName: "Kayaktrek",
+    title: "Kayaktrek · Sea-kayak expedition planner",
+    description: "Plan, crew, and navigate your sea-kayak expedition",
+    url: "/",
+    locale: "en",
+  },
+  // X falls back to the OpenGraph image when no twitter-image is declared, so only the card
+  // shape is set here — without it the same picture renders as a small square thumbnail.
+  twitter: {
+    card: "summary_large_image",
+    title: "Kayaktrek · Sea-kayak expedition planner",
+    description: "Plan, crew, and navigate your sea-kayak expedition",
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
