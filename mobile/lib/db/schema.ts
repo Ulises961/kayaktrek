@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 9,
+  version: 10,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -288,6 +288,23 @@ export const appDatabaseSchema = appSchema({
         { name: "item_id", type: "string", isOptional: true },
         { name: "item_name", type: "string" },
         { name: "checked", type: "boolean", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // A trip's travel documents and shuttle vehicles — the Logistics screen,
+      // which had no cache at all and so nothing to show offline. One row per
+      // document or vehicle, `kind` telling them apart, the DTO stored whole as
+      // JSON in `payload` and parsed back through its shared Zod schema on
+      // read. Whole rather than column-per-field because the screen is
+      // read-only offline and a vehicle's passengers are a nested list: a
+      // faithful copy is simpler and cannot drift from what the screen renders.
+      // `position` keeps the server's order.
+      name: "cached_logistics",
+      columns: [
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "kind", type: "string" },
+        { name: "position", type: "number" },
+        { name: "payload", type: "string" },
       ],
     }),
   ],

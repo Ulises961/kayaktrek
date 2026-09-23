@@ -7,6 +7,8 @@ import { saveGearCache } from "../gear-cache"
 import { saveKitCache } from "../kit-cache"
 import { saveRequirementsCache } from "../requirements-cache"
 import { saveBlocksCache, saveConnectionsCache } from "../paddlers-cache"
+import { saveLogisticsCache } from "../logistics-cache"
+import { getShuttleVehicles, getTravelDocuments } from "../../logistics/actions"
 import { listConnections } from "../../connections/actions"
 import { listBlocks } from "../../blocks/actions"
 import { pullRoute } from "../route-sync"
@@ -23,6 +25,11 @@ jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
 jest.mock("../kit-cache", () => ({ saveKitCache: jest.fn() }))
 jest.mock("../requirements-cache", () => ({ saveRequirementsCache: jest.fn() }))
 jest.mock("../paddlers-cache", () => ({ saveConnectionsCache: jest.fn(), saveBlocksCache: jest.fn() }))
+jest.mock("../logistics-cache", () => ({ saveLogisticsCache: jest.fn() }))
+jest.mock("../../logistics/actions", () => ({
+  getTravelDocuments: jest.fn(),
+  getShuttleVehicles: jest.fn(),
+}))
 jest.mock("../../connections/actions", () => ({ listConnections: jest.fn() }))
 jest.mock("../../blocks/actions", () => ({ listBlocks: jest.fn() }))
 jest.mock("../../trips/actions", () => ({ getTrip: jest.fn() }))
@@ -47,6 +54,9 @@ const mockListConnections = listConnections as jest.Mock
 const mockListBlocks = listBlocks as jest.Mock
 const mockSaveConnectionsCache = saveConnectionsCache as jest.Mock
 const mockSaveBlocksCache = saveBlocksCache as jest.Mock
+const mockSaveLogisticsCache = saveLogisticsCache as jest.Mock
+const mockGetTravelDocuments = getTravelDocuments as jest.Mock
+const mockGetShuttleVehicles = getShuttleVehicles as jest.Mock
 
 function cachedTrip(overrides: Record<string, unknown> = {}) {
   return {
@@ -85,6 +95,9 @@ beforeEach(() => {
   mockListBlocks.mockResolvedValue([])
   mockSaveConnectionsCache.mockResolvedValue(undefined)
   mockSaveBlocksCache.mockResolvedValue(undefined)
+  mockSaveLogisticsCache.mockResolvedValue(undefined)
+  mockGetTravelDocuments.mockResolvedValue([])
+  mockGetShuttleVehicles.mockResolvedValue([])
 })
 
 describe("runSweep", () => {
@@ -424,6 +437,32 @@ describe("runSweep — tier 3, kit and gear", () => {
 
     expect(mockListConnections).not.toHaveBeenCalled()
     expect(mockListBlocks).not.toHaveBeenCalled()
+  })
+
+  // Travel documents and shuttle vehicles ride their trip's own tier, like the
+  // kit and requirements: "which van am I in, and where is the pickup" is asked
+  // on the morning of departure, when that trip is at its most urgent.
+  it("warms each swept trip's logistics", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTravelDocuments.mockResolvedValue([{ id: "doc-1", name: "Permit" }])
+    mockGetShuttleVehicles.mockResolvedValue([{ id: "van-1", passengers: [] }])
+
+    await runSweep()
+
+    expect(mockSaveLogisticsCache).toHaveBeenCalledWith("t1", {
+      documents: [{ id: "doc-1", name: "Permit" }],
+      vehicles: [{ id: "van-1", passengers: [] }],
+    })
+  })
+
+  it("keeps a failing logistics fetch from costing that trip its route", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetShuttleVehicles.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockPullRoute).toHaveBeenCalledWith("t1")
+    expect(mockSaveLogisticsCache).not.toHaveBeenCalled()
   })
 
   it("skips the closet while it is inside its own budget", async () => {

@@ -31,6 +31,7 @@ export const CACHE_KEY = {
   tripSync: (tripId: string) => `trip:${tripId}:sync`,
   tripRequirements: (tripId: string) => `trip:${tripId}:requirements`,
   tripKit: (tripId: string) => `trip:${tripId}:kit`,
+  tripLogistics: (tripId: string) => `trip:${tripId}:logistics`,
 } as const
 
 export async function markCacheFresh(

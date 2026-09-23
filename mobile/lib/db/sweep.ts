@@ -2,10 +2,12 @@ import { listBlocks } from "../blocks/actions"
 import { listConnections } from "../connections/actions"
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
+import { getShuttleVehicles, getTravelDocuments } from "../logistics/actions"
 import { getTrip } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
+import { saveLogisticsCache } from "./logistics-cache"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveRequirementsCache } from "./requirements-cache"
 import { pullRoute } from "./route-sync"
@@ -102,16 +104,29 @@ async function syncOneTrip(tripId: string): Promise<void> {
   // trip leaving tomorrow gets its packing list warmed at tier 1 urgency.
   // Packing happens before departure, which is when that trip is most urgent
   // anyway — "did I pack the spare paddle" is asked at the put-in.
-  const [sync, route, kit, requirements] = await Promise.allSettled([
+  const [sync, route, kit, requirements, logistics] = await Promise.allSettled([
     syncTripSerially(tripId),
     pullRoute(tripId),
     warmKit(tripId),
     warmRequirements(tripId),
+    warmLogistics(tripId),
   ])
   reportSettled(`trip ${tripId} sync`, [sync])
   reportSettled(`trip ${tripId} route`, [route])
   reportSettled(`trip ${tripId} kit`, [kit])
   reportSettled(`trip ${tripId} requirements`, [requirements])
+  reportSettled(`trip ${tripId} logistics`, [logistics])
+}
+
+// Travel documents and shuttle vehicles: "which van am I in, and where is the
+// pickup" is asked on the morning of departure, when this trip is at its most
+// urgent — so they ride the trip's own tier rather than a schedule of their own.
+async function warmLogistics(tripId: string): Promise<void> {
+  const [documents, vehicles] = await Promise.all([
+    getTravelDocuments(tripId),
+    getShuttleVehicles(tripId),
+  ])
+  await saveLogisticsCache(tripId, { documents, vehicles })
 }
 
 async function warmKit(tripId: string): Promise<void> {

@@ -13,6 +13,8 @@ import {
   getTravelDocuments,
 } from "../lib/logistics/actions"
 import { getTrip } from "../lib/trips/actions"
+import { loadLogisticsCache } from "../lib/db/logistics-cache"
+import { readCachedAt } from "../lib/db/cache-freshness"
 
 jest.mock("expo-router", () => {
   const actual = jest.requireActual("expo-router")
@@ -28,6 +30,12 @@ jest.mock("../lib/trips/actions", () => ({
 }))
 jest.mock("../lib/auth/session", () => ({
   getSession: jest.fn(),
+}))
+jest.mock("../lib/db/logistics-cache", () => ({ loadLogisticsCache: jest.fn() }))
+jest.mock("../lib/db/offline-float-plan", () => ({ loadOfflineCrew: jest.fn(async () => []) }))
+jest.mock("../lib/db/cache-freshness", () => ({
+  ...jest.requireActual("../lib/db/cache-freshness"),
+  readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
 }))
 jest.mock("../lib/logistics/actions", () => ({
   getTravelDocuments: jest.fn(),
@@ -47,6 +55,8 @@ const mockGetShuttleVehicles = getShuttleVehicles as jest.Mock
 const mockCreateTravelDocument = createTravelDocument as jest.Mock
 const mockDeleteTravelDocument = deleteTravelDocument as jest.Mock
 const mockCreateShuttleVehicle = createShuttleVehicle as jest.Mock
+const mockLoadLogisticsCache = loadLogisticsCache as jest.Mock
+const mockReadCachedAt = readCachedAt as jest.Mock
 
 const LEADER = { id: "m-leader", role: "leader", user: { id: "leader-1", name: "Lea", surname: "Der" } }
 
@@ -60,6 +70,10 @@ beforeEach(() => {
   mockCreateShuttleVehicle.mockReset()
   mockGetTrip.mockResolvedValue({ id: "trip-1", travellers: [LEADER] })
   mockGetSession.mockResolvedValue({ userId: "leader-1" })
+  // Never cached, unless a test says otherwise: an empty cache with no
+  // recorded sync is "nothing to show", so the error paths stay reachable.
+  mockLoadLogisticsCache.mockReset().mockResolvedValue({ documents: [], vehicles: [] })
+  mockReadCachedAt.mockResolvedValue(null)
 })
 
 describe("LogisticsScreen", () => {
@@ -136,6 +150,54 @@ describe("LogisticsScreen", () => {
 })
 
 describe("LogisticsScreen — offline", () => {
+  const CACHED = {
+    documents: [
+      { id: "doc-1", ownerId: "leader-1", type: "permit", name: "National park permit" },
+    ],
+    vehicles: [
+      {
+        id: "veh-1",
+        arrangedById: "m-leader",
+        driverName: "Lea",
+        seatsAvailable: 4,
+        kayakSpots: 2,
+        passengers: [],
+      },
+    ],
+  }
+
+  // "Which van am I in, and where is the pickup" is asked on departure
+  // morning — exactly when signal is thinnest.
+  it("falls back to the cached documents and vehicles, with their age", async () => {
+    mockGetTravelDocuments.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    mockLoadLogisticsCache.mockResolvedValue(CACHED)
+    mockReadCachedAt.mockResolvedValue(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
+
+    const { findByText, getByText, queryByText } = await render(<LogisticsScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+
+    expect(await findByText("National park permit")).toBeTruthy()
+    expect(getByText("Driver: Lea")).toBeTruthy()
+    expect(getByText("Last synced 2 days ago.")).toBeTruthy()
+    expect(queryByText("Logistics needs a connection.")).toBeNull()
+  })
+
+  // Adding, deleting, joining and leaving all need the server.
+  it("offers no mutation while showing the cached logistics", async () => {
+    mockGetTravelDocuments.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    mockLoadLogisticsCache.mockResolvedValue(CACHED)
+
+    const { findByText, queryByLabelText, queryByText } = await render(<LogisticsScreen />, {
+      wrapper: WithOfflineBanner,
+    })
+    await findByText("National park permit")
+
+    expect(queryByLabelText("Add travel document")).toBeNull()
+    expect(queryByLabelText("Delete National park permit")).toBeNull()
+    expect(queryByText("Join")).toBeNull()
+  })
+
   it("leaves the network error to the banner", async () => {
     mockGetTravelDocuments.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
 

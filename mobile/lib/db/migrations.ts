@@ -127,5 +127,22 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // Logistics — travel documents and shuttle vehicles — had no cache, so
+      // the screen showed nothing offline. A new table, so existing installs
+      // lose nothing and simply fill it on the next sweep.
+      toVersion: 10,
+      steps: [
+        createTable({
+          name: "cached_logistics",
+          columns: [
+            { name: "trip_id", type: "string", isIndexed: true },
+            { name: "kind", type: "string" },
+            { name: "position", type: "number" },
+            { name: "payload", type: "string" },
+          ],
+        }),
+      ],
+    },
   ],
 })
