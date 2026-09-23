@@ -198,7 +198,9 @@ describe("PublicRouteScreen", () => {
   it("draws an overnight stop shared by two days as a single marker", async () => {
     mockFetch.mockResolvedValue(DETAIL)
 
-    const { findByText, getAllByTestId } = await render(<PublicRouteScreen />)
+    const { findByText, getAllByTestId } = await render(<PublicRouteScreen />, {
+      wrapper: WithCachedSurfaces,
+    })
     await findByText("Skye circuit")
 
     expect(getAllByTestId("marker-p3")).toHaveLength(1)
