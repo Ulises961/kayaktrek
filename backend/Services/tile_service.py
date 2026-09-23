@@ -8,7 +8,9 @@ from Services import tile_cache
 
 logger = logging.getLogger(__name__)
 
-FRESHNESS = timedelta(days=7)
+# Base-map and seamark tiles change slowly, and every refetch lands on the volunteer-run
+# OSM and OpenSeaMap servers, so a cached tile is served for about three months.
+FRESHNESS = timedelta(days=90)
 REQUEST_TIMEOUT_SECONDS = 10
 USER_AGENT = "KayakExpeditionPlanner/0.1 (+https://github.com/Ulises961/kayak-expedition-planner)"
 

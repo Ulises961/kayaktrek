@@ -18,12 +18,13 @@ one-box deployment the tile cache shares a filesystem with Postgres, and a full 
 Postgres writing WAL. Being stingy is actively counterproductive: eviction pressure pushes
 load back onto OpenStreetMap's tile servers, which is the party least worth leaning on.
 
-Freshness and eviction both key on **mtime**, deliberately, rather than atime. atime depends
-on mount options — a host mounted `noatime` (common on SSDs) never updates it, and eviction
-would then delete hot tiles on a schedule with nothing to explain it. mtime works because
-`TileService` rewrites a tile when it refetches past FRESHNESS: a tile still being requested
-gets its mtime reset every 7 days, while one nobody asks for keeps an old one. That makes
-mtime "last accessed, +/- the freshness window" with no bookkeeping and no mount dependency.
+Two timestamps, two jobs. **mtime is when the tile was fetched**: `put` writes it, and
+`TileService` reads it for freshness. **atime is when the tile was last served**: `get` sets it
+explicitly on a hit, and the sweep evicts least-recently-used first. It is set by `os.utime`
+rather than left to the kernel, because a host mounted `noatime` (common on SSDs) never updates
+it on its own, while an explicit utime works under any mount option. With a months-long
+freshness window, the fetch time says nothing about whether anyone still wants a tile, so
+eviction cannot use mtime.
 """
 import errno
 import logging
@@ -69,6 +70,11 @@ _MIN_FREE_BYTES = _int_env("TILE_CACHE_MIN_FREE_BYTES", 10 * 1024**3)
 # not immediately over it again on the next tile written.
 _LOW_WATER = 0.9
 
+# How stale a tile's last-used time may get before a hit rewrites it. A map view bursts dozens
+# of tiles and a busy tile is served many times a day; a day's resolution is plenty for
+# eviction, and it keeps hits from each costing a metadata write.
+_USE_RESOLUTION_SECONDS = 24 * 60 * 60
+
 
 def _tile_path(layer: str, z: int, x: int, y: int) -> Path:
     # z/x/y are ints by the time they arrive (Flask's <int:...> converters) and `layer` is
@@ -84,15 +90,29 @@ def get(layer: str, z: int, x: int, y: int) -> Optional[tuple[bytes, datetime]]:
     """Return (bytes, last-modified) for a cached tile, or None if it isn't cached."""
     path = _tile_path(layer, z, x, y)
     try:
+        stat = path.stat()
         data = path.read_bytes()
-        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
     except FileNotFoundError:
         # Also covers losing a race with the eviction sweep between stat and read.
         return None
     except OSError as error:
         logger.warning("tile_cache_read_failed", extra={"layer": layer, "z": z, "x": x, "y": y, "error": str(error)})
         return None
-    return data, modified
+    _mark_used(path, stat)
+    return data, datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+
+
+def _mark_used(path: Path, stat: os.stat_result) -> None:
+    """Record a hit in atime for LRU eviction, leaving mtime (the fetch time) untouched."""
+    now = datetime.now(timezone.utc).timestamp()
+    if now - stat.st_atime < _USE_RESOLUTION_SECONDS:
+        return
+    try:
+        os.utime(path, (now, stat.st_mtime))
+    except OSError as error:
+        # Evicted mid-request, or a read-only mount. The tile is still served; it just keeps
+        # its older last-used time.
+        logger.debug("tile_cache_mark_used_failed", extra={"path": str(path), "error": str(error)})
 
 
 def put(layer: str, z: int, x: int, y: int, data: bytes) -> None:
@@ -122,7 +142,8 @@ def put(layer: str, z: int, x: int, y: int, data: bytes) -> None:
 
 
 def sweep(max_bytes: int = _MAX_BYTES, min_free_bytes: int = _MIN_FREE_BYTES) -> dict:
-    """Evict oldest-first until the cache is under its cap and the disk has free headroom.
+    """Evict least-recently-used first until the cache is under its cap and the disk has
+    free headroom.
 
     Returns a summary dict — also the only place that reports cache size at all, which is
     what `docs/mobile/offline-tiles-spec.md` notes nothing currently does.
@@ -138,7 +159,7 @@ def sweep(max_bytes: int = _MAX_BYTES, min_free_bytes: int = _MIN_FREE_BYTES) ->
         except OSError:
             # Vanished mid-walk (a concurrent sweep, or a manual clear). Not an error.
             continue
-        tiles.append((stat.st_mtime, stat.st_size, path))
+        tiles.append((stat.st_atime, stat.st_size, path))
         total += stat.st_size
 
     free = shutil.disk_usage(_CACHE_DIR).free
@@ -150,7 +171,7 @@ def sweep(max_bytes: int = _MAX_BYTES, min_free_bytes: int = _MIN_FREE_BYTES) ->
 
     evicted = evicted_bytes = 0
     if to_free > 0:
-        tiles.sort(key=lambda entry: entry[0])  # oldest mtime first
+        tiles.sort(key=lambda entry: entry[0])  # least recently used first
         for _, size, path in tiles:
             if evicted_bytes >= to_free:
                 break

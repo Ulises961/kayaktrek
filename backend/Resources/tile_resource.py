@@ -14,7 +14,9 @@ tile_api = Blueprint("tile", __name__, url_prefix=TILE_ENDPOINT)
 
 
 @tile_api.route("/<layer>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
-@limiter.limit("600 per minute", key_func=get_remote_address)
+# Sized for one device downloading a map region at full speed, not just panning. Kept
+# bounded because the route is public and every cache miss is a request to OSM.
+@limiter.limit("3000 per minute", key_func=get_remote_address)
 def get_tile(layer: str, z: int, x: int, y: int):
     """
     ---
@@ -43,5 +45,5 @@ def get_tile(layer: str, z: int, x: int, y: int):
     return Response(
         data,
         mimetype=content_type,
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": "public, max-age=604800"},
     )

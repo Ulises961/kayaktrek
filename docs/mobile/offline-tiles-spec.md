@@ -31,8 +31,9 @@ rather than assumed from the ADR, because two things there turned out to not mat
   raises `ValueError` → `404`. A `502` means the upstream (OSM/OpenSeaMap) was unreachable *and*
   no cached copy existed to fall back to.
 - **Caching**: server-side only, on **local disk** — `backend/Services/tile_cache.py`, a plain
-  directory under `TILE_CACHE_DIR`, with 7-day freshness (`FRESHNESS = timedelta(days=7)`) and
-  size/free-space caps evicting on mtime. A stale cached tile is served rather than a `502` when
+  directory under `TILE_CACHE_DIR`, with 90-day freshness (`FRESHNESS = timedelta(days=90)`,
+  raised from 7 on 2026-09-23 to take load off the OSM/OpenSeaMap servers) and size/free-space
+  caps evicting least-recently-used first (last use in atime, fetch time in mtime). A stale cached tile is served rather than a `502` when
   upstream is down — the proxy prefers "outdated but present" over "absent." This is a *server*-side
   cache, unrelated to whatever the device stores; it does mean a bulk pre-departure download from
   many users' devices doubles as organic cache-warming for that corridor.
@@ -51,9 +52,10 @@ rather than assumed from the ADR, because two things there turned out to not mat
   `Authorization` header wired through it, which historically has been the awkward part of
   authenticated tile sources. Nothing to build here beyond pointing `styleURL`/tile source
   templates at the plain URL.
-- **Rate limit**: `600 per minute` per client IP (`flask_limiter`, `get_remote_address`). This
-  is the one real constraint on bulk downloads — see §5.
-- **Response header**: `Cache-Control: public, max-age=86400`. This is an HTTP-cache hint for
+- **Rate limit**: `3000 per minute` per client IP (`flask_limiter`, `get_remote_address`),
+  raised from 600 on 2026-09-23 so one device can download a region at full speed. Still the
+  one real constraint on bulk downloads — see §5; the "600/min" figures below predate it.
+- **Response header**: `Cache-Control: public, max-age=604800` (a week; was a day). This is an HTTP-cache hint for
   intermediate caches, not related to MapLibre's own on-device offline-pack storage — a pack's
   tiles persist until explicitly deleted regardless of this header, so no conflict.
 
@@ -313,7 +315,8 @@ Driven directly by §2's `progressListener` shape:
    so it isn't rediscovered the hard way.
 3. **The tile proxy's 600/min-per-IP rate limit was sized for interactive map panning, not bulk
    offline-pack downloads** (§6). A single device's first download can plausibly hit it. Worth a
-   backend conversation before M9g ships, not resolved in this design-only pass.
+   backend conversation before M9g ships, not resolved in this design-only pass. **Resolved
+   2026-09-23:** raised to 3000/min; re-measure against a real device when M9g is built.
 4. **`mobile-offline.md`'s MapLibre section names a `titiler`/Sentinel-2 satellite tile source
    that does not exist in the actual backend** (§1) — only `osm` and `seamark` are proxied. This
    spec is written against the real two layers; reconciling the ADR's wording is a WP6 item, not

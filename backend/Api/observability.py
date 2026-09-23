@@ -31,7 +31,7 @@ def _resolve_service_name() -> str:
 
 # M13 §A.0.4 cost guardrail: two route families are structurally high-volume
 # and low-diagnostic-value at 100% trace sampling.
-#   - The tile proxy (D10, 600/min per IP — a single map view bursts 30-60
+#   - The tile proxy (D10, 3000/min per IP — a single map view bursts 30-60
 #     requests) and the health check (polled every 10s by every container's
 #     compose healthcheck).
 #   - The SSE stream routes: LiveStreamService.stream_events re-queries the
