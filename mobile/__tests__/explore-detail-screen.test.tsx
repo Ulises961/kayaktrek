@@ -45,7 +45,9 @@ jest.mock("@maplibre/maplibre-react-native", () => {
   return {
     Camera: stub("Camera"),
     Map: stub("Map"),
-    Marker: stub("Marker"),
+    // Keyed by the marker's own id, so a test can count how many times one point is drawn.
+    Marker: ({ children, id }: { children?: React.ReactNode; id: string }) =>
+      react.createElement("Marker", { testID: `marker-${id}` }, children),
     GeoJSONSource: stub("GeoJSONSource"),
     Layer: stub("Layer"),
   }
@@ -188,6 +190,21 @@ describe("PublicRouteScreen", () => {
 
     // Markers alone leave a reader to guess the order the points join in.
     expect(await findByTestId("route-line")).toBeTruthy()
+  })
+
+  // An overnight stop ends one day and starts the next, so it sits in both days'
+  // segments (Loch Coruisk, p3, in the fixtures). Drawn once per day, it gave two
+  // Markers the same key and id, which crashed the screen on a device.
+  it("draws an overnight stop shared by two days as a single marker", async () => {
+    mockFetch.mockResolvedValue(DETAIL)
+
+    const { findByText, getAllByTestId } = await render(<PublicRouteScreen />)
+    await findByText("Skye circuit")
+
+    expect(getAllByTestId("marker-p3")).toHaveLength(1)
+    for (const id of ["p1", "p2", "p4"]) {
+      expect(getAllByTestId(`marker-${id}`)).toHaveLength(1)
+    }
   })
 
   it("shows the error rather than an empty map when the fetch fails", async () => {

@@ -254,6 +254,21 @@ services:
       OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
       OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
       OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      # M29 satellite-feed credentials, encrypted at rest with AES-GCM under this key
+      # (Services/Utils/server_secret_crypto.py). Needed on `backend`, which encrypts on
+      # create/update, and on `worker`, which decrypts on every poll — not on `beat`, which
+      # only dispatches the task name, nor `sse`, which never touches feeds.
+      #
+      # Blank-defaulted rather than required: a Garmin inReach MapShare feed needs no
+      # password, so the key is only read for a feed that has one, and `_key()` raises
+      # rather than failing quietly when it is missing. Requiring it would block every
+      # deploy over a key most installs never use.
+      #
+      # It was absent here entirely until now, which is the actual bug: `environment:` is
+      # the only path into these containers (no `env_file:`), so a value set in .env.prod
+      # was discarded and no operator action could fix it. Same shape as INVITE_CODE (see
+      # CLAUDE.md) and M32's OPEN_METEO_* vars — three instances of one pattern.
+      FEED_CREDENTIAL_KEY: ${FEED_CREDENTIAL_KEY:-}
       # Closed-beta registration gate (PR #160). This line was missing until M25 §1, and
       # `environment:` is the only path into these containers — there is no `env_file:` in
       # this compose file — so the backend has always received an empty INVITE_CODE, and
@@ -306,6 +321,11 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Rendered in the email footer when set, omitted when not (Api/config.py). Blank by
+      # default on purpose — publishing a postal address is a trader-identity decision
+      # (DSA), not a template default. Declared here so the operator *can* set it:
+      # `environment:` is the only path into these containers.
+      MAIL_POSTAL_ADDRESS: ${MAIL_POSTAL_ADDRESS:-}
       # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
       # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
       # this is the actual transport in production. See Services/mail_service.py.
@@ -401,6 +421,11 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Rendered in the email footer when set, omitted when not (Api/config.py). Blank by
+      # default on purpose — publishing a postal address is a trader-identity decision
+      # (DSA), not a template default. Declared here so the operator *can* set it:
+      # `environment:` is the only path into these containers.
+      MAIL_POSTAL_ADDRESS: ${MAIL_POSTAL_ADDRESS:-}
       # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
       # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
       # this is the actual transport in production. See Services/mail_service.py.
@@ -508,6 +533,11 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Rendered in the email footer when set, omitted when not (Api/config.py). Blank by
+      # default on purpose — publishing a postal address is a trader-identity decision
+      # (DSA), not a template default. Declared here so the operator *can* set it:
+      # `environment:` is the only path into these containers.
+      MAIL_POSTAL_ADDRESS: ${MAIL_POSTAL_ADDRESS:-}
       # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
       # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
       # this is the actual transport in production. See Services/mail_service.py.
@@ -516,6 +546,21 @@ services:
       OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
       OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
       OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      # M29 satellite-feed credentials, encrypted at rest with AES-GCM under this key
+      # (Services/Utils/server_secret_crypto.py). Needed on `backend`, which encrypts on
+      # create/update, and on `worker`, which decrypts on every poll — not on `beat`, which
+      # only dispatches the task name, nor `sse`, which never touches feeds.
+      #
+      # Blank-defaulted rather than required: a Garmin inReach MapShare feed needs no
+      # password, so the key is only read for a feed that has one, and `_key()` raises
+      # rather than failing quietly when it is missing. Requiring it would block every
+      # deploy over a key most installs never use.
+      #
+      # It was absent here entirely until now, which is the actual bug: `environment:` is
+      # the only path into these containers (no `env_file:`), so a value set in .env.prod
+      # was discarded and no operator action could fix it. Same shape as INVITE_CODE (see
+      # CLAUDE.md) and M32's OPEN_METEO_* vars — three instances of one pattern.
+      FEED_CREDENTIAL_KEY: ${FEED_CREDENTIAL_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
       # Required, with no fallback: MinIO is no longer in this file, so there is nothing
@@ -590,6 +635,11 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
+      # Rendered in the email footer when set, omitted when not (Api/config.py). Blank by
+      # default on purpose — publishing a postal address is a trader-identity decision
+      # (DSA), not a template default. Declared here so the operator *can* set it:
+      # `environment:` is the only path into these containers.
+      MAIL_POSTAL_ADDRESS: ${MAIL_POSTAL_ADDRESS:-}
       # Brevo's HTTP API, used instead of the SMTP config above when set — DigitalOcean
       # blocks outbound SMTP unconditionally on every droplet (confirmed 2026-09-06), so
       # this is the actual transport in production. See Services/mail_service.py.
