@@ -46,7 +46,11 @@ class SatelliteFeedService:
             feed.feed_url = data["feed_url"].strip()
         if "feed_username" in data:
             feed.feed_username = data["feed_username"]
-        if "feed_password" in data and data["feed_password"]:
+        # Presence decides, not truthiness: an absent key leaves the stored password
+        # alone, an explicit null clears it (the only way to remove one without deleting
+        # the feed), a value replaces it. Under `partial=True` marshmallow does not apply
+        # `load_default`, so an omitted field really is absent from `data` here.
+        if "feed_password" in data:
             SatelliteFeedService._set_password(feed, data["feed_password"])
         feed.needs_reauth = False
         db.session.commit()

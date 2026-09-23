@@ -105,6 +105,88 @@ def test_update_changes_url_and_clears_needs_reauth(client, auth_headers, app):
     assert data["needsReauth"] is False
 
 
+def test_update_omitting_password_leaves_it_alone(client, auth_headers, app):
+    # The web form sends no feedPassword key at all when the user is editing the URL of
+    # a feed whose password they want kept. Under partial=True marshmallow does not apply
+    # load_default, so the key is genuinely absent from `data` — that is what makes
+    # "leave alone" distinguishable from "clear" without a second flag field.
+    created = client.post(
+        f"{FEED_BASE}/create", json=_body(feedPassword="s3cret"), headers=auth_headers
+    ).get_json()
+    feed_id = created["id"]
+
+    with app.app_context():
+        before = _db.session.query(SatelliteFeed).filter_by(id=feed_id).first().feed_password_ciphertext
+
+    resp = client.patch(
+        f"{FEED_BASE}/{feed_id}",
+        json={"feedUrl": "https://share.garmin.com/Feed/Share/renewed"},
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["hasPassword"] is True
+    with app.app_context():
+        after = _db.session.query(SatelliteFeed).filter_by(id=feed_id).first()
+        assert after.feed_password_ciphertext == before
+        assert after.feed_password_ciphertext is not None
+
+
+def test_update_null_password_clears_it(client, auth_headers, app):
+    # An explicit null is how the form says "this feed has no password any more" — the
+    # only way to remove one short of deleting the feed.
+    created = client.post(
+        f"{FEED_BASE}/create", json=_body(feedPassword="s3cret"), headers=auth_headers
+    ).get_json()
+    feed_id = created["id"]
+
+    resp = client.patch(f"{FEED_BASE}/{feed_id}", json={"feedPassword": None}, headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert resp.get_json()["hasPassword"] is False
+    with app.app_context():
+        feed = _db.session.query(SatelliteFeed).filter_by(id=feed_id).first()
+        # The nonce matters as much as the ciphertext: half-cleared credentials would
+        # leave the poll task decrypting against a nonce with nothing to decrypt.
+        assert feed.feed_password_ciphertext is None
+        assert feed.feed_password_nonce is None
+
+
+def test_update_new_password_replaces_it(client, auth_headers, app):
+    created = client.post(
+        f"{FEED_BASE}/create", json=_body(feedPassword="s3cret"), headers=auth_headers
+    ).get_json()
+    feed_id = created["id"]
+
+    with app.app_context():
+        before = _db.session.query(SatelliteFeed).filter_by(id=feed_id).first().feed_password_ciphertext
+
+    resp = client.patch(
+        f"{FEED_BASE}/{feed_id}", json={"feedPassword": "replaced"}, headers=auth_headers
+    )
+
+    assert resp.status_code == 200
+    with app.app_context():
+        feed = _db.session.query(SatelliteFeed).filter_by(id=feed_id).first()
+        assert feed.feed_password_ciphertext is not None
+        assert feed.feed_password_ciphertext != before
+        assert feed.feed_password_ciphertext != "replaced"
+
+
+def test_reports_whether_a_password_is_stored_without_echoing_it(client, auth_headers, auth_headers_2):
+    # The edit form defaults its password switch from this. Without it the form cannot
+    # tell a feed that has a password from one that does not, and — now that switching
+    # off clears — would offer a default that silently removes one.
+    with_password = client.post(
+        f"{FEED_BASE}/create", json=_body(feedPassword="s3cret"), headers=auth_headers
+    ).get_json()
+    without_password = client.post(f"{FEED_BASE}/create", json=_body(), headers=auth_headers_2).get_json()
+
+    assert with_password["hasPassword"] is True
+    assert without_password["hasPassword"] is False
+    assert "feedPassword" not in with_password
+
+
 def test_update_someone_elses_feed_returns_404(client, auth_headers, auth_headers_2):
     created = client.post(f"{FEED_BASE}/create", json=_body(), headers=auth_headers).get_json()
     resp = client.patch(

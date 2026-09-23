@@ -159,9 +159,11 @@ function SatelliteFeedForm({
     defaultValues: {
       provider: feed?.provider ?? SATELLITE_PROVIDER.INREACH_MAPSHARE,
       feedUrl: feed?.feedUrl ?? "",
-      // Off on every open, including an edit of a feed that has a password: the safe
-      // default is the one where saving changes nothing the user did not ask to change.
-      setPassword: false,
+      // Mirrors what the feed actually has. Since off now clears, opening this form off
+      // for a password-protected feed would remove the password the moment someone
+      // edited only the URL — the switch has to start where the feed already stands.
+      setPassword: feed?.hasPassword ?? false,
+      hasStoredPassword: feed?.hasPassword ?? false,
       feedPassword: "",
     },
   })
@@ -201,11 +203,18 @@ function SatelliteFeedForm({
           />
           <Label htmlFor="setPassword">Set a MapShare password</Label>
         </div>
-        <p className="text-muted-foreground text-xs">
-          {feed
-            ? "Leave this off to keep the stored password exactly as it is."
-            : "Only if your MapShare page is password-protected."}
-        </p>
+        {/* Turning the switch off removes the stored password, so say so before the save
+            rather than after it. Only a feed that has one can lose one. */}
+        {feed?.hasPassword && !setPassword ? (
+          <p className="text-destructive text-sm">
+            Saving will remove the stored password. The feed is then only polled if your MapShare
+            page is public.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            Only if your MapShare page is password-protected.
+          </p>
+        )}
       </div>
 
       {setPassword && (
@@ -215,8 +224,14 @@ function SatelliteFeedForm({
             id="feedPassword"
             type="password"
             autoComplete="off"
+            placeholder={feed?.hasPassword ? "Unchanged" : ""}
             {...register("feedPassword")}
           />
+          {feed?.hasPassword && (
+            <p className="text-muted-foreground text-xs">
+              Leave blank to keep the password you saved before.
+            </p>
+          )}
           {errors.feedPassword && (
             <p className="text-destructive text-sm">{errors.feedPassword.message}</p>
           )}
