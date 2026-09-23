@@ -73,7 +73,7 @@ export type SweepItem = {
 // "runs eventually, and grows on the device forever". Past and archived trips
 // are read-later history, and explore routes (not in this list at all) are a
 // discovery surface acted on while connected.
-function isSyncable(state: TripState | null): boolean {
+export function isSyncable(state: TripState | null): boolean {
   return state === TRIP_STATE.HAPPENING || state === TRIP_STATE.BUILDING
 }
 

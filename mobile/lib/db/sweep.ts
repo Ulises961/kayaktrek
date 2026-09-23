@@ -3,13 +3,18 @@ import { listConnections } from "../connections/actions"
 import { getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
 import { getShuttleVehicles, getTravelDocuments } from "../logistics/actions"
+import { buildDayColoredRoute } from "../itinerary/day-route"
+import { numberedDays } from "../itinerary/numbered-days"
 import { getLogStats } from "../logs/actions"
+import { boundsOf } from "../map/bounds"
+import { ensureTripTiles, pruneTripTiles } from "../map/offline-tiles"
 import { getMe } from "../profile/actions"
 import { getTrip, getTrips } from "../trips/actions"
 import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
 import { saveLogisticsCache } from "./logistics-cache"
+import { loadOfflineTrip } from "./offline-itinerary"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveLogStatsCache, saveMeCache } from "./profile-cache"
 import { saveRequirementsCache } from "./requirements-cache"
@@ -18,6 +23,7 @@ import {
   GEAR_STALENESS_BUDGET_MS,
   PADDLERS_STALENESS_BUDGET_MS,
   PROFILE_STALENESS_BUDGET_MS,
+  isSyncable,
   planSweep,
   type SweepTrip,
 } from "./sync-scope"
@@ -133,6 +139,28 @@ async function warmLogistics(tripId: string): Promise<void> {
   await saveLogisticsCache(tripId, { documents, vehicles })
 }
 
+// The map under the route, at the view the itinerary opens at (M9g, free tier).
+// The box comes from the same numbered days and the same route walk the
+// itinerary screen fits its camera to, so the download covers what it shows.
+async function warmTiles(tripId: string): Promise<void> {
+  const { days } = await loadOfflineTrip(tripId)
+  const { points } = buildDayColoredRoute(numberedDays(days))
+  await ensureTripTiles(tripId, boundsOf(points))
+}
+
+// Every synced trip, not only those due this pass: a trip inside its staleness
+// budget still needs its map, and checking one that already has it is a local
+// read and a pack lookup. Runs after the trips so it reads freshly pulled routes,
+// and one trip at a time since each only starts a download that runs natively.
+async function warmAllTiles(tripIds: string[]): Promise<void> {
+  for (const tripId of tripIds) {
+    await warmTiles(tripId).catch((reason) => reportSweepFailure(`trip ${tripId} map tiles`, reason))
+  }
+  await pruneTripTiles(new Set(tripIds)).catch((reason) =>
+    reportSweepFailure("map tile cleanup", reason),
+  )
+}
+
 async function warmKit(tripId: string): Promise<void> {
   await saveKitCache(tripId, await getPackingItems(tripId))
 }
@@ -242,6 +270,8 @@ export async function runSweep(): Promise<void> {
       const batch = due.slice(index, index + MAX_CONCURRENT_TRIPS)
       await Promise.all(batch.map((item) => syncOneTrip(item.tripId)))
     }
+
+    await warmAllTiles(trips.filter((trip) => isSyncable(trip.state)).map((trip) => trip.id))
 
     // Last, and never allowed to cost the trips anything: a paddler's gear
     // library matters at packing time, the trips matter at sea. Its own
