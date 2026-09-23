@@ -1,14 +1,10 @@
 import { AUTH_GATED_PREFIXES } from "@/proxy"
 
-// The public origin, used to build absolute URLs for robots.txt and the sitemap. Server-only
-// (both are rendered on the server), so this is a plain env var rather than a NEXT_PUBLIC_ one
-// — nothing here reaches the client bundle and it needs no build arg. Same name the backend
-// already uses for the same concept, so the deploy set carries one variable, not two.
-const ORIGIN = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/+$/, "")
-
-export function siteUrl(path: string): string {
-  return `${ORIGIN}/${path.replace(/^\/+/, "")}`
-}
+// `siteUrl` moved to ./origin so the root layout can build absolute OpenGraph URLs without
+// importing this module, which pulls in `@/proxy`. Re-exported rather than relocated at the
+// call sites: robots, sitemap and their tests all read it from here, and nothing about those
+// changed.
+export { siteUrl } from "./origin"
 
 // Page-level metadata for the tokenised share surfaces. robots.txt asks a crawler not to
 // fetch these; this tells anything that fetched one anyway not to index it — which is the
