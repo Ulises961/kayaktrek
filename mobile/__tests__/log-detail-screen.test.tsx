@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { Alert } from "react-native"
 
 import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
@@ -92,7 +92,7 @@ describe("LogDetailScreen — owner", () => {
     mockGetLog.mockResolvedValue(OWN_LOG)
     mockDeleteLog.mockResolvedValue(undefined)
 
-    const { findByText, getByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
     await findByText("Delete log")
 
     await fireEvent.press(getByText("Delete log"))
@@ -115,7 +115,7 @@ describe("LogDetailScreen — someone else's log", () => {
   it("shows the icon meta row and an endorse toggle, no delete button", async () => {
     mockGetLog.mockResolvedValue(OTHERS_LOG)
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("3.0h")).toBeTruthy()
     expect(queryByText("Delete log")).toBeNull()
@@ -144,7 +144,7 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: 1,
     })
 
-    const { findByText, getByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("2026-06-01")).toBeTruthy()
     expect(getByText("3.0h")).toBeTruthy()
@@ -162,7 +162,7 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: null,
     })
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
     await findByText("2026-06-01")
 
     expect(queryByText("Delete log")).toBeNull()
@@ -182,7 +182,7 @@ describe("LogDetailScreen — offline", () => {
       endorsementCount: null,
     })
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
     await findByText("2026-06-01")
 
     expect(queryByText("Endorse this log")).toBeNull()
@@ -192,7 +192,7 @@ describe("LogDetailScreen — offline", () => {
   it("surfaces the error when the log was never cached", async () => {
     mockLoadCachedLog.mockResolvedValue(null)
 
-    const { findByText } = await render(<LogDetailScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })

@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react-native"
 import NetInfo from "@react-native-community/netinfo"
 
-import { WithOfflineBanner } from "../../../test-utils/with-offline-banner"
+import { WithBannerOnly } from "../../../test-utils/cached-surfaces"
 import { NeedsConnectionNotice, OfflineNotice } from "../offline-notice"
 
 jest.mock("@react-native-community/netinfo", () => ({ addEventListener: jest.fn() }))
@@ -35,7 +35,7 @@ describe("OfflineNotice", () => {
   it("shows the headline and the age, with the detail folded away", async () => {
     const { findByText, getByText, queryByText } = await render(
       <OfflineNotice cachedAt={hoursAgo(48)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -48,7 +48,7 @@ describe("OfflineNotice", () => {
   it("unfolds the detail on Read more, and folds it again", async () => {
     const { findByText, getByText, queryByText } = await render(
       <OfflineNotice cachedAt={hoursAgo(1)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -64,7 +64,7 @@ describe("OfflineNotice", () => {
   it("replaces the banner's generic out-of-date line", async () => {
     const { findByText, queryByText } = await render(
       <OfflineNotice cachedAt={hoursAgo(1)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -77,7 +77,7 @@ describe("OfflineNotice", () => {
   it("says the sync time is unknown rather than omitting it", async () => {
     const { findByText } = await render(
       <OfflineNotice cachedAt={null}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -89,7 +89,7 @@ describe("OfflineNotice", () => {
   it("raises the banner with signal when the screen is on cached data", async () => {
     const { findByText, queryByText } = await render(
       <OfflineNotice cachedAt={hoursAgo(1)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
 
     expect(await findByText("Can't reach the server.")).toBeTruthy()
@@ -102,7 +102,7 @@ describe("OfflineNotice", () => {
       <OfflineNotice cachedAt={hoursAgo(1)} visible={false}>
         {DETAIL}
       </OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
 
     expect(queryByText(/Last synced/)).toBeNull()
@@ -117,7 +117,7 @@ describe("OfflineNotice", () => {
         <OfflineNotice cachedAt={hoursAgo(1)}>Buddies: accepting needs a connection.</OfflineNotice>
         <OfflineNotice cachedAt={hoursAgo(48)}>Blocklist: unblocking needs a connection.</OfflineNotice>
       </>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -134,7 +134,7 @@ describe("OfflineNotice", () => {
         <OfflineNotice cachedAt={hoursAgo(1)}>Buddies.</OfflineNotice>
         <OfflineNotice cachedAt={null}>Blocklist.</OfflineNotice>
       </>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -151,7 +151,7 @@ describe("OfflineNotice", () => {
 
     const { findByText, queryByText } = await render(
       <OfflineNotice cachedAt={hoursAgo(1)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -164,7 +164,7 @@ describe("OfflineNotice", () => {
   // to fold away and no toggle to offer.
   it("offers no Read more when the screen has nothing to add to the age", async () => {
     const { findByText, queryByText } = await render(<OfflineNotice cachedAt={hoursAgo(1)} />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithBannerOnly,
     })
     await goOffline()
 
@@ -175,7 +175,7 @@ describe("OfflineNotice", () => {
   it("withdraws its report when the screen goes away", async () => {
     const { findByText, queryByText, rerender } = await render(
       <OfflineNotice cachedAt={hoursAgo(1)}>{DETAIL}</OfflineNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
     await findByText(/Last synced/)
@@ -194,7 +194,7 @@ describe("NeedsConnectionNotice", () => {
   it("says what needs a connection, directly and with no age", async () => {
     const { findByText, queryByText } = await render(
       <NeedsConnectionNotice>Explore needs a connection.</NeedsConnectionNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 
@@ -208,7 +208,7 @@ describe("NeedsConnectionNotice", () => {
   it("reports nothing until the screen actually needs it", async () => {
     const { findByText, queryByText } = await render(
       <NeedsConnectionNotice visible={false}>Explore needs a connection.</NeedsConnectionNotice>,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithBannerOnly },
     )
     await goOffline()
 

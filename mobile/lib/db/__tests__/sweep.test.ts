@@ -12,13 +12,13 @@ import { getShuttleVehicles, getTravelDocuments } from "../../logistics/actions"
 import { listConnections } from "../../connections/actions"
 import { listBlocks } from "../../blocks/actions"
 import { pullRoute } from "../route-sync"
-import { getTrip } from "../../trips/actions"
+import { getTrip, getTrips } from "../../trips/actions"
 import { runSweep } from "../sweep"
 import { syncTrip } from "../sync"
-import { loadTripListCache } from "../trip-list-cache"
+import { loadTripListCache, saveTripListCache } from "../trip-list-cache"
 
 jest.mock("../database", () => ({ database: {} }))
-jest.mock("../trip-list-cache", () => ({ loadTripListCache: jest.fn() }))
+jest.mock("../trip-list-cache", () => ({ loadTripListCache: jest.fn(), saveTripListCache: jest.fn() }))
 jest.mock("../../inventory/actions", () => ({ getMyItems: jest.fn() }))
 jest.mock("../../inventory/personal-packing-actions", () => ({ getPackingItems: jest.fn() }))
 jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
@@ -32,7 +32,7 @@ jest.mock("../../logistics/actions", () => ({
 }))
 jest.mock("../../connections/actions", () => ({ listConnections: jest.fn() }))
 jest.mock("../../blocks/actions", () => ({ listBlocks: jest.fn() }))
-jest.mock("../../trips/actions", () => ({ getTrip: jest.fn() }))
+jest.mock("../../trips/actions", () => ({ getTrip: jest.fn(), getTrips: jest.fn() }))
 jest.mock("../cache-freshness", () => ({
   ...jest.requireActual("../cache-freshness"),
   readCachedAt: jest.fn(),
@@ -49,6 +49,8 @@ const mockGetPackingItems = getPackingItems as jest.Mock
 const mockSaveGearCache = saveGearCache as jest.Mock
 const mockSaveKitCache = saveKitCache as jest.Mock
 const mockGetTrip = getTrip as jest.Mock
+const mockGetTrips = getTrips as jest.Mock
+const mockSaveTripListCache = saveTripListCache as jest.Mock
 const mockSaveRequirementsCache = saveRequirementsCache as jest.Mock
 const mockListConnections = listConnections as jest.Mock
 const mockListBlocks = listBlocks as jest.Mock
@@ -90,6 +92,8 @@ beforeEach(() => {
   mockSaveGearCache.mockResolvedValue(undefined)
   mockSaveKitCache.mockResolvedValue(undefined)
   mockGetTrip.mockResolvedValue({ inventory: { requirements: [] } })
+  mockGetTrips.mockResolvedValue({ items: [], total: 0, page: 1, pages: 1 })
+  mockSaveTripListCache.mockResolvedValue(undefined)
   mockSaveRequirementsCache.mockResolvedValue(undefined)
   mockListConnections.mockResolvedValue([])
   mockListBlocks.mockResolvedValue([])
@@ -98,6 +102,37 @@ beforeEach(() => {
   mockSaveLogisticsCache.mockResolvedValue(undefined)
   mockGetTravelDocuments.mockResolvedValue([])
   mockGetShuttleVehicles.mockResolvedValue([])
+})
+
+// Found on a device: after clearing app data, the first sweep synced no trips
+// at all. The sweep's index is the trip-list cache, and only the trip list
+// screen filled it — so a sweep that ran before that screen had saved found an
+// empty index, and the itinerary stayed empty until the next reconnect.
+describe("runSweep — the trip index", () => {
+  it("refreshes the trip list from the network before planning", async () => {
+    const fresh = [{ id: "t-new", state: TRIP_STATE.BUILDING }]
+    mockGetTrips.mockResolvedValue({ items: fresh, total: 1, page: 1, pages: 1 })
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t-new" })])
+
+    await runSweep()
+
+    expect(mockSaveTripListCache).toHaveBeenCalledWith(fresh)
+    // Saved before it is read, so the plan sees what the network just said.
+    expect(mockSaveTripListCache.mock.invocationCallOrder[0]).toBeLessThan(
+      mockLoadTripListCache.mock.invocationCallOrder[0],
+    )
+    expect(mockSyncTrip).toHaveBeenCalledWith("t-new")
+  })
+
+  it("falls back to the cached trip list when the refresh fails", async () => {
+    mockGetTrips.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t-cached" })])
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveTripListCache).not.toHaveBeenCalled()
+    expect(mockSyncTrip).toHaveBeenCalledWith("t-cached")
+  })
 })
 
 describe("runSweep", () => {

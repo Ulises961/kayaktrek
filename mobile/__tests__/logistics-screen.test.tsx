@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 
 import LogisticsScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/logistics"
@@ -81,7 +81,7 @@ describe("LogisticsScreen", () => {
     mockGetTravelDocuments.mockResolvedValue([])
     mockGetShuttleVehicles.mockResolvedValue([])
 
-    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("No travel documents yet")).toBeTruthy()
     expect(await findByText("No vehicles yet")).toBeTruthy()
@@ -102,7 +102,7 @@ describe("LogisticsScreen", () => {
       },
     ])
 
-    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("National park permit")).toBeTruthy()
     expect(await findByText("Driver: Lea")).toBeTruthy()
@@ -120,7 +120,7 @@ describe("LogisticsScreen", () => {
 
     const { findByText, getByText, getByLabelText, findByPlaceholderText } = await render(
       <LogisticsScreen />,
-      { wrapper: WithOfflineBanner },
+      { wrapper: WithCachedSurfaces },
     )
     await findByText("No travel documents yet")
 
@@ -143,7 +143,7 @@ describe("LogisticsScreen", () => {
     mockGetTravelDocuments.mockRejectedValue(new Error("Could not reach the server."))
     mockGetShuttleVehicles.mockResolvedValue([])
 
-    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<LogisticsScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
   })
@@ -174,7 +174,7 @@ describe("LogisticsScreen — offline", () => {
     mockReadCachedAt.mockResolvedValue(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
 
     const { findByText, getByText, queryByText } = await render(<LogisticsScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
 
     expect(await findByText("National park permit")).toBeTruthy()
@@ -189,7 +189,7 @@ describe("LogisticsScreen — offline", () => {
     mockLoadLogisticsCache.mockResolvedValue(CACHED)
 
     const { findByText, queryByLabelText, queryByText } = await render(<LogisticsScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
     await findByText("National park permit")
 
@@ -202,7 +202,7 @@ describe("LogisticsScreen — offline", () => {
     mockGetTravelDocuments.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
 
     const { findByText, queryByText } = await render(<LogisticsScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
 
     expect(await findByText("Logistics needs a connection.")).toBeTruthy()

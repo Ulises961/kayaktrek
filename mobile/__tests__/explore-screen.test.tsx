@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { WithOfflineBanner } from "../test-utils/with-offline-banner"
+import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 
 import { DIFFICULTIES } from "@shared/dtos/difficulty"
@@ -67,7 +67,7 @@ describe("ExploreScreen", () => {
   it("lists the published routes returned by the search", async () => {
     mockSearch.mockResolvedValue(page([SKYE]))
 
-    const { findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Skye circuit")).toBeTruthy()
     expect(await findByText("Three days around the Cuillin coast.")).toBeTruthy()
@@ -76,7 +76,7 @@ describe("ExploreScreen", () => {
   it("shows the route's own signals rather than leaving the card bare", async () => {
     mockSearch.mockResolvedValue(page([SKYE]))
 
-    const { findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     // The signals M23 added because description and difficulty are null on real
     // routes: total distance, day count, and the hardest day rather than the average.
@@ -90,7 +90,7 @@ describe("ExploreScreen", () => {
   it("asks for the same page size web does", async () => {
     mockSearch.mockResolvedValue(page([SKYE]))
 
-    await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     await waitFor(() => {
       expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ perPage: 20 }))
@@ -100,7 +100,7 @@ describe("ExploreScreen", () => {
   it("reports how many routes matched", async () => {
     mockSearch.mockResolvedValue(page([SKYE], { total: 7 }))
 
-    const { findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("7 routes")).toBeTruthy()
   })
@@ -108,7 +108,7 @@ describe("ExploreScreen", () => {
   it("says route, singular, when exactly one matched", async () => {
     mockSearch.mockResolvedValue(page([SKYE], { total: 1 }))
 
-    const { findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("1 route")).toBeTruthy()
   })
@@ -116,7 +116,7 @@ describe("ExploreScreen", () => {
   it("searches by name without needing the query submitted", async () => {
     mockSearch.mockResolvedValue(page([]))
 
-    const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
     await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
     await typeSearch(getByTestId, "skye")
@@ -130,7 +130,7 @@ describe("ExploreScreen", () => {
     it("filters by season", async () => {
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-filters-open"))
@@ -146,7 +146,7 @@ describe("ExploreScreen", () => {
     it("sends distance and duration bounds as numbers, not strings", async () => {
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-filters-open"))
@@ -165,7 +165,7 @@ describe("ExploreScreen", () => {
       // no minimum, and NaN would be sent as a parameter the backend cannot parse.
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-filters-open"))
@@ -184,7 +184,7 @@ describe("ExploreScreen", () => {
     it("counts the active filters so they are visible with the sheet closed", async () => {
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-filters-open"))
@@ -200,7 +200,7 @@ describe("ExploreScreen", () => {
     it("clears every filter at once", async () => {
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-filters-open"))
@@ -224,7 +224,7 @@ describe("ExploreScreen", () => {
     it("sorts by the chosen order", async () => {
       mockSearch.mockResolvedValue(page([SKYE]))
 
-      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await fireEvent.press(getByTestId("explore-sort-distance"))
@@ -241,7 +241,7 @@ describe("ExploreScreen", () => {
     it("invites a first publication when the library itself is empty", async () => {
       mockSearch.mockResolvedValue(page([]))
 
-      const { findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
       // "Widen the search" is actively misleading with no filter on — there is nothing
       // to widen towards.
@@ -251,7 +251,7 @@ describe("ExploreScreen", () => {
     it("offers to widen the search when a filter excluded everything", async () => {
       mockSearch.mockResolvedValue(page([]))
 
-      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await waitFor(() => expect(mockSearch).toHaveBeenCalled())
 
       await typeSearch(getByTestId, "nowhere")
@@ -263,7 +263,7 @@ describe("ExploreScreen", () => {
   it("shows the server's error message and can retry", async () => {
     mockSearch.mockRejectedValueOnce(new Error("Could not reach the server."))
 
-    const { findByText, getByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+    const { findByText, getByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
 
@@ -277,7 +277,7 @@ describe("ExploreScreen", () => {
     it("appends the next page rather than replacing the list", async () => {
       mockSearch.mockResolvedValue(page([SKYE], { pages: 2, total: 2 }))
 
-      const { getByTestId, findByText, queryByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId, findByText, queryByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await findByText("Skye circuit")
 
       mockSearch.mockResolvedValue({ items: [ARRAN], total: 2, page: 2, pages: 2 })
@@ -291,7 +291,7 @@ describe("ExploreScreen", () => {
     it("asks for the next page number when loading more", async () => {
       mockSearch.mockResolvedValue(page([SKYE], { pages: 3, total: 7 }))
 
-      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await findByText("Skye circuit")
 
       await fireEvent.press(getByTestId("explore-load-more"))
@@ -304,7 +304,7 @@ describe("ExploreScreen", () => {
     it("offers no load-more on the last page", async () => {
       mockSearch.mockResolvedValue(page([SKYE], { pages: 1 }))
 
-      const { findByText, queryByTestId } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { findByText, queryByTestId } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await findByText("Skye circuit")
 
       expect(queryByTestId("explore-load-more")).toBeNull()
@@ -315,7 +315,7 @@ describe("ExploreScreen", () => {
       // that may only have one, and the user sees nothing for a query that matched.
       mockSearch.mockResolvedValue(page([SKYE], { pages: 3, total: 7 }))
 
-      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithOfflineBanner })
+      const { getByTestId, findByText } = await render(<ExploreScreen />, { wrapper: WithCachedSurfaces })
       await findByText("Skye circuit")
 
       await fireEvent.press(getByTestId("explore-load-more"))
@@ -343,7 +343,7 @@ describe("ExploreScreen — offline", () => {
     mockSearch.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
 
     const { findByText, queryByText, queryByTestId } = await render(<ExploreScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
 
     expect(await findByText("Explore needs a connection.")).toBeTruthy()
@@ -357,7 +357,7 @@ describe("ExploreScreen — offline", () => {
     mockSearch.mockResolvedValue(page([SKYE]))
 
     const { findByText, rerender } = await render(<ExploreScreen />, {
-      wrapper: WithOfflineBanner,
+      wrapper: WithCachedSurfaces,
     })
     await findByText("Explore needs a connection.")
 

@@ -4,7 +4,6 @@ import { Slot } from "expo-router"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
-import { OfflineBanner } from "../components/ui/offline-banner"
 import { AuthProvider } from "../lib/auth/auth-context"
 import { CachedSurfacesProvider } from "../lib/network/cached-surfaces"
 
@@ -23,13 +22,12 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        {/* Wraps both: screens report what they show from the cache, and the
-            banner is where that is said (components/ui/offline-notice.tsx). */}
+        {/* Screens report what they show from the cache; the offline banner
+            each Screen renders (components/ui/layout.tsx) is where it is said. */}
         <CachedSurfacesProvider>
           <AuthProvider>
             <Slot />
           </AuthProvider>
-          <OfflineBanner />
         </CachedSurfacesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
