@@ -14,6 +14,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from flask import request
 from redis.exceptions import RedisError
 
 from Api.database import db
@@ -401,3 +402,147 @@ def test_login_records_no_location_without_a_trusted_proxy(app, client, paddler,
     with app.app_context():
         session = db.session.get(Session, UUID(_sid(app, access_token)))
         assert session.location_label is None
+
+
+# =============================================================================
+# Forwarded client identity
+# =============================================================================
+#
+# Web sign-in reaches the backend from a Next server action, so the request's own
+# User-Agent is Node's and its origin is the server's — every browser session was
+# labelled "Unknown device", and in production each 15-minute refresh overwrote the
+# location with the server's. Next forwards the browser's values instead, and they are
+# trusted only alongside a shared secret: a header any caller can set must not let a
+# stolen session dress itself up as the owner's own laptop, which is the one question
+# this list exists to answer.
+
+_FORWARD_SECRET = "s3cret-forwarding-key"
+
+
+def _identity_for(app, headers, secret=_FORWARD_SECRET, trusted_hops="0"):
+    env = {"PROXY_TRUSTED_HOPS": trusted_hops}
+    if secret is not None:
+        env["CLIENT_FORWARDING_SECRET"] = secret
+    with patch.dict(os.environ, env, clear=False):
+        if secret is None:
+            os.environ.pop("CLIENT_FORWARDING_SECRET", None)
+        with app.test_request_context("/", headers=headers):
+            return (
+                resolve_device_label(request.headers.get("User-Agent")),
+                resolve_location_label(),
+            )
+
+
+def test_forwarded_identity_is_used_when_the_secret_matches(app):
+    device, location = _identity_for(app, {
+        "User-Agent": "node",
+        "X-Client-Forwarded": _FORWARD_SECRET,
+        "X-Client-User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0 Safari/537.36",
+        "X-Client-City": "Genoa",
+        "X-Client-Region": "Liguria",
+        "X-Client-Country": "IT",
+    })
+    assert device == "Chrome on macOS"
+    assert location == "Genoa, Liguria, Italy"
+
+
+def test_forwarded_identity_is_ignored_without_the_secret(app):
+    device, location = _identity_for(app, {
+        "User-Agent": "node",
+        "X-Client-User-Agent": "Mozilla/5.0 (Macintosh) Chrome/131.0 Safari/537.36",
+        "X-Client-City": "Nowhere",
+        "X-Client-Country": "BR",
+    })
+    assert device is None
+    assert location is None
+
+
+def test_forwarded_identity_is_ignored_when_the_secret_is_wrong(app):
+    device, location = _identity_for(app, {
+        "User-Agent": "node",
+        "X-Client-Forwarded": "not-the-secret",
+        "X-Client-User-Agent": "Mozilla/5.0 (Macintosh) Chrome/131.0 Safari/537.36",
+        "X-Client-City": "Nowhere",
+        "X-Client-Country": "BR",
+    })
+    assert device is None
+    assert location is None
+
+
+def test_forwarded_identity_is_ignored_when_no_secret_is_configured(app):
+    """Unset means "this deployment does not forward", not "trust anyone who asks"."""
+    device, location = _identity_for(app, {
+        "X-Client-Forwarded": "anything",
+        "X-Client-User-Agent": "Mozilla/5.0 (Macintosh) Chrome/131.0 Safari/537.36",
+        "X-Client-Country": "BR",
+    }, secret=None)
+    assert device is None
+    assert location is None
+
+
+def test_forwarded_location_stands_without_a_trusted_proxy(app):
+    """The trusted-hops gate exists because Cloudflare's own headers are client-spoofable.
+    A forwarded header already proved itself with the shared secret, so it does not need
+    that gate — and must not, since a deployment can forward without Cloudflare at all."""
+    _, location = _identity_for(app, {
+        "X-Client-Forwarded": _FORWARD_SECRET,
+        "X-Client-City": "Genoa",
+        "X-Client-Country": "IT",
+    }, trusted_hops="0")
+    assert location == "Genoa, Italy"
+
+
+def test_refresh_fills_in_a_device_label_that_was_never_recorded(app, client, paddler, denylist):
+    """Sessions created before the forwarding existed carry no device label, and a paddler
+    should not have to sign out everywhere to clear "Unknown device" from their list. The
+    refresh already re-resolves the location; resolving the device alongside it heals those
+    rows on their own next refresh, which happens within fifteen minutes of ordinary use."""
+    access_token, refresh_token = _login(client, paddler)
+    with app.app_context():
+        session = db.session.get(Session, UUID(_sid(app, access_token)))
+        session.device_label = None
+        db.session.commit()
+
+    with patch.dict(os.environ, {"CLIENT_FORWARDING_SECRET": _FORWARD_SECRET}):
+        response = client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": refresh_token},
+            headers={
+                "X-Client-Forwarded": _FORWARD_SECRET,
+                "X-Client-User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0 Safari/537.36",
+            },
+        )
+    assert response.status_code == 200
+
+    with app.app_context():
+        healed = db.session.get(Session, UUID(_sid(app, access_token)))
+        assert healed.device_label == "Chrome on macOS"
+
+
+def test_refresh_does_not_erase_a_label_it_cannot_resolve(app, client, paddler, denylist):
+    """A refresh that carries no usable identity must leave what is already there alone —
+    otherwise one call from a client that does not forward wipes a good label."""
+    access_token, refresh_token = _login(client, paddler)
+    with app.app_context():
+        session = db.session.get(Session, UUID(_sid(app, access_token)))
+        session.device_label = "Chrome on macOS"
+        db.session.commit()
+
+    response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert response.status_code == 200
+
+    with app.app_context():
+        kept = db.session.get(Session, UUID(_sid(app, access_token)))
+        assert kept.device_label == "Chrome on macOS"
+
+
+@pytest.mark.parametrize("user_agent,expected", [
+    ("Kayaktrek/1.0.11 (Android 14; Pixel 8)", "Kayaktrek app on Pixel 8"),
+    ("Kayaktrek/1.0.11 (Android 14)", "Kayaktrek app on Android"),
+    ("Kayaktrek/1.0.11 (iOS 18.0)", "Kayaktrek app on iOS"),
+    ("Kayaktrek/1.0.11", "Kayaktrek app"),
+])
+def test_the_mobile_app_is_recognised_by_its_own_user_agent(app, user_agent, expected):
+    """React Native sends okhttp/… by default, which matches no browser or platform token,
+    so every phone session read "Unknown device"."""
+    assert resolve_device_label(user_agent) == expected

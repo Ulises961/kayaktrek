@@ -10,7 +10,7 @@ import { BreadcrumbProvider } from "@/components/common/breadcrumb-context"
 import { HeaderBreadcrumb } from "@/components/common/header-breadcrumb"
 import { BrandLockup } from "@/components/common/brand-lockup"
 import { Separator } from "@/components/ui/separator"
-import { getViewer, hasSessionCredentials } from "@/lib/user/me"
+import { getViewer, hasLiveSession } from "@/lib/user/me"
 import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import React from "react"
 
@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [user, pendingRequests, isAuthenticated] = await Promise.all([
     getViewer(),
     getPendingRequestsSummary(),
-    hasSessionCredentials(),
+    hasLiveSession(),
   ])
   const hasKeypair = user?.hasKeypair ?? true
 

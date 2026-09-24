@@ -72,14 +72,27 @@ export async function getViewer(): Promise<User | null> {
 }
 
 /**
- * Whether the visitor presented credentials at all — the anonymous/signed-in split the app
- * *shell* needs, which is not the same question as `getViewer() !== null`.
+ * Whether the visitor has a session the app can still act on — the anonymous/signed-in split
+ * the app *shell* needs, which is not the same question as `getViewer() !== null`.
  *
- * A signed-in visitor whose `/api/user/me` call failed also has a null viewer, and the shell
- * must keep treating them as signed in: they still need Sign out, and offering them Sign in
- * instead would be a lie the moment the API recovers. So chrome that changes shape by auth
- * state reads this, while chrome that merely renders the user's details reads `getViewer()`.
+ * Three states, and the shell needs the middle one separated from the other two:
+ *
+ * - **No credentials** → anonymous. Nothing to offer but Sign in.
+ * - **Credentials the API could not use** → also anonymous, for chrome purposes. A 30-day
+ *   expired refresh token, a device revoked by M17, or a pre-M17 cookie that carries no
+ *   `sid` all land here. The visitor holds a cookie, but the app cannot recognise them, so
+ *   every signed-in destination it offers — Dashboard, Trips, Gear, Logs — only leads to
+ *   /login. That is precisely the door M23 §1 set out to close, and this case walked
+ *   straight through it: the shell used to ask only whether a cookie *existed*.
+ * - **Credentials that work, or a `/api/user/me` that merely failed** → signed in. A 500 is
+ *   not a verdict on the session; treating it as one would take Sign out away from someone
+ *   who is still signed in and tell them so falsely, which is the reason the shell cannot
+ *   simply read `getViewer()`.
+ *
+ * Chrome that changes shape by auth state reads this; chrome that renders the user's own
+ * details reads `getViewer()` and copes with null.
  */
-export async function hasSessionCredentials(): Promise<boolean> {
-  return (await loadMe()).hasCredentials
+export async function hasLiveSession(): Promise<boolean> {
+  const { hasCredentials, sessionDead } = await loadMe()
+  return hasCredentials && !sessionDead
 }

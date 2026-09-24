@@ -269,6 +269,15 @@ services:
       # was discarded and no operator action could fix it. Same shape as INVITE_CODE (see
       # CLAUDE.md) and M32's OPEN_METEO_* vars — three instances of one pattern.
       FEED_CREDENTIAL_KEY: ${FEED_CREDENTIAL_KEY:-}
+      # Shared with the `frontend` service, and only with it. Sign-in and refresh arrive
+      # from a Next server action, so this request's own User-Agent is Node's and its
+      # address is this machine's; the frontend forwards the browser's under X-Client-* and
+      # proves it with this secret. Unset means "do not trust those headers at all" — never
+      # "trust anyone who sends them", which would let a stolen session dress itself up as
+      # the owner's own laptop in the one list built to catch exactly that.
+      # Needed only here: the labels are written on login and refresh, and `worker`, `beat`
+      # and `sse` never handle a client request.
+      CLIENT_FORWARDING_SECRET: ${CLIENT_FORWARDING_SECRET:-}
       # Closed-beta registration gate (PR #160). This line was missing until M25 §1, and
       # `environment:` is the only path into these containers — there is no `env_file:` in
       # this compose file — so the backend has always received an empty INVITE_CODE, and
@@ -690,6 +699,13 @@ services:
       - "127.0.0.1:3300:3000"
     environment:
       NODE_ENV: production
+      # Proves to the backend that the X-Client-* headers on a login or refresh really came
+      # from us, so the sessions list can name the paddler's browser and city instead of
+      # this container's. Must hold the SAME value as the `backend` service's copy — a
+      # mismatch is silent, and simply leaves every web session reading "Unknown device"
+      # exactly as before. Not a NEXT_PUBLIC_ var: it is read server-side only, and baking
+      # a shared secret into the client bundle would hand it to everyone.
+      CLIENT_FORWARDING_SECRET: ${CLIENT_FORWARDING_SECRET:-}
     depends_on:
       backend:
         condition: service_healthy

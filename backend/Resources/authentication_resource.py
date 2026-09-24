@@ -588,7 +588,14 @@ def refresh_token():
         abort(HTTPStatus.UNAUTHORIZED, description="Session invalidated — please log in again")
 
     try:
-        session = AuthService.rotate_session(user, payload, location_label=resolve_location_label())
+        session = AuthService.rotate_session(
+            user,
+            payload,
+            location_label=resolve_location_label(),
+            # Also re-resolved so sessions opened before the web client forwarded the
+            # browser's User-Agent stop reading "Unknown device" on their own next refresh.
+            device_label=resolve_device_label(request.headers.get("User-Agent")),
+        )
     except ValueError as e:
         abort(HTTPStatus.UNAUTHORIZED, description=str(e))
 

@@ -300,7 +300,12 @@ class AuthService:
         return user
 
     @staticmethod
-    def rotate_session(user: User, payload: dict, location_label: Optional[str] = None) -> Session:
+    def rotate_session(
+        user: User,
+        payload: dict,
+        location_label: Optional[str] = None,
+        device_label: Optional[str] = None,
+    ) -> Session:
         """
         Validate a decoded refresh-token payload against its own session and, if valid,
         advance that session's rotation counter. Returns the session so the caller can mint
@@ -339,7 +344,7 @@ class AuthService:
             )
             raise ValueError("Session invalidated — possible token reuse detected, please log in again")
 
-        SessionService.rotate(session, location_label=location_label)
+        SessionService.rotate(session, location_label=location_label, device_label=device_label)
         return session
 
     # ------------------------------------------------------------------

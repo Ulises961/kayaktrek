@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) 
 
 import { revokeSession } from "@/lib/sessions/actions"
 import { DeviceSessions } from "../device-sessions"
-import { formatTimeAgo } from "@/lib/utils/date"
+import { formatDayDate, formatTimeAgo } from "@/lib/utils/date"
 import type { Session } from "@/lib/dtos/session"
 
 const NOW = new Date("2026-08-02T12:00:00Z")
@@ -47,6 +47,20 @@ describe("DeviceSessions", () => {
     // Presented as approximate — the lookup is a rough guess, not a fact.
     expect(screen.getByText(/~Genoa, Liguria, Italy/)).toBeDefined()
     expect(screen.getByText(new RegExp(formatTimeAgo(otherDevice.lastUsedAt, NOW)))).toBeDefined()
+  })
+
+  it("says when each session began, not only when it was last active", () => {
+    // Two sessions from the same browser in the same city are otherwise identical rows,
+    // and "last used" is the one thing that keeps changing. When they began is what
+    // separates the laptop you signed in on last week from the one that appeared today.
+    render(<DeviceSessions sessions={[thisDevice, otherDevice]} now={NOW} />)
+
+    expect(
+      within(row("iPhone")).getByText(new RegExp(formatDayDate(otherDevice.created))),
+    ).toBeDefined()
+    expect(
+      within(row("Firefox on Linux")).getByText(new RegExp(formatDayDate(thisDevice.created))),
+    ).toBeDefined()
   })
 
   it("marks the current device and offers no way to sign it out from the list", () => {
