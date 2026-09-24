@@ -1,4 +1,5 @@
 import { API_URL, API_PREFIX } from "./config"
+import { appUserAgent } from "./user-agent"
 import { getAccessToken } from "../auth/token-store"
 import { refreshSession } from "../auth/refresh"
 
@@ -64,6 +65,9 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
       ...options,
       headers: {
         "Content-Type": "application/json",
+        // Sent on every request, not just login: the backend re-resolves the device label
+        // on refresh too, which is what heals sessions opened before this existed.
+        "User-Agent": appUserAgent(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },

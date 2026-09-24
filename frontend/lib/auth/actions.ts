@@ -4,6 +4,7 @@ import { cache } from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { API_URL, API_PREFIX } from "@/lib/api/config"
+import { clientIdentityHeaders } from "@/lib/auth/client-identity"
 import { z } from "zod"
 import {
   LoginSchema,
@@ -64,7 +65,9 @@ export async function login(
   try {
     res = await fetch(`${API_URL}${API_PREFIX}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Without these the session this call opens is labelled from *our* request — Node's
+      // User-Agent and the server's location — so every web device read "Unknown device".
+      headers: { "Content-Type": "application/json", ...(await clientIdentityHeaders()) },
       body: JSON.stringify({ mail, pwd: password }),
     })
   } catch {
@@ -380,7 +383,11 @@ async function exchangeRefreshToken(refreshToken: string): Promise<TokenPair | n
   try {
     res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Forwarded here too, for two reasons: the backend re-resolves the location on every
+      // refresh, so without them a session's location was rewritten to the server's every
+      // fifteen minutes — and it now heals a missing device label the same way, which is
+      // what clears "Unknown device" from sessions opened before any of this existed.
+      headers: { "Content-Type": "application/json", ...(await clientIdentityHeaders()) },
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   } catch {

@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
+  headers: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }))
 
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import {
   login,
@@ -84,6 +85,41 @@ describe("login", () => {
     expect(redirect).not.toHaveBeenCalled()
     // Signed in either way — the backfill is best-effort and must never gate access.
     expect(mockCookieStore.set).toHaveBeenCalledWith("access_token", "acc", expect.any(Object))
+  })
+
+  it("tells the backend which browser is signing in, not which server relayed it", async () => {
+    // Sign-in is a server action, so the request the backend sees is Node's. Left alone,
+    // every web session in the "Your devices" list reads "Unknown device" — the label that
+    // list exists to make meaningful.
+    process.env.CLIENT_FORWARDING_SECRET = "s3cret-forwarding-key"
+    vi.mocked(headers).mockResolvedValue({
+      get: (name: string) =>
+        ({
+          "user-agent": "Mozilla/5.0 (Macintosh) Chrome/131.0 Safari/537.36",
+          "cf-ipcity": "Genoa",
+          "cf-ipcountry": "IT",
+        })[name.toLowerCase()] ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: "acc", refresh_token: "ref" }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      await login(null, formData({ mail: "a@b.com", password: "correct" }))
+
+      const sent = fetchMock.mock.calls[0][1].headers
+      expect(sent["X-Client-User-Agent"]).toContain("Chrome")
+      expect(sent["X-Client-City"]).toBe("Genoa")
+      expect(sent["X-Client-Forwarded"]).toBe("s3cret-forwarding-key")
+      // The body still has to survive the header spread.
+      expect(sent["Content-Type"]).toBe("application/json")
+    } finally {
+      delete process.env.CLIENT_FORWARDING_SECRET
+    }
   })
 
   it("redirects normally when the response says nothing about a keypair", async () => {

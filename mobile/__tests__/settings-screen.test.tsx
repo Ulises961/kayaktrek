@@ -199,6 +199,18 @@ describe("SettingsScreen", () => {
       expect(await findByText(/Firefox on Linux/)).toBeTruthy()
     })
 
+    it("says when a session began, not only when it was last used", async () => {
+      // Without it, two sessions from the same phone in the same place are the same row,
+      // and the only moving part is "last used" — which cannot tell you whether a session
+      // is one you opened months ago or one that appeared today.
+      const { findAllByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+
+      // Anchored on the separator so the card's own "Where your account is signed in"
+      // blurb does not count. Both rows, not just one: the date is what tells two
+      // otherwise-identical sessions apart, so a row without it is one you cannot judge.
+      expect(await findAllByText(/· signed in \d/i)).toHaveLength(2)
+    })
+
     it("marks which device is this one", async () => {
       const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
 

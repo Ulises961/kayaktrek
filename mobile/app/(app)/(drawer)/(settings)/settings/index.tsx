@@ -525,9 +525,12 @@ function SecurityCard({
                 </Text>
                 {session.isCurrent && <Badge variant="secondary">This device</Badge>}
               </Row>
+              {/* Signed-in date as well as last used: two sessions from the same phone in
+                  the same city are otherwise the same row, and only the start date
+                  separates one you opened months ago from one that appeared today. */}
               <Text className="text-[11px] text-muted-foreground">
                 {session.locationLabel ?? "Location unknown"} · last used{" "}
-                {formatDayDate(session.lastUsedAt)}
+                {formatDayDate(session.lastUsedAt)} · signed in {formatDayDate(session.created)}
               </Text>
               {!session.isCurrent && (
                 <Button

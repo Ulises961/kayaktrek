@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { LaptopIcon, MapPinIcon } from "lucide-react"
 import { revokeSession } from "@/lib/sessions/actions"
 import type { Session } from "@/lib/dtos/session"
-import { formatTimeAgo } from "@/lib/utils/date"
+import { formatDayDate, formatTimeAgo } from "@/lib/utils/date"
 import { Button } from "@/components/ui/button"
 
 type DeviceSessionsProps = {
@@ -73,6 +73,13 @@ export function DeviceSessions({ sessions, loadError, now }: DeviceSessionsProps
                 </span>
                 <span aria-hidden>·</span>
                 <span>Active {formatTimeAgo(session.lastUsedAt, now)}</span>
+                {/* Two sessions from the same browser in the same city are otherwise
+                    identical rows, and "active" is the half that keeps moving. When a
+                    session began is what distinguishes the laptop you signed in on last
+                    week from one that appeared this morning — the question this list is
+                    for. */}
+                <span aria-hidden>·</span>
+                <span>Signed in {formatDayDate(session.created)}</span>
               </p>
             </div>
             {!session.isCurrent && (

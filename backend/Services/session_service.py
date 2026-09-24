@@ -69,16 +69,29 @@ class SessionService:
         return [session for session in sessions if session.is_usable]
 
     @staticmethod
-    def rotate(session: Session, location_label: Optional[str] = None) -> None:
+    def rotate(
+        session: Session,
+        location_label: Optional[str] = None,
+        device_label: Optional[str] = None,
+    ) -> None:
         """Advance the rotation counter on a successful refresh and mark it active.
 
         The location is re-resolved on every refresh so a device that has moved shows
-        where it is now rather than where it first signed in.
+        where it is now rather than where it first signed in. The device is re-resolved
+        for a narrower reason: sessions opened before the web client forwarded the
+        browser's User-Agent carry no label at all, and this heals them on their own next
+        refresh rather than asking the paddler to sign out everywhere to clear "Unknown
+        device" from the list.
+
+        Both are only written when resolved. A refresh from a client that sends nothing
+        usable must leave a good label alone rather than blank it.
         """
         session.token_version += 1
         session.last_used_at = datetime.now(timezone.utc)
         if location_label:
             session.location_label = location_label
+        if device_label:
+            session.device_label = device_label
         db.session.commit()
 
     @staticmethod

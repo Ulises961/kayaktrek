@@ -5,6 +5,7 @@ The raw User-Agent is never persisted, and neither is the client's IP address: t
 location is resolved from Cloudflare's request headers at write time and only the
 resulting text is kept.
 """
+import hmac
 import os
 import re
 from typing import Optional
@@ -12,6 +13,18 @@ from typing import Optional
 from flask import request
 
 from Services.Utils.country_names import country_name
+
+# The web client reaches us through a Next server action, so the request's own User-Agent
+# is Node's and its address is the server's. Next forwards the browser's values under these
+# names — not under Cloudflare's own, which Cloudflare would overwrite if that hop is
+# proxied — and proves they came from our frontend with a shared secret. Without that proof
+# they are ignored entirely: a header any caller can set must not let a stolen session
+# choose how it appears in the list that exists to spot exactly that.
+_FORWARDED_PROOF = "X-Client-Forwarded"
+_FORWARDED_USER_AGENT = "X-Client-User-Agent"
+_FORWARDED_CITY = "X-Client-City"
+_FORWARDED_REGION = "X-Client-Region"
+_FORWARDED_COUNTRY = "X-Client-Country"
 
 # Matched in order — the first hit wins, so more specific tokens come first
 # (Edge before Chrome, since Edge sends both; iPad/iPhone before Safari/Mac).
@@ -36,6 +49,43 @@ _PLATFORMS = [
 
 _LOCATION_PART = re.compile(r"^[\w\s.'\-()]{1,60}$", re.UNICODE)
 
+# Our own clients identify themselves rather than being guessed at: React Native's default
+# User-Agent (okhttp/…) matches no token above, so every phone read "Unknown device".
+_APP_USER_AGENT = re.compile(r"^Kayaktrek/\S+(?:\s+\((?P<detail>[^)]*)\))?")
+
+
+def _forwarding_is_proven() -> bool:
+    """Whether this request carries our frontend's shared secret.
+
+    Unset means the deployment does not forward — never "trust whatever arrives". Compared
+    with `compare_digest` so a wrong guess costs the same time as any other.
+    """
+    secret = os.environ.get("CLIENT_FORWARDING_SECRET", "")
+    if not secret:
+        return False
+    return hmac.compare_digest(request.headers.get(_FORWARDED_PROOF, ""), secret)
+
+
+def _app_device_label(user_agent: str) -> Optional[str]:
+    """"Kayaktrek app on Pixel 8" from our own clients' User-Agent, or None if not ours.
+
+    The detail is whatever the client chose to send: Android supplies a model, iOS only an
+    OS version (Apple gives no model string), and either may be absent.
+    """
+    match = _APP_USER_AGENT.match(user_agent)
+    if not match:
+        return None
+
+    detail = (match.group("detail") or "").strip()
+    if not detail:
+        return "Kayaktrek app"
+    # "Android 14; Pixel 8" — the model is the recognisable half, so it wins when present.
+    parts = [part.strip() for part in detail.split(";") if part.strip()]
+    if len(parts) > 1:
+        return f"Kayaktrek app on {parts[-1]}"
+    # "Android 14" / "iOS 18.0" — drop the version, which says nothing about which device.
+    return f"Kayaktrek app on {parts[0].split()[0]}"
+
 
 def resolve_device_label(user_agent: Optional[str]) -> Optional[str]:
     """Coarse device description ("Chrome on macOS", "iPhone") from a User-Agent.
@@ -43,8 +93,17 @@ def resolve_device_label(user_agent: Optional[str]) -> Optional[str]:
     Returns None for an absent or unrecognisable UA rather than inventing a label —
     "Unknown device" is a display decision, not a storage one.
     """
+    # The browser's own UA, when our frontend forwarded it on the caller's behalf. The
+    # request's own is Node's in that case, and describes nobody's device.
+    if _forwarding_is_proven():
+        user_agent = request.headers.get(_FORWARDED_USER_AGENT) or user_agent
+
     if not user_agent:
         return None
+
+    app_label = _app_device_label(user_agent)
+    if app_label:
+        return app_label
 
     browser = next((name for token, name in _BROWSERS if token in user_agent), None)
     platform = next((name for token, name in _PLATFORMS if token in user_agent), None)
@@ -70,6 +129,20 @@ def resolve_location_label() -> Optional[str]:
     precision, so they add nothing this label does not already say, and coordinates on a
     per-session row are a tracking-grade datum with no product question behind it.
     """
+    # Our frontend's forwarded copy wins, and does not need the trusted-hops gate: that gate
+    # exists because Cloudflare's headers are client-spoofable, and these already proved
+    # themselves with the shared secret. It also has to stand on its own, since the Next
+    # server's own origin is not the paddler's — without this every refresh relabelled a
+    # session with the datacentre it passed through.
+    if _forwarding_is_proven():
+        country_code = request.headers.get(_FORWARDED_COUNTRY)
+        parts = [
+            request.headers.get(_FORWARDED_CITY),
+            request.headers.get(_FORWARDED_REGION),
+            country_name(country_code) if country_code else None,
+        ]
+        return _join_location(parts)
+
     if int(os.environ.get("PROXY_TRUSTED_HOPS", "0")) <= 0:
         return None
 
@@ -81,6 +154,11 @@ def resolve_location_label() -> Optional[str]:
         region,
         country_name(country_code) if country_code else None,
     ]
+    return _join_location(parts)
+
+
+def _join_location(parts: list[Optional[str]]) -> Optional[str]:
+    """City, region and country into one readable label, or None if nothing usable."""
 
     label_parts: list[str] = []
     for part in parts:

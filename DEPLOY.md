@@ -679,6 +679,39 @@ keeps polling and only a password-protected provider needs re-entry. Keep it in 
 manager alongside `JWT_SECRET_KEY`. Rotating it invalidates every stored password, so rotate only
 with re-entry in mind.
 
+## Session device and location labels
+
+Optional, and only affects what the "Your devices" list can say. Unset, the list still works —
+every web session simply reads "Unknown device", which is what it did before this existed.
+
+Web sign-in and refresh reach the backend from a Next server action, so the request it sees
+carries Node's User-Agent and this machine's address. The frontend forwards the browser's own
+under `X-Client-User-Agent` and `X-Client-City`/`-Region`/`-Country`, and proves they came from
+us with a shared secret. **Without that proof the backend ignores them entirely** — otherwise
+anyone calling the API directly could choose how their session appears in the one list a
+paddler would use to spot a session that is not theirs.
+
+`CLIENT_FORWARDING_SECRET` is any high-entropy string, and must be **identical** on `backend`
+and `frontend`:
+
+```bash
+# on the dev machine — generate once, then deliver with scripts/deploy-sync.sh
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Add it to `.env.prod` and restart `backend` and `frontend`. A mismatch fails silently and
+simply leaves the labels as they were, so check a real session row after the first deploy
+rather than assuming.
+
+Two things worth knowing:
+
+- **It is not a `NEXT_PUBLIC_` variable.** It is read server-side only; inlining it into the
+  client bundle would hand the secret to every visitor, which is the whole thing it guards.
+- **Existing sessions heal themselves.** The backend re-resolves the device label on refresh
+  as well as on login, so rows created before this was configured pick up a real label within
+  about fifteen minutes of ordinary use — nobody has to sign out everywhere to clear "Unknown
+  device".
+
 ## Rolling back
 
 Set `KAYAK_IMAGE_TAG` to the last known-good version and redeploy — no file edits, no rebuild:
