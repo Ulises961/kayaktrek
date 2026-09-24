@@ -158,5 +158,33 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // M9d — offline editing. The queue of changes waiting to be sent, and a
+      // crew member's departure from a trip under way. Batched into one bump.
+      toVersion: 12,
+      steps: [
+        createTable({
+          name: "pending_mutations",
+          columns: [
+            { name: "mutation_id", type: "string", isIndexed: true },
+            { name: "user_id", type: "string", isIndexed: true },
+            { name: "entity_type", type: "string" },
+            { name: "operation", type: "string" },
+            { name: "entity_id", type: "string" },
+            { name: "payload", type: "string" },
+            { name: "device_timestamp", type: "number" },
+            { name: "status", type: "string" },
+            { name: "reason", type: "string", isOptional: true },
+          ],
+        }),
+        addColumns({
+          table: "trip_members",
+          columns: [
+            { name: "left_at", type: "number", isOptional: true },
+            { name: "left_note", type: "string", isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 })

@@ -7,6 +7,7 @@ import { CachedLogisticsItem } from "./CachedLogisticsItem"
 import { CachedPackingItem } from "./CachedPackingItem"
 import { CachedProfileEntry } from "./CachedProfileEntry"
 import { CachedRequirement } from "./CachedRequirement"
+import { PendingMutation } from "./PendingMutation"
 import { Day } from "./Day"
 import { Point } from "./Point"
 import { RequirementContribution } from "./RequirementContribution"
@@ -30,6 +31,7 @@ export {
   CachedProfileEntry,
   CachedRequirement,
   Day,
+  PendingMutation,
   Point,
   RequirementContribution,
   RouteMeta,
@@ -53,6 +55,7 @@ export const modelClasses = [
   CachedProfileEntry,
   CachedRequirement,
   Day,
+  PendingMutation,
   Point,
   RouteMeta,
   SyncCursor,

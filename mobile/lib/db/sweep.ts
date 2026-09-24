@@ -14,6 +14,7 @@ import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
 import { saveLogisticsCache } from "./logistics-cache"
+import { pushQueuedMutations } from "./mutation-queue"
 import { loadOfflineTrip } from "./offline-itinerary"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveLogStatsCache, saveMeCache } from "./profile-cache"
@@ -253,6 +254,10 @@ export async function runSweep(): Promise<void> {
   if (sweepInFlight) return
   sweepInFlight = true
   try {
+    // Up before down (M9d): a pull must never overwrite a change the paddler made
+    // offline with the server's older copy. Offline, this fails and the pulls then
+    // fail too — nothing is lost, the queue stays queued.
+    await pushQueuedMutations().catch((reason) => reportSweepFailure("queued changes", reason))
     await refreshTripIndex()
     const cached = await loadTripListCache()
     const trips: SweepTrip[] = cached.map((trip) => ({

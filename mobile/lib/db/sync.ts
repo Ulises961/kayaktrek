@@ -29,6 +29,8 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     emergencyContactPhone: "emergency_contact_phone",
     emergencyContactRelationship: "emergency_contact_relationship",
     floatPlanConfirmedAt: "float_plan_confirmed_at",
+    leftAt: "left_at",
+    leftNote: "left_note",
   },
   requirement_contributions: {
     requirementId: "requirement_id",

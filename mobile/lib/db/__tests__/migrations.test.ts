@@ -83,6 +83,20 @@ describe("migrations", () => {
     expect(createdTables).toEqual(["cached_logistics"])
   })
 
+  it("has a v12 step creating the offline queue and adding crew departures", () => {
+    const v12 = migrations.sortedMigrations.find((migration) => migration.toVersion === 12)
+    expect(v12).toBeDefined()
+
+    const createdTables = v12!.steps.flatMap((step) =>
+      step.type === "create_table" ? [step.schema.name] : [],
+    )
+    const addedColumns = v12!.steps.flatMap((step) =>
+      step.type === "add_columns" ? step.columns.map((column) => `${step.table}.${column.name}`) : [],
+    )
+    expect(createdTables).toEqual(["pending_mutations"])
+    expect(addedColumns.sort()).toEqual(["trip_members.left_at", "trip_members.left_note"])
+  })
+
   it("has a migration step creating cached_profile at v11", () => {
     const v11 = migrations.sortedMigrations.find((migration) => migration.toVersion === 11)
     expect(v11).toBeDefined()
