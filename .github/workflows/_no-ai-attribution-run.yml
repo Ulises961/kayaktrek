@@ -1,0 +1,49 @@
+name: No AI attribution run
+
+# Reusable job body for no-ai-attribution.yml. Exists so the same check can run on either
+# runner pool (GitHub-hosted first, self-hosted fallback) without duplicating the steps —
+# see no-ai-attribution.yml for the fallback policy and reasoning.
+#
+# `github.event` is inherited from the calling workflow's event, so the pull_request fields
+# below resolve exactly as they did when these steps lived in the caller.
+
+on:
+  workflow_call:
+    inputs:
+      runs-on-json:
+        description: JSON array of runner labels, e.g. '["ubuntu-latest"]'
+        required: true
+        type: string
+
+jobs:
+  check-attribution:
+    runs-on: ${{ fromJson(inputs.runs-on-json) }}
+
+    steps:
+      - name: Checkout with full PR history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Reject commits carrying an AI co-author trailer
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          MATCHES=$(git log --format='--- %H ---%n%B' "$BASE_SHA..$HEAD_SHA" \
+            | grep -iE 'co-authored-by:.*(claude|anthropic|gpt|copilot|codex)|claude-session:' || true)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Commit(s) on this PR carry an AI co-author trailer, which this repo does not accept:"
+            echo "$MATCHES"
+            exit 1
+          fi
+
+      - name: Reject a PR description crediting an AI coding tool
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if echo "$PR_BODY" | grep -iE 'generated with \[claude code\]|claude\.ai/code'; then
+            echo "::error::PR description credits an AI coding tool, which this repo does not accept."
+            exit 1
+          fi
