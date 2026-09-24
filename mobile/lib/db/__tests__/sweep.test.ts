@@ -562,6 +562,84 @@ describe("runSweep — map tiles", () => {
     )
   })
 
+  // A circular itinerary ends where it started. Its box must still take in every
+  // point on the loop, however the return to the start is stored.
+  describe("circular itineraries", () => {
+    // Out east along the coast, north, and back west to the put-in.
+    const LOOP = [
+      { id: "start", latitude: 41.8, longitude: 3.1 },
+      { id: "east", latitude: 41.85, longitude: 3.4 },
+      { id: "north", latitude: 42.1, longitude: 3.3 },
+      { id: "west", latitude: 42.0, longitude: 3.0 },
+    ]
+
+    it("covers the whole loop when it ends on its own point at the put-in", async () => {
+      mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+      const points = [...LOOP, { id: "finish", latitude: 41.8, longitude: 3.1 }].map(
+        (point, index, all) => ({ ...point, nextId: all[index + 1]?.id ?? null }),
+      )
+      mockLoadOfflineTrip.mockResolvedValue({
+        destination: null,
+        days: [{ id: "day-1", dayNumber: 1, points }],
+      })
+
+      await runSweep()
+
+      expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.0, 41.8, 3.4, 42.1])
+    })
+
+    it("covers the whole loop when its last point links back to the first", async () => {
+      mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+      const points = LOOP.map((point, index, all) => ({
+        ...point,
+        nextId: all[(index + 1) % all.length].id,
+      }))
+      mockLoadOfflineTrip.mockResolvedValue({
+        destination: null,
+        days: [{ id: "day-1", dayNumber: 1, points }],
+      })
+
+      await runSweep()
+
+      expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.0, 41.8, 3.4, 42.1])
+    })
+
+    it("covers a loop split across days that share their overnight stops", async () => {
+      mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+      const [start, east, north, west] = LOOP
+      mockLoadOfflineTrip.mockResolvedValue({
+        destination: null,
+        days: [
+          {
+            id: "day-1",
+            dayNumber: 1,
+            startPointId: "start",
+            endPointId: "north",
+            points: [
+              { ...start, nextId: "east" },
+              { ...east, nextId: "north" },
+            ],
+          },
+          {
+            id: "day-2",
+            dayNumber: 2,
+            startPointId: "north",
+            endPointId: "finish",
+            points: [
+              { ...north, nextId: "west" },
+              { ...west, nextId: "finish" },
+              { id: "finish", latitude: 41.8, longitude: 3.1, nextId: null },
+            ],
+          },
+        ],
+      })
+
+      await runSweep()
+
+      expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.0, 41.8, 3.4, 42.1])
+    })
+  })
+
   // Day 0 is the staging area for unassigned points (numbered-days.ts). The map's
   // camera ignores it, so the download must too.
   it("leaves Day 0's points out of the map's box", async () => {

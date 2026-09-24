@@ -25,8 +25,8 @@ const ZOOM_LEVELS_BELOW = 4
 // Past this, a single-point route would ask for street-level tiles.
 const MAX_PACK_ZOOM = 16
 
-// A tenth of the route's span on every side, so the route's edges are not
-// the edge of the map.
+// A tenth of the visible area's span on every side: a little panning room at
+// the opening zoom before the map runs out.
 const BOUNDS_MARGIN = 0.1
 
 // MapLibre's zoom levels are defined on a 512px world, whatever the source's
@@ -48,6 +48,28 @@ function mercatorY(latitude: number): number {
   return (1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2
 }
 
+function latitudeOf(mercator: number): number {
+  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * mercator))) * 180) / Math.PI
+}
+
+// What the screen shows when the camera fits the route: centred on the route,
+// at the route's fit zoom. The route fills one dimension; the other shows more
+// than the route's box, and that extra is on screen too.
+function visibleBounds(route: Bounds, viewport: Viewport): Bounds {
+  const [west, south, east, north] = route
+  const worldSize = WORLD_SIZE_AT_ZOOM_0 * 2 ** fitZoom(route, viewport)
+  const halfWidthDegrees = ((viewport.width / worldSize) * 360) / 2
+  const halfHeightMercator = viewport.height / worldSize / 2
+  const centreLongitude = (west + east) / 2
+  const centreMercator = (mercatorY(south) + mercatorY(north)) / 2
+  return [
+    centreLongitude - halfWidthDegrees,
+    latitudeOf(centreMercator + halfHeightMercator),
+    centreLongitude + halfWidthDegrees,
+    latitudeOf(centreMercator - halfHeightMercator),
+  ]
+}
+
 /** The zoom at which the box just fits the viewport — what the itinerary's camera opens at. */
 export function fitZoom([west, south, east, north]: Bounds, viewport: Viewport): number {
   const widthFraction = (east - west) / 360
@@ -58,7 +80,7 @@ export function fitZoom([west, south, east, north]: Bounds, viewport: Viewport):
 }
 
 export function tilePackRegion(route: Bounds, viewport: Viewport): TilePackRegion {
-  const [west, south, east, north] = route
+  const [west, south, east, north] = visibleBounds(route, viewport)
   const marginX = (east - west) * BOUNDS_MARGIN
   const marginY = (north - south) * BOUNDS_MARGIN
   const maxZoom = Math.max(0, Math.min(MAX_PACK_ZOOM, Math.ceil(fitZoom(route, viewport))))
