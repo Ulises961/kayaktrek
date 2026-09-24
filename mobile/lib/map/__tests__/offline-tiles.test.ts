@@ -87,6 +87,33 @@ describe("tilePackRegion", () => {
     expect(region.minZoom).toBe(region.maxZoom - 4)
   })
 
+  // The camera fits the route's binding dimension, so the screen shows more than
+  // the route's box in the other one. A north-south route on a portrait phone fills
+  // the height and leaves strips either side — visible at the opening zoom, and
+  // blank offline unless downloaded too.
+  it("covers the whole screen at the opening zoom, not just the route's box", () => {
+    const northSouth: [number, number, number, number] = [3.2, 41.5, 3.21, 42.3]
+    const zoom = fitZoom(northSouth, VIEWPORT)
+
+    const [west, south, east, north] = tilePackRegion(northSouth, VIEWPORT).bounds
+
+    const pixelsPerDegree = (512 * 2 ** zoom) / 360
+    expect((east - west) * pixelsPerDegree).toBeGreaterThanOrEqual(VIEWPORT.width)
+    const mercator = (latitude: number) => {
+      const radians = (latitude * Math.PI) / 180
+      return (1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2
+    }
+    expect((mercator(south) - mercator(north)) * 512 * 2 ** zoom).toBeGreaterThanOrEqual(
+      VIEWPORT.height,
+    )
+  })
+
+  it("keeps the screen centred on the route, as the camera does", () => {
+    const [west, , east] = tilePackRegion(ROUTE, VIEWPORT).bounds
+
+    expect((west + east) / 2).toBeCloseTo((ROUTE[0] + ROUTE[2]) / 2, 6)
+  })
+
   it("adds a margin around the route so its edges are not the edge of the map", () => {
     const [west, south, east, north] = tilePackRegion(ROUTE, VIEWPORT).bounds
 
