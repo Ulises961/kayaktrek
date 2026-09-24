@@ -9,6 +9,7 @@ from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_leader, require_owner
 from Services.itinerary_route_sync_service import RouteSyncService, RouteVersionMismatchError
 from Services.mobile_sync_service import MobileSyncService
+from Services.mutation_queue_service import MutationQueueService
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,37 @@ def pull_changes(trip_id: str):
 
     result = MobileSyncService.pull_changes(trip_id, last_pulled_at)
     return jsonify(result), HTTPStatus.OK
+
+
+@mobile_sync_api.route("/mutations", methods=["POST"])
+@JWTService.authenticate_restful
+def apply_mutations():
+    """
+    ---
+    post:
+      summary: Apply the changes a phone queued while offline (M9d)
+      description: >
+        A batch of envelopes, each applied through the ordinary service layer under
+        the same permission rules as its online request, in device-timestamp order,
+        one transaction each, and exactly once per mutationId however often the
+        batch is resent. Not trip-scoped: a batch may touch several trips, logs and
+        the caller's own records. The route travels on its own channel.
+      responses:
+        200:
+          description: >
+            One result per envelope — applied, rejected (with a reason),
+            duplicate (already processed; carries the earlier result), or failed
+            (transient; resend it)
+        400:
+          description: The body carries no mutations list
+    """
+    body = request.get_json(silent=True) or {}
+    mutations = body.get("mutations") if isinstance(body, dict) else None
+    if not isinstance(mutations, list):
+        abort(HTTPStatus.BAD_REQUEST, description="mutations list is required")
+
+    results = MutationQueueService.apply_batch(g.current_user_id, mutations)
+    return jsonify({"results": results}), HTTPStatus.OK
 
 
 @mobile_sync_api.route("/trip/<string:trip_id>/push", methods=["POST"])

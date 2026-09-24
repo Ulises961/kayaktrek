@@ -9,7 +9,7 @@ TripMember, so a non-owner can never see or touch another member's list.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from flask import g
@@ -64,7 +64,9 @@ class PersonalPackingService:
         return items
 
     @staticmethod
-    def add_item(trip_id: str, item_id: str) -> PersonalPackingItem:
+    def add_item(trip_id: str, item_id: str, entry_id: Optional[str] = None) -> PersonalPackingItem:
+        """`entry_id` is the id a phone gave the entry while offline (M9d), so later
+        queued changes can refer to it; omitted, the server generates one."""
         member = PersonalPackingService._get_member(trip_id)
 
         item = db.session.get(Item, UUID(item_id))
@@ -85,6 +87,8 @@ class PersonalPackingService:
             raise ValueError("This item is already on your packing list")
 
         entry = PersonalPackingItem(trip_member_id=member.id, item_id=UUID(item_id))
+        if entry_id is not None:
+            entry.id = UUID(entry_id)
         db.session.add(entry)
         db.session.commit()
         db.session.refresh(entry)
