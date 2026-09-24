@@ -22,11 +22,9 @@ import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
 import { pullRoute } from "@mobile/lib/db/route-sync";
-import {
-  buildDayColoredRoute,
-  type LocatedRoutePoint,
-} from "@mobile/lib/itinerary/day-route";
+import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
+import { boundsOf } from "@mobile/lib/map/bounds";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
 
@@ -44,29 +42,6 @@ type ScreenTrip = {
 // Same fallback web's builder uses (map-builder.tsx) when the itinerary has never
 // had a speed set — kept as one named constant rather than repeating the literal.
 const DEFAULT_AVG_SPEED_KNOTS = 2.5;
-
-function boundsOf(
-  points: LocatedRoutePoint[],
-): [number, number, number, number] | null {
-  if (points.length === 0) return null;
-  let west = points[0].longitude;
-  let east = points[0].longitude;
-  let south = points[0].latitude;
-  let north = points[0].latitude;
-  for (const p of points) {
-    west = Math.min(west, p.longitude);
-    east = Math.max(east, p.longitude);
-    south = Math.min(south, p.latitude);
-    north = Math.max(north, p.latitude);
-  }
-  // A single point (or a day with no spread) gives MapLibre a zero-area box, which
-  // it can't fit a camera to — pad it out to a small neighborhood.
-  if (west === east && south === north) {
-    const pad = 0.01;
-    return [west - pad, south - pad, east + pad, north + pad];
-  }
-  return [west, south, east, north];
-}
 
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

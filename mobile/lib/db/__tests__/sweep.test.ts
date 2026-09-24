@@ -15,6 +15,8 @@ import { getLogStats } from "../../logs/actions"
 import { getMe } from "../../profile/actions"
 import { saveLogStatsCache, saveMeCache } from "../profile-cache"
 import { pullRoute } from "../route-sync"
+import { loadOfflineTrip } from "../offline-itinerary"
+import { ensureTripTiles, pruneTripTiles } from "../../map/offline-tiles"
 import { getTrip, getTrips } from "../../trips/actions"
 import { runSweep } from "../sweep"
 import { syncTrip } from "../sync"
@@ -45,6 +47,8 @@ jest.mock("../cache-freshness", () => ({
 }))
 jest.mock("../sync", () => ({ syncTrip: jest.fn() }))
 jest.mock("../route-sync", () => ({ pullRoute: jest.fn() }))
+jest.mock("../offline-itinerary", () => ({ loadOfflineTrip: jest.fn() }))
+jest.mock("../../map/offline-tiles", () => ({ ensureTripTiles: jest.fn(), pruneTripTiles: jest.fn() }))
 
 const mockLoadTripListCache = loadTripListCache as jest.Mock
 const mockReadCachedAt = readCachedAt as jest.Mock
@@ -65,6 +69,9 @@ const mockSaveBlocksCache = saveBlocksCache as jest.Mock
 const mockSaveLogisticsCache = saveLogisticsCache as jest.Mock
 const mockGetTravelDocuments = getTravelDocuments as jest.Mock
 const mockGetShuttleVehicles = getShuttleVehicles as jest.Mock
+const mockLoadOfflineTrip = loadOfflineTrip as jest.Mock
+const mockEnsureTripTiles = ensureTripTiles as jest.Mock
+const mockPruneTripTiles = pruneTripTiles as jest.Mock
 const mockGetMe = getMe as jest.Mock
 const mockGetLogStats = getLogStats as jest.Mock
 const mockSaveMeCache = saveMeCache as jest.Mock
@@ -112,6 +119,9 @@ beforeEach(() => {
   mockSaveLogisticsCache.mockResolvedValue(undefined)
   mockGetTravelDocuments.mockResolvedValue([])
   mockGetShuttleVehicles.mockResolvedValue([])
+  mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [] })
+  mockEnsureTripTiles.mockResolvedValue(undefined)
+  mockPruneTripTiles.mockResolvedValue(undefined)
   mockGetMe.mockResolvedValue({ username: "ana" })
   mockGetLogStats.mockResolvedValue({ logCount: 0 })
   mockSaveMeCache.mockResolvedValue(undefined)
@@ -528,6 +538,85 @@ describe("runSweep — tier 3, kit and gear", () => {
 
 // Tier 4: the paddler's own record and log stats, for Profile, Settings and
 // the drawer header. Last in the sweep — tiny, slow-changing, never at sea.
+// M9g free tier: each swept trip keeps the map tiles for its itinerary's opening
+// view, so the map under the route still renders offline.
+describe("runSweep — map tiles", () => {
+  const DAY_ONE = {
+    id: "day-1",
+    dayNumber: 1,
+    points: [
+      { id: "p1", latitude: 41.8, longitude: 3.1, nextId: "p2" },
+      { id: "p2", latitude: 42.0, longitude: 3.3, nextId: null },
+    ],
+  }
+
+  it("downloads each swept trip's map once its route has been pulled", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [DAY_ONE] })
+
+    await runSweep()
+
+    expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.1, 41.8, 3.3, 42.0])
+    expect(mockPullRoute.mock.invocationCallOrder[0]).toBeLessThan(
+      mockEnsureTripTiles.mock.invocationCallOrder[0],
+    )
+  })
+
+  // Day 0 is the staging area for unassigned points (numbered-days.ts). The map's
+  // camera ignores it, so the download must too.
+  it("leaves Day 0's points out of the map's box", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    const dayZero = {
+      id: "day-0",
+      dayNumber: 0,
+      points: [{ id: "p0", latitude: 10, longitude: 10, nextId: null }],
+    }
+    mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [dayZero, DAY_ONE] })
+
+    await runSweep()
+
+    expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.1, 41.8, 3.3, 42.0])
+  })
+
+  // A trip inside its staleness budget is not re-synced, but it still needs its
+  // map — otherwise an app update would leave every trip without one until its
+  // budget ran out.
+  it("covers trips that are inside their budget, from the route already on the device", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockReadCachedAt.mockResolvedValue(new Date().toISOString())
+    mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [DAY_ONE] })
+
+    await runSweep()
+
+    expect(mockPullRoute).not.toHaveBeenCalled()
+    expect(mockEnsureTripTiles).toHaveBeenCalledWith("t1", [3.1, 41.8, 3.3, 42.0])
+  })
+
+  it("keeps a failing map download from costing the trip anything else", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [DAY_ONE] })
+    mockEnsureTripTiles.mockRejectedValue(new Error("offline database locked"))
+
+    await expect(runSweep()).resolves.toBeUndefined()
+
+    expect(mockSaveKitCache).toHaveBeenCalled()
+    expect(mockSaveLogisticsCache).toHaveBeenCalled()
+  })
+
+  // Past and archived trips are not synced, so their maps go too.
+  it("drops the maps of trips the sweep no longer covers", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "planned" }),
+      cachedTrip({ id: "under-way", state: TRIP_STATE.HAPPENING }),
+      cachedTrip({ id: "done", state: TRIP_STATE.PAST }),
+    ])
+
+    await runSweep()
+
+    expect(mockPruneTripTiles).toHaveBeenCalledWith(new Set(["planned", "under-way"]))
+  })
+})
+
 describe("runSweep — tier 4, profile", () => {
   it("warms the paddler's own record and log stats", async () => {
     await runSweep()

@@ -8,6 +8,9 @@ jest.mock("@react-native-community/netinfo", () => ({ addEventListener: jest.fn(
 // at import time — never usable under Jest (see sync.test.ts for the same
 // pattern).
 jest.mock("../database", () => ({ database: {} }))
+// sweep.ts -> map/offline-tiles.ts imports @maplibre/maplibre-react-native, whose
+// package root loads every map component, and those don't parse under Jest.
+jest.mock("../../map/offline-tiles", () => ({ ensureTripTiles: jest.fn(), pruneTripTiles: jest.fn() }))
 
 const mockedNetInfoAddEventListener = NetInfo.addEventListener as jest.Mock
 
