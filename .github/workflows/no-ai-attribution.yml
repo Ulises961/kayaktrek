@@ -13,33 +13,37 @@ on:
     types: [opened, synchronize, reopened, edited]
 
 jobs:
-  check-attribution:
-    runs-on: ubuntu-latest
+  # Hosted first, self-hosted on failure, same as backend-ci.yml and frontend-ci.yml.
+  # This check is a git log and two greps, so it needs nothing a runner pool provides —
+  # which is exactly why it had no fallback and why that was worth fixing anyway: when
+  # the hosted pool is unavailable (a billing lapse takes every hosted job down at once,
+  # in ~3s with zero steps), a check with no fallback reports `fail` on a PR that has
+  # nothing wrong with it. A red check that means "the runner is gone" teaches people to
+  # merge past a red check, which costs more than the minute this fallback spends.
+  check-hosted:
+    uses: ./.github/workflows/_no-ai-attribution-run.yml
+    with:
+      runs-on-json: '["ubuntu-latest"]'
+
+  check-fallback:
+    needs: check-hosted
+    if: always() && needs.check-hosted.result == 'failure'
+    uses: ./.github/workflows/_no-ai-attribution-run.yml
+    with:
+      runs-on-json: '["self-hosted","linux","x64"]'
+
+  # The job to require in branch protection: the two above are allowed to fail
+  # individually, and only their disagreement is a real verdict. Self-hosted so it can
+  # still report when the hosted pool is the thing that is down.
+  check-result:
+    needs: [check-hosted, check-fallback]
+    if: always()
+    runs-on: [self-hosted, linux, x64]
     steps:
-      - name: Checkout with full PR history
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Reject commits carrying an AI co-author trailer
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Require at least one runner to have passed
         run: |
-          MATCHES=$(git log --format='--- %H ---%n%B' "$BASE_SHA..$HEAD_SHA" \
-            | grep -iE 'co-authored-by:.*(claude|anthropic|gpt|copilot|codex)|claude-session:' || true)
-          if [ -n "$MATCHES" ]; then
-            echo "::error::Commit(s) on this PR carry an AI co-author trailer, which this repo does not accept:"
-            echo "$MATCHES"
-            exit 1
+          if [ "${{ needs.check-hosted.result }}" = "success" ] || [ "${{ needs.check-fallback.result }}" = "success" ]; then
+            exit 0
           fi
-
-      - name: Reject a PR description crediting an AI coding tool
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          if echo "$PR_BODY" | grep -iE 'generated with \[claude code\]|claude\.ai/code'; then
-            echo "::error::PR description credits an AI coding tool, which this repo does not accept."
-            exit 1
-          fi
+          echo "Neither the hosted nor the self-hosted run passed."
+          exit 1
