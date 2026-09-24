@@ -1,17 +1,20 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 
-const { fetchPublicItineraryDetail, fetchItineraries, getSession } = vi.hoisted(() => ({
+const { fetchPublicItineraryDetail, fetchItineraries, hasLiveSession } = vi.hoisted(() => ({
   fetchPublicItineraryDetail: vi.fn(),
   fetchItineraries: vi.fn(),
-  getSession: vi.fn(),
+  hasLiveSession: vi.fn(),
 }))
 vi.mock("@/lib/itinerary/actions", () => ({ fetchPublicItineraryDetail, fetchItineraries }))
-vi.mock("@/lib/auth/session", () => ({ getSession }))
-// The page renders getMe() for the viewer's unit preference, and getMe reads the auth
-// cookies directly to tell an anonymous visitor (normal on a public page) from a dead
-// session. Outside a request scope next/headers throws, so stand it in as "no cookies".
+// getViewer is left real: it reads the auth cookies directly to tell an anonymous visitor
+// (normal on a public page) from a dead session, and outside a request scope next/headers
+// throws — so stand the cookies in as "none" rather than mocking the accessor away.
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }))
+vi.mock("@/lib/user/me", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/user/me")>()),
+  hasLiveSession,
+}))
 vi.mock("@/components/map/map-loader", () => ({ default: () => <div data-testid="map" /> }))
 vi.mock("@/components/explore/route-detail-actions", () => ({
   RouteDetailActions: () => <div data-testid="actions" />,
@@ -38,14 +41,13 @@ describe("PublicRoutePage", () => {
     vi.clearAllMocks()
   })
 
-  it("sends an anonymous visitor's back link home, not to the auth-gated /explore", async () => {
-    // Regression: /explore is cookie-gated (proxy.ts), but this page is in the
-    // (public) group and reachable without a session. A hardcoded backHref="/explore"
-    // sent anonymous visitors into a login redirect instead of back — the exact kind
-    // of dead end that forces someone to fall back to the browser's back button.
+  it("sends a visitor with no usable session back to the root, their copy of the library", async () => {
+    // This page is reachable without a session, but /explore now redirects anyone the
+    // app cannot recognise to `/`. Sending them to /explore would still arrive, just
+    // via a pointless bounce — and before that redirect existed it was a login wall.
     fetchPublicItineraryDetail.mockResolvedValue(DETAIL)
     fetchItineraries.mockResolvedValue([])
-    getSession.mockResolvedValue(null)
+    hasLiveSession.mockResolvedValue(false)
 
     const jsx = await PublicRoutePage({
       params: Promise.resolve({ id: "01952f1a-0000-7000-8000-000000000r01" }),
@@ -56,10 +58,26 @@ describe("PublicRoutePage", () => {
     expect(link).toHaveAttribute("href", "/")
   })
 
+  // hasLiveSession, not "is there a cookie": a revoked device still carries an
+  // unexpired-looking access_token. Reading mere existence spent a request on an
+  // ownership check that can only 401, to decide between two actions both of which
+  // would have bounced the visitor to /login.
+  it("does not spend an ownership check on credentials the API cannot use", async () => {
+    fetchPublicItineraryDetail.mockResolvedValue(DETAIL)
+    hasLiveSession.mockResolvedValue(false)
+
+    const jsx = await PublicRoutePage({
+      params: Promise.resolve({ id: "01952f1a-0000-7000-8000-000000000r01" }),
+    })
+    render(jsx)
+
+    expect(fetchItineraries).not.toHaveBeenCalled()
+  })
+
   it("sends a logged-in visitor's back link to /explore", async () => {
     fetchPublicItineraryDetail.mockResolvedValue(DETAIL)
     fetchItineraries.mockResolvedValue([])
-    getSession.mockResolvedValue({ userId: "01952f1a-0000-7000-8000-000000000u01" })
+    hasLiveSession.mockResolvedValue(true)
 
     const jsx = await PublicRoutePage({
       params: Promise.resolve({ id: "01952f1a-0000-7000-8000-000000000r01" }),
@@ -73,7 +91,7 @@ describe("PublicRoutePage", () => {
   it("404s when the route does not exist or is not public", async () => {
     fetchPublicItineraryDetail.mockResolvedValue(null)
     fetchItineraries.mockResolvedValue([])
-    getSession.mockResolvedValue(null)
+    hasLiveSession.mockResolvedValue(false)
 
     await expect(
       PublicRoutePage({

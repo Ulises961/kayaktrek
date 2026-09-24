@@ -42,10 +42,12 @@ function isTokenExpired(token: string): boolean {
 // `/paddlers` URL prefix, and a prefix match here would gate the public profile pages behind
 // auth.
 //
-// `/explore` is intentionally ABSENT: the M7c public route library is anonymous-facing by
-// design (fork/CTA gating happens in-page via `isAuthenticated`), even though it lives in
-// `(app)` for the sidebar shell. The M11 §3 matcher sweep briefly gated it and broke anon
-// discovery (caught by e2e 13-explore-discovery, fixed 2026-07-10).
+// `/explore` is intentionally ABSENT, and must stay absent even though the page itself now
+// redirects a visitor it does not recognise. The redirect sends them to `/`, the library
+// they came for; this gate would answer /login, which is the dead end M23 §1 closed. The
+// M11 §3 matcher sweep briefly gated it and broke anon discovery (caught by e2e
+// 13-explore-discovery, fixed 2026-07-10) — adding it here would break it a third time,
+// just less visibly, since the visitor would still end up somewhere rather than nowhere.
 //
 // This used to be the proxy's `matcher` — now the matcher runs on every route (needed so the
 // CSP nonce below is set everywhere, not just authenticated segments), so the auth gate is a

@@ -5,16 +5,20 @@ import { PublicRouteDetail } from "@/components/explore/public-route-detail"
 import { PublicRouteShell } from "@/components/explore/public-route-shell"
 import { fetchPublicItineraryDetail, fetchItineraries } from "@/lib/itinerary/actions"
 import { extractRouteData } from "@/lib/itinerary/public-routes"
-import { getSession } from "@/lib/auth/session"
-import { getViewer } from "@/lib/user/me"
+import { getViewer, hasLiveSession } from "@/lib/user/me"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { seasonOfDetail } from "@/lib/itinerary/season"
 
 export default async function PublicRoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [detail, session, me] = await Promise.all([
+  // isSignedIn decides what this page offers — the back link's destination, the fork
+  // action, whether ownership is worth checking — so it reads hasLiveSession rather than
+  // asking whether a cookie exists. Credentials the API cannot use would otherwise buy a
+  // "Fork this route" button that only reaches /login and an ownership fetch that 401s.
+  // It shares getViewer's one cached /api/user/me call, so it costs no extra request.
+  const [detail, isSignedIn, me] = await Promise.all([
     fetchPublicItineraryDetail(id),
-    getSession(),
+    hasLiveSession(),
     getViewer(),
   ])
   if (!detail) notFound()
@@ -22,7 +26,7 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
   // The author already owns this route, so offer to open it rather than clone it into
   // a duplicate. fetchItineraries returns only the viewer's own routes, so membership
   // in that set is proof of ownership without leaking the owner from the public shape.
-  const isOwner = session
+  const isOwner = isSignedIn
     ? (await fetchItineraries()).some((itinerary) => itinerary.id === id)
     : false
 
@@ -37,13 +41,13 @@ export default async function PublicRoutePage({ params }: { params: Promise<{ id
         places={detail.places}
         author={detail.originalAuthor}
         tripState={detail.tripState}
-        // /explore is cookie-gated (proxy.ts); an anonymous visitor following that
-        // link would hit a login redirect instead of going back. Mirror the
-        // /story/[token] page's precedent and send them home instead.
-        backHref={session ? "/explore" : "/"}
-        backLabel={session ? "All routes" : "Home"}
+        // The library has an address per audience: `/` anonymously, `/explore` signed in,
+        // with /explore redirecting to the root for anyone else. Picking the right one
+        // here is what keeps "back" a single hop rather than a bounce through it.
+        backHref={isSignedIn ? "/explore" : "/"}
+        backLabel={isSignedIn ? "All routes" : "Home"}
         actions={
-          <RouteDetailActions itineraryId={id} isAuthenticated={!!session} isOwner={isOwner} />
+          <RouteDetailActions itineraryId={id} isAuthenticated={isSignedIn} isOwner={isOwner} />
         }
         unit={me?.unitPreference ?? DISTANCE_UNIT.NM}
       />

@@ -15,7 +15,13 @@ export const UNLISTED = {
 
 // Anonymous-reachable pages worth crawling. `/routes/<id>` is not here because it is
 // enumerated from the live library in `app/sitemap.ts`.
-export const INDEXABLE_PATHS = ["/", "/about", "/explore", "/terms", "/privacy"]
+//
+// `/explore` is not here either, and is not disallowed: a crawler is anonymous, and
+// `/explore` answers an anonymous request with a redirect to `/`, which serves the same
+// listing. Listing both put one page of content at two indexable URLs and a redirect in
+// the sitemap. `/` is the canonical library; `/explore` stays crawlable so the redirect
+// is followed rather than treated as a wall.
+export const INDEXABLE_PATHS = ["/", "/about", "/terms", "/privacy"]
 
 // robots.txt matches by prefix, so each entry covers itself and everything beneath it.
 //
@@ -31,7 +37,9 @@ export const INDEXABLE_PATHS = ["/", "/about", "/explore", "/terms", "/privacy"]
 // was still open). Reinstated 2026-09-12 once two real, author-pitched routes were
 // published — text description + difficulty grade was judged enough to be worth crawling;
 // photos and a trip narrative (M7d) are a nice-to-have for future routes, not a gate on
-// these two, since neither exists for trips that predate the app.
+// these two, since neither exists for trips that predate the app. `/explore` must stay
+// off this list even though it now redirects anonymously: a disallowed URL is one a
+// crawler never fetches, so it would never learn the redirect either.
 //
 // `/paddlers` covers the gated connections page *and* the public `/paddlers/<username>`
 // profile beneath it. That is deliberate: a profile carries a real person's logs,

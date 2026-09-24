@@ -15,11 +15,15 @@ import { getPendingRequestsSummary } from "@/lib/requests/actions"
 import React from "react"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // getViewer, not getMe: `/explore` is anonymous-facing (M7c) and deliberately ungated in
-  // proxy.ts, yet it renders in this shell for the sidebar — so the shell must not be the
-  // thing that demands a session. Everything below already treats a null user as normal.
-  // Auth for the genuinely gated segments stays where it belongs, in proxy.ts, with each
-  // page's own authenticated fetch redirecting if a live token is revoked mid-session.
+  // getViewer, not getMe: the shell must not be the thing that demands a session. Auth for
+  // the genuinely gated segments stays where it belongs, in proxy.ts, with each page's own
+  // authenticated fetch redirecting if a live token is revoked mid-session.
+  //
+  // The anonymous branch below is not dead now that `/explore` redirects a visitor it does
+  // not recognise: proxy.ts gates on a cookie *existing*, so a stale one still reaches a
+  // gated page, and this layout renders alongside the page whose own fetch will bounce it.
+  // Offering that visitor the full nav is what M23 §1 closed, so the shell keeps answering
+  // the question for itself rather than assuming a rendered `(app)` route means signed in.
   const [user, pendingRequests, isAuthenticated] = await Promise.all([
     getViewer(),
     getPendingRequestsSummary(),
