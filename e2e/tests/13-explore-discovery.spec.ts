@@ -1,15 +1,11 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiDeleteTrip } from "../fixtures/trips"
-import {
-  apiSeedPublicItinerary,
-  apiDeleteItinerary,
-  type SeededRoute,
-} from "../fixtures/itinerary"
+import { apiSeedPublicItinerary, apiDeleteItinerary, type SeededRoute } from "../fixtures/itinerary"
 import { LoginPage } from "../pages/login.page"
 
 // M7c — public route library & discovery. Proves the cross-service discovery flow the
-// unit/component tests mock out: an anonymous visitor filters the public /explore
+// unit/component tests mock out: an anonymous visitor filters the public route
 // library, opens a route's detail page, is gated behind login to reuse it, and after
 // authenticating forks it into their own private copy.
 //
@@ -68,16 +64,24 @@ test.describe("Public route discovery", () => {
     // A truly logged-out context: browser.newContext() would otherwise inherit the
     // project's leader storageState.
     const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+    // The root is where a signed-out visitor's library lives, and it floats the
+    // first-visit intro card over it. The card dismisses on any outside click, so the
+    // first interaction below would clear it anyway — pre-dismissing it just keeps that
+    // implicit dependency out of the assertions.
+    await anon.addInitScript(() =>
+      window.localStorage.setItem("kayaktrek:discovery-intro-dismissed", "1"),
+    )
     const page = await anon.newPage()
 
-    // Narrow the library to just the seeded route by its unique name.
-    await page.goto("/explore")
+    // Narrow the library to just the seeded route by its unique name. `/` rather than
+    // `/explore`, which redirects here for anyone not signed in.
+    await page.goto("/")
     await page.getByRole("textbox", { name: /search routes by name/i }).fill(ROUTE_NAME)
 
     const card = page.getByRole("link", { name: ROUTE_NAME })
     await expect(card).toBeVisible()
     // Derived facets surface on the card: distance and day count. (Season is a badge
-    // here too, but /explore also renders season *filter chips* — assert the season on
+    // here too, but the library also renders season *filter chips* — assert the season on
     // the detail page below, where only the badge exists.)
     await expect(page.getByText(`${DERIVED_NM} nm`)).toBeVisible()
     await expect(page.getByText("2 days")).toBeVisible()
