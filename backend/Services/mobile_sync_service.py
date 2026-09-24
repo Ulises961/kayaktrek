@@ -156,6 +156,8 @@ class MobileSyncService:
                 "emergencyContactPhone": member.emergency_contact_phone,
                 "emergencyContactRelationship": member.emergency_contact_relationship,
                 "floatPlanConfirmedAt": _epoch_ms(member.float_plan_confirmed_at),
+                "leftAt": _epoch_ms(member.left_at),
+                "leftNote": member.left_note,
             }
             for member in query.all()
         ]

@@ -36,6 +36,7 @@ from Models.processed_mutation import ProcessedMutation
 from Models.trip import TripStateType
 from Models.trip_member import MemberRoleType, TripMember
 from Schemas.trip_member_schema import TripMemberUpdateSchema
+from Services.inventory_service import InventoryService
 from Services.log_service import LogService
 from Services.Middleware.privileges_middleware import check_resource_ownership
 from Services.personal_packing_service import PersonalPackingService
@@ -150,6 +151,38 @@ def _remove_packing_item(envelope: Envelope) -> None:
     PersonalPackingService.remove(str(envelope.entity_id))
 
 
+def _contribute(envelope: Envelope) -> None:
+    """Bring one of your own items for a group checklist slot. `entity_id` is the
+    requirement; the service confirms the item is the caller's."""
+    inventory_id = str(envelope.payload.get("inventoryId"))
+    _require_access("inventory", inventory_id, "checklist")
+    InventoryService.contribute_item(inventory_id, str(envelope.entity_id), str(envelope.payload.get("itemId")))
+
+
+def _withdraw_contribution(envelope: Envelope) -> None:
+    inventory_id = str(envelope.payload.get("inventoryId"))
+    _require_access("inventory", inventory_id, "checklist")
+    InventoryService.unclaim_requirement(inventory_id, str(envelope.entity_id))
+
+
+def _record_departure(envelope: Envelope) -> None:
+    """The leader records that a paddler left the trip. `entity_id` is their crew row;
+    the departure time is when it was recorded on the phone."""
+    trip_id = str(envelope.payload.get("tripId"))
+    _require_access("trip", trip_id, "trip")
+    _require_leader(trip_id)
+    TripMemberService.record_departure(
+        trip_id, str(envelope.entity_id), envelope.device_timestamp, envelope.payload.get("note")
+    )
+
+
+def _clear_departure(envelope: Envelope) -> None:
+    trip_id = str(envelope.payload.get("tripId"))
+    _require_access("trip", trip_id, "trip")
+    _require_leader(trip_id)
+    TripMemberService.clear_departure(trip_id, str(envelope.entity_id))
+
+
 def _create_log(envelope: Envelope) -> None:
     LogService.create_log(envelope.payload, log_id=str(envelope.entity_id))
 
@@ -201,6 +234,10 @@ _HANDLERS: dict[tuple[str, str], Callable[[Envelope], None]] = {
     ("packing_item", "create"): _add_packing_item,
     ("packing_item", "update"): _tick_packing_item,
     ("packing_item", "delete"): _remove_packing_item,
+    ("contribution", "create"): _contribute,
+    ("contribution", "delete"): _withdraw_contribution,
+    ("crew_departure", "create"): _record_departure,
+    ("crew_departure", "delete"): _clear_departure,
     ("log", "create"): _create_log,
     ("log", "update"): _update_log,
     ("log", "delete"): _delete_log,

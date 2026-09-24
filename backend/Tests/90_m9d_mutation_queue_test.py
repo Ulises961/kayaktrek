@@ -15,8 +15,10 @@ from Api.database import db
 from Models.log import Log
 from Models.personal_packing_item import PersonalPackingItem
 from Models.processed_mutation import ProcessedMutation
+from Models.requirement_contribution import RequirementContribution
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember
+from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
 from Resources.mobile_sync_resource import MOBILE_SYNC_ENDPOINT
 from Services.mutation_queue_service import RETENTION, MutationQueueService
@@ -416,3 +418,131 @@ def test_end_date_is_not_changed_offline_before_the_trip_starts(client, app, tri
     result = _results(_send(client, trip_with_crew["leader_headers"], extend))[extend["mutationId"]]
 
     assert result["status"] == "rejected"
+
+
+# ── group checklist contributions ─────────────────────────────────────────
+
+
+def _requirement(client, headers, trip):
+    return json.loads(
+        client.post(
+            f"{INVENTORY_ENDPOINT}/{trip['inventory']['id']}/requirements",
+            headers=headers,
+            json={"name": "Tow line", "category": "safety"},
+        ).data
+    )["id"]
+
+
+def test_contributes_to_the_group_checklist_and_withdraws(client, app, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    headers = trip_with_crew["leader_headers"]
+    requirement_id = _requirement(client, headers, trip)
+    item_id = _owned_item(client, headers, trip)
+    inventory_id = trip["inventory"]["id"]
+    contribute = _envelope(
+        "contribution", "create", requirement_id, {"inventoryId": inventory_id, "itemId": item_id}, minutes=1
+    )
+
+    _send(client, headers, contribute)
+    with app.app_context():
+        assert db.session.query(RequirementContribution).filter_by(requirement_id=UUID(requirement_id)).count() == 1
+
+    withdraw = _envelope("contribution", "delete", requirement_id, {"inventoryId": inventory_id}, minutes=2)
+    result = _results(_send(client, headers, withdraw))[withdraw["mutationId"]]
+
+    assert result["status"] == "applied"
+    with app.app_context():
+        assert db.session.query(RequirementContribution).filter_by(requirement_id=UUID(requirement_id)).count() == 0
+
+
+def test_cannot_contribute_someone_elses_gear(client, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    requirement_id = _requirement(client, trip_with_crew["leader_headers"], trip)
+    leaders_item = _owned_item(client, trip_with_crew["leader_headers"], trip)
+    contribute = _envelope(
+        "contribution",
+        "create",
+        requirement_id,
+        {"inventoryId": trip["inventory"]["id"], "itemId": leaders_item},
+    )
+
+    result = _results(_send(client, trip_with_crew["crew_headers"], contribute))[contribute["mutationId"]]
+
+    assert result["status"] == "rejected"
+
+
+# ── crew drop-out ─────────────────────────────────────────────────────────
+
+
+def test_leader_records_that_a_paddler_left_the_trip(client, app, trip_with_crew):
+    """So the float plan and shore contact know who is actually on the water."""
+    trip = trip_with_crew["trip"]
+    _set_state(app, trip["id"], TripStateType.HAPPENING)
+    crew_member = _member_id(app, trip["id"])["crew"]
+    departure = _envelope(
+        "crew_departure", "create", crew_member, {"tripId": trip["id"], "note": "Wrist injury, taken off at Cala Montjoi"}
+    )
+
+    result = _results(_send(client, trip_with_crew["leader_headers"], departure))[departure["mutationId"]]
+
+    assert result["status"] == "applied"
+    with app.app_context():
+        member = db.session.get(TripMember, UUID(crew_member))
+        # When it happened on the phone, not when the server heard.
+        assert member.left_at == _BASE_TIME
+        assert member.left_note == "Wrist injury, taken off at Cala Montjoi"
+
+
+def test_a_recorded_departure_is_undone(client, app, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    _set_state(app, trip["id"], TripStateType.HAPPENING)
+    crew_member = _member_id(app, trip["id"])["crew"]
+    headers = trip_with_crew["leader_headers"]
+    _send(client, headers, _envelope("crew_departure", "create", crew_member, {"tripId": trip["id"]}, minutes=1))
+
+    _send(client, headers, _envelope("crew_departure", "delete", crew_member, {"tripId": trip["id"]}, minutes=2))
+
+    with app.app_context():
+        member = db.session.get(TripMember, UUID(crew_member))
+        assert member.left_at is None
+        assert member.left_note is None
+
+
+def test_crew_cannot_record_a_departure(client, app, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    _set_state(app, trip["id"], TripStateType.HAPPENING)
+    leader_member = _member_id(app, trip["id"])["leader"]
+    departure = _envelope("crew_departure", "create", leader_member, {"tripId": trip["id"]})
+
+    result = _results(_send(client, trip_with_crew["crew_headers"], departure))[departure["mutationId"]]
+
+    assert result["status"] == "rejected"
+
+
+def test_a_departure_is_only_recorded_on_a_trip_under_way(client, app, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    crew_member = _member_id(app, trip["id"])["crew"]
+    departure = _envelope("crew_departure", "create", crew_member, {"tripId": trip["id"]})
+
+    result = _results(_send(client, trip_with_crew["leader_headers"], departure))[departure["mutationId"]]
+
+    assert result["status"] == "rejected"
+
+
+def test_a_departure_travels_to_the_phones_on_the_next_pull(client, app, trip_with_crew):
+    trip = trip_with_crew["trip"]
+    _set_state(app, trip["id"], TripStateType.HAPPENING)
+    crew_member = _member_id(app, trip["id"])["crew"]
+    _send(
+        client,
+        trip_with_crew["leader_headers"],
+        _envelope("crew_departure", "create", crew_member, {"tripId": trip["id"], "note": "Evacuated"}),
+    )
+
+    pulled = client.get(
+        f"{MOBILE_SYNC_ENDPOINT}/trip/{trip['id']}/pull", headers=trip_with_crew["crew_headers"]
+    ).json["changes"]["trip_members"]["created"]
+
+    row = next(member for member in pulled if member["id"] == crew_member)
+    assert row["leftAt"] == int(_BASE_TIME.timestamp() * 1000)
+    assert row["leftNote"] == "Evacuated"
