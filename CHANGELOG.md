@@ -7,6 +7,41 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.12] - 2026-09-24
+
+### Fixed
+
+- **A session the app can no longer use is treated as signed out.** If your sign-in had
+  expired, or you had signed that device out from elsewhere, the app still showed you the
+  full navigation — Dashboard, Trips, Gear, Logs — and every one of those simply bounced you
+  to the login screen. You now get the signed-out view, which is the truth.
+- **Your devices are named.** The list showed "Unknown device" and "Unknown location" for
+  almost every row, which made it useless for its one purpose: spotting a sign-in that was
+  not you. Browser sessions now show the browser and approximate city, and the app names
+  itself and your phone. Existing entries fill themselves in as you use them — you do not
+  need to sign out everywhere.
+- **Each row says when that session began**, not only when it was last active. Two sign-ins
+  from the same browser in the same place were otherwise impossible to tell apart.
+
+### Changed
+
+- **The navigation is now a proper landmark for screen readers.** The app's own destinations
+  were an unlabelled list, so there was nothing to jump to — on the Explore page, no
+  navigation landmark existed at all.
+
+### Deploy notes
+
+- **No migrations.** Nothing here changes the database schema.
+- **`CLIENT_FORWARDING_SECRET` is new, optional, and must match on two services.** It lets
+  the backend trust the browser details the frontend forwards, so a session row can name a
+  real device instead of the server. Set the **same value** on `backend` and `frontend` in
+  `.env.prod`; unset is a working configuration and simply leaves the labels as they are
+  today. A *mismatch* fails silently, so check a real session row after deploying. Generate
+  with `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'` — see `DEPLOY.md`,
+  "Session device and location labels".
+- Device labels are also refreshed on token refresh, so rows predating this fill in within
+  about fifteen minutes of ordinary use rather than needing anyone to sign out everywhere.
+
 ## [1.0.11] - 2026-09-24
 
 ### Added
