@@ -100,6 +100,13 @@ export const appDatabaseSchema = appSchema({
         // M9d's push/divergence-detection needs it as the base version.
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "route_version", type: "number" },
+        // M9d: the leader edited the route on this phone and it has not been
+        // pushed yet — a pull must not overwrite it.
+        { name: "has_local_changes", type: "boolean", isOptional: true },
+        // M9d: a push was refused because the route changed elsewhere meanwhile.
+        // Parked for the leader to compare and resolve (spec §8.3); until then
+        // the phone keeps showing its own route and pulls leave it alone.
+        { name: "in_conflict", type: "boolean", isOptional: true },
       ],
     }),
     tableSchema({

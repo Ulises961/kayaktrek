@@ -83,7 +83,7 @@ describe("migrations", () => {
     expect(createdTables).toEqual(["cached_logistics"])
   })
 
-  it("has a v12 step creating the offline queue and adding crew departures", () => {
+  it("has a v12 step creating the offline queue and adding departures and route edits", () => {
     const v12 = migrations.sortedMigrations.find((migration) => migration.toVersion === 12)
     expect(v12).toBeDefined()
 
@@ -94,7 +94,12 @@ describe("migrations", () => {
       step.type === "add_columns" ? step.columns.map((column) => `${step.table}.${column.name}`) : [],
     )
     expect(createdTables).toEqual(["pending_mutations"])
-    expect(addedColumns.sort()).toEqual(["trip_members.left_at", "trip_members.left_note"])
+    expect(addedColumns.sort()).toEqual([
+      "route_meta.has_local_changes",
+      "route_meta.in_conflict",
+      "trip_members.left_at",
+      "trip_members.left_note",
+    ])
   })
 
   it("has a migration step creating cached_profile at v11", () => {

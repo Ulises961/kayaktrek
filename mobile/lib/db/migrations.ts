@@ -184,6 +184,13 @@ export const migrations = schemaMigrations({
             { name: "left_note", type: "string", isOptional: true },
           ],
         }),
+        addColumns({
+          table: "route_meta",
+          columns: [
+            { name: "has_local_changes", type: "boolean", isOptional: true },
+            { name: "in_conflict", type: "boolean", isOptional: true },
+          ],
+        }),
       ],
     },
   ],
