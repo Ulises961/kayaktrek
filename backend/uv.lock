@@ -1153,7 +1153,7 @@ wheels = [
 
 [[package]]
 name = "kayak-expedition-planner"
-version = "1.0.12"
+version = "1.0.13"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

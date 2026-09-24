@@ -1,6 +1,6 @@
 [project]
 name = "kayak-expedition-planner"
-version = "1.0.12"
+version = "1.0.13"
 requires-python = ">=3.12"
 dependencies = [
     "flask",

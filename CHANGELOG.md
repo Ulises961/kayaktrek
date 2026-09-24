@@ -7,6 +7,32 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.13] - 2026-09-25
+
+### Changed
+
+- **Signed out, the route library has one address: the site's front page.** Opening
+  `/explore` without being signed in used to put you inside the app's own frame — a sidebar
+  with a single entry in it and an account menu with nothing behind it — and left out
+  everything the front page gives you for the same routes: the chart, the introduction, and
+  somewhere to sign up. It now takes you to the front page. Signed in, `/explore` is
+  unchanged.
+- **Search engines are pointed at one copy of the library instead of two.** The same listing
+  was being advertised at both addresses, which left search engines to pick between them.
+  Only the front page is listed now; `/explore` stays reachable so a crawler that already
+  knows it follows the move.
+
+### Fixed
+
+- **A sign-in the app can no longer use no longer sends you round in circles.** The front
+  page decided you were signed in if a login cookie merely existed, so an expired or
+  revoked one sent you to the dashboard, which sent you back to the login screen. The front
+  page, `/explore` and the public route pages now all ask the same question, and someone the
+  app cannot recognise simply sees the public library.
+- **A public route page no longer offers a stale session a fork button that cannot work.**
+  With an unusable sign-in it showed "use this route", which only ever reached the login
+  screen, and spent a request checking ownership that could not succeed.
+
 ## [1.0.12] - 2026-09-24
 
 ### Fixed
