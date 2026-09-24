@@ -41,7 +41,8 @@ describe("DISALLOWED_PATHS", () => {
 
   // Reinstated 2026-09-12 once two real, author-pitched routes were published to the
   // library (§5 of plans/M25-web-1.0-release.md) — the discovery surface is no longer
-  // held back from crawlers.
+  // held back from crawlers. /explore stays allowed even though it redirects an
+  // anonymous crawler: disallowing it would stop the redirect ever being discovered.
   it("allows the discovery surface now that the library has real content", () => {
     expect(DISALLOWED_PATHS).not.toContain("/explore")
     expect(DISALLOWED_PATHS).not.toContain("/routes")
@@ -50,7 +51,15 @@ describe("DISALLOWED_PATHS", () => {
 
 describe("INDEXABLE_PATHS", () => {
   it("lists the anonymous-reachable pages that should be crawled", () => {
-    expect(INDEXABLE_PATHS).toEqual(["/", "/about", "/explore", "/terms", "/privacy"])
+    expect(INDEXABLE_PATHS).toEqual(["/", "/about", "/terms", "/privacy"])
+  })
+
+  // A crawler is anonymous, and /explore answers an anonymous request with a redirect to
+  // `/`. Advertising both put the same listing at two indexable URLs and a known redirect
+  // in the sitemap; `/` is the canonical library, so it is the only one enumerated.
+  it("does not advertise /explore, which redirects a crawler to the root", () => {
+    expect(INDEXABLE_PATHS).not.toContain("/explore")
+    expect(INDEXABLE_PATHS).toContain("/")
   })
 
   it("shares no entry with the disallow list", () => {

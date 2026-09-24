@@ -24,9 +24,10 @@ const AUTHENTICATED_ITEMS = [
   { title: "Logs", url: "/logs", icon: NewspaperIcon },
 ]
 
-// `/explore` is the only segment of this shell an anonymous visitor can use — it renders
-// here for the sidebar but stays out of proxy.ts's AUTH_GATED_PREFIXES. Offering the rest
-// sent every click to /login.
+// A visitor the app cannot recognise is offered the one destination that works for them.
+// `/explore` itself now redirects such a visitor to `/`, so this is what the shell shows
+// in the moment it renders beside a gated page a stale cookie got past proxy.ts. Offering
+// the rest sent every click to /login.
 const ANONYMOUS_ITEMS = [EXPLORE_ITEM]
 
 export function NavigationItems({ isAuthenticated = true }: { isAuthenticated?: boolean }) {

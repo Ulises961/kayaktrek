@@ -118,13 +118,14 @@ test.describe("Public links stay public", () => {
       test("the landing page, terms and the public route library all open", async ({ browser }) => {
         const { context, page } = await openAs(browser, visitor.cookies)
         try {
-          for (const route of ["/", "/terms", "/explore"]) {
+          for (const route of ["/", "/terms"]) {
             await page.goto(route)
             await expectNotGated(page, route)
           }
-          // /explore is the one that has broken twice, so prove it rendered the library
-          // rather than merely failing to redirect.
-          await expect(page.getByRole("heading", { name: /explore routes/i })).toBeVisible()
+          // The root is the one that has to be the library, so prove it rendered rather
+          // than merely failing to redirect.
+          await page.goto("/")
+          await expect(page.getByLabel(/search routes by name/i)).toBeVisible()
         } finally {
           await context.close()
         }
@@ -149,20 +150,23 @@ test.describe("Public links stay public", () => {
         }
       })
 
-      // M23 §1. The (app) shell renders for anonymous visitors because /explore lives in
-      // it. It used to offer the full signed-in nav, every entry redirecting to /login.
-      test("the shell offers an anonymous visitor no doors that only lead to /login", async ({
+      // /explore is the app shell's copy of the library, and the shell is furniture an
+      // unrecognised visitor has no use for — a one-item sidebar and an account menu with
+      // nothing in it. It hands them to the root instead, which serves the same listing
+      // with the pitch and the auth entry points on it.
+      //
+      // The assertion that matters is WHERE it hands them. /explore is deliberately absent
+      // from proxy.ts's AUTH_GATED_PREFIXES: answering an anonymous request with /login is
+      // the dead end M23 §1 closed, and it has been reintroduced twice.
+      test("/explore hands an unrecognised visitor to the library, not to /login", async ({
         browser,
       }) => {
         const { context, page } = await openAs(browser, visitor.cookies)
         try {
           await page.goto("/explore")
-          await expectNotGated(page, "/explore")
-          const nav = page.getByRole("navigation")
-          await expect(nav.getByText("Explore", { exact: true })).toBeVisible()
-          for (const gated of ["Dashboard", "Trips", "Gear", "Logs"]) {
-            await expect(nav.getByText(gated, { exact: true })).toHaveCount(0)
-          }
+          await expect(page).not.toHaveURL(/\/login/)
+          expect(new URL(page.url()).pathname).toBe("/")
+          await expect(page.getByLabel(/search routes by name/i)).toBeVisible()
         } finally {
           await context.close()
         }

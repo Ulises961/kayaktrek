@@ -37,7 +37,6 @@ describe("sitemap", () => {
     expect(entries.map((e) => e.url)).toEqual([
       siteUrl("/"),
       siteUrl("/about"),
-      siteUrl("/explore"),
       siteUrl("/terms"),
       siteUrl("/privacy"),
     ])
@@ -74,7 +73,7 @@ describe("sitemap", () => {
 
     const entries = await sitemap()
 
-    expect(entries).toHaveLength(5)
+    expect(entries).toHaveLength(4)
     expect(entries.every((e) => e.url.startsWith("http"))).toBe(true)
   })
 })
