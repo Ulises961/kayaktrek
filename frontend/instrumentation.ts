@@ -1,3 +1,4 @@
+import type { Instrumentation } from "next"
 import { API_URL, SSE_URL } from "@/lib/api/config"
 
 // M13 §A.3 — server-side distributed tracing (ADR-009). Mirrors the backend's
@@ -49,4 +50,33 @@ export async function register() {
       fetch: { propagateContextUrls: [API_URL, SSE_URL] },
     },
   })
+}
+
+// A server-render exception never reaches Logfire on its own: the backend answered 200 to
+// every call the page made, and the throw happens afterwards in Next (a Zod parse of a
+// response, say), so the only trace is a line on the container's stdout. Production shows
+// the visitor just a digest ("Reference: 3967558296"), and this span is what ties that
+// digest to the actual error.
+//
+// The route *template* is recorded, never `request.path`: share links carry their token in
+// the path (`/float-plan/[token]`, `/story/[token]`).
+export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
+  if (process.env.NEXT_RUNTIME !== "nodejs" || !process.env.LOGFIRE_TOKEN) {
+    return
+  }
+
+  const { trace, SpanStatusCode } = await import("@opentelemetry/api")
+  const span = trace.getTracer("kayak-frontend").startSpan(`render error ${context.routePath}`)
+  const digest = (error as { digest?: string } | null)?.digest
+  span.setAttributes({
+    "http.route": context.routePath,
+    "http.request.method": request.method,
+    "next.router_kind": context.routerKind,
+    "next.route_type": context.routeType,
+    "next.render_source": context.renderSource,
+    ...(digest ? { "next.digest": digest } : {}),
+  })
+  span.recordException(error as Error)
+  span.setStatus({ code: SpanStatusCode.ERROR })
+  span.end()
 }
