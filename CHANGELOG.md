@@ -7,6 +7,30 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.15] - 2026-09-25
+
+### Fixed
+
+- **The sitemap and `robots.txt` now point at the real site.** Both advertised
+  `http://localhost:3000/...` for every page, so a search engine that read them was sent to an
+  address that does not exist and could not find a single page. They are now built from the
+  site's own address on every request, and list the current public routes rather than the ones
+  that existed when the app was last built.
+- **A mistyped site address fails with a clear message.** Setting the site's address without
+  `https://` in front used to break every page with an unexplained error; it now names the
+  setting and what it needs.
+
+### Deploy notes
+
+- **No migrations.**
+- **`FRONTEND_URL` must be the full origin, scheme included** — `https://app.kayaktrek.app`,
+  not `app.kayaktrek.app` — in `.env.prod`. It is now required on the `frontend` container as
+  well as the four services that already had it, so the stack refuses to start without it.
+  The same variable builds the links in password-reset and verification emails, which a bare
+  host would have broken.
+- **Check it after deploying:** `curl https://app.kayaktrek.app/robots.txt` should end with
+  `Sitemap: https://app.kayaktrek.app/sitemap.xml`.
+
 ## [1.0.14] - 2026-09-25
 
 ### Fixed
