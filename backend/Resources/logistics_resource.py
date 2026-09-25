@@ -1,7 +1,6 @@
-import os
 from http import HTTPStatus
 
-from flask import Blueprint, g, jsonify, request, abort
+from flask import Blueprint, current_app, g, jsonify, request, abort
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -136,8 +135,7 @@ def send_share_email(trip_id: str):
           description: Trip not found
     """
     try:
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        LogisticsService.send_share_email(trip_id, g.current_user_id, frontend_url)
+        LogisticsService.send_share_email(trip_id, g.current_user_id, current_app.config["FRONTEND_URL"])
         return "", HTTPStatus.NO_CONTENT
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
