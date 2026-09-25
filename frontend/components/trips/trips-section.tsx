@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState, useTransition } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { TripCard } from "@/components/common/trip-card"
 import { listTrips, type TripListFilters } from "@/lib/trips/actions"
 import { TRIP_SORT, type Trip, type TripPage, type TripSort, type TripState } from "@/lib/dtos/trip"
 import { extractItineraryRoute } from "@/lib/itinerary/public-routes"
+
+const LOAD_FAILED = "Couldn't load your trips. Try again."
 
 // Derived from data already in hand — no extra fetch. Each Trip's envelope
 // nests its full itinerary (days+points), including trips loaded later via
@@ -99,12 +102,16 @@ export function TripsSection({
     }
     const requestId = ++latestRequest.current
     startTransition(async () => {
-      const result = await listTrips({ state, sort, page: 1, ...filters })
-      if (requestId !== latestRequest.current) return
-      setItems(result.items)
-      setPage(result.page)
-      setPages(result.pages)
-      setTotal(result.total)
+      try {
+        const result = await listTrips({ state, sort, page: 1, ...filters })
+        if (requestId !== latestRequest.current) return
+        setItems(result.items)
+        setPage(result.page)
+        setPages(result.pages)
+        setTotal(result.total)
+      } catch {
+        if (requestId === latestRequest.current) toast.error(LOAD_FAILED)
+      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, filters.difficulty, filters.minMiles, filters.maxMiles])
@@ -113,12 +120,16 @@ export function TripsSection({
     if (page >= pages || isPending) return
     const requestId = ++latestRequest.current
     startTransition(async () => {
-      const result = await listTrips({ state, sort, page: page + 1, ...filters })
-      if (requestId !== latestRequest.current) return
-      setItems((prev) => [...prev, ...result.items])
-      setPage(result.page)
-      setPages(result.pages)
-      setTotal(result.total)
+      try {
+        const result = await listTrips({ state, sort, page: page + 1, ...filters })
+        if (requestId !== latestRequest.current) return
+        setItems((prev) => [...prev, ...result.items])
+        setPage(result.page)
+        setPages(result.pages)
+        setTotal(result.total)
+      } catch {
+        if (requestId === latestRequest.current) toast.error(LOAD_FAILED)
+      }
     })
   }
 

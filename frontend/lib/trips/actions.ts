@@ -44,13 +44,11 @@ export async function listTrips(filters: TripListFilters): Promise<TripPage> {
   if (filters.minMiles != null) params.set("min_miles", String(filters.minMiles))
   if (filters.maxMiles != null) params.set("max_miles", String(filters.maxMiles))
 
-  try {
-    const raw = await apiGet<unknown>(`/api/trip/${session.userId}/all?${params}`)
-    return TripPageSchema.parse(raw)
-  } catch (e) {
-    if (isRedirectError(e)) throw e
-    return EMPTY_TRIP_PAGE
-  }
+  // No catch: an empty page here reads as "you have no trips" — the Trips page's empty state —
+  // so a failed fetch must reach the error boundary (page) or the caller's own handler (the
+  // client-side re-query and Load more) instead of masquerading as an empty list.
+  const raw = await apiGet<unknown>(`/api/trip/${session.userId}/all?${params}`)
+  return TripPageSchema.parse(raw)
 }
 
 interface TripFields {

@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event"
 vi.mock("@/lib/trips/actions", () => ({
   listTrips: vi.fn(),
 }))
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+vi.mock("sonner", () => ({ toast: { error: toastError } }))
 
 import { listTrips } from "@/lib/trips/actions"
 import { TripsSection, PLANNING_SORT_OPTIONS } from "../trips-section"
@@ -104,6 +106,40 @@ describe("TripsSection", () => {
     )
     await waitFor(() => expect(screen.getByText("Sooner")).toBeInTheDocument())
     expect(screen.queryByText("Later")).not.toBeInTheDocument()
+  })
+
+  it("keeps the trips on screen and says so when a re-query fails", async () => {
+    mockListTrips.mockRejectedValue(new Error("backend down"))
+    render(
+      <TripsSection
+        label="Planning"
+        state={TRIP_STATE.BUILDING}
+        initial={page([trip({ destination: "Later" })])}
+        defaultSort={TRIP_SORT.SOONEST}
+        sortOptions={PLANNING_SORT_OPTIONS}
+        filters={NO_FILTERS}
+      />,
+    )
+    await userEvent.selectOptions(screen.getByLabelText(/sort trips/i), TRIP_SORT.LATEST)
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
+    expect(screen.getByText("Later")).toBeInTheDocument()
+  })
+
+  it("keeps the loaded trips and Load more available when loading the next page fails", async () => {
+    mockListTrips.mockRejectedValue(new Error("backend down"))
+    render(
+      <TripsSection
+        label="Planning"
+        state={TRIP_STATE.BUILDING}
+        initial={page([trip({ destination: "First" })], { pages: 2, total: 2 })}
+        defaultSort={TRIP_SORT.SOONEST}
+        filters={NO_FILTERS}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /load more/i }))
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
+    expect(screen.getByText("First")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /load more/i })).toBeEnabled()
   })
 
   it("does not offer a sort dropdown when sortOptions is omitted", () => {

@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { getPublicProfile } from "../actions"
 
-vi.mock("@/lib/api/client", () => ({ apiGetPublic: vi.fn() }))
+vi.mock("@/lib/api/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/api/client")>()),
+  apiGetPublic: vi.fn(),
+}))
+vi.mock("next/headers", () => ({ cookies: vi.fn() }))
+vi.mock("@/lib/auth/actions", () => ({ refreshSession: vi.fn() }))
 
-import { apiGetPublic } from "@/lib/api/client"
+import { apiGetPublic, ApiError } from "@/lib/api/client"
 
 const GET = apiGetPublic as ReturnType<typeof vi.fn>
 
@@ -43,17 +48,19 @@ describe("getPublicProfile", () => {
   })
 
   it("returns null on a 404 (no existence oracle)", async () => {
-    GET.mockRejectedValue(new Error("GET ... failed: 404"))
+    GET.mockRejectedValue(new ApiError("GET ... failed: 404", 404))
     expect(await getPublicProfile("ghost")).toBeNull()
   })
 
-  it("returns null on other errors", async () => {
-    GET.mockRejectedValue(new Error("Internal Server Error"))
-    expect(await getPublicProfile("seapaddler")).toBeNull()
+  it("rethrows a 5xx instead of reporting the profile as missing", async () => {
+    const failure = new ApiError("Internal Server Error", 500)
+    GET.mockRejectedValue(failure)
+    await expect(getPublicProfile("seapaddler")).rejects.toBe(failure)
   })
 
-  it("returns null for non-Error throws", async () => {
-    GET.mockRejectedValue("Network error")
-    expect(await getPublicProfile("seapaddler")).toBeNull()
+  it("rethrows a timeout instead of reporting the profile as missing", async () => {
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError")
+    GET.mockRejectedValue(timeout)
+    await expect(getPublicProfile("seapaddler")).rejects.toBe(timeout)
   })
 })
