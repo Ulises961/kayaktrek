@@ -18,11 +18,11 @@ _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _REQUIRED_STAGING_PROD_VARS = ["SECRET_KEY", "JWT_SECRET_KEY", "DATABASE_URL", "RATELIMIT_STORAGE_URI"]
 
 
-def _import_config_with_env(env: dict) -> subprocess.CompletedProcess:
+def _import_config_with_env(env: dict, then: str = "") -> subprocess.CompletedProcess:
     # config.py's load_dotenv() searches upward from Api/config.py's own location, not the
     # subprocess cwd, so it would silently refill any var we strip from `env` with whatever
     # is in the developer's real backend/.env. Neutralise it before Api.config is imported.
-    script = "import dotenv; dotenv.load_dotenv = lambda *a, **k: None; import Api.config"
+    script = f"import dotenv; dotenv.load_dotenv = lambda *a, **k: None; import Api.config; {then}"
     return subprocess.run(
         [sys.executable, "-c", script],
         cwd=_BACKEND_DIR,
@@ -64,6 +64,53 @@ def test_config_module_imports_cleanly_when_all_required_vars_present():
     """Sanity check that the harness itself is correct — a complete environment imports fine."""
     result = _import_config_with_env(_base_env())
     assert result.returncode == 0, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# FRONTEND_URL — every emailed link is `f"{FRONTEND_URL}/path"`, so a value with no scheme
+# yields a relative link that a mail client cannot open. It is read at import time, so the
+# check has to be exercised the same way.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("bad_value", ["app.kayaktrek.app", "//app.kayaktrek.app", "ftp://app.kayaktrek.app", "https://"])
+def test_config_module_rejects_a_frontend_url_with_no_http_origin(bad_value):
+    result = _import_config_with_env(_base_env(FRONTEND_URL=bad_value))
+
+    assert result.returncode != 0
+    assert "ValueError" in result.stderr
+    assert "FRONTEND_URL" in result.stderr
+    assert bad_value in result.stderr
+
+
+@pytest.mark.parametrize("good_value", ["https://app.kayaktrek.app", "http://localhost:3000", "https://app.kayaktrek.app/"])
+def test_config_module_accepts_a_frontend_url_with_an_http_origin(good_value):
+    result = _import_config_with_env(_base_env(FRONTEND_URL=good_value))
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_config_frontend_url_has_no_trailing_slash():
+    """Links are built as `{FRONTEND_URL}/reset-password`, so a trailing slash in the
+    configured value would double it."""
+    result = _import_config_with_env(
+        _base_env(FRONTEND_URL="https://app.kayaktrek.app/"), then="print(Api.config.Config.FRONTEND_URL)"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "https://app.kayaktrek.app"
+
+
+@pytest.mark.parametrize("unset_value", [None, ""])
+def test_config_frontend_url_falls_back_to_local_dev_when_unset_or_blank(unset_value):
+    env = _base_env()
+    env.pop("FRONTEND_URL", None)
+    if unset_value is not None:
+        env["FRONTEND_URL"] = unset_value
+
+    result = _import_config_with_env(env, then="print(Api.config.Config.FRONTEND_URL)")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "http://localhost:3000"
 
 
 # ---------------------------------------------------------------------------

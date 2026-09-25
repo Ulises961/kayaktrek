@@ -1,8 +1,25 @@
 import os
+import re
 from dotenv import load_dotenv
 from sqlalchemy.pool import NullPool
 
 load_dotenv()
+
+_HTTP_ORIGIN = re.compile(r"^https?://[^/\s]+")
+
+
+def _frontend_url() -> str:
+    """The public origin emailed links are built on, as `f"{FRONTEND_URL}/path"`.
+
+    Without a scheme (`app.example.com`) every one of those links is relative and a mail
+    client cannot open it, so a value like that stops the process at import instead of
+    shipping broken password-reset and verification mail. Unset or blank falls back to the
+    local dev origin; a trailing slash is dropped so the path join cannot double it.
+    """
+    raw_value = os.getenv("FRONTEND_URL") or "http://localhost:3000"
+    if not _HTTP_ORIGIN.match(raw_value):
+        raise ValueError(f'FRONTEND_URL must start with http:// or https:// and name a host, got "{raw_value}"')
+    return raw_value.rstrip("/")
 
 
 class Config:
@@ -24,7 +41,7 @@ class Config:
     # not liftable by a support ticket. Empty (the default) keeps the SMTP path, which is
     # what local dev/mailpit and CI/testing use. See Services/mail_service.py.
     BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    FRONTEND_URL = _frontend_url()
     # Closed-beta registration gate (single shared code). Empty = gate disabled — every
     # environment that hasn't set one (local dev, CI, testing) registers exactly as before.
     INVITE_CODE = os.getenv("INVITE_CODE", "")
