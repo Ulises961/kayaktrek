@@ -706,6 +706,14 @@ services:
       # exactly as before. Not a NEXT_PUBLIC_ var: it is read server-side only, and baking
       # a shared secret into the client bundle would hand it to everyone.
       CLIENT_FORWARDING_SECRET: ${CLIENT_FORWARDING_SECRET:-}
+      # The public origin every absolute URL the server emits is built from —
+      # `frontend/lib/seo/origin.ts`, feeding sitemap.xml, robots.txt and the root layout's
+      # `metadataBase`. `backend`, `sse`, `worker` and `beat` have all had this since they
+      # started putting links in email; `frontend` never did, so it fell back to its default
+      # and production served a sitemap advertising `http://localhost:3000/...` for every
+      # page, plus OpenGraph image URLs resolving against the same. A crawler could reach
+      # none of it. Required, not defaulted: the fallback is precisely what hid this.
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
     depends_on:
       backend:
         condition: service_healthy
