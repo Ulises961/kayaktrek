@@ -32,6 +32,7 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Api.database import db
+from Models.inventory import Inventory
 from Models.processed_mutation import ProcessedMutation
 from Models.trip import TripStateType
 from Models.trip_member import MemberRoleType, TripMember
@@ -151,18 +152,28 @@ def _remove_packing_item(envelope: Envelope) -> None:
     PersonalPackingService.remove(str(envelope.entity_id))
 
 
+def _trip_inventory_id(envelope: Envelope) -> str:
+    """The trip's checklist, named by trip: offline the phone may never have seen the
+    inventory's own id, which only arrives with a live trip fetch."""
+    trip_id = str(envelope.payload.get("tripId"))
+    inventory = db.session.query(Inventory).filter_by(trip_id=UUID(trip_id)).one_or_none()
+    if inventory is None:
+        raise MutationRejected("That trip has no checklist.")
+    inventory_id = str(inventory.id)
+    _require_access("inventory", inventory_id, "checklist")
+    return inventory_id
+
+
 def _contribute(envelope: Envelope) -> None:
     """Bring one of your own items for a group checklist slot. `entity_id` is the
     requirement; the service confirms the item is the caller's."""
-    inventory_id = str(envelope.payload.get("inventoryId"))
-    _require_access("inventory", inventory_id, "checklist")
-    InventoryService.contribute_item(inventory_id, str(envelope.entity_id), str(envelope.payload.get("itemId")))
+    InventoryService.contribute_item(
+        _trip_inventory_id(envelope), str(envelope.entity_id), str(envelope.payload.get("itemId"))
+    )
 
 
 def _withdraw_contribution(envelope: Envelope) -> None:
-    inventory_id = str(envelope.payload.get("inventoryId"))
-    _require_access("inventory", inventory_id, "checklist")
-    InventoryService.unclaim_requirement(inventory_id, str(envelope.entity_id))
+    InventoryService.unclaim_requirement(_trip_inventory_id(envelope), str(envelope.entity_id))
 
 
 def _record_departure(envelope: Envelope) -> None:

@@ -435,20 +435,21 @@ def _requirement(client, headers, trip):
 
 
 def test_contributes_to_the_group_checklist_and_withdraws(client, app, trip_with_crew):
+    """Named by trip, not inventory: offline the phone may never have seen the
+    inventory's id, which only arrives with a live trip fetch."""
     trip = trip_with_crew["trip"]
     headers = trip_with_crew["leader_headers"]
     requirement_id = _requirement(client, headers, trip)
     item_id = _owned_item(client, headers, trip)
-    inventory_id = trip["inventory"]["id"]
     contribute = _envelope(
-        "contribution", "create", requirement_id, {"inventoryId": inventory_id, "itemId": item_id}, minutes=1
+        "contribution", "create", requirement_id, {"tripId": trip["id"], "itemId": item_id}, minutes=1
     )
 
     _send(client, headers, contribute)
     with app.app_context():
         assert db.session.query(RequirementContribution).filter_by(requirement_id=UUID(requirement_id)).count() == 1
 
-    withdraw = _envelope("contribution", "delete", requirement_id, {"inventoryId": inventory_id}, minutes=2)
+    withdraw = _envelope("contribution", "delete", requirement_id, {"tripId": trip["id"]}, minutes=2)
     result = _results(_send(client, headers, withdraw))[withdraw["mutationId"]]
 
     assert result["status"] == "applied"
@@ -464,7 +465,7 @@ def test_cannot_contribute_someone_elses_gear(client, trip_with_crew):
         "contribution",
         "create",
         requirement_id,
-        {"inventoryId": trip["inventory"]["id"], "itemId": leaders_item},
+        {"tripId": trip["id"], "itemId": leaders_item},
     )
 
     result = _results(_send(client, trip_with_crew["crew_headers"], contribute))[contribute["mutationId"]]
