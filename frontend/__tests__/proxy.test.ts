@@ -114,6 +114,36 @@ describe("proxy", () => {
     expect(res.status).not.toBe(307)
   })
 
+  // /explore's own page redirects a visitor it cannot recognise to `/`, but by the time a
+  // page can decide that, the (app) layout above it has already begun streaming — so Next
+  // cannot send a status and embeds the redirect in a 200 instead. A browser follows it; a
+  // crawler records a 200 whose body is the app shell, which is precisely the duplicate the
+  // redirect exists to remove. Answering here, before anything renders, is what makes it a
+  // real 307. Shipped as a 200 in v1.0.13 and verified against production.
+  it("answers an anonymous /explore with a real 307 to the root, not /login", async () => {
+    const res = await proxy(requestFor("/explore"))
+    expect(res.status).toBe(307)
+    const location = new URL(res.headers.get("location")!)
+    expect(location.pathname).toBe("/")
+  })
+
+  it("carries the query string over, so a shared filtered link survives the redirect", async () => {
+    const res = await proxy(requestFor("/explore?q=fjord"))
+    const location = new URL(res.headers.get("location")!)
+    expect(location.pathname).toBe("/")
+    expect(location.searchParams.get("q")).toBe("fjord")
+  })
+
+  // Only the cookie-less case is decidable here: the middleware runtime cannot tell a live
+  // session from a revoked one without a round trip. A visitor holding any credential falls
+  // through to the page, whose hasLiveSession() check is the one that can. That split is
+  // deliberate — the clean 307 is for crawlers and genuinely anonymous visitors, which is
+  // the case the SEO half depends on.
+  it("leaves /explore alone when the visitor presents credentials", async () => {
+    const res = await proxy(requestFor("/explore", "refresh_token=whatever"))
+    expect(res.status).not.toBe(307)
+  })
+
   describe("expired access token with a refresh token present", () => {
     // Regression guard: proxy.ts used to redirect straight to /login the moment the
     // access token looked expired, without ever trying the refresh token — meaning

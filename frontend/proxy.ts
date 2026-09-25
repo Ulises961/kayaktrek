@@ -42,10 +42,10 @@ function isTokenExpired(token: string): boolean {
 // `/paddlers` URL prefix, and a prefix match here would gate the public profile pages behind
 // auth.
 //
-// `/explore` is intentionally ABSENT, and must stay absent even though the page itself now
-// redirects a visitor it does not recognise. The redirect sends them to `/`, the library
-// they came for; this gate would answer /login, which is the dead end M23 §1 closed. The
-// M11 §3 matcher sweep briefly gated it and broke anon discovery (caught by e2e
+// `/explore` is intentionally ABSENT, and must stay absent even though an anonymous request
+// for it is now redirected in `proxy()` below. That redirect sends the visitor to `/`, the
+// library they came for; this list would answer /login, which is the dead end M23 §1 closed.
+// The M11 §3 matcher sweep briefly gated it and broke anon discovery (caught by e2e
 // 13-explore-discovery, fixed 2026-07-10) — adding it here would break it a third time,
 // just less visibly, since the visitor would still end up somewhere rather than nowhere.
 //
@@ -67,6 +67,13 @@ export const AUTH_GATED_PREFIXES = [
   "/trips",
   "/users",
 ]
+
+// Whether the visitor presents anything the app could try to authenticate with. Not
+// "are they signed in" — the middleware runtime cannot answer that without a round trip,
+// and `lib/user/me.ts`'s hasLiveSession is what does, once a page is rendering.
+function hasAnyCredential(request: NextRequest): boolean {
+  return Boolean(request.cookies.get("access_token") || request.cookies.get("refresh_token"))
+}
 
 export function isAuthGatedPath(pathname: string): boolean {
   if (pathname === "/paddlers") return true
@@ -134,6 +141,27 @@ async function tryRefresh(
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   let refreshed: { accessToken: string; refreshToken: string } | null = null
+
+  // `/explore` is the app shell's copy of the route library; signed out, `/` is the copy
+  // worth having. The page redirects too, on the better predicate (hasLiveSession), but a
+  // page cannot produce a *status*: the (app) layout has already begun streaming by then,
+  // so Next embeds the redirect in a 200 body. A browser follows that; a crawler files a
+  // 200 whose content is the app shell — the second indexable copy the redirect was meant
+  // to remove. Only middleware runs early enough to answer 307, so the crawler-facing half
+  // of this lives here.
+  //
+  // Cookie presence is all this runtime can read, and that is the right test for the case
+  // it serves: no cookie is exactly the crawler and the genuinely anonymous visitor. Anyone
+  // holding a credential falls through to the page, which can tell a live session from a
+  // dead one. Redirecting to `/` and never `/login` is what keeps this distinct from
+  // isAuthGatedPath above — see that list's comment for why /explore must stay out of it.
+  if (pathname === "/explore" && !hasAnyCredential(request)) {
+    const libraryUrl = new URL("/", request.url)
+    // Filters live in client state, so there is nothing to carry today — but a link with a
+    // query string should survive a redirect it did not ask for rather than lose it.
+    libraryUrl.search = request.nextUrl.search
+    return NextResponse.redirect(libraryUrl)
+  }
 
   if (isAuthGatedPath(pathname)) {
     const token = request.cookies.get("access_token")?.value
