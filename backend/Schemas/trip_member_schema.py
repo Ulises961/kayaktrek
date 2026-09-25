@@ -28,6 +28,9 @@ class TripMemberSchema(BaseSchema):
 
     medical_notes_consent_at = fields.DateTime(allow_none=True, dump_only=True)
     float_plan_confirmed_at = fields.DateTime(allow_none=True, dump_only=True)
+    # Recorded by the leader, never through a member's own float-plan update.
+    left_at = fields.DateTime(allow_none=True, dump_only=True)
+    left_note = fields.String(allow_none=True, dump_only=True)
     nominated_successor = fields.Boolean(dump_only=True)
 
     # Computed flags — never expose raw ciphertext in API responses

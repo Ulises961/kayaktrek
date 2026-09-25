@@ -126,6 +126,15 @@ def _send_checkpoint_alert(trip: Trip, today_day: Day, now: datetime) -> None:
         {
             "name": member.user.name + (f" {member.user.surname}" if member.user.surname else ""),
             "role": member.role.value,
+            # Recorded by the leader when this paddler left the trip (M9d): not
+            # someone the shore contact should be looking for on the water.
+            # Converted first: the database hands back its session's timezone.
+            "leftAt": (
+                member.left_at.astimezone(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+                if member.left_at
+                else None
+            ),
+            "leftNote": member.left_note,
             "emergencyContact": {
                 "name": member.emergency_contact_name,
                 "phone": member.emergency_contact_phone,

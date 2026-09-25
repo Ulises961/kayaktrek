@@ -3,25 +3,43 @@ import {
   type CameraRef,
   GeoJSONSource,
   Layer,
+  LocationManager,
   Map as MapLibreMap,
   Marker,
+  type PressEvent,
 } from "@maplibre/maplibre-react-native";
-import { Stack as RouterStack, useLocalSearchParams } from "expo-router";
+import {
+  Stack as RouterStack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { MapPinPlus, TriangleAlert } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  type NativeSyntheticEvent,
+  Pressable,
+  View,
+} from "react-native";
 
 import type { Day } from "@shared/dtos/day";
 import { getDayColor } from "@shared/itinerary/colors";
+import { lightTokens, palette } from "@shared/tokens";
 
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
+import { Button } from "@mobile/components/ui/button";
 import { Screen } from "@mobile/components/ui/layout";
 import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
+import { loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
+import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
 import { boundsOf } from "@mobile/lib/map/bounds";
@@ -53,7 +71,10 @@ export default function TripMapScreen() {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [zoom, setZoom] = useState(10);
+  const [isLeader, setIsLeader] = useState(false);
+  const [inConflict, setInConflict] = useState(false);
   const cameraRef = useRef<CameraRef>(null);
+  const router = useRouter();
 
   // Named and stable so a refresh action (the WP5 weather/sea "refresh"
   // button, threaded in as ItinerarySheet's onRefresh) can re-run the same
@@ -64,7 +85,16 @@ export default function TripMapScreen() {
       const t = await getTrip(id);
       // Filtered at ingestion, not at render: Day 0 sorts first, so leaving it in the
       // array also made it the default selection below.
-      const days = numberedDays(t.itinerary?.days ?? []);
+      // M9d: a route the leader edited on this phone and hasn't pushed yet — or a
+      // parked conflict — is shown from the phone, not the server: the server's
+      // copy doesn't have the edits, and hiding them would look like they'd vanished.
+      const sync = await loadRouteSyncState(id);
+      setInConflict(!!sync?.inConflict);
+      const days = numberedDays(
+        sync?.hasLocalChanges || sync?.inConflict
+          ? (await loadOfflineTrip(id)).days
+          : (t.itinerary?.days ?? []),
+      );
       setTrip({
         destination: t.destination ?? null,
         days,
@@ -80,6 +110,7 @@ export default function TripMapScreen() {
       void pullRoute(id).catch(() => undefined);
     } catch (err) {
       const offline = await loadOfflineTrip(id);
+      setInConflict(!!(await loadRouteSyncState(id))?.inConflict);
       if (offline.days.length > 0 || offline.destination !== null) {
         const offlineDays = numberedDays(offline.days);
         // The cache has no speed setting of its own — same default as a live
@@ -107,13 +138,68 @@ export default function TripMapScreen() {
     }
   }, [id]);
 
+  // On focus rather than on mount (M9d): coming back from editing or adding a
+  // point has to show the edit.
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
+
   useEffect(() => {
-    // Fetching on mount is exactly the "sync with an external system" case the rule's
-    // own docs carve out — the setState calls just happen inside `reload`'s async body
-    // rather than the effect body itself, which the lint rule can't see through.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
-  }, [reload]);
+    let cancelled = false;
+    void isTripLeader(id).then((leader) => {
+      if (!cancelled) setIsLeader(leader);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // M9d WP3: leader-only route editing, on the phone, signal or not.
+  function handleEditPoint(pointId: string) {
+    router.push(`/trips/${id}/point/${pointId}`);
+  }
+
+  function openNewPoint(latitude: number, longitude: number) {
+    router.push({
+      pathname: "/trips/[id]/point/new",
+      params: {
+        id,
+        dayId: selectedDayId ?? "",
+        latitude: String(latitude),
+        longitude: String(longitude),
+      },
+    });
+  }
+
+  function handleMapLongPress(event: NativeSyntheticEvent<PressEvent>) {
+    const [longitude, latitude] = event.nativeEvent.lngLat;
+    openNewPoint(latitude, longitude);
+  }
+
+  // "Add stop here": the emergency stop, at the phone's own position. MapLibre's
+  // location manager needs no module of its own, and foreground permission is
+  // enough — this is one reading, not tracking.
+  async function handleAddStopHere() {
+    const granted = await LocationManager.requestPermissions();
+    if (!granted) {
+      Alert.alert(
+        "Location is off",
+        "Allow location access to add a stop where you are, or long-press the map instead.",
+      );
+      return;
+    }
+    const position = await LocationManager.getCurrentPosition();
+    if (!position) {
+      Alert.alert(
+        "No position yet",
+        "The phone hasn't found where it is. Try again in a moment, or long-press the map.",
+      );
+      return;
+    }
+    openNewPoint(position.coords.latitude, position.coords.longitude);
+  }
 
   const days: Day[] = useMemo(() => trip?.days ?? [], [trip]);
   const selectedDay = days.find((d) => d.id === selectedDayId) ?? null;
@@ -211,6 +297,26 @@ export default function TripMapScreen() {
       <View style={{ flex: 1 }}>
         <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
 
+        {/* M9d WP4: a push refused because the route changed elsewhere is parked,
+            never merged. The phone keeps showing its own route until the leader
+            compares the two (spec §8.3). */}
+        {inConflict && (
+          <Pressable
+            onPress={() => router.push(`/trips/${id}/route-conflict`)}
+            accessibilityRole="button"
+            testID="route-conflict-banner"
+            className="flex-row items-center gap-2 bg-sunset-100 px-4 py-3"
+          >
+            <TriangleAlert size={16} color={palette.sunset600} />
+            <Text className="flex-1 text-xs text-sunset-600">
+              Route not synced: it changed elsewhere while you edited it.
+            </Text>
+            <Text className="text-xs font-medium text-sunset-600 underline">
+              Review
+            </Text>
+          </Pressable>
+        )}
+
         <DayRail
           days={days}
           selectedDayId={selectedDayId}
@@ -223,6 +329,7 @@ export default function TripMapScreen() {
             style={{ flex: 1 }}
             onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
             onPress={handleMapPress}
+            onLongPress={isLeader ? handleMapLongPress : undefined}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
             // compositing layer outside RN's normal view z-order — this is what caused the
             // day-strip/weather-panel area above the map to render as a solid black bar
@@ -297,12 +404,26 @@ export default function TripMapScreen() {
 
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
+          {isLeader && (
+            <View className="absolute left-3 top-3">
+              <Button
+                size="sm"
+                onPress={() => void handleAddStopHere()}
+                testID="add-stop-here"
+                icon={<MapPinPlus size={14} color={lightTokens.primaryForeground} />}
+              >
+                Add stop here
+              </Button>
+            </View>
+          )}
+
           <ItinerarySheet
             selectedDay={selectedDay}
             selectedPointId={selectedPointId}
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
             onClosePoint={() => setSelectedPointId(null)}
+            onEditPoint={isLeader ? handleEditPoint : undefined}
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}
             onRefreshWeather={reload}

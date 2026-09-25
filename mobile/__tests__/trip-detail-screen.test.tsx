@@ -5,6 +5,7 @@ import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
 import { loadTripListCache } from "../lib/db/trip-list-cache"
+import { isTripLeader } from "../lib/db/trip-role"
 import { getTrip } from "../lib/trips/actions"
 
 jest.mock("expo-router", () => {
@@ -25,6 +26,7 @@ jest.mock("../lib/db/sync-trigger", () => ({
 jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
 }))
+jest.mock("../lib/db/trip-role", () => ({ isTripLeader: jest.fn() }))
 
 // M9c WP7: every offline branch below now reads how old its cache is. The real
 // lookup needs a database; the age itself is asserted as a relative offset so
@@ -37,8 +39,11 @@ jest.mock("../lib/db/cache-freshness", () => ({
 const mockGetTrip = getTrip as jest.Mock
 const mockStartSyncTrigger = startSyncTrigger as jest.Mock
 const mockLoadTripListCache = loadTripListCache as jest.Mock
+const mockIsTripLeader = isTripLeader as jest.Mock
 
 beforeEach(() => {
+  mockIsTripLeader.mockReset()
+  mockIsTripLeader.mockResolvedValue(false)
   mockGetTrip.mockReset()
   mockStartSyncTrigger.mockReset()
   mockStartSyncTrigger.mockReturnValue(jest.fn())
@@ -47,6 +52,30 @@ beforeEach(() => {
 })
 
 describe("TripDetailScreen", () => {
+  // M9d WP5: the leader's pause/finish/extend controls on a trip under way.
+  it("gives the leader of a trip under way its controls", async () => {
+    mockIsTripLeader.mockResolvedValue(true)
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      destination: "Costa Brava",
+      state: "happening",
+      dateTo: "2026-10-05",
+    })
+
+    const { findByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByTestId("trip-pause")).toBeTruthy()
+  })
+
+  it("gives crew no trip controls", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "happening" })
+
+    const { findByText, queryByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    await findByText("Costa Brava")
+
+    expect(queryByTestId("trip-pause")).toBeNull()
+  })
+
   it("shows the trip's destination and state once loaded", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
 

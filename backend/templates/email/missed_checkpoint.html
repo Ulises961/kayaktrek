@@ -41,6 +41,11 @@
         {{ member.name }}
         <span style="font-weight:normal;color:#64748b;font-size:13px;">({{ member.role }})</span>
       </p>
+      {% if member.leftAt %}
+      <p style="margin:0 0 4px;font-size:14px;font-weight:bold;color:#b45309;">
+        Left the trip on {{ member.leftAt }}{% if member.leftNote %}: <span style="font-weight:normal;">{{ member.leftNote }}</span>{% endif %}
+      </p>
+      {% endif %}
       {% if member.emergencyContact.name %}
       <p style="margin:0;font-size:14px;color:#475569;">
         Emergency contact: <strong>{{ member.emergencyContact.name }}</strong>

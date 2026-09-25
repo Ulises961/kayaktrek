@@ -1,5 +1,8 @@
 import { fireEvent, render } from "@testing-library/react-native"
 import type { DrawerContentComponentProps } from "expo-router/drawer"
+import { Alert } from "react-native"
+
+import { QueuedChangesContext } from "../../../lib/network/queued-changes"
 
 import { AppDrawerContent } from "../app-drawer-content"
 import { useAuth } from "../../../lib/auth/auth-context"
@@ -85,6 +88,58 @@ describe("AppDrawerContent", () => {
     await fireEvent.press(await findByTestId("sign-out"))
 
     expect(signOut).toHaveBeenCalledTimes(1)
+  })
+
+  // M9d: changes made offline live only on this phone until sent. Signing out
+  // throws them away, so it asks first rather than losing someone's day of edits.
+  describe("with changes waiting to send", () => {
+    const pendingChange = {
+      mutationId: "m-1",
+      entityType: "log",
+      operation: "create",
+      entityId: "l-1",
+      payload: {},
+      deviceTimestamp: "2026-09-25T10:00:00.000Z",
+      status: "pending" as const,
+      reason: null,
+    }
+
+    function renderWithQueue(discardAll: jest.Mock) {
+      const queue = { pending: [pendingChange], rejected: [], dismiss: jest.fn(), discardAll }
+      return render(
+        <QueuedChangesContext.Provider value={queue}>
+          <AppDrawerContent {...fakeProps} />
+        </QueuedChangesContext.Provider>,
+      )
+    }
+
+    it("asks before signing out", async () => {
+      const signOut = jest.fn()
+      mockUseAuth.mockReturnValue({ status: "authenticated", signOut })
+      const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {})
+
+      const { findByTestId } = await renderWithQueue(jest.fn())
+      await fireEvent.press(await findByTestId("sign-out"))
+
+      expect(alert).toHaveBeenCalled()
+      expect(alert.mock.calls.at(-1)?.[1]).toMatch(/1 change/)
+      expect(signOut).not.toHaveBeenCalled()
+    })
+
+    it("discards the queue and signs out once confirmed", async () => {
+      const signOut = jest.fn()
+      const discardAll = jest.fn(async () => undefined)
+      mockUseAuth.mockReturnValue({ status: "authenticated", signOut })
+      const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {})
+
+      const { findByTestId } = await renderWithQueue(discardAll)
+      await fireEvent.press(await findByTestId("sign-out"))
+      const buttons = alert.mock.calls.at(-1)?.[2] as { text: string; onPress?: () => Promise<void> }[]
+      await buttons.find((button) => button.text === "Sign out")?.onPress?.()
+
+      expect(discardAll).toHaveBeenCalled()
+      expect(signOut).toHaveBeenCalledTimes(1)
+    })
   })
 
   it("navigates to Profile and closes the drawer when the identity row is pressed", async () => {

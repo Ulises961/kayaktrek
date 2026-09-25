@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from flask import g
 from sqlalchemy.exc import NoResultFound
 import logging
 
+from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.medical_notes_access_log import MedicalNotesAccessLog
 from Models.user import User
@@ -59,6 +60,45 @@ class TripMemberService:
             "user_id": str(g.current_user_id), "trip_id": trip_id,
         })
         return membership
+
+    @staticmethod
+    def _member_leaving(trip_id: str, member_id: str) -> TripMember:
+        """A crew member of a trip under way. Callers check the caller is the leader."""
+        trip = db.session.get(Trip, UUID(trip_id))
+        if trip is None:
+            raise NoResultFound(f"Trip {trip_id} not found")
+        if trip.state != TripStateType.HAPPENING:
+            raise ValueError("A departure is only recorded while the trip is under way")
+        member = db.session.get(TripMember, UUID(member_id))
+        if member is None or member.trip_id != trip.id:
+            raise NoResultFound("That paddler is not on this trip")
+        if member.role == MemberRoleType.LEADER:
+            raise ValueError("The leader can't be recorded as having left; hand over leadership first")
+        return member
+
+    @staticmethod
+    def record_departure(trip_id: str, member_id: str, left_at: datetime, note: Optional[str] = None) -> TripMember:
+        """Record that a paddler left a trip under way (M9d): injury, evacuation, picked
+        up by the support boat. The row stays — the float plan and shore contact need to
+        know who was on the water, and until when."""
+        member = TripMemberService._member_leaving(trip_id, member_id)
+        member.left_at = left_at
+        member.left_note = note.strip()[:500] if note and note.strip() else None
+        db.session.commit()
+        db.session.refresh(member)
+        logger.info("crew_departure_recorded", extra={"trip_id": trip_id, "member_id": member_id})
+        return member
+
+    @staticmethod
+    def clear_departure(trip_id: str, member_id: str) -> TripMember:
+        """Undo a departure recorded by mistake."""
+        member = TripMemberService._member_leaving(trip_id, member_id)
+        member.left_at = None
+        member.left_note = None
+        db.session.commit()
+        db.session.refresh(member)
+        logger.info("crew_departure_cleared", extra={"trip_id": trip_id, "member_id": member_id})
+        return member
 
     @staticmethod
     def get_trip_medical_notes(trip_id: str) -> Dict[str, str | None]:

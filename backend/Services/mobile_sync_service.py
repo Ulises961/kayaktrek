@@ -1,24 +1,23 @@
-"""Mobile sync-down/up for the tables that fit WatermelonDB's flat per-row
-model — everything EXCEPT the route (docs/mobile/sync-protocol-spec.md §4's
-per-row aggregates: trip_members, requirement_contributions; and the per-day
-weather/sea cache). The route (days + points) is deliberately not here — it
-syncs through its own atomic whole-subtree channel, ItineraryRouteSyncService
-(WP1 item 7), because a per-row delta cannot hold its chain invariant (§7.1).
+"""Mobile sync-down for the tables that fit WatermelonDB's flat per-row model —
+everything EXCEPT the route (docs/mobile/sync-protocol-spec.md §4's per-row
+aggregates: trip_members, requirement_contributions; and the per-day weather/sea
+cache). The route (days + points) is deliberately not here — it syncs through its
+own atomic whole-subtree channel, ItineraryRouteSyncService (WP1 item 7), because
+a per-row delta cannot hold its chain invariant (§7.1).
 
-`pullChanges`/`pushChanges` naming and shape follow WatermelonDB's own sync
-contract (§2): `{ <table>: { created, updated, deleted } }`, deletions as IDs
-only (server-side tombstones fill the gap SyncTombstone was built for — §5).
+`pullChanges` naming and shape follow WatermelonDB's own sync contract (§2):
+`{ <table>: { created, updated, deleted } }`, deletions as IDs only (server-side
+tombstones fill the gap SyncTombstone was built for — §5). Sync-up is not here:
+changes made on the phone arrive through the mutation queue
+(Services/mutation_queue_service.py, M9d).
 """
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy.exc import NoResultFound
-
 from Api.database import db
 from Models.inventory import Inventory
-from Models.item import Item, ItemStatusType
 from Models.requirement_contribution import RequirementContribution
 from Models.sea import Sea
 from Models.sync_tombstone import SyncTombstone
@@ -26,18 +25,8 @@ from Models.trip import Trip
 from Models.trip_member import TripMember
 from Models.trip_requirement import TripRequirement
 from Models.weather import Weather
-from Schemas.base_schema import camelcase
 
 logger = logging.getLogger(__name__)
-
-# Never role, user_id, trip_id, or any medical_notes_* field — those are never
-# device-writable, and medical notes stay out of this sync surface entirely
-# while the feature is parked (M24; docs/mobile/sync-protocol-spec.md §11).
-_TRIP_MEMBER_MUTABLE = frozenset({
-    "vessel_make", "vessel_model", "vessel_length_cm",
-    "vessel_color_primary", "vessel_color_secondary",
-    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
-})
 
 
 def _epoch_ms(value: Optional[datetime]) -> Optional[int]:
@@ -139,9 +128,8 @@ class MobileSyncService:
                 "id": str(member.id),
                 "tripId": str(member.trip_id),
                 "userId": str(member.user_id),
-                # Not device-writable (frozen list, _TRIP_MEMBER_MUTABLE) — carried so
-                # an offline float-plan crew manifest can attribute a vessel/emergency
-                # contact to a name, not just an opaque userId (M9c WP6).
+                # Carried so an offline float-plan crew manifest can attribute a
+                # vessel/emergency contact to a name, not just an opaque userId (M9c WP6).
                 "userName": member.user.name,
                 "userSurname": member.user.surname,
                 "userUsername": member.user.username,
@@ -156,6 +144,8 @@ class MobileSyncService:
                 "emergencyContactPhone": member.emergency_contact_phone,
                 "emergencyContactRelationship": member.emergency_contact_relationship,
                 "floatPlanConfirmedAt": _epoch_ms(member.float_plan_confirmed_at),
+                "leftAt": _epoch_ms(member.left_at),
+                "leftNote": member.left_note,
             }
             for member in query.all()
         ]
@@ -276,108 +266,3 @@ class MobileSyncService:
                     "currentDirection": state.current_direction,
                 })
         return rows
-
-    # ------------------------------------------------------------------ #
-    # push                                                                  #
-    # ------------------------------------------------------------------ #
-
-    @staticmethod
-    def push_changes(trip_id: str, changes: dict, user_id: str) -> None:
-        """Apply a device's pushed changes for its own trip_member row and its
-        own requirement contributions.
-
-        Weather/sea are read-only on the device (§6.4) — never accepted here.
-        A device may only touch ITS OWN trip_member row and contributions;
-        this is a straightforward apply, not the trip-state-gated device-wins
-        policy the route channel needs (WP1 items 7-8) — that policy exists
-        because the route's correctness is global (§7.1), which is not true
-        of these per-row tables (§4).
-        """
-        if changes.get("weather") or changes.get("sea") or changes.get("weather_states") or changes.get("sea_states"):
-            raise ValueError("weather and sea are read-only and must not be pushed")
-
-        trip_uuid = UUID(trip_id)
-        user_uuid = UUID(user_id)
-
-        own_member = (
-            db.session.query(TripMember)
-            .filter_by(trip_id=trip_uuid, user_id=user_uuid)
-            .one_or_none()
-        )
-        if own_member is None:
-            raise NoResultFound("Caller is not a member of this trip")
-
-        MobileSyncService._apply_trip_member_changes(
-            changes.get("trip_members", {}), own_member
-        )
-        MobileSyncService._apply_requirement_contribution_changes(
-            changes.get("requirement_contributions", {}), own_member
-        )
-        db.session.commit()
-
-    @staticmethod
-    def _apply_trip_member_changes(table_changes: dict, own_member: TripMember) -> None:
-        if table_changes.get("created") or table_changes.get("deleted"):
-            raise ValueError("trip_members can only be updated via mobile sync, not created or deleted")
-
-        for record in table_changes.get("updated", []):
-            if str(record.get("id")) != str(own_member.id):
-                raise PermissionError("Cannot push changes to another member's row")
-            for field in _TRIP_MEMBER_MUTABLE:
-                key = camelcase(field)
-                if key in record:
-                    setattr(own_member, field, record[key])
-
-    @staticmethod
-    def _apply_requirement_contribution_changes(table_changes: dict, own_member: TripMember) -> None:
-        for record in table_changes.get("created", []):
-            requirement_id = record.get("requirementId")
-            item_id = record.get("itemId")
-            if not requirement_id or not item_id:
-                raise ValueError("requirementId and itemId are required")
-
-            # Never trust a device-supplied requirementId/itemId at face value —
-            # without these two checks a device could contribute an item it
-            # doesn't own, or contribute into a requirement on a trip it isn't
-            # even a member of (mirrors InventoryService._get_trip_member's
-            # join, which confirms both in the ordinary HTTP path).
-            requirement = (
-                db.session.query(TripRequirement)
-                .join(Inventory, TripRequirement.inventory_id == Inventory.id)
-                .filter(TripRequirement.id == UUID(requirement_id), Inventory.trip_id == own_member.trip_id)
-                .first()
-            )
-            if requirement is None:
-                raise ValueError("Requirement does not belong to this trip")
-
-            item = db.session.get(Item, UUID(item_id))
-            if item is None or item.user_id != own_member.user_id:
-                raise ValueError("Item does not belong to the caller")
-            if item.status != ItemStatusType.OWNED:
-                raise ValueError("Only owned items can be contributed")
-
-            existing = db.session.query(RequirementContribution).filter_by(
-                requirement_id=UUID(requirement_id), trip_member_id=own_member.id
-            ).first()
-            if existing is not None:
-                raise ValueError("Already contributing to this requirement")
-            db.session.add(RequirementContribution(
-                requirement_id=UUID(requirement_id),
-                trip_member_id=own_member.id,
-                item_id=UUID(item_id),
-            ))
-
-        for record in table_changes.get("updated", []):
-            contribution = db.session.get(RequirementContribution, UUID(record["id"]))
-            if contribution is None or contribution.trip_member_id != own_member.id:
-                raise PermissionError("Cannot push changes to another member's contribution")
-            if "checked" in record:
-                contribution.checked = bool(record["checked"])
-
-        for record_id in table_changes.get("deleted", []):
-            contribution = db.session.get(RequirementContribution, UUID(record_id))
-            if contribution is None:
-                continue
-            if contribution.trip_member_id != own_member.id:
-                raise PermissionError("Cannot delete another member's contribution")
-            db.session.delete(contribution)

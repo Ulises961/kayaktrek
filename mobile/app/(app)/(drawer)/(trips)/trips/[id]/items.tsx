@@ -21,8 +21,16 @@ import { loadGearCache, saveGearCache } from "@mobile/lib/db/gear-cache"
 import { loadKitCache, saveKitCache } from "@mobile/lib/db/kit-cache"
 import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/requirements-cache"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
+import { MUTATION_ENTITY, MUTATION_OPERATION } from "@mobile/lib/db/mutation-queue"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import {
+  queueContribution,
+  queuePackingAdd,
+  queuePackingRemove,
+  queuePackingToggle,
+} from "@mobile/lib/inventory/offline-inventory"
 import { useIsOffline } from "@mobile/lib/network/use-is-offline"
+import { useQueuedChanges } from "@mobile/lib/network/queued-changes"
 import {
   addRequirement,
   contributeItem,
@@ -145,6 +153,15 @@ export default function InventoryScreen() {
   const setPackingItems = kitCache.setData
   const setKitError = kitCache.setError
 
+  // Group slots this paddler covered offline, not yet sent (M9d WP6).
+  const { pending, dismiss } = useQueuedChanges()
+  const queuedContributions = pending.filter(
+    (change) =>
+      change.entityType === MUTATION_ENTITY.CONTRIBUTION &&
+      change.operation === MUTATION_OPERATION.CREATE &&
+      change.payload.tripId === id,
+  )
+
   useEffect(() => {
     void load()
   }, [load])
@@ -206,8 +223,22 @@ export default function InventoryScreen() {
     )
   }
 
+  // M9d WP6: offline, kit changes and covering a group slot are queued and shown
+  // at once. The kit is also written back to its cache, so reopening the screen
+  // offline still shows the change before it has been sent.
+  function showKitOffline(next: PersonalPackingItem[]) {
+    setPackingItems(next)
+    void saveKitCache(id, next).catch(() => undefined)
+  }
+
   async function handleContribute(requirement: TripRequirement, item: GearView) {
-    if (!inventoryId || !requirement.id || !item.id) return
+    if (!requirement.id || !item.id) return
+    if (isOffline) {
+      await queueContribution(id, requirement.id, item.id)
+      setCoveringId(null)
+      return
+    }
+    if (!inventoryId) return
     setBusyId(requirement.id)
     try {
       const updated = await contributeItem(inventoryId, requirement.id, item.id)
@@ -239,6 +270,13 @@ export default function InventoryScreen() {
 
   async function handleTogglePacking(entry: PersonalPackingItem) {
     if (!entry.id) return
+    if (isKitOffline) {
+      await queuePackingToggle(entry.id, !entry.checked)
+      showKitOffline(
+        (packingItems ?? []).map((p) => (p.id === entry.id ? { ...p, checked: !entry.checked } : p)),
+      )
+      return
+    }
     setBusyId(entry.id)
     try {
       const updated = await togglePackingItem(entry.id, !entry.checked)
@@ -252,6 +290,11 @@ export default function InventoryScreen() {
 
   async function handleRemovePacking(entry: PersonalPackingItem) {
     if (!entry.id) return
+    if (isKitOffline) {
+      await queuePackingRemove(entry.id)
+      showKitOffline((packingItems ?? []).filter((p) => p.id !== entry.id))
+      return
+    }
     setBusyId(entry.id)
     try {
       await removePackingItem(entry.id)
@@ -272,6 +315,14 @@ export default function InventoryScreen() {
 
   async function handleAddPacking(item: GearView) {
     if (!item.id) return
+    if (isKitOffline || isGearOffline) {
+      const entryId = await queuePackingAdd(id, item.id)
+      showKitOffline([
+        ...(packingItems ?? []),
+        { id: entryId, checked: false, item: { id: item.id, name: item.name } } as PersonalPackingItem,
+      ])
+      return
+    }
     setBusyId(item.id)
     try {
       const created = await addPackingItem(id, item.id)
@@ -303,7 +354,8 @@ export default function InventoryScreen() {
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={requirementsCache.isOffline} cachedAt={requirementsCache.cachedAt}>
-            Adding, covering, and removing need a connection.
+            Covering an item is sent when you have signal. Adding, removing and withdrawing need a
+            connection.
           </OfflineNotice>
           <Row className="gap-2">
             <Input
@@ -327,6 +379,9 @@ export default function InventoryScreen() {
           {(requirements ?? []).map((requirement) => {
             const myContribution = requirement.contributions?.find(
               (c) => c.member?.user?.id === userId,
+            )
+            const queuedContribution = queuedContributions.find(
+              (change) => change.entityId === requirement.id,
             )
             return (
               <Card key={requirement.id}>
@@ -368,7 +423,24 @@ export default function InventoryScreen() {
                         Remove
                       </Button>
                     )}
-                    {myContribution ? (
+                    {queuedContribution ? (
+                      <Stack className="flex-1 gap-1">
+                        <Text className="text-xs text-muted-foreground">
+                          {`You're bringing ${
+                            myItems.find((item) => item.id === queuedContribution.payload.itemId)?.name ??
+                            "an item"
+                          } (not sent yet)`}
+                        </Text>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="self-start"
+                          onPress={() => void dismiss(queuedContribution.mutationId)}
+                        >
+                          Undo
+                        </Button>
+                      </Stack>
+                    ) : myContribution ? (
                       <Button
                         size="sm"
                         variant="outline"
@@ -380,7 +452,7 @@ export default function InventoryScreen() {
                     ) : (
                       <Button
                         size="sm"
-                        disabled={busyId === requirement.id || isOffline}
+                        disabled={busyId === requirement.id}
                         onPress={() =>
                           setCoveringId(coveringId === requirement.id ? null : (requirement.id ?? null))
                         }
@@ -401,7 +473,6 @@ export default function InventoryScreen() {
                             key={item.id}
                             size="sm"
                             variant="outline"
-                            disabled={isOffline}
                             onPress={() => void handleContribute(requirement, item)}
                           >
                             {item.name}
@@ -420,7 +491,7 @@ export default function InventoryScreen() {
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
           <OfflineNotice visible={kitCache.isOffline} cachedAt={kitCache.cachedAt}>
-            Packing, adding, and removing need a connection.
+            Packing, adding and removing are saved here and sent when you have signal.
           </OfflineNotice>
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}
           {/* Same shape as a Group requirement card: the name as the title, the
@@ -451,7 +522,7 @@ export default function InventoryScreen() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={busyId === entry.id || isKitOffline}
+                    disabled={busyId === entry.id}
                     onPress={() => confirmRemovePacking(entry)}
                   >
                     Remove
@@ -459,7 +530,7 @@ export default function InventoryScreen() {
                   <Button
                     size="sm"
                     variant={entry.checked ? "outline" : "default"}
-                    disabled={busyId === entry.id || isKitOffline}
+                    disabled={busyId === entry.id}
                     onPress={() => void handleTogglePacking(entry)}
                   >
                     {entry.checked ? "Unpack" : "Pack"}
@@ -470,16 +541,15 @@ export default function InventoryScreen() {
           ))}
           {unpackedOwnedItems.length > 0 && (
             <Stack className="gap-2 pt-2">
-              {/* Kept visible offline on purpose: "what do I own that isn't in
-                  this trip's kit" is exactly the question asked at a put-in,
-                  even though acting on the answer needs a connection. */}
+              {/* Kept working offline on purpose: "what do I own that isn't in
+                  this trip's kit" is exactly the question asked at a put-in. */}
               <Text className="text-sm font-semibold text-foreground">Add from your gear</Text>
               {unpackedOwnedItems.map((item) => (
                 <Button
                   key={item.id}
                   size="sm"
                   variant="outline"
-                  disabled={busyId === item.id || isGearOffline || isKitOffline}
+                  disabled={busyId === item.id}
                   onPress={() => void handleAddPacking(item)}
                 >
                   Add {item.name}

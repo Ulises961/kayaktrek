@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
 import { AuthProvider } from "../lib/auth/auth-context"
+import { QueuedChangesProvider } from "../lib/db/queued-changes-provider"
 import { CachedSurfacesProvider } from "../lib/network/cached-surfaces"
 
 // Root layout — the one place `global.css` (NativeWind's stylesheet) is imported, and the
@@ -25,9 +26,13 @@ export default function RootLayout() {
         {/* Screens report what they show from the cache; the offline banner
             each Screen renders (components/ui/layout.tsx) is where it is said. */}
         <CachedSurfacesProvider>
-          <AuthProvider>
-            <Slot />
-          </AuthProvider>
+          {/* Changes made offline and waiting to send (M9d): every Screen's
+              notice and the drawer's sign-out read it. */}
+          <QueuedChangesProvider>
+            <AuthProvider>
+              <Slot />
+            </AuthProvider>
+          </QueuedChangesProvider>
         </CachedSurfacesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

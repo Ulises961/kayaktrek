@@ -2,7 +2,13 @@ import { Database } from "nitromelondb"
 import LokiJSAdapter from "nitromelondb/adapters/lokijs"
 
 import { modelClasses } from "../models"
-import { loadCachedLog, loadLogsCache, saveLogsCache } from "../logs-cache"
+import {
+  loadCachedLog,
+  loadLogsCache,
+  removeCachedLog,
+  saveLogsCache,
+  upsertCachedLog,
+} from "../logs-cache"
 import { appDatabaseSchema } from "../schema"
 
 jest.mock("../database", () => ({ database: {} }))
@@ -82,5 +88,46 @@ describe("single cached log", () => {
     await saveLogsCache("mine", [{ id: "log-1", date: "2026-09-01" }] as never, database)
 
     expect(await loadCachedLog("log-missing", database)).toBeNull()
+  })
+})
+
+// M9d WP8: a log written, edited or deleted offline shows in the list at once.
+describe("single-log changes", () => {
+  it("adds a log written offline to 'mine'", async () => {
+    const database = createTestDatabase()
+
+    await upsertCachedLog(
+      { id: "log-new", date: "2026-10-02", hours: 4, distance: 14, avgSea: 3, endorsementCount: 0 },
+      "mine",
+      database,
+    )
+
+    expect(await loadLogsCache("mine", database)).toEqual([
+      { id: "log-new", date: "2026-10-02", hours: 4, distance: 14, avgSea: 3, endorsementCount: 0 },
+    ])
+  })
+
+  it("replaces a cached log's fields when it is edited offline", async () => {
+    const database = createTestDatabase()
+    await saveLogsCache("mine", [{ id: "log-1", date: "2026-09-10", hours: 3, distance: 12 }] as never, database)
+
+    await upsertCachedLog(
+      { id: "log-1", date: "2026-09-10", hours: 5, distance: 12, avgSea: null, endorsementCount: null },
+      "mine",
+      database,
+    )
+
+    const logs = await loadLogsCache("mine", database)
+    expect(logs).toHaveLength(1)
+    expect(logs[0].hours).toBe(5)
+  })
+
+  it("drops a log deleted offline", async () => {
+    const database = createTestDatabase()
+    await saveLogsCache("mine", [{ id: "log-1", date: "2026-09-10" }] as never, database)
+
+    await removeCachedLog("log-1", database)
+
+    expect(await loadLogsCache("mine", database)).toEqual([])
   })
 })

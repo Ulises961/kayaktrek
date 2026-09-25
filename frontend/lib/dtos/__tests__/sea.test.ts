@@ -56,9 +56,26 @@ describe("SeaStateSchema", () => {
     expect(SeaStateSchema.safeParse(noCurrents).success).toBe(true)
   })
 
-  it("rejects missing waveHeight", () => {
-    const { waveHeight: _, ...noWave } = SEA_STATE_FIXTURE
-    expect(SeaStateSchema.safeParse(noWave).success).toBe(false)
+  // Open-Meteo's marine API returns NaN for wave fields at nearshore/estuary points, which the
+  // backend stores as NULL (sea_state.wave_height/wave_direction are nullable). A required number
+  // here made one such row fail the whole trips envelope and crash the dashboard.
+  it("accepts null wave height and direction", () => {
+    const result = SeaStateSchema.safeParse({
+      ...SEA_STATE_FIXTURE,
+      waveHeight: null,
+      waveDirection: null,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.waveHeight).toBeNull()
+      expect(result.data.waveDirection).toBeNull()
+    }
+  })
+
+  it("rejects a non-numeric waveHeight", () => {
+    expect(SeaStateSchema.safeParse({ ...SEA_STATE_FIXTURE, waveHeight: "1.2" }).success).toBe(
+      false,
+    )
   })
 })
 
@@ -101,6 +118,21 @@ describe("SeaSchema", () => {
       ruleOfTwelfths: null,
     })
     expect(result.success).toBe(true)
+  })
+
+  it("parses a sea record whose hourly states are all-null (no marine data for the point)", () => {
+    const allNullState = {
+      dayId: SEA_FIXTURE.dayId,
+      time: "10:00",
+      waveHeight: null,
+      waveDirection: null,
+      swellWaveHeight: null,
+      swellDirection: null,
+      swellPeriod: null,
+      currentSpeed: null,
+      currentDirection: null,
+    }
+    expect(SeaSchema.safeParse({ ...SEA_FIXTURE, seaStates: [allNullState] }).success).toBe(true)
   })
 
   it("parses tidalSource as a string", () => {

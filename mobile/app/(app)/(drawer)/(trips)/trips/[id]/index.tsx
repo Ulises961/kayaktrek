@@ -6,7 +6,7 @@ import {
   UsersIcon,
 } from "lucide-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { ActivityIndicator, Pressable } from "react-native"
 
 import { DIFFICULTY_LABELS, type Difficulty } from "@shared/dtos/difficulty"
@@ -14,6 +14,7 @@ import type { Trip, TripState } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
+import { TripControls } from "@mobile/components/trips/trip-controls"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { OfflineNotice } from "@mobile/components/ui/offline-notice"
@@ -22,6 +23,7 @@ import { StateBadge } from "@mobile/components/ui/state-badge"
 import { Text } from "@mobile/components/ui/text"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
+import { isTripLeader } from "@mobile/lib/db/trip-role"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
 import { getTrip } from "@mobile/lib/trips/actions"
 
@@ -48,6 +50,9 @@ type TripHeaderView = {
   dateTo: string | null
   difficulty: Difficulty | null
   description: string | null
+  // Not in the trip-list cache either; offline it reads as not paused, and a
+  // pause queued on this phone is laid over it (TripControls).
+  isPaused: boolean
 }
 
 function toHeaderView(trip: Trip): TripHeaderView {
@@ -58,6 +63,7 @@ function toHeaderView(trip: Trip): TripHeaderView {
     dateTo: trip.dateTo ?? null,
     difficulty: trip.difficulty ?? null,
     description: trip.description ?? null,
+    isPaused: !!trip.isPaused,
   }
 }
 
@@ -80,7 +86,7 @@ export default function TripDetailScreen() {
     loadCache: async () => {
       const cached = await loadTripListCache()
       const row = cached.find((entry) => entry.id === id)
-      return row ? { ...row, difficulty: null, description: null } : null
+      return row ? { ...row, difficulty: null, description: null, isPaused: false } : null
     },
     // Deliberately a no-op: saveTripListCache replaces the whole table, so
     // writing this one trip back would destroy every other trip's cached row.
@@ -96,6 +102,20 @@ export default function TripDetailScreen() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  // Leader-only trip changes (M9d), known offline from the synced crew rows.
+  const [isLeader, setIsLeader] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void isTripLeader(id)
+      .then((leader) => {
+        if (!cancelled) setIsLeader(leader)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   if (error) {
     return (
@@ -160,6 +180,13 @@ export default function TripDetailScreen() {
             )}
           </CardContent>
         </Card>
+
+        {isLeader && (
+          <TripControls
+            tripId={id}
+            status={{ state: trip.state, isPaused: trip.isPaused, dateTo: trip.dateTo }}
+          />
+        )}
 
         <Stack className="gap-3">
           {links.map(({ href, label, icon: Icon }) => (

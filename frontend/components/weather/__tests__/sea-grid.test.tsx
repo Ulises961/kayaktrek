@@ -57,6 +57,16 @@ describe("SeaGrid", () => {
     expect(screen.getByText("2.8 m").className).toContain("text-red-700") // high
   })
 
+  it("renders a dash, not a number, for an hour with no wave data", () => {
+    const noWaveData: SeaState[] = [
+      { dayId: DAY_ID, time: "09:00:00", waveHeight: null, waveDirection: null },
+    ]
+    render(<SeaGrid states={noWaveData} />)
+    expect(screen.getByText("09:00")).toBeInTheDocument()
+    expect(screen.queryByText(/\d m$/)).not.toBeInTheDocument()
+    expect(screen.getByTestId("wave-height-missing")).toHaveTextContent("—")
+  })
+
   it("labels wind wave and swell sections", () => {
     render(<SeaGrid states={states} />)
     expect(screen.getAllByText("wv").length).toBeGreaterThanOrEqual(1)

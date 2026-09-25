@@ -11,7 +11,8 @@ import { TripMember } from "./models"
 export type OfflineCrewMember = {
   id: string
   role: string
-  user: { name: string; surname: string | null; username: string | null }
+  // The id lets a screen find the signed-in paddler's own row offline (M9d).
+  user: { id: string; name: string; surname: string | null; username: string | null }
   vesselMake: string | null
   vesselModel: string | null
   vesselLengthCm: number | null
@@ -20,6 +21,9 @@ export type OfflineCrewMember = {
   emergencyContactName: string | null
   emergencyContactPhone: string | null
   emergencyContactRelationship: string | null
+  // M9d: when the leader recorded this paddler leaving a trip under way (ISO).
+  leftAt: string | null
+  leftNote: string | null
 }
 
 // Shore contact (Logistics) has no local cache at all — it's not part of any
@@ -37,6 +41,7 @@ export async function loadOfflineCrew(tripId: string, database: Database = produ
       id: member.id,
       role: member.role,
       user: {
+        id: member.userId,
         name: member.userName ?? "",
         surname: member.userSurname,
         username: member.userUsername,
@@ -49,5 +54,7 @@ export async function loadOfflineCrew(tripId: string, database: Database = produ
       emergencyContactName: member.emergencyContactName,
       emergencyContactPhone: member.emergencyContactPhone,
       emergencyContactRelationship: member.emergencyContactRelationship,
+      leftAt: member.leftAt ? new Date(member.leftAt).toISOString() : null,
+      leftNote: member.leftNote,
     }))
 }
