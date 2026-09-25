@@ -25,6 +25,35 @@ export function rethrowIfRedirect(error: unknown): void {
   if (isRedirect(error)) throw error
 }
 
+/** A non-2xx response. `status` lets a caller tell "the backend says no" from "the call failed". */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
+/**
+ * For a catch that turns a failed fetch into "this resource isn't there" (`notFound()`, a null
+ * the page then 404s on). Only a client error qualifies — the backend answered and said no. A
+ * timeout, a network failure, a 5xx, a 429 or a parse error means the page could not be built,
+ * not that it does not exist, so those rethrow to the error boundary, whose digest is what
+ * `onRequestError` records in Logfire. Also rethrows Next's redirect signal, like
+ * `rethrowIfRedirect`.
+ */
+export function rethrowUnlessClientError(error: unknown): void {
+  rethrowIfRedirect(error)
+  const isClientError =
+    error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429
+  if (!isClientError) throw error
+}
+
+// A stalled backend must fail a page render, not hold it open until Node's own fetch timeout.
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function getAccessToken(): Promise<string | null> {
   const cookieStore = await cookies()
   return cookieStore.get("access_token")?.value ?? null
@@ -58,10 +87,15 @@ async function errorMessage(method: string, path: string, res: Response): Promis
   return technical
 }
 
+async function apiFailure(method: string, path: string, res: Response): Promise<ApiError> {
+  return new ApiError(await errorMessage(method, path, res), res.status)
+}
+
 async function apiFetch(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const token = await getAccessToken()
 
   const res = await fetch(`${API_URL}${versionPath(path)}`, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -81,7 +115,7 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
 
 export async function apiGet<T>(path: string, extraHeaders?: Record<string, string>): Promise<T> {
   const res = await apiFetch(path, { headers: extraHeaders })
-  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
+  if (!res.ok) throw await apiFailure("GET", path, res)
   return res.json() as Promise<T>
 }
 
@@ -96,14 +130,14 @@ export async function apiPost<T>(
     { method: "POST", body: JSON.stringify(body), headers: extraHeaders },
     retry,
   )
-  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
+  if (!res.ok) throw await apiFailure("POST", path, res)
   const text = await res.text()
   return (text ? JSON.parse(text) : null) as T
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const res = await apiFetch(path, { method: "PUT", body: JSON.stringify(body) })
-  if (!res.ok) throw new Error(await errorMessage("PUT", path, res))
+  if (!res.ok) throw await apiFailure("PUT", path, res)
   return res.json() as Promise<T>
 }
 
@@ -119,7 +153,7 @@ export async function apiPatch<T>(
     { method: "PATCH", body: JSON.stringify(body), headers: extraHeaders },
     retry,
   )
-  if (!res.ok) throw new Error(await errorMessage("PATCH", path, res))
+  if (!res.ok) throw await apiFailure("PATCH", path, res)
   return res.json() as Promise<T>
 }
 
@@ -129,7 +163,7 @@ export async function apiDelete(
 ): Promise<void> {
   const retry = !extraHeaders
   const res = await apiFetch(path, { method: "DELETE", headers: extraHeaders }, retry)
-  if (!res.ok) throw new Error(await errorMessage("DELETE", path, res))
+  if (!res.ok) throw await apiFailure("DELETE", path, res)
 }
 
 // Unauthenticated GET — for public endpoints that must not redirect to /login on failure.
@@ -144,7 +178,7 @@ export async function apiGetPublic<T>(path: string): Promise<T> {
     next: { revalidate: 300 },
     signal: AbortSignal.timeout(10_000),
   })
-  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
+  if (!res.ok) throw await apiFailure("GET", path, res)
   return res.json() as Promise<T>
 }
 
@@ -165,6 +199,6 @@ export async function apiUpload<T>(path: string, formData: FormData, retry = tru
     if (refreshed) return apiUpload(path, formData, false)
     redirect("/login")
   }
-  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
+  if (!res.ok) throw await apiFailure("POST", path, res)
   return res.json() as Promise<T>
 }

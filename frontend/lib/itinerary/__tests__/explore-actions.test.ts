@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const { mockApiGetPublic } = vi.hoisted(() => ({ mockApiGetPublic: vi.fn() }))
 
-vi.mock("@/lib/api/client", () => ({
+vi.mock("next/headers", () => ({ cookies: vi.fn() }))
+vi.mock("@/lib/auth/actions", () => ({ refreshSession: vi.fn() }))
+vi.mock("@/lib/api/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/api/client")>()),
   apiGet: vi.fn(),
   apiGetPublic: mockApiGetPublic,
   apiPost: vi.fn(),
@@ -13,6 +16,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
+import { ApiError } from "@/lib/api/client"
 import { searchPublicItineraries, fetchPublicRouteData, fetchStoryByToken } from "../actions"
 import { TRIP_STATE } from "@/lib/dtos/trip"
 
@@ -145,7 +149,7 @@ describe("fetchStoryByToken", () => {
   })
 
   it("returns null for an unknown or regenerated token", async () => {
-    mockApiGetPublic.mockImplementationOnce(() => Promise.reject(new Error("404")))
+    mockApiGetPublic.mockRejectedValueOnce(new ApiError("Not found", 404))
     expect(await fetchStoryByToken("gone")).toBeNull()
   })
 })

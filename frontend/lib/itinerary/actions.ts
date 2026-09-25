@@ -9,6 +9,7 @@ import {
   apiDelete,
   apiUpload,
   isRedirectError,
+  rethrowUnlessClientError,
 } from "@/lib/api/client"
 import { PointSchema } from "@/lib/dtos/point"
 import type { PointType, Point } from "@/lib/dtos/point"
@@ -411,16 +412,22 @@ export async function fetchPublicItineraryDetail(
   try {
     const raw = await apiGetPublic<unknown>(`/api/itinerary/${id}/public`)
     return PublicItineraryDetailSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowUnlessClientError(error)
     return null
   }
 }
 
 // Lazily fetch a single public route's full geometry (the polyline the explore list
-// does not carry — list items only have a centroid).
+// does not carry — list items only have a centroid). Best-effort: it decorates a chart
+// surface, so any failure leaves that route without a line rather than failing the page.
 export async function fetchPublicRouteData(id: string): Promise<RouteData | null> {
-  const detail = await fetchPublicItineraryDetail(id)
-  return detail ? extractRouteData(detail) : null
+  try {
+    const detail = await fetchPublicItineraryDetail(id)
+    return detail ? extractRouteData(detail) : null
+  } catch {
+    return null
+  }
 }
 
 // Unlisted trip-narrative share link (M7d) — same shape as fetchPublicItineraryDetail,
@@ -430,7 +437,8 @@ export async function fetchStoryByToken(token: string): Promise<PublicItineraryD
   try {
     const raw = await apiGetPublic<unknown>(`/api/itinerary/story/public/${token}`)
     return PublicItineraryDetailSchema.parse(raw)
-  } catch {
+  } catch (error) {
+    rethrowUnlessClientError(error)
     return null
   }
 }

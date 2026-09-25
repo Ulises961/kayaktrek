@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
 import { listSessions } from "@/lib/sessions/actions"
 import { listSatelliteFeeds } from "@/lib/satellite-feeds/actions"
 import { UserSchema } from "@/lib/dtos/user"
@@ -34,7 +34,7 @@ export default async function SettingsPage() {
     const raw = await apiGet("/api/user/me")
     user = UserSchema.parse(raw)
   } catch (error) {
-    rethrowIfRedirect(error)
+    rethrowUnlessClientError(error)
     notFound()
   }
 

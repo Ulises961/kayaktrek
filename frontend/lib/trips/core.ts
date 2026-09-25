@@ -1,6 +1,6 @@
 import "server-only"
 import { cache } from "react"
-import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
 import { TripSchema, type Trip } from "@/lib/dtos/trip"
 
 // The single fetcher for a trip's core record. Wrapped in React `cache()` so the
@@ -12,7 +12,7 @@ export const getTripCore = cache(async (tripId: string): Promise<Trip | null> =>
     const raw = await apiGet<unknown>(`/api/trip/${tripId}`)
     return TripSchema.parse(raw)
   } catch (error) {
-    rethrowIfRedirect(error)
+    rethrowUnlessClientError(error)
     return null
   }
 })

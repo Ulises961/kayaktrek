@@ -504,18 +504,28 @@ describe("listTrips", () => {
     )
   })
 
-  it("returns an empty page on failure", async () => {
+  it("rethrows a failed fetch instead of reporting the user has no trips", async () => {
+    const failure = new Error("boom")
     vi.mocked(getSession).mockResolvedValue(SESSION)
-    vi.mocked(apiGet).mockRejectedValue(new Error("boom"))
-    const result = await listTrips({})
-    expect(result).toEqual(EMPTY_PAGE)
+    vi.mocked(apiGet).mockRejectedValue(failure)
+    await expect(listTrips({})).rejects.toBe(failure)
+  })
+
+  it("rethrows a response that fails the schema instead of reporting the user has no trips", async () => {
+    vi.mocked(getSession).mockResolvedValue(SESSION)
+    vi.mocked(apiGet).mockResolvedValue({
+      items: [{ id: "not-a-uuid" }],
+      total: 1,
+      page: 1,
+      pages: 1,
+    })
+    await expect(listTrips({})).rejects.toMatchObject({ name: "ZodError" })
   })
 
   it("rethrows a redirect signal instead of returning an empty page", async () => {
     const redirectError = new Error("NEXT_REDIRECT")
     vi.mocked(getSession).mockResolvedValue(SESSION)
     vi.mocked(apiGet).mockRejectedValue(redirectError)
-    vi.mocked(isRedirectError).mockReturnValueOnce(true)
     await expect(listTrips({})).rejects.toBe(redirectError)
   })
 })

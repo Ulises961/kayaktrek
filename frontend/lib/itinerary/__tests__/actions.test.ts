@@ -20,7 +20,10 @@ const {
   mockRevalidatePath: vi.fn(),
 }))
 
-vi.mock("@/lib/api/client", () => ({
+vi.mock("next/headers", () => ({ cookies: vi.fn() }))
+vi.mock("@/lib/auth/actions", () => ({ refreshSession: vi.fn() }))
+vi.mock("@/lib/api/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/api/client")>()),
   apiGet: mockApiGet,
   apiGetPublic: mockApiGetPublic,
   apiPost: mockApiPost,
@@ -31,6 +34,7 @@ vi.mock("@/lib/api/client", () => ({
 }))
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }))
 
+import { ApiError } from "@/lib/api/client"
 import { DIFFICULTY } from "@/lib/dtos/difficulty"
 import {
   createItinerary,
@@ -965,16 +969,22 @@ describe("fetchPublicItineraryDetail", () => {
     expect(result).toEqual(expect.objectContaining({ id: ITINERARY_ID, name: "Coastal Route" }))
   })
 
-  it("returns null when the API throws", async () => {
-    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+  it("returns null when the route is private or missing", async () => {
+    mockApiGetPublic.mockRejectedValue(new ApiError("Not Found", 404))
     const result = await fetchPublicItineraryDetail(ITINERARY_ID)
     expect(result).toBeNull()
   })
 
-  it("returns null for non-Error throws too", async () => {
-    mockApiGetPublic.mockRejectedValue("oops")
-    const result = await fetchPublicItineraryDetail(ITINERARY_ID)
-    expect(result).toBeNull()
+  it("rethrows a 5xx instead of reporting the route as missing", async () => {
+    const failure = new ApiError("Bad Gateway", 502)
+    mockApiGetPublic.mockRejectedValue(failure)
+    await expect(fetchPublicItineraryDetail(ITINERARY_ID)).rejects.toBe(failure)
+  })
+
+  it("rethrows a timeout instead of reporting the route as missing", async () => {
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError")
+    mockApiGetPublic.mockRejectedValue(timeout)
+    await expect(fetchPublicItineraryDetail(ITINERARY_ID)).rejects.toBe(timeout)
   })
 })
 
@@ -1014,8 +1024,8 @@ describe("fetchPublicRouteData", () => {
     })
   })
 
-  it("returns null without throwing when the detail fetch fails", async () => {
-    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+  it("returns null without throwing when the detail fetch fails, whatever the failure", async () => {
+    mockApiGetPublic.mockRejectedValue(new ApiError("Bad Gateway", 502))
     const result = await fetchPublicRouteData(ITINERARY_ID)
     expect(result).toBeNull()
   })
@@ -1039,14 +1049,14 @@ describe("fetchStoryByToken", () => {
   })
 
   it("returns null when the token is invalid/expired", async () => {
-    mockApiGetPublic.mockRejectedValue(new Error("Not Found"))
+    mockApiGetPublic.mockRejectedValue(new ApiError("Not Found", 404))
     const result = await fetchStoryByToken(TOKEN)
     expect(result).toBeNull()
   })
 
-  it("returns null for non-Error throws too", async () => {
-    mockApiGetPublic.mockRejectedValue("oops")
-    const result = await fetchStoryByToken(TOKEN)
-    expect(result).toBeNull()
+  it("rethrows a 5xx instead of reporting the story as gone", async () => {
+    const failure = new ApiError("Bad Gateway", 502)
+    mockApiGetPublic.mockRejectedValue(failure)
+    await expect(fetchStoryByToken(TOKEN)).rejects.toBe(failure)
   })
 })

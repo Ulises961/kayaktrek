@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,7 +12,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     const raw = await apiGet(`/api/user/${id}`)
     user = UserSchema.parse(raw)
   } catch (error) {
-    rethrowIfRedirect(error)
+    rethrowUnlessClientError(error)
     notFound()
   }
 

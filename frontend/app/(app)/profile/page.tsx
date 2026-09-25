@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ export default async function ProfilePage() {
     const raw = await apiGet("/api/user/me")
     user = UserSchema.parse(raw)
   } catch (error) {
-    rethrowIfRedirect(error)
+    rethrowUnlessClientError(error)
     notFound()
   }
 

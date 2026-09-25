@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { apiGet, rethrowIfRedirect } from "@/lib/api/client"
+import { apiGet, rethrowIfRedirect, rethrowUnlessClientError } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { getMe } from "@/lib/user/me"
 import { ItinerarySchema } from "@/lib/dtos/itinerary"
@@ -21,7 +21,7 @@ export default async function ItineraryBuilderPage({
     const raw = await apiGet(`/api/itinerary/${id}`)
     itinerary = ItinerarySchema.parse(raw)
   } catch (error) {
-    rethrowIfRedirect(error)
+    rethrowUnlessClientError(error)
     notFound()
   }
 
