@@ -11,7 +11,9 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "trip-1" }),
   Stack: { Screen: () => null },
   useIsFocused: () => true,
+  Link: ({ children }: { children: React.ReactNode }) => children,
 }))
+jest.mock("../lib/auth/session", () => ({ getSession: jest.fn(async () => ({ userId: "me-id" })) }))
 
 jest.mock("../lib/trips/actions", () => ({
   getTrip: jest.fn(),
@@ -45,6 +47,22 @@ describe("FloatPlanScreen", () => {
     mockGetLogistics.mockReset().mockResolvedValue({})
     mockLoadOfflineCrew.mockReset().mockResolvedValue([])
     mockLoadTripListCache.mockReset().mockResolvedValue([])
+  })
+
+  // M9d WP7: a paddler keeps their own vessel and emergency contact current,
+  // signal or not, from their own row.
+  it("offers Edit my details on the paddler's own row only", async () => {
+    mockGetTrip.mockResolvedValue({
+      state: "happening",
+      travellers: [
+        { id: "m1", role: "leader", user: { id: "leader-id", name: "Sam" } },
+        { id: "m2", role: "crew", user: { id: "me-id", name: "Ana" } },
+      ],
+    })
+
+    const { findAllByTestId } = await render(<FloatPlanScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findAllByTestId("edit-my-details")).toHaveLength(1)
   })
 
   it("renders the crew manifest and shore contact once the fetch resolves", async () => {

@@ -39,8 +39,7 @@ import { Text } from "@mobile/components/ui/text"
 const header = <RouterStack.Screen options={{ title: "Crew" }} />
 
 // What a crew row reads. Both the live TripMember and the synced
-// OfflineCrewMember satisfy it — the cached one just has no user id, which only
-// the leader-only actions need. Same idiom as float-plan.tsx's CrewMemberView.
+// OfflineCrewMember satisfy it. Same idiom as float-plan.tsx's CrewMemberView.
 type CrewRow = {
   id?: string | null
   role: string
@@ -121,8 +120,7 @@ export default function CrewScreen() {
   const canRecordDepartures = leadsTrip && (trip?.state ?? cachedTripState) === TRIP_STATE.HAPPENING
   const pendingTravellers = trip?.pendingTravellers ?? []
   const leader = travellers.find((m) => m.role === "leader")
-  // Never from the cache: it carries no user ids, and every leader action
-  // needs the server anyway.
+  // Not offered from the cache: inviting and removing crew need the server.
   const isLeader =
     !isShowingCache && !!currentUserId && !!leader && leader.user.id === currentUserId
 
