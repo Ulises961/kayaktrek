@@ -7,6 +7,62 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.1.0] - 2026-09-26
+
+### Added
+
+- **A paddler who leaves a trip under way is recorded as having left, and everyone who reads the
+  float plan is told.** A leader can note that a crew member left, with the time and a short
+  reason (injury, evacuation, picked up by the support boat). The crew list on the float plan
+  and on the shareable public float plan then shows "Left the trip on …" for that person, and
+  the missed-checkpoint email to the shore contact says the same beside their emergency
+  contact, so nobody is sent looking for someone who is no longer on the water. Recording this
+  is done from the mobile app; the web shows it.
+- **Groundwork for editing a trip offline in the mobile app.** The backend now accepts a batch
+  of changes made while the phone had no signal — route edits, pause/abort/finish, an extra
+  day, a crew departure, kit and float-plan details, logs — and reports back which were applied
+  and which conflicted. The mobile app itself is not released yet, so nothing on the web
+  changes.
+
+### Fixed
+
+- **A route with no wave forecast no longer breaks the app.** Open-Meteo has no wave data for
+  some places — Lake Garda, estuaries, inshore water — and a trip planned there took down the
+  dashboard, the trips list and the itinerary page together. Those hours now show a dash on the
+  web and mobile, and the rest of the day's forecast still displays.
+- **A slow or failing backend no longer looks like a missing trip.** A timeout or server error
+  used to show a "not found" page on the trip, the itinerary, your profile and settings, and on
+  shared route, story and paddler links, and made the trips list say "No trips yet" for someone
+  who had trips. These now show an error page with a reference, and the trips list keeps what
+  it already loaded and tells you when a reload failed. A genuinely missing trip still shows
+  "not found".
+- **Server-side page errors now reach monitoring.** The reference shown on an error page is
+  recorded with the error, so a report of "Reference: 3967558296" can be traced to its cause.
+
+### Changed
+
+- Requests the web app makes to the backend now give up after 15 seconds instead of waiting on a
+  stalled server.
+- The old mobile sync "push" endpoint is gone, replaced by the batch endpoint above. Nothing
+  released called it.
+
+### Deploy notes
+
+- **Two migrations, both additive:** a new `processed_mutation` table, and two nullable columns
+  on `trip_member` (`left_at`, `left_note`). Every existing row is untouched and existing code
+  keeps working. `migrate` only ever upgrades, so a rollback restores the old code but leaves
+  the new table and columns in place — harmless to the old code.
+- **One new scheduled task:** `processed-mutation-prune` runs daily at 03:50 UTC and deletes
+  offline-change records older than 90 days. The `beat` container needs restarting to pick it
+  up, which the deploy already does.
+- **The missed-checkpoint email template changed.** It is the shore contact's safety alert, so
+  send a test trip through it after deploying rather than trusting the release.
+- **No new environment variables.**
+- **Watch for `TimeoutError` in Logfire after deploying.** The 15 second limit is new for every
+  server-side call; a burst of them would mean a backend endpoint is slower than that.
+- **To check the error reporting:** trigger any server render error and search Logfire for
+  `next.digest`.
+
 ## [1.0.15] - 2026-09-25
 
 ### Fixed
