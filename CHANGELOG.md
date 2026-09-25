@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.0.14] - 2026-09-25
+
+### Fixed
+
+- **Search engines are now actually told the route library moved.** 1.0.13 sent a signed-out
+  visitor from `/explore` to the front page, and in a browser it did exactly that — but the
+  server answered "here is a page" rather than "this has moved", and the page it described
+  was the empty application frame. A crawler had no way to know. It is a proper redirect now,
+  answered before the page is built, so what a search engine records is the front page and
+  nothing else.
+
 ## [1.0.13] - 2026-09-25
 
 ### Changed
