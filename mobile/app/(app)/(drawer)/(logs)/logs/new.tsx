@@ -6,7 +6,7 @@ import type { LogFields } from "@shared/dtos/log"
 
 import { Screen } from "@mobile/components/ui/layout"
 import { LogForm } from "@mobile/components/logs/log-form"
-import { createLog } from "@mobile/lib/logs/actions"
+import { createLogAnywhere } from "@mobile/lib/logs/offline-logs"
 
 const header = <RouterStack.Screen options={{ title: "New log" }} />
 
@@ -19,7 +19,8 @@ export default function NewLogScreen() {
     setSubmitting(true)
     setError(null)
     try {
-      await createLog(fields)
+      // With no signal the log is queued and shows in the list at once (M9d).
+      await createLogAnywhere(fields)
       router.back()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create log.")
