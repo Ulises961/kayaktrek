@@ -40,6 +40,21 @@ describe("SeaHourGrid", () => {
     expect(getByText("1.8 m")).toBeTruthy();
   });
 
+  it("shows a dash, not a number, for an hour with no wave data", async () => {
+    const { getByText, getAllByText, queryByText } = await render(
+      <SeaHourGrid
+        states={[
+          { dayId: "day-1", time: "09:00:00", waveHeight: null, waveDirection: null },
+        ]}
+      />,
+    );
+
+    expect(getByText("09:00")).toBeTruthy();
+    expect(queryByText(/\d m$/)).toBeNull();
+    // Wave height, swell height and swell period are all missing for the hour.
+    expect(getAllByText("—")).toHaveLength(3);
+  });
+
   it("shows swell height/period when present, a dash when not", async () => {
     const { getByText, getAllByText } = await render(
       <SeaHourGrid states={states} />,

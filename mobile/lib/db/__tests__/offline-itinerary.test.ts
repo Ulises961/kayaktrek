@@ -75,6 +75,34 @@ describe("loadOfflineTrip", () => {
     expect(days[0].sea?.recordedAt).toBe(new Date(1_700_000_000_000).toISOString())
   })
 
+  it("keeps a missing wave height null rather than reporting a calm 0 m sea", async () => {
+    const database = createTestDatabase()
+    mockedApiGet.mockResolvedValueOnce({
+      routeVersion: 1,
+      days: [{ id: "day-1", dayNumber: 0, date: null, startPointId: null, endPointId: null }],
+      points: [],
+    })
+    await pullRoute("trip-1", database)
+
+    const seaCollection = database.collections.get("sea")
+    const seaStateCollection = database.collections.get("sea_states")
+    await database.write(async () => {
+      await database.batch(
+        seaCollection.prepareCreateFromDirtyRaw({
+          id: "day-1", day_id: "day-1", recorded_at: 1_700_000_000_000,
+        }),
+        seaStateCollection.prepareCreateFromDirtyRaw({
+          id: "day-1:09:00", day_id: "day-1", time: "09:00",
+          wave_height: null, wave_direction: null,
+        })
+      )
+    })
+
+    const { days } = await loadOfflineTrip("trip-1", database)
+    expect(days[0].sea?.seaStates?.[0].waveHeight).toBeNull()
+    expect(days[0].sea?.seaStates?.[0].waveDirection).toBeNull()
+  })
+
   it("falls back to the cached trip-list destination, and to null when nothing is cached", async () => {
     const database = createTestDatabase()
     mockedApiGet.mockResolvedValueOnce({ routeVersion: 1, days: [], points: [] })

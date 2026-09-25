@@ -103,8 +103,8 @@ export async function loadOfflineTrip(tripId: string, database: Database = produ
               seaStates: (seaStatesByDay.get(day.id) ?? []).map((state) => ({
                 dayId: state.dayId,
                 time: state.time,
-                waveHeight: state.waveHeight ?? 0,
-                waveDirection: state.waveDirection ?? 0,
+                waveHeight: state.waveHeight,
+                waveDirection: state.waveDirection,
                 swellWaveHeight: state.swellWaveHeight,
                 swellDirection: state.swellDirection,
                 swellPeriod: state.swellPeriod,

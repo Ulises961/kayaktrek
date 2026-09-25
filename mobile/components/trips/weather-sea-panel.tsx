@@ -51,7 +51,8 @@ export function conditionsTeaser(day: Day | null): string | null {
     parts.push(`${Math.round(weatherNow.temperature)}°C`);
   if (weatherNow?.windForce != null)
     parts.push(`${Math.round(weatherNow.windForce)} kn`);
-  if (seaNow) parts.push(`${seaNow.waveHeight.toFixed(1)} m`);
+  if (seaNow?.waveHeight != null)
+    parts.push(`${seaNow.waveHeight.toFixed(1)} m`);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
