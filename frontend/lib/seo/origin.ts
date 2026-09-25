@@ -8,13 +8,26 @@
 // is a plain env var rather than a NEXT_PUBLIC_ one — nothing here reaches the client bundle
 // and it needs no build arg. Same name the backend already uses for the same concept, so the
 // deploy set carries one variable, not two.
-const ORIGIN = (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/+$/, "")
+//
+// Read per call, not captured at import, so `robots.ts` and `sitemap.ts` (both
+// `force-dynamic`) see the runtime environment rather than the build's.
+const DEFAULT_ORIGIN = "http://localhost:3000"
+
+function origin(): string {
+  const raw = process.env.FRONTEND_URL ?? DEFAULT_ORIGIN
+  // A bare host (`app.kayaktrek.app`) makes `new URL()` throw in the root layout and every
+  // sitemap entry a relative path; reject it with a message that names the variable.
+  if (!/^https?:\/\/[^/]/.test(raw)) {
+    throw new Error(`FRONTEND_URL must start with http:// or https://, got "${raw}"`)
+  }
+  return raw.replace(/\/+$/, "")
+}
 
 export function siteUrl(path: string): string {
-  return `${ORIGIN}/${path.replace(/^\/+/, "")}`
+  return `${origin()}/${path.replace(/^\/+/, "")}`
 }
 
 /** `metadataBase` for Next — what relative OpenGraph/Twitter image paths resolve against. */
 export function siteOrigin(): URL {
-  return new URL(ORIGIN)
+  return new URL(origin())
 }

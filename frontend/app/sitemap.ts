@@ -2,6 +2,10 @@ import type { MetadataRoute } from "next"
 import { searchPublicItineraries } from "@/lib/itinerary/actions"
 import { INDEXABLE_PATHS, siteUrl } from "@/lib/seo/robots"
 
+// Prerendered at build otherwise, where `FRONTEND_URL` is unset — every `<loc>` was
+// `http://localhost:3000/...` in production, and the route list was frozen at build time too.
+export const dynamic = "force-dynamic"
+
 // The backend caps per_page at 100 (`Services/itinerary_service.py`).
 const PER_PAGE = 100
 
