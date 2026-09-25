@@ -11,7 +11,8 @@ Emergency contacts
 ------------------
 {% for member in crew %}
 {{ member.name }} ({{ member.role }})
-  Emergency contact: {{ member.emergencyContact.name or 'not provided' }}{% if member.emergencyContact.phone %}  ·  {{ member.emergencyContact.phone }}{% endif %}{% if member.emergencyContact.relationship %}  ({{ member.emergencyContact.relationship }}){% endif %}
+{% if member.leftAt %}  Left the trip on {{ member.leftAt }}{% if member.leftNote %}: {{ member.leftNote }}{% endif %}
+{% endif %}  Emergency contact: {{ member.emergencyContact.name or 'not provided' }}{% if member.emergencyContact.phone %}  ·  {{ member.emergencyContact.phone }}{% endif %}{% if member.emergencyContact.relationship %}  ({{ member.emergencyContact.relationship }}){% endif %}
 
 {% endfor %}
 Full float plan (vessel descriptions and further details):

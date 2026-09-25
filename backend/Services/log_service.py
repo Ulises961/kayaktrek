@@ -120,12 +120,14 @@ class LogService:
         return query
 
     @staticmethod
-    def create_log(log_data: dict) -> Log:
+    def create_log(log_data: dict, log_id: Optional[str] = None) -> Log:
         """
         Create a new log.
 
         Args:
             log_data: Dictionary containing log information
+            log_id: The id a phone gave the log while offline (M9d), so later queued
+                edits can refer to it; omitted, the server generates one
 
         Returns:
             Created Log object
@@ -136,6 +138,8 @@ class LogService:
         """
         logger.info("Creating new log")
         log = cast(Log, LogSchema().load(log_data))
+        if log_id is not None:
+            log.id = UUID(log_id)
         db.session.add(log)
         db.session.commit()
 

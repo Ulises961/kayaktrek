@@ -15,13 +15,8 @@ import { LogForm } from "@mobile/components/logs/log-form"
 import { getSession } from "@mobile/lib/auth/session"
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { loadCachedLog } from "@mobile/lib/db/logs-cache"
-import {
-  deleteLog,
-  endorseLog,
-  getLog,
-  unendorseLog,
-  updateLog,
-} from "@mobile/lib/logs/actions"
+import { endorseLog, getLog, unendorseLog } from "@mobile/lib/logs/actions"
+import { deleteLogAnywhere, updateLogAnywhere } from "@mobile/lib/logs/offline-logs"
 
 const header = <RouterStack.Screen options={{ title: "Log" }} />
 
@@ -41,6 +36,8 @@ export default function LogDetailScreen() {
   // faking a Log, so nothing downstream can mistake a summary for a full log.
   const [cachedLog, setCachedLog] = useState<Awaited<ReturnType<typeof loadCachedLog>>>(null)
   const [cachedAt, setCachedAt] = useState<string | null>(null)
+  // The last save had no signal and was queued (M9d WP8).
+  const [queuedNotice, setQueuedNotice] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -69,8 +66,11 @@ export default function LogDetailScreen() {
     setSubmitting(true)
     setError(null)
     try {
-      const updated = await updateLog(id, fields)
-      setLog(updated)
+      // Null when there was no signal and the edit was queued (M9d).
+      const updated = await updateLogAnywhere(id, fields)
+      if (updated) setLog(updated)
+      else setLog((current) => (current ? { ...current, ...fields } : current))
+      setQueuedNotice(!updated)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update log.")
     } finally {
@@ -82,7 +82,7 @@ export default function LogDetailScreen() {
     setSubmitting(true)
     setError(null)
     try {
-      await deleteLog(id)
+      await deleteLogAnywhere(id)
       router.back()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete log.")
@@ -109,6 +109,59 @@ export default function LogDetailScreen() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // M9d WP8: the paddler's own log, edited or deleted offline from its cached card.
+  // The card holds no notes, so notes are sent only when typed here — an empty
+  // box must not blank the notes the server already has.
+  async function handleOfflineUpdate(fields: LogFields) {
+    const { notes, ...rest } = fields
+    await handleUpdate(notes ? fields : rest)
+    setCachedLog((current) => (current ? { ...current, ...rest } : current))
+  }
+
+  if (cachedLog?.kind === "mine") {
+    return (
+      <Screen edges={["bottom"]}>
+        {header}
+        <OfflineNotice cachedAt={cachedAt}>
+          Changes are saved here and sent when you have signal. Notes and endorsements need a
+          connection to show.
+        </OfflineNotice>
+        <ScrollView
+          contentContainerClassName="gap-4 p-4"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {queuedNotice && (
+            <Text className="text-sm text-muted-foreground">Saved on this phone, not sent yet.</Text>
+          )}
+          <LogForm
+            initial={{
+              date: cachedLog.date ?? undefined,
+              hours: cachedLog.hours ?? undefined,
+              distance: cachedLog.distance ?? undefined,
+              avgSea: cachedLog.avgSea ?? undefined,
+            }}
+            submitLabel="Save changes"
+            submitting={submitting}
+            error={error}
+            onSubmit={(fields) => void handleOfflineUpdate(fields)}
+          />
+          <Row className="justify-end border-t border-border pt-4">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={submitting}
+              onPress={confirmDelete}
+              icon={<Trash2Icon size={14} color={lightTokens.destructiveForeground} />}
+            >
+              Delete log
+            </Button>
+          </Row>
+        </ScrollView>
+      </Screen>
+    )
   }
 
   if (cachedLog) {
@@ -227,6 +280,9 @@ export default function LogDetailScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
+        {queuedNotice && (
+          <Text className="text-sm text-muted-foreground">Saved on this phone, not sent yet.</Text>
+        )}
         <LogForm
           initial={log}
           submitLabel="Save changes"

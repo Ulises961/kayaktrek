@@ -20,4 +20,6 @@ export class TripMember extends Model {
   @field("emergency_contact_phone") emergencyContactPhone!: string | null
   @field("emergency_contact_relationship") emergencyContactRelationship!: string | null
   @field("float_plan_confirmed_at") floatPlanConfirmedAt!: number | null
+  @field("left_at") leftAt!: number | null
+  @field("left_note") leftNote!: string | null
 }

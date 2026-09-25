@@ -3,6 +3,7 @@ import { Database, Q } from "nitromelondb"
 import { apiGet } from "../api/client"
 import { CACHE_KEY, markCacheFresh } from "./cache-freshness"
 import { database as productionDatabase } from "./database"
+import { RouteMeta } from "./models"
 
 type ApiRouteDay = {
   id: string
@@ -35,12 +36,26 @@ type ApiRoutePullResponse = {
 // generic synchronize() engine, which only understands created/updated/deleted
 // per row (§8.2's failure-containment argument: a parked route conflict must
 // never wedge crew/float-plan sync behind it).
-export async function pullRoute(tripId: string, database: Database = productionDatabase): Promise<void> {
-  const response = await apiGet<ApiRoutePullResponse>(`/api/sync/trip/${tripId}/route/pull`)
-
+//
+// Except over the leader's own unsent edits (M9d, lib/db/route-edit.ts): a route
+// with changes to push, or a parked conflict, is left alone until it is pushed or
+// the leader resolves the conflict. `discardLocalChanges` is that resolution
+// choosing the server's route.
+export async function pullRoute(
+  tripId: string,
+  database: Database = productionDatabase,
+  { discardLocalChanges = false }: { discardLocalChanges?: boolean } = {},
+): Promise<void> {
   const daysCollection = database.collections.get("days")
   const pointsCollection = database.collections.get("points")
-  const routeMetaCollection = database.collections.get("route_meta")
+  const routeMetaCollection = database.collections.get<RouteMeta>("route_meta")
+
+  if (!discardLocalChanges) {
+    const [meta] = await routeMetaCollection.query(Q.where("trip_id", tripId)).fetch()
+    if (meta?.hasLocalChanges || meta?.inConflict) return
+  }
+
+  const response = await apiGet<ApiRoutePullResponse>(`/api/sync/trip/${tripId}/route/pull`)
 
   await database.write(async () => {
     const staleDays = await daysCollection.query(Q.where("trip_id", tripId)).fetch()

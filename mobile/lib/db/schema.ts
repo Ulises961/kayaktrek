@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 11,
+  version: 12,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -100,6 +100,13 @@ export const appDatabaseSchema = appSchema({
         // M9d's push/divergence-detection needs it as the base version.
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "route_version", type: "number" },
+        // M9d: the leader edited the route on this phone and it has not been
+        // pushed yet — a pull must not overwrite it.
+        { name: "has_local_changes", type: "boolean", isOptional: true },
+        // M9d: a push was refused because the route changed elsewhere meanwhile.
+        // Parked for the leader to compare and resolve (spec §8.3); until then
+        // the phone keeps showing its own route and pulls leave it alone.
+        { name: "in_conflict", type: "boolean", isOptional: true },
       ],
     }),
     tableSchema({
@@ -135,6 +142,9 @@ export const appDatabaseSchema = appSchema({
         { name: "emergency_contact_phone", type: "string", isOptional: true },
         { name: "emergency_contact_relationship", type: "string", isOptional: true },
         { name: "float_plan_confirmed_at", type: "number", isOptional: true },
+        // M9d: set when the leader records that this paddler left a trip under way.
+        { name: "left_at", type: "number", isOptional: true },
+        { name: "left_note", type: "string", isOptional: true },
       ],
     }),
     tableSchema({
@@ -316,6 +326,24 @@ export const appDatabaseSchema = appSchema({
       columns: [
         { name: "kind", type: "string", isIndexed: true },
         { name: "payload", type: "string" },
+      ],
+    }),
+    tableSchema({
+      // M9d: changes made offline, waiting to be sent (lib/db/mutation-queue.ts).
+      // One row per envelope; the payload is the change's values as JSON. A
+      // rejected change stays, with the server's reason, until the paddler
+      // dismisses it — it is never dropped silently.
+      name: "pending_mutations",
+      columns: [
+        { name: "mutation_id", type: "string", isIndexed: true },
+        { name: "user_id", type: "string", isIndexed: true },
+        { name: "entity_type", type: "string" },
+        { name: "operation", type: "string" },
+        { name: "entity_id", type: "string" },
+        { name: "payload", type: "string" },
+        { name: "device_timestamp", type: "number" },
+        { name: "status", type: "string" },
+        { name: "reason", type: "string", isOptional: true },
       ],
     }),
   ],

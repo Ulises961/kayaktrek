@@ -2,7 +2,7 @@ import Constants from "expo-constants"
 import type { DrawerContentComponentProps } from "expo-router/drawer"
 import { DrawerContentScrollView, DrawerItemList } from "expo-router/drawer"
 import { useEffect, useState } from "react"
-import { Pressable, View } from "react-native"
+import { Alert, Pressable, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { User } from "@shared/dtos/user"
@@ -10,6 +10,7 @@ import type { User } from "@shared/dtos/user"
 import { loadMeCache } from "../../lib/db/profile-cache"
 import { getMe } from "../../lib/profile/actions"
 import { useAuth } from "../../lib/auth/auth-context"
+import { useQueuedChanges } from "../../lib/network/queued-changes"
 import { Avatar } from "../ui/avatar"
 import { Button } from "../ui/button"
 import { BrandMark } from "../ui/brand-mark"
@@ -26,6 +27,33 @@ import { Text } from "../ui/text"
 export function AppDrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets()
   const { signOut } = useAuth()
+  const { pending, discardAll } = useQueuedChanges()
+
+  // Changes made offline exist only on this phone until they are sent (M9d), and
+  // the queue belongs to whoever made them. Signing out throws them away, so it
+  // asks first.
+  function handleSignOut() {
+    if (pending.length === 0) {
+      void signOut()
+      return
+    }
+    const count = pending.length === 1 ? "1 change" : `${pending.length} changes`
+    Alert.alert(
+      "Sign out and discard changes?",
+      `${count} made offline haven't been sent yet. Signing out discards them.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: async () => {
+            await discardAll()
+            await signOut()
+          },
+        },
+      ],
+    )
+  }
   const [identity, setIdentity] = useState<User | null>(null)
 
   useEffect(() => {
@@ -101,7 +129,7 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
         <Text className="text-xs text-muted-foreground">
           Kayaktrek v{Constants.expoConfig?.version ?? "—"}
         </Text>
-        <Button variant="outline" onPress={signOut} testID="sign-out">
+        <Button variant="outline" onPress={handleSignOut} testID="sign-out">
           Sign out
         </Button>
       </View>

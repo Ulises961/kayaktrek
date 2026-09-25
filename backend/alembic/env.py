@@ -73,6 +73,7 @@ from Models.position_ping import PositionPing           # noqa: F401
 from Models.wind_diamond import WindDiamond              # noqa: F401
 from Models.sync_tombstone import SyncTombstone           # noqa: F401
 from Models.satellite_feed import SatelliteFeed           # noqa: F401
+from Models.processed_mutation import ProcessedMutation   # noqa: F401
 
 with _app.app_context():
     target_metadata = db.metadata

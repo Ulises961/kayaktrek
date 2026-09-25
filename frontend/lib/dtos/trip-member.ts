@@ -24,6 +24,10 @@ export const TripMemberSchema = z.object({
   hasTripMedicalNotes: z.boolean().optional(),
   hasLeaderMedicalNotes: z.boolean().optional(),
   floatPlanConfirmedAt: z.string().nullish(),
+  // Set by the leader when this paddler left a trip under way (M9d): who was on
+  // the water, and until when.
+  leftAt: z.string().nullish(),
+  leftNote: z.string().nullish(),
   // Leadership succession (trip-leadership-succession)
   nominatedSuccessor: z.boolean().optional(),
 })

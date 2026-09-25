@@ -22,6 +22,7 @@ import { readMemberMedicalNotes } from "@/lib/trip-member/actions"
 import { decrypt, decryptAsRecipient } from "@/lib/crypto/medical"
 import { FloatPlanCrewManifest } from "../float-plan-crew-manifest"
 import type { TripMember } from "@/lib/dtos/trip-member"
+import { formatDayDate } from "@/lib/utils/date"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const MEMBER_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -129,5 +130,25 @@ describe("FloatPlanCrewManifest — leader read path", () => {
 
     await waitFor(() => expect(screen.getByText(/set up medical note encryption/i)).toBeDefined())
     expect(readMemberMedicalNotes).not.toHaveBeenCalled()
+  })
+})
+
+// M9d: the leader records a paddler leaving a trip under way; whoever reads the float
+// plan must see who is no longer on the water, and since when.
+describe("FloatPlanCrewManifest — departures", () => {
+  it("says a paddler has left the trip, when, and why", () => {
+    const leftAt = "2026-10-02T09:30:00Z"
+    const departed = [{ ...CREW[0], leftAt, leftNote: "Evacuated from Cala Montjoi" } as TripMember]
+
+    render(<FloatPlanCrewManifest crew={departed} tripId={TRIP_ID} />)
+
+    expect(screen.getByText(`Left the trip on ${formatDayDate(leftAt)}`)).toBeDefined()
+    expect(screen.getByText("Evacuated from Cala Montjoi")).toBeDefined()
+  })
+
+  it("says nothing about leaving for a paddler still on the trip", () => {
+    render(<FloatPlanCrewManifest crew={CREW} tripId={TRIP_ID} />)
+
+    expect(screen.queryByText(/Left the trip/)).toBeNull()
   })
 })

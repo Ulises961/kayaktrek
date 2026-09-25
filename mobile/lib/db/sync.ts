@@ -29,6 +29,8 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     emergencyContactPhone: "emergency_contact_phone",
     emergencyContactRelationship: "emergency_contact_relationship",
     floatPlanConfirmedAt: "float_plan_confirmed_at",
+    leftAt: "left_at",
+    leftNote: "left_note",
   },
   requirement_contributions: {
     requirementId: "requirement_id",
@@ -135,7 +137,8 @@ async function setCursor(tripId: string, timestamp: number, database: Database):
   })
 }
 
-// Pull-only (WP2) — no pushChanges yet. Per-row aggregates only (trip_members,
+// Pull-only: changes made on the phone go up through the mutation queue
+// (lib/db/mutation-queue.ts, M9d), never pushChanges. Per-row aggregates only (trip_members,
 // requirement_contributions, weather(+states), sea(+states)); the route
 // (days/points) syncs through its own atomic channel, wired separately in
 // WP4, never through this generic delta engine (spec §7.1/§8.2).

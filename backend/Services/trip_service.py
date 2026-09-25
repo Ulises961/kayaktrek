@@ -366,9 +366,13 @@ class TripService:
             logger.info("trip_deleted_no_members_remaining", extra={"trip_id": trip_id})
 
     @staticmethod
-    def pause_trip(trip_id: str) -> Trip:
+    def pause_trip(trip_id: str, paused_on: Optional[date] = None) -> Trip:
         """
         Pause a happening trip (storm delay, injury wait, etc).
+
+        Args:
+            paused_on: The day the pause happened (defaults to today). A pause queued
+                offline (M9d) arrives days later and carries the day it was made.
 
         Raises:
             NoResultFound: If trip doesn't exist
@@ -381,7 +385,7 @@ class TripService:
             raise ValueError(f"Trip {trip_id} is already paused")
 
         trip.is_paused = True
-        trip.paused_at = date.today()
+        trip.paused_at = paused_on or date.today()
         db.session.commit()
         db.session.refresh(trip)
         logger.info("trip_paused", extra={"trip_id": trip_id})
