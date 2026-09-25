@@ -457,6 +457,22 @@ def test_contributes_to_the_group_checklist_and_withdraws(client, app, trip_with
         assert db.session.query(RequirementContribution).filter_by(requirement_id=UUID(requirement_id)).count() == 0
 
 
+def test_cannot_contribute_to_a_requirement_on_another_trip(client, trip_with_crew, trip_w_o_itinerary):
+    """A requirement id from an unrelated trip, sent against the caller's own trip,
+    must not let the phone write into that other trip's checklist."""
+    trip = trip_with_crew["trip"]
+    headers = trip_with_crew["leader_headers"]
+    own_item = _owned_item(client, headers, trip)
+    foreign_requirement = _requirement(client, headers, trip_w_o_itinerary)
+    contribute = _envelope(
+        "contribution", "create", foreign_requirement, {"tripId": trip["id"], "itemId": own_item}
+    )
+
+    result = _results(_send(client, headers, contribute))[contribute["mutationId"]]
+
+    assert result["status"] == "rejected"
+
+
 def test_cannot_contribute_someone_elses_gear(client, trip_with_crew):
     trip = trip_with_crew["trip"]
     requirement_id = _requirement(client, trip_with_crew["leader_headers"], trip)
