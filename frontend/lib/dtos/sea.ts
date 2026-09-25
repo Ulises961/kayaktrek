@@ -4,8 +4,10 @@ import { noHtmlTags } from "../validators"
 export const SeaStateSchema = z.object({
   dayId: z.string().uuid().optional(),
   time: z.string().optional(),
-  waveHeight: z.number(),
-  waveDirection: z.number(),
+  // Nullable like every other marine field: Open-Meteo has no wave data for some points
+  // (nearshore, estuaries) and the backend stores those hours as NULL.
+  waveHeight: z.number().nullable().optional(),
+  waveDirection: z.number().nullable().optional(),
   swellWaveHeight: z.number().nullable().optional(),
   swellDirection: z.number().nullable().optional(),
   swellPeriod: z.number().nullable().optional(),

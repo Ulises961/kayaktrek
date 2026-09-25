@@ -3,7 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import type { Day } from "@shared/dtos/day"
 
 import { refreshDayWeather } from "../../../lib/trips/actions"
-import { WeatherSeaPanel } from "../weather-sea-panel"
+import { WeatherSeaPanel, conditionsTeaser } from "../weather-sea-panel"
 
 jest.mock("../../../lib/trips/actions", () => ({
   refreshDayWeather: jest.fn(),
@@ -32,6 +32,28 @@ function dayWith(overrides: Partial<Day>): Day {
 
 beforeEach(() => {
   mockRefreshDayWeather.mockReset()
+})
+
+describe("conditionsTeaser", () => {
+  it("includes wave height when the sea state has one", () => {
+    const day = dayWith({
+      sea: {
+        dayId: DAY_ID,
+        seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: 0.8, waveDirection: 210 }],
+      },
+    })
+    expect(conditionsTeaser(day)).toBe("18°C · 0.8 m")
+  })
+
+  it("omits wave height, rather than crashing, when the marine data has none", () => {
+    const day = dayWith({
+      sea: {
+        dayId: DAY_ID,
+        seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: null, waveDirection: null }],
+      },
+    })
+    expect(conditionsTeaser(day)).toBe("18°C")
+  })
 })
 
 describe("WeatherSeaPanel", () => {

@@ -47,19 +47,25 @@ export function SeaHourGrid({ states }: { states: SeaState[] }) {
                     wv
                   </Text>
                 </Row>
-                <Text
-                  className="text-[11px] font-medium tabular-nums"
-                  style={{
-                    color: WAVE_COLOR[waveHeightSeverity(s.waveHeight)],
-                  }}
-                >
-                  {s.waveHeight.toFixed(1)} m
-                </Text>
-                <Navigation2
-                  size={10}
-                  color={lightTokens.mutedForeground}
-                  style={{ transform: [{ rotate: `${s.waveDirection}deg` }] }}
-                />
+                {s.waveHeight != null ? (
+                  <Text
+                    className="text-[11px] font-medium tabular-nums"
+                    style={{
+                      color: WAVE_COLOR[waveHeightSeverity(s.waveHeight)],
+                    }}
+                  >
+                    {s.waveHeight.toFixed(1)} m
+                  </Text>
+                ) : (
+                  <Text className="text-[10px] text-muted-foreground">—</Text>
+                )}
+                {s.waveDirection != null && (
+                  <Navigation2
+                    size={10}
+                    color={lightTokens.mutedForeground}
+                    style={{ transform: [{ rotate: `${s.waveDirection}deg` }] }}
+                  />
+                )}
               </Stack>
 
               <Stack className="w-full items-center gap-0.5 border-t border-border/50 pt-1">

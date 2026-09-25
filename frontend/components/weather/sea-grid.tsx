@@ -58,19 +58,30 @@ export function SeaGrid({ states, selectedHour = null, onHourChange }: SeaGridPr
                       wv
                     </span>
                   </span>
-                  <span
-                    className={cn(
-                      "text-[11px] font-medium tabular-nums",
-                      waveSeverityStyles[waveHeightSeverity(s.waveHeight)],
-                    )}
-                  >
-                    {s.waveHeight.toFixed(1)} m
-                  </span>
-                  <Navigation2
-                    className="text-muted-foreground/70 size-2.5"
-                    aria-hidden
-                    style={{ transform: `rotate(${s.waveDirection}deg)` }}
-                  />
+                  {s.waveHeight != null ? (
+                    <span
+                      className={cn(
+                        "text-[11px] font-medium tabular-nums",
+                        waveSeverityStyles[waveHeightSeverity(s.waveHeight)],
+                      )}
+                    >
+                      {s.waveHeight.toFixed(1)} m
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="wave-height-missing"
+                      className="text-muted-foreground/50 text-[10px]"
+                    >
+                      —
+                    </span>
+                  )}
+                  {s.waveDirection != null && (
+                    <Navigation2
+                      className="text-muted-foreground/70 size-2.5"
+                      aria-hidden
+                      style={{ transform: `rotate(${s.waveDirection}deg)` }}
+                    />
+                  )}
                 </span>
 
                 <span className="border-border/50 flex w-full flex-col items-center gap-0.5 border-t pt-1">
