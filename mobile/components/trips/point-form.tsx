@@ -1,20 +1,13 @@
 import { useState, type ReactNode } from "react"
 
+import { POINT_TYPE, type PointType } from "@shared/dtos/point"
+
 import { Button } from "../ui/button"
 import { Chip } from "../ui/chip"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
 import { Row, Stack } from "../ui/layout"
 import { Text } from "../ui/text"
-
-// The route's two point types (backend PointType). A stop is where the group
-// lands; a position only shapes the line between stops.
-export const POINT_TYPE = {
-  STOP: "stop",
-  POSITION: "position",
-} as const
-
-export type PointType = (typeof POINT_TYPE)[keyof typeof POINT_TYPE]
 
 export type PointFormValues = {
   name: string

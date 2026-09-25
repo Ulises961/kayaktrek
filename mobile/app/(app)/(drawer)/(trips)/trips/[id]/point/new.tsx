@@ -2,7 +2,9 @@ import { Stack as RouterStack, useLocalSearchParams, useRouter } from "expo-rout
 import { useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
-import { POINT_TYPE, PointForm, type PointFormValues } from "@mobile/components/trips/point-form"
+import { POINT_TYPE } from "@shared/dtos/point"
+
+import { PointForm, type PointFormValues } from "@mobile/components/trips/point-form"
 import { Screen } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"
 import { editRoute, loadEditableRoute, pushRouteChanges } from "@mobile/lib/db/route-edit"

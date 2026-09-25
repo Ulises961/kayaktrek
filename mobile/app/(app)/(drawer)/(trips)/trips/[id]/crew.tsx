@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
 import type { ConnectionUser } from "@shared/dtos/connection"
-import type { Trip } from "@shared/dtos/trip"
+import { TRIP_STATE, type Trip, type TripState } from "@shared/dtos/trip"
 import type { OfflineCrewMember } from "@mobile/lib/db/offline-float-plan"
 import { formatPaddlerName } from "@shared/user/format"
 import { lightTokens } from "@shared/tokens"
@@ -27,6 +27,11 @@ import { Input } from "@mobile/components/ui/input"
 import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
+import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
+import { isTripLeader } from "@mobile/lib/db/trip-role"
+import { useQueuedChanges } from "@mobile/lib/network/queued-changes"
+import { applyPendingDepartures } from "@mobile/lib/trips/pending-departures"
+import { CrewDeparture } from "@mobile/components/trips/crew-departure"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
@@ -40,6 +45,8 @@ type CrewRow = {
   id?: string | null
   role: string
   user: { id?: string | null; name: string; surname?: string | null; username?: string | null }
+  leftAt?: string | null
+  leftNote?: string | null
 }
 
 // Mobile port of frontend/components/trips/tabs/crew-tab.tsx — member list with
@@ -65,6 +72,23 @@ export default function CrewScreen() {
   // invitations are not synced, so neither is offered from the cache.
   const [cachedCrew, setCachedCrew] = useState<OfflineCrewMember[] | null>(null)
   const [cachedAt, setCachedAt] = useState<string | null>(null)
+  const [cachedTripState, setCachedTripState] = useState<TripState | null>(null)
+
+  // M9d WP5: recording a departure works offline, so leadership is read from the
+  // synced crew rows (which carry user ids) rather than from the live trip.
+  const [leadsTrip, setLeadsTrip] = useState(false)
+  const { pending } = useQueuedChanges()
+  useEffect(() => {
+    let cancelled = false
+    void isTripLeader(id)
+      .then((leader) => {
+        if (!cancelled) setLeadsTrip(leader)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   const load = useCallback(async () => {
     setError(null)
@@ -77,6 +101,8 @@ export default function CrewScreen() {
       const offlineCrew = await loadOfflineCrew(id)
       if (offlineCrew.length > 0) {
         setCachedCrew(offlineCrew)
+        const cachedTrip = (await loadTripListCache()).find((entry) => entry.id === id)
+        setCachedTripState(cachedTrip?.state ?? null)
         // Same age the float plan shows for the same rows: the trip's delta sync.
         setCachedAt(await readCachedAt(CACHE_KEY.tripSync(id)))
         return
@@ -91,7 +117,8 @@ export default function CrewScreen() {
   }, [load])
 
   const isShowingCache = !trip && cachedCrew !== null
-  const travellers: CrewRow[] = trip?.travellers ?? cachedCrew ?? []
+  const travellers = applyPendingDepartures<CrewRow>(id, trip?.travellers ?? cachedCrew ?? [], pending)
+  const canRecordDepartures = leadsTrip && (trip?.state ?? cachedTripState) === TRIP_STATE.HAPPENING
   const pendingTravellers = trip?.pendingTravellers ?? []
   const leader = travellers.find((m) => m.role === "leader")
   // Never from the cache: it carries no user ids, and every leader action
@@ -226,6 +253,12 @@ export default function CrewScreen() {
                           </Button>
                         )}
                       </Row>
+                      <CrewDeparture
+                        tripId={id}
+                        member={member}
+                        name={displayName}
+                        canRecord={canRecordDepartures && member.role !== "leader"}
+                      />
                     </CardContent>
                   </Card>
                 )

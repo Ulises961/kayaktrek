@@ -21,6 +21,7 @@ from Models.trip_member import TripMember
 from Resources.inventory_resource import INVENTORY_ENDPOINT
 from Resources.item_resource import ITEM_ENDPOINT
 from Resources.mobile_sync_resource import MOBILE_SYNC_ENDPOINT
+from Services.logistics_service import LogisticsService
 from Services.mutation_queue_service import RETENTION, MutationQueueService
 
 MUTATIONS_URL = f"{MOBILE_SYNC_ENDPOINT}/mutations"
@@ -527,6 +528,26 @@ def test_a_departure_is_only_recorded_on_a_trip_under_way(client, app, trip_with
     result = _results(_send(client, trip_with_crew["leader_headers"], departure))[departure["mutationId"]]
 
     assert result["status"] == "rejected"
+
+
+def test_a_float_plan_shared_after_a_departure_shows_it(client, app, trip_with_crew):
+    """The shore contact's float plan is a snapshot taken when it is shared (ADR-022);
+    one built after a departure says who has left the water."""
+    trip = trip_with_crew["trip"]
+    _set_state(app, trip["id"], TripStateType.HAPPENING)
+    crew_member = _member_id(app, trip["id"])["crew"]
+    _send(
+        client,
+        trip_with_crew["leader_headers"],
+        _envelope("crew_departure", "create", crew_member, {"tripId": trip["id"], "note": "Evacuated"}),
+    )
+
+    with app.app_context():
+        snapshot = LogisticsService.build_snapshot(trip["id"])
+
+    departed = next(member for member in snapshot["crew"] if member["role"] == "crew")
+    assert departed["leftAt"] == _BASE_TIME.isoformat()
+    assert departed["leftNote"] == "Evacuated"
 
 
 def test_a_departure_travels_to_the_phones_on_the_next_pull(client, app, trip_with_crew):

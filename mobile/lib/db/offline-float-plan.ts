@@ -20,6 +20,9 @@ export type OfflineCrewMember = {
   emergencyContactName: string | null
   emergencyContactPhone: string | null
   emergencyContactRelationship: string | null
+  // M9d: when the leader recorded this paddler leaving a trip under way (ISO).
+  leftAt: string | null
+  leftNote: string | null
 }
 
 // Shore contact (Logistics) has no local cache at all — it's not part of any
@@ -49,5 +52,7 @@ export async function loadOfflineCrew(tripId: string, database: Database = produ
       emergencyContactName: member.emergencyContactName,
       emergencyContactPhone: member.emergencyContactPhone,
       emergencyContactRelationship: member.emergencyContactRelationship,
+      leftAt: member.leftAt ? new Date(member.leftAt).toISOString() : null,
+      leftNote: member.leftNote,
     }))
 }

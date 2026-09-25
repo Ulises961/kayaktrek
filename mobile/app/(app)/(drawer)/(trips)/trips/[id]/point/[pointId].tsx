@@ -3,9 +3,10 @@ import { ArrowDown, ArrowUp } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
+import { POINT_TYPE } from "@shared/dtos/point"
 import { palette } from "@shared/tokens"
 
-import { POINT_TYPE, PointForm, type PointFormValues } from "@mobile/components/trips/point-form"
+import { PointForm, type PointFormValues } from "@mobile/components/trips/point-form"
 import { Button } from "@mobile/components/ui/button"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { Text } from "@mobile/components/ui/text"

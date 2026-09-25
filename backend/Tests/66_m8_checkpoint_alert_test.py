@@ -121,6 +121,25 @@ def test_fires_on_stale_ping(app, user_1):
     assert trip.last_checkpoint_alert_at is not None
 
 
+def test_alert_says_who_has_already_left_the_water(app, user_1):
+    """M9d: a paddler the leader recorded as having left the trip is not someone the
+    shore contact should be looking for. The alert says so, when, and why."""
+    trip_id = _build_trip(user_1)
+    left_at = datetime(2026, 10, 2, 9, 30, tzinfo=timezone.utc)
+    member = _db.session.query(TripMember).filter_by(trip_id=trip_id).one()
+    member.left_at = left_at
+    member.left_note = "Evacuated from Cala Montjoi"
+    _db.session.commit()
+    _add_ping(trip_id, user_1, datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1)))
+
+    with patch("Tasks.checkpoint_beat_task.send_template_email") as mock_send:
+        check_missed_checkpoints.run()
+
+    crew = _calls_for_our_trip(mock_send)[0].kwargs["crew"]
+    assert crew[0]["leftAt"] == "02 Oct 2026, 09:30 UTC"
+    assert crew[0]["leftNote"] == "Evacuated from Cala Montjoi"
+
+
 def test_skips_paused_trip(app, user_1):
     trip_id = _build_trip(user_1, paused=True)
     stale = datetime.now(timezone.utc) - (_alert_threshold() + timedelta(hours=1))
