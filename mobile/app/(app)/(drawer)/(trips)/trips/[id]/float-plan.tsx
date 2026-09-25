@@ -1,5 +1,5 @@
 import { HeartPulse, Phone, Sailboat, UserRound } from "lucide-react-native"
-import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
+import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, ScrollView } from "react-native"
 
@@ -9,6 +9,7 @@ import { lightTokens } from "@shared/tokens"
 import { formatPaddlerName, formatVesselLength } from "@shared/user/format"
 
 import { Badge } from "@mobile/components/ui/badge"
+import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { OfflineNotice } from "@mobile/components/ui/offline-notice"
@@ -16,6 +17,9 @@ import { Text } from "@mobile/components/ui/text"
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
+import { getSession } from "@mobile/lib/auth/session"
+import { useQueuedChanges } from "@mobile/lib/network/queued-changes"
+import { applyPendingFloatPlan } from "@mobile/lib/trips/pending-float-plan"
 import { getLogistics, getTrip } from "@mobile/lib/trips/actions"
 
 // The fields this screen actually renders off a crew member — both the live
@@ -25,7 +29,7 @@ import { getLogistics, getTrip } from "@mobile/lib/trips/actions"
 type CrewMemberView = {
   id?: string
   role: string
-  user: { name: string; surname?: string | null; username?: string | null }
+  user: { id?: string | null; name: string; surname?: string | null; username?: string | null }
   vesselMake?: string | null
   vesselModel?: string | null
   vesselLengthCm?: number | null
@@ -49,6 +53,14 @@ export default function FloatPlanScreen() {
   const [error, setError] = useState<string | null>(null)
   const [isOffline, setIsOffline] = useState(false)
   const [cachedAt, setCachedAt] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const { pending } = useQueuedChanges()
+
+  useEffect(() => {
+    void getSession()
+      .then((session) => setCurrentUserId(session?.userId ?? null))
+      .catch(() => undefined)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -104,7 +116,7 @@ export default function FloatPlanScreen() {
     )
   }
 
-  const sortedCrew = [...crew].sort((a, b) => {
+  const sortedCrew = [...applyPendingFloatPlan(id, crew, pending)].sort((a, b) => {
     if (a.role === "leader") return -1
     if (b.role === "leader") return 1
     return 0
@@ -198,6 +210,17 @@ export default function FloatPlanScreen() {
                           : ""}
                       </Text>
                     </Row>
+                  )}
+                  {member.floatPlanUnsent && (
+                    <Text className="text-xs text-sunset-600">Changed here, not sent yet.</Text>
+                  )}
+                  {/* M9d WP7: a paddler edits their own details, signal or not. */}
+                  {currentUserId && member.user.id === currentUserId && (
+                    <Link href={`/trips/${id}/my-details`} asChild>
+                      <Button variant="link" size="sm" className="self-start px-0" testID="edit-my-details">
+                        Edit my details
+                      </Button>
+                    </Link>
                   )}
                 </Stack>
               </CardContent>

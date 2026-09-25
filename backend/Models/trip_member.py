@@ -80,5 +80,12 @@ class TripMember(BaseModel):
     # Set on any successful PATCH to this member's float plan fields
     float_plan_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Set by the leader when this paddler leaves a trip under way — injury, evacuation,
+    # picked up by the support boat (M9d). Distinct from removal, which erases the person
+    # from the trip's record: the float plan and shore contact need to know who was on
+    # the water, and until when.
+    left_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    left_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     user: Mapped["User"] = relationship(back_populates="trip_memberships", passive_deletes=True)
     trip: Mapped["Trip"] = relationship(back_populates="trip_members", passive_deletes=True)

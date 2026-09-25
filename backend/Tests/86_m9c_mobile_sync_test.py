@@ -1,11 +1,11 @@
-"""Tests for the mobile pullChanges/pushChanges endpoints (M9c WP1 item 4):
+"""Tests for the mobile pullChanges endpoint (M9c WP1 item 4):
 Resources/mobile_sync_resource.py + Services/mobile_sync_service.py.
 
 Route tables (day, point) are out of scope here — WP1 item 7's dedicated
 channel covers those; this file only exercises trip_members,
-requirement_contributions, weather and sea.
+requirement_contributions, weather and sea. Changes made on the phone are
+sent through the mutation queue (Tests/90_m9d_mutation_queue_test.py).
 """
-import json
 from uuid import UUID
 
 import pytest
@@ -19,8 +19,6 @@ from Models.trip import Trip
 from Models.trip_member import MemberRoleType, TripMember
 from Models.weather import Weather
 from Models.weather_state import WeatherState
-from Resources.inventory_resource import INVENTORY_ENDPOINT
-from Resources.item_resource import ITEM_ENDPOINT
 from Resources.mobile_sync_resource import MOBILE_SYNC_ENDPOINT
 from datetime import datetime, time, timedelta, timezone
 
@@ -28,14 +26,6 @@ from datetime import datetime, time, timedelta, timezone
 def _pull(client, headers, trip_id, last_pulled_at=None):
     query = f"?lastPulledAt={last_pulled_at}" if last_pulled_at is not None else ""
     return client.get(f"{MOBILE_SYNC_ENDPOINT}/trip/{trip_id}/pull{query}", headers=headers)
-
-
-def _push(client, headers, trip_id, changes):
-    return client.post(
-        f"{MOBILE_SYNC_ENDPOINT}/trip/{trip_id}/push",
-        headers=headers,
-        json={"changes": changes},
-    )
 
 
 # ── pull: auth / membership ────────────────────────────────────────────────
@@ -159,201 +149,6 @@ def test_pull_reports_deleted_trip_member(client, app, trip_with_crew):
 
     second = _pull(client, trip_with_crew["leader_headers"], trip_id, cutoff)
     assert crew_id in second.json["changes"]["trip_members"]["deleted"]
-
-
-# ── push: trip_members ──────────────────────────────────────────────────────
-
-def test_push_updates_own_trip_member_row(client, app, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    with app.app_context():
-        leader = db.session.query(TripMember).filter_by(
-            trip_id=UUID(trip_id), role=MemberRoleType.LEADER
-        ).one()
-        leader_id = str(leader.id)
-
-    resp = _push(client, trip_with_crew["leader_headers"], trip_id, {
-        "trip_members": {"updated": [{"id": leader_id, "vesselMake": "P&H"}]}
-    })
-    assert resp.status_code == 200
-
-    with app.app_context():
-        leader = db.session.get(TripMember, UUID(leader_id))
-        assert leader.vessel_make == "P&H"
-
-
-def test_push_rejects_updating_another_members_row(client, app, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    with app.app_context():
-        crew = db.session.query(TripMember).filter_by(
-            trip_id=UUID(trip_id), role=MemberRoleType.CREW
-        ).one()
-        crew_id = str(crew.id)
-
-    resp = _push(client, trip_with_crew["leader_headers"], trip_id, {
-        "trip_members": {"updated": [{"id": crew_id, "vesselMake": "P&H"}]}
-    })
-    assert resp.status_code == 403
-
-
-def test_push_rejects_creating_or_deleting_trip_members(client, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    resp = _push(client, trip_with_crew["leader_headers"], trip_id, {
-        "trip_members": {"created": [{"id": "whatever"}]}
-    })
-    assert resp.status_code == 400
-
-
-def test_push_rejects_weather_or_sea(client, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    resp = _push(client, trip_with_crew["leader_headers"], trip_id, {
-        "weather": {"updated": [{"id": "whatever"}]}
-    })
-    assert resp.status_code == 400
-
-
-# ── push: requirement_contributions ────────────────────────────────────────
-
-def test_push_creates_and_deletes_own_contribution(client, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    headers = trip_with_crew["leader_headers"]
-    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
-
-    req_id = json.loads(
-        client.post(
-            f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements",
-            headers=headers,
-            json={"name": "Tow line", "category": "safety"},
-        ).data
-    )["id"]
-    item_id = json.loads(
-        client.post(
-            f"{ITEM_ENDPOINT}/create",
-            headers=headers,
-            json={"inventoryId": inventory_id, "name": "line", "category": "travel", "status": "owned"},
-        ).data
-    )["id"]
-
-    resp = _push(client, headers, trip_id, {
-        "requirement_contributions": {"created": [{"requirementId": req_id, "itemId": item_id}]}
-    })
-    assert resp.status_code == 200
-
-    pull_resp = _pull(client, headers, trip_id)
-    contributions = pull_resp.json["changes"]["requirement_contributions"]["created"]
-    match = next(c for c in contributions if c["requirementId"] == req_id)
-
-    delete_resp = _push(client, headers, trip_id, {
-        "requirement_contributions": {"deleted": [match["id"]]}
-    })
-    assert delete_resp.status_code == 200
-
-    client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=headers)
-
-
-def test_push_rejects_contributing_an_item_owned_by_another_user(client, trip_with_crew):
-    """The item a device contributes must belong to the pushing user — otherwise
-    it could claim someone else's owned item as its own contribution."""
-    trip_id = trip_with_crew["trip"]["id"]
-    leader_headers = trip_with_crew["leader_headers"]
-    crew_headers = trip_with_crew["crew_headers"]
-    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
-
-    req_id = json.loads(
-        client.post(
-            f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements",
-            headers=leader_headers,
-            json={"name": "Throw bag", "category": "safety"},
-        ).data
-    )["id"]
-    leaders_item_id = json.loads(
-        client.post(
-            f"{ITEM_ENDPOINT}/create",
-            headers=leader_headers,
-            json={"inventoryId": inventory_id, "name": "bag", "category": "travel", "status": "owned"},
-        ).data
-    )["id"]
-
-    resp = _push(client, crew_headers, trip_id, {
-        "requirement_contributions": {"created": [{"requirementId": req_id, "itemId": leaders_item_id}]}
-    })
-    assert resp.status_code == 400
-
-    client.delete(f"{ITEM_ENDPOINT}/{leaders_item_id}", headers=leader_headers)
-
-
-def test_push_rejects_contributing_to_a_requirement_on_another_trip(client, trip_with_crew, trip_w_o_itinerary):
-    """The requirement a device contributes to must belong to the pushing
-    user's own trip — otherwise a device could write into an unrelated trip's
-    inventory just by knowing/guessing a requirement id."""
-    trip_id = trip_with_crew["trip"]["id"]
-    leader_headers = trip_with_crew["leader_headers"]
-    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
-
-    own_item_id = json.loads(
-        client.post(
-            f"{ITEM_ENDPOINT}/create",
-            headers=leader_headers,
-            json={"inventoryId": inventory_id, "name": "rope", "category": "travel", "status": "owned"},
-        ).data
-    )["id"]
-
-    foreign_inventory_id = trip_w_o_itinerary["inventory"]["id"]
-    foreign_req_id = json.loads(
-        client.post(
-            f"{INVENTORY_ENDPOINT}/{foreign_inventory_id}/requirements",
-            headers=leader_headers,
-            json={"name": "Foreign requirement", "category": "safety"},
-        ).data
-    )["id"]
-
-    resp = _push(client, leader_headers, trip_id, {
-        "requirement_contributions": {"created": [{"requirementId": foreign_req_id, "itemId": own_item_id}]}
-    })
-    assert resp.status_code == 400
-
-    client.delete(f"{INVENTORY_ENDPOINT}/{foreign_inventory_id}/requirements/{foreign_req_id}", headers=leader_headers)
-    client.delete(f"{ITEM_ENDPOINT}/{own_item_id}", headers=leader_headers)
-
-
-def test_push_rejects_deleting_another_members_contribution(client, trip_with_crew):
-    trip_id = trip_with_crew["trip"]["id"]
-    leader_headers = trip_with_crew["leader_headers"]
-    crew_headers = trip_with_crew["crew_headers"]
-    inventory_id = trip_with_crew["trip"]["inventory"]["id"]
-
-    req_id = json.loads(
-        client.post(
-            f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements",
-            headers=leader_headers,
-            json={"name": "Bilge pump", "category": "safety"},
-        ).data
-    )["id"]
-    item_id = json.loads(
-        client.post(
-            f"{ITEM_ENDPOINT}/create",
-            headers=leader_headers,
-            json={"inventoryId": inventory_id, "name": "pump", "category": "travel", "status": "owned"},
-        ).data
-    )["id"]
-    client.post(
-        f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute",
-        headers=leader_headers,
-        json={"itemId": item_id},
-    )
-    contributions = json.loads(
-        client.get(f"{INVENTORY_ENDPOINT}/{inventory_id}", headers=leader_headers).data
-    )["requirements"]
-    contribution_id = next(
-        r for r in contributions if r["id"] == req_id
-    )["contributions"][0]["id"]
-
-    resp = _push(client, crew_headers, trip_id, {
-        "requirement_contributions": {"deleted": [contribution_id]}
-    })
-    assert resp.status_code == 403
-
-    client.delete(f"{INVENTORY_ENDPOINT}/{inventory_id}/requirements/{req_id}/contribute", headers=leader_headers)
-    client.delete(f"{ITEM_ENDPOINT}/{item_id}", headers=leader_headers)
 
 
 # ── pull: weather / sea ─────────────────────────────────────────────────────

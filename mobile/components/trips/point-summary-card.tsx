@@ -2,6 +2,7 @@ import {
   Anchor,
   CircleDot,
   Image as ImageIcon,
+  Pencil,
   Route as RouteIcon,
   StickyNote,
   X,
@@ -27,11 +28,14 @@ export function PointSummaryCard({
   days,
   avgSpeedKnots,
   onClose,
+  onEdit,
 }: {
   pointId: string;
   days: Day[];
   avgSpeedKnots: number;
   onClose: () => void;
+  // The leader's way into editing this point (M9d); absent for crew.
+  onEdit?: () => void;
 }) {
   const point = days
     .flatMap((day) => day.points ?? [])
@@ -60,6 +64,18 @@ export function PointSummaryCard({
             {displayName}
           </Text>
         </View>
+        {onEdit && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit point"
+            onPress={onEdit}
+            hitSlop={8}
+            testID="point-edit"
+            className="mt-0.5 shrink-0 p-1"
+          >
+            <Pencil size={16} color={palette.ocean500} />
+          </Pressable>
+        )}
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}

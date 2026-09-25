@@ -116,6 +116,17 @@ function MemberCard({ member, notes, loading, notesError, onView }: MemberCardPr
         </span>
       </div>
 
+      {/* Recorded by the leader when this paddler left a trip under way (M9d): the
+          float plan must not list them as still on the water. */}
+      {member.leftAt && (
+        <div className="bg-destructive/10 flex flex-col gap-0.5 rounded px-3 py-2">
+          <span className="text-destructive text-sm font-semibold">
+            {`Left the trip on ${formatDayDate(member.leftAt)}`}
+          </span>
+          {member.leftNote && <span className="text-sm">{member.leftNote}</span>}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-[0.08em] uppercase">

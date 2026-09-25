@@ -19,6 +19,9 @@ const SnapshotCrewMemberSchema = z.object({
   mail: z.string(),
   role: z.enum(["leader", "crew"]),
   floatPlanConfirmedAt: z.string().nullish(),
+  // Recorded by the leader when this paddler left a trip under way (M9d).
+  leftAt: z.string().nullish(),
+  leftNote: z.string().nullish(),
   vessel: SnapshotVesselSchema,
   emergencyContact: SnapshotEmergencyContactSchema,
 })

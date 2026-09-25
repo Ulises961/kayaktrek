@@ -6,7 +6,9 @@ import { Alert } from "react-native"
 import LogDetailScreen from "../app/(app)/(drawer)/(logs)/logs/[id]"
 import { getSession } from "../lib/auth/session"
 import { loadCachedLog } from "../lib/db/logs-cache"
-import { deleteLog, endorseLog, getLog, unendorseLog } from "../lib/logs/actions"
+import { deleteLog, endorseLog, getLog, unendorseLog, updateLog } from "../lib/logs/actions"
+import { enqueueMutation } from "../lib/db/mutation-queue"
+import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 
 const mockBack = jest.fn()
 
@@ -33,6 +35,13 @@ jest.mock("../lib/auth/session", () => ({
 }))
 jest.mock("../lib/db/logs-cache", () => ({
   loadCachedLog: jest.fn(),
+  upsertCachedLog: jest.fn(async () => undefined),
+  removeCachedLog: jest.fn(async () => undefined),
+}))
+jest.mock("../lib/db/mutation-queue", () => ({
+  ...jest.requireActual("../lib/db/mutation-queue"),
+  enqueueMutation: jest.fn(async () => "mutation-1"),
+  pushQueuedMutations: jest.fn(async () => ({ applied: 0, rejected: 0, kept: 1 })),
 }))
 
 // M9c WP7: every offline branch below now reads how old its cache is. The real
@@ -49,6 +58,8 @@ const mockGetSession = getSession as jest.Mock
 const mockEndorseLog = endorseLog as jest.Mock
 const mockUnendorseLog = unendorseLog as jest.Mock
 const mockLoadCachedLog = loadCachedLog as jest.Mock
+const mockUpdateLog = updateLog as jest.Mock
+const mockEnqueue = enqueueMutation as jest.Mock
 
 const ME = { userId: "01958f60-0000-7000-8000-00000000000a" }
 const OWN_LOG = {
@@ -136,7 +147,7 @@ describe("LogDetailScreen — offline", () => {
   it("falls back to the cached summary instead of an error screen", async () => {
     mockLoadCachedLog.mockResolvedValue({
       id: "log-1",
-      kind: "mine",
+      kind: "endorsed",
       date: "2026-06-01",
       hours: 3,
       distance: 12,
@@ -151,8 +162,9 @@ describe("LogDetailScreen — offline", () => {
     expect(queryByText("Could not reach the server.")).toBeNull()
   })
 
-  it("offers no mutation on a cached own log — editing and deleting need a connection", async () => {
-    mockLoadCachedLog.mockResolvedValue({
+  // M9d WP8: the paddler's own log stays editable at camp; changes are queued.
+  describe("own cached log", () => {
+    const OWN = {
       id: "log-1",
       kind: "mine",
       date: "2026-06-01",
@@ -160,15 +172,49 @@ describe("LogDetailScreen — offline", () => {
       distance: null,
       avgSea: null,
       endorsementCount: null,
+    }
+
+    beforeEach(() => {
+      mockLoadCachedLog.mockResolvedValue(OWN)
+      mockUpdateLog.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+      mockDeleteLog.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
     })
 
-    const { findByText, queryByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
-    await findByText("2026-06-01")
+    it("offers editing and deleting, with the cache's age", async () => {
+      const { findByText, getByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
 
-    expect(queryByText("Delete log")).toBeNull()
-    expect(queryByText("Save changes")).toBeNull()
-    expect(await findByText(/Can't reach the server\./)).toBeTruthy()
-    expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
+      expect(await findByText("Save changes")).toBeTruthy()
+      expect(getByText("Delete log")).toBeTruthy()
+      expect(await findByText(/Last synced 2 days ago/)).toBeTruthy()
+    })
+
+    // The cached card holds no notes; an empty notes box must not blank the
+    // notes the server already has.
+    it("queues an edit without touching the notes it never had", async () => {
+      const { findByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
+
+      await fireEvent.press(await findByText("Save changes"))
+
+      await waitFor(() => expect(mockEnqueue).toHaveBeenCalled())
+      const envelope = mockEnqueue.mock.calls[0][0]
+      expect(envelope).toMatchObject({ entityType: "log", operation: "update", entityId: "log-1" })
+      expect(envelope.payload).not.toHaveProperty("notes")
+      expect(await findByText("Saved on this phone, not sent yet.")).toBeTruthy()
+    })
+
+    it("queues a delete once confirmed, and leaves", async () => {
+      jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+        buttons?.find((button) => button.text === "Delete")?.onPress?.()
+      })
+      const { findByText } = await render(<LogDetailScreen />, { wrapper: WithCachedSurfaces })
+
+      await fireEvent.press(await findByText("Delete log"))
+
+      await waitFor(() => expect(mockBack).toHaveBeenCalled())
+      expect(mockEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: "log", operation: "delete", entityId: "log-1" }),
+      )
+    })
   })
 
   it("offers no endorsement toggle on a cached log from the endorsed list", async () => {

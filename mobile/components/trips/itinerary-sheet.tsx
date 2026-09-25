@@ -37,6 +37,7 @@ export function ItinerarySheet({
   days,
   avgSpeedKnots,
   onClosePoint,
+  onEditPoint,
   expanded,
   onExpandedChange,
   onRefreshWeather,
@@ -46,6 +47,8 @@ export function ItinerarySheet({
   days: Day[];
   avgSpeedKnots: number;
   onClosePoint: () => void;
+  // Set only for the trip leader (M9d): route editing is leader-only.
+  onEditPoint?: (pointId: string) => void;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onRefreshWeather?: () => Promise<void>;
@@ -87,6 +90,7 @@ export function ItinerarySheet({
             days={days}
             avgSpeedKnots={avgSpeedKnots}
             onClose={onClosePoint}
+            onEdit={onEditPoint ? () => onEditPoint(selectedPointId) : undefined}
           />
         ) : (
           <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />

@@ -61,6 +61,7 @@ from Models.shuttle_passenger import ShuttlePassenger  # noqa: F401
 from Models.position_ping import PositionPing  # noqa: F401
 from Models.sync_tombstone import SyncTombstone  # noqa: F401
 from Models.satellite_feed import SatelliteFeed  # noqa: F401
+from Models.processed_mutation import ProcessedMutation  # noqa: F401
 
 # Registers ORM after_delete listeners (M9c WP1 item 1) — import for the
 # side effect, same convention as the model imports just above.

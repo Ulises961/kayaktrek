@@ -64,6 +64,49 @@ export async function saveLogsCache(
   await markCacheFresh(CACHE_KEY.logs, database)
 }
 
+// M9d WP8: one log written or edited on this phone offline, shown in the list at
+// once. The next live refresh replaces the whole kind, server copy included.
+export async function upsertCachedLog(
+  card: LogCardData,
+  kind: LogsCacheKind,
+  database: Database = productionDatabase,
+): Promise<void> {
+  const collection = database.collections.get<CachedLog>("cached_logs")
+  const [existing] = await collection.query(Q.where("id", card.id)).fetch()
+  await database.write(async () => {
+    if (existing) {
+      await existing.update((row) => {
+        row.date = card.date
+        row.hours = card.hours
+        row.distance = card.distance
+        row.avgSea = card.avgSea
+        row.endorsementCount = card.endorsementCount
+      })
+      return
+    }
+    await database.batch(
+      collection.prepareCreateFromDirtyRaw({
+        id: card.id,
+        kind,
+        date: card.date,
+        hours: card.hours,
+        distance: card.distance,
+        avg_sea: card.avgSea,
+        endorsement_count: card.endorsementCount,
+      }),
+    )
+  })
+}
+
+/** M9d WP8: a log deleted on this phone offline. */
+export async function removeCachedLog(id: string, database: Database = productionDatabase): Promise<void> {
+  const collection = database.collections.get<CachedLog>("cached_logs")
+  const rows = await collection.query(Q.where("id", id)).fetch()
+  await database.write(async () => {
+    for (const row of rows) await row.destroyPermanently()
+  })
+}
+
 // One cached log by id, for the detail screen. `kind` comes back with it
 // because the cache carries no userId — the list a log was cached under is the
 // only record of whether it is the caller's own, which is what the detail

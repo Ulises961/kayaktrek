@@ -57,7 +57,8 @@ describe("loadOfflineCrew", () => {
 
     expect(crew.map((member) => member.id)).toEqual(["member-leader", "member-crew"])
     expect(crew[0].role).toBe("leader")
-    expect(crew[0].user).toEqual({ name: "Sam", surname: "Lee", username: "samlee" })
+    // The user id lets a screen find the signed-in paddler's own row offline (M9d).
+    expect(crew[0].user).toEqual({ id: "user-1", name: "Sam", surname: "Lee", username: "samlee" })
     expect(crew[0].vesselMake).toBe("Valley")
     expect(crew[0].vesselLengthCm).toBe(550)
     expect(crew[1].emergencyContactName).toBe("Alex Doe")

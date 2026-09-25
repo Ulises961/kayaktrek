@@ -20,8 +20,14 @@ import {
 } from "../lib/inventory/personal-packing-actions"
 import { getTrip } from "../lib/trips/actions"
 import { loadGearCache } from "../lib/db/gear-cache"
-import { loadKitCache } from "../lib/db/kit-cache"
+import { loadKitCache, saveKitCache } from "../lib/db/kit-cache"
 import { loadRequirementsCache } from "../lib/db/requirements-cache"
+import {
+  queueContribution,
+  queuePackingAdd,
+  queuePackingRemove,
+  queuePackingToggle,
+} from "../lib/inventory/offline-inventory"
 import { useIsOffline } from "../lib/network/use-is-offline"
 
 // Extends jest.setup.ts's global Stack.Screen stub rather than replacing the module —
@@ -77,6 +83,12 @@ jest.mock("../lib/db/kit-cache", () => ({
 // lookup needs a database; the age itself is asserted as a relative offset so
 // the expectation can't rot into an absolute date as the suite gets older.
 jest.mock("../lib/network/use-is-offline", () => ({ useIsOffline: jest.fn(() => false) }))
+jest.mock("../lib/inventory/offline-inventory", () => ({
+  queuePackingToggle: jest.fn(async () => undefined),
+  queuePackingAdd: jest.fn(async () => "entry-new"),
+  queuePackingRemove: jest.fn(async () => undefined),
+  queueContribution: jest.fn(async () => "mutation-1"),
+}))
 jest.mock("../lib/db/cache-freshness", () => ({
   ...jest.requireActual("../lib/db/cache-freshness"),
   readCachedAt: jest.fn(async () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
@@ -97,6 +109,11 @@ const mockLoadRequirementsCache = loadRequirementsCache as jest.Mock
 const mockLoadGearCache = loadGearCache as jest.Mock
 const mockLoadKitCache = loadKitCache as jest.Mock
 const mockUseIsOffline = useIsOffline as jest.Mock
+const mockSaveKitCache = saveKitCache as jest.Mock
+const mockQueuePackingToggle = queuePackingToggle as jest.Mock
+const mockQueuePackingAdd = queuePackingAdd as jest.Mock
+const mockQueuePackingRemove = queuePackingRemove as jest.Mock
+const mockQueueContribution = queueContribution as jest.Mock
 
 const ME = { userId: "me-id", email: "me@example.com" }
 const MY_ITEM = { id: "item-1", name: "Spare paddle", status: "owned" }
@@ -147,6 +164,11 @@ beforeEach(() => {
   mockLoadRequirementsCache.mockReset().mockResolvedValue([])
   mockLoadGearCache.mockReset().mockResolvedValue([])
   mockLoadKitCache.mockReset().mockResolvedValue([])
+  mockSaveKitCache.mockClear()
+  mockQueuePackingToggle.mockClear()
+  mockQueuePackingAdd.mockClear()
+  mockQueuePackingRemove.mockClear()
+  mockQueueContribution.mockClear()
   mockUseIsOffline.mockReturnValue(false)
 })
 
@@ -158,7 +180,9 @@ describe("InventoryScreen — device drops offline after a live load", () => {
     mockUseIsOffline.mockReturnValue(true)
   })
 
-  it("disables every Group action", async () => {
+  // M9d WP6: covering a slot works offline (queued); changing the list itself and
+  // withdrawing — which needs the server's record of who brings what — still wait.
+  it("keeps Cover working and disables the rest of Group", async () => {
     mockGetTrip.mockResolvedValue({
       id: "trip-1",
       inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT, COVERED_BY_ME] },
@@ -170,11 +194,27 @@ describe("InventoryScreen — device drops offline after a live load", () => {
     expect(getByText("Add")).toBeDisabled()
     expect(getByPlaceholderText("Add a requirement").props.editable).toBe(false)
     expect(getByText("Remove")).toBeDisabled()
-    expect(getByText("Cover")).toBeDisabled()
     expect(getByText("Withdraw")).toBeDisabled()
+    expect(getByText("Cover")).not.toBeDisabled()
   })
 
-  it("disables every kit action, including adding from gear", async () => {
+  it("queues covering a slot with an item, and shows it as not sent", async () => {
+    mockGetTrip.mockResolvedValue({
+      id: "trip-1",
+      inventory: { id: "inv-1", requirements: [NEEDED_REQUIREMENT] },
+    })
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
+    await findByText("First aid kit")
+
+    await fireEvent.press(getByText("Cover"))
+    await fireEvent.press(getByText("Spare paddle"))
+
+    expect(mockQueueContribution).toHaveBeenCalledWith("trip-1", "req-1", "item-1")
+    expect(mockContributeItem).not.toHaveBeenCalled()
+  })
+
+  // M9d WP6: "did I pack the spare paddle" is asked at the put-in, with no signal.
+  it("packs an item offline, queued, and shows it packed at once", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
     mockGetPackingItems.mockResolvedValue([
       { id: "entry-1", item: { id: "item-2", name: "Bilge pump" }, checked: false },
@@ -183,10 +223,42 @@ describe("InventoryScreen — device drops offline after a live load", () => {
     const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("My kit"))
     await findByText("Bilge pump")
+    await fireEvent.press(getByText("Pack"))
 
-    expect(getByText("Pack")).toBeDisabled()
-    expect(getByText("Remove")).toBeDisabled()
-    expect(getByText("Add Spare paddle")).toBeDisabled()
+    expect(mockQueuePackingToggle).toHaveBeenCalledWith("entry-1", true)
+    expect(mockTogglePackingItem).not.toHaveBeenCalled()
+    expect(await findByText("Packed")).toBeTruthy()
+    // Remembered for the next time the screen opens offline.
+    expect(mockSaveKitCache).toHaveBeenCalledWith("trip-1", [
+      expect.objectContaining({ id: "entry-1", checked: true }),
+    ])
+  })
+
+  it("adds gear to the kit offline under the id the phone chose", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockQueuePackingAdd.mockResolvedValue("entry-new")
+
+    const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
+    await fireEvent.press(getByText("My kit"))
+    await fireEvent.press(await findByText("Add Spare paddle"))
+
+    expect(mockQueuePackingAdd).toHaveBeenCalledWith("trip-1", "item-1")
+    expect(await findByText("To pack")).toBeTruthy()
+  })
+
+  it("removes an item from the kit offline", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+    mockGetPackingItems.mockResolvedValue([
+      { id: "entry-1", item: { id: "item-2", name: "Bilge pump" }, checked: false },
+    ])
+
+    const { findByText, getByText, queryByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
+    await fireEvent.press(getByText("My kit"))
+    await findByText("Bilge pump")
+    await fireEvent.press(getByText("Remove"))
+
+    expect(mockQueuePackingRemove).toHaveBeenCalledWith("entry-1")
+    await waitFor(() => expect(queryByText("Bilge pump")).toBeNull())
   })
 
   // The notice is about the data, not the signal: what is on screen here was
@@ -276,7 +348,7 @@ describe("InventoryScreen — group requirements", () => {
     expect(queryByText("Cover")).toBeNull()
   })
 
-  it("falls back to the cached requirements and disables mutation when the fetch fails", async () => {
+  it("falls back to the cached requirements, with only Cover working offline", async () => {
     mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadRequirementsCache.mockResolvedValue([{ id: "req-1", name: "First aid kit", status: "needed" }])
 
@@ -286,7 +358,7 @@ describe("InventoryScreen — group requirements", () => {
     expect(getByText(/Can't reach the server\./)).toBeTruthy()
     expect(getByText(/Last synced 2 days ago/)).toBeTruthy()
     expect(getByText("Add")).toBeDisabled()
-    expect(getByText("Cover")).toBeDisabled()
+    expect(getByText("Cover")).not.toBeDisabled()
     expect(getByPlaceholderText("Add a requirement").props.editable).toBe(false)
   })
 
@@ -412,7 +484,7 @@ describe("InventoryScreen — offline kit and gear", () => {
     expect(getByText(/Last synced 2 days ago/)).toBeTruthy()
   })
 
-  it("disables every kit mutation offline", async () => {
+  it("packs from the cached kit offline, queued", async () => {
     mockLoadKitCache.mockResolvedValue([
       { id: "entry-1", itemId: "item-1", itemName: "Spare paddle", checked: false },
     ])
@@ -420,24 +492,26 @@ describe("InventoryScreen — offline kit and gear", () => {
     const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("My kit"))
     await findByText("Spare paddle")
+    await fireEvent.press(getByText("Pack"))
 
-    expect(getByText("Pack")).toBeDisabled()
-    expect(getByText("Remove")).toBeDisabled()
+    expect(mockQueuePackingToggle).toHaveBeenCalledWith("entry-1", true)
+    expect(mockTogglePackingItem).not.toHaveBeenCalled()
   })
 
-  // Offline, gear is read-only: it answers "what do I own that is not in this
-  // trip's kit" — the spare-paddle question asked at a put-in — while adding
-  // it still needs a connection.
-  it("still lists unpacked gear from the cache, disabled", async () => {
+  // Offline, gear still answers "what do I own that is not in this trip's kit" —
+  // the spare-paddle question asked at a put-in — and adding it is queued.
+  it("still lists unpacked gear from the cache, and adding it is queued", async () => {
     mockGetMyItems.mockRejectedValue(new Error("Could not reach the server."))
     mockLoadKitCache.mockResolvedValue([])
     mockLoadGearCache.mockResolvedValue([{ id: "item-1", name: "Spare paddle", status: "owned" }])
+    mockQueuePackingAdd.mockResolvedValue("entry-new")
 
     const { findByText, getByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
     await fireEvent.press(getByText("My kit"))
+    await fireEvent.press(await findByText("Add Spare paddle"))
 
-    expect(await findByText("Add Spare paddle")).toBeTruthy()
-    expect(getByText("Add Spare paddle")).toBeDisabled()
+    expect(mockQueuePackingAdd).toHaveBeenCalledWith("trip-1", "item-1")
+    expect(getByText("Spare paddle")).toBeTruthy()
   })
 
   it("surfaces the error when the kit fetch fails and nothing is cached", async () => {

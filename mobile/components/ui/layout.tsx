@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { cn } from "../../lib/cn"
 import { OfflineBanner } from "./offline-banner"
+import { QueuedChangesNotice } from "./queued-changes-notice"
 
 /**
  * The small set of layout atoms — full screen container, vertical/horizontal stacks.
@@ -43,6 +44,7 @@ function Screen({
       }}
     >
       <OfflineBanner />
+      <QueuedChangesNotice />
       <View className={cn("flex-1", className)} style={style} {...props}>
         {children}
       </View>

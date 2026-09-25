@@ -46,6 +46,12 @@ construction. Each queued envelope is a change record. The only live decision wa
 
 ## 2. What WatermelonDB actually requires
 
+> **Sync-up superseded, 2026-09-25 (M9d).** The app uses WatermelonDB for sync-*down* only.
+> Everything the phone changes, except the route, goes up as envelopes through the mutation
+> queue (`docs/adr/mobile-offline.md` "Sync up", `plans/M9d.md`); the `pushChanges` endpoint
+> item 4 below built was removed once nothing used it. The route still travels on its own
+> channel (§8.2). The `pushChanges` discussion below is kept as the design history it is.
+
 `synchronize({ pullChanges, pushChanges })`.
 
 - **`pullChanges({ lastPulledAt, ... })` → `{ changes, timestamp }`** — this is **sync-down**.

@@ -114,6 +114,37 @@ describe("PointSummaryCard", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  // M9d: the leader's way into editing a point. Crew get no edit control.
+  it("offers Edit to the leader", async () => {
+    const onEdit = jest.fn();
+    const { getByLabelText } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onEdit={onEdit}
+      />,
+    );
+
+    await fireEvent.press(getByLabelText("Edit point"));
+
+    expect(onEdit).toHaveBeenCalled();
+  });
+
+  it("offers no Edit without an edit handler", async () => {
+    const { queryByLabelText } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(queryByLabelText("Edit point")).toBeNull();
+  });
+
   it("renders nothing when the point isn't found", async () => {
     const { toJSON } = await render(
       <PointSummaryCard

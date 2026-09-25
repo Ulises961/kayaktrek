@@ -96,9 +96,26 @@ async function apiFetch(path: string, options: RequestInit = {}, retry = true): 
 // `headers` exists for the elevated-token flow: re-authenticating returns a short-lived
 // token that the sensitive endpoints (email change) want on the request itself, not in
 // the body, matching frontend/lib/profile/actions.ts's "X-Elevated-Token".
+// A failed response, keeping its status for the few callers that act on it — the
+// route push tells "the route changed elsewhere" (409) from any other failure.
+// Still an Error with a readable message, so every other caller is unaffected.
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
+async function apiError(method: string, path: string, res: Response): Promise<ApiError> {
+  return new ApiError(await errorMessage(method, path, res), res.status)
+}
+
 export async function apiGet<T>(path: string, headers?: Record<string, string>): Promise<T> {
   const res = await apiFetch(path, { headers })
-  if (!res.ok) throw new Error(await errorMessage("GET", path, res))
+  if (!res.ok) throw await apiError("GET", path, res)
   return res.json() as Promise<T>
 }
 
@@ -108,18 +125,18 @@ export async function apiPost<T>(
   headers?: Record<string, string>,
 ): Promise<T> {
   const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body), headers })
-  if (!res.ok) throw new Error(await errorMessage("POST", path, res))
+  if (!res.ok) throw await apiError("POST", path, res)
   const text = await res.text()
   return (text ? JSON.parse(text) : null) as T
 }
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const res = await apiFetch(path, { method: "PATCH", body: JSON.stringify(body) })
-  if (!res.ok) throw new Error(await errorMessage("PATCH", path, res))
+  if (!res.ok) throw await apiError("PATCH", path, res)
   return res.json() as Promise<T>
 }
 
 export async function apiDelete(path: string): Promise<void> {
   const res = await apiFetch(path, { method: "DELETE" })
-  if (!res.ok) throw new Error(await errorMessage("DELETE", path, res))
+  if (!res.ok) throw await apiError("DELETE", path, res)
 }
