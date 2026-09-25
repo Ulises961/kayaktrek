@@ -6,6 +6,7 @@ import { deletePoint, editPoint } from "../../itinerary/route-edits"
 import { modelClasses } from "../models"
 import {
   editRoute,
+  fetchServerRoute,
   loadEditableRoute,
   loadRouteSyncState,
   pushRouteChanges,
@@ -155,6 +156,22 @@ describe("pushRouteChanges", () => {
       hasLocalChanges: true,
       inConflict: false,
     })
+  })
+})
+
+describe("fetchServerRoute", () => {
+  // For the comparison view: the other version, read without touching the
+  // phone's own route.
+  it("reads the server's route without replacing the phone's", async () => {
+    const database = await pulledDatabase()
+    await editRoute("trip-1", (route) => editPoint(route, "b", { name: "Mine" }), database)
+    mockApiGet.mockResolvedValue({ ...SERVER_ROUTE, routeVersion: 6 })
+
+    const theirs = await fetchServerRoute("trip-1")
+
+    expect(theirs.points.find((point) => point.id === "b")!.name).toBe("B")
+    const mine = await loadEditableRoute("trip-1", database)
+    expect(mine.points.find((point) => point.id === "b")!.name).toBe("Mine")
   })
 })
 

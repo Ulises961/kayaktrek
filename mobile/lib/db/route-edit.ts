@@ -1,7 +1,7 @@
 import type { Database } from "nitromelondb"
 import { Q } from "nitromelondb"
 
-import { ApiError, apiPost } from "../api/client"
+import { ApiError, apiGet, apiPost } from "../api/client"
 import { type EditableRoute, orderedPoints } from "../itinerary/route-edits"
 import { database as productionDatabase } from "./database"
 import { Day, Point, RouteMeta } from "./models"
@@ -212,6 +212,22 @@ export async function tripsWithRouteChanges(database: Database = productionDatab
     .query(Q.where("has_local_changes", true))
     .fetch()
   return rows.filter((row) => !row.inConflict).map((row) => row.tripId)
+}
+
+type ServerRoute = {
+  days: { id: string; dayNumber: number; date: string | null; startPointId: string | null; endPointId: string | null }[]
+  points: EditableRoute["points"]
+}
+
+/** The server's current route, for the comparison view — read, never stored. */
+export async function fetchServerRoute(tripId: string): Promise<EditableRoute> {
+  const response = await apiGet<ServerRoute>(`/api/sync/trip/${tripId}/route/pull`)
+  return {
+    days: response.days,
+    points: orderedPoints(
+      response.points.map((point) => ({ ...point, dayId: point.dayId ?? "" })),
+    ),
+  }
 }
 
 /**

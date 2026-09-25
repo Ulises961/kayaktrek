@@ -5,6 +5,7 @@ import {
   insertPoint,
   movePointToDay,
   movePointWithinDay,
+  nearestPointInDay,
   orderedPoints,
 } from "../route-edits"
 
@@ -127,6 +128,28 @@ describe("movePointWithinDay", () => {
     const edited = movePointWithinDay(twoDayRoute(), "putin", -1)
 
     expect(order(edited)).toEqual(order(twoDayRoute()))
+  })
+})
+
+describe("nearestPointInDay", () => {
+  it("finds the day's point closest to a position", () => {
+    const route = twoDayRoute()
+    route.points = route.points.map((p) =>
+      p.id === "cape" ? { ...p, latitude: 42.5, longitude: 3.5 } : p,
+    )
+
+    expect(nearestPointInDay(route, "d1", 42.49, 3.51)).toBe("cape")
+  })
+
+  it("only looks at that day's own points", () => {
+    expect(nearestPointInDay(twoDayRoute(), "d1", 42, 3)).toMatch(/putin|cape/)
+  })
+
+  it("is null for a day with no points", () => {
+    const route = twoDayRoute()
+    route.days.push({ id: "d3", dayNumber: 3, date: null, startPointId: null, endPointId: null })
+
+    expect(nearestPointInDay(route, "d3", 42, 3)).toBeNull()
   })
 })
 

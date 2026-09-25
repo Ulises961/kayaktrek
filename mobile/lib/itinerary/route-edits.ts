@@ -154,6 +154,32 @@ export function movePointToDay(route: EditableRoute, pointId: string, dayId: str
   return settle(route, rest)
 }
 
+/**
+ * The day's own point nearest a position — where a point added there most likely
+ * belongs in the route. Flat-earth distance is plenty at the scale of one day.
+ */
+export function nearestPointInDay(
+  route: EditableRoute,
+  dayId: string,
+  latitude: number,
+  longitude: number,
+): string | null {
+  const cosLatitude = Math.cos((latitude * Math.PI) / 180)
+  let nearest: string | null = null
+  let nearestDistance = Number.POSITIVE_INFINITY
+  for (const point of route.points) {
+    if (point.dayId !== dayId || point.latitude === null || point.longitude === null) continue
+    const dx = (point.longitude - longitude) * cosLatitude
+    const dy = point.latitude - latitude
+    const distance = dx * dx + dy * dy
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearest = point.id
+    }
+  }
+  return nearest
+}
+
 /** Swap a point with its neighbour in the same day: -1 earlier, 1 later. */
 export function movePointWithinDay(route: EditableRoute, pointId: string, direction: -1 | 1): EditableRoute {
   const inOrder = orderedPoints(route.points)
