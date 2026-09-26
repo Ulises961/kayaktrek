@@ -7,7 +7,6 @@ import math
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, List, Optional
 from flask import g
-from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from uuid import UUID
 
@@ -295,21 +294,6 @@ class TripService:
         existing_trip = TripService.get_trip_by_id(trip_id)
 
         logger.info(f"Updating trip {trip_id}")
-
-        # A PATCH may carry one date only, so the order is checked against what the trip
-        # would hold afterwards, before anything is applied.
-        def resulting_date(field: str) -> Optional[date]:
-            key = camelcase(field)
-            if key not in trip_data:
-                return getattr(existing_trip, field)
-            value = trip_data[key]
-            return date.fromisoformat(value) if isinstance(value, str) else value
-
-        date_from, date_to = resulting_date("date_from"), resulting_date("date_to")
-        if date_from and date_to and date_to < date_from:
-            raise ValidationError(
-                "date_to must be on or after date_from", field_name="date_to"
-            )
 
         for field in _MUTABLE_FIELDS:
             key = camelcase(field)
