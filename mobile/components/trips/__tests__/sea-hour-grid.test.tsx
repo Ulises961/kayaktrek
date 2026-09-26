@@ -40,19 +40,37 @@ describe("SeaHourGrid", () => {
     expect(getByText("1.8 m")).toBeTruthy();
   });
 
-  it("shows a dash, not a number, for an hour with no wave data", async () => {
+  it("shows a dash, not a number, for an hour with no wave data when other hours have it", async () => {
     const { getByText, getAllByText, queryByText } = await render(
       <SeaHourGrid
         states={[
           { dayId: "day-1", time: "09:00:00", waveHeight: null, waveDirection: null },
+          { dayId: "day-1", time: "12:00:00", waveHeight: 0.4, waveDirection: 200 },
         ]}
       />,
     );
 
     expect(getByText("09:00")).toBeTruthy();
-    expect(queryByText(/\d m$/)).toBeNull();
-    // Wave height, swell height and swell period are all missing for the hour.
-    expect(getAllByText("—")).toHaveLength(3);
+    expect(getByText("0.4 m")).toBeTruthy();
+    expect(queryByText(/no wave forecast/i)).toBeNull();
+    // 09:00 is missing wave height, swell height and swell period; 12:00 has no swell.
+    expect(getAllByText("—")).toHaveLength(5);
+  });
+
+  it("says there is no wave forecast, instead of a row of dashes, when no hour has any", async () => {
+    const { getByText, queryByText, queryAllByText } = await render(
+      <SeaHourGrid
+        states={[
+          { dayId: "day-1", time: "09:00:00", waveHeight: null, waveDirection: null },
+          { dayId: "day-1", time: "12:00:00", waveHeight: null, waveDirection: null },
+        ]}
+      />,
+    );
+
+    expect(getByText(/Sea & swell/)).toBeTruthy();
+    expect(getByText(/no wave forecast for this area/i)).toBeTruthy();
+    expect(queryByText("09:00")).toBeNull();
+    expect(queryAllByText("—")).toHaveLength(0);
   });
 
   it("shows swell height/period when present, a dash when not", async () => {

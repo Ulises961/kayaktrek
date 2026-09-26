@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { formatHour, hourOf, representativeHour } from "../hourly"
+import { formatHour, hasWaveForecast, hourOf, representativeHour } from "../hourly"
 
 describe("formatHour", () => {
   it("trims seconds from an HH:MM:SS time", () => {
@@ -48,5 +48,34 @@ describe("representativeHour", () => {
   it("returns undefined for empty or missing series", () => {
     expect(representativeHour([])).toBeUndefined()
     expect(representativeHour(null)).toBeUndefined()
+  })
+})
+
+// A lake has no marine forecast at all: Open-Meteo returns every wave and swell value
+// as missing, and the backend stores those 24 hours as rows of nulls.
+describe("hasWaveForecast", () => {
+  const empty = { time: "12:00:00", waveHeight: null, waveDirection: null }
+
+  it("is false for a missing or empty series", () => {
+    expect(hasWaveForecast(null)).toBe(false)
+    expect(hasWaveForecast(undefined)).toBe(false)
+    expect(hasWaveForecast([])).toBe(false)
+  })
+
+  it("is false when every hour is missing every wave and swell value", () => {
+    expect(hasWaveForecast([empty, { ...empty, swellWaveHeight: null }])).toBe(false)
+  })
+
+  it("is true as soon as one hour has a wave height", () => {
+    expect(hasWaveForecast([empty, { ...empty, waveHeight: 0.4 }])).toBe(true)
+  })
+
+  it("is true when only the swell is present", () => {
+    expect(hasWaveForecast([{ ...empty, swellWaveHeight: 0.9 }])).toBe(true)
+    expect(hasWaveForecast([{ ...empty, swellPeriod: 8 }])).toBe(true)
+  })
+
+  it("counts a calm 0 m reading as a forecast", () => {
+    expect(hasWaveForecast([{ ...empty, waveHeight: 0 }])).toBe(true)
   })
 })
