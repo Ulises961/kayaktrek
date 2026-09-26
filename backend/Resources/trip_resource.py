@@ -486,7 +486,8 @@ def update_trip(id: str):
     """
     try:
         raw = request.get_json()
-        validated = TripUpdateSchema().load(raw)
+        stored_trip = TripService.get_trip_by_id(id, eager=False)
+        validated = TripUpdateSchema(stored_trip=stored_trip).load(raw)
         assert isinstance(validated, dict)
         trip_data = {**raw, **validated}
         trip = TripService.update_trip(id, trip_data)

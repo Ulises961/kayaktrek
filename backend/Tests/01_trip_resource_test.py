@@ -321,6 +321,57 @@ def test_patch_trip_date_to_before_date_from_rejected(client, auth_headers):
     assert response.status_code == 400
 
 
+def _create_dated_trip(client, auth_headers):
+    data = _create_trip(client, auth_headers)
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{data['id']}",
+        json={"dateFrom": "2027-06-01", "dateTo": "2027-06-14"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    return data["id"]
+
+
+def test_patch_trip_start_alone_past_stored_end_rejected(client, auth_headers):
+    trip_id = _create_dated_trip(client, auth_headers)
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{trip_id}", json={"dateFrom": "2027-06-20"}, headers=auth_headers
+    )
+    assert response.status_code == 400
+    stored = json.loads(client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers).data)
+    assert stored["dateFrom"] == "2027-06-01"
+    assert stored["dateTo"] == "2027-06-14"
+
+
+def test_patch_trip_end_alone_before_stored_start_rejected(client, auth_headers):
+    trip_id = _create_dated_trip(client, auth_headers)
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{trip_id}", json={"dateTo": "2027-05-20"}, headers=auth_headers
+    )
+    assert response.status_code == 400
+    stored = json.loads(client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers).data)
+    assert stored["dateFrom"] == "2027-06-01"
+    assert stored["dateTo"] == "2027-06-14"
+
+
+def test_patch_trip_single_date_within_stored_range_accepted(client, auth_headers):
+    trip_id = _create_dated_trip(client, auth_headers)
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{trip_id}", json={"dateFrom": "2027-06-14"}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)["dateFrom"] == "2027-06-14"
+
+
+def test_patch_trip_clearing_one_date_accepted(client, auth_headers):
+    trip_id = _create_dated_trip(client, auth_headers)
+    response = client.patch(
+        f"{TRIP_ENDPOINT}/{trip_id}", json={"dateTo": None}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)["dateTo"] is None
+
+
 def test_patch_trip_ignores_unknown_fields(client, auth_headers):
     data = _create_trip(client, auth_headers)
     response = client.patch(
