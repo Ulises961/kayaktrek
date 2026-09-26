@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest"
-import { formatDayDate, addDaysIso, formatMinutesAgo, formatTimeAgo, minutesSince } from "../date"
+import {
+  formatDayDate,
+  addDaysIso,
+  todayIso,
+  formatMinutesAgo,
+  formatTimeAgo,
+  minutesSince,
+} from "../date"
 
 describe("formatDayDate", () => {
   it("formats an ISO date as 'd MMM yyyy'", () => {
@@ -95,5 +102,14 @@ describe("formatTimeAgo", () => {
   it("returns a dash for a missing or unparseable timestamp", () => {
     expect(formatTimeAgo("", now)).toBe("—")
     expect(formatTimeAgo("not-a-date", now)).toBe("—")
+  })
+})
+
+describe("todayIso", () => {
+  it("is the local calendar date, not the UTC one", () => {
+    // 23:30 local on 5 Jul: a UTC conversion would already read 6 Jul east of Greenwich
+    // and 5 Jul west of it — the local date must win either way.
+    expect(todayIso(new Date(2026, 6, 5, 23, 30))).toBe("2026-07-05")
+    expect(todayIso(new Date(2026, 6, 5, 0, 15))).toBe("2026-07-05")
   })
 })

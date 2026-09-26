@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { useForm, Controller } from "react-hook-form"
+import { useForm, useWatch, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createTrip } from "@/lib/trips/actions"
 import { TripFieldsSchema, type TripFields } from "@/lib/dtos/trip"
@@ -14,6 +14,7 @@ import { Dialog, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { AccentDialogContent } from "@/components/common/accent-dialog"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/common/date-picker"
+import { todayIso } from "@/lib/utils/date"
 import { KayakIcon, PlusIcon } from "lucide-react"
 
 export function NewTripDialog() {
@@ -31,6 +32,8 @@ export function NewTripDialog() {
   } = useForm<TripFields>({
     resolver: zodResolver(TripFieldsSchema),
   })
+
+  const dateFrom = useWatch({ control, name: "dateFrom" })
 
   const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
@@ -95,6 +98,7 @@ export function NewTripDialog() {
                     value={field.value}
                     onChange={field.onChange}
                     disabled={isPending}
+                    minDate={todayIso()}
                   />
                 )}
               />
@@ -113,6 +117,7 @@ export function NewTripDialog() {
                     value={field.value}
                     onChange={field.onChange}
                     disabled={isPending}
+                    minDate={dateFrom || todayIso()}
                   />
                 )}
               />

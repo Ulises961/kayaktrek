@@ -10,6 +10,12 @@ export function formatDayDate(iso: string | null | undefined): string {
   return isValid(d) ? format(d, "d MMM yyyy") : "—"
 }
 
+/** The current local calendar date as an ISO date (YYYY-MM-DD). Local, not UTC: an evening
+ * in the Americas is already tomorrow in UTC, and a trip can start on the day the user sees. */
+export function todayIso(now: Date = new Date()): string {
+  return format(now, "yyyy-MM-dd")
+}
+
 /** Add (or subtract, with a negative `days`) days to an ISO date (YYYY-MM-DD),
  * returning an ISO date. Uses UTC internally to avoid DST/timezone drift. */
 export function addDaysIso(iso: string, days: number): string {

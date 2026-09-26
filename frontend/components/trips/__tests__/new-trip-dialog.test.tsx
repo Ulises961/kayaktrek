@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
@@ -37,6 +37,56 @@ describe("NewTripDialog", () => {
     expect(screen.getByPlaceholderText(/destination/i)).toBeDefined()
     expect(screen.getByLabelText(/from/i)).toBeDefined()
     expect(screen.getByLabelText(/to/i)).toBeDefined()
+  })
+
+  describe("start date", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 8, 15, 10, 0) })
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function openFromCalendar() {
+      await openDialog()
+      await userEvent.click(screen.getByLabelText(/from/i))
+    }
+
+    it("allows starting today", async () => {
+      await openFromCalendar()
+      expect(screen.getByRole("button", { name: /15th/ })).toBeEnabled()
+    })
+
+    it("disables every day before today", async () => {
+      await openFromCalendar()
+      expect(screen.getByRole("button", { name: /14th/ })).toBeDisabled()
+      expect(screen.getByRole("button", { name: /September 1st,/ })).toBeDisabled()
+    })
+  })
+
+  describe("end date", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 8, 15, 10, 0) })
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("cannot be before today while no start date is chosen", async () => {
+      await openDialog()
+      await userEvent.click(screen.getByLabelText(/to/i))
+      expect(screen.getByRole("button", { name: /September 14th,/ })).toBeDisabled()
+      expect(screen.getByRole("button", { name: /September 15th,/ })).toBeEnabled()
+    })
+
+    it("cannot be before the chosen start date", async () => {
+      await openDialog()
+      await userEvent.click(screen.getByLabelText(/from/i))
+      await userEvent.click(screen.getByRole("button", { name: /September 20th,/ }))
+      await userEvent.click(screen.getByLabelText(/to/i))
+      expect(screen.getByRole("button", { name: /September 19th,/ })).toBeDisabled()
+      expect(screen.getByRole("button", { name: /September 20th,/ })).toBeEnabled()
+    })
   })
 
   it("calls createTrip with the entered values on submit", async () => {
