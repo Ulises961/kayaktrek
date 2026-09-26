@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { ChartHeaderBar } from "@/components/common/chart-header"
+import { HistoryBackLink } from "@/components/common/history-back-link"
 import { PageHeading } from "@/components/common/page-heading"
 
 export const metadata = {
@@ -79,6 +80,7 @@ export default function TermsPage() {
       <ChartHeaderBar className="relative" />
 
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
+        <HistoryBackLink />
         <div className="flex flex-col gap-1">
           <PageHeading>Terms of Use</PageHeading>
           <p className="text-muted-foreground text-xs">Last updated 7 September 2026</p>

@@ -14,6 +14,7 @@ interface BackLinkProps {
    *  compact document-header context (float plan). */
   size?: "xs" | "sm"
   className?: string
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>
 }
 
 export function BackLink({
@@ -22,10 +23,12 @@ export function BackLink({
   variant = "inline",
   size = "sm",
   className,
+  onClick,
 }: BackLinkProps) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         "inline-flex w-fit min-w-0 items-center transition-colors",
         size === "sm" && "gap-1.5 text-sm",
