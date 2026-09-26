@@ -124,6 +124,54 @@ describe("ConditionsSection", () => {
     expect(await screen.findByText("12:00")).toBeInTheDocument()
   })
 
+  it("keeps the wind summary and says there is no wave forecast on a lake day", async () => {
+    WEATHER.mockResolvedValue({
+      success: true,
+      data: {
+        dayId: DAY_ID,
+        model: "gfs",
+        weatherStates: [
+          {
+            dayId: DAY_ID,
+            time: "12:00:00",
+            temperature: 18,
+            precipitation: 0,
+            windDirection: 247,
+            windForce: 12,
+            cloud: null,
+          },
+        ],
+      },
+    })
+    SEA.mockResolvedValue({
+      success: true,
+      data: {
+        dayId: DAY_ID,
+        seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: null, waveDirection: null }],
+      },
+    })
+    render(<ConditionsSection dayId={DAY_ID} isLeader />)
+    await screen.findByTestId("conditions-section")
+    expect(await screen.findByText(/Moderate breeze/i)).toBeInTheDocument()
+    expect(screen.queryByText(/\d m$/)).not.toBeInTheDocument()
+
+    await userEvent.click(await screen.findByRole("button", { name: /hourly/i }))
+    expect(await screen.findByText(/no wave forecast for this area/i)).toBeInTheDocument()
+  })
+
+  it("shows no forecast, not a Beaufort badge, when the only data is an all-missing sea row", async () => {
+    SEA.mockResolvedValue({
+      success: true,
+      data: {
+        dayId: DAY_ID,
+        seaStates: [{ dayId: DAY_ID, time: "12:00:00", waveHeight: null, waveDirection: null }],
+      },
+    })
+    render(<ConditionsSection dayId={DAY_ID} isLeader />)
+    await screen.findByTestId("conditions-section")
+    expect(await screen.findByText("No forecast yet.")).toBeInTheDocument()
+  })
+
   it("triggers a weather fetch via the Refresh button in the summary strip", async () => {
     render(<ConditionsSection dayId={DAY_ID} isLeader />)
     await screen.findByTestId("conditions-section")

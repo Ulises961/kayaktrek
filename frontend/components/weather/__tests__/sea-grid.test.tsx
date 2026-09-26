@@ -57,14 +57,30 @@ describe("SeaGrid", () => {
     expect(screen.getByText("2.8 m").className).toContain("text-red-700") // high
   })
 
-  it("renders a dash, not a number, for an hour with no wave data", () => {
-    const noWaveData: SeaState[] = [
+  it("renders a dash, not a number, for an hour with no wave data when other hours have it", () => {
+    const partial: SeaState[] = [
       { dayId: DAY_ID, time: "09:00:00", waveHeight: null, waveDirection: null },
+      { dayId: DAY_ID, time: "12:00:00", waveHeight: 1.2, waveDirection: 270 },
     ]
-    render(<SeaGrid states={noWaveData} />)
+    render(<SeaGrid states={partial} />)
     expect(screen.getByText("09:00")).toBeInTheDocument()
-    expect(screen.queryByText(/\d m$/)).not.toBeInTheDocument()
+    expect(screen.getByText("1.2 m")).toBeInTheDocument()
     expect(screen.getByTestId("wave-height-missing")).toHaveTextContent("—")
+    expect(screen.queryByText(/no wave forecast/i)).not.toBeInTheDocument()
+  })
+
+  it("says there is no wave forecast, instead of a row of dashes, when no hour has any", () => {
+    const lake: SeaState[] = ["09:00:00", "12:00:00", "15:00:00"].map((time) => ({
+      dayId: DAY_ID,
+      time,
+      waveHeight: null,
+      waveDirection: null,
+    }))
+    render(<SeaGrid states={lake} />)
+    expect(screen.getByText("Sea & swell")).toBeInTheDocument()
+    expect(screen.getByText(/no wave forecast for this area/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("sea-grid")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("wave-height-missing")).not.toBeInTheDocument()
   })
 
   it("labels wind wave and swell sections", () => {
