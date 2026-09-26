@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { ChartHeaderBar } from "@/components/common/chart-header"
+import { HistoryBackLink } from "@/components/common/history-back-link"
 import { PageHeading } from "@/components/common/page-heading"
 
 const contactMail = "privacy@kayaktrek.app"
@@ -83,6 +84,7 @@ export default function PrivacyPage() {
       <ChartHeaderBar className="relative" />
 
       <main className="mx-auto flex max-w-2xl flex-col gap-8 px-5 py-10 sm:px-0">
+        <HistoryBackLink />
         <div className="flex flex-col gap-1">
           <PageHeading>Privacy Policy</PageHeading>
           <p className="text-muted-foreground text-xs">Last updated 7 September 2026</p>

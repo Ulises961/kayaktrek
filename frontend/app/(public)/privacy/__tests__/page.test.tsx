@@ -1,11 +1,19 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }))
+
 import PrivacyPage from "../page"
 
 // These assertions are deliberately about the claims Play reviews the policy against, and the
 // ones a user relies on. A wording tweak that keeps the meaning should keep these passing; a
 // change that removes the claim should fail, because removing it is a substantive change.
 describe("PrivacyPage", () => {
+  it("offers a way back", () => {
+    render(<PrivacyPage />)
+    expect(screen.getByRole("link", { name: /^back$/i })).toBeInTheDocument()
+  })
+
   // This assertion has now been inverted twice, and the reason is the same each time: the
   // page must state whatever is currently true about health data, and a change in either
   // direction is substantive. It first asserted the policy correctly *disclaimed* E2E; M22
