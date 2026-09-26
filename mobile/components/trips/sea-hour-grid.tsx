@@ -4,7 +4,7 @@ import { ScrollView } from "react-native-gesture-handler";
 
 import type { SeaState } from "@shared/dtos/sea";
 import { lightTokens, palette } from "@shared/tokens";
-import { formatHour } from "@shared/weather/hourly";
+import { formatHour, hasWaveForecast } from "@shared/weather/hourly";
 import { waveHeightSeverity } from "@shared/weather/beaufort";
 
 import { Row, Stack } from "../ui/layout";
@@ -23,6 +23,21 @@ const WAVE_COLOR: Record<ReturnType<typeof waveHeightSeverity>, string> = {
 // why (no embla-carousel-react equivalent, no hour-selection sync in scope).
 export function SeaHourGrid({ states }: { states: SeaState[] }) {
   if (states.length === 0) return null;
+
+  // A lake has no marine forecast: every hour is empty, so say so once rather than
+  // drawing a row of dashes.
+  if (!hasWaveForecast(states)) {
+    return (
+      <Stack className="gap-2">
+        <Text className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Sea &amp; swell
+        </Text>
+        <Text className="text-xs text-muted-foreground">
+          No wave forecast for this area.
+        </Text>
+      </Stack>
+    );
+  }
 
   return (
     <Stack className="gap-2">

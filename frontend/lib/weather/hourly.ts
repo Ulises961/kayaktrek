@@ -14,6 +14,25 @@ export function hourOf(time: string | undefined | null): number | null {
   return Number.isNaN(h) ? null : h
 }
 
+// Whether a day's sea series carries any wave or swell reading at all. Open-Meteo's marine
+// model covers the ocean only, so a lake or an inland waterway comes back as 24 rows of
+// nothing — a day with no wave forecast, which is different from an hour with a gap in one.
+export function hasWaveForecast(
+  states:
+    | {
+        waveHeight?: number | null
+        swellWaveHeight?: number | null
+        swellPeriod?: number | null
+      }[]
+    | null
+    | undefined,
+): boolean {
+  return (
+    !!states &&
+    states.some((s) => s.waveHeight != null || s.swellWaveHeight != null || s.swellPeriod != null)
+  )
+}
+
 // The day strip shows a single representative value per condition — prefer the
 // midday (12:00) reading, falling back to the middle of the available hours.
 export function representativeHour<T extends { time?: string }>(

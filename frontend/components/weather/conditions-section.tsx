@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useDayConditions } from "@/lib/weather/use-day-conditions"
 import { beaufortLabel, degreesToCompass, combinedSeaState } from "@/lib/weather/beaufort"
-import { representativeHour } from "@/lib/weather/hourly"
+import { hasWaveForecast, representativeHour } from "@/lib/weather/hourly"
 import { ConditionsBadge } from "@/components/weather/conditions-badge"
 import { WeatherGrid } from "@/components/weather/weather-grid"
 import { SeaGrid } from "@/components/weather/sea-grid"
@@ -74,7 +74,7 @@ export function ConditionsSection({ dayId, isLeader }: ConditionsSectionProps) {
   const ruleOfTwelfths = sea?.ruleOfTwelfths ?? []
   const tideSrcLabel = sourceLabel(sea)
 
-  const hasWeather = weatherStates.length > 0 || seaStates.length > 0
+  const hasWeather = weatherStates.length > 0 || hasWaveForecast(seaStates)
   const hasTidalData = sea?.highTide != null || sea?.lowTide != null || sea?.tidalRangeM != null
   const hasData = hasWeather || gates.length > 0 || tideSrcLabel != null
 
