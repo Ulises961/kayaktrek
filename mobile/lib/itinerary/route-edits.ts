@@ -35,7 +35,7 @@ export type EditableRoute = { days: EditableDay[]; points: EditablePoint[] }
 
 export type NewPoint = Omit<EditablePoint, "dayId" | "orderKey">
 
-export type PointFields = Partial<Pick<EditablePoint, "name" | "notes" | "type">>
+export type PointFields = Partial<Pick<EditablePoint, "name" | "notes" | "type" | "latitude" | "longitude">>
 
 // The server's own spacing (backend Services/Utils/point_ordering.py
 // assign_order_keys): zero-padded so string order is numeric order.
@@ -157,6 +157,34 @@ export function nearestPointInDay(
     }
   }
   return nearest
+}
+
+/**
+ * Drag a point to a new position within its own day (M34 WP1/WP3, merged —
+ * moving a point to a *different* day is out of scope here, left for the
+ * future day-boundaries work). Repositions it, then reorders it to match its
+ * new geographic neighbours — the earlier/later buttons this replaces only
+ * ever moved a point one step at a time.
+ */
+export function movePointByDrag(
+  route: EditableRoute,
+  pointId: string,
+  latitude: number,
+  longitude: number,
+): EditableRoute {
+  const moving = route.points.find((point) => point.id === pointId)
+  if (!moving) return route
+
+  const withoutMoving = deletePoint(route, pointId)
+  const afterPointId = nearestPointInDay(withoutMoving, moving.dayId, latitude, longitude)
+  return insertPoint(withoutMoving, moving.dayId, afterPointId, {
+    id: moving.id,
+    latitude,
+    longitude,
+    name: moving.name,
+    notes: moving.notes,
+    type: moving.type,
+  })
 }
 
 /** Swap a point with its neighbour in the same day: -1 earlier, 1 later. */

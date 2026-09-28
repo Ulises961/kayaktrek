@@ -5,8 +5,9 @@ import {
   Layer,
   LocationManager,
   Map as MapLibreMap,
-  Marker,
   type PressEvent,
+  ViewAnnotation,
+  type ViewAnnotationEvent,
 } from "@maplibre/maplibre-react-native";
 import {
   Stack as RouterStack,
@@ -37,11 +38,12 @@ import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
-import { loadRouteSyncState } from "@mobile/lib/db/route-edit";
+import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
+import { movePointByDrag } from "@mobile/lib/itinerary/route-edits";
 import { boundsOf } from "@mobile/lib/map/bounds";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
@@ -245,6 +247,30 @@ export default function TripMapScreen() {
     setSelectedPointId(null);
   }
 
+  // M34 WP1/WP3 (merged): dragging a marker repositions the point and reorders
+  // it within its own day to match its new geographic neighbours, through the
+  // same editRoute path the point-edit form already uses (lib/db/route-edit.ts)
+  // — no new persistence code, only a new gesture entry into it. Moving a point
+  // to a *different* day is out of scope for this drag (left for the future
+  // day-boundaries work) — the day-picker on the point-edit form is still the
+  // only way to do that. A drag also fires the map's own onPress underneath it
+  // (the same double-recognizer behaviour handlePointPress works around above),
+  // so it reuses that guard too.
+  async function handlePointDragEnd(pointId: string, event: { nativeEvent: ViewAnnotationEvent }) {
+    suppressNextMapPress.current = true;
+    const [longitude, latitude] = event.nativeEvent.lngLat;
+    try {
+      await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+    } catch (err) {
+      Alert.alert(
+        "Couldn't move point",
+        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      );
+    } finally {
+      await reload();
+    }
+  }
+
   // M9l WP1: the whole trip's route, colored per day, always on screen — selecting
   // a day (ItinerarySheet) no longer changes what's drawn on the map, only what the
   // sheet shows below it. Mirrors web's map-core.tsx (buildSegments/getDayColor),
@@ -363,17 +389,25 @@ export default function TripMapScreen() {
             )}
 
             {routePoints.map((point, index) => (
-              <Marker
+              <ViewAnnotation
                 key={point.id ?? index}
                 id={point.id ?? String(index)}
                 lngLat={[point.longitude, point.latitude]}
+                // M34 WP1: leader-only, same gating as long-press-to-add and "Add stop
+                // here" — a crew member reads the route, only the leader edits it.
+                draggable={isLeader}
                 onPress={() => point.id && handlePointPress(point.id)}
+                onDragStart={() => point.id && handlePointPress(point.id)}
+                onDragEnd={(event) => point.id && void handlePointDragEnd(point.id, event)}
               >
                 {/* MapLibre's native marker view sizes its tap area to exactly its
                   children's rendered bounds — no padding/hit-slop of its own (confirmed
-                  by reading Marker.js). The visible dot is 8-14px, unusably small to
-                  tap on a real device (found on-device: taps were landing on nothing),
-                  so the touch target is this 32px box, with the dot centered inside it. */}
+                  by reading Marker.js; ViewAnnotation shares the same underlying native
+                  point-annotation component, so treat this as still true until checked
+                  on-device — M34 WP1's own risk note). The visible dot is 8-14px,
+                  unusably small to tap on a real device (found on-device: taps were
+                  landing on nothing), so the touch target is this 32px box, with the
+                  dot centered inside it. */}
                 <View
                   style={{
                     width: 32,
@@ -398,7 +432,7 @@ export default function TripMapScreen() {
                     }}
                   />
                 </View>
-              </Marker>
+              </ViewAnnotation>
             ))}
           </MapLibreMap>
 
