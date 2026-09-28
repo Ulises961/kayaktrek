@@ -12,7 +12,9 @@ export type LocatedRoutePoint = Point & {
 
 export type RouteLegFeature = {
   type: "Feature"
-  properties: { dayNum: number; color: string }
+  // afterId: the leg's own predecessor point — M34 WP4's mid-route insertion
+  // (tap near this leg) inserts a new point right after it.
+  properties: { dayNum: number; color: string; afterId: string | null }
   geometry: { type: "LineString"; coordinates: [number, number][] }
 }
 
@@ -84,7 +86,7 @@ export function buildDayColoredRoute(days: Day[]): {
     )
     legs.push({
       type: "Feature",
-      properties: { dayNum, color: getDayColor(dayNum) },
+      properties: { dayNum, color: getDayColor(dayNum), afterId: a.id ?? null },
       geometry: {
         type: "LineString",
         coordinates: [

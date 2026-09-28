@@ -5,6 +5,8 @@ import {
   Layer,
   LocationManager,
   Map as MapLibreMap,
+  type MapRef,
+  type PixelPointBounds,
   type PressEvent,
   ViewAnnotation,
   type ViewAnnotationEvent,
@@ -26,9 +28,11 @@ import {
 } from "react-native";
 
 import type { Day } from "@shared/dtos/day";
+import { POINT_TYPE } from "@shared/dtos/point";
 import { getDayColor } from "@shared/itinerary/colors";
 import { lightTokens, palette } from "@shared/tokens";
 
+import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
@@ -38,15 +42,17 @@ import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
-import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
+import { editRoute, loadRouteSyncState, pushRouteChanges } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
+import { distanceToPredecessorNm } from "@mobile/lib/itinerary/draft-point";
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
-import { movePointByDrag } from "@mobile/lib/itinerary/route-edits";
+import { insertionDayId, insertPoint, movePointByDrag } from "@mobile/lib/itinerary/route-edits";
 import { boundsOf } from "@mobile/lib/map/bounds";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
+import { uuidv7 } from "@mobile/lib/uuid";
 
 // M9c WP6: the same live-first, cache-fallback shape as the trip list screen.
 // This screen only needs `destination` and `itinerary.days` from the full
@@ -63,6 +69,18 @@ type ScreenTrip = {
 // had a speed set — kept as one named constant rather than repeating the literal.
 const DEFAULT_AVG_SPEED_KNOTS = 2.5;
 
+// M34 WP4: a not-yet-created point, pending Undo/Confirm at the tap location.
+// `afterPointId` is already resolved (append-at-end vs mid-route insert) by
+// the time the draft is shown, so Confirm has nothing left to figure out.
+type DraftPoint = { latitude: number; longitude: number; afterPointId: string | null };
+
+// How close a tap needs to land to the route line to count as a mid-route
+// insertion rather than an append at the end — a small screen-pixel box around
+// the tap point, queried against the rendered "route-line" layer. Mirrors web's
+// own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
+// visible line), achieved differently since MapLibre RN's Layer has no onPress.
+const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [trip, setTrip] = useState<ScreenTrip | null>(null);
@@ -75,7 +93,10 @@ export default function TripMapScreen() {
   const [zoom, setZoom] = useState(10);
   const [isLeader, setIsLeader] = useState(false);
   const [inConflict, setInConflict] = useState(false);
+  const [draftPoint, setDraftPoint] = useState<DraftPoint | null>(null);
+  const [addingPoint, setAddingPoint] = useState(false);
   const cameraRef = useRef<CameraRef>(null);
+  const mapRef = useRef<MapRef>(null);
   const router = useRouter();
 
   // Named and stable so a refresh action (the WP5 weather/sea "refresh"
@@ -175,20 +196,16 @@ export default function TripMapScreen() {
     });
   }
 
-  function handleMapLongPress(event: NativeSyntheticEvent<PressEvent>) {
-    const [longitude, latitude] = event.nativeEvent.lngLat;
-    openNewPoint(latitude, longitude);
-  }
-
   // "Add stop here": the emergency stop, at the phone's own position. MapLibre's
   // location manager needs no module of its own, and foreground permission is
-  // enough — this is one reading, not tracking.
+  // enough — this is one reading, not tracking. Unaffected by M34 WP4's tap-to-place
+  // flow below, which replaces long-press-to-add, not this.
   async function handleAddStopHere() {
     const granted = await LocationManager.requestPermissions();
     if (!granted) {
       Alert.alert(
         "Location is off",
-        "Allow location access to add a stop where you are, or long-press the map instead.",
+        "Allow location access to add a stop where you are, or tap the map instead.",
       );
       return;
     }
@@ -196,7 +213,7 @@ export default function TripMapScreen() {
     if (!position) {
       Alert.alert(
         "No position yet",
-        "The phone hasn't found where it is. Try again in a moment, or long-press the map.",
+        "The phone hasn't found where it is. Try again in a moment, or tap the map.",
       );
       return;
     }
@@ -239,14 +256,6 @@ export default function TripMapScreen() {
     setSheetExpanded(true);
   }
 
-  function handleMapPress() {
-    if (suppressNextMapPress.current) {
-      suppressNextMapPress.current = false;
-      return;
-    }
-    setSelectedPointId(null);
-  }
-
   // M34 WP1/WP3 (merged): dragging a marker repositions the point and reorders
   // it within its own day to match its new geographic neighbours, through the
   // same editRoute path the point-edit form already uses (lib/db/route-edit.ts)
@@ -287,6 +296,97 @@ export default function TripMapScreen() {
   );
 
   const bounds = useMemo(() => boundsOf(routePoints), [routePoints]);
+
+  // M34 WP4: a tap on empty map space, with nothing selected, starts the
+  // tap-to-place flow — replacing the old long-press-then-navigate-to-a-form
+  // placement outright (long-press competes with panning the map; a tap
+  // doesn't, since MapLibre resolves it to a pan instead the moment the finger
+  // moves). Ported from web's builder: distance/time preview, Undo/Confirm,
+  // then the same point-edit screen every other point uses — not a separate
+  // compact form. "Add stop here" (GPS-position add) is untouched.
+  async function handleMapPress(event: NativeSyntheticEvent<PressEvent>) {
+    if (suppressNextMapPress.current) {
+      suppressNextMapPress.current = false;
+      return;
+    }
+    if (selectedPointId) {
+      setSelectedPointId(null);
+      return;
+    }
+    if (draftPoint) {
+      setDraftPoint(null);
+      return;
+    }
+    if (!isLeader) return;
+
+    const { point, lngLat } = event.nativeEvent;
+    const [longitude, latitude] = lngLat;
+    const tolerance = ROUTE_LINE_TAP_TOLERANCE_PX;
+    const queryBounds: PixelPointBounds = [
+      [point[0] - tolerance, point[1] - tolerance],
+      [point[0] + tolerance, point[1] + tolerance],
+    ];
+
+    // Mid-route insert when the tap lands near an existing leg, append-at-end
+    // otherwise. Falls back to append-at-end on any query failure — a leader
+    // can still always add a point, just not necessarily mid-route this time.
+    let afterPointId = routePoints[routePoints.length - 1]?.id ?? null;
+    try {
+      const features = await mapRef.current?.queryRenderedFeatures(queryBounds, {
+        layers: ["route-line"],
+      });
+      const hitAfterId = features?.[0]?.properties?.afterId;
+      if (typeof hitAfterId === "string") afterPointId = hitAfterId;
+    } catch {
+      // Line hit-testing is a nice-to-have, not a precondition for adding a point.
+    }
+
+    setDraftPoint({ latitude, longitude, afterPointId });
+  }
+
+  // Any tap landing on the draft tooltip — button or not — must not fall
+  // through to handleMapPress underneath it (the same paired-recognizer
+  // behaviour handlePointPress works around above).
+  function handleDraftTooltipPress() {
+    suppressNextMapPress.current = true;
+  }
+
+  function handleUndoDraft() {
+    suppressNextMapPress.current = true;
+    setDraftPoint(null);
+  }
+
+  async function handleConfirmDraft() {
+    if (!draftPoint) return;
+    suppressNextMapPress.current = true;
+    setAddingPoint(true);
+    const newPointId = uuidv7();
+    try {
+      await editRoute(id, (route) => {
+        const dayId = insertionDayId(route, draftPoint.afterPointId);
+        return insertPoint(route, dayId, draftPoint.afterPointId, {
+          id: newPointId,
+          latitude: draftPoint.latitude,
+          longitude: draftPoint.longitude,
+          name: null,
+          notes: null,
+          type: POINT_TYPE.STOP,
+        });
+      });
+      // Best effort: offline it fails and the sweep pushes later.
+      void pushRouteChanges(id).catch(() => undefined);
+      setDraftPoint(null);
+      await reload();
+      router.push(`/trips/${id}/point/${newPointId}`);
+    } catch (err) {
+      Alert.alert(
+        "Couldn't add point",
+        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setAddingPoint(false);
+    }
+  }
 
   if (error) {
     return (
@@ -351,11 +451,11 @@ export default function TripMapScreen() {
 
         <View style={{ flex: 1 }}>
           <MapLibreMap
+            ref={mapRef}
             mapStyle={MAP_STYLE}
             style={{ flex: 1 }}
             onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
-            onPress={handleMapPress}
-            onLongPress={isLeader ? handleMapLongPress : undefined}
+            onPress={(event) => void handleMapPress(event)}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
             // compositing layer outside RN's normal view z-order — this is what caused the
             // day-strip/weather-panel area above the map to render as a solid black bar
@@ -434,6 +534,27 @@ export default function TripMapScreen() {
                 </View>
               </ViewAnnotation>
             ))}
+
+            {draftPoint && (
+              <ViewAnnotation
+                id="draft-point"
+                lngLat={[draftPoint.longitude, draftPoint.latitude]}
+                onPress={handleDraftTooltipPress}
+              >
+                <AddPointTooltip
+                  distanceNm={distanceToPredecessorNm(
+                    routePoints,
+                    draftPoint.afterPointId,
+                    draftPoint.latitude,
+                    draftPoint.longitude,
+                  )}
+                  avgSpeedKnots={trip.avgSpeedKnots}
+                  submitting={addingPoint}
+                  onUndo={handleUndoDraft}
+                  onConfirm={() => void handleConfirmDraft()}
+                />
+              </ViewAnnotation>
+            )}
           </MapLibreMap>
 
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />

@@ -124,4 +124,20 @@ describe("buildDayColoredRoute", () => {
   it("returns no points or legs for an empty trip", () => {
     expect(buildDayColoredRoute([])).toEqual({ points: [], legs: [] })
   })
+
+  // M34 WP4: mid-route insertion (tap near an existing leg) needs to know which
+  // point the new one would be inserted after.
+  it("tags each leg with the id of its predecessor point", () => {
+    const days: Day[] = [
+      {
+        id: "day-1",
+        dayNumber: 1,
+        points: [point("a", 0, 0, "b"), point("b", 0, 1, "c"), point("c", 0, 2)],
+      },
+    ]
+
+    const { legs } = buildDayColoredRoute(days)
+
+    expect(legs.map((l) => l.properties.afterId)).toEqual(["a", "b"])
+  })
 })

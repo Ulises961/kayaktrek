@@ -122,6 +122,24 @@ function positionAfterEarlierDays(route: EditableRoute, inOrder: EditablePoint[]
   return index
 }
 
+/**
+ * The day a point inserted after `afterPointId` (or, when null, before the
+ * route's first point) belongs to — ported from web's M20 mid-route insertion
+ * (`handleLegClick`): the successor's day first, falling back to the
+ * predecessor's, falling back to Day 0. Mid-day the two already agree; this
+ * only matters right at a day boundary, where the boundary stop belongs to
+ * the day it *closes*, so a point inserted right after it belongs to the day
+ * it *opens*.
+ */
+export function insertionDayId(route: EditableRoute, afterPointId: string | null): string {
+  const inOrder = orderedPoints(route.points)
+  const index = afterPointId ? inOrder.findIndex((point) => point.id === afterPointId) : -1
+  const predecessor = index >= 0 ? inOrder[index] : null
+  const successor = afterPointId ? inOrder[index + 1] : inOrder[0]
+  const day0 = route.days.find((day) => day.dayNumber === 0)
+  return successor?.dayId ?? predecessor?.dayId ?? day0?.id ?? ""
+}
+
 /** Move a point to another day, after that day's own last point. */
 export function movePointToDay(route: EditableRoute, pointId: string, dayId: string): EditableRoute {
   const moving = route.points.find((point) => point.id === pointId)

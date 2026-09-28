@@ -2,6 +2,7 @@ import {
   type EditableRoute,
   deletePoint,
   editPoint,
+  insertionDayId,
   insertPoint,
   movePointByDrag,
   movePointToDay,
@@ -191,6 +192,37 @@ describe("order keys", () => {
 // M34 WP1/WP3 (merged): dragging a point repositions it and reorders it to
 // match its new geographic neighbours within its own day. Moving a point to a
 // different day is out of scope here (left for the future day-boundaries work).
+// M34 WP4: mid-route insertion's day rule, ported from web's M20 handleLegClick —
+// the successor's day first, falling back to the predecessor's, falling back to
+// Day 0. Mid-day the two agree; this only bites right at a day boundary.
+describe("insertionDayId", () => {
+  it("uses the shared day when predecessor and successor agree", () => {
+    expect(insertionDayId(twoDayRoute(), "putin")).toBe("d1")
+  })
+
+  it("uses the successor's day when inserting right before a boundary stop", () => {
+    // cape (d1) -> camp (d2, the boundary). Inserting after cape lands on the
+    // day the boundary stop opens, not the one it closes.
+    expect(insertionDayId(twoDayRoute(), "cape")).toBe("d2")
+  })
+
+  it("uses the predecessor's day when appending at the very end", () => {
+    expect(insertionDayId(twoDayRoute(), "unassigned")).toBe("d0")
+  })
+
+  it("uses the first point's day when inserting with no predecessor", () => {
+    expect(insertionDayId(twoDayRoute(), null)).toBe("d1")
+  })
+
+  it("falls back to Day 0 for a route with no points at all", () => {
+    const empty: EditableRoute = {
+      days: [{ id: "d0", dayNumber: 0, date: null, startPointId: null, endPointId: null }],
+      points: [],
+    }
+    expect(insertionDayId(empty, null)).toBe("d0")
+  })
+})
+
 describe("movePointByDrag", () => {
   it("repositions and reorders a point dragged past its day's other points", () => {
     const route: EditableRoute = {
