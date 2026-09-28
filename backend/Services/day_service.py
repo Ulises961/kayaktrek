@@ -144,6 +144,13 @@ class DayService:
             if trip:
                 _require_editable(trip)
         db.session.add(day)
+        # M34: a day created here is invisible to RouteSyncService's
+        # optimistic-concurrency check (it never creates/deletes days itself),
+        # so a route push whose base_route_version predates this day would
+        # otherwise succeed unaware of it. Bumping here forces any push
+        # in flight to reconcile against a route that now includes this day.
+        if itinerary:
+            bump_route_version(itinerary)
         db.session.commit()
         db.session.refresh(day)
         return day
@@ -327,6 +334,12 @@ class DayService:
             db.session.query(Point).filter_by(day_id=day_to_delete.id).update(
                 {"day_id": day0.id}
             )
+
+        # M34: same reasoning as create_day — deletion here is invisible to
+        # RouteSyncService's version check otherwise.
+        itinerary = db.session.query(Itinerary).filter_by(id=day_to_delete.itinerary_id).first()
+        if itinerary:
+            bump_route_version(itinerary)
 
         db.session.delete(day_to_delete)
         db.session.commit()
