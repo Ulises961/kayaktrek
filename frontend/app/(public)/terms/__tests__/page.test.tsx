@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }))
+
 import TermsPage from "../page"
 
 describe("TermsPage", () => {
+  it("offers a way back", () => {
+    render(<TermsPage />)
+    expect(screen.getByRole("link", { name: /^back$/i })).toBeInTheDocument()
+  })
+
   it("renders the safety disclaimer", () => {
     render(<TermsPage />)
     expect(screen.getByText(/planning aid only/i)).toBeInTheDocument()

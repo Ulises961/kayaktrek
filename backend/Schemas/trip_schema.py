@@ -84,6 +84,19 @@ class TripUpdateSchema(TripSchema):
     itinerary = fields.Nested('ItinerarySchema', dump_only=True)
     pending_travellers = fields.Nested('UserSchema', many=True, dump_only=True)
 
+    def __init__(self, *args, stored_trip: Trip | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stored_trip = stored_trip
+
+    @validates_schema
+    def validate_dates(self, data, **kwargs):
+        # A PATCH may carry one date only, so a date it omits is the one already stored.
+        stored = self.stored_trip
+        date_from = data['date_from'] if 'date_from' in data else stored and stored.date_from
+        date_to = data['date_to'] if 'date_to' in data else stored and stored.date_to
+        if date_from and date_to and date_to < date_from:
+            raise ValidationError("date_to must be on or after date_from", field_name="date_to")
+
     @post_load
     def make_trip(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}
