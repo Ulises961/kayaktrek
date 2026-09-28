@@ -5,16 +5,12 @@
 // The route is one ordered list of points across the whole trip — its order keys,
 // the column the device holds instead of next_id (sync-protocol-spec.md §7.2) —
 // with each point belonging to a day. A day's boundaries are derived from that,
-// never edited directly, after every change:
-//
-//   - a day starts at its own first point;
-//   - it ends where the next day starts — the shared overnight stop, which belongs
-//     to the arriving day (lib/itinerary/day-route.ts explains why) — or, for the
-//     last day, at its own last point.
-//
-// That is the shape the web builder produces, so an edited route pushed from the
-// phone reads the same on the web. Day 0, the staging area for unassigned points
-// (numbered-days.ts), never has boundaries.
+// never edited directly, via `deriveDayBoundaries` (M34: shared with web's
+// `@shared/itinerary/day-boundaries`, the one source of truth for what a day
+// boundary is). That is the shape the web builder produces, so an edited route
+// pushed from the phone reads the same on the web.
+
+import { deriveDayBoundaries } from "@shared/itinerary/day-boundaries"
 
 export type EditableDay = {
   id: string
@@ -62,27 +58,10 @@ function rekey(inOrder: EditablePoint[]): EditablePoint[] {
 }
 
 function withBoundaries(days: EditableDay[], inOrder: EditablePoint[]): EditableDay[] {
-  const numbered = days.filter((day) => day.dayNumber > 0).sort((a, b) => a.dayNumber - b.dayNumber)
-  const firstOf = new Map<string, string>()
-  const lastOf = new Map<string, string>()
-  for (const point of inOrder) {
-    if (!firstOf.has(point.dayId)) firstOf.set(point.dayId, point.id)
-    lastOf.set(point.dayId, point.id)
-  }
-
-  const boundaries = new Map<string, Pick<EditableDay, "startPointId" | "endPointId">>()
-  numbered.forEach((day, index) => {
-    const nextDay = numbered[index + 1]
-    const nextStart = nextDay ? firstOf.get(nextDay.id) : undefined
-    boundaries.set(day.id, {
-      startPointId: firstOf.get(day.id) ?? null,
-      endPointId: nextStart ?? lastOf.get(day.id) ?? null,
-    })
-  })
-
+  const boundaries = deriveDayBoundaries(days, inOrder)
   return days.map((day) =>
     day.dayNumber > 0
-      ? { ...day, ...boundaries.get(day.id) }
+      ? { ...day, ...boundaries[day.id] }
       : { ...day, startPointId: null, endPointId: null },
   )
 }
