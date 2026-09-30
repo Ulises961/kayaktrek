@@ -1,12 +1,12 @@
-import { useState } from "react"
-import { Pressable, View } from "react-native"
-import { WifiOff, X } from "lucide-react-native"
+import { useEffect, useRef, useState } from "react"
+import { ActivityIndicator, Pressable, View } from "react-native"
+import { RefreshCw, WifiOff, X } from "lucide-react-native"
 
 import { lightTokens, palette } from "@shared/tokens"
 import { formatTimeAgo } from "@shared/utils/date"
 
 import { type CachedSurfaceReport, useCachedSurfaces } from "../../lib/network/cached-surfaces"
-import { useIsOffline } from "../../lib/network/use-is-offline"
+import { recheckConnectivity, useIsOffline } from "../../lib/network/use-is-offline"
 import { Text } from "./text"
 
 // Rendered by every Screen (components/ui/layout.tsx), in flow above the screen's
@@ -54,18 +54,46 @@ export function OfflineBanner() {
   const { reports, dismissed, setDismissed } = useCachedSurfaces()
   const isOffline = isDeviceOffline || reports.length > 0
   const [expanded, setExpanded] = useState(false)
+  const [rechecking, setRechecking] = useState(false)
   const headline = isDeviceOffline ? "No internet connection." : "Can't reach the server."
   const dated = reports.filter((report) => report.cachedAt !== undefined)
   const explained = reports.filter(hasMessage)
 
-  // Reconnecting resets dismissal so the next disconnect starts expanded again.
-  // Adjusted during render (React's documented pattern for state derived from a
-  // prop/value change) rather than an effect, which would cost an extra commit.
-  const [wasOffline, setWasOffline] = useState(isOffline)
-  if (isOffline !== wasOffline) {
-    setWasOffline(isOffline)
-    if (!isOffline) setDismissed(false)
+  // A manual escape hatch for when NetInfo's own passive state is stale — the
+  // OS doesn't always fire a change event promptly (captive portals, flaky
+  // wifi that never fully drops). useIsOffline's listener picks up whatever
+  // recheckConnectivity() settles to; nothing else needs doing with the
+  // result here.
+  async function handleRecheck() {
+    setRechecking(true)
+    try {
+      await recheckConnectivity()
+    } finally {
+      setRechecking(false)
+    }
   }
+
+  // Reconnecting resets dismissal so the next disconnect starts expanded
+  // again. This has to be a real effect, not the render-phase "adjust state"
+  // pattern the previous version used: that pattern is only sanctioned for a
+  // component's OWN state, and `setDismissed` belongs to CachedSurfacesProvider,
+  // a different component — calling it during OfflineBanner's render crashed on
+  // a real device ("Cannot update a component (CachedSurfacesProvider) while
+  // rendering a different component (OfflineBanner)"), which only ever showed
+  // as a console warning under the RN Testing Library renderer, never an
+  // actual failure there.
+  //
+  // Guarded to fire only on an observed offline->online *transition*, not on
+  // mount: dismissal is shared (CachedSurfacesProvider) and survives this
+  // component remounting on navigation (every Screen has its own banner
+  // instance), so a fresh instance mounting while momentarily offline=false
+  // (useIsOffline starts false until NetInfo's first event lands) must not
+  // wipe out a dismissal a previous instance already earned.
+  const wasOffline = useRef(isOffline)
+  useEffect(() => {
+    if (wasOffline.current && !isOffline) setDismissed(false)
+    wasOffline.current = isOffline
+  }, [isOffline, setDismissed])
 
   if (!isOffline) return null
 
@@ -134,9 +162,24 @@ export function OfflineBanner() {
           </Pressable>
         )}
       </View>
-      {/* Padded to a 36pt box plus 8pt of slop on every side — a 44pt target.
-          The bare 16px icon was the whole touch area, which was hard to hit
-          (found on a device), and on the water it is hit with a wet thumb. */}
+      {/* Both padded to a 36pt box plus 8pt of slop on every side — a 44pt
+          target. The bare 16px icon was the whole touch area, which was hard
+          to hit (found on a device), and on the water it is hit with a wet
+          thumb. */}
+      <Pressable
+        onPress={() => void handleRecheck()}
+        accessibilityRole="button"
+        accessibilityLabel="Recheck connection"
+        disabled={rechecking}
+        hitSlop={8}
+        className="-my-2 items-center justify-center p-2.5"
+      >
+        {rechecking ? (
+          <ActivityIndicator size="small" color={palette.sunset600} />
+        ) : (
+          <RefreshCw size={16} color={palette.sunset600} />
+        )}
+      </Pressable>
       <Pressable
         onPress={() => setDismissed(true)}
         accessibilityRole="button"

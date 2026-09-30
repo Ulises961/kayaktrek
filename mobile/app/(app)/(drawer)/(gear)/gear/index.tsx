@@ -27,7 +27,7 @@ import {
   getMyItems,
   setDefaultPack,
 } from "@mobile/lib/inventory/actions"
-import { useIsOffline } from "@mobile/lib/network/use-is-offline"
+import { recheckConnectivity, useIsOffline } from "@mobile/lib/network/use-is-offline"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Gear" drawer
 // item's root screen, so it supplies its own menu button.
@@ -232,7 +232,10 @@ export default function GearScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true)
-              void load()
+              // A pull-to-refresh means "check again, properly" — NetInfo's
+              // own passive state can lag a real reconnect, so force it to
+              // re-evaluate before trusting the fetch that follows.
+              void recheckConnectivity().then(load)
             }}
           />
         }

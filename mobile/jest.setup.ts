@@ -8,9 +8,9 @@ jest.mock("react-native-safe-area-context", () => {
   // jest.mock factories must require() inline; babel-plugin-jest-hoist forbids
   // referencing outer imports here.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mock = require("react-native-safe-area-context/jest/mock")
-  return mock.default ?? mock
-})
+  const mock = require("react-native-safe-area-context/jest/mock");
+  return mock.default ?? mock;
+});
 
 // Screens set their own Stack title via `<Stack.Screen options={...} />` rendered
 // inline (see (app)/_layout.tsx's comment on why) — that calls useRoute() under the
@@ -21,13 +21,13 @@ jest.mock("react-native-safe-area-context", () => {
 // under test is the one in front, so it is focused — OfflineNotice keys on it to
 // report only the focused screen's cached data to the banner.
 jest.mock("expo-router", () => {
-  const actual = jest.requireActual("expo-router")
+  const actual = jest.requireActual("expo-router");
   return {
     ...actual,
     Stack: Object.assign(actual.Stack, { Screen: () => null }),
     useIsFocused: () => true,
-  }
-})
+  };
+});
 
 // The package's own jest mock (online, reachable). Screen tests now render the
 // app-root OfflineBanner through test-utils/with-offline-banner.tsx, which reads
@@ -35,7 +35,7 @@ jest.mock("expo-router", () => {
 jest.mock("@react-native-community/netinfo", () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require("@react-native-community/netinfo/jest/netinfo-mock.js"),
-)
+);
 
 // expo-router/drawer transitively requires react-native-drawer-layout ->
 // react-native-reanimated -> react-native-worklets, which tries to load a native
@@ -46,7 +46,7 @@ jest.mock("@react-native-community/netinfo", () =>
 // Stack.Screen's headerLeft (M9i WP0).
 jest.mock("expo-router/drawer", () => ({
   DrawerToggleButton: () => null,
-}))
+}));
 
 // react-native-gesture-handler's own package (used directly since M9l WP4's
 // ScrollView, and already a transitive dependency via reanimated) ships this exact
@@ -56,7 +56,7 @@ jest.mock("expo-router/drawer", () => ({
 // can't handle ("Cannot convert undefined or null to object" in
 // copyComponentProperties).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-require("react-native-gesture-handler/jestSetup")
+require("react-native-gesture-handler/jestSetup");
 
 // The package's own jestSetup.js only mocks the *legacy* GestureComponents module
 // (`./src/components/GestureComponents`) — v3's modern ScrollView (the one M9l WP4
@@ -73,11 +73,77 @@ require("react-native-gesture-handler/jestSetup")
 // resolves to `lib/module/index.js` in this jest environment (no react-native-platform
 // resolver active), confirmed via require.resolve; the package's own jestSetup.js mocks
 // both trees for the legacy module but only ships the v3 one it doesn't cover here.
-jest.mock("react-native-gesture-handler/lib/module/v3/components/GestureComponents", () => {
+jest.mock(
+  "react-native-gesture-handler/lib/module/v3/components/GestureComponents",
+  () => {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const {
+      FlatList,
+      RefreshControl,
+      ScrollView,
+      Switch,
+      TextInput,
+    } = require("react-native");
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    return {
+      __esModule: true,
+      FlatList,
+      RefreshControl,
+      ScrollView,
+      Switch,
+      TextInput,
+    };
+  },
+);
+
+// M34: babel-preset-expo rewrites our own `import { Image } from "react-native"`
+// (components/trips/photo-carousel.tsx, components/ui/avatar.tsx) into
+// `react-native-css/components/Image` — which jest-expo's `customExportConditions:
+// ["react-native"]` resolves to the package's raw, untranspiled source
+// (`react-native-css/src/components/Image.tsx`, confirmed against its package.json
+// exports map: `"./components/*"`'s `"react-native"` condition points there, same as
+// Text/View/etc.). That file's own `import { Image as RNImage } from "react-native"`
+// then hits react-native's real lazy `Image` getter, which under
+// `@react-native/jest-preset`'s automock requires this exact same react-native-css
+// path again — a genuine circular resolution ("Cannot convert undefined or null to
+// object" in copyComponentProperties). Text/View etc. apparently don't hit this
+// (RNGH's jestSetup above happens to warm Text first); nothing warmed Image before,
+// since no earlier suite rendered a real RN `Image`. Mocked at the exact resolved
+// subpath rather than chasing the underlying resolution order further — a plain
+// passthrough component, since no screen test asserts on an Image's actual pixels,
+// only that the screen renders at all.
+jest.mock("react-native-css/components/Image", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { FlatList, RefreshControl, ScrollView, Switch, TextInput } = require("react-native")
-  return { __esModule: true, FlatList, RefreshControl, ScrollView, Switch, TextInput }
-})
+  const React = require("react");
+  const StubImage = React.forwardRef(
+    (props: Record<string, unknown>, ref: unknown) =>
+      React.createElement("Image", { ...props, ref }),
+  );
+  StubImage.displayName = "Image";
+  return { __esModule: true, Image: StubImage, default: StubImage };
+});
+
+// M34: the same class of crash as Image above, hit by components/trips/photo-viewer-modal.tsx
+// (the fullscreen photo viewer), but through a different path — react-native-css's own
+// `index.cts` doesn't wrap Modal at all (`get Modal() { return require("react-native").Modal }`,
+// a bare passthrough), so this is RN's own lazy `Modal` getter reaching
+// `@react-native/jest-preset`'s Modal automock, whose `mockComponent('react-native/Libraries/Modal/Modal', ...)`
+// internally does a `jest.requireActual` that recurses into the same react-native-css
+// resolution tangle. Stubbed at that exact underlying module id, bypassing the preset's
+// own (here, broken) automock rather than chasing the resolution further — same
+// justification as Image: no screen test asserts on Modal's native presentation, only
+// that its children render (or don't) when `visible` is set.
+jest.mock("react-native/Libraries/Modal/Modal", () => {
+  const StubModal = ({
+    visible,
+    children,
+  }: {
+    visible?: boolean;
+    children?: unknown;
+  }) => (visible === false ? null : children);
+  StubModal.displayName = "Modal";
+  return { __esModule: true, default: StubModal };
+});
 
 // lib/db/database.ts builds a real SQLiteAdapter at module load, which needs
 // react-native-nitro-modules and throws outright under jest. Suites that want
@@ -89,4 +155,4 @@ jest.mock("react-native-gesture-handler/lib/module/v3/components/GestureComponen
 // suites failed at import, none of them for a reason about the screen.
 // Stubbed once here rather than re-mocked in every suite that happens to pull
 // a db module into its graph.
-jest.mock("./lib/db/database", () => ({ database: {} }))
+jest.mock("./lib/db/database", () => ({ database: {} }));

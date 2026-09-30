@@ -60,6 +60,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
       />,
     );
 
@@ -75,6 +76,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
       />,
     );
 
@@ -92,6 +94,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
       />,
     );
 
@@ -106,6 +109,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={onClose}
+        onViewPoint={jest.fn()}
       />,
     );
 
@@ -123,6 +127,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
         onEdit={onEdit}
       />,
     );
@@ -139,10 +144,117 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
       />,
     );
 
     expect(queryByLabelText("Edit point")).toBeNull();
+  });
+
+  // M34: the bin deletes straight from the sheet, no fields to fill first —
+  // same leader-only gating as Edit.
+  it("offers Delete to the leader", async () => {
+    const onDelete = jest.fn();
+    const { getByLabelText } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={jest.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    await fireEvent.press(getByLabelText("Delete point"));
+
+    expect(onDelete).toHaveBeenCalled();
+  });
+
+  it("offers no Delete without a delete handler", async () => {
+    const { queryByLabelText } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={jest.fn()}
+      />,
+    );
+
+    expect(queryByLabelText("Delete point")).toBeNull();
+  });
+
+  // M34 (revised): Notes and Images both navigate to the point-detail screen
+  // now, instead of opening a local modal — that screen serves both roles
+  // (editable for the leader, read-only for crew), so the sheet no longer
+  // needs its own separate viewer surfaces.
+  it("navigates to the point detail screen from the Images tile", async () => {
+    const onViewPoint = jest.fn();
+    const { getByTestId } = await render(
+      <PointSummaryCard
+        pointId="b"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={onViewPoint}
+      />,
+    );
+
+    await fireEvent.press(getByTestId("point-images-tile"));
+
+    expect(onViewPoint).toHaveBeenCalled();
+  });
+
+  it("does not navigate from the Images tile for a point with no photos", async () => {
+    const onViewPoint = jest.fn();
+    const { getByTestId } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={onViewPoint}
+      />,
+    );
+
+    await fireEvent.press(getByTestId("point-images-tile"));
+
+    expect(onViewPoint).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the point detail screen from the Notes tile", async () => {
+    const onViewPoint = jest.fn();
+    const { getByTestId } = await render(
+      <PointSummaryCard
+        pointId="b"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={onViewPoint}
+      />,
+    );
+
+    await fireEvent.press(getByTestId("point-notes-tile"));
+
+    expect(onViewPoint).toHaveBeenCalled();
+  });
+
+  it("does not navigate from the Notes tile for a point with no notes", async () => {
+    const onViewPoint = jest.fn();
+    const { getByTestId } = await render(
+      <PointSummaryCard
+        pointId="a"
+        days={days}
+        avgSpeedKnots={2.5}
+        onClose={jest.fn()}
+        onViewPoint={onViewPoint}
+      />,
+    );
+
+    await fireEvent.press(getByTestId("point-notes-tile"));
+
+    expect(onViewPoint).not.toHaveBeenCalled();
   });
 
   it("renders nothing when the point isn't found", async () => {
@@ -152,6 +264,7 @@ describe("PointSummaryCard", () => {
         days={days}
         avgSpeedKnots={2.5}
         onClose={jest.fn()}
+        onViewPoint={jest.fn()}
       />,
     );
 

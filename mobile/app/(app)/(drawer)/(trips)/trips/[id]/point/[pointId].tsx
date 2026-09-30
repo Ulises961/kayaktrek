@@ -1,93 +1,107 @@
-import { Stack as RouterStack, useLocalSearchParams, useRouter } from "expo-router"
-import { ArrowDown, ArrowUp } from "lucide-react-native"
-import { useEffect, useState } from "react"
-import { ActivityIndicator, Alert, ScrollView } from "react-native"
+import {
+  Stack as RouterStack,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { Anchor, CircleDot } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView } from "react-native";
 
-import { POINT_TYPE } from "@shared/dtos/point"
-import { palette } from "@shared/tokens"
+import type { Image as PointImage } from "@shared/dtos/image";
+import { POINT_TYPE } from "@shared/dtos/point";
+import { palette } from "@shared/tokens";
 
-import { PointForm, type PointFormValues } from "@mobile/components/trips/point-form"
-import { Button } from "@mobile/components/ui/button"
-import { Row, Screen, Stack } from "@mobile/components/ui/layout"
-import { Text } from "@mobile/components/ui/text"
-import { editRoute, loadEditableRoute, pushRouteChanges } from "@mobile/lib/db/route-edit"
-import { isTripLeader } from "@mobile/lib/db/trip-role"
+import { PhotoCarousel } from "@mobile/components/trips/photo-carousel";
+import {
+  PointForm,
+  type PointFormValues,
+} from "@mobile/components/trips/point-form";
+import { Label } from "@mobile/components/ui/label";
+import { Row, Screen, Stack } from "@mobile/components/ui/layout";
+import { Text } from "@mobile/components/ui/text";
+import {
+  editRoute,
+  loadEditableRoute,
+  pushRouteChanges,
+} from "@mobile/lib/db/route-edit";
+import { isTripLeader } from "@mobile/lib/db/trip-role";
 import {
   type EditableRoute,
-  deletePoint,
   editPoint,
-  movePointToDay,
-  movePointWithinDay,
-} from "@mobile/lib/itinerary/route-edits"
+} from "@mobile/lib/itinerary/route-edits";
 
-const header = <RouterStack.Screen options={{ title: "Edit point" }} />
+// Parses the `images` route param (itinerary.tsx's handleEditPoint) back into
+// the shape PhotoCarousel wants. Guarded, not trusted: a malformed or missing
+// param degrades to "no photos" rather than crashing the screen.
+function parseImagesParam(raw: string | undefined): PointImage[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed as PointImage[];
+  } catch {
+    return [];
+  }
+}
 
-// M9d WP3: the leader edits a route point on the phone, with or without signal.
-// Every change lands in the local route at once (lib/db/route-edit.ts) and is
-// pushed straight away when there is signal, or by the next sweep when there is
-// not — so a failed push here is not an error to show.
+// One screen for every role, mirroring web's PointDetailModal `canEdit`
+// split: editable inputs for the leader, plain read-only text for crew.
+// Pushes straight away on save; a failed push isn't an error here since the
+// sweep retries it later.
 export default function EditPointScreen() {
-  const { id, pointId } = useLocalSearchParams<{ id: string; pointId: string }>()
-  const router = useRouter()
-  const [route, setRoute] = useState<EditableRoute | null>(null)
-  const [isLeader, setIsLeader] = useState<boolean | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { id, pointId, images: imagesParam } = useLocalSearchParams<{
+    id: string;
+    pointId: string;
+    images?: string;
+  }>();
+  const router = useRouter();
+  const [route, setRoute] = useState<EditableRoute | null>(null);
+  const [isLeader, setIsLeader] = useState<boolean | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const images = parseImagesParam(imagesParam);
 
   useEffect(() => {
-    let cancelled = false
-    void Promise.all([loadEditableRoute(id), isTripLeader(id)]).then(([loaded, leader]) => {
-      if (cancelled) return
-      setRoute(loaded)
-      setIsLeader(leader)
-    })
+    let cancelled = false;
+    void Promise.all([loadEditableRoute(id), isTripLeader(id)]).then(
+      ([loaded, leader]) => {
+        if (cancelled) return;
+        setRoute(loaded);
+        setIsLeader(leader);
+      },
+    );
     return () => {
-      cancelled = true
-    }
-  }, [id])
-
-  async function apply(edit: (current: EditableRoute) => EditableRoute): Promise<boolean> {
-    setSubmitting(true)
-    setError(null)
-    try {
-      setRoute(await editRoute(id, edit))
-      // Best effort: offline it fails and the sweep pushes later.
-      void pushRouteChanges(id).catch(() => undefined)
-      return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the change.")
-      return false
-    } finally {
-      setSubmitting(false)
-    }
-  }
+      cancelled = true;
+    };
+  }, [id]);
 
   async function handleSave(values: PointFormValues) {
-    const saved = await apply((current) => {
-      const edited = editPoint(current, pointId, {
-        name: values.name.trim() || null,
-        notes: values.notes.trim() || null,
-        type: values.type,
-      })
-      return movePointToDay(edited, pointId, values.dayId)
-    })
-    if (saved) router.back()
+    setSubmitting(true);
+    setError(null);
+    try {
+      await editRoute(id, (current) =>
+        editPoint(current, pointId, {
+          name: values.name.trim() || null,
+          notes: values.notes.trim() || null,
+          type: values.type,
+        }),
+      );
+      // Best effort: offline it fails and the sweep pushes later.
+      void pushRouteChanges(id).catch(() => undefined);
+      router.back();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't save the change.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function confirmDelete() {
-    Alert.alert("Delete this point?", "It is removed from the route for everyone once sent.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          if (await apply((current) => deletePoint(current, pointId))) router.back()
-        },
-      },
-    ])
-  }
-
-  const point = route?.points.find((candidate) => candidate.id === pointId)
+  const point = route?.points.find((candidate) => candidate.id === pointId);
+  const header = (
+    <RouterStack.Screen options={{ title: isLeader ? "Edit point" : "Point" }} />
+  );
 
   if (!route || isLeader === null) {
     return (
@@ -95,79 +109,84 @@ export default function EditPointScreen() {
         {header}
         <ActivityIndicator />
       </Screen>
-    )
+    );
   }
 
-  if (!isLeader || !point) {
+  if (!point) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center p-6">
         {header}
         <Text className="text-center text-muted-foreground">
-          {!isLeader ? "Only the trip leader can change the route." : "This point is no longer on the route."}
+          This point is no longer on the route.
         </Text>
       </Screen>
-    )
+    );
   }
-
-  const days = route.days
-    .filter((day) => day.dayNumber > 0)
-    .sort((a, b) => a.dayNumber - b.dayNumber)
-    .map((day) => ({ id: day.id, dayNumber: day.dayNumber }))
 
   return (
     <Screen edges={["bottom"]}>
       {header}
-      <ScrollView contentContainerClassName="p-4" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <PointForm
-          initial={{
-            name: point.name ?? "",
-            notes: point.notes ?? "",
-            type: point.type === POINT_TYPE.STOP ? POINT_TYPE.STOP : POINT_TYPE.POSITION,
-            dayId: point.dayId,
-          }}
-          days={days}
-          submitLabel="Save point"
-          submitting={submitting}
-          error={error}
-          onSubmit={(values) => void handleSave(values)}
-        >
-          {/* Reordering is a list operation, not a drag (plans/M31.md): one step
-              at a time within the point's own day. */}
-          <Stack className="gap-2">
-            <Text className="text-sm font-medium">Order in the day</Text>
-            <Row className="gap-2">
-              <Button
-                variant="outline"
-                onPress={() => void apply((current) => movePointWithinDay(current, pointId, -1))}
-                disabled={submitting}
-                testID="point-move-earlier"
-                icon={<ArrowUp size={14} color={palette.ocean700} />}
-              >
-                Earlier
-              </Button>
-              <Button
-                variant="outline"
-                onPress={() => void apply((current) => movePointWithinDay(current, pointId, 1))}
-                disabled={submitting}
-                testID="point-move-later"
-                icon={<ArrowDown size={14} color={palette.ocean700} />}
-              >
-                Later
-              </Button>
+      <ScrollView
+        contentContainerClassName="p-4"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {isLeader ? (
+          <PointForm
+            initial={{
+              name: point.name ?? "",
+              notes: point.notes ?? "",
+              type:
+                point.type === POINT_TYPE.STOP
+                  ? POINT_TYPE.STOP
+                  : POINT_TYPE.POSITION,
+            }}
+            submitLabel="Save point"
+            submitting={submitting}
+            error={error}
+            onSubmit={(values) => void handleSave(values)}
+          />
+        ) : (
+          <Stack className="gap-4">
+            <Row className="items-center gap-1.5">
+              {point.type === POINT_TYPE.STOP ? (
+                <Anchor size={14} color={palette.ocean500} />
+              ) : (
+                <CircleDot size={14} color={palette.ocean500} />
+              )}
+              <Text className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                {point.type ?? "position"}
+              </Text>
             </Row>
-          </Stack>
-        </PointForm>
+            <Text className="text-lg font-semibold">
+              {point.name || point.type || "position"}
+            </Text>
 
-        <Button
-          variant="destructive"
-          className="mt-6 self-start"
-          onPress={confirmDelete}
-          disabled={submitting}
-          testID="point-delete"
-        >
-          Delete point
-        </Button>
+            <Stack className="gap-1">
+              <Label>Notes</Label>
+              {point.notes ? (
+                <ScrollView
+                  nestedScrollEnabled
+                  className="max-h-40 rounded-md border border-input p-3"
+                >
+                  <Text className="text-base leading-6">{point.notes}</Text>
+                </ScrollView>
+              ) : (
+                <Text className="text-sm italic text-muted-foreground">
+                  No notes for this point.
+                </Text>
+              )}
+            </Stack>
+          </Stack>
+        )}
+
+        {images.length > 0 && (
+          <Stack className="mt-6 gap-2">
+            <Label>Photos</Label>
+            <PhotoCarousel images={images} />
+          </Stack>
+        )}
       </ScrollView>
     </Screen>
-  )
+  );
 }

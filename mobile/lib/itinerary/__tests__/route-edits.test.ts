@@ -2,7 +2,9 @@ import {
   type EditableRoute,
   deletePoint,
   editPoint,
+  insertionDayId,
   insertPoint,
+  movePointByDrag,
   movePointToDay,
   movePointWithinDay,
   nearestPointInDay,
@@ -47,6 +49,15 @@ describe("editPoint", () => {
 
     const cape = edited.points.find((p) => p.id === "cape")!
     expect(cape).toMatchObject({ name: "Cap de Creus", notes: "Swell wraps round", type: "stop" })
+    expect(order(edited)).toEqual(order(twoDayRoute()))
+  })
+
+  // M34 WP1: dragging a marker repositions it without touching its order or day.
+  it("changes a point's latitude and longitude and nothing else", () => {
+    const edited = editPoint(twoDayRoute(), "cape", { latitude: 42.5, longitude: 3.2 })
+
+    const cape = edited.points.find((p) => p.id === "cape")!
+    expect(cape).toMatchObject({ latitude: 42.5, longitude: 3.2, name: "cape", dayId: "d1" })
     expect(order(edited)).toEqual(order(twoDayRoute()))
   })
 })
@@ -175,5 +186,68 @@ describe("order keys", () => {
     const edited = deletePoint(twoDayRoute(), "cape")
 
     expect(day(edited, "d0")).toMatchObject({ startPointId: null, endPointId: null })
+  })
+})
+
+// M34 WP1/WP3 (merged): dragging a point repositions it and reorders it to
+// match its new geographic neighbours within its own day. Moving a point to a
+// different day is out of scope here (left for the future day-boundaries work).
+// M34 WP4: mid-route insertion's day rule, ported from web's M20 handleLegClick —
+// the successor's day first, falling back to the predecessor's, falling back to
+// Day 0. Mid-day the two agree; this only bites right at a day boundary.
+describe("insertionDayId", () => {
+  it("uses the shared day when predecessor and successor agree", () => {
+    expect(insertionDayId(twoDayRoute(), "putin")).toBe("d1")
+  })
+
+  it("uses the successor's day when inserting right before a boundary stop", () => {
+    // cape (d1) -> camp (d2, the boundary). Inserting after cape lands on the
+    // day the boundary stop opens, not the one it closes.
+    expect(insertionDayId(twoDayRoute(), "cape")).toBe("d2")
+  })
+
+  it("uses the predecessor's day when appending at the very end", () => {
+    expect(insertionDayId(twoDayRoute(), "unassigned")).toBe("d0")
+  })
+
+  it("uses the first point's day when inserting with no predecessor", () => {
+    expect(insertionDayId(twoDayRoute(), null)).toBe("d1")
+  })
+
+  it("falls back to Day 0 for a route with no points at all", () => {
+    const empty: EditableRoute = {
+      days: [{ id: "d0", dayNumber: 0, date: null, startPointId: null, endPointId: null }],
+      points: [],
+    }
+    expect(insertionDayId(empty, null)).toBe("d0")
+  })
+})
+
+describe("movePointByDrag", () => {
+  it("repositions a point without reordering it, even dragged past its day's other points", () => {
+    const route: EditableRoute = {
+      days: [{ id: "d1", dayNumber: 1, date: null, startPointId: null, endPointId: null }],
+      points: [
+        { id: "a", dayId: "d1", orderKey: "00001000", latitude: 0, longitude: 0, name: "a", notes: null, type: "stop" },
+        { id: "b", dayId: "d1", orderKey: "00002000", latitude: 0, longitude: 1, name: "b", notes: null, type: "stop" },
+        { id: "c", dayId: "d1", orderKey: "00003000", latitude: 0, longitude: 2, name: "c", notes: null, type: "stop" },
+      ],
+    }
+
+    // Dragging "a" out past "c" moves only its coordinates — order (and the
+    // legs drawn from it) stays "a", "b", "c". Reordering an existing point
+    // is out of scope for a drag; only an actual insertion re-derives order
+    // (see movePointByDrag's own comment for why).
+    const edited = movePointByDrag(route, "a", 0, 2.1)
+
+    expect(orderedPoints(edited.points).map((p) => p.id)).toEqual(["a", "b", "c"])
+    const a = edited.points.find((p) => p.id === "a")!
+    expect(a).toMatchObject({ latitude: 0, longitude: 2.1, dayId: "d1" })
+  })
+
+  it("leaves the day unchanged — moving a point to a different day is out of scope here", () => {
+    const edited = movePointByDrag(twoDayRoute(), "cape", 42, 3)
+
+    expect(edited.points.find((p) => p.id === "cape")).toMatchObject({ dayId: "d1" })
   })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildBoundaryColorMap, resolveLegDayNumber } from "../day-boundaries"
+import { buildBoundaryColorMap, deriveDayBoundaries, resolveLegDayNumber } from "../day-boundaries"
 import { getDayColor, UNASSIGNED_COLOR } from "../colors"
 
 describe("buildBoundaryColorMap", () => {
@@ -71,5 +71,50 @@ describe("resolveLegDayNumber", () => {
 
   it("greys a boundary leg that skips a day", () => {
     expect(resolveLegDayNumber(1, 3, true)).toBe(0)
+  })
+})
+
+describe("deriveDayBoundaries", () => {
+  const days = [
+    { id: "d0", dayNumber: 0 },
+    { id: "d1", dayNumber: 1 },
+    { id: "d2", dayNumber: 2 },
+  ]
+
+  it("starts a day at its own first point and ends it where the next day starts", () => {
+    const points = [
+      { id: "putin", dayId: "d1" },
+      { id: "cape", dayId: "d1" },
+      { id: "camp", dayId: "d2" },
+      { id: "takeout", dayId: "d2" },
+    ]
+
+    expect(deriveDayBoundaries(days, points)).toEqual({
+      d1: { startPointId: "putin", endPointId: "camp" },
+      d2: { startPointId: "camp", endPointId: "takeout" },
+    })
+  })
+
+  it("ends the last numbered day at its own last point", () => {
+    const points = [
+      { id: "putin", dayId: "d1" },
+      { id: "takeout", dayId: "d1" },
+    ]
+
+    expect(deriveDayBoundaries([days[0], days[1]], points)).toEqual({
+      d1: { startPointId: "putin", endPointId: "takeout" },
+    })
+  })
+
+  it("never assigns boundaries to day 0's unassigned staging points", () => {
+    const points = [{ id: "loose", dayId: "d0" }]
+
+    expect(deriveDayBoundaries(days, points).d0).toBeUndefined()
+  })
+
+  it("gives a day with no points at all a null start and end", () => {
+    const points = [{ id: "putin", dayId: "d1" }]
+
+    expect(deriveDayBoundaries(days, points).d2).toEqual({ startPointId: null, endPointId: null })
   })
 })

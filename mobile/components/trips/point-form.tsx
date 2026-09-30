@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from "react"
+import { Anchor, CircleDot } from "lucide-react-native"
+import { useState } from "react"
 
 import { POINT_TYPE, type PointType } from "@shared/dtos/point"
+import { lightTokens } from "@shared/tokens"
 
 import { Button } from "../ui/button"
 import { Chip } from "../ui/chip"
@@ -13,35 +15,25 @@ export type PointFormValues = {
   name: string
   notes: string
   type: PointType
-  dayId: string
 }
 
-export type DayOption = { id: string; dayNumber: number }
-
-// Shared by the add and edit point screens (M9d WP3), like LogForm for logs:
-// plain controlled inputs, converted to the route's fields only on submit.
+// Plain controlled inputs, converted to the route's fields only on submit.
 export function PointForm({
   initial,
-  days,
   submitLabel,
   submitting,
   error,
   onSubmit,
-  children,
 }: {
   initial: PointFormValues
-  days: DayOption[]
   submitLabel: string
   submitting: boolean
   error: string | null
   onSubmit: (values: PointFormValues) => void
-  // Screen-specific controls between the fields and the submit button.
-  children?: ReactNode
 }) {
   const [name, setName] = useState(initial.name)
   const [notes, setNotes] = useState(initial.notes)
   const [type, setType] = useState<PointType>(initial.type)
-  const [dayId, setDayId] = useState(initial.dayId)
 
   return (
     <Stack className="gap-4">
@@ -58,31 +50,31 @@ export function PointForm({
             onPress={() => setType(POINT_TYPE.STOP)}
             testID="point-type-stop"
           >
-            Stop
+            <Row className="items-center gap-1.5">
+              <Anchor
+                size={14}
+                color={type === POINT_TYPE.STOP ? lightTokens.primaryForeground : lightTokens.foreground}
+              />
+              <Text className={type === POINT_TYPE.STOP ? "text-sm text-primary-foreground" : "text-sm text-foreground"}>
+                Stop
+              </Text>
+            </Row>
           </Chip>
           <Chip
             active={type === POINT_TYPE.POSITION}
             onPress={() => setType(POINT_TYPE.POSITION)}
             testID="point-type-position"
           >
-            Waypoint
+            <Row className="items-center gap-1.5">
+              <CircleDot
+                size={14}
+                color={type === POINT_TYPE.POSITION ? lightTokens.primaryForeground : lightTokens.foreground}
+              />
+              <Text className={type === POINT_TYPE.POSITION ? "text-sm text-primary-foreground" : "text-sm text-foreground"}>
+                Position
+              </Text>
+            </Row>
           </Chip>
-        </Row>
-      </Stack>
-
-      <Stack className="gap-2">
-        <Label>Day</Label>
-        <Row className="flex-wrap gap-2">
-          {days.map((day) => (
-            <Chip
-              key={day.id}
-              active={dayId === day.id}
-              onPress={() => setDayId(day.id)}
-              testID={`point-day-${day.dayNumber}`}
-            >
-              {`Day ${day.dayNumber}`}
-            </Chip>
-          ))}
         </Row>
       </Stack>
 
@@ -93,16 +85,15 @@ export function PointForm({
           onChangeText={setNotes}
           placeholder="Landing, water, hazards"
           multiline
-          numberOfLines={3}
+          numberOfLines={6}
+          className="min-h-32 max-h-40"
           testID="point-notes"
         />
       </Stack>
 
-      {children}
-
       {error && <Text className="text-sm text-destructive">{error}</Text>}
       <Button
-        onPress={() => onSubmit({ name, notes, type, dayId })}
+        onPress={() => onSubmit({ name, notes, type })}
         disabled={submitting}
         testID="point-submit"
       >

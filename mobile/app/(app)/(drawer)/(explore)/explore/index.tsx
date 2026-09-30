@@ -23,7 +23,7 @@ import { NeedsConnectionNotice } from "@mobile/components/ui/offline-notice"
 import { Text } from "@mobile/components/ui/text"
 import { isOfflineError } from "@mobile/lib/api/client"
 import { searchPublicItineraries } from "@mobile/lib/explore/actions"
-import { useIsOffline } from "@mobile/lib/network/use-is-offline"
+import { recheckConnectivity, useIsOffline } from "@mobile/lib/network/use-is-offline"
 import { getMe } from "@mobile/lib/profile/actions"
 
 // headerLeft: see (drawer)/(trips)/index.tsx's comment — this is the "Explore" drawer
@@ -119,6 +119,15 @@ export default function ExploreScreen() {
     },
     [filters],
   )
+
+  // A pull-to-refresh means "check again, properly" — NetInfo's own passive
+  // state can lag a real reconnect, so force it to re-evaluate before
+  // trusting the search that follows.
+  async function handleRefresh() {
+    setRefreshing(true)
+    await recheckConnectivity()
+    await runSearch(1, { append: false })
+  }
 
   // Any filter change restarts at page 1 — asking for page 3 of a freshly-filtered set
   // shows nothing for a query that matched.
@@ -248,13 +257,7 @@ export default function ExploreScreen() {
           <ScrollView
             contentContainerClassName="gap-3 pb-4"
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true)
-                  void runSearch(1, { append: false })
-                }}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />
             }
           >
             <Text className="text-[11px] tabular-nums text-muted-foreground">

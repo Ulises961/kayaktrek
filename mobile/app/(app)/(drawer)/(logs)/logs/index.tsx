@@ -26,6 +26,7 @@ import {
 import { loadLogsCache, saveLogsCache } from "@mobile/lib/db/logs-cache"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import { recheckConnectivity } from "@mobile/lib/network/use-is-offline"
 import { endorseLog, getEndorsedLogs, getLogs, getLogStats } from "@mobile/lib/logs/actions"
 
 type LogLists = { mine: Log[]; endorsed: Log[] }
@@ -89,7 +90,13 @@ export default function LogsScreen() {
   const reloadLogs = logsCache.reload
   const load = useCallback(
     async (isRefresh = false) => {
-      if (isRefresh) setIsRefreshing(true)
+      if (isRefresh) {
+        setIsRefreshing(true)
+        // A pull-to-refresh means "check again, properly" — NetInfo's own
+        // passive state can lag a real reconnect, so force it to re-evaluate
+        // before trusting the fetch that follows.
+        await recheckConnectivity()
+      }
       try {
         await reloadLogs()
       } finally {

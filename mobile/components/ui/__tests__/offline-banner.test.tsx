@@ -4,9 +4,13 @@ import NetInfo from "@react-native-community/netinfo"
 import { CachedSurfacesProvider } from "../../../lib/network/cached-surfaces"
 import { OfflineBanner } from "../offline-banner"
 
-jest.mock("@react-native-community/netinfo", () => ({ addEventListener: jest.fn() }))
+jest.mock("@react-native-community/netinfo", () => ({
+  addEventListener: jest.fn(),
+  refresh: jest.fn(),
+}))
 
 const mockedAddEventListener = NetInfo.addEventListener as jest.Mock
+const mockedRefresh = NetInfo.refresh as jest.Mock
 
 function connectivityHandler(): (state: { isConnected: boolean | null }) => void {
   return mockedAddEventListener.mock.calls[0][0] as (state: { isConnected: boolean | null }) => void
@@ -15,6 +19,7 @@ function connectivityHandler(): (state: { isConnected: boolean | null }) => void
 beforeEach(() => {
   jest.clearAllMocks()
   mockedAddEventListener.mockReturnValue(jest.fn())
+  mockedRefresh.mockResolvedValue({ isConnected: false })
 })
 
 describe("OfflineBanner", () => {
@@ -84,5 +89,36 @@ describe("OfflineBanner", () => {
     handler({ isConnected: false })
 
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+  })
+
+  // A manual escape hatch for when the OS is slow to fire its own change
+  // event (captive portals, flaky wifi that never fully drops).
+  it("forces a connectivity recheck via NetInfo.refresh()", async () => {
+    const { getByText, getByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    const handler = connectivityHandler()
+    handler({ isConnected: false })
+    await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+
+    await fireEvent.press(getByLabelText("Recheck connection"))
+
+    expect(mockedRefresh).toHaveBeenCalled()
+  })
+
+  it("clears once a forced recheck reports the device back online", async () => {
+    mockedRefresh.mockResolvedValue({ isConnected: true })
+    const { getByText, getByLabelText, queryByText } = await render(<OfflineBanner />, {
+      wrapper: CachedSurfacesProvider,
+    })
+    const handler = connectivityHandler()
+    handler({ isConnected: false })
+    await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+
+    await fireEvent.press(getByLabelText("Recheck connection"))
+    // recheckConnectivity() only forces NetInfo to re-evaluate — the banner
+    // still updates through the same addEventListener callback it always
+    // does, which NetInfo.refresh() is documented to invoke.
+    connectivityHandler()({ isConnected: true })
+
+    await waitFor(() => expect(queryByText(/no internet connection/i)).toBeNull())
   })
 })

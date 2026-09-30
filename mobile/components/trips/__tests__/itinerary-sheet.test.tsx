@@ -112,6 +112,7 @@ describe("ItinerarySheet", () => {
         days={[]}
         avgSpeedKnots={2.5}
         onClosePoint={jest.fn()}
+        onViewPoint={jest.fn()}
         expanded={false}
         onExpandedChange={jest.fn()}
       />,
@@ -128,6 +129,7 @@ describe("ItinerarySheet", () => {
         days={[]}
         avgSpeedKnots={2.5}
         onClosePoint={jest.fn()}
+        onViewPoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -147,6 +149,7 @@ describe("ItinerarySheet", () => {
         days={[]}
         avgSpeedKnots={2.5}
         onClosePoint={jest.fn()}
+        onViewPoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -163,6 +166,7 @@ describe("ItinerarySheet", () => {
         days={[]}
         avgSpeedKnots={2.5}
         onClosePoint={jest.fn()}
+        onViewPoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -179,6 +183,7 @@ describe("ItinerarySheet", () => {
         days={daysWithPoint}
         avgSpeedKnots={2.5}
         onClosePoint={jest.fn()}
+        onViewPoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,
@@ -198,6 +203,7 @@ describe("ItinerarySheet", () => {
         days={daysWithPoint}
         avgSpeedKnots={2.5}
         onClosePoint={onClosePoint}
+        onViewPoint={jest.fn()}
         expanded={true}
         onExpandedChange={jest.fn()}
       />,

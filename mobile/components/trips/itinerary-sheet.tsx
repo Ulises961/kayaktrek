@@ -38,20 +38,31 @@ export function ItinerarySheet({
   avgSpeedKnots,
   onClosePoint,
   onEditPoint,
+  onDeletePoint,
+  onViewPoint,
   expanded,
   onExpandedChange,
   onRefreshWeather,
+  panGestureDisabled,
 }: {
   selectedDay: Day | null;
   selectedPointId: string | null;
   days: Day[];
   avgSpeedKnots: number;
   onClosePoint: () => void;
-  // Set only for the trip leader (M9d): route editing is leader-only.
+  // Set only for the trip leader (M9d/M34): route editing is leader-only.
   onEditPoint?: (pointId: string) => void;
+  onDeletePoint?: (pointId: string) => void;
+  // Unlike onEditPoint/onDeletePoint, available to every role.
+  onViewPoint: (pointId: string) => void;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onRefreshWeather?: () => Promise<void>;
+  // M34 WP6 fix: while the itinerary screen has a marker drag in flight, this
+  // sheet's own content/handle pan gestures must not compete with it for the
+  // same touch stream (gorhom's gesture-handler and MapLibre's native drag
+  // recognizer were both live over the map at once, otherwise).
+  panGestureDisabled?: boolean;
 }) {
   const showingPoint = selectedPointId != null;
   const canExpand = showingPoint || hasConditions(selectedDay);
@@ -73,8 +84,8 @@ export function ItinerarySheet({
       index={actuallyExpanded ? 1 : 0}
       snapPoints={snapPoints}
       onChange={(i) => onExpandedChange(i > 0)}
-      enableContentPanningGesture={canExpand}
-      enableHandlePanningGesture={canExpand}
+      enableContentPanningGesture={canExpand && !panGestureDisabled}
+      enableHandlePanningGesture={canExpand && !panGestureDisabled}
       backgroundStyle={{ backgroundColor: lightTokens.card }}
       handleIndicatorStyle={{ backgroundColor: lightTokens.border }}
       handleComponent={() => (
@@ -91,6 +102,8 @@ export function ItinerarySheet({
             avgSpeedKnots={avgSpeedKnots}
             onClose={onClosePoint}
             onEdit={onEditPoint ? () => onEditPoint(selectedPointId) : undefined}
+            onDelete={onDeletePoint ? () => onDeletePoint(selectedPointId) : undefined}
+            onViewPoint={() => onViewPoint(selectedPointId)}
           />
         ) : (
           <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />

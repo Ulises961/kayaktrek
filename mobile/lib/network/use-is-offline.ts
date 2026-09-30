@@ -17,3 +17,14 @@ export function useIsOffline(): boolean {
 
   return isOffline
 }
+
+// A forced recheck, for when the device's own connectivity state is stale —
+// NetInfo.refresh() re-evaluates immediately and fires the same listener
+// useIsOffline subscribes to, so a caller doesn't need this function's return
+// value at all, only the side effect of it settling before its own reload.
+// Exposed for the offline banner's manual retry and every screen's
+// pull-to-refresh, which both want "actually recheck now," not just "wait
+// for the next passive network-change event."
+export function recheckConnectivity(): Promise<NetInfoState> {
+  return NetInfo.refresh()
+}

@@ -194,6 +194,36 @@ def test_update_day_sea_create_then_update_then_remove(itinerary_with_days):
     assert db.session.query(Sea).filter_by(day_id=uuid.UUID(target)).first() is None
 
 
+# ── create_day / delete_day bump route_version ──────────────────────────────
+# M34: day creation/deletion happen through these ordinary endpoints, outside
+# the route-push optimistic-concurrency channel (RouteSyncService._apply_replace
+# deliberately never creates/deletes days). Without a version bump here, a
+# concurrent route push based on a route_version predating the day change could
+# still succeed, silently unaware the day it's about to reference (or a day it
+# omits) just appeared or vanished server-side.
+
+def test_create_day_bumps_route_version(itinerary_with_days):
+    itinerary_id = itinerary_with_days["itinerary_id"]
+    before = db.session.get(Itinerary, uuid.UUID(itinerary_id)).route_version
+
+    new_day = Day(day_number=2, itinerary_id=uuid.UUID(itinerary_id))
+    DayService.create_day(new_day)
+
+    after = db.session.get(Itinerary, uuid.UUID(itinerary_id)).route_version
+    assert after == before + 1
+
+
+def test_delete_day_bumps_route_version(itinerary_with_days):
+    itinerary_id = itinerary_with_days["itinerary_id"]
+    target = itinerary_with_days["target_day_id"]
+    before = db.session.get(Itinerary, uuid.UUID(itinerary_id)).route_version
+
+    DayService.delete_day(target)
+
+    after = db.session.get(Itinerary, uuid.UUID(itinerary_id)).route_version
+    assert after == before + 1
+
+
 # ── delete_day ────────────────────────────────────────────────────────────────
 
 def test_delete_day_not_found_raises(client, auth_headers):

@@ -5,16 +5,12 @@
 // The route is one ordered list of points across the whole trip — its order keys,
 // the column the device holds instead of next_id (sync-protocol-spec.md §7.2) —
 // with each point belonging to a day. A day's boundaries are derived from that,
-// never edited directly, after every change:
-//
-//   - a day starts at its own first point;
-//   - it ends where the next day starts — the shared overnight stop, which belongs
-//     to the arriving day (lib/itinerary/day-route.ts explains why) — or, for the
-//     last day, at its own last point.
-//
-// That is the shape the web builder produces, so an edited route pushed from the
-// phone reads the same on the web. Day 0, the staging area for unassigned points
-// (numbered-days.ts), never has boundaries.
+// never edited directly, via `deriveDayBoundaries` (M34: shared with web's
+// `@shared/itinerary/day-boundaries`, the one source of truth for what a day
+// boundary is). That is the shape the web builder produces, so an edited route
+// pushed from the phone reads the same on the web.
+
+import { deriveDayBoundaries } from "@shared/itinerary/day-boundaries"
 
 export type EditableDay = {
   id: string
@@ -39,7 +35,7 @@ export type EditableRoute = { days: EditableDay[]; points: EditablePoint[] }
 
 export type NewPoint = Omit<EditablePoint, "dayId" | "orderKey">
 
-export type PointFields = Partial<Pick<EditablePoint, "name" | "notes" | "type">>
+export type PointFields = Partial<Pick<EditablePoint, "name" | "notes" | "type" | "latitude" | "longitude">>
 
 // The server's own spacing (backend Services/Utils/point_ordering.py
 // assign_order_keys): zero-padded so string order is numeric order.
@@ -62,27 +58,10 @@ function rekey(inOrder: EditablePoint[]): EditablePoint[] {
 }
 
 function withBoundaries(days: EditableDay[], inOrder: EditablePoint[]): EditableDay[] {
-  const numbered = days.filter((day) => day.dayNumber > 0).sort((a, b) => a.dayNumber - b.dayNumber)
-  const firstOf = new Map<string, string>()
-  const lastOf = new Map<string, string>()
-  for (const point of inOrder) {
-    if (!firstOf.has(point.dayId)) firstOf.set(point.dayId, point.id)
-    lastOf.set(point.dayId, point.id)
-  }
-
-  const boundaries = new Map<string, Pick<EditableDay, "startPointId" | "endPointId">>()
-  numbered.forEach((day, index) => {
-    const nextDay = numbered[index + 1]
-    const nextStart = nextDay ? firstOf.get(nextDay.id) : undefined
-    boundaries.set(day.id, {
-      startPointId: firstOf.get(day.id) ?? null,
-      endPointId: nextStart ?? lastOf.get(day.id) ?? null,
-    })
-  })
-
+  const boundaries = deriveDayBoundaries(days, inOrder)
   return days.map((day) =>
     day.dayNumber > 0
-      ? { ...day, ...boundaries.get(day.id) }
+      ? { ...day, ...boundaries[day.id] }
       : { ...day, startPointId: null, endPointId: null },
   )
 }
@@ -143,6 +122,24 @@ function positionAfterEarlierDays(route: EditableRoute, inOrder: EditablePoint[]
   return index
 }
 
+/**
+ * The day a point inserted after `afterPointId` (or, when null, before the
+ * route's first point) belongs to — ported from web's M20 mid-route insertion
+ * (`handleLegClick`): the successor's day first, falling back to the
+ * predecessor's, falling back to Day 0. Mid-day the two already agree; this
+ * only matters right at a day boundary, where the boundary stop belongs to
+ * the day it *closes*, so a point inserted right after it belongs to the day
+ * it *opens*.
+ */
+export function insertionDayId(route: EditableRoute, afterPointId: string | null): string {
+  const inOrder = orderedPoints(route.points)
+  const index = afterPointId ? inOrder.findIndex((point) => point.id === afterPointId) : -1
+  const predecessor = index >= 0 ? inOrder[index] : null
+  const successor = afterPointId ? inOrder[index + 1] : inOrder[0]
+  const day0 = route.days.find((day) => day.dayNumber === 0)
+  return successor?.dayId ?? predecessor?.dayId ?? day0?.id ?? ""
+}
+
 /** Move a point to another day, after that day's own last point. */
 export function movePointToDay(route: EditableRoute, pointId: string, dayId: string): EditableRoute {
   const moving = route.points.find((point) => point.id === pointId)
@@ -178,6 +175,33 @@ export function nearestPointInDay(
     }
   }
   return nearest
+}
+
+/**
+ * Drag a point to a new position within its own day (M34 WP1/WP3, merged —
+ * moving a point to a *different* day is out of scope here, left for the
+ * future day-boundaries work). Repositions it only — it does NOT reorder it.
+ *
+ * An earlier version reordered by re-inserting the point next to whichever
+ * remaining point was nearest the drop location (`nearestPointInDay`). That
+ * heuristic is order-blind: on any route with real back-and-forth shape, the
+ * nearest point by straight-line distance isn't necessarily the point's
+ * neighbour along the path, so a drag could re-insert it in the wrong place
+ * in the sequence and garble the drawn line into a non-linear path — found
+ * on-device. Route order (`orderKey`) is otherwise only ever re-derived by an
+ * actual insertion (`insertPoint`, and `deletePoint`/`movePointToDay`/
+ * `movePointWithinDay`, which are a delete+insert or a swap) — a drag isn't
+ * one, so it shouldn't touch order either. The legs drawn from a day's own
+ * points already follow that stored order (day-route.ts's `walkPoints`), so
+ * leaving it alone here is what keeps them linear through a drag.
+ */
+export function movePointByDrag(
+  route: EditableRoute,
+  pointId: string,
+  latitude: number,
+  longitude: number,
+): EditableRoute {
+  return editPoint(route, pointId, { latitude, longitude })
 }
 
 /** Swap a point with its neighbour in the same day: -1 earlier, 1 later. */
