@@ -224,7 +224,7 @@ describe("insertionDayId", () => {
 })
 
 describe("movePointByDrag", () => {
-  it("repositions and reorders a point dragged past its day's other points", () => {
+  it("repositions a point without reordering it, even dragged past its day's other points", () => {
     const route: EditableRoute = {
       days: [{ id: "d1", dayNumber: 1, date: null, startPointId: null, endPointId: null }],
       points: [
@@ -234,32 +234,15 @@ describe("movePointByDrag", () => {
       ],
     }
 
-    // Dragging "a" out past "c" repositions it there and reorders it to last,
-    // since "c" is now its nearest remaining neighbour.
+    // Dragging "a" out past "c" moves only its coordinates — order (and the
+    // legs drawn from it) stays "a", "b", "c". Reordering an existing point
+    // is out of scope for a drag; only an actual insertion re-derives order
+    // (see movePointByDrag's own comment for why).
     const edited = movePointByDrag(route, "a", 0, 2.1)
 
-    expect(orderedPoints(edited.points).map((p) => p.id)).toEqual(["b", "c", "a"])
+    expect(orderedPoints(edited.points).map((p) => p.id)).toEqual(["a", "b", "c"])
     const a = edited.points.find((p) => p.id === "a")!
     expect(a).toMatchObject({ latitude: 0, longitude: 2.1, dayId: "d1" })
-  })
-
-  it("moves a point earlier when dragged near the front of its day", () => {
-    const route: EditableRoute = {
-      days: [{ id: "d1", dayNumber: 1, date: null, startPointId: null, endPointId: null }],
-      points: [
-        { id: "a", dayId: "d1", orderKey: "00001000", latitude: 0, longitude: 0, name: "a", notes: null, type: "stop" },
-        { id: "b", dayId: "d1", orderKey: "00002000", latitude: 0, longitude: 1, name: "b", notes: null, type: "stop" },
-        { id: "c", dayId: "d1", orderKey: "00003000", latitude: 0, longitude: 2, name: "c", notes: null, type: "stop" },
-      ],
-    }
-
-    // "c" dragged right next to "a" always lands AFTER its nearest remaining
-    // neighbour, regardless of which side it approached from — no before/after
-    // directionality, matching the plan's own scope (nearestPointInDay's
-    // distance alone, nothing fancier).
-    const edited = movePointByDrag(route, "c", 0, 0.1)
-
-    expect(orderedPoints(edited.points).map((p) => p.id)).toEqual(["a", "c", "b"])
   })
 
   it("leaves the day unchanged — moving a point to a different day is out of scope here", () => {

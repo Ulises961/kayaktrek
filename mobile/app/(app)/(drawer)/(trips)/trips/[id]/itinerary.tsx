@@ -3,7 +3,6 @@ import {
   type CameraRef,
   GeoJSONSource,
   Layer,
-  LocationManager,
   Map as MapLibreMap,
   type MapRef,
   type PixelPointBounds,
@@ -17,7 +16,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import { MapPinPlus, TriangleAlert } from "lucide-react-native";
+import { TriangleAlert } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,8 +34,8 @@ import { lightTokens, palette } from "@shared/tokens";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
+import { UndoSnackbar } from "@mobile/components/trips/undo-snackbar";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
-import { Button } from "@mobile/components/ui/button";
 import { Screen } from "@mobile/components/ui/layout";
 import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
@@ -47,8 +46,14 @@ import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
 import { distanceToPredecessorNm } from "@mobile/lib/itinerary/draft-point";
+import { withLiveImages } from "@mobile/lib/itinerary/live-images";
 import { numberedDays } from "@mobile/lib/itinerary/numbered-days";
-import { insertionDayId, insertPoint, movePointByDrag } from "@mobile/lib/itinerary/route-edits";
+import {
+  deletePoint,
+  insertionDayId,
+  insertPoint,
+  movePointByDrag,
+} from "@mobile/lib/itinerary/route-edits";
 import { boundsOf } from "@mobile/lib/map/bounds";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
@@ -95,9 +100,55 @@ export default function TripMapScreen() {
   const [inConflict, setInConflict] = useState(false);
   const [draftPoint, setDraftPoint] = useState<DraftPoint | null>(null);
   const [addingPoint, setAddingPoint] = useState(false);
+  // M34 WP6 fix: the draft tooltip's Add/Undo buttons stopped being tappable
+  // once they were map-annotation children (both as ViewAnnotation and as
+  // Marker) — found on-device, and traced to the library's own Android
+  // click handling (MLRNMapView.onMapClick): a tap is resolved by the map's
+  // OWN click gesture detector, which hit-tests against each Marker's
+  // bounding box and fires that ONE marker's onPress — nested Pressables
+  // inside it never get a real touch event through this path. The fix is
+  // the same one ZoomControl already uses: a plain RN
+  // overlay `View`, not a map annotation, positioned over the map via
+  // `mapRef.project()` (lngLat -> screen pixel) instead of MapLibre's own
+  // annotation placement. `draftScreenPoint` is that projected position,
+  // recomputed whenever the draft point changes or the map moves (handled
+  // in handleMapPress/handleRegionChange); `tooltipSize` is the tooltip's
+  // own measured size, needed to center it above the point rather than
+  // anchoring at its top-left corner.
+  const [draftScreenPoint, setDraftScreenPoint] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [tooltipSize, setTooltipSize] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+  // M34 WP6 fix: while a point is being dragged, its adjacent legs still draw
+  // from the pre-drag `days` state (only `reload()` after drag-end brings them
+  // current) — without this, they'd visibly lag behind the marker mid-drag.
+  // `draggingPointId` marks which point's legs need the live override below;
+  // `dragPreview` is that live position, updated on every `onDrag` tick
+  // (ViewAnnotation's `onDrag`, not just `onDragStart`/`onDragEnd`, fires
+  // continuously with the current `lngLat` — confirmed against the installed
+  // `@maplibre/maplibre-react-native` types). A brief position mismatch
+  // (dragging disappearing/reappearing, or turning dashed) reads worse than
+  // just tracking it, and only the affected leg endpoints need recomputing
+  // per tick, not the whole route.
+  const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ latitude: number; longitude: number } | null>(
+    null,
+  );
+  // M34: where the most recently dragged point was before the drag, so a pan
+  // that caught a marker can be taken back (UndoSnackbar). Only the latest
+  // move is kept — a newer drag replaces it, and the snackbar's own timer or
+  // a delete clears it.
+  const [lastMove, setLastMove] = useState<{
+    pointId: string;
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const cameraRef = useRef<CameraRef>(null);
   const mapRef = useRef<MapRef>(null);
   const router = useRouter();
+  const dismissLastMove = useCallback(() => setLastMove(null), []);
 
   // Named and stable so a refresh action (the WP5 weather/sea "refresh"
   // button, threaded in as ItinerarySheet's onRefresh) can re-run the same
@@ -113,11 +164,12 @@ export default function TripMapScreen() {
       // copy doesn't have the edits, and hiding them would look like they'd vanished.
       const sync = await loadRouteSyncState(id);
       setInConflict(!!sync?.inConflict);
-      const days = numberedDays(
+      const liveDays = t.itinerary?.days ?? [];
+      const rawDays =
         sync?.hasLocalChanges || sync?.inConflict
           ? (await loadOfflineTrip(id)).days
-          : (t.itinerary?.days ?? []),
-      );
+          : liveDays;
+      const days = numberedDays(withLiveImages(rawDays, liveDays));
       setTrip({
         destination: t.destination ?? null,
         days,
@@ -179,48 +231,49 @@ export default function TripMapScreen() {
     };
   }, [id]);
 
-  // M9d WP3: leader-only route editing, on the phone, signal or not.
-  function handleEditPoint(pointId: string) {
-    router.push(`/trips/${id}/point/${pointId}`);
-  }
+  const days: Day[] = useMemo(() => trip?.days ?? [], [trip]);
 
-  function openNewPoint(latitude: number, longitude: number) {
+  // Images ride along as a JSON route param instead of the edit screen
+  // fetching them itself — an independent fetch there previously swallowed
+  // any failure to "no photos," indistinguishable from the point having none.
+  function handleEditPoint(pointId: string) {
+    const point = days.flatMap((day) => day.points ?? []).find((p) => p.id === pointId);
+    const images = (point?.images ?? []).map((image) => ({
+      id: image.id ?? null,
+      location: image.location,
+      caption: image.caption ?? null,
+    }));
     router.push({
-      pathname: "/trips/[id]/point/new",
-      params: {
-        id,
-        dayId: selectedDayId ?? "",
-        latitude: String(latitude),
-        longitude: String(longitude),
-      },
+      pathname: "/trips/[id]/point/[pointId]",
+      params: { id, pointId, images: JSON.stringify(images) },
     });
   }
 
-  // "Add stop here": the emergency stop, at the phone's own position. MapLibre's
-  // location manager needs no module of its own, and foreground permission is
-  // enough — this is one reading, not tracking. Unaffected by M34 WP4's tap-to-place
-  // flow below, which replaces long-press-to-add, not this.
-  async function handleAddStopHere() {
-    const granted = await LocationManager.requestPermissions();
-    if (!granted) {
-      Alert.alert(
-        "Location is off",
-        "Allow location access to add a stop where you are, or tap the map instead.",
-      );
-      return;
-    }
-    const position = await LocationManager.getCurrentPosition();
-    if (!position) {
-      Alert.alert(
-        "No position yet",
-        "The phone hasn't found where it is. Try again in a moment, or tap the map.",
-      );
-      return;
-    }
-    openNewPoint(position.coords.latitude, position.coords.longitude);
+  function confirmDeletePoint(pointId: string) {
+    Alert.alert("Delete this point?", "It is removed from the route for everyone once sent.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => void handleDeletePoint(pointId),
+      },
+    ]);
   }
 
-  const days: Day[] = useMemo(() => trip?.days ?? [], [trip]);
+  async function handleDeletePoint(pointId: string) {
+    try {
+      await editRoute(id, (route) => deletePoint(route, pointId));
+      setSelectedPointId(null);
+      setLastMove((move) => (move?.pointId === pointId ? null : move));
+      await reload();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't delete point",
+        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      );
+    }
+  }
+
   const selectedDay = days.find((d) => d.id === selectedDayId) ?? null;
 
   // Select-or-toggle now lives here rather than inside ItinerarySheet — DayRail
@@ -256,27 +309,65 @@ export default function TripMapScreen() {
     setSheetExpanded(true);
   }
 
-  // M34 WP1/WP3 (merged): dragging a marker repositions the point and reorders
-  // it within its own day to match its new geographic neighbours, through the
+  // M34 WP1/WP3 (merged): dragging a marker repositions the point through the
   // same editRoute path the point-edit form already uses (lib/db/route-edit.ts)
-  // — no new persistence code, only a new gesture entry into it. Moving a point
-  // to a *different* day is out of scope for this drag (left for the future
+  // — no new persistence code, only a new gesture entry into it. It does NOT
+  // reorder the point — an earlier version re-inserted it next to whichever
+  // point was nearest the drop location, which is order-blind and could
+  // garble the route into a non-linear path on anything but a straight line
+  // (found on-device); see movePointByDrag's own comment. Moving a point to a
+  // *different* day is out of scope for this drag too (left for the future
   // day-boundaries work) — the day-picker on the point-edit form is still the
-  // only way to do that. A drag also fires the map's own onPress underneath it
-  // (the same double-recognizer behaviour handlePointPress works around above),
-  // so it reuses that guard too.
-  async function handlePointDragEnd(pointId: string, event: { nativeEvent: ViewAnnotationEvent }) {
+  // only way to do either. A drag also fires the map's own onPress underneath
+  // it (the same double-recognizer behaviour handlePointPress works around
+  // above), so it reuses that guard too.
+  // `before` is the marker's own pre-drag position, handed in by the caller
+  // rather than looked up in routePoints (declared further down — reading it
+  // from here makes the React Compiler skip this component).
+  async function handlePointDragEnd(
+    pointId: string,
+    event: { nativeEvent: ViewAnnotationEvent },
+    before: { latitude: number; longitude: number },
+  ) {
     suppressNextMapPress.current = true;
     const [longitude, latitude] = event.nativeEvent.lngLat;
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+      setLastMove({ pointId, latitude: before.latitude, longitude: before.longitude });
     } catch (err) {
       Alert.alert(
         "Couldn't move point",
         err instanceof Error ? err.message : "Something went wrong. Please try again.",
       );
     } finally {
+      // Reload before clearing the live-preview override, so the real legs
+      // take over already at the dragged-to position rather than flashing at
+      // the stale one first.
       await reload();
+      setDraggingPointId(null);
+      setDragPreview(null);
+      // The summary sheet expands here, once the drag has actually finished,
+      // not at drag-start (see onDragStart below) — expanding it mid-drag was
+      // handing its own pan gesture a live claim on the same touch stream the
+      // marker drag was still using.
+      setSheetExpanded(true);
+    }
+  }
+
+  // Restores the pre-drag position through the same editRoute path the drag
+  // itself used. Cleared first so a double tap can't undo twice.
+  async function handleUndoMove() {
+    if (!lastMove) return;
+    const { pointId, latitude, longitude } = lastMove;
+    setLastMove(null);
+    try {
+      await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+      await reload();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't undo the move",
+        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      );
     }
   }
 
@@ -290,10 +381,37 @@ export default function TripMapScreen() {
     [days],
   );
 
-  const routeGeoJson = useMemo(
-    () => ({ type: "FeatureCollection" as const, features: routeLegs }),
-    [routeLegs],
-  );
+  // M34 WP6 fix: while dragging, redraw the leg(s) touching the dragged point
+  // at its live position — legs are index-aligned with routePoints (legs[i]
+  // joins points[i]/points[i+1]), so the dragged point at index `i` touches
+  // legs[i-1] (incoming, where it's the second coordinate) and legs[i]
+  // (outgoing, where it's the first).
+  const draggingIndex = draggingPointId
+    ? routePoints.findIndex((p) => p.id === draggingPointId)
+    : -1;
+
+  const routeGeoJson = useMemo(() => {
+    if (draggingIndex === -1 || !dragPreview) {
+      return { type: "FeatureCollection" as const, features: routeLegs };
+    }
+    const liveCoord: [number, number] = [dragPreview.longitude, dragPreview.latitude];
+    const features = routeLegs.map((leg, i) => {
+      if (i === draggingIndex - 1) {
+        return {
+          ...leg,
+          geometry: { ...leg.geometry, coordinates: [leg.geometry.coordinates[0], liveCoord] },
+        };
+      }
+      if (i === draggingIndex) {
+        return {
+          ...leg,
+          geometry: { ...leg.geometry, coordinates: [liveCoord, leg.geometry.coordinates[1]] },
+        };
+      }
+      return leg;
+    });
+    return { type: "FeatureCollection" as const, features };
+  }, [routeLegs, draggingIndex, dragPreview]);
 
   const bounds = useMemo(() => boundsOf(routePoints), [routePoints]);
 
@@ -302,8 +420,10 @@ export default function TripMapScreen() {
   // placement outright (long-press competes with panning the map; a tap
   // doesn't, since MapLibre resolves it to a pan instead the moment the finger
   // moves). Ported from web's builder: distance/time preview, Undo/Confirm,
-  // then the same point-edit screen every other point uses — not a separate
-  // compact form. "Add stop here" (GPS-position add) is untouched.
+  // then selection into the point summary sheet, same as every other point —
+  // not a separate compact form. This is now the only way to add a point on
+  // mobile; the separate GPS-position "Add stop here" button was retired once
+  // this covered its case too (tap the map at your own dot, same result).
   async function handleMapPress(event: NativeSyntheticEvent<PressEvent>) {
     if (suppressNextMapPress.current) {
       suppressNextMapPress.current = false;
@@ -315,6 +435,8 @@ export default function TripMapScreen() {
     }
     if (draftPoint) {
       setDraftPoint(null);
+      setDraftScreenPoint(null);
+      setTooltipSize(null);
       return;
     }
     if (!isLeader) return;
@@ -342,23 +464,33 @@ export default function TripMapScreen() {
     }
 
     setDraftPoint({ latitude, longitude, afterPointId });
+    // The tap's own screen point is already exactly the projection of
+    // (latitude, longitude) — no need for a round-trip through mapRef.project()
+    // just to place the tooltip where the finger already is.
+    setDraftScreenPoint({ x: point[0], y: point[1] });
+    setTooltipSize(null);
   }
 
-  // Any tap landing on the draft tooltip — button or not — must not fall
-  // through to handleMapPress underneath it (the same paired-recognizer
-  // behaviour handlePointPress works around above).
-  function handleDraftTooltipPress() {
-    suppressNextMapPress.current = true;
+  // Keeps the overlay tooltip tracking the draft point's geographic position
+  // as the map is panned/zoomed — its screen position changes even though
+  // the underlying lngLat doesn't.
+  function handleRegionChange(event: { nativeEvent: { zoom: number } }) {
+    setZoom(event.nativeEvent.zoom);
+    if (!draftPoint) return;
+    void mapRef.current
+      ?.project([draftPoint.longitude, draftPoint.latitude])
+      .then(([x, y]) => setDraftScreenPoint({ x, y }))
+      .catch(() => undefined);
   }
 
   function handleUndoDraft() {
-    suppressNextMapPress.current = true;
     setDraftPoint(null);
+    setDraftScreenPoint(null);
+    setTooltipSize(null);
   }
 
   async function handleConfirmDraft() {
     if (!draftPoint) return;
-    suppressNextMapPress.current = true;
     setAddingPoint(true);
     const newPointId = uuidv7();
     try {
@@ -376,8 +508,15 @@ export default function TripMapScreen() {
       // Best effort: offline it fails and the sweep pushes later.
       void pushRouteChanges(id).catch(() => undefined);
       setDraftPoint(null);
+      setDraftScreenPoint(null);
+      setTooltipSize(null);
       await reload();
-      router.push(`/trips/${id}/point/${newPointId}`);
+      // Select the new point and let the summary sheet show it — no forced
+      // trip to a form. Name and type are set right there in the sheet
+      // (PointSummaryCard); a point created with neither is a normal, valid
+      // state, not one that demands immediate editing.
+      setSelectedPointId(newPointId);
+      setSheetExpanded(true);
     } catch (err) {
       Alert.alert(
         "Couldn't add point",
@@ -454,7 +593,7 @@ export default function TripMapScreen() {
             ref={mapRef}
             mapStyle={MAP_STYLE}
             style={{ flex: 1 }}
-            onRegionDidChange={(event) => setZoom(event.nativeEvent.zoom)}
+            onRegionDidChange={handleRegionChange}
             onPress={(event) => void handleMapPress(event)}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
             // compositing layer outside RN's normal view z-order — this is what caused the
@@ -497,8 +636,21 @@ export default function TripMapScreen() {
                 // here" — a crew member reads the route, only the leader edits it.
                 draggable={isLeader}
                 onPress={() => point.id && handlePointPress(point.id)}
-                onDragStart={() => point.id && handlePointPress(point.id)}
-                onDragEnd={(event) => point.id && void handlePointDragEnd(point.id, event)}
+                // Selects the point but deliberately does NOT expand the sheet
+                // (unlike handlePointPress) — see handlePointDragEnd's own note.
+                onDragStart={(event) => {
+                  if (!point.id) return;
+                  suppressNextMapPress.current = true;
+                  setSelectedPointId(point.id);
+                  setDraggingPointId(point.id);
+                  const [longitude, latitude] = event.nativeEvent.lngLat;
+                  setDragPreview({ latitude, longitude });
+                }}
+                onDrag={(event) => {
+                  const [longitude, latitude] = event.nativeEvent.lngLat;
+                  setDragPreview({ latitude, longitude });
+                }}
+                onDragEnd={(event) => point.id && void handlePointDragEnd(point.id, event, point)}
               >
                 {/* MapLibre's native marker view sizes its tap area to exactly its
                   children's rendered bounds — no padding/hit-slop of its own (confirmed
@@ -536,10 +688,60 @@ export default function TripMapScreen() {
             ))}
 
             {draftPoint && (
+              // Non-interactive — just marks where the point would land. No
+              // onPress: the Undo/Confirm controls live in the plain overlay
+              // below now, not on this annotation (see that overlay's own
+              // comment for why they moved out of the map layer entirely).
               <ViewAnnotation
                 id="draft-point"
                 lngLat={[draftPoint.longitude, draftPoint.latitude]}
-                onPress={handleDraftTooltipPress}
+              >
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 2,
+                    borderStyle: "dashed",
+                    borderColor: lightTokens.cta,
+                  }}
+                />
+              </ViewAnnotation>
+            )}
+          </MapLibreMap>
+
+          {draftPoint && draftScreenPoint && (
+            // A plain RN overlay, not a map annotation — see draftScreenPoint's
+            // own comment (state declarations, above) for why: MapLibre's
+            // Android click handling resolves a tap by hit-testing map
+            // annotations and firing that ONE annotation's own onPress, so a
+            // Pressable nested inside one never got a real touch event
+            // through it (confirmed on both ViewAnnotation and Marker,
+            // on-device). Positioned by projecting the draft point's lngLat
+            // to a screen pixel instead, exactly like ZoomControl and "Add
+            // stop here" already are.
+            <View
+              pointerEvents="box-none"
+              style={{ position: "absolute", left: draftScreenPoint.x, top: draftScreenPoint.y }}
+            >
+              <View
+                onLayout={(event) =>
+                  setTooltipSize({
+                    width: event.nativeEvent.layout.width,
+                    height: event.nativeEvent.layout.height,
+                  })
+                }
+                style={{
+                  position: "absolute",
+                  // Centered above the point: -50% of its own width, and its
+                  // own height plus a small gap above the point's dashed ring.
+                  left: tooltipSize ? -tooltipSize.width / 2 : 0,
+                  top: tooltipSize ? -tooltipSize.height - 16 : -16,
+                  // Invisible until measured once — an unmeasured tooltip
+                  // would otherwise flash at the wrong (top-left-anchored)
+                  // position for one frame.
+                  opacity: tooltipSize ? 1 : 0,
+                }}
               >
                 <AddPointTooltip
                   distanceNm={distanceToPredecessorNm(
@@ -553,24 +755,27 @@ export default function TripMapScreen() {
                   onUndo={handleUndoDraft}
                   onConfirm={() => void handleConfirmDraft()}
                 />
-              </ViewAnnotation>
-            )}
-          </MapLibreMap>
-
-          <ZoomControl cameraRef={cameraRef} zoom={zoom} />
-
-          {isLeader && (
-            <View className="absolute left-3 top-3">
-              <Button
-                size="sm"
-                onPress={() => void handleAddStopHere()}
-                testID="add-stop-here"
-                icon={<MapPinPlus size={14} color={lightTokens.primaryForeground} />}
-              >
-                Add stop here
-              </Button>
+              </View>
             </View>
           )}
+
+          {/* Top of the map, not the bottom: ItinerarySheet docks over the bottom
+            edge. Hidden while a draft point is pending so the two "Undo"s never
+            compete — confirming or discarding the draft comes first. */}
+          {lastMove && !draftPoint && (
+            <View
+              pointerEvents="box-none"
+              style={{ position: "absolute", top: 16, left: 16, right: 16 }}
+            >
+              <UndoSnackbar
+                message="Point moved"
+                onUndo={() => void handleUndoMove()}
+                onDismiss={dismissLastMove}
+              />
+            </View>
+          )}
+
+          <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
           <ItinerarySheet
             selectedDay={selectedDay}
@@ -579,9 +784,15 @@ export default function TripMapScreen() {
             avgSpeedKnots={trip.avgSpeedKnots}
             onClosePoint={() => setSelectedPointId(null)}
             onEditPoint={isLeader ? handleEditPoint : undefined}
+            onDeletePoint={isLeader ? confirmDeletePoint : undefined}
+            onViewPoint={handleEditPoint}
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}
             onRefreshWeather={reload}
+            // A marker drag is still claiming the touch stream at this point
+            // (draggingPointId only clears in handlePointDragEnd's finally) —
+            // gorhom's own pan gesture must not compete for it.
+            panGestureDisabled={draggingPointId !== null}
           />
         </View>
       </View>

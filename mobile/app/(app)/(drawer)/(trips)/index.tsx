@@ -13,6 +13,7 @@ import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness"
 import { type TripCardData, loadTripListCache, saveTripListCache, toTripCardData } from "@mobile/lib/db/trip-list-cache"
+import { recheckConnectivity } from "@mobile/lib/network/use-is-offline"
 import { groupTrips } from "@mobile/lib/trips/group-trips"
 import { getTrips } from "@mobile/lib/trips/actions"
 
@@ -42,7 +43,14 @@ export default function TripListScreen() {
   const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setIsRefreshing(true)
+    if (isRefresh) {
+      setIsRefreshing(true)
+      // A pull-to-refresh means "check again, properly" — NetInfo's own passive
+      // state can lag a real reconnect (captive portals, flaky wifi that never
+      // fully drops), so force it to re-evaluate before trusting the fetch
+      // that follows.
+      await recheckConnectivity()
+    }
     try {
       const page = await getTrips()
       const cardData = page.items.map(toTripCardData)

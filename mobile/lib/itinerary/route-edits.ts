@@ -180,9 +180,20 @@ export function nearestPointInDay(
 /**
  * Drag a point to a new position within its own day (M34 WP1/WP3, merged —
  * moving a point to a *different* day is out of scope here, left for the
- * future day-boundaries work). Repositions it, then reorders it to match its
- * new geographic neighbours — the earlier/later buttons this replaces only
- * ever moved a point one step at a time.
+ * future day-boundaries work). Repositions it only — it does NOT reorder it.
+ *
+ * An earlier version reordered by re-inserting the point next to whichever
+ * remaining point was nearest the drop location (`nearestPointInDay`). That
+ * heuristic is order-blind: on any route with real back-and-forth shape, the
+ * nearest point by straight-line distance isn't necessarily the point's
+ * neighbour along the path, so a drag could re-insert it in the wrong place
+ * in the sequence and garble the drawn line into a non-linear path — found
+ * on-device. Route order (`orderKey`) is otherwise only ever re-derived by an
+ * actual insertion (`insertPoint`, and `deletePoint`/`movePointToDay`/
+ * `movePointWithinDay`, which are a delete+insert or a swap) — a drag isn't
+ * one, so it shouldn't touch order either. The legs drawn from a day's own
+ * points already follow that stored order (day-route.ts's `walkPoints`), so
+ * leaving it alone here is what keeps them linear through a drag.
  */
 export function movePointByDrag(
   route: EditableRoute,
@@ -190,19 +201,7 @@ export function movePointByDrag(
   latitude: number,
   longitude: number,
 ): EditableRoute {
-  const moving = route.points.find((point) => point.id === pointId)
-  if (!moving) return route
-
-  const withoutMoving = deletePoint(route, pointId)
-  const afterPointId = nearestPointInDay(withoutMoving, moving.dayId, latitude, longitude)
-  return insertPoint(withoutMoving, moving.dayId, afterPointId, {
-    id: moving.id,
-    latitude,
-    longitude,
-    name: moving.name,
-    notes: moving.notes,
-    type: moving.type,
-  })
+  return editPoint(route, pointId, { latitude, longitude })
 }
 
 /** Swap a point with its neighbour in the same day: -1 earlier, 1 later. */

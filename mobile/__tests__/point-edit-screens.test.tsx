@@ -1,10 +1,8 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
-import { Alert } from "react-native"
 
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 import EditPointScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/point/[pointId]"
-import NewPointScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/point/new"
 import { editRoute, loadEditableRoute, pushRouteChanges } from "../lib/db/route-edit"
 import { isTripLeader } from "../lib/db/trip-role"
 import type { EditableRoute } from "../lib/itinerary/route-edits"
@@ -85,16 +83,6 @@ describe("EditPointScreen", () => {
     expect(mockBack).toHaveBeenCalled()
   })
 
-  it("moves the point to another day", async () => {
-    const { findByTestId, getByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
-
-    await fireEvent.press(await findByTestId("point-day-2"))
-    await fireEvent.press(getByTestId("point-submit"))
-
-    await waitFor(() => expect(mockEditRoute).toHaveBeenCalled())
-    expect(editedRoute().points.find((p) => p.id === "b")!.dayId).toBe("d2")
-  })
-
   it("tries to push the change straight away", async () => {
     const { findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
 
@@ -114,61 +102,73 @@ describe("EditPointScreen", () => {
     expect(queryByText(/Could not reach/)).toBeNull()
   })
 
-  it("deletes the point after confirmation", async () => {
-    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {})
-    const { findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
-
-    await fireEvent.press(await findByTestId("point-delete"))
-    const buttons = alert.mock.calls.at(-1)?.[2] as { text: string; onPress?: () => Promise<void> }[]
-    await buttons.find((button) => button.text === "Delete")?.onPress?.()
-
-    expect(editedRoute().points.map((p) => p.id)).toEqual(["a", "c", "d"])
-  })
-
-  it("moves the point later within its day", async () => {
-    mockParams = { id: "trip-1", pointId: "a" }
-    const { findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
-
-    await fireEvent.press(await findByTestId("point-move-later"))
-
-    await waitFor(() => expect(mockEditRoute).toHaveBeenCalled())
-    const order = [...editedRoute().points]
-      .sort((x, y) => (x.orderKey ?? "").localeCompare(y.orderKey ?? ""))
-      .map((p) => p.id)
-    expect(order).toEqual(["b", "a", "c", "d"])
-  })
-
-  it("offers no editing to crew", async () => {
+  // M34 (revised): crew get the same screen now, read-only — mirroring web's
+  // PointDetailModal `canEdit` split — rather than being turned away entirely.
+  it("shows crew a read-only view instead of the edit form", async () => {
     mockIsLeader.mockResolvedValue(false)
     const { findByText, queryByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
 
-    expect(await findByText("Only the trip leader can change the route.")).toBeTruthy()
+    expect(await findByText("position")).toBeTruthy()
     expect(queryByTestId("point-submit")).toBeNull()
-  })
-})
-
-describe("NewPointScreen", () => {
-  beforeEach(() => {
-    mockParams = { id: "trip-1", dayId: "d1", latitude: "42.11", longitude: "3.11" }
+    expect(queryByTestId("point-name")).toBeNull()
   })
 
-  // The emergency stop: added where the paddler is, into the chosen day, after the
-  // day's stop nearest to it.
-  it("adds a stop at the given position, after the day's nearest stop", async () => {
-    const { findByTestId, getByTestId } = await render(<NewPointScreen />, { wrapper: WithCachedSurfaces })
+  it("shows a point's notes to crew, read-only", async () => {
+    mockIsLeader.mockResolvedValue(false)
+    mockParams = { id: "trip-1", pointId: "a" }
+    mockLoadRoute.mockResolvedValue({
+      ...route(),
+      points: route().points.map((p) =>
+        p.id === "a" ? { ...p, notes: "Swell wraps round" } : p,
+      ),
+    })
+    const { findByText } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
 
-    await fireEvent.changeText(await findByTestId("point-name"), "Sheltered beach")
-    await fireEvent.press(getByTestId("point-submit"))
+    expect(await findByText("Put-in")).toBeTruthy()
+    expect(await findByText("Swell wraps round")).toBeTruthy()
+  })
 
-    await waitFor(() => expect(mockEditRoute).toHaveBeenCalled())
-    const edited = editedRoute()
-    const order = [...edited.points]
-      .sort((x, y) => (x.orderKey ?? "").localeCompare(y.orderKey ?? ""))
-      .map((p) => p.name)
-    expect(order).toEqual(["Put-in", "Cape", "Sheltered beach", "Camp", "Take-out"])
-    const added = edited.points.find((p) => p.name === "Sheltered beach")!
-    expect(added).toMatchObject({ dayId: "d1", latitude: 42.11, longitude: 3.11, type: "stop" })
-    expect(added.id).toMatch(/^[0-9a-f-]{36}$/)
-    expect(mockBack).toHaveBeenCalled()
+  it("shows a placeholder when crew's point has no notes", async () => {
+    mockIsLeader.mockResolvedValue(false)
+    mockParams = { id: "trip-1", pointId: "a" }
+    const { findByText } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByText("Put-in")).toBeTruthy()
+    expect(await findByText("No notes for this point.")).toBeTruthy()
+  })
+
+  // M34: images aren't part of the offline-editable route (lib/itinerary/route-edits.ts's
+  // EditablePoint has no images field) — itinerary.tsx's handleEditPoint hands them
+  // over as a JSON route param instead of this screen fetching them itself.
+  it("shows the photos handed over via the route param", async () => {
+    mockParams = {
+      id: "trip-1",
+      pointId: "b",
+      images: JSON.stringify([
+        { id: "img-1", location: "https://example.com/a.jpg", caption: null },
+      ]),
+    }
+
+    const { findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByTestId("photo-thumbnail-0")).toBeTruthy()
+  })
+
+  it("shows no photos section for a point with none", async () => {
+    const { queryByTestId, findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+
+    await findByTestId("point-name")
+    expect(queryByTestId("photo-thumbnail-0")).toBeNull()
+  })
+
+  // The param is trusted data from our own itinerary.tsx, but a screen must not
+  // crash on it regardless — belt and suspenders against a malformed value.
+  it("degrades to no photos on an unparseable images param", async () => {
+    mockParams = { id: "trip-1", pointId: "b", images: "not json" }
+
+    const { queryByTestId, findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+
+    await findByTestId("point-name")
+    expect(queryByTestId("photo-thumbnail-0")).toBeNull()
   })
 })
