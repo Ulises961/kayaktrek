@@ -91,6 +91,22 @@ describe("advanceFrame", () => {
     expect(head.x - tail.x).toBeCloseTo(4, 3)
   })
 
+  it("lets a layer set its own trail limits, so swell can be short dashes where wind is long streaks", () => {
+    const length = (limits: { minTrailPixels?: number; maxTrailPixels?: number }) => {
+      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+      const [tail, head] = advanceFrame(particles, eastwardField(8), view, size, 1 / 60, {
+        pixelsPerSecondPerMetreSecond: 8,
+        ...limits,
+      })[0]
+      return head.x - tail.x
+    }
+
+    // 8 m/s would trail 8 * 8 * 0.35 = 22.4 px unconstrained.
+    expect(length({})).toBeCloseTo(22.4, 1)
+    expect(length({ maxTrailPixels: 10 })).toBeCloseTo(10, 3)
+    expect(length({ minTrailPixels: 30 })).toBeCloseTo(30, 3)
+  })
+
   it("draws no trail for a particle that is not moving, rather than guessing a direction", () => {
     const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
 

@@ -2,6 +2,7 @@ import { act, render } from "@testing-library/react-native";
 import type { RefObject } from "react";
 
 import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
+import { discOnScreen } from "@mobile/lib/weather/forecast-cell";
 import type { VelocityField } from "@mobile/lib/weather/velocity";
 
 import { VelocityOverlay } from "../velocity-overlay";
@@ -17,6 +18,12 @@ jest.mock("@shopify/react-native-skia", () => ({
     return createElement("View", { testID: "velocity-canvas", ...props });
   },
   Points: () => null,
+  // The dashed ring, recorded as a host element so a test can tell whether it was drawn.
+  Circle: (props: object) => {
+    const { createElement } = jest.requireActual("react");
+    return createElement("View", { testID: "forecast-ring", ...props });
+  },
+  DashPathEffect: () => null,
 }));
 
 // Reanimated loads a native worklets module jest has no binding for. Only
@@ -156,7 +163,89 @@ describe("VelocityOverlay", () => {
     ref.current = { ...flatView, pitch: 30 };
     await nextFrame();
 
-    expect(mockSetPoints).toHaveBeenLastCalledWith([]);
+    // The trails are cleared (the ring is cleared too, which is why this is not the last call).
+    expect(mockSetPoints).toHaveBeenCalledWith([]);
+  });
+
+  // The forecast cell: the field is shown inside a disc, and a dashed ring marks where the
+  // forecast stops (web's ForecastCellShell). The disc is centred on [latitude, longitude].
+  describe("forecast area ring", () => {
+    const disc = { center: [54.1, -4.5] as [number, number], radiusKm: 30 };
+
+    it("is drawn when a disc is given and this layer owns the ring", async () => {
+      controlFrames();
+      const { getByTestId } = await render(
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef(flatView)}
+          size={size}
+          color="rgb(40, 170, 180)"
+          disc={disc}
+          drawRing
+        />,
+      );
+
+      expect(getByTestId("forecast-ring")).toBeTruthy();
+    });
+
+    it("is left to the other layer when both wind and swell are on", async () => {
+      controlFrames();
+      const { queryByTestId } = await render(
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef(flatView)}
+          size={size}
+          color="rgb(40, 170, 180)"
+          disc={disc}
+          drawRing={false}
+        />,
+      );
+
+      expect(queryByTestId("forecast-ring")).toBeNull();
+    });
+
+    it("follows the map: centred where the disc is, as wide as the distance it stands for", async () => {
+      const nextFrame = controlFrames();
+      await render(
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef(flatView)}
+          size={size}
+          color="rgb(40, 170, 180)"
+          disc={disc}
+          drawRing
+        />,
+      );
+
+      await nextFrame();
+      await nextFrame();
+
+      const expected = discOnScreen(flatView, size, disc.center, disc.radiusKm);
+      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.x, 3));
+      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.y, 3));
+      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.radius, 3));
+    });
+
+    it("is hidden on a tilted map, where the flat projection would put it in the wrong place", async () => {
+      const nextFrame = controlFrames();
+      await render(
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef({ ...flatView, pitch: 30 })}
+          size={size}
+          color="rgb(40, 170, 180)"
+          disc={disc}
+          drawRing
+        />,
+      );
+
+      await nextFrame();
+      await nextFrame();
+
+      const expected = discOnScreen(flatView, size, disc.center, disc.radiusKm);
+      expect(mockSetPoints).not.toHaveBeenCalledWith(expect.closeTo(expected.radius, 3));
+      expect(mockSetPoints).toHaveBeenCalledWith(0);
+    });
   });
 
   it("stops drawing when it is unmounted", async () => {

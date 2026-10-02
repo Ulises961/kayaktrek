@@ -1,10 +1,13 @@
-import { Canvas, Points, type SkPoint } from "@shopify/react-native-skia"
+import { Canvas, Circle, DashPathEffect, Points, type SkPoint } from "@shopify/react-native-skia"
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react"
 import { StyleSheet } from "react-native"
 import { useSharedValue } from "react-native-reanimated"
 
+import { palette } from "@shared/tokens"
+
 import type { Particle } from "../../lib/weather/advection"
 import type { MapViewState } from "../../lib/map/project-lng-lat"
+import { discOnScreen } from "../../lib/weather/forecast-cell"
 import {
   advanceFrame,
   AREA_PADDING_PX,
@@ -29,12 +32,18 @@ import type { VelocityField } from "../../lib/weather/velocity"
 // the whole screen for each of them.
 //
 // Drawn only on a flat map: a tilted view's perspective is not modelled, so the trails
-// are cleared rather than drawn in the wrong place.
+// and ring are cleared rather than drawn in the wrong place.
 const MAX_PITCH_DEGREES = 1
 // Visual drift speed: a 1 m/s flow crosses this many screen pixels per second.
 const PIXELS_PER_SECOND_PER_METRE_SECOND = 8
 // A long frame (a stall, the app backgrounded) must not fling every particle across the map.
 const MAX_FRAME_SECONDS = 0.05
+
+// Web's contour ring (ForecastCellShell): chart ink, a thin dashed line, outline only.
+const RING_COLOR = palette.ocean700
+const RING_WIDTH = 1.25
+const RING_OPACITY = 0.5
+const RING_DASH: [number, number] = [2, 7]
 
 export function VelocityOverlay({
   field,
@@ -44,6 +53,9 @@ export function VelocityOverlay({
   // Web's planner values: wind 0.0016 with 2.5 px lines, swell 0.0014 with 3.5 px.
   particleMultiplier = 0.0016,
   strokeWidth = 2.5,
+  trail,
+  disc,
+  drawRing = false,
 }: {
   field: VelocityField
   /** The map's latest reported view; `current` is null until its first report. */
@@ -52,16 +64,30 @@ export function VelocityOverlay({
   color: string
   particleMultiplier?: number
   strokeWidth?: number
+  /** This layer's own trail look: wind is long streaks, swell short dashes. */
+  trail?: { seconds?: number; minPixels?: number; maxPixels?: number }
+  /** The forecast area, as web draws it: [latitude, longitude] and a radius. */
+  disc?: { center: [number, number]; radiusKm: number }
+  /** Only one layer draws the ring when wind and swell are both on. */
+  drawRing?: boolean
 }) {
   const lines = useSharedValue<SkPoint[]>([])
+  const ringX = useSharedValue(0)
+  const ringY = useSharedValue(0)
+  // A radius of 0 is "not drawn".
+  const ringRadius = useSharedValue(0)
   const sizeRef = useRef(size)
   const hasSize = size.width > 0 && size.height > 0
+  const showRing = drawRing && disc !== undefined
   // Sized to the area particles live in (the screen plus its margin), so the density on
   // the screen itself is what was asked for.
   const count = particleCountFor(
     { width: size.width + 2 * AREA_PADDING_PX, height: size.height + 2 * AREA_PADDING_PX },
     particleMultiplier,
   )
+  const trailSeconds = trail?.seconds
+  const minTrailPixels = trail?.minPixels
+  const maxTrailPixels = trail?.maxPixels
 
   // The frame loop reads the latest size without being restarted by it: a restart would
   // respawn every particle.
@@ -85,11 +111,21 @@ export function VelocityOverlay({
 
       if (view && Math.abs(view.pitch) >= MAX_PITCH_DEGREES) {
         lines.set([])
+        ringRadius.set(0)
       } else if (view) {
+        if (showRing && disc) {
+          const ring = discOnScreen(view, sizeRef.current, disc.center, disc.radiusKm)
+          ringX.set(ring.x)
+          ringY.set(ring.y)
+          ringRadius.set(ring.radius)
+        }
         particles ??= seedParticles(field, view, sizeRef.current, count)
         if (dt > 0) {
           const segments = advanceFrame(particles, field, view, sizeRef.current, dt, {
             pixelsPerSecondPerMetreSecond: PIXELS_PER_SECOND_PER_METRE_SECOND,
+            trailSeconds,
+            minTrailPixels,
+            maxTrailPixels,
           })
           // Skia's "lines" mode draws a line between each consecutive pair of points.
           lines.set(segments.flat())
@@ -100,12 +136,39 @@ export function VelocityOverlay({
     frame = requestAnimationFrame(tick)
 
     return () => cancelAnimationFrame(frame)
-  }, [field, count, hasSize, viewRef, lines])
+  }, [
+    field,
+    count,
+    hasSize,
+    viewRef,
+    lines,
+    ringX,
+    ringY,
+    ringRadius,
+    showRing,
+    disc,
+    trailSeconds,
+    minTrailPixels,
+    maxTrailPixels,
+  ])
 
   if (!hasSize) return null
 
   return (
     <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {showRing && (
+        <Circle
+          cx={ringX}
+          cy={ringY}
+          r={ringRadius}
+          style="stroke"
+          strokeWidth={RING_WIDTH}
+          color={RING_COLOR}
+          opacity={RING_OPACITY}
+        >
+          <DashPathEffect intervals={RING_DASH} />
+        </Circle>
+      )}
       <Points
         points={lines}
         mode="lines"

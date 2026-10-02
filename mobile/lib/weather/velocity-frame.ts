@@ -50,6 +50,9 @@ export type AdvanceFrameOptions = {
   pixelsPerSecondPerMetreSecond: number
   lifeSeconds?: number
   trailSeconds?: number
+  /** Trail length limits in pixels; a layer's own look (swell is short, wind long). */
+  minTrailPixels?: number
+  maxTrailPixels?: number
   random?: () => number
 }
 
@@ -123,7 +126,10 @@ export function advanceFrame(
     if (travelled === 0 || realDtSeconds <= 0) continue
 
     // The trail is `trailSeconds` of the particle's own on-screen speed, laid out behind it.
-    const trailLength = Math.min(Math.max((travelled / realDtSeconds) * trailSeconds, MIN_TRAIL_PX), MAX_TRAIL_PX)
+    const trailLength = Math.min(
+      Math.max((travelled / realDtSeconds) * trailSeconds, options.minTrailPixels ?? MIN_TRAIL_PX),
+      options.maxTrailPixels ?? MAX_TRAIL_PX,
+    )
     const tail = { x: head.x - (dx / travelled) * trailLength, y: head.y - (dy / travelled) * trailLength }
     if (!isOnScreen(tail, size) && !isOnScreen(head, size)) continue
     segments.push([tail, head])
