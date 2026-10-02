@@ -28,8 +28,8 @@ const MAX_SPACING_PIXELS = 72
 // Points this far (px) outside the screen are kept, so a dash does not pop in at the edge.
 const VISIBLE_PADDING_PIXELS = 80
 const OFFSCREEN_MARGIN_PIXELS = 16
-// Below this a dash is too faint to be worth drawing.
-const MIN_ALPHA = 0.02
+/** Below this a dash is too faint to be worth drawing. */
+export const SWELL_MIN_ALPHA = 0.02
 const METRES_PER_DEGREE_LATITUDE = 111_320
 // How far (m) to look along the flow to find its direction on screen.
 const DIRECTION_PROBE_METRES = 50
@@ -203,7 +203,7 @@ export function swellDashes(
     const step = Math.floor(cycle)
     const progress = cycle - step
     const alpha = Math.sin(Math.PI * progress) ** 2 * node.strength
-    if (alpha < MIN_ALPHA) continue
+    if (alpha < SWELL_MIN_ALPHA) continue
 
     const [x, y] = projectLngLat(view, size, node.longitude, node.latitude)
     const centreX = x + node.direction.x * step * SWELL_STEP_PIXELS
