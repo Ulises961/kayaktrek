@@ -1,5 +1,6 @@
 import { pixelsPerMetre, projectLngLat, visibleBounds, type MapViewState } from "../map/project-lng-lat"
 import { createParticles, stepParticles, type Particle } from "./advection"
+import { discOnScreen } from "./forecast-cell"
 import type { VelocityField } from "./velocity"
 
 // One animation frame of the velocity overlay, as pure functions — the Skia component
@@ -63,6 +64,54 @@ export type AdvanceFrameOptions = {
  */
 export function particleCountFor(size: { width: number; height: number }, particleMultiplier: number): number {
   return Math.round(size.width * size.height * particleMultiplier)
+}
+
+// How finely the part of the disc on screen is sampled to measure its area: 48 x 48 points
+// is within about a percent, and this runs once per settled view, not per frame.
+const AREA_SAMPLES_PER_AXIS = 48
+
+/**
+ * How many screen pixels the forecast disc covers: its own area if it is wholly on screen,
+ * the whole screen if it is bigger, the overlap if it hangs over an edge, 0 if it is elsewhere.
+ */
+export function forecastAreaPixels(
+  view: MapViewState,
+  size: { width: number; height: number },
+  disc: { center: [number, number]; radiusKm: number },
+): number {
+  const ring = discOnScreen(view, size, disc.center, disc.radiusKm)
+  const left = Math.max(0, ring.x - ring.radius)
+  const right = Math.min(size.width, ring.x + ring.radius)
+  const top = Math.max(0, ring.y - ring.radius)
+  const bottom = Math.min(size.height, ring.y + ring.radius)
+  if (right <= left || bottom <= top) return 0
+
+  const cellWidth = (right - left) / AREA_SAMPLES_PER_AXIS
+  const cellHeight = (bottom - top) / AREA_SAMPLES_PER_AXIS
+  let inside = 0
+  for (let row = 0; row < AREA_SAMPLES_PER_AXIS; row++) {
+    const y = top + (row + 0.5) * cellHeight
+    for (let column = 0; column < AREA_SAMPLES_PER_AXIS; column++) {
+      const x = left + (column + 0.5) * cellWidth
+      if (Math.hypot(x - ring.x, y - ring.y) <= ring.radius) inside++
+    }
+  }
+  return inside * cellWidth * cellHeight
+}
+
+/**
+ * How many particles the forecast disc gets on this view: the multiplier times the part of
+ * the screen the disc covers. Web's leaflet-velocity keeps a fixed count and lets the
+ * cell's mask decide where it lands; here the density a paddler sees stays the same as the
+ * disc grows and shrinks on screen, instead of blobbing when it is far out.
+ */
+export function particleCountForForecast(
+  view: MapViewState,
+  size: { width: number; height: number },
+  disc: { center: [number, number]; radiusKm: number },
+  particleMultiplier: number,
+): number {
+  return Math.round(forecastAreaPixels(view, size, disc) * particleMultiplier)
 }
 
 /** Seeds particles over the ground the screen is showing, not over the whole field. */

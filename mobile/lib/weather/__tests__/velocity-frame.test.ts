@@ -1,7 +1,15 @@
 import type { MapViewState } from "../../map/project-lng-lat"
-import { projectLngLat, visibleBounds } from "../../map/project-lng-lat"
+import { projectLngLat, unprojectScreen, visibleBounds } from "../../map/project-lng-lat"
 import type { Particle } from "../advection"
-import { advanceFrame, meanSpeed, particleCountFor, seedParticles, simulationTimeScale } from "../velocity-frame"
+import {
+  advanceFrame,
+  forecastAreaPixels,
+  meanSpeed,
+  particleCountFor,
+  particleCountForForecast,
+  seedParticles,
+  simulationTimeScale,
+} from "../velocity-frame"
 import type { VelocityField } from "../velocity"
 
 const size = { width: 400, height: 800 }
@@ -205,5 +213,77 @@ describe("seedParticles", () => {
     const elsewhere: MapViewState = { center: [30, -20], zoom: 10, bearing: 0, pitch: 0 }
 
     expect(seedParticles(eastwardField(4), elsewhere, size, 100)).toEqual([])
+  })
+})
+
+// The forecast is only drawn inside its disc, so density has to follow how much of the
+// screen the disc covers: zooming out shrinks the disc on screen, and the same number of
+// particles crammed into it would read as a dense blob.
+describe("forecastAreaPixels", () => {
+  const centre: [number, number] = [54.1, -4.5] // [latitude, longitude]
+  const screenPixels = size.width * size.height
+
+  it("is the disc's own area when it sits wholly on the screen", () => {
+    // 5 km at zoom 10 near 54 degrees north is about 111 px.
+    const radiusPixels = 5000 * (512 * 2 ** 10) / (40_075_016.686 * Math.cos((54.1 * Math.PI) / 180))
+
+    const area = forecastAreaPixels(view, size, { center: centre, radiusKm: 5 })
+
+    expect(area).toBeCloseTo(Math.PI * radiusPixels ** 2, -3)
+    expect(area / (Math.PI * radiusPixels ** 2)).toBeCloseTo(1, 1)
+  })
+
+  it("is the whole screen when the disc is far bigger than it", () => {
+    const area = forecastAreaPixels(view, size, { center: centre, radiusKm: 200 })
+
+    expect(area / screenPixels).toBeCloseTo(1, 1)
+  })
+
+  it("is nothing when the disc is somewhere else entirely", () => {
+    expect(forecastAreaPixels(view, size, { center: [30, 10], radiusKm: 30 })).toBe(0)
+  })
+
+  it("only counts the part of a disc that hangs over the screen's edge", () => {
+    // Centred on the screen's left edge: about half is on screen.
+    const [longitude] = unprojectScreen(view, size, 0, 400)
+    const radiusPixels = 5000 * (512 * 2 ** 10) / (40_075_016.686 * Math.cos((54.1 * Math.PI) / 180))
+
+    const area = forecastAreaPixels(view, size, { center: [54.1, longitude], radiusKm: 5 })
+
+    expect(area / (Math.PI * radiusPixels ** 2)).toBeCloseTo(0.5, 1)
+  })
+
+  it("falls to a quarter for every zoom level out, as the disc shrinks on screen", () => {
+    const disc = { center: centre, radiusKm: 5 }
+
+    const near = forecastAreaPixels(view, size, disc)
+    const far = forecastAreaPixels({ ...view, zoom: 9 }, size, disc)
+
+    expect(far / near).toBeCloseTo(0.25, 1)
+  })
+})
+
+describe("particleCountForForecast", () => {
+  const disc = { center: [54.1, -4.5] as [number, number], radiusKm: 5 }
+
+  it("is the multiplier times the part of the screen the forecast covers", () => {
+    const area = forecastAreaPixels(view, size, disc)
+
+    expect(particleCountForForecast(view, size, disc, 0.0016)).toBe(Math.round(area * 0.0016))
+  })
+
+  it("thins out as the map zooms out, so the density on screen stays the same", () => {
+    const near = particleCountForForecast(view, size, disc, 0.0016)
+    const far = particleCountForForecast({ ...view, zoom: 8 }, size, disc, 0.0016)
+
+    expect(far).toBeLessThan(near / 10)
+  })
+
+  it("never asks for more than the whole screen would get", () => {
+    const huge = { center: disc.center, radiusKm: 5000 }
+
+    expect(particleCountForForecast(view, size, huge, 0.0016)).toBeLessThanOrEqual(
+      particleCountFor(size, 0.0016),
+    )
   })
 })
