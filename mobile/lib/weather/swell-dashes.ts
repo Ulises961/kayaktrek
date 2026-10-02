@@ -21,12 +21,13 @@ export const SWELL_STEP_SECONDS = 1.2
 export const SWELL_STEP_PIXELS = 18
 export const SWELL_DASH_PIXELS = 8
 
-// The lattice keeps its points between 36 and 72 px apart on screen: closer is a crowd, further
-// leaves too little in the field to read. Only the maximum is written down: spacing is halved
-// or doubled until it is under it, which leaves it above half of it.
-const MAX_SPACING_PIXELS = 72
+// The lattice keeps its points between these on screen: closer is a crowd, further leaves too
+// little in the field to read. Spacing is halved or doubled until it is under the maximum,
+// which leaves it above half of it — so the minimum follows from the maximum.
+export const SWELL_MAX_SPACING_PIXELS = 72
+export const SWELL_MIN_SPACING_PIXELS = SWELL_MAX_SPACING_PIXELS / 2
 // Points this far (px) outside the screen are kept, so a dash does not pop in at the edge.
-const VISIBLE_PADDING_PIXELS = 80
+export const SWELL_VISIBLE_PADDING_PIXELS = 80
 const OFFSCREEN_MARGIN_PIXELS = 16
 /** Below this a dash is too faint to be worth drawing. */
 export const SWELL_MIN_ALPHA = 0.02
@@ -128,12 +129,12 @@ export function swellLattice(
   const gridSpacingPixels = gridSpacingMetres * pixelsPerMetre(view.zoom, centreLatitude)
 
   // Nodes per data-point spacing, a power of two: >1 fills in, <1 thins out.
-  const refinement = 2 ** Math.ceil(Math.log2(gridSpacingPixels / MAX_SPACING_PIXELS))
+  const refinement = 2 ** Math.ceil(Math.log2(gridSpacingPixels / SWELL_MAX_SPACING_PIXELS))
   const stepLongitude = gridStepLongitude / refinement
   const stepLatitude = gridStepLatitude / refinement
   const nodeSpacingMetres = gridSpacingMetres / refinement
 
-  const bounds = visibleBounds(view, size, VISIBLE_PADDING_PIXELS)
+  const bounds = visibleBounds(view, size, SWELL_VISIBLE_PADDING_PIXELS)
   const lastColumn = Math.floor((field.east - field.west) / stepLongitude + GRID_POINT_TOLERANCE)
   const lastRow = Math.floor((field.north - field.south) / stepLatitude + GRID_POINT_TOLERANCE)
   const firstColumn = Math.max(0, Math.ceil((bounds.west - field.west) / stepLongitude - GRID_POINT_TOLERANCE))

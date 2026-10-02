@@ -2,10 +2,19 @@ import { act, render } from "@testing-library/react-native";
 import type { RefObject } from "react";
 
 import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
-import { discOnScreen } from "@mobile/lib/weather/forecast-cell";
+import { VIEW_SETTLE_MS } from "@mobile/lib/map/view-change";
 import type { VelocityField } from "@mobile/lib/weather/velocity";
+import {
+  AREA_PADDING_PX,
+  particleCountFor,
+  particleCountForForecast,
+} from "@mobile/lib/weather/velocity-frame";
 
-import { VelocityOverlay, VIEW_SETTLE_MS } from "../velocity-overlay";
+import { VelocityOverlay, WIND_FADE_IN_MS, WIND_TRAIL_OPACITY } from "../velocity-overlay";
+
+// The density these tests ask the overlay for; what they expect is worked out from it with the
+// real density functions, not copied.
+const MULTIPLIER = 0.0016;
 
 // Skia's canvas needs a native surface jest does not have, so it is replaced with a
 // plain View that records the props it was given. What is under test is when the
@@ -22,19 +31,12 @@ jest.mock("@shopify/react-native-skia", () => ({
     const { createElement } = jest.requireActual("react");
     return createElement("View", { testID: "trails", ...props });
   },
-  // The dashed ring, recorded as a host element so a test can tell whether it was drawn.
-  Circle: (props: object) => {
-    const { createElement } = jest.requireActual("react");
-    return createElement("View", { testID: "forecast-ring", ...props });
-  },
-  DashPathEffect: () => null,
 }));
 
 // Reanimated loads a native worklets module jest has no binding for. Only
 // useSharedValue is used, and only to hold what is handed to Skia. Every write is seen
 // by `mockSetPoints`; `mockSharedValues` has one setter per shared value in the order the
-// component creates them (trails, ring x, ring y, ring radius, opacity), so a test can ask
-// about one of them. Like the real hook, each value is created once and kept.
+// component creates them (trails, opacity), so a test can ask about one of them. Like the real hook, each value is created once and kept.
 const mockSetPoints = jest.fn();
 const mockSharedValues: jest.Mock[] = [];
 jest.mock("react-native-reanimated", () => ({
@@ -154,16 +156,21 @@ describe("VelocityOverlay", () => {
         viewRef={viewRef({ ...flatView, zoom: 14 })}
         size={size}
         color="rgb(40, 170, 180)"
-        particleMultiplier={0.0016}
+        particleMultiplier={MULTIPLIER}
       />,
     );
 
     await nextFrame(); // seeds, and starts the clock
     await nextFrame();
 
-    // (400 + 48) x (800 + 48) px of particle area x 0.0016 is about 608 trails.
+    // Particles live in the screen plus its margin, at the density the multiplier asks for.
+    const asked = particleCountFor(
+      { width: size.width + 2 * AREA_PADDING_PX, height: size.height + 2 * AREA_PADDING_PX },
+      MULTIPLIER,
+    );
     const trails = (lastTrails()?.length ?? 0) / 2;
-    expect(trails).toBeGreaterThan(608 * 0.9);
+    expect(trails).toBeGreaterThan(asked * 0.9);
+    expect(trails).toBeLessThanOrEqual(asked);
   });
 
   it("draws nothing until the map has reported its position", async () => {
@@ -189,89 +196,7 @@ describe("VelocityOverlay", () => {
     ref.current = { ...flatView, pitch: 30 };
     await nextFrame();
 
-    // The trails are cleared (the ring is cleared too, which is why this is not the last call).
-    expect(mockSetPoints).toHaveBeenCalledWith([]);
-  });
-
-  // The forecast cell: the field is shown inside a disc, and a dashed ring marks where the
-  // forecast stops (web's ForecastCellShell). The disc is centred on [latitude, longitude].
-  describe("forecast area ring", () => {
-    const disc = { center: [54.1, -4.5] as [number, number], radiusKm: 30 };
-
-    it("is drawn when a disc is given and this layer owns the ring", async () => {
-      controlFrames();
-      const { getByTestId } = await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef(flatView)}
-          size={size}
-          color="rgb(40, 170, 180)"
-          disc={disc}
-          drawRing
-        />,
-      );
-
-      expect(getByTestId("forecast-ring")).toBeTruthy();
-    });
-
-    it("is left to the other layer when both wind and swell are on", async () => {
-      controlFrames();
-      const { queryByTestId } = await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef(flatView)}
-          size={size}
-          color="rgb(40, 170, 180)"
-          disc={disc}
-          drawRing={false}
-        />,
-      );
-
-      expect(queryByTestId("forecast-ring")).toBeNull();
-    });
-
-    it("follows the map: centred where the disc is, as wide as the distance it stands for", async () => {
-      const nextFrame = controlFrames();
-      await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef(flatView)}
-          size={size}
-          color="rgb(40, 170, 180)"
-          disc={disc}
-          drawRing
-        />,
-      );
-
-      await nextFrame();
-      await nextFrame();
-
-      const expected = discOnScreen(flatView, size, disc.center, disc.radiusKm);
-      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.x, 3));
-      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.y, 3));
-      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.radius, 3));
-    });
-
-    it("is hidden on a tilted map, where the flat projection would put it in the wrong place", async () => {
-      const nextFrame = controlFrames();
-      await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef({ ...flatView, pitch: 30 })}
-          size={size}
-          color="rgb(40, 170, 180)"
-          disc={disc}
-          drawRing
-        />,
-      );
-
-      await nextFrame();
-      await nextFrame();
-
-      const expected = discOnScreen(flatView, size, disc.center, disc.radiusKm);
-      expect(mockSetPoints).not.toHaveBeenCalledWith(expect.closeTo(expected.radius, 3));
-      expect(mockSetPoints).toHaveBeenCalledWith(0);
-    });
+    expect(lastTrails()).toEqual([]);
   });
 
   // While the map is being zoomed or panned the animation is taken away, and put back only
@@ -291,14 +216,16 @@ describe("VelocityOverlay", () => {
           viewRef={ref}
           size={size}
           color="rgb(40, 170, 180)"
+          particleMultiplier={MULTIPLIER}
           disc={disc}
-          drawRing
         />,
       );
     }
 
+    // Frames fine enough to catch the moment the settle time runs out: a quarter of it each.
+    const STEP_MS = VIEW_SETTLE_MS / 4;
     async function settleFrames(nextFrame: (ms?: number) => Promise<void>, totalMs: number) {
-      for (let elapsed = 0; elapsed < totalMs; elapsed += 50) await nextFrame(50);
+      for (let elapsed = 0; elapsed < totalMs; elapsed += STEP_MS) await nextFrame(STEP_MS);
     }
 
     it("takes the trails away as soon as the view changes", async () => {
@@ -325,7 +252,7 @@ describe("VelocityOverlay", () => {
       // A pinch: the zoom changes a little on every frame for most of a second.
       for (let step = 1; step <= 20; step++) {
         ref.current = { ...flatView, zoom: 12 - step * 0.05 };
-        await nextFrame(50);
+        await nextFrame(STEP_MS);
         expect(lastTrails()).toEqual([]);
       }
     });
@@ -339,10 +266,10 @@ describe("VelocityOverlay", () => {
 
       ref.current = { ...flatView, zoom: 11.6 };
       await nextFrame();
-      await settleFrames(nextFrame, VIEW_SETTLE_MS - 100);
+      await settleFrames(nextFrame, VIEW_SETTLE_MS / 2);
       expect(lastTrails()).toEqual([]);
 
-      await settleFrames(nextFrame, 300);
+      await settleFrames(nextFrame, VIEW_SETTLE_MS);
       await nextFrame();
       await nextFrame();
       expect(lastTrails()?.length).toBeGreaterThan(0);
@@ -357,16 +284,22 @@ describe("VelocityOverlay", () => {
       const before = (lastTrails()?.length ?? 0) / 2;
 
       // Far out: the 5 km disc is now a small circle on the screen, and gets few particles.
-      ref.current = { ...flatView, zoom: 9 };
+      const zoomedOut: MapViewState = { ...flatView, zoom: 9 };
+      ref.current = zoomedOut;
       await nextFrame();
-      await settleFrames(nextFrame, VIEW_SETTLE_MS + 200);
+      await settleFrames(nextFrame, VIEW_SETTLE_MS * 2);
       await nextFrame();
       await nextFrame();
       const after = (lastTrails()?.length ?? 0) / 2;
 
-      expect(before).toBeGreaterThan(100);
+      // What the density rule asks for at each zoom, from the real functions.
+      const askedBefore = particleCountForForecast({ ...flatView, zoom: 12 }, size, disc, MULTIPLIER);
+      const askedAfter = particleCountForForecast(zoomedOut, size, disc, MULTIPLIER);
+      expect(askedAfter).toBeLessThan(askedBefore);
+      expect(before).toBeGreaterThan(askedBefore * 0.8);
+      expect(before).toBeLessThanOrEqual(askedBefore);
       expect(after).toBeGreaterThan(0);
-      expect(after).toBeLessThan(before / 5);
+      expect(after).toBeLessThanOrEqual(askedAfter);
     });
 
     it("spreads the new particles over the new area, not where the old ones were", async () => {
@@ -379,27 +312,11 @@ describe("VelocityOverlay", () => {
       // Panned a long way off: the old particles' ground is no longer on screen at all.
       ref.current = { ...flatView, center: [-4.46, 54.1], zoom: 12 };
       await nextFrame();
-      await settleFrames(nextFrame, VIEW_SETTLE_MS + 200);
+      await settleFrames(nextFrame, VIEW_SETTLE_MS * 2);
       await nextFrame();
       await nextFrame();
 
       expect(lastTrails()?.length).toBeGreaterThan(0);
-    });
-
-    it("keeps the ring following the map the whole time, even while the trails are away", async () => {
-      const nextFrame = controlFrames();
-      const ref = viewRef({ ...flatView, zoom: 12 });
-      await renderMoving(ref);
-      await nextFrame();
-      await nextFrame();
-
-      const zoomedOut: MapViewState = { ...flatView, zoom: 9 };
-      ref.current = zoomedOut;
-      await nextFrame();
-
-      const expected = discOnScreen(zoomedOut, size, disc.center, disc.radiusKm);
-      expect(lastTrails()).toEqual([]);
-      expect(mockSetPoints).toHaveBeenCalledWith(expect.closeTo(expected.radius, 3));
     });
 
     it("does not treat an unchanged view as movement, so the animation is not restarted every frame", async () => {
@@ -423,76 +340,32 @@ describe("VelocityOverlay", () => {
       await renderMoving(ref);
       await nextFrame();
       await nextFrame();
-      const opacity = mockSharedValues[4];
+      const opacity = mockSharedValues[1];
 
       ref.current = { ...flatView, zoom: 11.6 };
       await nextFrame();
       expect(opacity).toHaveBeenLastCalledWith(0);
 
-      await settleFrames(nextFrame, VIEW_SETTLE_MS + 100);
-      await nextFrame(40);
+      // Once the view has settled and the trails are seeded, the opacity climbs rather than jumps.
+      await settleFrames(nextFrame, VIEW_SETTLE_MS + STEP_MS);
+      await nextFrame(WIND_FADE_IN_MS / 4);
       const partway = opacity.mock.calls.at(-1)?.[0] as number;
       expect(partway).toBeGreaterThan(0);
-      expect(partway).toBeLessThan(0.85);
+      expect(partway).toBeLessThan(WIND_TRAIL_OPACITY);
 
-      await settleFrames(nextFrame, 600);
-      expect(opacity).toHaveBeenLastCalledWith(0.85);
+      await settleFrames(nextFrame, WIND_FADE_IN_MS * 2);
+      expect(opacity).toHaveBeenLastCalledWith(WIND_TRAIL_OPACITY);
     });
   });
 
-  describe("how the trails are drawn", () => {
-    it("has round ends by default, like wind's long lines", async () => {
-      controlFrames();
-      const { getByTestId } = await render(
-        <VelocityOverlay field={field} viewRef={viewRef(flatView)} size={size} color="rgb(40, 170, 180)" />,
-      );
+  it("draws wind as long round-ended lines in the colour it is given", async () => {
+    controlFrames();
+    const { getByTestId } = await render(
+      <VelocityOverlay field={field} viewRef={viewRef(flatView)} size={size} color="rgb(40, 170, 180)" />,
+    );
 
-      expect(getByTestId("trails").props.strokeCap).toBe("round");
-    });
-
-    it("draws several separate dashes for each particle when asked, not one trail", async () => {
-      const nextFrame = controlFrames();
-      const plain = await render(
-        <VelocityOverlay field={field} viewRef={viewRef(flatView)} size={size} color="rgb(40, 170, 180)" />,
-      );
-      await nextFrame();
-      await nextFrame();
-      const plainTrails = (lastTrails()?.length ?? 0) / 2;
-      await plain.unmount();
-      mockSetPoints.mockClear();
-
-      await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef(flatView)}
-          size={size}
-          color="rgb(255, 255, 255)"
-          dashes={{ count: 3, lengthPixels: 5, gapPixels: 6 }}
-        />,
-      );
-      await nextFrame();
-      await nextFrame();
-      const dashedSegments = (lastTrails()?.length ?? 0) / 2;
-
-      // Three dashes per particle where the plain layer draws one trail per particle.
-      expect(dashedSegments).toBeGreaterThan(plainTrails * 2.5);
-      expect(dashedSegments).toBeLessThan(plainTrails * 3.2);
-    });
-
-    it("can have square ends, which is what makes swell read as dashes", async () => {
-      controlFrames();
-      const { getByTestId } = await render(
-        <VelocityOverlay
-          field={field}
-          viewRef={viewRef(flatView)}
-          size={size}
-          color="rgb(255, 255, 255)"
-          strokeCap="butt"
-        />,
-      );
-
-      expect(getByTestId("trails").props.strokeCap).toBe("butt");
-    });
+    expect(getByTestId("trails").props.strokeCap).toBe("round");
+    expect(getByTestId("trails").props.color).toBe("rgb(40, 170, 180)");
   });
 
   it("stops drawing when it is unmounted", async () => {

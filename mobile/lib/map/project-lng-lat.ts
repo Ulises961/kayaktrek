@@ -18,7 +18,7 @@ export type MapViewState = {
 }
 
 // MapLibre's world is 512 logical pixels wide at zoom 0.
-const TILE_SIZE = 512
+export const TILE_SIZE = 512
 
 function mercatorX(longitude: number, worldSize: number): number {
   return ((longitude + 180) / 360) * worldSize
@@ -31,7 +31,7 @@ function mercatorY(latitude: number, worldSize: number): number {
   return (0.5 - Math.log((1 + clamped) / (1 - clamped)) / (4 * Math.PI)) * worldSize
 }
 
-const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686
+export const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686
 
 /** How many screen pixels one metre of ground covers, at a zoom and latitude. */
 export function pixelsPerMetre(zoom: number, latitude: number): number {

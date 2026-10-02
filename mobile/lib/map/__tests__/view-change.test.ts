@@ -1,5 +1,11 @@
 import type { MapViewState } from "../project-lng-lat"
-import { VIEW_SETTLE_MS, viewChanged } from "../view-change"
+import {
+  BEARING_EPSILON_DEGREES,
+  CENTER_EPSILON_DEGREES,
+  VIEW_SETTLE_MS,
+  viewChanged,
+  ZOOM_EPSILON,
+} from "../view-change"
 
 const view: MapViewState = { center: [-4.5, 54.1], zoom: 10, bearing: 0, pitch: 0 }
 
@@ -8,27 +14,36 @@ describe("viewChanged", () => {
     expect(viewChanged(view, { ...view, center: [...view.center] })).toBe(false)
   })
 
-  it("is true when the zoom changes", () => {
-    expect(viewChanged(view, { ...view, zoom: 10.05 })).toBe(true)
+  it("is true when the zoom changes by more than the threshold", () => {
+    expect(viewChanged(view, { ...view, zoom: view.zoom + ZOOM_EPSILON * 2 })).toBe(true)
   })
 
-  it("is true when the map is panned", () => {
-    expect(viewChanged(view, { ...view, center: [-4.499, 54.1] })).toBe(true)
-    expect(viewChanged(view, { ...view, center: [-4.5, 54.101] })).toBe(true)
+  it("is true when the map is panned by more than the threshold, in either direction", () => {
+    const step = CENTER_EPSILON_DEGREES * 2
+    expect(viewChanged(view, { ...view, center: [view.center[0] + step, view.center[1]] })).toBe(true)
+    expect(viewChanged(view, { ...view, center: [view.center[0], view.center[1] - step] })).toBe(true)
   })
 
-  it("is true when the map is rotated", () => {
-    expect(viewChanged(view, { ...view, bearing: 5 })).toBe(true)
+  it("is true when the map is rotated by more than the threshold", () => {
+    expect(viewChanged(view, { ...view, bearing: view.bearing + BEARING_EPSILON_DEGREES * 2 })).toBe(true)
   })
 
-  it("ignores differences too small to be movement", () => {
-    expect(viewChanged(view, { ...view, zoom: 10.0000001, center: [-4.50000001, 54.1], bearing: 0.001 })).toBe(false)
+  it("ignores differences below each threshold, which are the map reporting the same view", () => {
+    expect(
+      viewChanged(view, {
+        ...view,
+        zoom: view.zoom + ZOOM_EPSILON / 2,
+        center: [view.center[0] + CENTER_EPSILON_DEGREES / 2, view.center[1] - CENTER_EPSILON_DEGREES / 2],
+        bearing: view.bearing + BEARING_EPSILON_DEGREES / 2,
+      }),
+    ).toBe(false)
   })
 })
 
 describe("VIEW_SETTLE_MS", () => {
-  it("is long enough to ride out a pinch's pauses and short enough to feel immediate", () => {
-    expect(VIEW_SETTLE_MS).toBeGreaterThanOrEqual(250)
+  it("is long enough to ride out the pause between two frames of a gesture, and short enough to feel immediate", () => {
+    // The map reports a view every frame or so while moving: well under this.
+    expect(VIEW_SETTLE_MS).toBeGreaterThanOrEqual(100)
     expect(VIEW_SETTLE_MS).toBeLessThanOrEqual(500)
   })
 })

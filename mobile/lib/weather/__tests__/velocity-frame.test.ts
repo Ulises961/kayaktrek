@@ -1,10 +1,20 @@
 import type { MapViewState } from "../../map/project-lng-lat"
-import { projectLngLat, unprojectScreen, visibleBounds } from "../../map/project-lng-lat"
+import {
+  EARTH_CIRCUMFERENCE_METRES,
+  pixelsPerMetre,
+  projectLngLat,
+  unprojectScreen,
+  visibleBounds,
+} from "../../map/project-lng-lat"
 import type { Particle } from "../advection"
 import {
   advanceFrame,
+  AREA_PADDING_PX,
+  DEFAULT_TRAIL_SECONDS,
   forecastAreaPixels,
+  MAX_TRAIL_PX,
   meanSpeed,
+  MIN_TRAIL_PX,
   particleCountFor,
   particleCountForForecast,
   seedParticles,
@@ -14,8 +24,28 @@ import type { VelocityField } from "../velocity"
 
 const size = { width: 400, height: 800 }
 const view: MapViewState = { center: [-4.5, 54.1], zoom: 10, bearing: 0, pitch: 0 }
+const [CENTRE_LONGITUDE, CENTRE_LATITUDE] = view.center
+const centreX = size.width / 2
+const centreY = size.height / 2
 
-// A 2x2 field over the view, blowing east at 4 m/s everywhere.
+// How the tests drive a frame: 60 fps, with a stated visual speed, so what they expect is
+// derived from these and from the real constants rather than from copied numbers.
+const FRAME_SECONDS = 1 / 60
+const PIXELS_PER_SECOND_PER_METRE_SECOND = 8
+const options = { pixelsPerSecondPerMetreSecond: PIXELS_PER_SECOND_PER_METRE_SECOND }
+const MULTIPLIER = 0.0016
+const DISC_RADIUS_KM = 5
+
+// How far a particle drifts on screen in one frame, and the trail that makes of it.
+function driftPixelsPerFrame(speed: number): number {
+  return (speed * PIXELS_PER_SECOND_PER_METRE_SECOND) * FRAME_SECONDS
+}
+function expectedTrailPixels(speed: number): number {
+  const pixelsPerSecond = speed * PIXELS_PER_SECOND_PER_METRE_SECOND
+  return Math.min(Math.max(pixelsPerSecond * DEFAULT_TRAIL_SECONDS, MIN_TRAIL_PX), MAX_TRAIL_PX)
+}
+
+// A 2x2 field over the view, blowing east at `speed` everywhere.
 function eastwardField(speed: number): VelocityField {
   return { north: 54.3, south: 53.9, west: -4.7, east: -4.3, nx: 2, ny: 2, u: [speed, speed, speed, speed], v: [0, 0, 0, 0] }
 }
@@ -24,7 +54,7 @@ describe("meanSpeed", () => {
   it("is the magnitude of (u, v), averaged over the cells", () => {
     const field: VelocityField = { ...eastwardField(0), u: [3, 3, 3, 3], v: [4, 4, 4, 4] }
 
-    expect(meanSpeed(field)).toBeCloseTo(5, 6)
+    expect(meanSpeed(field)).toBeCloseTo(Math.hypot(3, 4), 6)
   })
 
   it("ignores masked cells", () => {
@@ -42,177 +72,108 @@ describe("meanSpeed", () => {
 
 describe("simulationTimeScale", () => {
   it("makes a 1 m/s drift cover the requested number of screen pixels per real second", () => {
-    const pixelsPerSecondPerMetreSecond = 8
-    const scale = simulationTimeScale(10, 54.1, pixelsPerSecondPerMetreSecond)
+    const scale = simulationTimeScale(view.zoom, CENTRE_LATITUDE, PIXELS_PER_SECOND_PER_METRE_SECOND)
 
     // Drift east for one real second at 1 m/s, simulated at `scale`, and measure it on screen.
-    const metresPerDegreeLongitude = 111_320 * Math.cos((54.1 * Math.PI) / 180)
-    const driftedLongitude = -4.5 + (1 * scale) / metresPerDegreeLongitude
-    const [x] = projectLngLat(view, size, driftedLongitude, 54.1)
+    const metresPerDegreeLongitude =
+      (EARTH_CIRCUMFERENCE_METRES / 360) * Math.cos((CENTRE_LATITUDE * Math.PI) / 180)
+    const driftedLongitude = CENTRE_LONGITUDE + (1 * scale) / metresPerDegreeLongitude
+    const [x] = projectLngLat(view, size, driftedLongitude, CENTRE_LATITUDE)
 
-    expect(x - 200).toBeCloseTo(pixelsPerSecondPerMetreSecond, 1)
+    expect(x - centreX).toBeCloseTo(PIXELS_PER_SECOND_PER_METRE_SECOND, 1)
   })
 
   it("simulates less time per real second the further in you zoom, so drift stays the same on screen", () => {
-    expect(simulationTimeScale(12, 54.1, 8)).toBeCloseTo(simulationTimeScale(10, 54.1, 8) / 4, 6)
+    const near = simulationTimeScale(view.zoom + 2, CENTRE_LATITUDE, PIXELS_PER_SECOND_PER_METRE_SECOND)
+    const far = simulationTimeScale(view.zoom, CENTRE_LATITUDE, PIXELS_PER_SECOND_PER_METRE_SECOND)
+
+    // Two zoom levels in is four times as many pixels per metre, so a quarter of the time.
+    expect(near).toBeCloseTo(far / 4, 6)
   })
 })
 
 describe("advanceFrame", () => {
-  it("returns a segment from where each particle was to where it is now, in screen pixels", () => {
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-    const field = eastwardField(4)
+  const speed = 4
 
-    const segments = advanceFrame(particles, field, view, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8 })
+  it("returns a segment from where each particle was to where it is now, in screen pixels", () => {
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
+
+    const segments = advanceFrame(particles, eastwardField(speed), view, size, FRAME_SECONDS, options)
 
     expect(segments).toHaveLength(1)
     const [tail, head] = segments[0]
     // The head is where the particle is now: a frame's drift east of the screen centre.
-    // 4 m/s at 8 px per second per m/s is 32 px/s, about half a pixel per 60 fps frame.
-    expect(head.x).toBeCloseTo(200 + 32 / 60, 3)
-    expect(head.y).toBeCloseTo(400, 3)
-    // The tail trails behind it, back along the flow: 32 px/s for 0.35 s is 11.2 px.
-    expect(tail.x).toBeCloseTo(head.x - 11.2, 2)
+    expect(head.x).toBeCloseTo(centreX + driftPixelsPerFrame(speed), 3)
+    expect(head.y).toBeCloseTo(centreY, 3)
+    // The tail trails behind it, back along the flow.
+    expect(head.x - tail.x).toBeCloseTo(expectedTrailPixels(speed), 2)
     expect(tail.y).toBeCloseTo(head.y, 3)
   })
 
   it("makes the trail longer for a faster flow and shorter for a slower one", () => {
-    const length = (speed: number) => {
-      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-      const [tail, head] = advanceFrame(particles, eastwardField(speed), view, size, 1 / 60, {
-        pixelsPerSecondPerMetreSecond: 8,
-      })[0]
+    const length = (flow: number) => {
+      const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
+      const [tail, head] = advanceFrame(particles, eastwardField(flow), view, size, FRAME_SECONDS, options)[0]
       return head.x - tail.x
     }
 
-    expect(length(8)).toBeGreaterThan(length(4))
-    expect(length(4)).toBeGreaterThan(length(2))
+    // Three speeds far enough apart that none is clamped.
+    const slow = (MIN_TRAIL_PX / DEFAULT_TRAIL_SECONDS / PIXELS_PER_SECOND_PER_METRE_SECOND) * 2
+    expect(length(slow * 2)).toBeGreaterThan(length(slow))
+    expect(length(slow * 4)).toBeGreaterThan(length(slow * 2))
   })
 
-  it("never draws a trail shorter than a few pixels, so a light breeze still shows", () => {
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+  it("never draws a trail shorter than the minimum, so a light breeze still shows", () => {
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
+    // Slow enough that its own trail would be well under the minimum.
+    const breeze = MIN_TRAIL_PX / DEFAULT_TRAIL_SECONDS / PIXELS_PER_SECOND_PER_METRE_SECOND / 10
 
-    const [tail, head] = advanceFrame(particles, eastwardField(0.1), view, size, 1 / 60, {
-      pixelsPerSecondPerMetreSecond: 8,
-    })[0]
+    const [tail, head] = advanceFrame(particles, eastwardField(breeze), view, size, FRAME_SECONDS, options)[0]
 
-    expect(head.x - tail.x).toBeCloseTo(4, 3)
+    expect(head.x - tail.x).toBeCloseTo(MIN_TRAIL_PX, 3)
   })
 
-  it("lets a layer set its own trail limits, so swell can be short dashes where wind is long streaks", () => {
+  it("never draws a trail longer than the maximum, so a gale does not smear across the map", () => {
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
+    const gale = (MAX_TRAIL_PX / DEFAULT_TRAIL_SECONDS / PIXELS_PER_SECOND_PER_METRE_SECOND) * 10
+
+    const [tail, head] = advanceFrame(particles, eastwardField(gale), view, size, FRAME_SECONDS, options)[0]
+
+    expect(head.x - tail.x).toBeCloseTo(MAX_TRAIL_PX, 3)
+  })
+
+  it("lets a layer set its own trail limits", () => {
+    const flow = 8
     const length = (limits: { minTrailPixels?: number; maxTrailPixels?: number }) => {
-      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-      const [tail, head] = advanceFrame(particles, eastwardField(8), view, size, 1 / 60, {
-        pixelsPerSecondPerMetreSecond: 8,
+      const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
+      const [tail, head] = advanceFrame(particles, eastwardField(flow), view, size, FRAME_SECONDS, {
+        ...options,
         ...limits,
       })[0]
       return head.x - tail.x
     }
+    const unconstrained = expectedTrailPixels(flow)
 
-    // 8 m/s would trail 8 * 8 * 0.35 = 22.4 px unconstrained.
-    expect(length({})).toBeCloseTo(22.4, 1)
-    expect(length({ maxTrailPixels: 10 })).toBeCloseTo(10, 3)
-    expect(length({ minTrailPixels: 30 })).toBeCloseTo(30, 3)
-  })
-
-  // A layer can be drawn as a dashed trail instead of a continuous one: several short
-  // segments with gaps between them, laid out behind the particle as one unit. That is what
-  // lets swell read as dashes moving rather than as a shorter, thicker version of wind.
-  describe("as dashes", () => {
-    const dashes = { count: 3, lengthPixels: 5, gapPixels: 6 }
-
-    function dashedFrame() {
-      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-      return advanceFrame(particles, eastwardField(4), view, size, 1 / 60, {
-        pixelsPerSecondPerMetreSecond: 8,
-        dashes,
-      })
-    }
-
-    it("makes one short segment per dash, rather than one long one", () => {
-      expect(dashedFrame()).toHaveLength(3)
-    })
-
-    it("makes each dash the length asked for", () => {
-      for (const [tail, head] of dashedFrame()) {
-        expect(head.x - tail.x).toBeCloseTo(5, 3)
-        expect(head.y).toBeCloseTo(tail.y, 3)
-      }
-    })
-
-    it("starts at the particle and leaves a gap between one dash and the next, behind it", () => {
-      const [first, second, third] = dashedFrame()
-
-      // The first dash ends at the particle (a frame's drift east of the screen centre).
-      expect(first[1].x).toBeCloseTo(200 + 32 / 60, 3)
-      // The next one ends where the gap behind the first dash's tail ends: 5 px dash + 6 px gap.
-      expect(first[0].x - second[1].x).toBeCloseTo(6, 3)
-      expect(second[0].x - third[1].x).toBeCloseTo(6, 3)
-      // So each dash is 11 px behind the last.
-      expect(first[1].x - second[1].x).toBeCloseTo(11, 3)
-    })
-
-    it("does not stretch the dashes with the flow's speed, unlike a line's trail", () => {
-      const lengthAt = (speed: number) => {
-        const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-        const [tail, head] = advanceFrame(particles, eastwardField(speed), view, size, 1 / 60, {
-          pixelsPerSecondPerMetreSecond: 8,
-          dashes,
-        })[0]
-        return head.x - tail.x
-      }
-
-      expect(lengthAt(8)).toBeCloseTo(lengthAt(1), 3)
-    })
-
-    it("draws nothing for a particle that is not moving, or that has just respawned", () => {
-      const still: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-      const respawned: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 1e9 }]
-
-      expect(
-        advanceFrame(still, eastwardField(0), view, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8, dashes }),
-      ).toHaveLength(0)
-      expect(
-        advanceFrame(respawned, eastwardField(4), view, size, 1 / 60, {
-          pixelsPerSecondPerMetreSecond: 8,
-          dashes,
-          random: () => 0.9,
-        }),
-      ).toHaveLength(0)
-    })
-
-    it("follows the flow's direction, whichever way it blows", () => {
-      const northward: VelocityField = { ...eastwardField(0), u: [0, 0, 0, 0], v: [4, 4, 4, 4] }
-      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
-
-      const [first, second] = advanceFrame(particles, northward, view, size, 1 / 60, {
-        pixelsPerSecondPerMetreSecond: 8,
-        dashes,
-      })
-
-      // Blowing north is up the screen, so the dashes trail below the particle.
-      expect(first[1].x).toBeCloseTo(200, 3)
-      expect(second[1].y).toBeGreaterThan(first[1].y)
-    })
+    expect(length({})).toBeCloseTo(unconstrained, 1)
+    // Limits either side of what it would have been bind it to them. (The minimum stays under
+    // the default maximum, which would otherwise clamp it back down.)
+    const betweenItAndTheMaximum = (unconstrained + MAX_TRAIL_PX) / 2
+    expect(length({ maxTrailPixels: unconstrained / 2 })).toBeCloseTo(unconstrained / 2, 3)
+    expect(length({ minTrailPixels: betweenItAndTheMaximum })).toBeCloseTo(betweenItAndTheMaximum, 3)
   })
 
   it("draws no trail for a particle that is not moving, rather than guessing a direction", () => {
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
 
-    const segments = advanceFrame(particles, eastwardField(0), view, size, 1 / 60, {
-      pixelsPerSecondPerMetreSecond: 8,
-    })
-
-    expect(segments).toHaveLength(0)
+    expect(advanceFrame(particles, eastwardField(0), view, size, FRAME_SECONDS, options)).toHaveLength(0)
   })
 
   it("draws nothing for a particle that respawned this frame, rather than a streak across the map", () => {
     // Already past its lifetime, so this step respawns it somewhere else.
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 1e9 }]
-    const field = eastwardField(4)
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 1e9 }]
 
-    const segments = advanceFrame(particles, field, view, size, 1 / 60, {
-      pixelsPerSecondPerMetreSecond: 8,
+    const segments = advanceFrame(particles, eastwardField(speed), view, size, FRAME_SECONDS, {
+      ...options,
       random: () => 0.9,
     })
 
@@ -220,14 +181,13 @@ describe("advanceFrame", () => {
   })
 
   it("moves a particle that is off the screen back onto it, instead of spending it out of sight", () => {
-    // Inside the field (which spans -4.7 to -4.3) but nowhere near the screen.
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.4, age: 0 }]
+    // Inside the field (which spans -4.7 to -4.3) but nowhere near the screen once zoomed in.
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: -4.4, age: 0 }]
     const zoomedIn = { ...view, zoom: 14 }
 
-    advanceFrame(particles, eastwardField(4), zoomedIn, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8 })
+    advanceFrame(particles, eastwardField(speed), zoomedIn, size, FRAME_SECONDS, options)
 
-    // At zoom 14 the 400px-wide screen covers a sliver of the field around -4.5.
-    const onScreen = visibleBounds(zoomedIn, size, 64)
+    const onScreen = visibleBounds(zoomedIn, size, AREA_PADDING_PX)
     expect(particles[0].longitude).toBeGreaterThanOrEqual(onScreen.west)
     expect(particles[0].longitude).toBeLessThanOrEqual(onScreen.east)
   })
@@ -235,15 +195,16 @@ describe("advanceFrame", () => {
   it("keeps all of its particles on the screen over time, however much bigger the field is", () => {
     // The field spans 0.4 degrees; at zoom 14 the screen shows well under 0.02 of it.
     const zoomedIn = { ...view, zoom: 14 }
-    const field = eastwardField(4)
-    const particles = seedParticles(field, zoomedIn, size, 300)
+    const field = eastwardField(speed)
+    const count = 300
+    const particles = seedParticles(field, zoomedIn, size, count)
 
     for (let frame = 0; frame < 120; frame++) {
-      advanceFrame(particles, field, zoomedIn, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8 })
+      advanceFrame(particles, field, zoomedIn, size, FRAME_SECONDS, options)
     }
 
-    const onScreen = visibleBounds(zoomedIn, size, 64)
-    expect(particles).toHaveLength(300)
+    const onScreen = visibleBounds(zoomedIn, size, AREA_PADDING_PX)
+    expect(particles).toHaveLength(count)
     for (const particle of particles) {
       expect(particle.longitude).toBeGreaterThanOrEqual(onScreen.west)
       expect(particle.longitude).toBeLessThanOrEqual(onScreen.east)
@@ -253,11 +214,11 @@ describe("advanceFrame", () => {
   })
 
   it("moves the particles themselves forward, so the next frame continues from here", () => {
-    const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+    const particles: Particle[] = [{ latitude: CENTRE_LATITUDE, longitude: CENTRE_LONGITUDE, age: 0 }]
 
-    advanceFrame(particles, eastwardField(4), view, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8 })
+    advanceFrame(particles, eastwardField(speed), view, size, FRAME_SECONDS, options)
 
-    expect(particles[0].longitude).toBeGreaterThan(-4.5)
+    expect(particles[0].longitude).toBeGreaterThan(CENTRE_LONGITUDE)
   })
 })
 
@@ -266,22 +227,23 @@ describe("advanceFrame", () => {
 // day's forecast area happens to be. Mobile matches it.
 describe("particleCountFor", () => {
   it("is the screen's pixel count times the multiplier", () => {
-    expect(particleCountFor({ width: 400, height: 800 }, 0.0016)).toBe(512)
+    expect(particleCountFor(size, MULTIPLIER)).toBe(Math.round(size.width * size.height * MULTIPLIER))
   })
 
   it("is zero for a screen with no size yet", () => {
-    expect(particleCountFor({ width: 0, height: 0 }, 0.0016)).toBe(0)
+    expect(particleCountFor({ width: 0, height: 0 }, MULTIPLIER)).toBe(0)
   })
 })
 
 describe("seedParticles", () => {
   it("seeds the requested number on the screen, not across the whole field", () => {
     const zoomedIn = { ...view, zoom: 14 }
+    const count = 250
 
-    const particles = seedParticles(eastwardField(4), zoomedIn, size, 250)
+    const particles = seedParticles(eastwardField(4), zoomedIn, size, count)
 
-    const onScreen = visibleBounds(zoomedIn, size, 64)
-    expect(particles).toHaveLength(250)
+    const onScreen = visibleBounds(zoomedIn, size, AREA_PADDING_PX)
+    expect(particles).toHaveLength(count)
     for (const particle of particles) {
       expect(particle.longitude).toBeGreaterThanOrEqual(onScreen.west)
       expect(particle.longitude).toBeLessThanOrEqual(onScreen.east)
@@ -301,17 +263,14 @@ describe("seedParticles", () => {
 // screen the disc covers: zooming out shrinks the disc on screen, and the same number of
 // particles crammed into it would read as a dense blob.
 describe("forecastAreaPixels", () => {
-  const centre: [number, number] = [54.1, -4.5] // [latitude, longitude]
+  const centre: [number, number] = [CENTRE_LATITUDE, CENTRE_LONGITUDE] // [latitude, longitude]
   const screenPixels = size.width * size.height
+  const discPixels = (radiusKm: number) => Math.PI * (radiusKm * 1000 * pixelsPerMetre(view.zoom, CENTRE_LATITUDE)) ** 2
 
   it("is the disc's own area when it sits wholly on the screen", () => {
-    // 5 km at zoom 10 near 54 degrees north is about 111 px.
-    const radiusPixels = 5000 * (512 * 2 ** 10) / (40_075_016.686 * Math.cos((54.1 * Math.PI) / 180))
+    const area = forecastAreaPixels(view, size, { center: centre, radiusKm: DISC_RADIUS_KM })
 
-    const area = forecastAreaPixels(view, size, { center: centre, radiusKm: 5 })
-
-    expect(area).toBeCloseTo(Math.PI * radiusPixels ** 2, -3)
-    expect(area / (Math.PI * radiusPixels ** 2)).toBeCloseTo(1, 1)
+    expect(area / discPixels(DISC_RADIUS_KM)).toBeCloseTo(1, 1)
   })
 
   it("is the whole screen when the disc is far bigger than it", () => {
@@ -326,45 +285,45 @@ describe("forecastAreaPixels", () => {
 
   it("only counts the part of a disc that hangs over the screen's edge", () => {
     // Centred on the screen's left edge: about half is on screen.
-    const [longitude] = unprojectScreen(view, size, 0, 400)
-    const radiusPixels = 5000 * (512 * 2 ** 10) / (40_075_016.686 * Math.cos((54.1 * Math.PI) / 180))
+    const [longitude] = unprojectScreen(view, size, 0, centreY)
 
-    const area = forecastAreaPixels(view, size, { center: [54.1, longitude], radiusKm: 5 })
+    const area = forecastAreaPixels(view, size, { center: [CENTRE_LATITUDE, longitude], radiusKm: DISC_RADIUS_KM })
 
-    expect(area / (Math.PI * radiusPixels ** 2)).toBeCloseTo(0.5, 1)
+    expect(area / discPixels(DISC_RADIUS_KM)).toBeCloseTo(0.5, 1)
   })
 
   it("falls to a quarter for every zoom level out, as the disc shrinks on screen", () => {
-    const disc = { center: centre, radiusKm: 5 }
+    const disc = { center: centre, radiusKm: DISC_RADIUS_KM }
 
     const near = forecastAreaPixels(view, size, disc)
-    const far = forecastAreaPixels({ ...view, zoom: 9 }, size, disc)
+    const far = forecastAreaPixels({ ...view, zoom: view.zoom - 1 }, size, disc)
 
     expect(far / near).toBeCloseTo(0.25, 1)
   })
 })
 
 describe("particleCountForForecast", () => {
-  const disc = { center: [54.1, -4.5] as [number, number], radiusKm: 5 }
+  const disc = { center: [CENTRE_LATITUDE, CENTRE_LONGITUDE] as [number, number], radiusKm: DISC_RADIUS_KM }
 
   it("is the multiplier times the part of the screen the forecast covers", () => {
     const area = forecastAreaPixels(view, size, disc)
 
-    expect(particleCountForForecast(view, size, disc, 0.0016)).toBe(Math.round(area * 0.0016))
+    expect(particleCountForForecast(view, size, disc, MULTIPLIER)).toBe(Math.round(area * MULTIPLIER))
   })
 
   it("thins out as the map zooms out, so the density on screen stays the same", () => {
-    const near = particleCountForForecast(view, size, disc, 0.0016)
-    const far = particleCountForForecast({ ...view, zoom: 8 }, size, disc, 0.0016)
+    const near = particleCountForForecast(view, size, disc, MULTIPLIER)
+    const far = particleCountForForecast({ ...view, zoom: view.zoom - 2 }, size, disc, MULTIPLIER)
 
+    // Two zoom levels out is a sixteenth of the area on screen.
     expect(far).toBeLessThan(near / 10)
   })
 
   it("never asks for more than the whole screen would get", () => {
     const huge = { center: disc.center, radiusKm: 5000 }
 
-    expect(particleCountForForecast(view, size, huge, 0.0016)).toBeLessThanOrEqual(
-      particleCountFor(size, 0.0016),
+    expect(particleCountForForecast(view, size, huge, MULTIPLIER)).toBeLessThanOrEqual(
+      particleCountFor(size, MULTIPLIER),
     )
   })
 })

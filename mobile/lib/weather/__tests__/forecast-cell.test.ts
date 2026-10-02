@@ -76,14 +76,32 @@ describe("maskFieldToDisc", () => {
 })
 
 describe("the forecast disc", () => {
-  it("is built from the day's route by web's own discCell, with its minimum radius", () => {
-    const { center, radiusKm } = discCell([
-      [54.1, -4.5],
-      [54.12, -4.48],
-    ])
+  // The disc is web's (`discCell`), imported rather than copied, so what its radius works out to
+  // is web's business and is not pinned here; mobile only relies on it being centred on the route.
+  const route: [number, number][] = [
+    [54.1, -4.5],
+    [54.12, -4.48],
+  ]
 
-    expect(center[0]).toBeCloseTo(54.11, 6)
-    expect(radiusKm).toBe(38)
+  it("is centred on the day's route", () => {
+    const { center } = discCell(route)
+
+    expect(center[0]).toBeCloseTo((route[0][0] + route[1][0]) / 2, 6)
+    expect(center[1]).toBeCloseTo((route[0][1] + route[1][1]) / 2, 6)
+  })
+
+  it("is big enough to take in the whole route", () => {
+    const { center, radiusKm } = discCell(route)
+
+    // Distance from the centre to the farthest point of the route, in km.
+    const kmPerDegreeLatitude = 111
+    const kmPerDegreeLongitude = kmPerDegreeLatitude * Math.cos((center[0] * Math.PI) / 180)
+    const farthest = Math.max(
+      ...route.map(([latitude, longitude]) =>
+        Math.hypot((latitude - center[0]) * kmPerDegreeLatitude, (longitude - center[1]) * kmPerDegreeLongitude),
+      ),
+    )
+    expect(radiusKm).toBeGreaterThan(farthest)
   })
 })
 

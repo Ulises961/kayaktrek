@@ -16,9 +16,9 @@ const OFFSCREEN_MARGIN_PX = 16
 export const AREA_PADDING_PX = 24
 // Each particle drags a trail this many seconds of its own travel behind it, clamped so a
 // light breeze still shows and a gale does not smear across the map.
-const DEFAULT_TRAIL_SECONDS = 0.35
-const MIN_TRAIL_PX = 4
-const MAX_TRAIL_PX = 40
+export const DEFAULT_TRAIL_SECONDS = 0.35
+export const MIN_TRAIL_PX = 4
+export const MAX_TRAIL_PX = 40
 
 export type ScreenPoint = { x: number; y: number }
 export type Segment = [from: ScreenPoint, to: ScreenPoint]
@@ -51,14 +51,9 @@ export type AdvanceFrameOptions = {
   pixelsPerSecondPerMetreSecond: number
   lifeSeconds?: number
   trailSeconds?: number
-  /** Trail length limits in pixels; a layer's own look (swell is short, wind long). */
+  /** Trail length limits in pixels, for a layer that wants its own look. */
   minTrailPixels?: number
   maxTrailPixels?: number
-  /**
-   * Draw each particle as `count` separate dashes with gaps between them, instead of one
-   * continuous trail: how swell is told apart from wind. Overrides the trail settings.
-   */
-  dashes?: { count: number; lengthPixels: number; gapPixels: number }
   random?: () => number
 }
 
@@ -181,24 +176,6 @@ export function advanceFrame(
 
     const directionX = dx / travelled
     const directionY = dy / travelled
-
-    if (options.dashes) {
-      // Dashes: several short segments, each `lengthPixels` long with `gapPixels` between,
-      // laid out behind the particle as a unit. Fixed lengths — a dash does not stretch with
-      // the flow's speed the way a line's trail does.
-      const { count, lengthPixels, gapPixels } = options.dashes
-      for (let dash = 0; dash < count; dash++) {
-        const headOffset = dash * (lengthPixels + gapPixels)
-        const dashHead = { x: head.x - directionX * headOffset, y: head.y - directionY * headOffset }
-        const dashTail = {
-          x: dashHead.x - directionX * lengthPixels,
-          y: dashHead.y - directionY * lengthPixels,
-        }
-        if (!isOnScreen(dashTail, size) && !isOnScreen(dashHead, size)) continue
-        segments.push([dashTail, dashHead])
-      }
-      continue
-    }
 
     // The trail is `trailSeconds` of the particle's own on-screen speed, laid out behind it.
     const trailLength = Math.min(

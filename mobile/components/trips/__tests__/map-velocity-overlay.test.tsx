@@ -1,25 +1,47 @@
 import { fireEvent, render } from "@testing-library/react-native";
 
 import type { Day } from "@shared/dtos/day";
+import { discCell } from "@shared/landing/ambient-wind";
+import { formatTimeAgo } from "@shared/utils/date";
 
+import { speedColor } from "@mobile/lib/weather/advection";
 import type { VelocityField } from "@mobile/lib/weather/velocity";
+import { meanSpeed } from "@mobile/lib/weather/velocity-frame";
 import { useVelocityField } from "@mobile/lib/weather/use-velocity-field";
 
-import { MapVelocityOverlay } from "../map-velocity-overlay";
+import { MapVelocityOverlay, WIND_PARTICLE_MULTIPLIER, WIND_STROKE_WIDTH } from "../map-velocity-overlay";
 
 jest.mock("@mobile/lib/weather/use-velocity-field", () => ({
   useVelocityField: jest.fn(),
 }));
 
-// The Skia overlay is covered by its own test; here it is a marker that records how it
-// was asked to draw: which layer, in what colour, whether it owns the ring, and the field
-// it was given.
-const mockOverlayProps: Record<string, Record<string, unknown>> = {};
+// The three Skia components are covered by their own tests. Here each is a marker that records
+// the props it was given, so what is under test is what the container decides: which of them
+// to draw, for which field, and with what.
+const mockProps: {
+  wind?: Record<string, unknown>
+  swell?: Record<string, unknown>
+  ring?: Record<string, unknown>
+} = {};
 jest.mock("../velocity-overlay", () => ({
-  VelocityOverlay: (props: { color: string; drawRing: boolean }) => {
+  VelocityOverlay: (props: Record<string, unknown>) => {
     const { createElement } = jest.requireActual("react");
-    mockOverlayProps[props.color] = props;
-    return createElement("View", { testID: `velocity-overlay-${props.color}` });
+    mockProps.wind = props;
+    return createElement("View", { testID: "wind-overlay" });
+  },
+}));
+jest.mock("../swell-overlay", () => ({
+  SwellOverlay: (props: Record<string, unknown>) => {
+    const { createElement } = jest.requireActual("react");
+    mockProps.swell = props;
+    return createElement("View", { testID: "swell-overlay" });
+  },
+}));
+jest.mock("../forecast-ring", () => ({
+  ForecastRing: (props: Record<string, unknown>) => {
+    const { createElement } = jest.requireActual("react");
+    mockProps.ring = props;
+    return createElement("View", { testID: "forecast-ring" });
   },
 }));
 
@@ -60,8 +82,6 @@ const field: VelocityField = {
   v: new Array(25).fill(0),
 };
 
-const WHITE = "rgb(255, 255, 255)";
-
 type HookState = { status: string; field: VelocityField | null; error: string | null };
 const idle: HookState = { status: "idle", field: null, error: null };
 const ready: HookState = { status: "ready", field, error: null };
@@ -89,7 +109,9 @@ beforeEach(() => {
   hooks(idle, idle);
   handlers.onWindToggle.mockReset();
   handlers.onSwellToggle.mockReset();
-  for (const key of Object.keys(mockOverlayProps)) delete mockOverlayProps[key];
+  delete mockProps.wind;
+  delete mockProps.swell;
+  delete mockProps.ring;
 });
 
 async function openPanel(utils: Awaited<ReturnType<typeof render>>) {
@@ -156,103 +178,101 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
   it("draws nothing while a layer is still loading", async () => {
     hooks({ status: "loading", field: null, error: null }, idle);
 
-    const { toJSON } = await render(<MapVelocityOverlay {...baseProps} windOn />);
+    await render(<MapVelocityOverlay {...baseProps} windOn />);
 
-    expect(Object.keys(mockOverlayProps)).toHaveLength(0);
-    expect(JSON.stringify(toJSON())).not.toContain("velocity-overlay");
+    expect(mockProps.wind).toBeUndefined();
+    expect(mockProps.swell).toBeUndefined();
+    expect(mockProps.ring).toBeUndefined();
   });
 
-  it("draws wind once loaded, in a colour from the wind ramp", async () => {
+  it("draws wind once loaded, as particles in a colour from the wind ramp", async () => {
     hooks(ready, idle);
 
     await render(<MapVelocityOverlay {...baseProps} windOn />);
 
-    const colours = Object.keys(mockOverlayProps);
-    expect(colours).toHaveLength(1);
-    expect(colours[0]).not.toBe(WHITE);
+    expect(mockProps.wind).toBeTruthy();
+    expect(mockProps.swell).toBeUndefined();
+    // The colour is the ramp's, for how strong the wind is.
+    expect(mockProps.wind?.color).toBe(speedColor(meanSpeed(field)));
+    expect(mockProps.wind?.particleMultiplier).toBe(WIND_PARTICLE_MULTIPLIER);
+    expect(mockProps.wind?.strokeWidth).toBe(WIND_STROKE_WIDTH);
   });
 
-  it("draws swell in white", async () => {
+  it("draws swell with its own renderer, not as wind's particles in another colour", async () => {
     hooks(idle, ready);
 
     await render(<MapVelocityOverlay {...baseProps} swellOn />);
 
-    expect(mockOverlayProps[WHITE]).toBeTruthy();
+    expect(mockProps.swell).toBeTruthy();
+    expect(mockProps.wind).toBeUndefined();
   });
 
-  it("draws swell as a dash that moves, not a line like wind", async () => {
+  it("draws both when both are on", async () => {
     hooks(ready, ready);
 
     await render(<MapVelocityOverlay {...baseProps} windOn swellOn />);
 
-    const swell = mockOverlayProps[WHITE];
-    const wind = Object.entries(mockOverlayProps).find(([colour]) => colour !== WHITE)?.[1];
-    expect(wind).toBeTruthy();
-
-    // Swell is a run of separate dashes with gaps between them, moving together — not one
-    // continuous line, however short and thick.
-    const dashes = swell.dashes as { count: number; lengthPixels: number; gapPixels: number };
-    expect(dashes.count).toBeGreaterThan(1);
-    expect(dashes.gapPixels).toBeGreaterThan(0);
-    // Square ends make each one a dash; wind keeps the default round ends of a line.
-    expect(swell.strokeCap).toBe("butt");
-    expect(wind?.strokeCap).toBeUndefined();
-    // And wind stays a continuous, speed-scaled trail.
-    expect(wind?.dashes).toBeUndefined();
+    expect(mockProps.wind).toBeTruthy();
+    expect(mockProps.swell).toBeTruthy();
   });
 
-  it("draws swell thinner than a solid line would be, so the gaps between the dashes show", async () => {
-    hooks(idle, ready);
-
-    await render(<MapVelocityOverlay {...baseProps} swellOn />);
-
-    expect(mockOverlayProps[WHITE].strokeWidth).toBeLessThan(3.5);
-  });
-
-  it("clips the field to the disc around the day's route, as the web planner does", async () => {
-    hooks(ready, idle);
-
-    await render(<MapVelocityOverlay {...baseProps} windOn />);
-
-    const drawn = Object.values(mockOverlayProps)[0].field as VelocityField;
-    // The field's far corners are tens of kilometres from a route a few km long.
-    expect(drawn.u[0]).toBeNull();
-    expect(drawn.u[24]).toBeNull();
-    // The cell at the middle of the field is at the route, inside the disc.
-    expect(drawn.u[12]).not.toBeNull();
-  });
-
-  it("gives the disc, centred on the day's route, to the layer that draws the ring", async () => {
-    hooks(ready, idle);
-
-    await render(<MapVelocityOverlay {...baseProps} windOn />);
-
-    const wind = Object.values(mockOverlayProps)[0];
-    const disc = wind.disc as { center: [number, number]; radiusKm: number };
-    expect(disc.center[0]).toBeCloseTo(54.11, 6);
-    expect(disc.center[1]).toBeCloseTo(-4.49, 6);
-    // Web's rule: at least a 38 km radius.
-    expect(disc.radiusKm).toBeGreaterThanOrEqual(38);
-    expect(wind.drawRing).toBe(true);
-  });
-
-  it("draws the ring once when wind and swell are both on", async () => {
+  it("clips each field to the disc around the day's route, as the web planner does", async () => {
     hooks(ready, ready);
 
     await render(<MapVelocityOverlay {...baseProps} windOn swellOn />);
 
-    const layers = Object.values(mockOverlayProps);
-    expect(layers).toHaveLength(2);
-    expect(layers.filter((layer) => layer.drawRing === true)).toHaveLength(1);
+    for (const layer of [mockProps.wind, mockProps.swell]) {
+      const drawn = layer?.field as VelocityField;
+      // The field's far corners are tens of kilometres from a route a few km long.
+      expect(drawn.u[0]).toBeNull();
+      expect(drawn.u[drawn.u.length - 1]).toBeNull();
+      // The cell at the middle of the field is at the route, inside the disc.
+      expect(drawn.u[Math.floor(drawn.u.length / 2)]).not.toBeNull();
+    }
   });
 
-  it("draws the ring from swell alone when wind is off", async () => {
+  it("gives wind the forecast disc, which web builds from the day's route, so its density can follow it", async () => {
+    hooks(ready, idle);
+
+    await render(<MapVelocityOverlay {...baseProps} windOn />);
+
+    expect(mockProps.wind?.disc).toEqual(discCell(dayPositions));
+  });
+});
+
+describe("MapVelocityOverlay: the forecast ring", () => {
+  it("is drawn around the disc that web builds from the day's route", async () => {
+    hooks(ready, idle);
+
+    await render(<MapVelocityOverlay {...baseProps} windOn />);
+
+    expect(mockProps.ring?.disc).toEqual(discCell(dayPositions));
+  });
+
+  it("is drawn for swell alone", async () => {
     hooks(idle, ready);
 
     await render(<MapVelocityOverlay {...baseProps} swellOn />);
 
-    expect(mockOverlayProps[WHITE].drawRing).toBe(true);
+    expect(mockProps.ring).toBeTruthy();
   });
+
+  it("is drawn once when wind and swell are both showing", async () => {
+    hooks(ready, ready);
+
+    const { getAllByTestId } = await render(<MapVelocityOverlay {...baseProps} windOn swellOn />);
+
+    expect(getAllByTestId("forecast-ring")).toHaveLength(1);
+  });
+
+  it("is not drawn when no layer is showing", async () => {
+    hooks(idle, idle);
+
+    const { queryByTestId } = await render(<MapVelocityOverlay {...baseProps} />);
+
+    expect(queryByTestId("forecast-ring")).toBeNull();
+  });
+
 });
 
 describe("MapVelocityOverlay: saying what is going on, in the panel and not on the map", () => {
@@ -262,7 +282,10 @@ describe("MapVelocityOverlay: saying what is going on, in the panel and not on t
 
     await openPanel(utils);
 
-    expect(utils.getByText(/12:00 · forecast as of 2 hours ago/)).toBeTruthy();
+    // The hour being shown, and the age of the forecast as the weather panel words it.
+    const hourShown = `${String(baseProps.hour).padStart(2, "0")}:00`;
+    const age = formatTimeAgo(day.weather?.fetchedAt);
+    expect(utils.getByText(`${hourShown} · forecast as of ${age}`)).toBeTruthy();
   });
 
   it("says it is loading", async () => {
@@ -290,7 +313,8 @@ describe("MapVelocityOverlay: saying what is going on, in the panel and not on t
     await openPanel(utils);
 
     expect(utils.getByText("Could not reach the server.")).toBeTruthy();
-    expect(Object.keys(mockOverlayProps)).toHaveLength(0);
+    expect(mockProps.wind).toBeUndefined();
+    expect(mockProps.ring).toBeUndefined();
   });
 
   it("says the flow is one reading for the whole area, not a spatial map", async () => {

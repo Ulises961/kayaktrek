@@ -4,13 +4,16 @@ import type { MapViewState } from "./project-lng-lat"
 // wind particles and the swell dashes both take themselves away while the view moves and
 // come back once it has been still for this long.
 
-/** How long the view must stand still before an overlay comes back. Web waits 320 ms. */
-export const VIEW_SETTLE_MS = 320
+/**
+ * How long the view must stand still before an overlay comes back. Web waits 320 ms; this is
+ * shorter because it was tuned on a device, where the overlay felt slow to return.
+ */
+export const VIEW_SETTLE_MS = 200
 
 // Smaller than this is the map reporting the same view again, not movement.
-const ZOOM_EPSILON = 1e-3
-const CENTER_EPSILON_DEGREES = 1e-6
-const BEARING_EPSILON_DEGREES = 0.05
+export const ZOOM_EPSILON = 1e-3
+export const CENTER_EPSILON_DEGREES = 1e-6
+export const BEARING_EPSILON_DEGREES = 0.05
 
 /** Whether the map has moved between two reports of its view. */
 export function viewChanged(before: MapViewState, after: MapViewState): boolean {

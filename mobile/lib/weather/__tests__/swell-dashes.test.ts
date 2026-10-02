@@ -1,9 +1,12 @@
 import { projectLngLat, visibleBounds, type MapViewState } from "../../map/project-lng-lat"
 import {
   SWELL_DASH_PIXELS,
+  SWELL_MAX_SPACING_PIXELS,
+  SWELL_MIN_SPACING_PIXELS,
   SWELL_STEP_PIXELS,
   SWELL_STEP_SECONDS,
   SWELL_STEPS,
+  SWELL_VISIBLE_PADDING_PIXELS,
   swellDashes,
   swellLattice,
   type SwellNode,
@@ -14,7 +17,8 @@ const size = { width: 400, height: 800 }
 const view: MapViewState = { center: [-4.5, 54.1], zoom: 10, bearing: 0, pitch: 0 }
 
 // 5 x 5 data points over 0.1 degrees of latitude and 0.17 of longitude: about 2.8 km apart in
-// both directions, which is about 62 px at zoom 10 — inside the 36-72 px a node should have.
+// both directions, which is about 62 px at zoom 10 — between the minimum and maximum spacing a
+// node should have, so at this zoom the nodes are the data points themselves.
 function field(overrides: Partial<VelocityField> = {}): VelocityField {
   return {
     north: 54.15,
@@ -54,12 +58,12 @@ describe("swellLattice", () => {
 
     const nodes = swellLattice(field(), zoomedIn, size)
 
-    // The grid is ~250 px apart at zoom 12; nodes are subdivided until they are 36-72 px apart.
+    // The grid is ~250 px apart at zoom 12; nodes are subdivided until they are within range.
     const nearest = (node: SwellNode) =>
       Math.min(...nodes.filter((other) => other !== node).map((other) => pixelDistance(node, other, zoomedIn)))
     for (const node of nodes) {
-      expect(nearest(node)).toBeLessThanOrEqual(72 + 1e-6)
-      expect(nearest(node)).toBeGreaterThanOrEqual(36 - 1e-6)
+      expect(nearest(node)).toBeLessThanOrEqual(SWELL_MAX_SPACING_PIXELS + 1e-6)
+      expect(nearest(node)).toBeGreaterThanOrEqual(SWELL_MIN_SPACING_PIXELS - 1e-6)
     }
   })
 
@@ -73,7 +77,7 @@ describe("swellLattice", () => {
     const nearest = (node: SwellNode) =>
       Math.min(...nodes.filter((other) => other !== node).map((other) => pixelDistance(node, other, zoomedOut)))
     for (const node of nodes) {
-      expect(nearest(node)).toBeGreaterThanOrEqual(36 - 1e-6)
+      expect(nearest(node)).toBeGreaterThanOrEqual(SWELL_MIN_SPACING_PIXELS - 1e-6)
     }
   })
 
@@ -98,7 +102,7 @@ describe("swellLattice", () => {
     const zoomedIn: MapViewState = { ...view, zoom: 14 }
     const nodes = swellLattice(field(), zoomedIn, size)
 
-    const bounds = visibleBounds(zoomedIn, size, 80)
+    const bounds = visibleBounds(zoomedIn, size, SWELL_VISIBLE_PADDING_PIXELS)
     for (const node of nodes) {
       expect(node.longitude).toBeGreaterThanOrEqual(bounds.west)
       expect(node.longitude).toBeLessThanOrEqual(bounds.east)
@@ -149,10 +153,10 @@ describe("swellLattice", () => {
 
     const westmost = nodes.filter((node) => node.latitude === nodes[0].latitude).sort((a, b) => a.longitude - b.longitude)
     const phases = westmost.map((node) => node.phase)
-    // Each step east moves the phase on by the same amount (a third of a cycle at this spacing).
+    // Each step east moves the phase on by the same amount: one step's worth of the cycle, so a
+    // dash at one node is one position ahead of the dash at the node behind it.
     const step = (phases[1] - phases[0] + 1) % 1
-    expect(step).toBeGreaterThan(0.2)
-    expect(step).toBeLessThan(0.5)
+    expect(step).toBeCloseTo(1 / SWELL_STEPS, 6)
     expect((phases[2] - phases[1] + 1) % 1).toBeCloseTo(step, 6)
     for (const phase of phases) {
       expect(phase).toBeGreaterThanOrEqual(0)

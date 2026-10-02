@@ -1,4 +1,12 @@
-import { projectLngLat, unprojectScreen, visibleBounds, type MapViewState } from "../project-lng-lat"
+import {
+  EARTH_CIRCUMFERENCE_METRES,
+  pixelsPerMetre,
+  projectLngLat,
+  TILE_SIZE,
+  unprojectScreen,
+  visibleBounds,
+  type MapViewState,
+} from "../project-lng-lat"
 
 const size = { width: 400, height: 800 }
 
@@ -29,11 +37,11 @@ describe("projectLngLat", () => {
     expect(x11 - 200).toBeCloseTo((x10 - 200) * 2, 6)
   })
 
-  it("measures 512 * 2^zoom pixels around the whole world at the equator", () => {
+  it("makes the world one tile wide at zoom 0, and the tile is MapLibre's", () => {
     const [x] = projectLngLat({ center: [0, 0], zoom: 0, bearing: 0, pitch: 0 }, size, 90, 0)
 
-    // A quarter of the way round the world at zoom 0 is 512 / 4 pixels.
-    expect(x - 200).toBeCloseTo(128, 6)
+    // A quarter of the way round the world at zoom 0 is a quarter of a tile.
+    expect(x - size.width / 2).toBeCloseTo(TILE_SIZE / 4, 6)
   })
 
   it("keeps the same ground distance per degree of longitude at any latitude (Mercator)", () => {
@@ -49,6 +57,33 @@ describe("projectLngLat", () => {
 
     expect(x).toBeLessThan(200)
     expect(y).toBeCloseTo(400, 3)
+  })
+})
+
+describe("pixelsPerMetre", () => {
+  // Checked against the projection itself, not against its own formula: walk a known number
+  // of metres east and see how many pixels the map moves.
+  const metres = 1000
+
+  function eastwardPixelsFor(latitude: number, zoom: number): number {
+    const mapView: MapViewState = { center: [0, latitude], zoom, bearing: 0, pitch: 0 }
+    const metresPerDegreeLongitude = (EARTH_CIRCUMFERENCE_METRES / 360) * Math.cos((latitude * Math.PI) / 180)
+    const [x] = projectLngLat(mapView, size, metres / metresPerDegreeLongitude, latitude)
+    return x - size.width / 2
+  }
+
+  it("is how far the projection moves for a metre of ground, at the equator and away from it", () => {
+    for (const latitude of [0, 54.1, -33.4]) {
+      expect(pixelsPerMetre(10, latitude) * metres).toBeCloseTo(eastwardPixelsFor(latitude, 10), 6)
+    }
+  })
+
+  it("doubles with each zoom level", () => {
+    expect(pixelsPerMetre(11, 54.1)).toBeCloseTo(pixelsPerMetre(10, 54.1) * 2, 12)
+  })
+
+  it("grows towards the poles, where a metre of ground covers more of a Mercator map", () => {
+    expect(pixelsPerMetre(10, 60)).toBeGreaterThan(pixelsPerMetre(10, 0))
   })
 })
 

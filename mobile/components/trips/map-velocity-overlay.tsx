@@ -13,15 +13,14 @@ import { maskFieldToDisc } from "../../lib/weather/forecast-cell"
 import { useVelocityField, type VelocityKind } from "../../lib/weather/use-velocity-field"
 import { meanSpeed } from "../../lib/weather/velocity-frame"
 import { Text } from "../ui/text"
+import { ForecastRing } from "./forecast-ring"
+import { SwellOverlay } from "./swell-overlay"
 import { VelocityOverlay } from "./velocity-overlay"
 
-// Swell is white: direction matters more than speed, the standard chart convention, and web
-// draws it the same way (map-core.tsx SWELL_OPTIONS). It is drawn as a dash, not a line: one
-// fixed length (minimum and maximum the same, so it does not stretch with the flow the way
-// wind's trails do) with square ends, so a wave crest moving through reads differently from
-// wind streaming past.
-const SWELL_COLOR = "rgb(255, 255, 255)"
-const SWELL_DASHES = { count: 3, lengthPixels: 5, gapPixels: 6 }
+// Wind's look: web's planner values (map-core.tsx WIND_OPTIONS: 2.5 px lines), with the density
+// raised on the device from web's 0.0016, where a phone's small screen read as sparse.
+export const WIND_PARTICLE_MULTIPLIER = 0.0026
+export const WIND_STROKE_WIDTH = 2.5
 
 function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
@@ -140,36 +139,21 @@ export function MapVelocityOverlay({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {/* The ring marks the one forecast area, whichever of the two layers are inside it. */}
+      {(windDrawn || swellDrawn) && disc && <ForecastRing disc={disc} viewRef={viewRef} size={size} />}
       {windDrawn && windField && disc && (
         <VelocityOverlay
           field={windField}
           viewRef={viewRef}
           size={size}
           color={speedColor(meanSpeed(wind.field ?? windField))}
-          // Web's planner values (map-core.tsx WIND_OPTIONS).
-          particleMultiplier={0.0016}
-          strokeWidth={2.5}
+          particleMultiplier={WIND_PARTICLE_MULTIPLIER}
+          strokeWidth={WIND_STROKE_WIDTH}
           disc={disc}
-          drawRing
         />
       )}
-      {swellDrawn && swellField && disc && (
-        <VelocityOverlay
-          field={swellField}
-          viewRef={viewRef}
-          size={size}
-          color={SWELL_COLOR}
-          // Sparser than wind (web's swell is too, 0.0014 against 0.0016), and lower still
-          // here: each particle is three dashes, so it carries about three times the ink.
-          // Thinner than web's 3.5 px line so the gaps between the dashes show.
-          particleMultiplier={0.0009}
-          strokeWidth={2.5}
-          strokeCap="butt"
-          dashes={SWELL_DASHES}
-          disc={disc}
-          drawRing={!windDrawn}
-        />
-      )}
+      {/* Swell is not particles: one dash per data point, fading in place. */}
+      {swellDrawn && swellField && <SwellOverlay field={swellField} viewRef={viewRef} size={size} />}
 
       <View pointerEvents="box-none" className="absolute right-3 top-3 items-end gap-1">
         <Pressable

@@ -25,17 +25,22 @@ import type { VelocityField } from "../../lib/weather/velocity"
 // Each dash fades on its own, but a Skia paint has one opacity, so the dashes are sorted into
 // five levels of opacity and each level is drawn as one set of lines.
 const MAX_PITCH_DEGREES = 1
-const FADE_IN_MS = 300
-const LEVELS = 5
-const MAX_OPACITY = 0.9
-// Lightest first: level i is drawn at (i + 1) / LEVELS of the strongest.
-const LEVEL_OPACITIES = Array.from({ length: LEVELS }, (_, level) => ((level + 1) / LEVELS) * MAX_OPACITY)
+export const SWELL_FADE_IN_MS = 300
+export const SWELL_LEVELS = 5
+export const SWELL_MAX_OPACITY = 0.9
+/** Swell is white: direction matters more than speed, the standard chart convention, and web's too. */
+export const SWELL_COLOR = "rgb(255, 255, 255)"
+// Lightest first: level i is drawn at (i + 1) / SWELL_LEVELS of the strongest.
+const LEVEL_OPACITIES = Array.from(
+  { length: SWELL_LEVELS },
+  (_, level) => ((level + 1) / SWELL_LEVELS) * SWELL_MAX_OPACITY,
+)
 
 export function SwellOverlay({
   field,
   viewRef,
   size,
-  color = "rgb(255, 255, 255)",
+  color = SWELL_COLOR,
   strokeWidth = 3,
 }: {
   field: VelocityField
@@ -93,12 +98,12 @@ export function SwellOverlay({
         }
 
         if (nodes !== null) {
-          const fade = Math.min(1, (now - fadeStartedAt) / FADE_IN_MS)
+          const fade = Math.min(1, (now - fadeStartedAt) / SWELL_FADE_IN_MS)
           const points: SkPoint[][] = levels.map(() => [])
           for (const dash of swellDashes(nodes, view, sizeRef.current, now / 1000)) {
             const alpha = dash.alpha * fade
             if (alpha < SWELL_MIN_ALPHA) continue
-            const level = Math.min(LEVELS - 1, Math.floor(alpha * LEVELS))
+            const level = Math.min(SWELL_LEVELS - 1, Math.floor(alpha * SWELL_LEVELS))
             // Skia's "lines" mode draws a line between each consecutive pair of points.
             points[level].push(dash.from, dash.to)
           }

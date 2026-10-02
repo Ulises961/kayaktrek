@@ -3,9 +3,23 @@ import type { RefObject } from "react";
 
 import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
 import { VIEW_SETTLE_MS } from "@mobile/lib/map/view-change";
+import { SWELL_STEP_SECONDS, SWELL_STEPS } from "@mobile/lib/weather/swell-dashes";
 import type { VelocityField } from "@mobile/lib/weather/velocity";
 
-import { SwellOverlay } from "../swell-overlay";
+import {
+  SWELL_COLOR,
+  SWELL_FADE_IN_MS,
+  SWELL_LEVELS,
+  SWELL_MAX_OPACITY,
+  SwellOverlay,
+} from "../swell-overlay";
+
+// Long enough for the overlay to have faded in and for dashes to be showing at some moment
+// of their cycle: the fade, then one full cycle.
+const CYCLE_MS = SWELL_STEPS * SWELL_STEP_SECONDS * 1000;
+const SHOWING_AFTER_MS = SWELL_FADE_IN_MS + CYCLE_MS;
+// Long enough, after the view has stopped changing, to settle, fade in and show again.
+const BACK_AFTER_MS = VIEW_SETTLE_MS + SHOWING_AFTER_MS;
 
 // Skia's canvas needs a native surface jest does not have; its pieces become host elements
 // that record the props they were drawn with.
@@ -84,7 +98,11 @@ function dashesShowing(): number {
   }, 0);
 }
 
-async function advance(nextFrame: (ms?: number) => Promise<void>, totalMs: number, stepMs = 50) {
+// Frames a quarter of the settle time apart: fine enough to catch the moment it runs out, and
+// close enough together that a gesture's frames never let the view settle between them.
+const FRAME_MS = VIEW_SETTLE_MS / 4;
+
+async function advance(nextFrame: (ms?: number) => Promise<void>, totalMs: number, stepMs = FRAME_MS) {
   for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) await nextFrame(stepMs);
 }
 
@@ -120,7 +138,7 @@ describe("SwellOverlay", () => {
 
     for (const level of getAllByTestId("swell-dashes")) {
       expect(level.props.strokeCap).toBe("butt");
-      expect(level.props.color).toBe("rgb(255, 255, 255)");
+      expect(level.props.color).toBe(SWELL_COLOR);
     }
   });
 
@@ -131,10 +149,11 @@ describe("SwellOverlay", () => {
     );
 
     const opacities = getAllByTestId("swell-dashes").map((level) => level.props.opacity as number);
-    expect(opacities).toHaveLength(5);
+    expect(opacities).toHaveLength(SWELL_LEVELS);
     expect([...opacities].sort((a, b) => a - b)).toEqual(opacities);
-    expect(new Set(opacities).size).toBe(5);
-    expect(Math.max(...opacities)).toBeLessThanOrEqual(1);
+    expect(new Set(opacities).size).toBe(SWELL_LEVELS);
+    // The strongest level is drawn at the overlay's maximum; the lightest is still visible.
+    expect(Math.max(...opacities)).toBeCloseTo(SWELL_MAX_OPACITY, 6);
     expect(Math.min(...opacities)).toBeGreaterThan(0);
   });
 
@@ -143,7 +162,7 @@ describe("SwellOverlay", () => {
     await render(<SwellOverlay field={field} viewRef={viewRef(flatView)} size={size} />);
 
     // The first frame builds the lattice; the fade-in then takes about 300 ms.
-    await advance(nextFrame, 600);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     expect(dashesShowing()).toBeGreaterThan(0);
     expect(dashesShowing()).toBeLessThanOrEqual(25);
@@ -153,7 +172,7 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     await render(<SwellOverlay field={field} viewRef={viewRef(null)} size={size} />);
 
-    await advance(nextFrame, 600);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     expect(dashesShowing()).toBe(0);
   });
@@ -165,7 +184,7 @@ describe("SwellOverlay", () => {
     await nextFrame();
     expect(dashesShowing()).toBe(0);
 
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
     expect(dashesShowing()).toBeGreaterThan(0);
   });
 
@@ -173,7 +192,7 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     const ref = viewRef(flatView);
     await render(<SwellOverlay field={field} viewRef={ref} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
     expect(dashesShowing()).toBeGreaterThan(0);
 
     ref.current = { ...flatView, zoom: 9.6 };
@@ -186,11 +205,11 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     const ref = viewRef(flatView);
     await render(<SwellOverlay field={field} viewRef={ref} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     for (let step = 1; step <= 20; step++) {
       ref.current = { ...flatView, zoom: 10 - step * 0.05 };
-      await nextFrame(50);
+      await nextFrame(FRAME_MS);
       expect(dashesShowing()).toBe(0);
     }
   });
@@ -199,14 +218,14 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     const ref = viewRef(flatView);
     await render(<SwellOverlay field={field} viewRef={ref} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     ref.current = { ...flatView, zoom: 9.6 };
     await nextFrame();
-    await advance(nextFrame, VIEW_SETTLE_MS - 100);
+    await advance(nextFrame, VIEW_SETTLE_MS / 2);
     expect(dashesShowing()).toBe(0);
 
-    await advance(nextFrame, 1200);
+    await advance(nextFrame, BACK_AFTER_MS);
     expect(dashesShowing()).toBeGreaterThan(0);
   });
 
@@ -214,11 +233,11 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     const ref = viewRef(flatView);
     await render(<SwellOverlay field={field} viewRef={ref} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     for (let frame = 0; frame < 30; frame++) {
       ref.current = { ...flatView, center: [...flatView.center] };
-      await nextFrame(30);
+      await nextFrame(FRAME_MS);
     }
 
     expect(dashesShowing()).toBeGreaterThan(0);
@@ -228,7 +247,7 @@ describe("SwellOverlay", () => {
     const nextFrame = controlFrames();
     const ref = viewRef(flatView);
     await render(<SwellOverlay field={field} viewRef={ref} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
     expect(dashesShowing()).toBeGreaterThan(0);
 
     ref.current = { ...flatView, pitch: 30 };
@@ -240,11 +259,11 @@ describe("SwellOverlay", () => {
   it("moves on through its cycle, so what is showing changes over time", async () => {
     const nextFrame = controlFrames();
     await render(<SwellOverlay field={field} viewRef={viewRef(flatView)} size={size} />);
-    await advance(nextFrame, 800);
+    await advance(nextFrame, SHOWING_AFTER_MS);
 
     const seen = new Set<string>();
     for (let frame = 0; frame < 40; frame++) {
-      await nextFrame(100);
+      await nextFrame(CYCLE_MS / 40);
       seen.add(JSON.stringify(mockSharedValues.map((set) => set.mock.calls.at(-1)?.[0])));
     }
 
