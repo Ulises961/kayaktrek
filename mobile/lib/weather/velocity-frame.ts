@@ -54,6 +54,11 @@ export type AdvanceFrameOptions = {
   /** Trail length limits in pixels; a layer's own look (swell is short, wind long). */
   minTrailPixels?: number
   maxTrailPixels?: number
+  /**
+   * Draw each particle as `count` separate dashes with gaps between them, instead of one
+   * continuous trail: how swell is told apart from wind. Overrides the trail settings.
+   */
+  dashes?: { count: number; lengthPixels: number; gapPixels: number }
   random?: () => number
 }
 
@@ -174,12 +179,33 @@ export function advanceFrame(
     // Not moving: there is no direction to trail behind it.
     if (travelled === 0 || realDtSeconds <= 0) continue
 
+    const directionX = dx / travelled
+    const directionY = dy / travelled
+
+    if (options.dashes) {
+      // Dashes: several short segments, each `lengthPixels` long with `gapPixels` between,
+      // laid out behind the particle as a unit. Fixed lengths — a dash does not stretch with
+      // the flow's speed the way a line's trail does.
+      const { count, lengthPixels, gapPixels } = options.dashes
+      for (let dash = 0; dash < count; dash++) {
+        const headOffset = dash * (lengthPixels + gapPixels)
+        const dashHead = { x: head.x - directionX * headOffset, y: head.y - directionY * headOffset }
+        const dashTail = {
+          x: dashHead.x - directionX * lengthPixels,
+          y: dashHead.y - directionY * lengthPixels,
+        }
+        if (!isOnScreen(dashTail, size) && !isOnScreen(dashHead, size)) continue
+        segments.push([dashTail, dashHead])
+      }
+      continue
+    }
+
     // The trail is `trailSeconds` of the particle's own on-screen speed, laid out behind it.
     const trailLength = Math.min(
       Math.max((travelled / realDtSeconds) * trailSeconds, options.minTrailPixels ?? MIN_TRAIL_PX),
       options.maxTrailPixels ?? MAX_TRAIL_PX,
     )
-    const tail = { x: head.x - (dx / travelled) * trailLength, y: head.y - (dy / travelled) * trailLength }
+    const tail = { x: head.x - directionX * trailLength, y: head.y - directionY * trailLength }
     if (!isOnScreen(tail, size) && !isOnScreen(head, size)) continue
     segments.push([tail, head])
   }

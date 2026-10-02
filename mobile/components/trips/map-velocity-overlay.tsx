@@ -21,8 +21,7 @@ import { VelocityOverlay } from "./velocity-overlay"
 // wind's trails do) with square ends, so a wave crest moving through reads differently from
 // wind streaming past.
 const SWELL_COLOR = "rgb(255, 255, 255)"
-const SWELL_DASH_PIXELS = 8
-const SWELL_TRAIL = { minPixels: SWELL_DASH_PIXELS, maxPixels: SWELL_DASH_PIXELS }
+const SWELL_DASHES = { count: 3, lengthPixels: 5, gapPixels: 6 }
 
 function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
@@ -160,11 +159,13 @@ export function MapVelocityOverlay({
           viewRef={viewRef}
           size={size}
           color={SWELL_COLOR}
-          // Web's planner values (map-core.tsx SWELL_OPTIONS): sparser and thicker than wind.
-          particleMultiplier={0.0014}
-          strokeWidth={3.5}
+          // Sparser than wind (web's swell is too, 0.0014 against 0.0016), and lower still
+          // here: each particle is three dashes, so it carries about three times the ink.
+          // Thinner than web's 3.5 px line so the gaps between the dashes show.
+          particleMultiplier={0.0009}
+          strokeWidth={2.5}
           strokeCap="butt"
-          trail={SWELL_TRAIL}
+          dashes={SWELL_DASHES}
           disc={disc}
           drawRing={!windDrawn}
         />

@@ -81,6 +81,7 @@ export function VelocityOverlay({
   strokeWidth = 2.5,
   strokeCap = "round",
   trail,
+  dashes,
   disc,
   drawRing = false,
 }: {
@@ -95,6 +96,8 @@ export function VelocityOverlay({
   strokeCap?: "round" | "butt"
   /** This layer's own trail look: wind is long streaks, swell short dashes. */
   trail?: { seconds?: number; minPixels?: number; maxPixels?: number }
+  /** Draw each particle as separate dashes with gaps (swell), not one continuous trail (wind). */
+  dashes?: { count: number; lengthPixels: number; gapPixels: number }
   /** The forecast area, as web draws it: [latitude, longitude] and a radius. */
   disc?: { center: [number, number]; radiusKm: number }
   /** Only one layer draws the ring when wind and swell are both on. */
@@ -113,6 +116,9 @@ export function VelocityOverlay({
   const trailSeconds = trail?.seconds
   const minTrailPixels = trail?.minPixels
   const maxTrailPixels = trail?.maxPixels
+  const dashCount = dashes?.count
+  const dashLengthPixels = dashes?.lengthPixels
+  const dashGapPixels = dashes?.gapPixels
 
   // The frame loop reads the latest size without being restarted by it: a restart would
   // respawn every particle.
@@ -187,6 +193,10 @@ export function VelocityOverlay({
               trailSeconds,
               minTrailPixels,
               maxTrailPixels,
+              dashes:
+                dashCount !== undefined && dashLengthPixels !== undefined && dashGapPixels !== undefined
+                  ? { count: dashCount, lengthPixels: dashLengthPixels, gapPixels: dashGapPixels }
+                  : undefined,
             })
             // Skia's "lines" mode draws a line between each consecutive pair of points.
             lines.set(segments.flat())
@@ -218,6 +228,9 @@ export function VelocityOverlay({
     trailSeconds,
     minTrailPixels,
     maxTrailPixels,
+    dashCount,
+    dashLengthPixels,
+    dashGapPixels,
   ])
 
   if (!hasSize) return null

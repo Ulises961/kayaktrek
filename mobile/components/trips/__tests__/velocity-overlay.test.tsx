@@ -450,6 +450,35 @@ describe("VelocityOverlay", () => {
       expect(getByTestId("trails").props.strokeCap).toBe("round");
     });
 
+    it("draws several separate dashes for each particle when asked, not one trail", async () => {
+      const nextFrame = controlFrames();
+      const plain = await render(
+        <VelocityOverlay field={field} viewRef={viewRef(flatView)} size={size} color="rgb(40, 170, 180)" />,
+      );
+      await nextFrame();
+      await nextFrame();
+      const plainTrails = (lastTrails()?.length ?? 0) / 2;
+      await plain.unmount();
+      mockSetPoints.mockClear();
+
+      await render(
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef(flatView)}
+          size={size}
+          color="rgb(255, 255, 255)"
+          dashes={{ count: 3, lengthPixels: 5, gapPixels: 6 }}
+        />,
+      );
+      await nextFrame();
+      await nextFrame();
+      const dashedSegments = (lastTrails()?.length ?? 0) / 2;
+
+      // Three dashes per particle where the plain layer draws one trail per particle.
+      expect(dashedSegments).toBeGreaterThan(plainTrails * 2.5);
+      expect(dashedSegments).toBeLessThan(plainTrails * 3.2);
+    });
+
     it("can have square ends, which is what makes swell read as dashes", async () => {
       controlFrames();
       const { getByTestId } = await render(

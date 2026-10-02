@@ -115,6 +115,87 @@ describe("advanceFrame", () => {
     expect(length({ minTrailPixels: 30 })).toBeCloseTo(30, 3)
   })
 
+  // A layer can be drawn as a dashed trail instead of a continuous one: several short
+  // segments with gaps between them, laid out behind the particle as one unit. That is what
+  // lets swell read as dashes moving rather than as a shorter, thicker version of wind.
+  describe("as dashes", () => {
+    const dashes = { count: 3, lengthPixels: 5, gapPixels: 6 }
+
+    function dashedFrame() {
+      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+      return advanceFrame(particles, eastwardField(4), view, size, 1 / 60, {
+        pixelsPerSecondPerMetreSecond: 8,
+        dashes,
+      })
+    }
+
+    it("makes one short segment per dash, rather than one long one", () => {
+      expect(dashedFrame()).toHaveLength(3)
+    })
+
+    it("makes each dash the length asked for", () => {
+      for (const [tail, head] of dashedFrame()) {
+        expect(head.x - tail.x).toBeCloseTo(5, 3)
+        expect(head.y).toBeCloseTo(tail.y, 3)
+      }
+    })
+
+    it("starts at the particle and leaves a gap between one dash and the next, behind it", () => {
+      const [first, second, third] = dashedFrame()
+
+      // The first dash ends at the particle (a frame's drift east of the screen centre).
+      expect(first[1].x).toBeCloseTo(200 + 32 / 60, 3)
+      // The next one ends where the gap behind the first dash's tail ends: 5 px dash + 6 px gap.
+      expect(first[0].x - second[1].x).toBeCloseTo(6, 3)
+      expect(second[0].x - third[1].x).toBeCloseTo(6, 3)
+      // So each dash is 11 px behind the last.
+      expect(first[1].x - second[1].x).toBeCloseTo(11, 3)
+    })
+
+    it("does not stretch the dashes with the flow's speed, unlike a line's trail", () => {
+      const lengthAt = (speed: number) => {
+        const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+        const [tail, head] = advanceFrame(particles, eastwardField(speed), view, size, 1 / 60, {
+          pixelsPerSecondPerMetreSecond: 8,
+          dashes,
+        })[0]
+        return head.x - tail.x
+      }
+
+      expect(lengthAt(8)).toBeCloseTo(lengthAt(1), 3)
+    })
+
+    it("draws nothing for a particle that is not moving, or that has just respawned", () => {
+      const still: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+      const respawned: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 1e9 }]
+
+      expect(
+        advanceFrame(still, eastwardField(0), view, size, 1 / 60, { pixelsPerSecondPerMetreSecond: 8, dashes }),
+      ).toHaveLength(0)
+      expect(
+        advanceFrame(respawned, eastwardField(4), view, size, 1 / 60, {
+          pixelsPerSecondPerMetreSecond: 8,
+          dashes,
+          random: () => 0.9,
+        }),
+      ).toHaveLength(0)
+    })
+
+    it("follows the flow's direction, whichever way it blows", () => {
+      const northward: VelocityField = { ...eastwardField(0), u: [0, 0, 0, 0], v: [4, 4, 4, 4] }
+      const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
+
+      const [first, second] = advanceFrame(particles, northward, view, size, 1 / 60, {
+        pixelsPerSecondPerMetreSecond: 8,
+        dashes,
+      })
+
+      // Blowing north is up the screen, so the dashes trail below the particle.
+      expect(first[1].x).toBeCloseTo(200, 3)
+      expect(second[1].y).toBeGreaterThan(first[1].y)
+    })
+  })
+
   it("draws no trail for a particle that is not moving, rather than guessing a direction", () => {
     const particles: Particle[] = [{ latitude: 54.1, longitude: -4.5, age: 0 }]
 

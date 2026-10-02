@@ -178,7 +178,6 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
     await render(<MapVelocityOverlay {...baseProps} swellOn />);
 
     expect(mockOverlayProps[WHITE]).toBeTruthy();
-    expect(mockOverlayProps[WHITE].strokeWidth).toBe(3.5);
   });
 
   it("draws swell as a dash that moves, not a line like wind", async () => {
@@ -190,16 +189,24 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
     const wind = Object.entries(mockOverlayProps).find(([colour]) => colour !== WHITE)?.[1];
     expect(wind).toBeTruthy();
 
-    // A dash is one fixed length: it does not stretch with the flow's speed the way a wind
-    // line does, so a fast swell and a slow one are the same dash moving at different rates.
-    const swellTrail = swell.trail as { minPixels: number; maxPixels: number };
-    expect(swellTrail.minPixels).toBe(swellTrail.maxPixels);
-    expect(swellTrail.maxPixels).toBeLessThan(14);
-    // Square ends make it a dash; wind keeps the default round ends of a line.
+    // Swell is a run of separate dashes with gaps between them, moving together — not one
+    // continuous line, however short and thick.
+    const dashes = swell.dashes as { count: number; lengthPixels: number; gapPixels: number };
+    expect(dashes.count).toBeGreaterThan(1);
+    expect(dashes.gapPixels).toBeGreaterThan(0);
+    // Square ends make each one a dash; wind keeps the default round ends of a line.
     expect(swell.strokeCap).toBe("butt");
     expect(wind?.strokeCap).toBeUndefined();
-    // And wind keeps its own, longer, speed-scaled trails.
-    expect(wind?.trail).toBeUndefined();
+    // And wind stays a continuous, speed-scaled trail.
+    expect(wind?.dashes).toBeUndefined();
+  });
+
+  it("draws swell thinner than a solid line would be, so the gaps between the dashes show", async () => {
+    hooks(idle, ready);
+
+    await render(<MapVelocityOverlay {...baseProps} swellOn />);
+
+    expect(mockOverlayProps[WHITE].strokeWidth).toBeLessThan(3.5);
   });
 
   it("clips the field to the disc around the day's route, as the web planner does", async () => {
