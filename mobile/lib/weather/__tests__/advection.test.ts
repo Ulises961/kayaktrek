@@ -244,6 +244,65 @@ describe("stepParticles", () => {
   })
 })
 
+// M35: a day's field can be far bigger than the screen. Spawning across all of it leaves
+// most particles off-screen and the visible density a fraction of what was asked for, so
+// callers can confine particles to the area actually being looked at.
+describe("confining particles to an area", () => {
+  const area = { north: 0.6, south: 0.4, west: 0.4, east: 0.6 }
+
+  it("seeds every particle inside the area, not across the whole field", () => {
+    const particles = createParticles(uniformField(), 200, Math.random, area)
+
+    expect(particles).toHaveLength(200)
+    for (const particle of particles) {
+      expect(particle.latitude).toBeGreaterThanOrEqual(area.south)
+      expect(particle.latitude).toBeLessThanOrEqual(area.north)
+      expect(particle.longitude).toBeGreaterThanOrEqual(area.west)
+      expect(particle.longitude).toBeLessThanOrEqual(area.east)
+    }
+  })
+
+  it("only uses the part of the area that overlaps the field", () => {
+    // Half of this area hangs off the field's east edge.
+    const overhanging = { north: 0.6, south: 0.4, west: 0.9, east: 1.1 }
+
+    const particles = createParticles(uniformField(), 100, Math.random, overhanging)
+
+    expect(particles).toHaveLength(100)
+    for (const particle of particles) {
+      expect(particle.longitude).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("seeds nothing when the area does not touch the field at all", () => {
+    const elsewhere = { north: 11, south: 10, west: 10, east: 11 }
+
+    expect(createParticles(uniformField(), 50, Math.random, elsewhere)).toEqual([])
+  })
+
+  it("respawns a particle that is inside the field but outside the area", () => {
+    // In the field (0..1) and sampleable, but not inside the 0.4..0.6 area.
+    const particles = [{ latitude: 0.9, longitude: 0.9, age: 0 }]
+
+    stepParticles(particles, uniformField(), 0.001, { area, maxAgeSeconds: 1e9 })
+
+    expect(particles[0].latitude).toBeGreaterThanOrEqual(area.south)
+    expect(particles[0].latitude).toBeLessThanOrEqual(area.north)
+    expect(particles[0].longitude).toBeGreaterThanOrEqual(area.west)
+    expect(particles[0].longitude).toBeLessThanOrEqual(area.east)
+    expect(particles[0].age).toBe(0)
+  })
+
+  it("leaves a particle that is inside the area to carry on", () => {
+    const particles = [{ latitude: 0.5, longitude: 0.5, age: 0 }]
+
+    stepParticles(particles, uniformField(), 0.001, { area, maxAgeSeconds: 1e9 })
+
+    expect(particles[0].age).toBeCloseTo(0.001, 8)
+    expect(particles[0].longitude).toBeGreaterThan(0.5)
+  })
+})
+
 describe("speedColor", () => {
   it("returns the slowest stop's colour at or below its speed", () => {
     const [slowest] = DEFAULT_SPEED_PALETTE

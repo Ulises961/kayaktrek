@@ -6,6 +6,9 @@ import type { VelocityField } from "./velocity"
 // plus a land mask for waves) but nothing here assumes that; it is written
 // for a general bilinear field.
 
+/** A box of ground, in degrees. */
+export type GeoArea = { north: number; south: number; west: number; east: number }
+
 export type Particle = {
   latitude: number
   longitude: number
@@ -76,24 +79,49 @@ export function sampleField(field: VelocityField, latitude: number, longitude: n
 function randomSampleablePosition(
   field: VelocityField,
   random: () => number,
+  area?: GeoArea,
 ): { latitude: number; longitude: number } | null {
+  // Only the part of the area that overlaps the field has anything to draw.
+  const south = area ? Math.max(field.south, area.south) : field.south
+  const north = area ? Math.min(field.north, area.north) : field.north
+  const west = area ? Math.max(field.west, area.west) : field.west
+  const east = area ? Math.min(field.east, area.east) : field.east
+  if (south > north || west > east) return null
+
   for (let attempt = 0; attempt < MAX_SEED_ATTEMPTS; attempt++) {
-    const latitude = field.south + random() * (field.north - field.south)
-    const longitude = field.west + random() * (field.east - field.west)
+    const latitude = south + random() * (north - south)
+    const longitude = west + random() * (east - west)
     if (sampleField(field, latitude, longitude) !== null) return { latitude, longitude }
   }
   return null
 }
 
+function isInside(area: GeoArea | undefined, latitude: number, longitude: number): boolean {
+  return (
+    area === undefined ||
+    (latitude >= area.south && latitude <= area.north && longitude >= area.west && longitude <= area.east)
+  )
+}
+
 /**
  * Seeds `count` particles at random positions inside the field's bbox,
  * skipping masked cells. Returns fewer than `count` only if the field has
- * no unmasked cells to seed on at all (e.g. entirely land-masked).
+ * no unmasked cells to seed on at all (e.g. entirely land-masked), or — when
+ * an `area` is given — none of the area overlaps the field.
+ *
+ * With an `area` (the ground the screen is showing), particles are seeded
+ * only there. A day's field can be many times the size of the screen, and
+ * seeding across all of it leaves most particles off-screen.
  */
-export function createParticles(field: VelocityField, count: number, random: () => number = Math.random): Particle[] {
+export function createParticles(
+  field: VelocityField,
+  count: number,
+  random: () => number = Math.random,
+  area?: GeoArea,
+): Particle[] {
   const particles: Particle[] = []
   for (let i = 0; i < count; i++) {
-    const position = randomSampleablePosition(field, random)
+    const position = randomSampleablePosition(field, random, area)
     if (position === null) continue
     // Staggered initial age so a whole batch doesn't respawn in lockstep.
     particles.push({ ...position, age: random() * DEFAULT_MAX_AGE_SECONDS })
@@ -104,6 +132,8 @@ export function createParticles(field: VelocityField, count: number, random: () 
 export type StepParticlesOptions = {
   maxAgeSeconds?: number
   random?: () => number
+  /** Keep particles inside this area: one outside it, or stepping out of it, respawns inside it. */
+  area?: GeoArea
 }
 
 /**
@@ -124,12 +154,13 @@ export function stepParticles(
 ): Particle[] {
   const maxAgeSeconds = options.maxAgeSeconds ?? DEFAULT_MAX_AGE_SECONDS
   const random = options.random ?? Math.random
+  const area = options.area
 
   for (const particle of particles) {
     const sample = sampleField(field, particle.latitude, particle.longitude)
     particle.age += dtSeconds
 
-    if (sample !== null && particle.age < maxAgeSeconds) {
+    if (sample !== null && particle.age < maxAgeSeconds && isInside(area, particle.latitude, particle.longitude)) {
       const [u, v] = sample
       const cosLatitude = Math.cos((particle.latitude * Math.PI) / 180)
       const metresPerDegreeLongitude = METRES_PER_DEGREE_LATITUDE * cosLatitude
@@ -142,14 +173,14 @@ export function stepParticles(
       // to the next call's own sample at the top — otherwise a particle
       // that stepped out of bounds or onto a masked cell draws one extra
       // frame off-field before anything notices.
-      if (sampleField(field, nextLatitude, nextLongitude) !== null) {
+      if (sampleField(field, nextLatitude, nextLongitude) !== null && isInside(area, nextLatitude, nextLongitude)) {
         particle.latitude = nextLatitude
         particle.longitude = nextLongitude
         continue
       }
     }
 
-    const respawn = randomSampleablePosition(field, random)
+    const respawn = randomSampleablePosition(field, random, area)
     if (respawn !== null) {
       particle.latitude = respawn.latitude
       particle.longitude = respawn.longitude
