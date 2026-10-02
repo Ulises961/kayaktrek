@@ -16,10 +16,13 @@ import { Text } from "../ui/text"
 import { VelocityOverlay } from "./velocity-overlay"
 
 // Swell is white: direction matters more than speed, the standard chart convention, and web
-// draws it the same way (map-core.tsx SWELL_OPTIONS). Short and thick, so it reads as wave
-// crests moving through rather than as a second kind of wind.
+// draws it the same way (map-core.tsx SWELL_OPTIONS). It is drawn as a dash, not a line: one
+// fixed length (minimum and maximum the same, so it does not stretch with the flow the way
+// wind's trails do) with square ends, so a wave crest moving through reads differently from
+// wind streaming past.
 const SWELL_COLOR = "rgb(255, 255, 255)"
-const SWELL_TRAIL = { seconds: 0.2, minPixels: 5, maxPixels: 12 }
+const SWELL_DASH_PIXELS = 8
+const SWELL_TRAIL = { minPixels: SWELL_DASH_PIXELS, maxPixels: SWELL_DASH_PIXELS }
 
 function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
@@ -160,6 +163,7 @@ export function MapVelocityOverlay({
           // Web's planner values (map-core.tsx SWELL_OPTIONS): sparser and thicker than wind.
           particleMultiplier={0.0014}
           strokeWidth={3.5}
+          strokeCap="butt"
           trail={SWELL_TRAIL}
           disc={disc}
           drawRing={!windDrawn}

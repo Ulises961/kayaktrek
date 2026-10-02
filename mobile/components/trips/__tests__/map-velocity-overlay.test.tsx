@@ -172,17 +172,34 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
     expect(colours[0]).not.toBe(WHITE);
   });
 
-  it("draws swell in white, as short thick dashes rather than long wind-like streaks", async () => {
+  it("draws swell in white", async () => {
     hooks(idle, ready);
 
     await render(<MapVelocityOverlay {...baseProps} swellOn />);
 
+    expect(mockOverlayProps[WHITE]).toBeTruthy();
+    expect(mockOverlayProps[WHITE].strokeWidth).toBe(3.5);
+  });
+
+  it("draws swell as a dash that moves, not a line like wind", async () => {
+    hooks(ready, ready);
+
+    await render(<MapVelocityOverlay {...baseProps} windOn swellOn />);
+
     const swell = mockOverlayProps[WHITE];
-    expect(swell).toBeTruthy();
-    expect(swell.strokeWidth).toBe(3.5);
-    const trail = swell.trail as { maxPixels: number };
-    // Wind's trails run to 40 px; swell's stay short.
-    expect(trail.maxPixels).toBeLessThanOrEqual(14);
+    const wind = Object.entries(mockOverlayProps).find(([colour]) => colour !== WHITE)?.[1];
+    expect(wind).toBeTruthy();
+
+    // A dash is one fixed length: it does not stretch with the flow's speed the way a wind
+    // line does, so a fast swell and a slow one are the same dash moving at different rates.
+    const swellTrail = swell.trail as { minPixels: number; maxPixels: number };
+    expect(swellTrail.minPixels).toBe(swellTrail.maxPixels);
+    expect(swellTrail.maxPixels).toBeLessThan(14);
+    // Square ends make it a dash; wind keeps the default round ends of a line.
+    expect(swell.strokeCap).toBe("butt");
+    expect(wind?.strokeCap).toBeUndefined();
+    // And wind keeps its own, longer, speed-scaled trails.
+    expect(wind?.trail).toBeUndefined();
   });
 
   it("clips the field to the disc around the day's route, as the web planner does", async () => {
