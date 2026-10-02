@@ -126,11 +126,13 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
       <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-8">
         {/* Banner + avatar */}
         <div className="flex flex-col gap-4">
-          <div className="bg-muted relative h-32 w-full overflow-hidden rounded-lg sm:h-40">
-            {bannerUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={bannerUrl} alt="" className="size-full object-cover" />
-            )}
+          <div className="relative h-32 w-full sm:h-40">
+            <div className="bg-muted absolute inset-0 overflow-hidden rounded-lg">
+              {bannerUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={bannerUrl} alt="" className="size-full object-cover" />
+              )}
+            </div>
             <div className="absolute top-2 right-2 flex items-center gap-2">
               <input
                 ref={bannerInputRef}
