@@ -26,6 +26,7 @@ class UserSchema(BaseSchema):
     endorsed_logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
     logs = fields.List(fields.Nested(LogSchema), allow_none=True, dump_only=True)
     avatar_url = fields.String(allow_none=True, dump_only=True)
+    banner_url = fields.String(allow_none=True, dump_only=True)
     admin = fields.Bool(dump_only=True)
 
     vessel_make = fields.String(allow_none=True)
@@ -201,6 +202,7 @@ class PublicUserSchema(BaseSchema):
     name = fields.String(dump_only=True)
     surname = fields.String(dump_only=True)
     avatar_url = fields.String(dump_only=True)
+    banner_url = fields.String(dump_only=True)
     bio = fields.String(dump_only=True)
     home_location = fields.String(dump_only=True)
     certifications = fields.List(

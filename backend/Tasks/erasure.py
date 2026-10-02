@@ -89,7 +89,7 @@ def _erase_user(user: User) -> None:
     # delete cascade below (user_endorses_log.endorsers FK has ondelete='CASCADE').
     db.session.query(Log).filter_by(user_id=user.id).delete()
 
-    # Remove avatar from storage before the row is gone
+    # Remove avatar/banner from storage before the row is gone
     if user.avatar_url:
         try:
             old_key = user.avatar_url.split("/avatars/")[-1]
@@ -97,6 +97,16 @@ def _erase_user(user: User) -> None:
         except Exception as e:
             logger.error(
                 "erasure_avatar_cleanup_failed",
+                extra={"user_id": user_id, "error": str(e)},
+            )
+
+    if user.banner_url:
+        try:
+            old_key = user.banner_url.split("/banners/")[-1]
+            StorageService.delete(old_key, kind="banner")
+        except Exception as e:
+            logger.error(
+                "erasure_banner_cleanup_failed",
                 extra={"user_id": user_id, "error": str(e)},
             )
 

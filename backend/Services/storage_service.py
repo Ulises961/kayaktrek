@@ -62,6 +62,7 @@ _EXPORTS_PREFIX = "exports/"
 
 MIN_SIZE = 512
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
+MAX_BANNER_SIZE = 8 * 1024 * 1024
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
 
 ALLOWED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
@@ -76,7 +77,7 @@ ALLOWED_DOCUMENT_MIMES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
-FileKind = Literal["image", "image-private", "document", "avatar"]
+FileKind = Literal["image", "image-private", "document", "avatar", "banner"]
 
 _KIND_PREFIXES: dict[FileKind, str] = {
     "image": "point-images/",
@@ -85,12 +86,14 @@ _KIND_PREFIXES: dict[FileKind, str] = {
     "image-private": "point-images-private/",
     "document": "documents/",
     "avatar": "avatars/",
+    "banner": "banners/",
 }
 
 _KIND_ALLOWED_MIMES: dict[FileKind, set[str]] = {
     "image": ALLOWED_IMAGE_MIMES,
     "image-private": ALLOWED_IMAGE_MIMES,
     "avatar": ALLOWED_IMAGE_MIMES,
+    "banner": ALLOWED_IMAGE_MIMES,
     "document": ALLOWED_DOCUMENT_MIMES,
 }
 
@@ -98,6 +101,7 @@ _KIND_MAX_SIZE: dict[FileKind, int] = {
     "image": MAX_IMAGE_SIZE,
     "image-private": MAX_IMAGE_SIZE,
     "avatar": MAX_IMAGE_SIZE,
+    "banner": MAX_BANNER_SIZE,
     "document": MAX_DOCUMENT_SIZE,
 }
 
@@ -108,6 +112,7 @@ BucketRole = Literal["public", "private"]
 # rest require a presigned URL.
 _KIND_ROLES: dict[FileKind, BucketRole] = {
     "avatar": "public",
+    "banner": "public",
     "image": "public",
     "image-private": "private",
     "document": "private",

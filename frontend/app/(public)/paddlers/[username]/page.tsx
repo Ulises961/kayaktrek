@@ -46,6 +46,13 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
       <ChartHeaderBar className="relative" />
 
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-10">
+        {profile.bannerUrl && (
+          <div className="bg-muted h-32 w-full overflow-hidden rounded-lg sm:h-40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={profile.bannerUrl} alt="" className="size-full object-cover" />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start gap-5">
           <UserAvatar

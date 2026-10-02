@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ProfileFormSchema, type ProfileFormValues, type User } from "@/lib/dtos/user"
-import { updateProfile, uploadAvatar, removeAvatar } from "@/lib/profile/actions"
+import {
+  updateProfile,
+  uploadAvatar,
+  removeAvatar,
+  uploadBanner,
+  removeBanner,
+} from "@/lib/profile/actions"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,8 +28,11 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isUploading, startUpload] = useTransition()
+  const [isUploadingBanner, startBannerUpload] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bannerInputRef = useRef<HTMLInputElement>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user.avatarUrl)
+  const [bannerUrl, setBannerUrl] = useState<string | null | undefined>(user.bannerUrl)
 
   const {
     register,
@@ -86,16 +95,85 @@ export function EditProfileForm({ user }: EditProfileFormProps) {
     })
   }
 
+  function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const fd = new FormData()
+    fd.append("file", file)
+    startBannerUpload(async () => {
+      const result = await uploadBanner(fd)
+      if (result.success) {
+        setBannerUrl(result.bannerUrl)
+      } else {
+        setError("root", { message: result.error })
+      }
+    })
+  }
+
+  function handleRemoveBanner() {
+    startBannerUpload(async () => {
+      const result = await removeBanner()
+      if (result.success) {
+        setBannerUrl(null)
+      } else {
+        setError("root", { message: result.error })
+      }
+    })
+  }
+
   return (
     <>
       <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-8">
-        {/* Avatar */}
-        <div className="flex items-center gap-4">
-          <UserAvatar name={user.name} surname={user.surname} imageUrl={avatarUrl} size="lg" />
-          <div className="flex items-center gap-2">
+        {/* Banner + avatar */}
+        <div className="flex flex-col gap-4">
+          <div className="bg-muted relative h-32 w-full overflow-hidden rounded-lg sm:h-40">
+            {bannerUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={bannerUrl} alt="" className="size-full object-cover" />
+            )}
+            <div className="absolute top-2 right-2 flex items-center gap-2">
+              <input
+                ref={bannerInputRef}
+                type="file"
+                data-testid="banner-file-input"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="hidden"
+                onChange={handleBannerChange}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isUploadingBanner}
+                onClick={() => bannerInputRef.current?.click()}
+              >
+                <CameraIcon className="size-4" />
+                {isUploadingBanner ? "Uploading…" : bannerUrl ? "Replace banner" : "Upload banner"}
+              </Button>
+              {bannerUrl && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={isUploadingBanner}
+                  onClick={handleRemoveBanner}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2Icon className="size-4" />
+                  Remove
+                </Button>
+              )}
+            </div>
+            <div className="border-background bg-background absolute -bottom-6 left-4 rounded-full border-4">
+              <UserAvatar name={user.name} surname={user.surname} imageUrl={avatarUrl} size="lg" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end pt-6">
             <input
               ref={fileInputRef}
               type="file"
+              data-testid="avatar-file-input"
               accept="image/jpeg,image/png,image/webp,image/avif"
               className="hidden"
               onChange={handleAvatarChange}

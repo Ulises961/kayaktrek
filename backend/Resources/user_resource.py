@@ -892,6 +892,93 @@ def delete_avatar():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
+@user_api.route("/me/banner", methods=["POST"])
+@JWTService.authenticate_restful
+def upload_banner():
+    """
+    Upload or replace the profile banner for the authenticated user.
+
+    Expects a multipart/form-data request with a 'file' field.
+    Accepted MIME types: image/jpeg, image/png, image/webp, image/gif, image/avif.
+    Size limits: minimum 512 B, maximum 8 MB.
+
+    Returns:
+        JSON response with the updated user object and 200 status code
+
+    Raises:
+        400: If no file is provided or the file fails validation
+    ---
+    post:
+      summary: Upload or replace the authenticated user's profile banner
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: The updated user
+          content:
+            application/json:
+              schema: UserSchema
+        400:
+          description: No file provided, or the file fails validation (type/size)
+        404:
+          description: Authenticated user not found
+    """
+    if "file" not in request.files:
+        abort(HTTPStatus.BAD_REQUEST, description="No file provided")
+
+    file = request.files["file"]
+    if not file.filename:
+        abort(HTTPStatus.BAD_REQUEST, description="File has no name")
+
+    try:
+        file_bytes = file.read()
+        user = UserService.upload_banner(str(g.current_user_id), file_bytes, file.filename)
+        return jsonify(UserSchema().dump(user)), HTTPStatus.OK
+
+    except StorageValidationError as e:
+        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
+@user_api.route("/me/banner", methods=["DELETE"])
+@JWTService.authenticate_restful
+def delete_banner():
+    """
+    Remove the profile banner for the authenticated user.
+
+    Returns:
+        204 No Content on success
+    ---
+    delete:
+      summary: Remove the authenticated user's profile banner
+      responses:
+        204:
+          description: Banner removed
+        404:
+          description: Authenticated user not found
+    """
+    try:
+        UserService.delete_banner(str(g.current_user_id))
+        return "", HTTPStatus.NO_CONTENT
+
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
+    except Exception as e:
+        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+
+
 @user_api.route("/me/data-export", methods=["POST"])
 @JWTService.authenticate_restful
 @limiter.limit("1 per day", key_func=lambda: str(g.current_user_id))

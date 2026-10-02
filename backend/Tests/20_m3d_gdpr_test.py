@@ -543,6 +543,58 @@ def test_erasure_task_survives_avatar_cleanup_failure(app, client):
         assert db.session.query(User).count() >= 0
 
 
+def test_erasure_task_removes_banner_from_storage(app, client):
+    """Banner objects live in object storage, outside the DB — nothing cascades
+    them, so `_erase_user` must delete them explicitly using the key embedded in
+    `banner_url`."""
+    user_id, _ = _register_and_activate(
+        app, client,
+        mail="banner.erasure@example.com",
+        phone="+39099922230",
+        username="gdpr_banner_erasure",
+    )
+    with app.app_context():
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.banner_url = "https://cdn.example.com/banners/abc123.jpg"
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    with patch("Tasks.erasure.StorageService.delete") as mock_delete:
+        run_erasure.apply()
+
+    mock_delete.assert_called_once_with("abc123.jpg", kind="banner")
+    with app.app_context():
+        assert db.session.query(User).filter_by(id=UUID(user_id)).first() is None
+
+
+def test_erasure_task_survives_banner_cleanup_failure(app, client):
+    """Storage being unreachable must not block the user's actual erasure — the
+    banner cleanup failure is caught and logged, not left to abort `_erase_user`
+    (and, per the rubric, the transaction must stay usable afterwards)."""
+    user_id, _ = _register_and_activate(
+        app, client,
+        mail="banner.fail.erasure@example.com",
+        phone="+39099922231",
+        username="gdpr_banner_fail_erasure",
+    )
+    with app.app_context():
+        user = db.session.query(User).filter_by(id=UUID(user_id)).first()
+        user.banner_url = "https://cdn.example.com/banners/broken.jpg"
+        user.deletion_requested_at = datetime.now(timezone.utc) - timedelta(days=31)
+        user.active = False
+        db.session.commit()
+
+    with patch("Tasks.erasure.StorageService.delete", side_effect=RuntimeError("bucket unreachable")):
+        result = run_erasure.apply()
+
+    assert result.get() == {"erased": 1, "failed": 0}
+    with app.app_context():
+        assert db.session.query(User).filter_by(id=UUID(user_id)).first() is None
+        # session must still be usable — no dangling PendingRollbackError
+        assert db.session.query(User).count() >= 0
+
+
 def test_erasure_task_one_failure_does_not_block_other_candidates(app, client, erasure_user):
     """A raised exception for one candidate must not abort the whole beat run —
     `run_erasure` catches per-user, rolls back, and keeps going. Assert the

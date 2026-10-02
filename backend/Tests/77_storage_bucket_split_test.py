@@ -25,7 +25,7 @@ from Services.storage_service import StorageService
 # > MIN_SIZE (512 bytes), valid JPEG magic bytes so `magic.from_buffer` resolves to image/jpeg.
 _FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 600
 
-_PUBLIC_KINDS = ["avatar", "image"]
+_PUBLIC_KINDS = ["avatar", "banner", "image"]
 _PRIVATE_KINDS = ["image-private", "document"]
 
 
