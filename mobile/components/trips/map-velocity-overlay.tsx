@@ -87,7 +87,7 @@ export function MapVelocityOverlay({
         <VelocityOverlay field={field} viewRef={viewRef} size={size} color={colour} />
       )}
 
-      <View pointerEvents="box-none" className="absolute right-3 top-3 items-end gap-1">
+      <View pointerEvents="box-none" className="absolute right-3 top-16 items-end gap-1">
         <View className="flex-row gap-2">
           {(["wind", "wave"] as const).map((layer) => (
             <Chip
