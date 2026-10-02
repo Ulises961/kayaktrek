@@ -1,4 +1,4 @@
-import { projectLngLat, visibleBounds, type MapViewState } from "../map/project-lng-lat"
+import { pixelsPerMetre, projectLngLat, visibleBounds, type MapViewState } from "../map/project-lng-lat"
 import { createParticles, stepParticles, type Particle } from "./advection"
 import type { VelocityField } from "./velocity"
 
@@ -6,9 +6,6 @@ import type { VelocityField } from "./velocity"
 // only owns the clock and the canvas. Positions are projected locally (see
 // project-lng-lat.ts) because this runs for every particle on every frame.
 
-const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686
-// MapLibre's world is 512 logical pixels wide at zoom 0.
-const WORLD_PIXELS_AT_ZOOM_0 = 512
 // How long a particle lives, in real seconds, before it respawns elsewhere.
 const DEFAULT_LIFE_SECONDS = 8
 // Particles this far (px) outside the screen are still drawn, so a streak does not pop in at the edge.
@@ -46,9 +43,7 @@ export function meanSpeed(field: VelocityField): number {
  * that, not the zoom level, stays constant: zooming in slows the simulation to match.
  */
 export function simulationTimeScale(zoom: number, latitude: number, pixelsPerSecondPerMetreSecond: number): number {
-  const worldPixels = WORLD_PIXELS_AT_ZOOM_0 * 2 ** zoom
-  const pixelsPerMetre = worldPixels / (EARTH_CIRCUMFERENCE_METRES * Math.cos((latitude * Math.PI) / 180))
-  return pixelsPerSecondPerMetreSecond / pixelsPerMetre
+  return pixelsPerSecondPerMetreSecond / pixelsPerMetre(zoom, latitude)
 }
 
 export type AdvanceFrameOptions = {

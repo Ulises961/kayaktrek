@@ -31,6 +31,14 @@ function mercatorY(latitude: number, worldSize: number): number {
   return (0.5 - Math.log((1 + clamped) / (1 - clamped)) / (4 * Math.PI)) * worldSize
 }
 
+const EARTH_CIRCUMFERENCE_METRES = 40_075_016.686
+
+/** How many screen pixels one metre of ground covers, at a zoom and latitude. */
+export function pixelsPerMetre(zoom: number, latitude: number): number {
+  const worldSize = TILE_SIZE * 2 ** zoom
+  return worldSize / (EARTH_CIRCUMFERENCE_METRES * Math.cos((latitude * Math.PI) / 180))
+}
+
 /** The screen position, in pixels from the top-left, of a coordinate. */
 export function projectLngLat(
   view: MapViewState,
