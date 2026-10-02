@@ -1,5 +1,5 @@
-import { projectLngLat, type MapViewState } from "../map/project-lng-lat"
-import { stepParticles, type Particle } from "./advection"
+import { projectLngLat, visibleBounds, type MapViewState } from "../map/project-lng-lat"
+import { createParticles, stepParticles, type Particle } from "./advection"
 import type { VelocityField } from "./velocity"
 
 // One animation frame of the velocity overlay, as pure functions — the Skia component
@@ -13,6 +13,14 @@ const WORLD_PIXELS_AT_ZOOM_0 = 512
 const DEFAULT_LIFE_SECONDS = 8
 // Particles this far (px) outside the screen are still drawn, so a streak does not pop in at the edge.
 const OFFSCREEN_MARGIN_PX = 16
+// Particles live in the screen's area plus this much all round — a margin for streaks that
+// begin just off the edge, not a second screen's worth of particles nobody can see.
+export const AREA_PADDING_PX = 24
+// Each particle drags a trail this many seconds of its own travel behind it, clamped so a
+// light breeze still shows and a gale does not smear across the map.
+const DEFAULT_TRAIL_SECONDS = 0.35
+const MIN_TRAIL_PX = 4
+const MAX_TRAIL_PX = 40
 
 export type ScreenPoint = { x: number; y: number }
 export type Segment = [from: ScreenPoint, to: ScreenPoint]
@@ -46,7 +54,28 @@ export function simulationTimeScale(zoom: number, latitude: number, pixelsPerSec
 export type AdvanceFrameOptions = {
   pixelsPerSecondPerMetreSecond: number
   lifeSeconds?: number
+  trailSeconds?: number
   random?: () => number
+}
+
+/**
+ * How many particles a screen of this size gets. Web sizes it the same way —
+ * leaflet-velocity draws `viewport pixels * particleMultiplier` — so the density a paddler
+ * sees does not depend on how big the day's forecast area is.
+ */
+export function particleCountFor(size: { width: number; height: number }, particleMultiplier: number): number {
+  return Math.round(size.width * size.height * particleMultiplier)
+}
+
+/** Seeds particles over the ground the screen is showing, not over the whole field. */
+export function seedParticles(
+  field: VelocityField,
+  view: MapViewState,
+  size: { width: number; height: number },
+  count: number,
+  random: () => number = Math.random,
+): Particle[] {
+  return createParticles(field, count, random, visibleBounds(view, size, AREA_PADDING_PX))
 }
 
 function isOnScreen(point: ScreenPoint, size: { width: number; height: number }): boolean {
@@ -80,17 +109,29 @@ export function advanceFrame(
   stepParticles(particles, field, realDtSeconds * scale, {
     maxAgeSeconds: (options.lifeSeconds ?? DEFAULT_LIFE_SECONDS) * scale,
     random: options.random,
+    // Keeps the whole population on the screen: one that drifts off its edge respawns on it.
+    area: visibleBounds(view, size, AREA_PADDING_PX),
   })
 
+  const trailSeconds = options.trailSeconds ?? DEFAULT_TRAIL_SECONDS
   const segments: Segment[] = []
   for (let i = 0; i < particles.length; i++) {
     const particle = particles[i]
     // stepParticles resets a respawned particle's age to 0, so the age going down is the tell.
     if (particle.age < before[i].age) continue
-    const from = { x: before[i].x, y: before[i].y }
-    const to = projectPoint(view, size, particle)
-    if (!isOnScreen(from, size) && !isOnScreen(to, size)) continue
-    segments.push([from, to])
+
+    const head = projectPoint(view, size, particle)
+    const dx = head.x - before[i].x
+    const dy = head.y - before[i].y
+    const travelled = Math.hypot(dx, dy)
+    // Not moving: there is no direction to trail behind it.
+    if (travelled === 0 || realDtSeconds <= 0) continue
+
+    // The trail is `trailSeconds` of the particle's own on-screen speed, laid out behind it.
+    const trailLength = Math.min(Math.max((travelled / realDtSeconds) * trailSeconds, MIN_TRAIL_PX), MAX_TRAIL_PX)
+    const tail = { x: head.x - (dx / travelled) * trailLength, y: head.y - (dy / travelled) * trailLength }
+    if (!isOnScreen(tail, size) && !isOnScreen(head, size)) continue
+    segments.push([tail, head])
   }
   return segments
 }
