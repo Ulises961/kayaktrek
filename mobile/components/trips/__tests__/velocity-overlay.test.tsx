@@ -111,6 +111,28 @@ describe("VelocityOverlay", () => {
     expect(lastDrawn.length % 2).toBe(0); // streaks are drawn as pairs of points
   });
 
+  it("keeps the density the screen asks for when the field is far bigger than the screen", async () => {
+    // The field spans 0.4 degrees; at zoom 14 the screen shows a small fraction of it. Particles
+    // spread across the whole field would leave almost none of them on screen.
+    const nextFrame = controlFrames();
+    await render(
+      <VelocityOverlay
+        field={field}
+        viewRef={viewRef({ ...flatView, zoom: 14 })}
+        size={size}
+        color="rgb(40, 170, 180)"
+        particleMultiplier={0.0016}
+      />,
+    );
+
+    await nextFrame(); // seeds, and starts the clock
+    await nextFrame();
+
+    // (400 + 48) x (800 + 48) px of particle area x 0.0016 is about 608 trails.
+    const trails = mockSetPoints.mock.calls.at(-1)?.[0].length / 2;
+    expect(trails).toBeGreaterThan(608 * 0.9);
+  });
+
   it("draws nothing until the map has reported its position", async () => {
     const nextFrame = controlFrames();
     await render(

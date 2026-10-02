@@ -84,7 +84,15 @@ export function MapVelocityOverlay({
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {kind && status === "ready" && field && colour && (
-        <VelocityOverlay field={field} viewRef={viewRef} size={size} color={colour} />
+        <VelocityOverlay
+          field={field}
+          viewRef={viewRef}
+          size={size}
+          color={colour}
+          // Web's planner values (map-core.tsx): swell is sparser and thicker than wind.
+          particleMultiplier={kind === "wave" ? 0.0014 : 0.0016}
+          strokeWidth={kind === "wave" ? 3.5 : 2.5}
+        />
       )}
 
       <View pointerEvents="box-none" className="absolute right-3 top-16 items-end gap-1">
