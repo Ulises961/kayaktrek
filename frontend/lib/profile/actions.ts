@@ -12,6 +12,8 @@ import type { DistanceUnit } from "@/lib/itinerary/distance"
 export type ProfileActionResult = { success: true } | { success: false; error: string }
 export type AvatarActionResult =
   { success: true; avatarUrl: string | null } | { success: false; error: string }
+export type BannerActionResult =
+  { success: true; bannerUrl: string | null } | { success: false; error: string }
 
 export async function updateProfile(fields: ProfileFormValues): Promise<ProfileActionResult> {
   const session = await getSession()
@@ -124,6 +126,29 @@ export async function removeAvatar(): Promise<ProfileActionResult> {
   } catch (e) {
     if (isRedirectError(e)) throw e
     return { success: false, error: e instanceof Error ? e.message : "Failed to remove avatar." }
+  }
+}
+
+export async function uploadBanner(formData: FormData): Promise<BannerActionResult> {
+  try {
+    const raw = await apiUpload<unknown>("/api/user/me/banner", formData)
+    const user = UserSchema.parse(raw)
+    revalidatePath("/profile")
+    return { success: true, bannerUrl: user.bannerUrl ?? null }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to upload banner." }
+  }
+}
+
+export async function removeBanner(): Promise<ProfileActionResult> {
+  try {
+    await apiDelete("/api/user/me/banner")
+    revalidatePath("/profile")
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return { success: false, error: e instanceof Error ? e.message : "Failed to remove banner." }
   }
 }
 

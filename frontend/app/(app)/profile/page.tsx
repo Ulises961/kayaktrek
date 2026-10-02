@@ -45,6 +45,13 @@ export default async function ProfilePage() {
 
   return (
     <>
+      {user.bannerUrl && (
+        <div className="bg-muted h-32 w-full overflow-hidden rounded-lg sm:h-40">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={user.bannerUrl} alt="" className="size-full object-cover" />
+        </div>
+      )}
+
       {/* Header */}
       {/* The avatar sits above the identity block at base and beside it from sm. At 320 the
           72px avatar, its gap and the edit button leave the name, handle and contact lines

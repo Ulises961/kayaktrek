@@ -358,6 +358,88 @@ class UserService:
         return user
 
     @staticmethod
+    def upload_banner(id: str, file_bytes: bytes, filename: str) -> User:
+        """
+        Upload a new profile banner to object storage and update the user's banner_url.
+        The previous banner is deleted from storage after the DB is committed.
+
+        Args:
+            id: UUID string of the user
+            file_bytes: Raw file content from the multipart upload
+            filename: Original filename (stored as metadata only)
+
+        Returns:
+            Updated User object with the new banner_url
+
+        Raises:
+            NoResultFound: If the user does not exist
+            StorageValidationError: If the file fails size or MIME type checks
+        """
+        user = UserService.get_user_by_id(id)
+        old_url = user.banner_url
+
+        object_key = str(uuid_extension.uuid7())
+        url = StorageService.upload(file_bytes, object_key, kind="banner")
+
+        try:
+            user.banner_url = url
+            db.session.commit()
+        except Exception:
+            try:
+                StorageService.delete(object_key, kind="banner")
+            except Exception as cleanup_err:
+                logger.error(
+                    "Orphaned MinIO banner object '%s' after DB failure — manual cleanup required. Error: %s",
+                    object_key, cleanup_err,
+                )
+            raise
+
+        if old_url:
+            old_key = old_url.split("/banners/")[-1]
+            try:
+                StorageService.delete(old_key, kind="banner")
+            except Exception as e:
+                logger.error(
+                    "Orphaned MinIO banner 'banners/%s' after replacement — manual cleanup required. Error: %s",
+                    old_key, e,
+                )
+
+        db.session.refresh(user)
+        return user
+
+    @staticmethod
+    def delete_banner(id: str) -> User:
+        """
+        Remove a user's banner from object storage and clear banner_url.
+
+        Args:
+            id: UUID string of the user
+
+        Returns:
+            Updated User object with banner_url set to None
+
+        Raises:
+            NoResultFound: If the user does not exist
+        """
+        user = UserService.get_user_by_id(id)
+        old_url = user.banner_url
+
+        user.banner_url = None
+        db.session.commit()
+
+        if old_url:
+            try:
+                old_key = old_url.split("/banners/")[-1]
+                StorageService.delete(old_key, kind="banner")
+            except Exception as e:
+                logger.error(
+                    "Orphaned MinIO banner after DB delete — manual cleanup required. Error: %s", e,
+                )
+
+        db.session.refresh(user)
+        return user
+
+    @staticmethod
     def change_password(
         id: str,
         current_pwd: str,
@@ -666,7 +748,7 @@ class UserService:
     @staticmethod
     def delete_user(id: str) -> None:
         """
-        Permanently delete a user and clean up their avatar from storage.
+        Permanently delete a user and clean up their avatar/banner from storage.
 
         Args:
             id: UUID string of the user to delete
@@ -679,7 +761,8 @@ class UserService:
         if not saved_user:
             raise NoResultFound(f"User with id {id} not found")
 
-        old_url = saved_user.avatar_url
+        old_avatar_url = saved_user.avatar_url
+        old_banner_url = saved_user.banner_url
 
         try:
             db.session.delete(saved_user)
@@ -693,11 +776,20 @@ class UserService:
                 orig=e,
             )
 
-        if old_url:
+        if old_avatar_url:
             try:
-                old_key = old_url.split("/avatars/")[-1]
+                old_key = old_avatar_url.split("/avatars/")[-1]
                 StorageService.delete(old_key, kind="avatar")
             except Exception as e:
                 logger.error(
                     "Orphaned MinIO avatar after user deletion — manual cleanup required. Error: %s", e,
+                )
+
+        if old_banner_url:
+            try:
+                old_key = old_banner_url.split("/banners/")[-1]
+                StorageService.delete(old_key, kind="banner")
+            except Exception as e:
+                logger.error(
+                    "Orphaned MinIO banner after user deletion — manual cleanup required. Error: %s", e,
                 )

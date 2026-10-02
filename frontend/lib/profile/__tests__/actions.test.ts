@@ -20,6 +20,8 @@ import {
   updateProfile,
   uploadAvatar,
   removeAvatar,
+  uploadBanner,
+  removeBanner,
   changePassword,
   requestDataExport,
   requestAccountDeletion,
@@ -303,6 +305,62 @@ describe("removeAvatar", () => {
   it("returns success: false when the API throws", async () => {
     vi.mocked(apiDelete).mockRejectedValue(new Error("404"))
     expect(await removeAvatar()).toEqual({ success: false, error: expect.any(String) })
+  })
+})
+
+describe("uploadBanner", () => {
+  const BANNER_USER = {
+    id: USER_ID,
+    mail: "ada@example.com",
+    username: "ada",
+    name: "Ada",
+    bannerUrl: "http://localhost:9000/kplanner/banners/new.jpg",
+  }
+
+  it("uploads to /api/user/me/banner", async () => {
+    vi.mocked(apiUpload).mockResolvedValue(BANNER_USER)
+    const fd = new FormData()
+    await uploadBanner(fd)
+    expect(apiUpload).toHaveBeenCalledWith("/api/user/me/banner", fd)
+  })
+
+  it("returns success: true with the new bannerUrl", async () => {
+    vi.mocked(apiUpload).mockResolvedValue(BANNER_USER)
+    const result = await uploadBanner(new FormData())
+    expect(result).toEqual({ success: true, bannerUrl: BANNER_USER.bannerUrl })
+  })
+
+  it("revalidates /profile on success", async () => {
+    vi.mocked(apiUpload).mockResolvedValue(BANNER_USER)
+    await uploadBanner(new FormData())
+    expect(revalidatePath).toHaveBeenCalledWith("/profile")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiUpload).mockRejectedValue(new Error("400"))
+    expect(await uploadBanner(new FormData())).toEqual({
+      success: false,
+      error: expect.any(String),
+    })
+  })
+})
+
+describe("removeBanner", () => {
+  it("sends DELETE to /api/user/me/banner", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await removeBanner()
+    expect(apiDelete).toHaveBeenCalledWith("/api/user/me/banner")
+  })
+
+  it("revalidates /profile on success", async () => {
+    vi.mocked(apiDelete).mockResolvedValue(undefined)
+    await removeBanner()
+    expect(revalidatePath).toHaveBeenCalledWith("/profile")
+  })
+
+  it("returns success: false when the API throws", async () => {
+    vi.mocked(apiDelete).mockRejectedValue(new Error("404"))
+    expect(await removeBanner()).toEqual({ success: false, error: expect.any(String) })
   })
 })
 

@@ -34,6 +34,7 @@ export const UserSchema = z.object({
   admin: z.boolean().nullish(),
   image: ImageSchema.nullish(),
   avatarUrl: z.string().url().nullish(),
+  bannerUrl: z.string().url().nullish(),
   itineraries: ItinerariesSchema.nullish(),
   inventories: InventoriesSchema.nullish(),
   items: ItemsSchema.nullish(),
