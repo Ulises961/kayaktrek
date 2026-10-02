@@ -58,7 +58,6 @@ import {
 import { boundsOf } from "@mobile/lib/map/bounds";
 import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
-import type { VelocityKind } from "@mobile/lib/weather/use-velocity-field";
 import { getTrip } from "@mobile/lib/trips/actions";
 import { uuidv7 } from "@mobile/lib/uuid";
 
@@ -152,7 +151,9 @@ export default function TripMapScreen() {
   // chosen in the weather sheet's grids, so both live here, where the sheet and the
   // overlay can both reach them. 12:00 is the same representative hour the day
   // strip uses.
-  const [overlayKind, setOverlayKind] = useState<VelocityKind | null>(null);
+  // Wind and swell are independent layers, as on web, so both can be on at once.
+  const [windOn, setWindOn] = useState(false);
+  const [swellOn, setSwellOn] = useState(false);
   const [overlayHour, setOverlayHour] = useState(12);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   // The map's latest view, kept in a ref: it changes many times a second during a
@@ -395,6 +396,16 @@ export default function TripMapScreen() {
     [days],
   );
 
+  // The selected day's route, which the forecast disc is built around (web's map-core.tsx
+  // `selectedDayPositions`): the overlay shows conditions over that passage.
+  const selectedDayPositions = useMemo(
+    () =>
+      routePoints
+        .filter((point) => point.dayId === selectedDayId)
+        .map((point): [number, number] => [point.latitude, point.longitude]),
+    [routePoints, selectedDayId],
+  );
+
   // M34 WP6 fix: while dragging, redraw the leg(s) touching the dragged point
   // at its live position — legs are index-aligned with routePoints (legs[i]
   // joins points[i]/points[i+1]), so the dragged point at index `i` touches
@@ -495,15 +506,23 @@ export default function TripMapScreen() {
 
   // The map only reports a view when it moves, so switching a layer on at rest has
   // nothing to draw against until it is asked once.
-  function handleOverlayKindChange(kind: VelocityKind | null) {
-    setOverlayKind(kind);
-    if (kind === null) return;
+  function seedMapView() {
     void mapRef.current
       ?.getViewState()
       .then(({ center, zoom: nextZoom, bearing, pitch }) => {
         mapViewRef.current = { center, zoom: nextZoom, bearing, pitch };
       })
       .catch(() => undefined);
+  }
+
+  function handleWindToggle() {
+    if (!windOn) seedMapView();
+    setWindOn(!windOn);
+  }
+
+  function handleSwellToggle() {
+    if (!swellOn) seedMapView();
+    setSwellOn(!swellOn);
   }
 
   function handleRegionChange(event: { nativeEvent: MapViewState }) {
@@ -819,8 +838,11 @@ export default function TripMapScreen() {
 
           <MapVelocityOverlay
             day={selectedDay}
-            kind={overlayKind}
-            onKindChange={handleOverlayKindChange}
+            dayPositions={selectedDayPositions}
+            windOn={windOn}
+            swellOn={swellOn}
+            onWindToggle={handleWindToggle}
+            onSwellToggle={handleSwellToggle}
             hour={overlayHour}
             viewRef={mapViewRef}
             size={mapSize}

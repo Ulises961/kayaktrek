@@ -1,130 +1,217 @@
-import type { RefObject } from "react"
-import { StyleSheet, View } from "react-native"
+import { Layers } from "lucide-react-native"
+import { useMemo, useState, type RefObject } from "react"
+import { Pressable, StyleSheet, View } from "react-native"
 
 import type { Day } from "@shared/dtos/day"
+import { discCell } from "@shared/landing/ambient-wind"
+import { lightTokens } from "@shared/tokens"
 import { formatTimeAgo } from "@shared/utils/date"
 
 import type { MapViewState } from "../../lib/map/project-lng-lat"
+import { speedColor } from "../../lib/weather/advection"
+import { maskFieldToDisc } from "../../lib/weather/forecast-cell"
 import { useVelocityField, type VelocityKind } from "../../lib/weather/use-velocity-field"
 import { meanSpeed } from "../../lib/weather/velocity-frame"
-import { speedColor, type SpeedColorStop } from "../../lib/weather/advection"
-import { Chip } from "../ui/chip"
 import { Text } from "../ui/text"
 import { VelocityOverlay } from "./velocity-overlay"
 
-// Wave height stands in for speed on the swell field (backend: 1 m of wave is drawn as
-// 1 m/s), so this ramp runs from pale to deep blue over wave heights, not wind speeds.
-const SWELL_PALETTE: SpeedColorStop[] = [
-  { speed: 0, color: [150, 200, 240] },
-  { speed: 1, color: [70, 140, 220] },
-  { speed: 3, color: [30, 80, 190] },
-  { speed: 6, color: [20, 40, 140] },
-]
-
-const LAYER_NAME: Record<VelocityKind, string> = { wind: "wind", wave: "swell" }
+// Swell is white: direction matters more than speed, the standard chart convention, and web
+// draws it the same way (map-core.tsx SWELL_OPTIONS). Short and thick, so it reads as wave
+// crests moving through rather than as a second kind of wind.
+const SWELL_COLOR = "rgb(255, 255, 255)"
+const SWELL_TRAIL = { seconds: 0.2, minPixels: 5, maxPixels: 12 }
 
 function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`
 }
 
-// M35: the wind/swell layer's controls, status line and drawing, in one piece so the
-// itinerary screen only owns the choices (which layer, which hour) that the weather
-// sheet also needs to see. The overlay is online-only — velocity grids are not in the
-// sync cache — and is switched off with the reason rather than left showing a field it
-// cannot refresh. While it shows, it carries the same "forecast as of" age the weather
-// panel does: a moving field reads as live, and must not.
+function LayerSwitch({
+  label,
+  on,
+  disabled,
+  detail,
+  onToggle,
+}: {
+  label: string
+  on: boolean
+  disabled: boolean
+  detail: string | null
+  onToggle: () => void
+}) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      disabled={disabled}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{ checked: on, disabled }}
+      className={`px-3 py-2 ${disabled ? "opacity-50" : ""}`}
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-[11px] font-medium text-foreground">{label}</Text>
+        {/* Web's Toggle: a small pill with a knob. */}
+        <View className={`h-4 w-7 rounded-full ${on ? "bg-primary" : "bg-muted-foreground/30"}`}>
+          <View
+            className="absolute top-0.5 h-3 w-3 rounded-full bg-white"
+            style={{ left: on ? 14 : 2 }}
+          />
+        </View>
+      </View>
+      {detail && <Text className="mt-0.5 text-[10px] text-muted-foreground">{detail}</Text>}
+    </Pressable>
+  )
+}
+
+// M35: the wind/swell layers, behind a layers control as on web (layers-control.tsx): one
+// button, a panel of switches, nothing else on the map. Wind and swell are independent
+// and can both be on. While they show, the panel carries the same "forecast as of" age
+// the weather panel does — a moving field reads as live, and must not — and says the flow
+// is one reading, not a map of varying wind.
+//
+// The overlay is online-only (velocity grids are not in the sync cache), so it is switched
+// off with the reason rather than left showing a field it cannot refresh. It needs a day
+// with points: web's forecast cell is a disc around that day's route (`discCell`), the field
+// is clipped to it (`maskGridToDisc`), and a dashed ring marks where the forecast stops —
+// both are web's own functions, shared rather than copied.
 export function MapVelocityOverlay({
   day,
-  kind,
-  onKindChange,
+  dayPositions,
+  windOn,
+  swellOn,
+  onWindToggle,
+  onSwellToggle,
   hour,
   viewRef,
   size,
   offline,
 }: {
   day: Day | null
-  kind: VelocityKind | null
-  onKindChange: (kind: VelocityKind | null) => void
+  /** The selected day's route points as [latitude, longitude], which the forecast disc is built from. */
+  dayPositions: [number, number][]
+  windOn: boolean
+  swellOn: boolean
+  onWindToggle: () => void
+  onSwellToggle: () => void
   hour: number
   viewRef: RefObject<MapViewState | null>
   size: { width: number; height: number }
   offline: boolean
 }) {
+  const [open, setOpen] = useState(false)
   const dayId = day?.id ?? null
-  const unavailable = offline || dayId === null
-  const { status, field, error } = useVelocityField({
-    dayId,
-    hour,
-    // The hook ignores `kind` while disabled; "wind" is just a placeholder then.
-    kind: kind ?? "wind",
-    enabled: kind !== null && !unavailable,
-  })
+  const disc = useMemo(() => (dayPositions.length > 0 ? discCell(dayPositions) : null), [dayPositions])
 
-  const asOf = day?.weather?.fetchedAt ?? day?.sea?.recordedAt ?? null
-  const name = kind ? LAYER_NAME[kind] : null
+  let unavailableReason: string | null = null
+  if (offline) unavailableReason = "Needs a connection."
+  else if (dayId === null) unavailableReason = "Select a day to show overlays."
+  else if (disc === null) unavailableReason = "This day has no points yet."
+  const unavailable = unavailableReason !== null
 
-  let statusLine: string | null = null
-  if (offline) statusLine = "The overlay needs a connection."
-  else if (dayId === null) statusLine = "Select a day to show wind or swell."
-  else if (kind && status === "loading") statusLine = `Loading ${name}…`
-  else if (kind && status === "empty") statusLine = `No ${name} forecast for this day.`
-  else if (kind && status === "error") statusLine = error
-  else if (kind && status === "ready") {
-    statusLine = `${name?.[0].toUpperCase()}${name?.slice(1)} · ${hourLabel(hour)} · forecast as of ${formatTimeAgo(asOf)}`
-  }
+  const wind = useVelocityField({ dayId, hour, kind: "wind", enabled: windOn && !unavailable })
+  const swell = useVelocityField({ dayId, hour, kind: "wave", enabled: swellOn && !unavailable })
 
-  const colour = field
-    ? speedColor(meanSpeed(field), kind === "wave" ? SWELL_PALETTE : undefined)
-    : null
+  // Clipped to the disc once per field, so the overlay keeps a stable `field` and does not
+  // restart its particles on every render.
+  const windField = useMemo(
+    () => (wind.field && disc ? maskFieldToDisc(wind.field, disc.center, disc.radiusKm) : null),
+    [wind.field, disc],
+  )
+  const swellField = useMemo(
+    () => (swell.field && disc ? maskFieldToDisc(swell.field, disc.center, disc.radiusKm) : null),
+    [swell.field, disc],
+  )
 
-  function toggle(layer: VelocityKind) {
-    onKindChange(kind === layer ? null : layer)
+  const windDrawn = windOn && wind.status === "ready" && windField !== null
+  const swellDrawn = swellOn && swell.status === "ready" && swellField !== null
+
+  const windAsOf = day?.weather?.fetchedAt ?? day?.sea?.recordedAt ?? null
+  const swellAsOf = day?.sea?.recordedAt ?? day?.weather?.fetchedAt ?? null
+
+  function detailFor(on: boolean, state: { status: string; error: string | null }, asOf: string | null) {
+    if (!on || unavailable) return null
+    if (state.status === "loading") return "Loading…"
+    if (state.status === "empty") return "No forecast for this day."
+    if (state.status === "error") return state.error
+    if (state.status === "ready") return `${hourLabel(hour)} · forecast as of ${formatTimeAgo(asOf)}`
+    return null
   }
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {kind && status === "ready" && field && colour && (
+      {windDrawn && windField && disc && (
         <VelocityOverlay
-          field={field}
+          field={windField}
           viewRef={viewRef}
           size={size}
-          color={colour}
-          // Web's planner values (map-core.tsx): swell is sparser and thicker than wind.
-          particleMultiplier={kind === "wave" ? 0.0014 : 0.0016}
-          strokeWidth={kind === "wave" ? 3.5 : 2.5}
+          color={speedColor(meanSpeed(wind.field ?? windField))}
+          // Web's planner values (map-core.tsx WIND_OPTIONS).
+          particleMultiplier={0.0016}
+          strokeWidth={2.5}
+          disc={disc}
+          drawRing
+        />
+      )}
+      {swellDrawn && swellField && disc && (
+        <VelocityOverlay
+          field={swellField}
+          viewRef={viewRef}
+          size={size}
+          color={SWELL_COLOR}
+          // Web's planner values (map-core.tsx SWELL_OPTIONS): sparser and thicker than wind.
+          particleMultiplier={0.0014}
+          strokeWidth={3.5}
+          trail={SWELL_TRAIL}
+          disc={disc}
+          drawRing={!windDrawn}
         />
       )}
 
-      <View pointerEvents="box-none" className="absolute right-3 top-16 items-end gap-1">
-        <View className="flex-row gap-2">
-          {(["wind", "wave"] as const).map((layer) => (
-            <Chip
-              key={layer}
-              active={kind === layer}
-              disabled={unavailable}
-              onPress={() => toggle(layer)}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${LAYER_NAME[layer]} on the map`}
-              accessibilityState={{ selected: kind === layer, disabled: unavailable }}
-              className="px-3 py-1"
-              textClassName="text-xs"
-            >
-              {layer === "wind" ? "Wind" : "Swell"}
-            </Chip>
-          ))}
-        </View>
+      <View pointerEvents="box-none" className="absolute right-3 top-3 items-end gap-1">
+        <Pressable
+          onPress={() => setOpen((wasOpen) => !wasOpen)}
+          accessibilityRole="button"
+          accessibilityLabel="Map overlays"
+          accessibilityState={{ expanded: open }}
+          className={`rounded-md bg-card/90 p-2 ${open ? "border border-primary/50" : "border border-border/40"}`}
+        >
+          <Layers size={16} color={lightTokens.foreground} />
+        </Pressable>
 
-        {statusLine && (
-          <View className="max-w-64 rounded-md bg-card/90 px-2 py-1">
-            <Text className="text-[11px] text-foreground">{statusLine}</Text>
-            {kind && status === "ready" && (
+        {open && (
+          <View className="w-48 overflow-hidden rounded-md border border-border/30 bg-card">
+            <View className="border-b border-border/30 px-3 py-1.5">
+              <Text className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Map overlays
+              </Text>
+            </View>
+            <LayerSwitch
+              label="Wind"
+              on={windOn}
+              disabled={unavailable}
+              detail={detailFor(windOn, wind, windAsOf)}
+              onToggle={onWindToggle}
+            />
+            <View className="h-px bg-border/20" />
+            <LayerSwitch
+              label="Swell"
+              on={swellOn}
+              disabled={unavailable}
+              detail={detailFor(swellOn, swell, swellAsOf)}
+              onToggle={onSwellToggle}
+            />
+            <View className="border-t border-border/30 px-3 py-1.5">
+              {unavailableReason && (
+                <Text className="mb-1 text-[10px] text-foreground">{unavailableReason}</Text>
+              )}
               <Text className="text-[10px] text-muted-foreground">
                 Forecast direction and strength, the same across the whole area.
               </Text>
-            )}
+            </View>
           </View>
         )}
       </View>
     </View>
   )
 }
+
+export type { VelocityKind }
