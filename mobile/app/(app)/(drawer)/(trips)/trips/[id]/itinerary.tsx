@@ -593,7 +593,7 @@ export default function TripMapScreen() {
           see plans/M9b3.md's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void reload()} />
 
         {/* M9d WP4: a push refused because the route changed elsewhere is parked,
             never merged. The phone keeps showing its own route until the leader

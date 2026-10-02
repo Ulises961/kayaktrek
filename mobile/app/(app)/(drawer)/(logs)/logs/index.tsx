@@ -168,7 +168,11 @@ export default function LogsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
-        <OfflineNotice visible={isOffline} cachedAt={logsCache.cachedAt}>
+        <OfflineNotice
+          visible={isOffline}
+          cachedAt={logsCache.cachedAt}
+          onRetry={() => void load()}
+        >
           Recording a paddle needs a connection.
         </OfflineNotice>
 

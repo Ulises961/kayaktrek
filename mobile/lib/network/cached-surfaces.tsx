@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 
 // What the screen in front of the paddler is showing from the cache, reported
 // up to the app-root banner so there is one offline message rather than two.
@@ -27,6 +35,16 @@ type CachedSurfacesValue = {
   // dismissal would come straight back on the next navigation.
   dismissed: boolean
   setDismissed: (dismissed: boolean) => void
+  // A reporter's own retry, registered alongside its report under the same id.
+  // The banner's "Recheck connection" used to only re-poll device connectivity
+  // (NetInfo), which can't clear a stale report: that failure came from a
+  // backend request, not from the device being offline, so nothing retried it
+  // until the screen itself happened to refocus or remount (found live —
+  // "the server connection is not present even if adb port forwarding is
+  // active": the backend was reachable the whole time, the report just never
+  // got a chance to re-check).
+  registerRetry: (id: string, retry: (() => void) | null) => void
+  retryAll: () => void
 }
 
 const CachedSurfacesContext = createContext<CachedSurfacesValue | null>(null)
@@ -46,9 +64,30 @@ export function CachedSurfacesProvider({ children }: { children: ReactNode }) {
 
   const [dismissed, setDismissed] = useState(false)
 
+  // A ref, not state: a retry callback changing identity (a screen's `load`
+  // re-created on every render) must not itself trigger a re-render of every
+  // consumer the way adding it to `entries` would.
+  const retries = useRef<Map<string, () => void>>(new Map())
+
+  const registerRetry = useCallback((id: string, retry: (() => void) | null) => {
+    if (retry === null) retries.current.delete(id)
+    else retries.current.set(id, retry)
+  }, [])
+
+  const retryAll = useCallback(() => {
+    for (const retry of retries.current.values()) retry()
+  }, [])
+
   const value = useMemo(
-    () => ({ reports: [...entries.values()], report, dismissed, setDismissed }),
-    [entries, report, dismissed],
+    () => ({
+      reports: [...entries.values()],
+      report,
+      dismissed,
+      setDismissed,
+      registerRetry,
+      retryAll,
+    }),
+    [entries, report, dismissed, registerRetry, retryAll],
   )
 
   return <CachedSurfacesContext.Provider value={value}>{children}</CachedSurfacesContext.Provider>

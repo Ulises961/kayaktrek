@@ -51,7 +51,7 @@ function hasMessage(report: CachedSurfaceReport): boolean {
 
 export function OfflineBanner() {
   const isDeviceOffline = useIsOffline()
-  const { reports, dismissed, setDismissed } = useCachedSurfaces()
+  const { reports, dismissed, setDismissed, retryAll } = useCachedSurfaces()
   const isOffline = isDeviceOffline || reports.length > 0
   const [expanded, setExpanded] = useState(false)
   const [rechecking, setRechecking] = useState(false)
@@ -59,15 +59,20 @@ export function OfflineBanner() {
   const dated = reports.filter((report) => report.cachedAt !== undefined)
   const explained = reports.filter(hasMessage)
 
-  // A manual escape hatch for when NetInfo's own passive state is stale — the
-  // OS doesn't always fire a change event promptly (captive portals, flaky
-  // wifi that never fully drops). useIsOffline's listener picks up whatever
-  // recheckConnectivity() settles to; nothing else needs doing with the
-  // result here.
+  // A manual escape hatch for when either half of `isOffline` is stale: NetInfo's
+  // own passive state (the OS doesn't always fire a change event promptly —
+  // captive portals, flaky wifi that never fully drops), or a `reports` entry
+  // left over from a backend request that failed for a reason that has since
+  // gone away (found live: the device was online and the backend reachable the
+  // whole time, but the banner still read "Can't reach the server" because
+  // nothing had re-run the request that originally failed). recheckConnectivity()
+  // only ever covered the first; retryAll() re-runs every focused screen's own
+  // load/reload so a surviving failure re-reports itself and a resolved one clears.
   async function handleRecheck() {
     setRechecking(true)
     try {
       await recheckConnectivity()
+      retryAll()
     } finally {
       setRechecking(false)
     }

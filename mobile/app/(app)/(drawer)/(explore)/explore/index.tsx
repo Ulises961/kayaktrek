@@ -233,7 +233,10 @@ export default function ExploreScreen() {
             {/* Explore is deliberately not cached: it is a discovery surface acted
                 on while connected. Offline is therefore expected, and the banner
                 says so; only a genuine server error is shown here. */}
-            <NeedsConnectionNotice visible={isOfflineError(error)}>
+            <NeedsConnectionNotice
+              visible={isOfflineError(error)}
+              onRetry={() => void runSearch(1, { append: false })}
+            >
               Explore needs a connection.
             </NeedsConnectionNotice>
             {/* No retry offline: it could only fail again, and the search re-runs
