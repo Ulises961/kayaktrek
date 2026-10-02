@@ -1,4 +1,4 @@
-import { projectLngLat, type MapViewState } from "../project-lng-lat"
+import { projectLngLat, unprojectScreen, visibleBounds, type MapViewState } from "../project-lng-lat"
 
 const size = { width: 400, height: 800 }
 
@@ -49,5 +49,69 @@ describe("projectLngLat", () => {
 
     expect(x).toBeLessThan(200)
     expect(y).toBeCloseTo(400, 3)
+  })
+})
+
+describe("unprojectScreen", () => {
+  it("is the inverse of projectLngLat, at any bearing and zoom", () => {
+    const views: MapViewState[] = [
+      view,
+      { ...view, bearing: 37, zoom: 12.5 },
+      { center: [12.1, -33.4], zoom: 6, bearing: 200, pitch: 0 },
+    ]
+
+    for (const mapView of views) {
+      const [x, y] = projectLngLat(mapView, size, mapView.center[0] + 0.03, mapView.center[1] - 0.02)
+      const [longitude, latitude] = unprojectScreen(mapView, size, x, y)
+
+      expect(longitude).toBeCloseTo(mapView.center[0] + 0.03, 6)
+      expect(latitude).toBeCloseTo(mapView.center[1] - 0.02, 6)
+    }
+  })
+
+  it("gives the map centre for the middle of the screen", () => {
+    const [longitude, latitude] = unprojectScreen(view, size, 200, 400)
+
+    expect(longitude).toBeCloseTo(-4.5, 8)
+    expect(latitude).toBeCloseTo(54.1, 8)
+  })
+})
+
+describe("visibleBounds", () => {
+  it("is the area the screen shows, around the centre", () => {
+    const bounds = visibleBounds(view, size)
+
+    expect(bounds.west).toBeLessThan(-4.5)
+    expect(bounds.east).toBeGreaterThan(-4.5)
+    expect(bounds.south).toBeLessThan(54.1)
+    expect(bounds.north).toBeGreaterThan(54.1)
+  })
+
+  it("covers a tall screen more in latitude than in longitude", () => {
+    const bounds = visibleBounds(view, size)
+
+    // 400 x 800 px, so twice as many pixels vertically; a degree of latitude is longer than one
+    // of longitude at 54 degrees north, so compare in pixels, not degrees.
+    const [westX] = projectLngLat(view, size, bounds.west, 54.1)
+    const [eastX] = projectLngLat(view, size, bounds.east, 54.1)
+    expect(eastX - westX).toBeCloseTo(400, 3)
+  })
+
+  it("grows to contain the whole screen when the map is rotated", () => {
+    const rotated = visibleBounds({ ...view, bearing: 45 }, size)
+    const flat = visibleBounds(view, size)
+
+    expect(rotated.east - rotated.west).toBeGreaterThan(flat.east - flat.west)
+    expect(rotated.north - rotated.south).toBeGreaterThan(flat.north - flat.south)
+  })
+
+  it("can be padded, so particles are not culled right at the screen edge", () => {
+    const tight = visibleBounds(view, size)
+    const padded = visibleBounds(view, size, 50)
+
+    expect(padded.west).toBeLessThan(tight.west)
+    expect(padded.east).toBeGreaterThan(tight.east)
+    expect(padded.north).toBeGreaterThan(tight.north)
+    expect(padded.south).toBeLessThan(tight.south)
   })
 })

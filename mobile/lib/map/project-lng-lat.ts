@@ -51,3 +51,56 @@ export function projectLngLat(
 
   return [size.width / 2 + x, size.height / 2 + y]
 }
+
+/** The coordinate under a screen pixel — the inverse of `projectLngLat`. */
+export function unprojectScreen(
+  view: MapViewState,
+  size: { width: number; height: number },
+  screenX: number,
+  screenY: number,
+): [number, number] {
+  const worldSize = TILE_SIZE * 2 ** view.zoom
+  const x = screenX - size.width / 2
+  const y = screenY - size.height / 2
+
+  // Undo the bearing rotation applied in projectLngLat.
+  const radians = (view.bearing * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  const dx = x * cos - y * sin
+  const dy = x * sin + y * cos
+
+  const worldX = mercatorX(view.center[0], worldSize) + dx
+  const worldY = mercatorY(view.center[1], worldSize) + dy
+  const longitude = (worldX / worldSize) * 360 - 180
+  const latitude = (Math.atan(Math.sinh(Math.PI * (1 - (2 * worldY) / worldSize))) * 180) / Math.PI
+  return [longitude, latitude]
+}
+
+export type GeoBounds = { north: number; south: number; west: number; east: number }
+
+/**
+ * The smallest box of coordinates containing the whole screen, plus `paddingPixels`
+ * all round. A rotated map shows a tilted rectangle of ground, so the box grows to
+ * contain it.
+ */
+export function visibleBounds(
+  view: MapViewState,
+  size: { width: number; height: number },
+  paddingPixels = 0,
+): GeoBounds {
+  const corners = [
+    unprojectScreen(view, size, -paddingPixels, -paddingPixels),
+    unprojectScreen(view, size, size.width + paddingPixels, -paddingPixels),
+    unprojectScreen(view, size, size.width + paddingPixels, size.height + paddingPixels),
+    unprojectScreen(view, size, -paddingPixels, size.height + paddingPixels),
+  ]
+  const longitudes = corners.map(([longitude]) => longitude)
+  const latitudes = corners.map(([, latitude]) => latitude)
+  return {
+    west: Math.min(...longitudes),
+    east: Math.max(...longitudes),
+    south: Math.min(...latitudes),
+    north: Math.max(...latitudes),
+  }
+}
