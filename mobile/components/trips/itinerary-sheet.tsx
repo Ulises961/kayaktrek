@@ -43,6 +43,8 @@ export function ItinerarySheet({
   expanded,
   onExpandedChange,
   onRefreshWeather,
+  selectedHour,
+  onHourChange,
   panGestureDisabled,
 }: {
   selectedDay: Day | null;
@@ -58,6 +60,9 @@ export function ItinerarySheet({
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onRefreshWeather?: () => Promise<void>;
+  // M35 WP3: the hour the map's velocity overlay shows, picked from the hourly grids.
+  selectedHour?: number | null;
+  onHourChange?: (hour: number) => void;
   // M34 WP6 fix: while the itinerary screen has a marker drag in flight, this
   // sheet's own content/handle pan gestures must not compete with it for the
   // same touch stream (gorhom's gesture-handler and MapLibre's native drag
@@ -106,7 +111,12 @@ export function ItinerarySheet({
             onViewPoint={() => onViewPoint(selectedPointId)}
           />
         ) : (
-          <WeatherSeaPanel day={selectedDay} onRefresh={onRefreshWeather} />
+          <WeatherSeaPanel
+            day={selectedDay}
+            onRefresh={onRefreshWeather}
+            selectedHour={selectedHour}
+            onHourChange={onHourChange}
+          />
         )}
       </BottomSheetView>
     </BottomSheet>
