@@ -8,3 +8,9 @@ __pycache__
 var/
 *.log
 alembic/versions/__pycache__
+# Local-only artefacts a CI checkout never has, so a local build matches the released one
+node_modules
+.mypy_cache
+.ruff_cache
+# Tests run on the CI host (uv run pytest), never inside the image
+Tests
