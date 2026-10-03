@@ -375,7 +375,10 @@ services:
       redis-auth:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # -I -S: skip site-packages and the environment. A full interpreter startup every 10s
+      # leaves ~10x more reclaimable kernel slab per run, which keeps `docker stats` reading
+      # near the limit. Real usage is memory.stat's `anon`, not that percentage.
+      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -475,7 +478,10 @@ services:
       redis-auth:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # -I -S: skip site-packages and the environment. A full interpreter startup every 10s
+      # leaves ~10x more reclaimable kernel slab per run, which keeps `docker stats` reading
+      # near the limit. Real usage is memory.stat's `anon`, not that percentage.
+      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5

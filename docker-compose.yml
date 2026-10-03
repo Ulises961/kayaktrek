@@ -359,7 +359,7 @@ services:
     healthcheck:
       # No curl in the runtime image (python:3.12-slim + only libpq-dev/gcc/libmagic1) —
       # urllib is stdlib. GET /api/v1/health pings the DB (M11 §4).
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -448,7 +448,7 @@ services:
     healthcheck:
       # Same probe as backend — the sidecar serves the whole Flask app (D1); routing
       # via nginx/the reverse proxy is what isolates it to SSE routes, not the process.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
       interval: 10s
       timeout: 5s
       retries: 5
