@@ -175,6 +175,29 @@ def denylist(app):
         yield fake
 
 
+class FakeTripChangeRedis:
+    """Records what the trip-change publisher sends (M36). Autouse below so no test
+    depends on a reachable Redis just because a commit now publishes."""
+
+    def __init__(self):
+        self.published: list[tuple[str, str]] = []
+        self.revisions: dict[str, int] = {}
+
+    def incr(self, key):
+        self.revisions[key] = self.revisions.get(key, 0) + 1
+        return self.revisions[key]
+
+    def publish(self, channel, message):
+        self.published.append((channel, message))
+
+
+@pytest.fixture(autouse=True)
+def trip_change_redis():
+    fake = FakeTripChangeRedis()
+    with patch("Services.trip_change_service.live_redis", return_value=fake):
+        yield fake
+
+
 @pytest.fixture(scope='session')
 def client(app):
     """Test client for making requests."""

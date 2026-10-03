@@ -67,6 +67,9 @@ from Models.processed_mutation import ProcessedMutation  # noqa: F401
 # side effect, same convention as the model imports just above.
 from Services.Utils import sync_tombstones  # noqa: F401
 
+# Registers the session listeners that publish trip change notifications (M36 WP1).
+from Services.Utils import trip_change_events  # noqa: F401
+
 
 def createApp(config_mode: str, *, schema: str | None = None):
     """

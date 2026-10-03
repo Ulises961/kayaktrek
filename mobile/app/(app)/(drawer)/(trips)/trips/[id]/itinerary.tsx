@@ -44,6 +44,7 @@ import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
 import { editRoute, loadRouteSyncState, pushRouteChanges } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
+import { useTripChanges } from "@mobile/lib/live/use-trip-changes";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
 import { distanceToPredecessorNm } from "@mobile/lib/itinerary/draft-point";
 import { withLiveImages } from "@mobile/lib/itinerary/live-images";
@@ -85,6 +86,18 @@ type DraftPoint = { latitude: number; longitude: number; afterPointId: string | 
 // own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
 // visible line), achieved differently since MapLibre RN's Layer has no onPress.
 const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+
+// Wire names (TripChange.t) of everything this screen draws.
+const ROUTE_CHANGE_TABLES = [
+  "trip",
+  "itinerary",
+  "day",
+  "point",
+  "image",
+  "place",
+  "wind_diamond",
+  "tidal_station",
+];
 
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -220,6 +233,9 @@ export default function TripMapScreen() {
       void reload();
     }, [reload]),
   );
+
+  // Someone else changed the route, or a place/diamond/photo on it (M36).
+  useTripChanges(id, () => void reload(), { tables: ROUTE_CHANGE_TABLES });
 
   useEffect(() => {
     let cancelled = false;

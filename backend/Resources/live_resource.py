@@ -303,3 +303,76 @@ def trip_stream(id: str):
 # the auth-invariant canary (Tests/40_auth_invariants_test.py) recognises this
 # as populated, not a silent gap.
 trip_stream._populates_current_user = True  # type: ignore[attr-defined]
+
+
+@live_api.route("/trip/<string:id>/changes-ticket", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+def post_changes_ticket(id: str):
+    """
+    ---
+    post:
+      summary: Mint a short-lived trip-changes stream ticket
+      description: >
+        For the browser's EventSource, which can't send an Authorization header. Valid
+        for the changes stream of this trip only — a position-stream ticket does not
+        open it, nor this one that.
+      responses:
+        200:
+          description: The ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    type: string
+    """
+    return jsonify({"ticket": LiveStreamService.mint_changes_ticket(id, str(g.current_user_id))}), HTTPStatus.OK
+
+
+@live_api.route("/trip/<string:id>/changes", methods=["GET"])
+@limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
+def trip_changes_stream(id: str):
+    """Crew-only stream of trip change notifications, in any trip state. Accepts a normal
+    access token or a `?ticket=` from POST .../changes-ticket, checked in that order.
+    Missing, forbidden and unauthenticated are one undifferentiated 404.
+    ---
+    get:
+      summary: Trip change notifications for a crew member
+      description: >
+        Server-Sent Events. `hello` carries the trip's current revision, `change` carries
+        `{rev, changes:[{t, id, op}]}` — identities only, never field values — and `end`
+        means membership was lost.
+      parameters:
+        - name: ticket
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: SSE stream
+          content:
+            text/event-stream: {}
+        404:
+          description: Not authorized, or no such trip
+    """
+    user_id = JWTService.resolve_user_id_from_bearer_header()
+    if user_id is None:
+        ticket = request.args.get("ticket")
+        if ticket is not None:
+            user_id = LiveStreamService.verify_changes_ticket(ticket, id)
+
+    if user_id is None or not _check_trip_ownership(user_id, id):
+        return Response(status=HTTPStatus.NOT_FOUND)
+
+    return Response(
+        stream_with_context(LiveStreamService.stream_trip_changes(id, user_id)),
+        mimetype="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+# Self-authenticating, for the same reason as `trip_stream` above.
+trip_changes_stream._populates_current_user = True  # type: ignore[attr-defined]

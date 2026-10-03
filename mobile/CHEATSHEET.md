@@ -83,6 +83,9 @@ adb uninstall <package.name>               # e.g. com.anonymous.mobile — check
 - **API URL**: `mobile/.env` (`cp .env.example .env`) needs `EXPO_PUBLIC_API_URL=http://10.0.2.2:5000`
   for the emulator specifically — `10.0.2.2` is the emulator's alias for the host machine's
   `localhost`. A physical phone instead needs your machine's real LAN IP.
+- **SSE URL** (live trip-change notifications, M36): the same file needs
+  `EXPO_PUBLIC_SSE_URL=http://10.0.2.2:5001` on the emulator, for the same reason. Without it the
+  app still works — screens simply don't refresh when someone else edits the trip.
 - **Metro cache acting weird after a native/config change**: `pnpm exec expo start -c` clears it.
 - **Emulator slow to boot the first time**: normal, it's a cold boot of the whole system image.
   Subsequent boots are much faster (snapshot resume) unless you `-no-snapshot-save`.

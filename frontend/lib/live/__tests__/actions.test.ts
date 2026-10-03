@@ -7,7 +7,7 @@ vi.mock("@/lib/api/client", () => ({
   isRedirectError: () => false,
 }))
 
-import { sendPositionPing, getStreamTicket, closeDay } from "../actions"
+import { sendPositionPing, getStreamTicket, getChangesStreamUrl, closeDay } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 
@@ -69,6 +69,20 @@ describe("getStreamTicket", () => {
     mockApiPost.mockRejectedValue(new Error("nope"))
     const url = await getStreamTicket(TRIP_ID)
     expect(url).toBeNull()
+  })
+})
+
+describe("getChangesStreamUrl", () => {
+  it("returns the sidecar changes URL with the minted ticket", async () => {
+    mockApiPost.mockResolvedValue({ ticket: "tok-xyz" })
+    const url = await getChangesStreamUrl(TRIP_ID)
+    expect(mockApiPost).toHaveBeenCalledWith(`/api/live/trip/${TRIP_ID}/changes-ticket`, {})
+    expect(url).toBe(`http://localhost:5001/api/v1/live/trip/${TRIP_ID}/changes?ticket=tok-xyz`)
+  })
+
+  it("returns null on failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("nope"))
+    expect(await getChangesStreamUrl(TRIP_ID)).toBeNull()
   })
 })
 

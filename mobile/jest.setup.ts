@@ -156,3 +156,12 @@ jest.mock("react-native/Libraries/Modal/Modal", () => {
 // Stubbed once here rather than re-mocked in every suite that happens to pull
 // a db module into its graph.
 jest.mock("./lib/db/database", () => ({ database: {} }));
+
+// lib/live/trip-changes.ts builds the app-wide change-stream hub over lib/db/sync and
+// lib/db/route-sync, and screens now subscribe to it (M36). Screen suites are about the
+// screen, not a live connection, so it is stubbed inert here once; the hub, the streaming
+// gate and the hook each have their own suites that import their modules directly.
+jest.mock("./lib/live/trip-changes", () => ({
+  tripChangesHub: { subscribe: () => () => undefined, setStreaming: () => undefined },
+  startTripChanges: () => () => undefined,
+}));

@@ -23,6 +23,7 @@ import { loadRequirementsCache, saveRequirementsCache } from "@mobile/lib/db/req
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { MUTATION_ENTITY, MUTATION_OPERATION } from "@mobile/lib/db/mutation-queue"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import { useTripChanges } from "@mobile/lib/live/use-trip-changes"
 import {
   queueContribution,
   queuePackingAdd,
@@ -47,6 +48,15 @@ import {
 import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Inventory" }} />
+
+// Wire names (TripChange.t) of everything this screen shows.
+const INVENTORY_CHANGE_TABLES = [
+  "inventory",
+  "trip_requirement",
+  "requirement_contribution",
+  "personal_packing_item",
+  "trip_member",
+]
 
 type Tab = "group" | "kit"
 
@@ -177,6 +187,17 @@ export default function InventoryScreen() {
   useEffect(() => {
     void loadKit()
   }, [loadKit])
+
+  // Someone else changed the trip's requirements, a contribution, or the crew who cover
+  // them (M36). The paddler's own gear closet is not trip-scoped, so it is left alone.
+  useTripChanges(
+    id,
+    () => {
+      void load()
+      void loadKit()
+    },
+    { tables: INVENTORY_CHANGE_TABLES },
+  )
 
   function selectTab(next: Tab) {
     setTab(next)

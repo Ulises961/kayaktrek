@@ -5,6 +5,7 @@ import { ActivityIndicator } from "react-native"
 import { Screen } from "../../components/ui/layout"
 import { useAuth } from "../../lib/auth/auth-context"
 import { startSyncTrigger } from "../../lib/db/sync-trigger"
+import { startTripChanges } from "../../lib/live/trip-changes"
 
 // Guards every route under (app) — the group is authenticated-only, matching web's
 // getMe()-gated (app) shell (proxy.ts) rather than the anonymous-tolerant (public) group.
@@ -33,6 +34,12 @@ export default function AppLayout() {
   useEffect(() => {
     if (status !== "authenticated") return
     return startSyncTrigger()
+  }, [status])
+
+  // Holds the trip-change stream open only while foregrounded and reachable (M36).
+  useEffect(() => {
+    if (status !== "authenticated") return
+    return startTripChanges()
   }, [status])
 
   if (status === "loading") {

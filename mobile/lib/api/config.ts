@@ -19,6 +19,14 @@ export const API_URL = resolveOrigin(
   "EXPO_PUBLIC_API_URL",
 )
 
+// The SSE sidecar's origin (ADR-033) — a separate host in production, the same role as
+// frontend/lib/api/config.ts's SSE_URL. The trip-changes stream (M36) connects here.
+export const SSE_URL = resolveOrigin(
+  process.env.EXPO_PUBLIC_SSE_URL,
+  "http://localhost:5001",
+  "EXPO_PUBLIC_SSE_URL",
+)
+
 // Mirrors frontend/lib/api/config.ts's API_VERSION/API_PREFIX exactly — same backend,
 // same versioning scheme (ADR-031).
 export const API_VERSION = "v1"

@@ -8,6 +8,7 @@ import type { TripState } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
 import { deriveMembership } from "@/lib/trips/membership"
 import { MapBuilder } from "@/components/map/map-builder"
+import { TripChangesListener } from "@/components/trips/trip-changes-listener"
 
 export default async function ItineraryBuilderPage({
   params,
@@ -31,6 +32,7 @@ export default async function ItineraryBuilderPage({
   let tripState: TripState | null = null
   let isLeader = true
   let showNavigate = false
+  let isTripMember = false
 
   const me = await getMe()
   const initialDistanceUnit = me?.unitPreference ?? DISTANCE_UNIT.NM
@@ -47,6 +49,7 @@ export default async function ItineraryBuilderPage({
       const session = await getSession()
       const membership = deriveMembership(trip, session)
       isLeader = membership.isLeader
+      isTripMember = membership.isMember
       showNavigate = membership.isMember && tripState === TRIP_STATE.HAPPENING
     } catch (error) {
       rethrowIfRedirect(error)
@@ -55,16 +58,19 @@ export default async function ItineraryBuilderPage({
   }
 
   return (
-    <MapBuilder
-      itinerary={itinerary}
-      tripId={itinerary.tripId ?? null}
-      tripName={tripName}
-      tripDateFrom={tripDateFrom}
-      tripDateTo={tripDateTo}
-      tripState={tripState}
-      isLeader={isLeader}
-      showNavigate={showNavigate}
-      initialDistanceUnit={initialDistanceUnit}
-    />
+    <>
+      {isTripMember && itinerary.tripId && <TripChangesListener tripId={itinerary.tripId} />}
+      <MapBuilder
+        itinerary={itinerary}
+        tripId={itinerary.tripId ?? null}
+        tripName={tripName}
+        tripDateFrom={tripDateFrom}
+        tripDateTo={tripDateTo}
+        tripState={tripState}
+        isLeader={isLeader}
+        showNavigate={showNavigate}
+        initialDistanceUnit={initialDistanceUnit}
+      />
+    </>
   )
 }

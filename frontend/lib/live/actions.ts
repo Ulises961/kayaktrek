@@ -39,6 +39,22 @@ export async function closeDay(tripId: string, date?: string): Promise<CloseDayR
   }
 }
 
+// Mints a trip-changes ticket (M36) and returns the sidecar URL for the crew-only change
+// stream, or null on failure. Distinct from getStreamTicket: that one opens the position
+// stream and ends when a trip is no longer happening; this one is valid in every state.
+export async function getChangesStreamUrl(tripId: string): Promise<string | null> {
+  try {
+    const { ticket } = await apiPost<{ ticket: string }>(
+      `/api/live/trip/${tripId}/changes-ticket`,
+      {},
+    )
+    return `${SSE_URL}${API_PREFIX}/live/trip/${tripId}/changes?ticket=${ticket}`
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return null
+  }
+}
+
 // Mints a fresh stream ticket (§D5) and returns the full sidecar URL the browser's
 // EventSource should connect to, or null on failure (e.g. not a trip member).
 export async function getStreamTicket(tripId: string): Promise<string | null> {
