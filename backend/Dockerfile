@@ -27,6 +27,12 @@ FROM base AS runtime
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
+# busybox for the compose healthchecks' `busybox wget`: one package, ~0.9 MB, against ~14 MB
+# (22 packages) for curl or ~12 MB for Debian's wget. A healthcheck every 10s that starts
+# the venv's Python instead scans all of site-packages each time.
+RUN apt-get update && apt-get install -y --no-install-recommends busybox \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m appuser
 
 # Cache directories for the decompressed land mask (Services/Utils/land_mask.py) and the

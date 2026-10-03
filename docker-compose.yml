@@ -357,9 +357,10 @@ services:
       - ./backend:/app
       - /app/.venv
     healthcheck:
-      # No curl in the runtime image (python:3.12-slim + only libpq-dev/gcc/libmagic1) —
-      # urllib is stdlib. GET /api/v1/health pings the DB (M11 §4).
-      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # busybox wget (installed in the runtime image for this) rather than Python, which
+      # scans the venv's site-packages on every start. 127.0.0.1: gunicorn binds IPv4 only.
+      # GET /api/v1/health pings the DB (M11 §4); non-2xx exits 1.
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -448,7 +449,7 @@ services:
     healthcheck:
       # Same probe as backend — the sidecar serves the whole Flask app (D1); routing
       # via nginx/the reverse proxy is what isolates it to SSE routes, not the process.
-      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5

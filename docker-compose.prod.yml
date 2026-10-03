@@ -375,10 +375,11 @@ services:
       redis-auth:
         condition: service_healthy
     healthcheck:
-      # -I -S: skip site-packages and the environment. A full interpreter startup every 10s
-      # leaves ~10x more reclaimable kernel slab per run, which keeps `docker stats` reading
-      # near the limit. Real usage is memory.stat's `anon`, not that percentage.
-      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # busybox wget, not Python: an interpreter start every 10s scans the venv's whole
+      # site-packages and keeps `docker stats` reading near the limit with reclaimable kernel
+      # slab (real usage is memory.stat's `anon`). 127.0.0.1, not localhost: gunicorn binds
+      # IPv4 only, and busybox tries ::1 first. Non-2xx exits 1.
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -478,10 +479,11 @@ services:
       redis-auth:
         condition: service_healthy
     healthcheck:
-      # -I -S: skip site-packages and the environment. A full interpreter startup every 10s
-      # leaves ~10x more reclaimable kernel slab per run, which keeps `docker stats` reading
-      # near the limit. Real usage is memory.stat's `anon`, not that percentage.
-      test: ["CMD", "python", "-I", "-S", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # busybox wget, not Python: an interpreter start every 10s scans the venv's whole
+      # site-packages and keeps `docker stats` reading near the limit with reclaimable kernel
+      # slab (real usage is memory.stat's `anon`). 127.0.0.1, not localhost: gunicorn binds
+      # IPv4 only, and busybox tries ::1 first. Non-2xx exits 1.
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
