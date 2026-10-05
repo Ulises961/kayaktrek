@@ -1,23 +1,23 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { enqueueMutation, pushQueuedMutations } from "../../../lib/db/mutation-queue"
+import { enqueueMutation } from "../../../lib/db/mutation-queue"
+import { requestPush } from "../../../lib/db/push-pending"
 import { CrewDeparture } from "../crew-departure"
 
 jest.mock("../../../lib/db/mutation-queue", () => ({
   ...jest.requireActual("../../../lib/db/mutation-queue"),
   enqueueMutation: jest.fn(),
-  pushQueuedMutations: jest.fn(),
 }))
+jest.mock("../../../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockEnqueue = enqueueMutation as jest.Mock
-const mockPush = pushQueuedMutations as jest.Mock
+const mockPush = requestPush as jest.Mock
 
 const ON_THE_WATER = { id: "m1", leftAt: null, leftNote: null, departureUnsent: false }
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockEnqueue.mockResolvedValue("mutation-1")
-  mockPush.mockResolvedValue({ applied: 1, rejected: 0, kept: 0 })
 })
 
 // M9d WP5: the leader records who has left the water, so the float plan and shore

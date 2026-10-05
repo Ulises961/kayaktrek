@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { ActivityIndicator, Pressable, View } from "react-native"
 import { RefreshCw, WifiOff, X } from "lucide-react-native"
 
@@ -6,6 +6,7 @@ import { lightTokens, palette } from "@shared/tokens"
 import { formatTimeAgo } from "@shared/utils/date"
 
 import { type CachedSurfaceReport, useCachedSurfaces } from "../../lib/network/cached-surfaces"
+import { getPushStatus, retryPush, subscribePushStatus } from "../../lib/network/push-status"
 import { recheckConnectivity, useIsOffline } from "../../lib/network/use-is-offline"
 import { Text } from "./text"
 
@@ -52,22 +53,39 @@ function hasMessage(report: CachedSurfaceReport): boolean {
 export function OfflineBanner() {
   const isDeviceOffline = useIsOffline()
   const { reports, dismissed, setDismissed } = useCachedSurfaces()
-  const isOffline = isDeviceOffline || reports.length > 0
+  // A failed push raises the banner by itself: the OS can call the device
+  // connected while the server is unreachable (or a push failed at the instant
+  // of reconnecting), and edits then sit unsent with nothing on screen saying so.
+  const pushStatus = useSyncExternalStore(subscribePushStatus, getPushStatus)
+  const pushFailed = pushStatus.state === "failed"
+  const isOffline = isDeviceOffline || reports.length > 0 || pushFailed
   const [expanded, setExpanded] = useState(false)
   const [rechecking, setRechecking] = useState(false)
-  const headline = isDeviceOffline ? "No internet connection." : "Can't reach the server."
+  const busy = rechecking || pushStatus.state === "pushing"
+  // When the unsent edits are the only thing wrong, they are the headline, with
+  // the retry state beside it — the button is on this same row. Otherwise the
+  // connection headline stands and the edits are explained under Read more.
+  const unsentOnly = pushFailed && !isDeviceOffline && reports.length === 0
+  const headline = isDeviceOffline
+    ? "No internet connection."
+    : unsentOnly
+      ? `Changes not sent yet. ${pushStatus.retryAt !== null ? "Retrying…" : "Tap to retry."}`
+      : "Can't reach the server."
   const dated = reports.filter((report) => report.cachedAt !== undefined)
   const explained = reports.filter(hasMessage)
 
   // A manual escape hatch for when NetInfo's own passive state is stale — the
   // OS doesn't always fire a change event promptly (captive portals, flaky
   // wifi that never fully drops). useIsOffline's listener picks up whatever
-  // recheckConnectivity() settles to; nothing else needs doing with the
-  // result here.
+  // recheckConnectivity() settles to. It then also sends what the phone still
+  // holds: rechecking the network alone changed nothing visible when the OS
+  // already called the device connected. A failed send leaves the push status
+  // failed, so the banner keeps saying so and the automatic retries restart.
   async function handleRecheck() {
     setRechecking(true)
     try {
       await recheckConnectivity()
+      await retryPush()
     } finally {
       setRechecking(false)
     }
@@ -129,7 +147,7 @@ export function OfflineBanner() {
           there is nothing to fold the explanation under, so it shows directly. */}
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium text-sunset-600">{headline}</Text>
-        {reports.length === 0 && (
+        {reports.length === 0 && !pushFailed && (
           <Text className="text-xs text-sunset-600">Some information may be out of date.</Text>
         )}
         {dated.length > 0 && (
@@ -137,7 +155,7 @@ export function OfflineBanner() {
             {syncedLabel(oldestCachedAt(dated.map((report) => report.cachedAt ?? null)))}
           </Text>
         )}
-        {(dated.length === 0 || expanded) &&
+        {(expanded || (dated.length === 0 && !pushFailed)) &&
           explained.map((report, index) => (
             <Text key={index} className="text-xs text-sunset-600">
               {report.message}
@@ -148,7 +166,12 @@ export function OfflineBanner() {
                 ` ${syncedLabel(report.cachedAt)}`}
             </Text>
           ))}
-        {dated.length > 0 && explained.length > 0 && (
+        {pushFailed && expanded && (
+          <Text className="text-xs text-sunset-600">
+            Your changes are saved on this phone and will be sent as soon as the server can be reached.
+          </Text>
+        )}
+        {(dated.length > 0 || pushFailed) && (explained.length > 0 || pushFailed) && (
           <Pressable
             onPress={() => setExpanded((current) => !current)}
             accessibilityRole="button"
@@ -169,12 +192,12 @@ export function OfflineBanner() {
       <Pressable
         onPress={() => void handleRecheck()}
         accessibilityRole="button"
-        accessibilityLabel="Recheck connection"
-        disabled={rechecking}
+        accessibilityLabel="Retry sync"
+        disabled={busy}
         hitSlop={8}
         className="-my-2 items-center justify-center p-2.5"
       >
-        {rechecking ? (
+        {busy ? (
           <ActivityIndicator size="small" color={palette.sunset600} />
         ) : (
           <RefreshCw size={16} color={palette.sunset600} />

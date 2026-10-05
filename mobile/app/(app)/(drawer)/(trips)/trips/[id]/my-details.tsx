@@ -13,9 +13,9 @@ import {
   MUTATION_ENTITY,
   MUTATION_OPERATION,
   enqueueMutation,
-  pushQueuedMutations,
 } from "@mobile/lib/db/mutation-queue"
 import { loadOfflineCrew } from "@mobile/lib/db/offline-float-plan"
+import { requestPush } from "@mobile/lib/db/push-pending"
 import { useQueuedChanges } from "@mobile/lib/network/queued-changes"
 import { type FloatPlanField, applyPendingFloatPlan } from "@mobile/lib/trips/pending-float-plan"
 import { getTrip } from "@mobile/lib/trips/actions"
@@ -101,8 +101,7 @@ export default function MyDetailsScreen() {
         entityId: mine.id,
         payload,
       })
-      // Best effort: offline it fails, and the next sweep sends it.
-      void pushQueuedMutations().catch(() => undefined)
+      requestPush()
       router.back()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save your details.")

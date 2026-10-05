@@ -23,8 +23,8 @@ jest.mock("../lib/db/logs-cache", () => ({ upsertCachedLog: jest.fn(async () => 
 jest.mock("../lib/db/mutation-queue", () => ({
   ...jest.requireActual("../lib/db/mutation-queue"),
   enqueueMutation: jest.fn(async () => "mutation-1"),
-  pushQueuedMutations: jest.fn(async () => ({ applied: 0, rejected: 0, kept: 1 })),
 }))
+jest.mock("../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockCreateLog = createLog as jest.Mock
 

@@ -19,11 +19,8 @@ import {
 import { Label } from "@mobile/components/ui/label";
 import { Row, Screen, Stack } from "@mobile/components/ui/layout";
 import { Text } from "@mobile/components/ui/text";
-import {
-  editRoute,
-  loadEditableRoute,
-  pushRouteChanges,
-} from "@mobile/lib/db/route-edit";
+import { requestPush } from "@mobile/lib/db/push-pending";
+import { editRoute, loadEditableRoute } from "@mobile/lib/db/route-edit";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import {
   type EditableRoute,
@@ -86,8 +83,7 @@ export default function EditPointScreen() {
           type: values.type,
         }),
       );
-      // Best effort: offline it fails and the sweep pushes later.
-      void pushRouteChanges(id).catch(() => undefined);
+      requestPush();
       router.back();
     } catch (err) {
       setError(
