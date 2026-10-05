@@ -268,6 +268,39 @@ Design constraints on that endpoint:
   Say so plainly to beta testers, alongside the same honesty the PWA-decline already requires
   about reading the plan offline.
 
+### 6.5 The map overlay's wind and swell fields (M35)
+
+The itinerary map's animated wind and swell are drawn from the same grids the
+`GET /api/v1/day/<id>/wind-vectors` and `/wave-vectors` endpoints return. Each is one `(u, v)`
+stamped across a 24×24 grid over the day's bounding box, with land cells nulled for waves — so the
+pull carries the ingredients, not 24 hours of full grids (about 55,000 numbers a day). Two more
+tables, read-only like weather and sea, and sent **whole on every pull** rather than by delta:
+the box comes from the route's points, which have no tombstones and no per-row delta, and a day's
+rows are about 5 KB a day raw (a few hundred bytes gzipped; about 50 KB raw for a ten-day trip)
+that apply idempotently.
+
+`velocity_days` — one row per day that has weather or sea data (`id` = `dayId`):
+
+| Field | Meaning |
+|---|---|
+| `south`, `north`, `west`, `east` | The day's padded route bounding box, in degrees |
+| `size` | Cells per axis (24) |
+| `landMask` | `size × size` characters, `"1"` where the cell is land, flat and row-major from the NW corner |
+
+`velocity_hours` — 24 rows per such day, hours 0–23 (`id` = `<dayId>:<hour>`): `windU`, `windV`,
+`waveU`, `waveV`, each in m/s and `null` when the day has no usable state. Every hour is always
+sent, so a stale one on the device is overwritten rather than kept.
+
+**The device stamps; it does not compute.** It rebuilds a field by filling `size × size` cells with
+the hour's `(u, v)` and, for waves only, nulling the `"1"` cells. The unit conversion (wind km/h →
+m/s), the nearest-hour fallback and the rounding all stay on the server
+(`TidalService.wind_flow_at_hour` / `wave_flow_at_hour`), shared with the two endpoints, and
+`Tests/92_m35_velocity_sync_test.py` asserts that the stamped result equals what the endpoints
+return for the same day and hour. A device with no cached rows falls back to fetching the endpoint.
+
+The "forecast as of" age is the day's existing `weather.fetched_at` / `sea.recorded_at`; these
+rows add no timestamp of their own.
+
 ---
 
 ## 7. The point linked list
