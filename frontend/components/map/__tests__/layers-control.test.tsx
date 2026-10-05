@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen, fireEvent, within } from "@testing-library/react"
 import React from "react"
+import { windLegendLabels } from "@/lib/weather/wind-scale"
 import { LayersControl } from "../layers-control"
 
 const BASE_PROPS = {
@@ -89,6 +90,22 @@ describe("LayersControl", () => {
   it("shows the wind speed legend in the panel when windEnabled is true", () => {
     render(<LayersControl {...BASE_PROPS} windEnabled={true} />)
     expect(screen.getByTestId("wind-legend")).toBeInTheDocument()
+  })
+
+  it("labels the legend over the window the particles are coloured on", () => {
+    render(<LayersControl {...BASE_PROPS} windEnabled={true} />)
+    const legend = screen.getByTestId("wind-legend")
+
+    for (const label of windLegendLabels()) {
+      expect(within(legend).getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  it("draws the legend bar and the wind switch's swatch from the same colour scale", () => {
+    render(<LayersControl {...BASE_PROPS} windEnabled={true} />)
+
+    expect(screen.getByTestId("wind-legend-bar").getAttribute("style")).toContain("linear-gradient")
+    expect(screen.getByTestId("wind-swatch").getAttribute("style")).toContain("linear-gradient")
   })
 
   it("hides the wind speed legend when windEnabled is false", () => {

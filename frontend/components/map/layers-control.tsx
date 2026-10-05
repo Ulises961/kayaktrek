@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { Layers, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { windLegendGradient, windLegendLabels } from "@/lib/weather/wind-scale"
 
 export type LayersControlProps = {
   windEnabled: boolean
@@ -145,7 +146,9 @@ export function LayersControl({
               aria-checked={windEnabled}
             >
               <span
-                className="inline-block h-1.5 w-4 shrink-0 rounded-full bg-gradient-to-r from-[#0d47a1] via-[#ffd600] to-[#d50000]"
+                data-testid="wind-swatch"
+                className="inline-block h-1.5 w-4 shrink-0 rounded-full"
+                style={{ background: windLegendGradient() }}
                 aria-hidden
               />
               Wind
@@ -216,16 +219,14 @@ export function LayersControl({
               Wind speed
             </p>
             <div
+              data-testid="wind-legend-bar"
               className="h-2.5 w-full rounded-sm"
-              style={{
-                background:
-                  "linear-gradient(to right, #0d47a1, #0091ea, #00bfa5, #00c853, #aeea00, #ffd600, #ff9100, #ff3d00, #d50000)",
-              }}
+              style={{ background: windLegendGradient() }}
             />
             <div className="text-muted-foreground mt-0.5 flex justify-between text-[8px]">
-              <span>0</span>
-              <span>20</span>
-              <span>40+ m/s</span>
+              {windLegendLabels().map((label) => (
+                <span key={label}>{label}</span>
+              ))}
             </div>
           </div>
         )}
