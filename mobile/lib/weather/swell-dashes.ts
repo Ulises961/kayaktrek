@@ -3,16 +3,19 @@ import { sampleField } from "./advection"
 import type { ScreenPoint } from "./velocity-frame"
 import type { VelocityField } from "./velocity"
 
-// Swell is not drawn as moving particles. Each data point shows ONE dash at a time; the
-// dash fades in and out where it is, and the next one appears a fixed distance further along
-// the direction the swell runs, so crests seem to march across the field while nothing slides.
+// Swell is not drawn as moving particles. Each data point shows ONE dash at a time, drawn as a
+// wave crest: a short line across the flow, square to the way the swell travels (along it, it
+// would read as wind). The dash fades in and out where it is, and the next one appears a fixed
+// distance further along the direction the swell runs, so crests seem to march across the field
+// while nothing slides.
 // Neighbouring points are a little out of step with each other, so the pattern ripples
 // through the field as a wave would rather than blinking in unison.
 //
 // A regular lattice blinking in step reads as a grid of lights, not as a sea, so it is
 // deliberately irregular (see "Chaos" below): points are nudged off their grid positions, run a
-// little fast or slow, and each cycle every dash lands, sizes and angles itself a little
-// differently, or is skipped. None of it uses Math.random: it is a hash of the point and the
+// little fast or slow, and each cycle every dash lands and sizes itself a little differently, or
+// is skipped. Only where and when a dash appears varies; every dash is square to the same flow.
+// None of it uses Math.random: it is a hash of the point and the
 // cycle, so every frame agrees with the last and a pan does not reshuffle the pattern.
 //
 // This file is the pure part: which points there are (the lattice, built once the view has
@@ -45,8 +48,6 @@ export const SWELL_STEP_VARIATION = 0.4
 export const SWELL_LATERAL_WOBBLE_PIXELS = 4
 /** How much a cycle's dash length may vary, as a fraction. */
 export const SWELL_LENGTH_VARIATION = 0.35
-/** How far a cycle's dashes may turn off the flow's direction, each way, in degrees. */
-export const SWELL_DIRECTION_WOBBLE_DEGREES = 14
 /** The chance that a point sits out a whole cycle. */
 export const SWELL_SKIP_PROBABILITY = 0.2
 
@@ -110,7 +111,6 @@ const CYCLE_SKIP = 0
 const CYCLE_STEP = 1
 const CYCLE_LATERAL = 2
 const CYCLE_LENGTH = 3
-const CYCLE_ANGLE = 4
 const CYCLE_SALT_BASE = 100
 
 function strongestSpeed(field: VelocityField): number {
@@ -275,13 +275,14 @@ function isOnScreen(point: ScreenPoint, size: { width: number; height: number })
  * The dashes showing at `nowSeconds`: one per node at most. A node's cycle is SWELL_STEPS steps
  * long; in each step its dash fades in and out in place, at a position one SWELL_STEP_PIXELS
  * further along the flow than the last step's, and after the last step it starts again at the
- * node. Projected afresh on every call, so the dashes follow the map.
+ * node. Each dash is a crest, square to the flow. Projected afresh on every call, so the dashes
+ * follow the map.
  *
  * With `chaos` above 0 each cycle is its own: the point's rate sets its pace, and a hash of the
  * point and the cycle number decides whether the cycle is skipped altogether (the whole cycle,
  * never a dash here and there), how far apart its dashes step, how far to the side of the point
- * they sit, how long they are, and how far they turn off the flow. Within a cycle those are
- * fixed, so a cycle is still a regular march.
+ * they sit, and how long they are. Within a cycle those are fixed, so a cycle is still a regular
+ * march. Nothing turns a dash: its direction is always the flow's.
  */
 export function swellDashes(
   nodes: SwellNode[],
@@ -308,17 +309,19 @@ export function swellDashes(
     const stepPixels = SWELL_STEP_PIXELS * (1 + signed(node.seed, salt(CYCLE_STEP)) * SWELL_STEP_VARIATION * chaos)
     const lateralPixels = signed(node.seed, salt(CYCLE_LATERAL)) * SWELL_LATERAL_WOBBLE_PIXELS * chaos
     const lengthPixels = SWELL_DASH_PIXELS * (1 + signed(node.seed, salt(CYCLE_LENGTH)) * SWELL_LENGTH_VARIATION * chaos)
-    const angle = (signed(node.seed, salt(CYCLE_ANGLE)) * SWELL_DIRECTION_WOBBLE_DEGREES * chaos * Math.PI) / 180
 
-    // The flow's direction, turned by this cycle's wobble, and the line across it.
-    const directionX = node.direction.x * Math.cos(angle) - node.direction.y * Math.sin(angle)
-    const directionY = node.direction.x * Math.sin(angle) + node.direction.y * Math.cos(angle)
+    // A dash is a wave crest, so it lies across the flow, square to the way the swell runs; the
+    // steps and the sideways wobble are measured along and across that same direction. The
+    // irregularity never turns a dash: a sea has one direction at a time.
+    const { x: directionX, y: directionY } = node.direction
+    const acrossX = -directionY
+    const acrossY = directionX
     const [x, y] = projectLngLat(view, size, node.longitude, node.latitude)
-    const centreX = x + directionX * step * stepPixels - directionY * lateralPixels
-    const centreY = y + directionY * step * stepPixels + directionX * lateralPixels
+    const centreX = x + directionX * step * stepPixels + acrossX * lateralPixels
+    const centreY = y + directionY * step * stepPixels + acrossY * lateralPixels
     const half = lengthPixels / 2
-    const from = { x: centreX - directionX * half, y: centreY - directionY * half }
-    const to = { x: centreX + directionX * half, y: centreY + directionY * half }
+    const from = { x: centreX - acrossX * half, y: centreY - acrossY * half }
+    const to = { x: centreX + acrossX * half, y: centreY + acrossY * half }
     if (!isOnScreen(from, size) && !isOnScreen(to, size)) continue
     dashes.push({ from, to, alpha })
   }

@@ -2,7 +2,6 @@ import { projectLngLat, visibleBounds, type MapViewState } from "../../map/proje
 import {
   SWELL_CHAOS,
   SWELL_DASH_PIXELS,
-  SWELL_DIRECTION_WOBBLE_DEGREES,
   SWELL_LATERAL_WOBBLE_PIXELS,
   SWELL_LENGTH_VARIATION,
   SWELL_MAX_SPACING_PIXELS,
@@ -224,13 +223,33 @@ describe("swellDashes", () => {
     expect(swellDashes([node, second], view, size, middleOfStep(0))).toHaveLength(2)
   })
 
-  it("puts the dash on the node, along the flow, at the length asked for, in the first step", () => {
+  it("puts the dash on the node, across the flow, at the length asked for, in the first step", () => {
     const [dash] = swellDashes([node], view, size, middleOfStep(0))
 
     expect((dash.from.x + dash.to.x) / 2).toBeCloseTo(centreX, 3)
     expect((dash.from.y + dash.to.y) / 2).toBeCloseTo(centreY, 3)
-    expect(dash.to.x - dash.from.x).toBeCloseTo(SWELL_DASH_PIXELS, 3)
-    expect(dash.to.y).toBeCloseTo(dash.from.y, 3)
+    // East on a north-up map: the crest runs north to south, straight up and down the screen.
+    expect(dash.to.x).toBeCloseTo(dash.from.x, 3)
+    expect(Math.abs(dash.to.y - dash.from.y)).toBeCloseTo(SWELL_DASH_PIXELS, 3)
+  })
+
+  // A wave crest is a line square to the way the swell travels. Drawn along the flow it is a
+  // streak, which is what wind looks like.
+  it("draws every dash square to the flow, whichever way it runs", () => {
+    const directions = [
+      { x: 1, y: 0 },
+      { x: 0, y: -1 },
+      { x: -1, y: 0 },
+      { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+      { x: -0.6, y: 0.8 },
+    ]
+
+    for (const direction of directions) {
+      const [dash] = swellDashes([{ ...node, direction }], view, size, middleOfStep(0))
+      const along = (dash.to.x - dash.from.x) * direction.x + (dash.to.y - dash.from.y) * direction.y
+
+      expect(along).toBeCloseTo(0, 6)
+    }
   })
 
   it("is at full strength in the middle of a step and fading either side of it", () => {
@@ -508,15 +527,20 @@ describe("chaos: the dashes", () => {
     expect(new Set(lengths.map((length) => length.toFixed(3))).size).toBeGreaterThan(1)
   })
 
-  it("turns a cycle's dashes a little off the flow's direction, within the wobble", () => {
-    const limit = (SWELL_DIRECTION_WOBBLE_DEGREES * SWELL_CHAOS * Math.PI) / 180
-    const angles = cycles
-      .map((cycle) => dashAt(midStep(cycle, 0)))
+  // The irregularity is in where and when a dash appears. It is never in which way the swell
+  // runs: a sea has one direction at a time, so every dash is square to it, in every cycle.
+  it("keeps every dash square to the flow, in every cycle, however irregular the rest is", () => {
+    const dashes = cycles
+      .flatMap((cycle) => [0, 1, 2, 3].map((step) => dashAt(midStep(cycle, step))))
       .filter((dash) => dash !== undefined)
-      .map((dash) => Math.atan2(dash.to.y - dash.from.y, dash.to.x - dash.from.x))
 
-    for (const angle of angles) expect(Math.abs(angle)).toBeLessThanOrEqual(limit + 1e-9)
-    expect(angles.some((angle) => Math.abs(angle) > 1e-6)).toBe(true)
+    expect(dashes.length).toBeGreaterThan(0)
+    for (const dash of dashes) {
+      const along = (dash.to.x - dash.from.x) * node.direction.x + (dash.to.y - dash.from.y) * node.direction.y
+      expect(along).toBeCloseTo(0, 9)
+    }
+    const angles = new Set(dashes.map((dash) => Math.atan2(dash.to.y - dash.from.y, dash.to.x - dash.from.x).toFixed(6)))
+    expect(angles.size).toBeLessThanOrEqual(2) // the two ends of one line: up or down the screen
   })
 
   it("skips some cycles altogether, about as often as the probability says", () => {
