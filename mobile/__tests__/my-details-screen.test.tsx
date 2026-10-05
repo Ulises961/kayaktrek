@@ -5,8 +5,9 @@ import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 
 import MyDetailsScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/my-details"
 import { getSession } from "../lib/auth/session"
-import { enqueueMutation, pushQueuedMutations } from "../lib/db/mutation-queue"
+import { enqueueMutation } from "../lib/db/mutation-queue"
 import { loadOfflineCrew } from "../lib/db/offline-float-plan"
+import { requestPush } from "../lib/db/push-pending"
 import { getTrip } from "../lib/trips/actions"
 
 const mockBack = jest.fn()
@@ -26,14 +27,14 @@ jest.mock("../lib/db/offline-float-plan", () => ({ loadOfflineCrew: jest.fn() })
 jest.mock("../lib/db/mutation-queue", () => ({
   ...jest.requireActual("../lib/db/mutation-queue"),
   enqueueMutation: jest.fn(),
-  pushQueuedMutations: jest.fn(),
 }))
+jest.mock("../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockGetTrip = getTrip as jest.Mock
 const mockGetSession = getSession as jest.Mock
 const mockLoadOfflineCrew = loadOfflineCrew as jest.Mock
 const mockEnqueue = enqueueMutation as jest.Mock
-const mockPush = pushQueuedMutations as jest.Mock
+const mockPush = requestPush as jest.Mock
 
 const ME = {
   id: "member-me",
@@ -52,7 +53,6 @@ beforeEach(() => {
   mockGetTrip.mockResolvedValue({ id: "trip-1", travellers: [ME] })
   mockLoadOfflineCrew.mockResolvedValue([])
   mockEnqueue.mockResolvedValue("mutation-1")
-  mockPush.mockResolvedValue({ applied: 1, rejected: 0, kept: 0 })
 })
 
 // M9d WP7: vessel and emergency contact, edited with or without signal.

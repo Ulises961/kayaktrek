@@ -3,7 +3,8 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 import EditPointScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/point/[pointId]"
-import { editRoute, loadEditableRoute, pushRouteChanges } from "../lib/db/route-edit"
+import { requestPush } from "../lib/db/push-pending"
+import { editRoute, loadEditableRoute } from "../lib/db/route-edit"
 import { isTripLeader } from "../lib/db/trip-role"
 import type { EditableRoute } from "../lib/itinerary/route-edits"
 
@@ -22,13 +23,13 @@ jest.mock("expo-router", () => {
 jest.mock("../lib/db/route-edit", () => ({
   loadEditableRoute: jest.fn(),
   editRoute: jest.fn(),
-  pushRouteChanges: jest.fn(),
 }))
+jest.mock("../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 jest.mock("../lib/db/trip-role", () => ({ isTripLeader: jest.fn() }))
 
 const mockLoadRoute = loadEditableRoute as jest.Mock
 const mockEditRoute = editRoute as jest.Mock
-const mockPush = pushRouteChanges as jest.Mock
+const mockPush = requestPush as jest.Mock
 const mockIsLeader = isTripLeader as jest.Mock
 
 function route(): EditableRoute {
@@ -88,18 +89,16 @@ describe("EditPointScreen", () => {
 
     await fireEvent.press(await findByTestId("point-submit"))
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("trip-1"))
+    await waitFor(() => expect(mockPush).toHaveBeenCalled())
   })
 
-  // Offline, the push fails; the edit is on the phone and goes up later.
-  it("keeps the edit when the push can't reach the server", async () => {
-    mockPush.mockRejectedValue(new Error("Could not reach the server."))
-    const { findByTestId, queryByText } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+  it("leaves the screen once the edit is saved on the phone, without waiting for the push", async () => {
+    const { findByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
 
     await fireEvent.press(await findByTestId("point-submit"))
 
     await waitFor(() => expect(mockBack).toHaveBeenCalled())
-    expect(queryByText(/Could not reach/)).toBeNull()
+    expect(mockEditRoute.mock.invocationCallOrder[0]).toBeLessThan(mockPush.mock.invocationCallOrder[0])
   })
 
   // M34 (revised): crew get the same screen now, read-only — mirroring web's

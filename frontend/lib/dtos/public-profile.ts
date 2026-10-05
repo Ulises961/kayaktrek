@@ -38,6 +38,7 @@ export const PublicUserSchema = z.object({
   name: z.string(),
   surname: z.string().nullish(),
   avatarUrl: z.string().url().nullish(),
+  bannerUrl: z.string().url().nullish(),
   bio: z.string().nullish(),
   homeLocation: z.string().nullish(),
   certifications: z.array(PublicCertificationSchema),

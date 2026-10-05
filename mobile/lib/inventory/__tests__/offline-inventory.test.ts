@@ -1,19 +1,19 @@
-import { enqueueMutation, pushQueuedMutations } from "../../db/mutation-queue"
+import { enqueueMutation } from "../../db/mutation-queue"
+import { requestPush } from "../../db/push-pending"
 import { queueContribution, queuePackingAdd, queuePackingRemove, queuePackingToggle } from "../offline-inventory"
 
 jest.mock("../../db/mutation-queue", () => ({
   ...jest.requireActual("../../db/mutation-queue"),
   enqueueMutation: jest.fn(),
-  pushQueuedMutations: jest.fn(),
 }))
+jest.mock("../../db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockEnqueue = enqueueMutation as jest.Mock
-const mockPush = pushQueuedMutations as jest.Mock
+const mockPush = requestPush as jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockEnqueue.mockResolvedValue("mutation-1")
-  mockPush.mockResolvedValue({ applied: 0, rejected: 0, kept: 1 })
 })
 
 // M9d WP6: the kit and group checklist changed with no signal, queued for the
@@ -68,9 +68,9 @@ describe("offline inventory changes", () => {
     expect(mockPush).toHaveBeenCalled()
   })
 
-  it("keeps the change queued when sending fails", async () => {
-    mockPush.mockRejectedValue(new Error("Could not reach the server."))
+  it("queues the change before asking for the push, so a push never races an unwritten row", async () => {
+    await queuePackingToggle("entry-1", false)
 
-    await expect(queuePackingToggle("entry-1", false)).resolves.toBeUndefined()
+    expect(mockEnqueue.mock.invocationCallOrder[0]).toBeLessThan(mockPush.mock.invocationCallOrder[0])
   })
 })

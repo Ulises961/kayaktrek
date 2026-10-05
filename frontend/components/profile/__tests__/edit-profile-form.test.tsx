@@ -9,9 +9,17 @@ vi.mock("@/lib/profile/actions", () => ({
   updateProfile: vi.fn(),
   uploadAvatar: vi.fn(),
   removeAvatar: vi.fn(),
+  uploadBanner: vi.fn(),
+  removeBanner: vi.fn(),
 }))
 
-import { updateProfile, uploadAvatar, removeAvatar } from "@/lib/profile/actions"
+import {
+  updateProfile,
+  uploadAvatar,
+  removeAvatar,
+  uploadBanner,
+  removeBanner,
+} from "@/lib/profile/actions"
 import { EditProfileForm } from "../edit-profile-form"
 import type { User } from "@/lib/dtos/user"
 
@@ -58,7 +66,7 @@ describe("EditProfileForm — avatar section", () => {
     render(<EditProfileForm user={BASE_USER} />)
 
     const file = new File(["x"], "photo.png", { type: "image/png" })
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const input = screen.getByTestId("avatar-file-input") as HTMLInputElement
     await userEvent.upload(input, file)
 
     await waitFor(() =>
@@ -72,7 +80,7 @@ describe("EditProfileForm — avatar section", () => {
     render(<EditProfileForm user={BASE_USER} />)
 
     const file = new File(["x"], "photo.png", { type: "image/png" })
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const input = screen.getByTestId("avatar-file-input") as HTMLInputElement
     await userEvent.upload(input, file)
 
     // Both conditions in one waitFor: the failure is only settled once the
@@ -107,6 +115,78 @@ describe("EditProfileForm — avatar section", () => {
     await waitFor(() => {
       expect(screen.getByText("Could not remove photo.")).toBeInTheDocument()
       expect(screen.getByRole("button", { name: /replace photo/i })).toBeEnabled()
+    })
+    expect(screen.getByRole("button", { name: /remove/i })).toBeEnabled()
+  })
+})
+
+describe("EditProfileForm — banner section", () => {
+  it("shows only 'Upload banner' when there is no existing banner", () => {
+    render(<EditProfileForm user={BASE_USER} />)
+    expect(screen.getByRole("button", { name: /upload banner/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /replace banner/i })).not.toBeInTheDocument()
+  })
+
+  it("shows 'Replace banner' and 'Remove' when a banner exists", () => {
+    render(<EditProfileForm user={{ ...BASE_USER, bannerUrl: "https://cdn.example.com/b.jpg" }} />)
+    expect(screen.getByRole("button", { name: /replace banner/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^upload banner$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument()
+  })
+
+  it("switches to 'Replace banner' + 'Remove' after a successful upload", async () => {
+    vi.mocked(uploadBanner).mockResolvedValue({
+      success: true,
+      bannerUrl: "https://cdn.example.com/new-banner.jpg",
+    })
+    render(<EditProfileForm user={BASE_USER} />)
+
+    const file = new File(["x"], "banner.png", { type: "image/png" })
+    const input = screen.getByTestId("banner-file-input") as HTMLInputElement
+    await userEvent.upload(input, file)
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /replace banner/i })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument()
+  })
+
+  it("shows an error and leaves the banner unchanged when upload fails", async () => {
+    vi.mocked(uploadBanner).mockResolvedValue({ success: false, error: "File too large." })
+    render(<EditProfileForm user={BASE_USER} />)
+
+    const file = new File(["x"], "banner.png", { type: "image/png" })
+    const input = screen.getByTestId("banner-file-input") as HTMLInputElement
+    await userEvent.upload(input, file)
+
+    await waitFor(() => {
+      expect(screen.getByText("File too large.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /upload banner/i })).toBeEnabled()
+    })
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument()
+  })
+
+  it("removes the banner and shows 'Upload banner' again after a successful removal", async () => {
+    vi.mocked(removeBanner).mockResolvedValue({ success: true })
+    render(<EditProfileForm user={{ ...BASE_USER, bannerUrl: "https://cdn.example.com/b.jpg" }} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /remove/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^upload banner$/i })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument()
+  })
+
+  it("keeps the existing banner and shows an error when removal fails", async () => {
+    vi.mocked(removeBanner).mockResolvedValue({ success: false, error: "Could not remove banner." })
+    render(<EditProfileForm user={{ ...BASE_USER, bannerUrl: "https://cdn.example.com/b.jpg" }} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /remove/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText("Could not remove banner.")).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /replace banner/i })).toBeEnabled()
     })
     expect(screen.getByRole("button", { name: /remove/i })).toBeEnabled()
   })

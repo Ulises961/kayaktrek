@@ -14,8 +14,7 @@ import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
 import { saveLogisticsCache } from "./logistics-cache"
-import { pushQueuedMutations } from "./mutation-queue"
-import { pushRouteChanges, tripsWithRouteChanges } from "./route-edit"
+import { pushPending } from "./push-pending"
 import { loadOfflineTrip } from "./offline-itinerary"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveLogStatsCache, saveMeCache } from "./profile-cache"
@@ -222,19 +221,6 @@ async function warmProfile(): Promise<void> {
   reportSettled("log stats", [stats])
 }
 
-// Routes the leader edited offline (M9d), pushed first so their pulls in this
-// same sweep are not skipped for another pass. Each on its own: one trip's route
-// failing to push — or being parked as a conflict — costs no other trip anything.
-async function pushEditedRoutes(): Promise<void> {
-  try {
-    for (const tripId of await tripsWithRouteChanges()) {
-      await pushRouteChanges(tripId).catch((reason) => reportSweepFailure(`trip ${tripId} route push`, reason))
-    }
-  } catch (reason) {
-    reportSweepFailure("route pushes", reason)
-  }
-}
-
 // The trip-list cache is the sweep's index — but only the trip list screen
 // used to fill it, so a sweep that ran first (a fresh install, cleared app
 // data, or a trip created on web since) planned against an empty or stale
@@ -271,8 +257,7 @@ export async function runSweep(): Promise<void> {
     // Up before down (M9d): a pull must never overwrite a change the paddler made
     // offline with the server's older copy. Offline, this fails and the pulls then
     // fail too — nothing is lost, the queue stays queued.
-    await pushEditedRoutes()
-    await pushQueuedMutations().catch((reason) => reportSweepFailure("queued changes", reason))
+    await pushPending()
     await refreshTripIndex()
     const cached = await loadTripListCache()
     const trips: SweepTrip[] = cached.map((trip) => ({

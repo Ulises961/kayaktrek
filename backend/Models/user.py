@@ -57,6 +57,7 @@ class User(BaseModel):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     surname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    banner_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 

@@ -1,8 +1,11 @@
 FROM python:3.12-slim AS base
 
-# System deps required by psycopg2, GeoAlchemy2, and python-magic
+# libmagic1 is python-magic's shared library, loaded at runtime. No compiler or libpq
+# headers: every dependency installs from a prebuilt wheel (psycopg2-binary bundles its own
+# libpq), and gcc + libpq-dev were ~200 MB of the runtime image. A dependency that ever
+# needs building from source should get a builder-stage-only install, not this layer.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc libmagic1 \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # --- dependency layer (rebuilt only when pyproject.toml or uv.lock change) ---
@@ -15,7 +18,9 @@ WORKDIR /app
 
 # Install deps without the project first — leverages Docker layer cache
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project \
+    # Packages' own bundled test suites (~24 MB), never imported at runtime.
+    && find /app/.venv -type d \( -name tests -o -name test \) -prune -exec rm -rf {} +
 
 # Install the project itself in editable mode so intra-project imports resolve
 COPY . .
@@ -26,6 +31,12 @@ FROM base AS runtime
 
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
+
+# busybox for the compose healthchecks' `busybox wget`: one package, ~0.9 MB, against ~14 MB
+# (22 packages) for curl or ~12 MB for Debian's wget. A healthcheck every 10s that starts
+# the venv's Python instead scans all of site-packages each time.
+RUN apt-get update && apt-get install -y --no-install-recommends busybox \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m appuser
 

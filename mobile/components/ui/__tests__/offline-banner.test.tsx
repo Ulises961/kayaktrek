@@ -1,8 +1,9 @@
 import { useEffect } from "react"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import NetInfo from "@react-native-community/netinfo"
 
 import { CachedSurfacesProvider, useCachedSurfaces } from "../../../lib/network/cached-surfaces"
+import { registerPushRetry, setPushStatus } from "../../../lib/network/push-status"
 import { OfflineBanner } from "../offline-banner"
 
 // A reporter with no retry of its own — mirrors a screen that renders
@@ -55,6 +56,10 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockedAddEventListener.mockReturnValue(jest.fn())
   mockedRefresh.mockResolvedValue({ isConnected: false })
+  // The push status is module-level, like the pipeline it reports on: reset it so
+  // one test's failed push is not the next test's starting banner.
+  setPushStatus({ state: "idle", retryAt: null })
+  registerPushRetry(async () => "sent")
 })
 
 describe("OfflineBanner", () => {
@@ -134,9 +139,95 @@ describe("OfflineBanner", () => {
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
 
-    await fireEvent.press(getByLabelText("Recheck connection"))
+    await fireEvent.press(getByLabelText("Retry sync"))
 
     expect(mockedRefresh).toHaveBeenCalled()
+  })
+
+  // The button used to recheck the network and nothing else: with the OS already
+  // calling the device connected, pressing it did nothing visible while changes
+  // sat unsent on the phone.
+  it("also tries to send the changes still on the phone", async () => {
+    const retry = jest.fn(async () => "sent" as const)
+    registerPushRetry(retry)
+    const { getByText, getByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    connectivityHandler()({ isConnected: false })
+    await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+
+    await fireEvent.press(getByLabelText("Retry sync"))
+
+    await waitFor(() => expect(retry).toHaveBeenCalledTimes(1))
+  })
+
+  it("raises the banner when a push failed even though the device thinks it is online", async () => {
+    const { getByText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    expect(queryByText(/changes not sent yet/i)).toBeNull()
+
+    await act(async () => setPushStatus({ state: "failed", retryAt: Date.now() + 5000 }))
+
+    expect(getByText(/changes not sent yet/i)).toBeTruthy()
+    expect(queryByText(/some information may be out of date/i)).toBeNull()
+  })
+
+  // One line is all the banner needs to say, retry state included; the
+  // reassurance is for whoever asks.
+  it("says on the one line that it is retrying, and keeps the reassurance behind Read more", async () => {
+    const { getByText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+
+    await act(async () => setPushStatus({ state: "failed", retryAt: Date.now() + 5000 }))
+
+    expect(getByText(/changes not sent yet\. retrying/i)).toBeTruthy()
+    expect(queryByText(/saved on this phone/i)).toBeNull()
+
+    await fireEvent.press(getByText("Read more"))
+
+    expect(getByText(/saved on this phone/i)).toBeTruthy()
+  })
+
+  it("says to tap to retry on that line once the automatic retries have run out", async () => {
+    const { getByText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+
+    await act(async () => setPushStatus({ state: "failed", retryAt: null }))
+
+    expect(getByText(/changes not sent yet\. tap to retry/i)).toBeTruthy()
+    expect(queryByText(/retrying/i)).toBeNull()
+  })
+
+  it("keeps saying so when a manual retry fails too, instead of going quiet", async () => {
+    registerPushRetry(async () => {
+      setPushStatus({ state: "failed", retryAt: Date.now() + 5000 })
+      return "failed"
+    })
+    const { getByText, getByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    await act(async () => setPushStatus({ state: "failed", retryAt: null }))
+    expect(getByText(/tap to retry/i)).toBeTruthy()
+
+    await fireEvent.press(getByLabelText("Retry sync"))
+
+    await waitFor(() => expect(getByText(/changes not sent yet\. retrying/i)).toBeTruthy())
+  })
+
+  it("clears once the push goes through", async () => {
+    const { queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    await act(async () => setPushStatus({ state: "failed", retryAt: null }))
+    expect(queryByText(/changes not sent yet/i)).toBeTruthy()
+
+    await act(async () => setPushStatus({ state: "idle", retryAt: null }))
+
+    await waitFor(() => expect(queryByText(/changes not sent yet/i)).toBeNull())
+  })
+
+  it("leaves the device-offline headline alone and still files the push details under Read more", async () => {
+    const { getByText, queryByText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    connectivityHandler()({ isConnected: false })
+    await act(async () => setPushStatus({ state: "failed", retryAt: null }))
+
+    expect(getByText(/no internet connection/i)).toBeTruthy()
+    expect(queryByText(/changes not sent yet/i)).toBeNull()
+
+    await fireEvent.press(getByText("Read more"))
+
+    expect(getByText(/saved on this phone/i)).toBeTruthy()
   })
 
   it("clears once a forced recheck reports the device back online", async () => {
@@ -148,7 +239,7 @@ describe("OfflineBanner", () => {
     handler({ isConnected: false })
     await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
 
-    await fireEvent.press(getByLabelText("Recheck connection"))
+    await fireEvent.press(getByLabelText("Retry sync"))
     // recheckConnectivity() only forces NetInfo to re-evaluate — the banner
     // still updates through the same addEventListener callback it always
     // does, which NetInfo.refresh() is documented to invoke.
@@ -172,7 +263,7 @@ describe("OfflineBanner", () => {
 
     await waitFor(() => expect(getByText(/can't reach the server/i)).toBeTruthy())
 
-    await fireEvent.press(getByLabelText("Recheck connection"))
+    await fireEvent.press(getByLabelText("Retry sync"))
 
     expect(onRetried).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(queryByText(/can't reach the server/i)).toBeNull())
@@ -188,6 +279,6 @@ describe("OfflineBanner", () => {
     )
     await waitFor(() => expect(getByText(/can't reach the server/i)).toBeTruthy())
 
-    await expect(fireEvent.press(getByLabelText("Recheck connection"))).resolves.not.toThrow()
+    await expect(fireEvent.press(getByLabelText("Retry sync"))).resolves.not.toThrow()
   })
 })

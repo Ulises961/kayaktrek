@@ -50,7 +50,7 @@ export function OfflineNotice({
   /** ISO timestamp from `readCachedAt`/`useLiveCache`, or null if never recorded. */
   cachedAt: string | null
   visible?: boolean
-  /** Re-run on "Recheck connection", so a stale report can clear itself once the
+  /** Re-run on "Retry sync", so a stale report can clear itself once the
    *  backend is actually reachable again, without the paddler having to leave
    *  and return to the screen. Usually the screen's own `load`/`reload`. */
   onRetry?: () => void
@@ -71,7 +71,7 @@ export function NeedsConnectionNotice({
   /** e.g. "Explore needs a connection." */
   children: ReactNode
   visible?: boolean
-  /** Re-run on "Recheck connection" (see OfflineNotice's onRetry). */
+  /** Re-run on "Retry sync" (see OfflineNotice's onRetry). */
   onRetry?: () => void
 }) {
   useReportToBanner(visible, { message: children }, onRetry)

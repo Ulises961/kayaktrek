@@ -355,3 +355,81 @@ def test_delete_avatar_success(client, auth_headers, id):
     me_response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
     assert me_response.status_code == 200
     assert json.loads(me_response.data)["avatarUrl"] is None
+
+
+# ============================================================================
+# POST /api/user/me/banner  &  DELETE /api/user/me/banner
+# ============================================================================
+
+_FAKE_BANNER = b"\xff\xd8\xff" + b"X" * 600  # JPEG magic bytes + padding, > 512 B
+
+
+def test_upload_banner_success(client, auth_headers):
+    """A valid multipart upload sets banner_url on the user."""
+    with patch("Services.user_service.StorageService.upload",
+               return_value="http://minio/banners/test.jpg"), \
+         patch("Services.user_service.StorageService.delete"):
+        response = client.post(
+            f"{USER_ENDPOINT}/me/banner",
+            data={"file": (io.BytesIO(_FAKE_BANNER), "banner.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    assert json.loads(response.data)["bannerUrl"] == "http://minio/banners/test.jpg"
+
+
+def test_upload_banner_no_file_returns_400(client, auth_headers):
+    """Request without a file field returns 400."""
+    response = client.post(
+        f"{USER_ENDPOINT}/me/banner",
+        data={},
+        content_type="multipart/form-data",
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_upload_banner_storage_validation_error_returns_400(client, auth_headers):
+    """StorageValidationError (e.g. wrong MIME type) surfaces as 400."""
+    from Services.storage_service import StorageValidationError
+    with patch("Services.user_service.StorageService.upload",
+               side_effect=StorageValidationError("bad mime")):
+        response = client.post(
+            f"{USER_ENDPOINT}/me/banner",
+            data={"file": (io.BytesIO(_FAKE_BANNER), "banner.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+    assert response.status_code == 400
+
+
+def test_delete_banner_success(client, auth_headers, id):
+    """Deleting the banner clears banner_url and returns 204."""
+    with patch("Services.user_service.StorageService.upload",
+               return_value="http://minio/banners/test.jpg"), \
+         patch("Services.user_service.StorageService.delete") as mock_delete:
+        upload_response = client.post(
+            f"{USER_ENDPOINT}/me/banner",
+            data={"file": (io.BytesIO(_FAKE_BANNER), "banner.jpg")},
+            content_type="multipart/form-data",
+            headers=auth_headers,
+        )
+        assert upload_response.status_code == 200
+
+        response = client.delete(f"{USER_ENDPOINT}/me/banner", headers=auth_headers)
+        assert response.status_code == 204
+        # The uploaded object is actually removed from storage, not just unlinked in the DB.
+        # `id`/`auth_headers` are session-scoped, so the upload above may itself have
+        # triggered a delete-old-banner call if an earlier test in the suite left this
+        # user with a banner — at least one call is the real, order-independent contract.
+        assert mock_delete.called
+
+    # banner_url is actually cleared, both in the DB and as read back through the API.
+    user = User.query.filter_by(id=UUID(id)).first()
+    assert user is not None
+    assert user.banner_url is None
+
+    me_response = client.get(f"{USER_ENDPOINT}/me", headers=auth_headers)
+    assert me_response.status_code == 200
+    assert json.loads(me_response.data)["bannerUrl"] is None

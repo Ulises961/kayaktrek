@@ -36,7 +36,7 @@ type CachedSurfacesValue = {
   dismissed: boolean
   setDismissed: (dismissed: boolean) => void
   // A reporter's own retry, registered alongside its report under the same id.
-  // The banner's "Recheck connection" used to only re-poll device connectivity
+  // The banner's "Retry sync" (then "Recheck connection") used to only re-poll device connectivity
   // (NetInfo), which can't clear a stale report: that failure came from a
   // backend request, not from the device being offline, so nothing retried it
   // until the screen itself happened to refocus or remount (found live —

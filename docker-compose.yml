@@ -191,14 +191,15 @@ services:
         limits:
           memory: 128M
     # Bucket + public-read policy provisioning lives here, not in the app at request time
-    # (M11 §4) — avatars/ and point-images/ are public-read (stable, cacheable URLs);
-    # documents/ and point-images-private/ stay private, served only via
+    # (M11 §4) — avatars/, banners/ and point-images/ are public-read (stable, cacheable
+    # URLs); documents/ and point-images-private/ stay private, served only via
     # StorageService.presigned_url. Runtime credentials then only need object CRUD.
     entrypoint: >
       /bin/sh -c "
         mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
         mc mb --ignore-existing local/$$STORAGE_BUCKET &&
         mc anonymous set download local/$$STORAGE_BUCKET/avatars &&
+        mc anonymous set download local/$$STORAGE_BUCKET/banners &&
         mc anonymous set download local/$$STORAGE_BUCKET/point-images
       "
     environment:
@@ -356,9 +357,10 @@ services:
       - ./backend:/app
       - /app/.venv
     healthcheck:
-      # No curl in the runtime image (python:3.12-slim + only libpq-dev/gcc/libmagic1) —
-      # urllib is stdlib. GET /api/v1/health pings the DB (M11 §4).
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      # busybox wget (installed in the runtime image for this) rather than Python, which
+      # scans the venv's site-packages on every start. 127.0.0.1: gunicorn binds IPv4 only.
+      # GET /api/v1/health pings the DB (M11 §4); non-2xx exits 1.
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -447,7 +449,7 @@ services:
     healthcheck:
       # Same probe as backend — the sidecar serves the whole Flask app (D1); routing
       # via nginx/the reverse proxy is what isolates it to SSE routes, not the process.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health', timeout=5)"]
+      test: ["CMD", "busybox", "wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:5000/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5

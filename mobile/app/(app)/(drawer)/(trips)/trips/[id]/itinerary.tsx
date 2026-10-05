@@ -42,7 +42,8 @@ import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
-import { editRoute, loadRouteSyncState, pushRouteChanges } from "@mobile/lib/db/route-edit";
+import { requestPush } from "@mobile/lib/db/push-pending";
+import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
@@ -86,7 +87,11 @@ type DraftPoint = { latitude: number; longitude: number; afterPointId: string | 
 // the tap point, queried against the rendered "route-line" layer. Mirrors web's
 // own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
 // visible line), achieved differently since MapLibre RN's Layer has no onPress.
-const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+// Wider than web's ±9px on purpose: a tap that close to an existing route is
+// clearly meant to refine it, and nobody travelling the chain back wants the
+// tip dragged to that spot, so there is no reason to make them zoom in first.
+// ±24px is a 48px target, the usual minimum for a finger.
+const ROUTE_LINE_TAP_TOLERANCE_PX = 24;
 
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -278,7 +283,8 @@ export default function TripMapScreen() {
   async function handleDeletePoint(pointId: string) {
     try {
       await editRoute(id, (route) => deletePoint(route, pointId));
-      setSelectedPointId(null);
+      requestPush();
+      clearPointSelection();
       setLastMove((move) => (move?.pointId === pointId ? null : move));
       await reload();
     } catch (err) {
@@ -318,6 +324,15 @@ export default function TripMapScreen() {
   // without guessing at a timing window.
   const suppressNextMapPress = useRef(false);
 
+  // Deselecting a point also collapses the sheet. It was expanded to show that
+  // point, and left open it falls back to the weather body — the forecast
+  // popping up on a plain map tap. Weather expands only from the day strip
+  // (handleDayPress).
+  function clearPointSelection() {
+    setSelectedPointId(null);
+    setSheetExpanded(false);
+  }
+
   function handlePointPress(pointId: string) {
     suppressNextMapPress.current = true;
     setSelectedPointId(pointId);
@@ -349,6 +364,7 @@ export default function TripMapScreen() {
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
       setLastMove({ pointId, latitude: before.latitude, longitude: before.longitude });
+      requestPush();
     } catch (err) {
       Alert.alert(
         "Couldn't move point",
@@ -377,6 +393,7 @@ export default function TripMapScreen() {
     setLastMove(null);
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+      requestPush();
       await reload();
     } catch (err) {
       Alert.alert(
@@ -455,7 +472,7 @@ export default function TripMapScreen() {
       return;
     }
     if (selectedPointId) {
-      setSelectedPointId(null);
+      clearPointSelection();
       return;
     }
     if (draftPoint) {
@@ -557,8 +574,7 @@ export default function TripMapScreen() {
           type: POINT_TYPE.STOP,
         });
       });
-      // Best effort: offline it fails and the sweep pushes later.
-      void pushRouteChanges(id).catch(() => undefined);
+      requestPush();
       setDraftPoint(null);
       setDraftScreenPoint(null);
       setTooltipSize(null);
@@ -856,7 +872,7 @@ export default function TripMapScreen() {
             selectedPointId={selectedPointId}
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
-            onClosePoint={() => setSelectedPointId(null)}
+            onClosePoint={clearPointSelection}
             onEditPoint={isLeader ? handleEditPoint : undefined}
             onDeletePoint={isLeader ? confirmDeletePoint : undefined}
             onViewPoint={handleEditPoint}
