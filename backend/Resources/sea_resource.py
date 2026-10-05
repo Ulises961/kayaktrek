@@ -360,15 +360,6 @@ def get_global_wind_vectors():
         abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
-def _day_bounding_box(day, pad: float = 0.5) -> tuple:
-    """Return (lat_min, lat_max, lon_min, lon_max) from the day's route points."""
-    lats = [float(p.latitude) for p in (day.points or []) if p.latitude is not None]
-    lons = [float(p.longitude) for p in (day.points or []) if p.longitude is not None]
-    if lats and lons:
-        return (min(lats) - pad, max(lats) + pad, min(lons) - pad, max(lons) + pad)
-    return (49.0, 60.0, -8.0, 2.0)  # UK coastal fallback
-
-
 @sea_api.route('/<string:id>/wind-vectors', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
@@ -408,7 +399,7 @@ def get_wind_vectors(id: str):
         day = DayService.get_day_by_id(id)
         weather = day.weather
         states = weather.weather_states if weather else []
-        bbox = _day_bounding_box(day)
+        bbox = TidalService.day_bounding_box(day)
         grid = TidalService.build_wind_velocity_grid(bbox, states, hour)
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:
@@ -459,7 +450,7 @@ def get_wave_vectors(id: str):
         day = DayService.get_day_by_id(id)
         sea = day.sea
         states = sea.sea_states if sea else []
-        bbox = _day_bounding_box(day)
+        bbox = TidalService.day_bounding_box(day)
         grid = TidalService.build_wave_velocity_grid(bbox, states, hour)
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:

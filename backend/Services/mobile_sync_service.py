@@ -16,8 +16,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import UUID
 
+from sqlalchemy import or_
+
 from Api.database import db
+from Models.day import Day
 from Models.inventory import Inventory
+from Models.itinerary import Itinerary
 from Models.requirement_contribution import RequirementContribution
 from Models.sea import Sea
 from Models.sync_tombstone import SyncTombstone
@@ -25,6 +29,7 @@ from Models.trip import Trip
 from Models.trip_member import TripMember
 from Models.trip_requirement import TripRequirement
 from Models.weather import Weather
+from Services.tidal_service import VELOCITY_GRID_RESOLUTION, TidalService
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +120,16 @@ class MobileSyncService:
             "sea_states": _bucket(
                 MobileSyncService._live_sea_states(trip_uuid, cutoff), is_initial
             ) | {"deleted": []},
+            # Always sent whole, whatever the cutoff: the box comes from the route's points,
+            # which have no tombstones and no per-row delta, and a day's rows are about 5 KB
+            # (a few hundred bytes gzipped) that apply idempotently. Nothing is ever deleted — a day with no data keeps
+            # null hours rather than losing them.
+            "velocity_days": _bucket(
+                MobileSyncService._live_velocity_days(trip_uuid), is_initial
+            ) | {"deleted": []},
+            "velocity_hours": _bucket(
+                MobileSyncService._live_velocity_hours(trip_uuid), is_initial
+            ) | {"deleted": []},
         }
         return {"changes": changes, "timestamp": _epoch_ms(snapshot_timestamp)}
 
@@ -173,9 +188,6 @@ class MobileSyncService:
 
     @staticmethod
     def _weather_query(trip_id: UUID, cutoff: Optional[datetime]):
-        from Models.day import Day
-        from Models.itinerary import Itinerary
-
         query = (
             db.session.query(Weather)
             .join(Day, Weather.day_id == Day.id)
@@ -218,10 +230,64 @@ class MobileSyncService:
         return rows
 
     @staticmethod
-    def _sea_query(trip_id: UUID, cutoff: Optional[datetime]):
-        from Models.day import Day
-        from Models.itinerary import Itinerary
+    def _velocity_days(trip_id: UUID) -> List[Day]:
+        """The trip's days that have weather or sea data, in day order."""
+        return (
+            db.session.query(Day)
+            .join(Itinerary, Day.itinerary_id == Itinerary.id)
+            .filter(Itinerary.trip_id == trip_id, or_(Day.weather.has(), Day.sea.has()))
+            .order_by(Day.day_number)
+            .all()
+        )
 
+    @staticmethod
+    def _live_velocity_days(trip_id: UUID) -> List[dict]:
+        """Per day, what the phone needs to rebuild the wind-vectors / wave-vectors grid for
+        any hour: the box, the grid size and the land mask ("1" where a cell is land, flat and
+        row-major from the NW corner, as the endpoints null it). The phone stamps a (u, v) over
+        the grid and, for waves only, nulls the land cells."""
+        rows: List[dict] = []
+        for day in MobileSyncService._velocity_days(trip_id):
+            bounding_box = TidalService.day_bounding_box(day)
+            lat_min, lat_max, lon_min, lon_max = bounding_box
+            land = TidalService.velocity_land_mask(bounding_box)
+            rows.append({
+                "id": str(day.id),
+                "dayId": str(day.id),
+                "south": lat_min,
+                "north": lat_max,
+                "west": lon_min,
+                "east": lon_max,
+                "size": VELOCITY_GRID_RESOLUTION,
+                "landMask": "".join("1" if is_land else "0" for is_land in land),
+            })
+        return rows
+
+    @staticmethod
+    def _live_velocity_hours(trip_id: UUID) -> List[dict]:
+        """Per day, one row for every hour 0-23 with the wind and wave (u, v) the endpoints
+        would stamp for it — null when the day has no usable state. Every hour is sent so a
+        stale one on the phone is overwritten, not kept."""
+        rows: List[dict] = []
+        for day in MobileSyncService._velocity_days(trip_id):
+            weather_states = day.weather.weather_states if day.weather else []
+            sea_states = day.sea.sea_states if day.sea else []
+            for hour in range(24):
+                wind = TidalService.wind_flow_at_hour(weather_states, hour)
+                wave = TidalService.wave_flow_at_hour(sea_states, hour)
+                rows.append({
+                    "id": f"{day.id}:{hour}",
+                    "dayId": str(day.id),
+                    "hour": hour,
+                    "windU": wind[0] if wind else None,
+                    "windV": wind[1] if wind else None,
+                    "waveU": wave[0] if wave else None,
+                    "waveV": wave[1] if wave else None,
+                })
+        return rows
+
+    @staticmethod
+    def _sea_query(trip_id: UUID, cutoff: Optional[datetime]):
         query = (
             db.session.query(Sea)
             .join(Day, Sea.day_id == Day.id)
