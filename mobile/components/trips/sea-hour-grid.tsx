@@ -1,10 +1,10 @@
 import { Navigation2, Waves } from "lucide-react-native";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 
 import type { SeaState } from "@shared/dtos/sea";
 import { lightTokens, palette } from "@shared/tokens";
-import { formatHour, hasWaveForecast } from "@shared/weather/hourly";
+import { formatHour, hasWaveForecast, hourOf } from "@shared/weather/hourly";
 import { waveHeightSeverity } from "@shared/weather/beaufort";
 
 import { Row, Stack } from "../ui/layout";
@@ -20,8 +20,18 @@ const WAVE_COLOR: Record<ReturnType<typeof waveHeightSeverity>, string> = {
 
 // M9l WP4: adapts web's SeaGrid (frontend/components/weather/sea-grid.tsx)
 // content onto a horizontal ScrollView — see WeatherHourGrid's own comment for
-// why (no embla-carousel-react equivalent, no hour-selection sync in scope).
-export function SeaHourGrid({ states }: { states: SeaState[] }) {
+// why (no embla-carousel-react equivalent). M35 WP3 added web's hour selection
+// (`selectedHour` + `onHourChange`) so the swell overlay can be drawn for the
+// hour a paddler picks; without `onHourChange` the cards are plain display.
+export function SeaHourGrid({
+  states,
+  selectedHour = null,
+  onHourChange,
+}: {
+  states: SeaState[];
+  selectedHour?: number | null;
+  onHourChange?: (hour: number) => void;
+}) {
   if (states.length === 0) return null;
 
   // A lake has no marine forecast: every hour is empty, so say so once rather than
@@ -46,10 +56,15 @@ export function SeaHourGrid({ states }: { states: SeaState[] }) {
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Row className="gap-1.5">
-          {states.map((s) => (
+          {states.map((s) => {
+            const hour = hourOf(s.time);
+            const selected =
+              onHourChange != null && hour != null && hour === selectedHour;
+            const card = (
             <View
-              key={s.time}
-              className="w-16 items-center gap-1 rounded-md border border-border bg-muted/30 px-1 py-1.5"
+              className={`w-16 items-center gap-1 rounded-md border bg-muted/30 px-1 py-1.5 ${
+                selected ? "border-primary" : "border-border"
+              }`}
             >
               <Text className="text-[10px] tabular-nums text-muted-foreground">
                 {formatHour(s.time)}
@@ -105,7 +120,20 @@ export function SeaHourGrid({ states }: { states: SeaState[] }) {
                 </Text>
               </Stack>
             </View>
-          ))}
+            );
+            if (!onHourChange || hour == null) return <View key={s.time}>{card}</View>;
+            return (
+              <Pressable
+                key={s.time}
+                onPress={() => onHourChange(hour)}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${formatHour(s.time)} on the map`}
+                accessibilityState={{ selected }}
+              >
+                {card}
+              </Pressable>
+            );
+          })}
         </Row>
       </ScrollView>
     </Stack>

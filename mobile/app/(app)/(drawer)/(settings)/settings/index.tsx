@@ -120,10 +120,14 @@ export default function SettingsScreen() {
           {/* Offline, the banner says what needs a connection. The account
               shows read-only from the cache, and the cards that would only
               fail (devices, data export) stay out of the way. */}
-          <OfflineNotice visible={isShowingCache} cachedAt={meCache.cachedAt}>
+          <OfflineNotice
+            visible={isShowingCache}
+            cachedAt={meCache.cachedAt}
+            onRetry={() => void load()}
+          >
             Changing settings needs a connection.
           </OfflineNotice>
-          <NeedsConnectionNotice visible={needsConnection}>
+          <NeedsConnectionNotice visible={needsConnection} onRetry={() => void load()}>
             Settings need a connection.
           </NeedsConnectionNotice>
           {error && !needsConnection && <Text className="text-sm text-destructive">{error}</Text>}

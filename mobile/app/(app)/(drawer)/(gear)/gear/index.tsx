@@ -240,7 +240,11 @@ export default function GearScreen() {
           />
         }
       >
-        <OfflineNotice visible={isShowingCache} cachedAt={gearCache.cachedAt}>
+        <OfflineNotice
+          visible={isShowingCache}
+          cachedAt={gearCache.cachedAt}
+          onRetry={() => void load()}
+        >
           Adding, deleting and changing default pack need a connection.
         </OfflineNotice>
         {error && <Text className="text-sm text-destructive">{error}</Text>}

@@ -7,17 +7,27 @@ import { type CachedSurfaceReport, useCachedSurfaces } from "../../lib/network/c
 // which is the one place any of it is said. Only while the screen is focused:
 // stacked and drawer screens stay mounted behind the one in front, and the
 // banner must describe the screen the paddler is actually looking at.
-function useReportToBanner(visible: boolean, entry: CachedSurfaceReport) {
+function useReportToBanner(visible: boolean, entry: CachedSurfaceReport, retry?: () => void) {
   const id = useId()
   const isFocused = useIsFocused()
-  const { report } = useCachedSurfaces()
+  const { report, registerRetry } = useCachedSurfaces()
   const { message, cachedAt } = entry
 
   useEffect(() => {
     report(id, visible && isFocused ? { message, cachedAt } : null)
   }, [id, visible, isFocused, message, cachedAt, report])
 
-  useEffect(() => () => report(id, null), [id, report])
+  useEffect(() => {
+    registerRetry(id, visible && isFocused ? (retry ?? null) : null)
+  }, [id, visible, isFocused, retry, registerRetry])
+
+  useEffect(
+    () => () => {
+      report(id, null)
+      registerRetry(id, null)
+    },
+    [id, report, registerRetry],
+  )
 }
 
 // The screen is showing its cached copy. The banner states how old it is —
@@ -32,6 +42,7 @@ export function OfflineNotice({
   children,
   cachedAt,
   visible = true,
+  onRetry,
 }: {
   /** What cannot be done with the cached data, shown behind the banner's "Read more",
    *  e.g. "Adding, covering, and removing need a connection." Omit when the age says it all. */
@@ -39,8 +50,12 @@ export function OfflineNotice({
   /** ISO timestamp from `readCachedAt`/`useLiveCache`, or null if never recorded. */
   cachedAt: string | null
   visible?: boolean
+  /** Re-run on "Retry sync", so a stale report can clear itself once the
+   *  backend is actually reachable again, without the paddler having to leave
+   *  and return to the screen. Usually the screen's own `load`/`reload`. */
+  onRetry?: () => void
 }) {
-  useReportToBanner(visible, { message: children, cachedAt })
+  useReportToBanner(visible, { message: children, cachedAt }, onRetry)
   return null
 }
 
@@ -51,11 +66,14 @@ export function OfflineNotice({
 export function NeedsConnectionNotice({
   children,
   visible = true,
+  onRetry,
 }: {
   /** e.g. "Explore needs a connection." */
   children: ReactNode
   visible?: boolean
+  /** Re-run on "Retry sync" (see OfflineNotice's onRetry). */
+  onRetry?: () => void
 }) {
-  useReportToBanner(visible, { message: children })
+  useReportToBanner(visible, { message: children }, onRetry)
   return null
 }
