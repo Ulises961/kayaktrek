@@ -263,7 +263,7 @@ export default function TripMapScreen() {
   async function handleDeletePoint(pointId: string) {
     try {
       await editRoute(id, (route) => deletePoint(route, pointId));
-      setSelectedPointId(null);
+      clearPointSelection();
       setLastMove((move) => (move?.pointId === pointId ? null : move));
       await reload();
     } catch (err) {
@@ -302,6 +302,15 @@ export default function TripMapScreen() {
   // by the very next handleMapPress call, absorbs exactly that one paired call
   // without guessing at a timing window.
   const suppressNextMapPress = useRef(false);
+
+  // Deselecting a point also collapses the sheet. It was expanded to show that
+  // point, and left open it falls back to the weather body — the forecast
+  // popping up on a plain map tap. Weather expands only from the day strip
+  // (handleDayPress).
+  function clearPointSelection() {
+    setSelectedPointId(null);
+    setSheetExpanded(false);
+  }
 
   function handlePointPress(pointId: string) {
     suppressNextMapPress.current = true;
@@ -430,7 +439,7 @@ export default function TripMapScreen() {
       return;
     }
     if (selectedPointId) {
-      setSelectedPointId(null);
+      clearPointSelection();
       return;
     }
     if (draftPoint) {
@@ -782,7 +791,7 @@ export default function TripMapScreen() {
             selectedPointId={selectedPointId}
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
-            onClosePoint={() => setSelectedPointId(null)}
+            onClosePoint={clearPointSelection}
             onEditPoint={isLeader ? handleEditPoint : undefined}
             onDeletePoint={isLeader ? confirmDeletePoint : undefined}
             onViewPoint={handleEditPoint}
