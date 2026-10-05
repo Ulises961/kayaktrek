@@ -84,7 +84,11 @@ type DraftPoint = { latitude: number; longitude: number; afterPointId: string | 
 // the tap point, queried against the rendered "route-line" layer. Mirrors web's
 // own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
 // visible line), achieved differently since MapLibre RN's Layer has no onPress.
-const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+// Wider than web's ±9px on purpose: a tap that close to an existing route is
+// clearly meant to refine it, and nobody travelling the chain back wants the
+// tip dragged to that spot, so there is no reason to make them zoom in first.
+// ±24px is a 48px target, the usual minimum for a finger.
+const ROUTE_LINE_TAP_TOLERANCE_PX = 24;
 
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -263,7 +267,7 @@ export default function TripMapScreen() {
   async function handleDeletePoint(pointId: string) {
     try {
       await editRoute(id, (route) => deletePoint(route, pointId));
-      setSelectedPointId(null);
+      clearPointSelection();
       setLastMove((move) => (move?.pointId === pointId ? null : move));
       await reload();
     } catch (err) {
@@ -302,6 +306,15 @@ export default function TripMapScreen() {
   // by the very next handleMapPress call, absorbs exactly that one paired call
   // without guessing at a timing window.
   const suppressNextMapPress = useRef(false);
+
+  // Deselecting a point also collapses the sheet. It was expanded to show that
+  // point, and left open it falls back to the weather body — the forecast
+  // popping up on a plain map tap. Weather expands only from the day strip
+  // (handleDayPress).
+  function clearPointSelection() {
+    setSelectedPointId(null);
+    setSheetExpanded(false);
+  }
 
   function handlePointPress(pointId: string) {
     suppressNextMapPress.current = true;
@@ -430,7 +443,7 @@ export default function TripMapScreen() {
       return;
     }
     if (selectedPointId) {
-      setSelectedPointId(null);
+      clearPointSelection();
       return;
     }
     if (draftPoint) {
@@ -782,7 +795,7 @@ export default function TripMapScreen() {
             selectedPointId={selectedPointId}
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
-            onClosePoint={() => setSelectedPointId(null)}
+            onClosePoint={clearPointSelection}
             onEditPoint={isLeader ? handleEditPoint : undefined}
             onDeletePoint={isLeader ? confirmDeletePoint : undefined}
             onViewPoint={handleEditPoint}

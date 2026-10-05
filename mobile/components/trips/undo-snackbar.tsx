@@ -1,4 +1,4 @@
-import { Undo2Icon } from "lucide-react-native"
+import { CheckIcon, Undo2Icon } from "lucide-react-native"
 import { useEffect } from "react"
 
 import { lightTokens } from "@shared/tokens"
@@ -10,8 +10,9 @@ import { Text } from "../ui/text"
 
 // M34: a dragged point is committed the instant the finger lifts, and a pan
 // that caught a marker looks exactly like a deliberate drag — so the move can
-// be taken back for a few seconds afterwards. Dismisses itself after
-// `durationMs`; the parent owns what "undo" restores, this only offers it.
+// be taken back for a few seconds afterwards. OK accepts the move and
+// dismisses at once; otherwise it dismisses itself after `durationMs`. The
+// parent owns what "undo" restores, this only offers it.
 export function UndoSnackbar({
   message,
   onUndo,
@@ -34,6 +35,15 @@ export function UndoSnackbar({
     <Card className="self-center px-3 py-2">
       <Row className="items-center gap-4">
         <Text className="text-sm text-card-foreground">{message}</Text>
+        <Button
+          variant="cta"
+          size="sm"
+          onPress={onDismiss}
+          accessibilityLabel="Keep move"
+          icon={<CheckIcon size={14} color={lightTokens.ctaForeground} />}
+        >
+          OK
+        </Button>
         <Button
           variant="outline"
           size="sm"
