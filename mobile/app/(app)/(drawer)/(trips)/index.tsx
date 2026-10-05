@@ -129,7 +129,7 @@ export default function TripListScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
-      <OfflineNotice visible={isOffline} cachedAt={cachedAt}>
+      <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void load(true)}>
         These are your trips as last synced. Pull down to refresh once you are back online.
       </OfflineNotice>
       {/* Plain ScrollView + map, not FlatList — WP2's trip counts are small and this is

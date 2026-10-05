@@ -52,7 +52,7 @@ function hasMessage(report: CachedSurfaceReport): boolean {
 
 export function OfflineBanner() {
   const isDeviceOffline = useIsOffline()
-  const { reports, dismissed, setDismissed } = useCachedSurfaces()
+  const { reports, dismissed, setDismissed, retryAll } = useCachedSurfaces()
   // A failed push raises the banner by itself: the OS can call the device
   // connected while the server is unreachable (or a push failed at the instant
   // of reconnecting), and edits then sit unsent with nothing on screen saying so.
@@ -74,17 +74,23 @@ export function OfflineBanner() {
   const dated = reports.filter((report) => report.cachedAt !== undefined)
   const explained = reports.filter(hasMessage)
 
-  // A manual escape hatch for when NetInfo's own passive state is stale — the
-  // OS doesn't always fire a change event promptly (captive portals, flaky
-  // wifi that never fully drops). useIsOffline's listener picks up whatever
-  // recheckConnectivity() settles to. It then also sends what the phone still
-  // holds: rechecking the network alone changed nothing visible when the OS
-  // already called the device connected. A failed send leaves the push status
-  // failed, so the banner keeps saying so and the automatic retries restart.
+  // A manual escape hatch for when any part of `isOffline` is stale:
+  // - NetInfo's own passive state (the OS doesn't always fire a change event
+  //   promptly — captive portals, flaky wifi that never fully drops);
+  // - a `reports` entry left over from a backend request that failed for a reason
+  //   that has since gone away (found live: the device was online and the backend
+  //   reachable, but the banner still read "Can't reach the server" because
+  //   nothing had re-run the request that failed) — retryAll() re-runs every
+  //   focused screen's own load/reload, so a surviving failure re-reports itself
+  //   and a resolved one clears;
+  // - changes still unsent on the phone — retryPush() sends them. A failed send
+  //   leaves the push status failed, so the banner keeps saying so and the
+  //   automatic retries restart.
   async function handleRecheck() {
     setRechecking(true)
     try {
       await recheckConnectivity()
+      retryAll()
       await retryPush()
     } finally {
       setRechecking(false)

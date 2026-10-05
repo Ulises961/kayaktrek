@@ -65,9 +65,15 @@ export function conditionsTeaser(day: Day | null): string | null {
 export function WeatherSeaPanel({
   day,
   onRefresh,
+  selectedHour,
+  onHourChange,
 }: {
   day: Day | null;
   onRefresh?: () => Promise<void>;
+  // M35 WP3: the hour the map's velocity overlay is drawn for, chosen from either
+  // hourly grid. Without `onHourChange` the grids are plain display.
+  selectedHour?: number | null;
+  onHourChange?: (hour: number) => void;
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -140,8 +146,16 @@ export function WeatherSeaPanel({
           plan's own analysis had wrongly deferred these as if they were the
           TidalEntryForm/RuleOfTwelfthsTable editing widgets, when they're pure
           display (see plans/M9l.md's corrected table row). */}
-      <WeatherHourGrid states={day?.weather?.weatherStates ?? []} />
-      <SeaHourGrid states={day?.sea?.seaStates ?? []} />
+      <WeatherHourGrid
+        states={day?.weather?.weatherStates ?? []}
+        selectedHour={selectedHour}
+        onHourChange={onHourChange}
+      />
+      <SeaHourGrid
+        states={day?.sea?.seaStates ?? []}
+        selectedHour={selectedHour}
+        onHourChange={onHourChange}
+      />
 
       {sea && (sea.highTide || sea.lowTide) && (
         <Row className="flex-wrap gap-x-4 gap-y-1">

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import type { WeatherState } from "@shared/dtos/weather";
 
@@ -68,5 +68,44 @@ describe("WeatherHourGrid", () => {
     const { getByText } = await render(<WeatherHourGrid states={noWind} />);
 
     expect(getByText("—")).toBeTruthy();
+  });
+
+  // M35 WP3: same contract as web's WeatherGrid (`selectedHour` + `onHourChange`) —
+  // the hour a paddler taps is the hour the map overlay is drawn for.
+  describe("hour selection", () => {
+    it("reports the tapped hour as a number of hours into the day", async () => {
+      const onHourChange = jest.fn();
+      const { getByLabelText } = await render(
+        <WeatherHourGrid states={states} onHourChange={onHourChange} />,
+      );
+
+      await fireEvent.press(getByLabelText("Show 12:00 on the map"));
+
+      expect(onHourChange).toHaveBeenCalledTimes(1);
+      expect(onHourChange).toHaveBeenCalledWith(12);
+    });
+
+    it("marks only the selected hour as selected", async () => {
+      const { getByLabelText } = await render(
+        <WeatherHourGrid
+          states={states}
+          selectedHour={9}
+          onHourChange={jest.fn()}
+        />,
+      );
+
+      expect(getByLabelText("Show 09:00 on the map").props.accessibilityState)
+        .toMatchObject({ selected: true });
+      expect(getByLabelText("Show 12:00 on the map").props.accessibilityState)
+        .toMatchObject({ selected: false });
+    });
+
+    it("is not tappable when nothing is listening for the hour", async () => {
+      const { queryByLabelText } = await render(
+        <WeatherHourGrid states={states} />,
+      );
+
+      expect(queryByLabelText("Show 12:00 on the map")).toBeNull();
+    });
   });
 });

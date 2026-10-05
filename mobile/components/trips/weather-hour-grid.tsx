@@ -5,12 +5,12 @@ import {
   Navigation2,
   Sun,
 } from "lucide-react-native";
-import { View } from "react-native"
+import { Pressable, View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler";
 
 import type { WeatherState } from "@shared/dtos/weather";
 import { lightTokens, palette } from "@shared/tokens";
-import { formatHour } from "@shared/weather/hourly";
+import { formatHour, hourOf } from "@shared/weather/hourly";
 import { beaufortSeverity, knotsToBeaufort } from "@shared/weather/beaufort";
 
 import { Row, Stack } from "../ui/layout";
@@ -37,10 +37,19 @@ function CloudIcon({ cloud }: { cloud: string | null | undefined }) {
 
 // M9l WP4: adapts web's WeatherGrid (frontend/components/weather/weather-grid.tsx)
 // content onto a horizontal ScrollView — embla-carousel-react (web's mechanism)
-// has no RN equivalent, and no hour-selection sync is in scope here (that exists
-// on web because the builder's map has hour-scoped velocity overlays; mobile's
-// map has none, M5b was never ported — see the plan's own note on this).
-export function WeatherHourGrid({ states }: { states: WeatherState[] }) {
+// has no RN equivalent. M35 WP3 added the hour selection web has for the same
+// reason (`selectedHour` + `onHourChange`, as web's WeatherGrid): the map's
+// velocity overlay is drawn for one hour, and this is where it is chosen. With no
+// `onHourChange` the cards are plain display, exactly as before.
+export function WeatherHourGrid({
+  states,
+  selectedHour = null,
+  onHourChange,
+}: {
+  states: WeatherState[];
+  selectedHour?: number | null;
+  onHourChange?: (hour: number) => void;
+}) {
   if (states.length === 0) return null;
 
   return (
@@ -53,10 +62,14 @@ export function WeatherHourGrid({ states }: { states: WeatherState[] }) {
           {states.map((s) => {
             const force =
               s.windForce != null ? knotsToBeaufort(s.windForce) : null;
-            return (
+            const hour = hourOf(s.time);
+            const selectable = onHourChange != null && hour != null;
+            const selected = selectable && hour === selectedHour;
+            const card = (
               <View
-                key={s.time}
-                className="w-16 items-center gap-1 rounded-md border border-border bg-muted/30 px-1 py-1.5"
+                className={`w-16 items-center gap-1 rounded-md border bg-muted/30 px-1 py-1.5 ${
+                  selected ? "border-primary" : "border-border"
+                }`}
               >
                 <Text className="text-[10px] tabular-nums text-muted-foreground">
                   {formatHour(s.time)}
@@ -102,6 +115,18 @@ export function WeatherHourGrid({ states }: { states: WeatherState[] }) {
                   </Text>
                 </Stack>
               </View>
+            );
+            if (!onHourChange || hour == null) return <View key={s.time}>{card}</View>;
+            return (
+              <Pressable
+                key={s.time}
+                onPress={() => onHourChange(hour)}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${formatHour(s.time)} on the map`}
+                accessibilityState={{ selected }}
+              >
+                {card}
+              </Pressable>
             );
           })}
         </Row>

@@ -34,6 +34,7 @@ import { lightTokens, palette } from "@shared/tokens";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
+import { MapVelocityOverlay } from "@mobile/components/trips/map-velocity-overlay";
 import { UndoSnackbar } from "@mobile/components/trips/undo-snackbar";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
 import { Screen } from "@mobile/components/ui/layout";
@@ -56,6 +57,7 @@ import {
   movePointByDrag,
 } from "@mobile/lib/itinerary/route-edits";
 import { boundsOf } from "@mobile/lib/map/bounds";
+import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
 import { uuidv7 } from "@mobile/lib/uuid";
@@ -150,6 +152,19 @@ export default function TripMapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  // M35: which forecast layer is drawn on the map, and for which hour. The hour is
+  // chosen in the weather sheet's grids, so both live here, where the sheet and the
+  // overlay can both reach them. 12:00 is the same representative hour the day
+  // strip uses.
+  // Wind and swell are independent layers, as on web, so both can be on at once.
+  const [windOn, setWindOn] = useState(false);
+  const [swellOn, setSwellOn] = useState(false);
+  const [overlayHour, setOverlayHour] = useState(12);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  // The map's latest view, kept in a ref: it changes many times a second during a
+  // gesture, and the overlay reads it every frame, so state would re-render this
+  // whole screen for each report.
+  const mapViewRef = useRef<MapViewState | null>(null);
   const cameraRef = useRef<CameraRef>(null);
   const mapRef = useRef<MapRef>(null);
   const router = useRouter();
@@ -398,6 +413,16 @@ export default function TripMapScreen() {
     [days],
   );
 
+  // The selected day's route, which the forecast disc is built around (web's map-core.tsx
+  // `selectedDayPositions`): the overlay shows conditions over that passage.
+  const selectedDayPositions = useMemo(
+    () =>
+      routePoints
+        .filter((point) => point.dayId === selectedDayId)
+        .map((point): [number, number] => [point.latitude, point.longitude]),
+    [routePoints, selectedDayId],
+  );
+
   // M34 WP6 fix: while dragging, redraw the leg(s) touching the dragged point
   // at its live position — legs are index-aligned with routePoints (legs[i]
   // joins points[i]/points[i+1]), so the dragged point at index `i` touches
@@ -491,7 +516,34 @@ export default function TripMapScreen() {
   // Keeps the overlay tooltip tracking the draft point's geographic position
   // as the map is panned/zoomed — its screen position changes even though
   // the underlying lngLat doesn't.
-  function handleRegionChange(event: { nativeEvent: { zoom: number } }) {
+  function handleRegionMoving(event: { nativeEvent: MapViewState }) {
+    const { center, zoom: nextZoom, bearing, pitch } = event.nativeEvent;
+    mapViewRef.current = { center, zoom: nextZoom, bearing, pitch };
+  }
+
+  // The map only reports a view when it moves, so switching a layer on at rest has
+  // nothing to draw against until it is asked once.
+  function seedMapView() {
+    void mapRef.current
+      ?.getViewState()
+      .then(({ center, zoom: nextZoom, bearing, pitch }) => {
+        mapViewRef.current = { center, zoom: nextZoom, bearing, pitch };
+      })
+      .catch(() => undefined);
+  }
+
+  function handleWindToggle() {
+    if (!windOn) seedMapView();
+    setWindOn(!windOn);
+  }
+
+  function handleSwellToggle() {
+    if (!swellOn) seedMapView();
+    setSwellOn(!swellOn);
+  }
+
+  function handleRegionChange(event: { nativeEvent: MapViewState }) {
+    handleRegionMoving(event);
     setZoom(event.nativeEvent.zoom);
     if (!draftPoint) return;
     void mapRef.current
@@ -576,7 +628,7 @@ export default function TripMapScreen() {
           see plans/M9b3.md's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void reload()} />
 
         {/* M9d WP4: a push refused because the route changed elsewhere is parked,
             never merged. The phone keeps showing its own route until the leader
@@ -604,11 +656,20 @@ export default function TripMapScreen() {
           onDayPress={handleDayPress}
         />
 
-        <View style={{ flex: 1 }}>
+        <View
+          style={{ flex: 1 }}
+          onLayout={(event) =>
+            setMapSize({
+              width: event.nativeEvent.layout.width,
+              height: event.nativeEvent.layout.height,
+            })
+          }
+        >
           <MapLibreMap
             ref={mapRef}
             mapStyle={MAP_STYLE}
             style={{ flex: 1 }}
+            onRegionIsChanging={handleRegionMoving}
             onRegionDidChange={handleRegionChange}
             onPress={(event) => void handleMapPress(event)}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
@@ -791,6 +852,19 @@ export default function TripMapScreen() {
             </View>
           )}
 
+          <MapVelocityOverlay
+            day={selectedDay}
+            dayPositions={selectedDayPositions}
+            windOn={windOn}
+            swellOn={swellOn}
+            onWindToggle={handleWindToggle}
+            onSwellToggle={handleSwellToggle}
+            hour={overlayHour}
+            viewRef={mapViewRef}
+            size={mapSize}
+            offline={isOffline}
+          />
+
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
           <ItinerarySheet
@@ -805,6 +879,8 @@ export default function TripMapScreen() {
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}
             onRefreshWeather={reload}
+            selectedHour={overlayHour}
+            onHourChange={setOverlayHour}
             // A marker drag is still claiming the touch stream at this point
             // (draggingPointId only clears in handlePointDragEnd's finally) —
             // gorhom's own pan gesture must not compete for it.
