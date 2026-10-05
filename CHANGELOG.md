@@ -16,6 +16,11 @@ A version here means a git tag, which is the only thing that publishes images â€
   to 8 MB). It is deleted with your account.
 - **A way back from the Terms and Privacy pages.** They now have a back link that steps back to
   where you came from, or goes home if you arrived directly.
+- **Groundwork for the mobile map's wind and swell working without signal.** The mobile sync now
+  carries each day's wind and swell flow (the area, its land mask and an hourly direction and
+  strength), computed by the same code that serves the map's wind and swell layers on the web, so
+  the two cannot disagree. The mobile app itself is not released yet, so nothing on the web
+  changes.
 
 ### Changed
 
