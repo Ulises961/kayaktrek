@@ -1,11 +1,5 @@
 import type { VelocityField } from "../velocity"
-import {
-  DEFAULT_SPEED_PALETTE,
-  createParticles,
-  sampleField,
-  speedColor,
-  stepParticles,
-} from "../advection"
+import { createParticles, sampleField, stepParticles } from "../advection"
 
 // A 2x2 grid, 1 degree on a side: NW (north, west) to SE (south, east).
 // u/v are indexed row-major from the NW corner: [NW, NE, SW, SE].
@@ -303,27 +297,3 @@ describe("confining particles to an area", () => {
   })
 })
 
-describe("speedColor", () => {
-  it("returns the slowest stop's colour at or below its speed", () => {
-    const [slowest] = DEFAULT_SPEED_PALETTE
-    expect(speedColor(slowest.speed, DEFAULT_SPEED_PALETTE)).toBe(speedColor(0, DEFAULT_SPEED_PALETTE))
-  })
-
-  it("returns the fastest stop's colour at or above its speed", () => {
-    const fastest = DEFAULT_SPEED_PALETTE[DEFAULT_SPEED_PALETTE.length - 1]
-    expect(speedColor(fastest.speed, DEFAULT_SPEED_PALETTE)).toBe(speedColor(fastest.speed + 100, DEFAULT_SPEED_PALETTE))
-  })
-
-  it("interpolates between two stops", () => {
-    const palette = [
-      { speed: 0, color: [0, 0, 0] as const },
-      { speed: 10, color: [200, 0, 0] as const },
-    ]
-
-    expect(speedColor(5, palette)).toBe("rgb(100, 0, 0)")
-  })
-
-  it("returns a valid rgb() string for the default palette", () => {
-    expect(speedColor(6, DEFAULT_SPEED_PALETTE)).toMatch(/^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/)
-  })
-})

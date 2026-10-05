@@ -4,7 +4,8 @@ import type { Day } from "@shared/dtos/day";
 import { discCell } from "@shared/landing/ambient-wind";
 import { formatTimeAgo } from "@shared/utils/date";
 
-import { speedColor } from "@mobile/lib/weather/advection";
+import { WIND_SPEED_COLORS, windLegendLabels, windSpeedColor } from "@shared/weather/wind-scale";
+
 import type { VelocityField } from "@mobile/lib/weather/velocity";
 import { meanSpeed } from "@mobile/lib/weather/velocity-frame";
 import { useVelocityField } from "@mobile/lib/weather/use-velocity-field";
@@ -167,6 +168,50 @@ describe("MapVelocityOverlay: the layers control", () => {
   });
 });
 
+// The bar under the switches says what the colours mean: web's wind legend, over the same
+// window the particles are coloured on (lib/weather/wind-scale.ts).
+describe("MapVelocityOverlay: the wind speed legend", () => {
+  it("shows the legend with its labels whenever the panel is open", async () => {
+    hooks(ready, idle);
+    const utils = await render(<MapVelocityOverlay {...baseProps} windOn />);
+
+    await openPanel(utils);
+
+    expect(utils.getByTestId("wind-legend")).toBeTruthy();
+    expect(utils.getByText(/wind speed/i)).toBeTruthy();
+    for (const label of windLegendLabels()) {
+      expect(utils.getByText(label)).toBeTruthy();
+    }
+  });
+
+  // Web starts with wind on, so its bar is there every time the panel opens. Mobile starts with
+  // the layers off, so the bar must not wait for the switch or the scale is never seen.
+  it("shows the legend with wind off, and when the layers cannot be shown, such as offline", async () => {
+    const windOff = await render(<MapVelocityOverlay {...baseProps} />);
+    await openPanel(windOff);
+    expect(windOff.getByTestId("wind-legend")).toBeTruthy();
+
+    const offline = await render(<MapVelocityOverlay {...baseProps} windOn offline />);
+    await openPanel(offline);
+    expect(offline.getByTestId("wind-legend")).toBeTruthy();
+  });
+
+  it("is not there while the panel is closed", async () => {
+    const utils = await render(<MapVelocityOverlay {...baseProps} windOn />);
+
+    expect(utils.queryByTestId("wind-legend")).toBeNull();
+  });
+
+  it("gives the wind switch the scale's swatch and the swell switch its own", async () => {
+    const utils = await render(<MapVelocityOverlay {...baseProps} />);
+
+    await openPanel(utils);
+
+    expect(utils.getByTestId("wind-swatch")).toBeTruthy();
+    expect(utils.getByTestId("swell-swatch")).toBeTruthy();
+  });
+});
+
 describe("MapVelocityOverlay: what is fetched and drawn", () => {
   it("fetches only the layers that are on, for the selected day and hour", async () => {
     await render(<MapVelocityOverlay {...baseProps} windOn hour={15} />);
@@ -192,10 +237,30 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
 
     expect(mockProps.wind).toBeTruthy();
     expect(mockProps.swell).toBeUndefined();
-    // The colour is the ramp's, for how strong the wind is.
-    expect(mockProps.wind?.color).toBe(speedColor(meanSpeed(field)));
+    // The colour is the shared scale's, for how strong the wind is.
+    expect(mockProps.wind?.color).toBe(windSpeedColor(meanSpeed(field)));
     expect(mockProps.wind?.particleMultiplier).toBe(WIND_PARTICLE_MULTIPLIER);
     expect(mockProps.wind?.strokeWidth).toBe(WIND_STROKE_WIDTH);
+  });
+
+  it("colours a stronger wind further along the scale, and a gale as the last colour", async () => {
+    const wind = (speed: number): HookState => ({
+      status: "ready",
+      field: { ...field, u: new Array(25).fill(speed), v: new Array(25).fill(0) },
+      error: null,
+    });
+
+    hooks(wind(1), idle);
+    await render(<MapVelocityOverlay {...baseProps} windOn />);
+    const breeze = mockProps.wind?.color;
+
+    hooks(wind(30), idle);
+    await render(<MapVelocityOverlay {...baseProps} windOn />);
+    const gale = mockProps.wind?.color;
+
+    expect(breeze).toBe(windSpeedColor(1));
+    expect(gale).toBe(WIND_SPEED_COLORS[WIND_SPEED_COLORS.length - 1]);
+    expect(breeze).not.toBe(gale);
   });
 
   it("draws swell with its own renderer, not as wind's particles in another colour", async () => {

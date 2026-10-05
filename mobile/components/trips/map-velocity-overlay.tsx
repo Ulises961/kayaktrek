@@ -1,14 +1,14 @@
 import { Layers } from "lucide-react-native"
-import { useMemo, useState, type RefObject } from "react"
+import { useMemo, useState, type ReactNode, type RefObject } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 
 import type { Day } from "@shared/dtos/day"
 import { discCell } from "@shared/landing/ambient-wind"
 import { lightTokens } from "@shared/tokens"
 import { formatTimeAgo } from "@shared/utils/date"
+import { windSpeedColor } from "@shared/weather/wind-scale"
 
 import type { MapViewState } from "../../lib/map/project-lng-lat"
-import { speedColor } from "../../lib/weather/advection"
 import { maskFieldToDisc } from "../../lib/weather/forecast-cell"
 import { useVelocityField, type VelocityKind } from "../../lib/weather/use-velocity-field"
 import { meanSpeed } from "../../lib/weather/velocity-frame"
@@ -16,6 +16,7 @@ import { Text } from "../ui/text"
 import { ForecastRing } from "./forecast-ring"
 import { SwellOverlay } from "./swell-overlay"
 import { VelocityOverlay } from "./velocity-overlay"
+import { WindGradient, WindLegend } from "./wind-legend"
 
 // Wind's look: web's planner values (map-core.tsx WIND_OPTIONS: 2.5 px lines), with the density
 // raised on the device from web's 0.0016, where a phone's small screen read as sparse.
@@ -28,12 +29,15 @@ function hourLabel(hour: number): string {
 
 function LayerSwitch({
   label,
+  swatch,
   on,
   disabled,
   detail,
   onToggle,
 }: {
   label: string
+  /** A small mark of what the layer looks like, as on web's switches. */
+  swatch: ReactNode
   on: boolean
   disabled: boolean
   detail: string | null
@@ -49,7 +53,10 @@ function LayerSwitch({
       className={`px-3 py-2 ${disabled ? "opacity-50" : ""}`}
     >
       <View className="flex-row items-center justify-between">
-        <Text className="text-[11px] font-medium text-foreground">{label}</Text>
+        <View className="flex-row items-center gap-2">
+          {swatch}
+          <Text className="text-[11px] font-medium text-foreground">{label}</Text>
+        </View>
         {/* Web's Toggle: a small pill with a knob. */}
         <View className={`h-4 w-7 rounded-full ${on ? "bg-primary" : "bg-muted-foreground/30"}`}>
           <View
@@ -146,7 +153,7 @@ export function MapVelocityOverlay({
           field={windField}
           viewRef={viewRef}
           size={size}
-          color={speedColor(meanSpeed(wind.field ?? windField))}
+          color={windSpeedColor(meanSpeed(wind.field ?? windField))}
           particleMultiplier={WIND_PARTICLE_MULTIPLIER}
           strokeWidth={WIND_STROKE_WIDTH}
           disc={disc}
@@ -175,6 +182,11 @@ export function MapVelocityOverlay({
             </View>
             <LayerSwitch
               label="Wind"
+              swatch={
+                <View testID="wind-swatch" className="overflow-hidden rounded-full">
+                  <WindGradient id="wind-swatch-bar" width={16} height={6} radius={3} />
+                </View>
+              }
               on={windOn}
               disabled={unavailable}
               detail={detailFor(windOn, wind, windAsOf)}
@@ -183,11 +195,13 @@ export function MapVelocityOverlay({
             <View className="h-px bg-border/20" />
             <LayerSwitch
               label="Swell"
+              swatch={<View testID="swell-swatch" className="h-1.5 w-4 rounded-full border border-border/40 bg-white/80" />}
               on={swellOn}
               disabled={unavailable}
               detail={detailFor(swellOn, swell, swellAsOf)}
               onToggle={onSwellToggle}
             />
+            <WindLegend />
             <View className="border-t border-border/30 px-3 py-1.5">
               {unavailableReason && (
                 <Text className="mb-1 text-[10px] text-foreground">{unavailableReason}</Text>
