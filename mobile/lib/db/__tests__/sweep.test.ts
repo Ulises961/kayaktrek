@@ -16,8 +16,7 @@ import { getMe } from "../../profile/actions"
 import { saveLogStatsCache, saveMeCache } from "../profile-cache"
 import { pullRoute } from "../route-sync"
 import { loadOfflineTrip } from "../offline-itinerary"
-import { pushQueuedMutations } from "../mutation-queue"
-import { pushRouteChanges, tripsWithRouteChanges } from "../route-edit"
+import { pushPending } from "../push-pending"
 import { ensureTripTiles, pruneTripTiles } from "../../map/offline-tiles"
 import { getTrip, getTrips } from "../../trips/actions"
 import { runSweep } from "../sweep"
@@ -50,8 +49,7 @@ jest.mock("../cache-freshness", () => ({
 jest.mock("../sync", () => ({ syncTrip: jest.fn() }))
 jest.mock("../route-sync", () => ({ pullRoute: jest.fn() }))
 jest.mock("../offline-itinerary", () => ({ loadOfflineTrip: jest.fn() }))
-jest.mock("../mutation-queue", () => ({ pushQueuedMutations: jest.fn() }))
-jest.mock("../route-edit", () => ({ pushRouteChanges: jest.fn(), tripsWithRouteChanges: jest.fn() }))
+jest.mock("../push-pending", () => ({ pushPending: jest.fn() }))
 jest.mock("../../map/offline-tiles", () => ({ ensureTripTiles: jest.fn(), pruneTripTiles: jest.fn() }))
 
 const mockLoadTripListCache = loadTripListCache as jest.Mock
@@ -74,9 +72,7 @@ const mockSaveLogisticsCache = saveLogisticsCache as jest.Mock
 const mockGetTravelDocuments = getTravelDocuments as jest.Mock
 const mockGetShuttleVehicles = getShuttleVehicles as jest.Mock
 const mockLoadOfflineTrip = loadOfflineTrip as jest.Mock
-const mockPushQueuedMutations = pushQueuedMutations as jest.Mock
-const mockPushRouteChanges = pushRouteChanges as jest.Mock
-const mockTripsWithRouteChanges = tripsWithRouteChanges as jest.Mock
+const mockPushPending = pushPending as jest.Mock
 const mockEnsureTripTiles = ensureTripTiles as jest.Mock
 const mockPruneTripTiles = pruneTripTiles as jest.Mock
 const mockGetMe = getMe as jest.Mock
@@ -127,9 +123,7 @@ beforeEach(() => {
   mockGetTravelDocuments.mockResolvedValue([])
   mockGetShuttleVehicles.mockResolvedValue([])
   mockLoadOfflineTrip.mockResolvedValue({ destination: null, days: [] })
-  mockPushQueuedMutations.mockResolvedValue({ applied: 0, rejected: 0, kept: 0 })
-  mockTripsWithRouteChanges.mockResolvedValue([])
-  mockPushRouteChanges.mockResolvedValue("pushed")
+  mockPushPending.mockResolvedValue("sent")
   mockEnsureTripTiles.mockResolvedValue(undefined)
   mockPruneTripTiles.mockResolvedValue(undefined)
   mockGetMe.mockResolvedValue({ username: "ana" })
@@ -550,39 +544,30 @@ describe("runSweep — tier 3, kit and gear", () => {
 // the drawer header. Last in the sweep — tiny, slow-changing, never at sea.
 // M9d: changes made offline go up before anything comes down, so a pull never
 // overwrites a change the paddler made with the server's older copy.
+// What a push sends, and in which order (routes, then the queue), is
+// push-pending.test.ts's job; the sweep only has to go up before it comes down.
 describe("runSweep — sending queued changes", () => {
-  it("sends the queue before refreshing the trip list", async () => {
+  it("pushes everything pending before refreshing the trip list", async () => {
     await runSweep()
 
-    expect(mockPushQueuedMutations).toHaveBeenCalledTimes(1)
-    expect(mockPushQueuedMutations.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockPushPending).toHaveBeenCalledTimes(1)
+    expect(mockPushPending.mock.invocationCallOrder[0]).toBeLessThan(
       mockGetTrips.mock.invocationCallOrder[0],
     )
   })
 
-  it("pushes a route the leader edited offline before pulling routes", async () => {
-    mockTripsWithRouteChanges.mockResolvedValue(["t1"])
+  it("pushes before pulling routes, so a pull never overwrites an unsent edit", async () => {
     mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
 
     await runSweep()
 
-    expect(mockPushRouteChanges).toHaveBeenCalledWith("t1")
-    expect(mockPushRouteChanges.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockPushPending.mock.invocationCallOrder[0]).toBeLessThan(
       mockPullRoute.mock.invocationCallOrder[0],
     )
   })
 
-  it("still sends the queue when a route push fails", async () => {
-    mockTripsWithRouteChanges.mockResolvedValue(["t1"])
-    mockPushRouteChanges.mockRejectedValue(new Error("Could not reach the server."))
-
-    await expect(runSweep()).resolves.toBeUndefined()
-
-    expect(mockPushQueuedMutations).toHaveBeenCalled()
-  })
-
-  it("still pulls when the queue can't be sent", async () => {
-    mockPushQueuedMutations.mockRejectedValue(new Error("Could not reach the server."))
+  it("still pulls when the push failed", async () => {
+    mockPushPending.mockResolvedValue("failed")
     mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
 
     await expect(runSweep()).resolves.toBeUndefined()

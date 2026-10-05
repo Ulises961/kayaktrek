@@ -2,7 +2,8 @@ import { useState } from "react"
 
 import { formatDayDate } from "@shared/utils/date"
 
-import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation, pushQueuedMutations } from "../../lib/db/mutation-queue"
+import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation } from "../../lib/db/mutation-queue"
+import { requestPush } from "../../lib/db/push-pending"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Row, Stack } from "../ui/layout"
@@ -47,8 +48,7 @@ export function CrewDeparture({
         entityId: memberId as string,
         payload: { tripId, ...payload },
       })
-      // Best effort: offline it fails, and the next sweep sends it.
-      void pushQueuedMutations().catch(() => undefined)
+      requestPush()
       setOpen(false)
       setNote("")
     } finally {

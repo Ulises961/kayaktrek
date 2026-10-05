@@ -1,6 +1,7 @@
 import { OFFLINE_ERROR_MESSAGE } from "../../api/client"
 import { removeCachedLog, upsertCachedLog } from "../../db/logs-cache"
-import { enqueueMutation, pushQueuedMutations } from "../../db/mutation-queue"
+import { enqueueMutation } from "../../db/mutation-queue"
+import { requestPush } from "../../db/push-pending"
 import { createLog, deleteLog, updateLog } from "../actions"
 import { createLogAnywhere, deleteLogAnywhere, updateLogAnywhere } from "../offline-logs"
 
@@ -9,8 +10,8 @@ jest.mock("../../db/logs-cache", () => ({ upsertCachedLog: jest.fn(), removeCach
 jest.mock("../../db/mutation-queue", () => ({
   ...jest.requireActual("../../db/mutation-queue"),
   enqueueMutation: jest.fn(),
-  pushQueuedMutations: jest.fn(),
 }))
+jest.mock("../../db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockCreateLog = createLog as jest.Mock
 const mockUpdateLog = updateLog as jest.Mock
@@ -18,14 +19,13 @@ const mockDeleteLog = deleteLog as jest.Mock
 const mockUpsert = upsertCachedLog as jest.Mock
 const mockRemove = removeCachedLog as jest.Mock
 const mockEnqueue = enqueueMutation as jest.Mock
-const mockPush = pushQueuedMutations as jest.Mock
+const mockPush = requestPush as jest.Mock
 
 const FIELDS = { date: "2026-10-02", hours: 4, distance: 14, avgSea: 3, notes: "Headwind" }
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockEnqueue.mockResolvedValue("mutation-1")
-  mockPush.mockResolvedValue({ applied: 0, rejected: 0, kept: 1 })
   mockUpsert.mockResolvedValue(undefined)
   mockRemove.mockResolvedValue(undefined)
 })
@@ -52,6 +52,16 @@ describe("createLogAnywhere", () => {
       expect.objectContaining({ id: envelope.entityId, date: "2026-10-02", hours: 4 }),
       "mine",
     )
+  })
+
+  it("asks for a push once it is queued, and not when the server took it directly", async () => {
+    mockCreateLog.mockResolvedValue({ id: "log-1", ...FIELDS })
+    await createLogAnywhere(FIELDS)
+    expect(mockPush).not.toHaveBeenCalled()
+
+    mockCreateLog.mockRejectedValue(new Error(OFFLINE_ERROR_MESSAGE))
+    await createLogAnywhere(FIELDS)
+    expect(mockPush).toHaveBeenCalledTimes(1)
   })
 
   it("does not queue a log the server refused", async () => {

@@ -3,8 +3,8 @@ import {
   MUTATION_OPERATION,
   type MutationInput,
   enqueueMutation,
-  pushQueuedMutations,
 } from "../db/mutation-queue"
+import { requestPush } from "../db/push-pending"
 import { uuidv7 } from "../uuid"
 
 // M9d WP6: kit and group-checklist changes made with no signal. Each is queued
@@ -13,8 +13,7 @@ import { uuidv7 } from "../uuid"
 
 async function queue(input: MutationInput): Promise<string> {
   const mutationId = await enqueueMutation(input)
-  // Best effort: offline it fails, and the next sweep sends it.
-  void pushQueuedMutations().catch(() => undefined)
+  requestPush()
   return mutationId
 }
 

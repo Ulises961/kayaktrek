@@ -41,7 +41,8 @@ import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
-import { editRoute, loadRouteSyncState, pushRouteChanges } from "@mobile/lib/db/route-edit";
+import { requestPush } from "@mobile/lib/db/push-pending";
+import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
@@ -267,6 +268,7 @@ export default function TripMapScreen() {
   async function handleDeletePoint(pointId: string) {
     try {
       await editRoute(id, (route) => deletePoint(route, pointId));
+      requestPush();
       clearPointSelection();
       setLastMove((move) => (move?.pointId === pointId ? null : move));
       await reload();
@@ -347,6 +349,7 @@ export default function TripMapScreen() {
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
       setLastMove({ pointId, latitude: before.latitude, longitude: before.longitude });
+      requestPush();
     } catch (err) {
       Alert.alert(
         "Couldn't move point",
@@ -375,6 +378,7 @@ export default function TripMapScreen() {
     setLastMove(null);
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+      requestPush();
       await reload();
     } catch (err) {
       Alert.alert(
@@ -518,8 +522,7 @@ export default function TripMapScreen() {
           type: POINT_TYPE.STOP,
         });
       });
-      // Best effort: offline it fails and the sweep pushes later.
-      void pushRouteChanges(id).catch(() => undefined);
+      requestPush();
       setDraftPoint(null);
       setDraftScreenPoint(null);
       setTooltipSize(null);

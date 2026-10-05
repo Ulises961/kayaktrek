@@ -2,7 +2,8 @@ import { Alert } from "react-native"
 
 import { TRIP_STATE } from "@shared/dtos/trip"
 
-import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation, pushQueuedMutations } from "../../lib/db/mutation-queue"
+import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation } from "../../lib/db/mutation-queue"
+import { requestPush } from "../../lib/db/push-pending"
 import { describeChange, useQueuedChanges } from "../../lib/network/queued-changes"
 import {
   TRIP_ACTION,
@@ -59,8 +60,7 @@ export function TripControls({ tripId, status }: { tripId: string; status: TripS
       entityId: tripId,
       payload,
     })
-    // Best effort: offline it fails, and the next sweep sends it.
-    void pushQueuedMutations().catch(() => undefined)
+    requestPush()
   }
 
   function confirmAction(action: TripAction) {
