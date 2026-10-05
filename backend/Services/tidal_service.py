@@ -40,7 +40,40 @@ _DEFAULT_START_MIN = 9 * 60  # 09:00
 # stamped value, so densifying it is information-neutral (every cell keeps the
 # same u/v) but is required for a smooth forecast-cell disc edge and a
 # reasonable land coastline when masking (M5b). Tuned to the landing cell.
-_VELOCITY_GRID_RESOLUTION = 24
+VELOCITY_GRID_RESOLUTION = 24
+
+
+def _flow_components(rate_ms: float, direction_deg: float) -> tuple[float, float]:
+    """Eastward and northward components (m/s) of a flow of ``rate_ms`` toward ``direction_deg``."""
+    rad = math.radians(direction_deg)
+    return round(rate_ms * math.sin(rad), 5), round(rate_ms * math.cos(rad), 5)
+
+
+def _cell_spacing(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> tuple[float, float]:
+    """Degrees between neighbouring grid cells, ``(dx, dy)``."""
+    cells = VELOCITY_GRID_RESOLUTION
+    dx = round((lon_max - lon_min) / (cells - 1), 4) if cells > 1 else 0.0
+    dy = round((lat_max - lat_min) / (cells - 1), 4) if cells > 1 else 0.0
+    return dx, dy
+
+
+def _land_cells(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> np.ndarray:
+    """Which grid cells' centres fall on land, flat and row-major from the NW corner
+    (la1/north, lo1/west) — how leaflet-velocity maps a flat cell index back to lat/lon."""
+    cells = VELOCITY_GRID_RESOLUTION
+    dx, dy = _cell_spacing(lat_min, lat_max, lon_min, lon_max)
+    cell_lats = lat_max - np.arange(cells) * dy
+    cell_lons = lon_min + np.arange(cells) * dx
+    lat_grid, lon_grid = np.meshgrid(cell_lats, cell_lons, indexing="ij")
+    return land_mask.is_land(lat_grid, lon_grid).ravel()
+
+
+def _closest_state(states: list, hour: int):
+    """The hourly state whose hour is nearest ``hour``."""
+    def hour_of(state) -> int:
+        return state.time.hour if hasattr(state.time, "hour") else 0
+
+    return min(states, key=lambda state: abs(hour_of(state) - hour))
 
 
 def _build_uniform_velocity_grid(
@@ -48,40 +81,30 @@ def _build_uniform_velocity_grid(
     lat_max: float,
     lon_min: float,
     lon_max: float,
-    rate_ms: float,
-    direction_deg: float,
+    flow: tuple[float, float],
     source: str,
     mask_land: bool = False,
 ) -> dict:
     """
-    Build a uniform leaflet-velocity grid from speed (m/s) + direction.
+    Build a uniform leaflet-velocity grid from an eastward/northward flow (m/s).
 
     The grid stamps one (u, v) across an ``N×N`` grid (``N`` =
-    ``_VELOCITY_GRID_RESOLUTION``); it is not a spatial forecast. When
+    ``VELOCITY_GRID_RESOLUTION``); it is not a spatial forecast. When
     ``mask_land`` is set (marine fields only), cells whose centre falls on land
     are nulled so no particles render over land — waves do not exist on land.
     leaflet-velocity skips null cells.
     """
-    rad = math.radians(direction_deg)
-    u = round(rate_ms * math.sin(rad), 5)
-    v = round(rate_ms * math.cos(rad), 5)
+    u, v = flow
 
-    nx = ny = _VELOCITY_GRID_RESOLUTION
+    nx = ny = VELOCITY_GRID_RESOLUTION
     n = nx * ny
-    dx = round((lon_max - lon_min) / (nx - 1), 4) if nx > 1 else 0.0
-    dy = round((lat_max - lat_min) / (ny - 1), 4) if ny > 1 else 0.0
+    dx, dy = _cell_spacing(lat_min, lat_max, lon_min, lon_max)
 
     eastward: list[Optional[float]] = [u] * n
     northward: list[Optional[float]] = [v] * n
 
     if mask_land:
-        # Row-major from the NW corner (la1/north, lo1/west) — matches how
-        # leaflet-velocity maps a flat cell index back to lat/lon.
-        cell_lats = lat_max - np.arange(ny) * dy
-        cell_lons = lon_min + np.arange(nx) * dx
-        lat_grid, lon_grid = np.meshgrid(cell_lats, cell_lons, indexing="ij")
-        is_land = land_mask.is_land(lat_grid, lon_grid).ravel()
-        for index in np.flatnonzero(is_land):
+        for index in np.flatnonzero(_land_cells(lat_min, lat_max, lon_min, lon_max)):
             eastward[index] = None
             northward[index] = None
 
@@ -321,61 +344,80 @@ class TidalService:
         return neap_rate + ratio * (spring_rate - neap_rate)
 
     @staticmethod
+    def wind_flow_at_hour(weather_states: list, hour: int) -> Optional[tuple[float, float]]:
+        """
+        The wind's (eastward, northward) components in m/s at the given UTC hour, or None
+        when there is no usable state.
+
+        wind_force is stored in km/h (OpenMeteo default). Falls back to the closest
+        available state when no exact hour match exists. The one place this is computed:
+        the wind-vectors endpoint and the mobile sync both read it.
+        """
+        if not weather_states:
+            return None
+        best = _closest_state(weather_states, hour)
+        if best.wind_force is None or best.wind_direction is None:
+            return None
+        return _flow_components(float(best.wind_force) / 3.6, float(best.wind_direction))  # km/h → m/s
+
+    @staticmethod
+    def wave_flow_at_hour(sea_states: list, hour: int) -> Optional[tuple[float, float]]:
+        """
+        The waves' (eastward, northward) components at the given UTC hour, or None when
+        there is no usable state.
+
+        wave_height (m) is used as a proxy for speed magnitude (1 m ≈ 1 m/s visually).
+        Falls back to the closest available state when no exact hour match exists.
+        """
+        if not sea_states:
+            return None
+        best = _closest_state(sea_states, hour)
+        if best.wave_height is None or best.wave_direction is None:
+            return None
+        return _flow_components(float(best.wave_height), float(best.wave_direction))
+
+    @staticmethod
+    def day_bounding_box(day, pad: float = 0.5) -> tuple:
+        """(lat_min, lat_max, lon_min, lon_max) of the day's route points, padded; a UK
+        coastal box when the day has none."""
+        lats = [float(p.latitude) for p in (day.points or []) if p.latitude is not None]
+        lons = [float(p.longitude) for p in (day.points or []) if p.longitude is not None]
+        if lats and lons:
+            return (min(lats) - pad, max(lats) + pad, min(lons) - pad, max(lons) + pad)
+        return (49.0, 60.0, -8.0, 2.0)
+
+    @staticmethod
+    def velocity_land_mask(bounding_box: tuple) -> list[bool]:
+        """Whether each cell of the box's velocity grid is land, flat and row-major from the
+        NW corner. The wave grid nulls exactly these cells."""
+        lat_min, lat_max, lon_min, lon_max = bounding_box
+        return [bool(is_land) for is_land in _land_cells(lat_min, lat_max, lon_min, lon_max)]
+
+    @staticmethod
     def build_wind_velocity_grid(bounding_box: tuple, weather_states: list, hour: int) -> dict:
         """
         Build a leaflet-velocity grid from WeatherState data at the given UTC hour.
 
-        wind_force is stored in km/h (OpenMeteo default). Converts to m/s for the grid.
-        Falls back to the closest available state when no exact hour match exists.
         Returns {"source": "weather", "grid": [...]} or {"source": "weather", "grid": []}.
         """
-        if not weather_states:
+        flow = TidalService.wind_flow_at_hour(weather_states, hour)
+        if flow is None:
             return {"source": "weather", "grid": []}
-
-        def _hour_of(state) -> int:
-            return state.time.hour if hasattr(state.time, "hour") else 0
-
-        best = min(weather_states, key=lambda s: abs(_hour_of(s) - hour))
-        if best.wind_force is None or best.wind_direction is None:
-            return {"source": "weather", "grid": []}
-
-        speed_ms = float(best.wind_force) / 3.6  # km/h → m/s
         lat_min, lat_max, lon_min, lon_max = bounding_box
-        return _build_uniform_velocity_grid(
-            lat_min, lat_max, lon_min, lon_max,
-            speed_ms,
-            float(best.wind_direction),
-            "weather",
-        )
+        return _build_uniform_velocity_grid(lat_min, lat_max, lon_min, lon_max, flow, "weather")
 
     @staticmethod
     def build_wave_velocity_grid(bounding_box: tuple, sea_states: list, hour: int) -> dict:
         """
         Build a leaflet-velocity grid from SeaState wave data at the given UTC hour.
 
-        wave_height (m) is used as a proxy for speed magnitude (1 m ≈ 1 m/s visually).
-        Falls back to closest available state when no exact hour match exists.
         Returns {"source": "marine", "grid": [...]} or {"source": "marine", "grid": []}.
         """
-        if not sea_states:
+        flow = TidalService.wave_flow_at_hour(sea_states, hour)
+        if flow is None:
             return {"source": "marine", "grid": []}
-
-        def _hour_of(state) -> int:
-            return state.time.hour if hasattr(state.time, "hour") else 0
-
-        best = min(sea_states, key=lambda s: abs(_hour_of(s) - hour))
-        if best.wave_height is None or best.wave_direction is None:
-            return {"source": "marine", "grid": []}
-
         lat_min, lat_max, lon_min, lon_max = bounding_box
-        speed_ms = float(best.wave_height)  # metres → treat directly as m/s for visualisation
-        return _build_uniform_velocity_grid(
-            lat_min, lat_max, lon_min, lon_max,
-            speed_ms,
-            float(best.wave_direction),
-            "marine",
-            mask_land=True,
-        )
+        return _build_uniform_velocity_grid(lat_min, lat_max, lon_min, lon_max, flow, "marine", mask_land=True)
 
     @staticmethod
     def _entry_rate(entry: TidalStreamEntry, sea: Optional[Sea]) -> Optional[float]:
