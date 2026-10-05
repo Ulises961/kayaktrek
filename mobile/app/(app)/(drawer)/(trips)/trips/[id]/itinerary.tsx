@@ -84,7 +84,11 @@ type DraftPoint = { latitude: number; longitude: number; afterPointId: string | 
 // the tap point, queried against the rendered "route-line" layer. Mirrors web's
 // own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
 // visible line), achieved differently since MapLibre RN's Layer has no onPress.
-const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+// Wider than web's ±9px on purpose: a tap that close to an existing route is
+// clearly meant to refine it, and nobody travelling the chain back wants the
+// tip dragged to that spot, so there is no reason to make them zoom in first.
+// ±24px is a 48px target, the usual minimum for a finger.
+const ROUTE_LINE_TAP_TOLERANCE_PX = 24;
 
 export default function TripMapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
