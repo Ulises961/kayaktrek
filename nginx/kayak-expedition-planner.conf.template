@@ -68,6 +68,32 @@
 # Cloudflare's CNAME flattening makes the tunnel's route work at the zone apex the same
 # as any subdomain, for both the apex redirect and www./app.
 
+# --- Upstreams (M33 WP1) ---
+# Named rather than a literal 127.0.0.1:PORT in each proxy_pass, so rolling replacement
+# (M33 WP2) has one place to repoint: edit the `server` line, `nginx -t`, reload. On their own
+# these change no behaviour. Host ports are docker-compose.prod.yml's, not the containers'
+# internal ones (the frontend's :3000 is already taken on this box, hence 3300).
+upstream kayak_frontend { server 127.0.0.1:3300; }
+upstream kayak_backend  { server 127.0.0.1:5000; }
+upstream kayak_sse      { server 127.0.0.1:5001; }
+
+# --- Maintenance mode (M33 WP1) ---
+# While /var/www/kayak-maintenance/maintenance.flag exists, app./api./live. answer 503 with
+# the static page beside it. scripts/deploy.sh raises the flag around `up -d` and drops it
+# once the health check passes (and on any failure). nginx runs on the host, outside the
+# compose lifecycle, so this works with every container stopped — which is the point: a
+# visitor gets an honest page instead of a connection error.
+#
+# One-time install on the box (the deploy user must own the directory, so deploy.sh can
+# touch and remove the flag without sudo):
+#   sudo install -d -o <deploy-user> /var/www/kayak-maintenance
+#   sudo install -m 644 nginx/maintenance.html /var/www/kayak-maintenance/maintenance.html
+#
+# The `if` only wraps `return`, the one use nginx documents as safe. `error_page` without
+# `=` keeps the 503 status, so monitors and crawlers see an outage rather than a 200 that
+# says "back in a minute". www. and the apex are untouched: the marketing page is static and
+# is exactly what a visitor should still be able to reach.
+
 # --- Marketing (static company page, M28 — no build pipeline, no app code) ---
 server {
     listen 443 ssl;
@@ -105,11 +131,18 @@ server {
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
 
+    if (-f /var/www/kayak-maintenance/maintenance.flag) { return 503; }
+    error_page 503 @maintenance;
+    location @maintenance {
+        root /var/www/kayak-maintenance;
+        rewrite ^ /maintenance.html break;
+        add_header Retry-After 120 always;
+        add_header Cache-Control "no-store" always;
+    }
+
     location / {
-        # Host port 3300, not the container's default 3000 — 3000 is already taken by
-        # another app on this box (docker-compose.prod.yml maps the frontend container's
-        # internal :3000 to host :3300 to avoid the collision).
-        proxy_pass http://127.0.0.1:3300;
+        # Upstream kayak_frontend is host port 3300 (see the upstreams above).
+        proxy_pass http://kayak_frontend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -131,8 +164,17 @@ server {
     # upload failures show a 413.
     client_max_body_size 20m;
 
+    if (-f /var/www/kayak-maintenance/maintenance.flag) { return 503; }
+    error_page 503 @maintenance;
+    location @maintenance {
+        root /var/www/kayak-maintenance;
+        rewrite ^ /maintenance.html break;
+        add_header Retry-After 120 always;
+        add_header Cache-Control "no-store" always;
+    }
+
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://kayak_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -151,8 +193,17 @@ server {
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
 
+    if (-f /var/www/kayak-maintenance/maintenance.flag) { return 503; }
+    error_page 503 @maintenance;
+    location @maintenance {
+        root /var/www/kayak-maintenance;
+        rewrite ^ /maintenance.html break;
+        add_header Retry-After 120 always;
+        add_header Cache-Control "no-store" always;
+    }
+
     location / {
-        proxy_pass http://127.0.0.1:5001;
+        proxy_pass http://kayak_sse;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
