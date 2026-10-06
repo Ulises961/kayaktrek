@@ -19,7 +19,8 @@ import { loadOfflineTrip } from "../offline-itinerary"
 import { pushPending } from "../push-pending"
 import { ensureTripTiles, pruneTripTiles } from "../../map/offline-tiles"
 import { getTrip, getTrips } from "../../trips/actions"
-import { runSweep } from "../sweep"
+import { manualSync } from "../../network/manual-sync"
+import { runSweep, syncTripsNow } from "../sweep"
 import { syncTrip } from "../sync"
 import { loadTripListCache, saveTripListCache } from "../trip-list-cache"
 
@@ -337,6 +338,114 @@ describe("runSweep", () => {
 // back to them; what was missing was anything WARMING them. They only filled if
 // you happened to open the Items screen's "My kit" tab, or the Gear screen,
 // while online — the same per-screen laziness the trip sweep exists to remove.
+// The offline banner's "Retry sync". A paddler asking for a sync wants it now, so it ignores the
+// staleness budgets a foreground sweep honours; it stops before the slow extras (map tiles, gear,
+// buddies, profile), which a button should not make a paddler wait through.
+describe("syncTripsNow — the manual pull", () => {
+  it("pulls a trip whose caches are still inside their budget, which a sweep would skip", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "fresh" })])
+    mockReadCachedAt.mockResolvedValue(new Date().toISOString())
+    await runSweep()
+    expect(mockSyncTrip).not.toHaveBeenCalled()
+
+    await syncTripsNow()
+
+    expect(mockSyncTrip).toHaveBeenCalledWith("fresh")
+    expect(mockPullRoute).toHaveBeenCalledWith("fresh")
+  })
+
+  it("still leaves past trips alone", async () => {
+    mockLoadTripListCache.mockResolvedValue([
+      cachedTrip({ id: "old", state: TRIP_STATE.PAST, dateFrom: "2020-01-01" }),
+      cachedTrip({ id: "live" }),
+    ])
+
+    await syncTripsNow()
+
+    expect(mockSyncTrip).toHaveBeenCalledWith("live")
+    expect(mockSyncTrip).not.toHaveBeenCalledWith("old")
+  })
+
+  it("sends what is waiting and refreshes the trip list before it pulls, as a sweep does", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+
+    await syncTripsNow()
+
+    const pulled = mockSyncTrip.mock.invocationCallOrder[0]
+    expect(mockPushPending.mock.invocationCallOrder[0]).toBeLessThan(mockGetTrips.mock.invocationCallOrder[0])
+    expect(mockGetTrips.mock.invocationCallOrder[0]).toBeLessThan(pulled)
+  })
+
+  it("does not go on to map tiles, gear, buddies or the profile", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+
+    await syncTripsNow()
+
+    expect(mockEnsureTripTiles).not.toHaveBeenCalled()
+    expect(mockGetMyItems).not.toHaveBeenCalled()
+    expect(mockListConnections).not.toHaveBeenCalled()
+    expect(mockGetMe).not.toHaveBeenCalled()
+  })
+
+  it("resolves rather than rejecting when everything fails, as it does offline", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockSyncTrip.mockRejectedValue(new Error("Could not reach the server."))
+    mockPullRoute.mockRejectedValue(new Error("Could not reach the server."))
+    mockGetTrips.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(syncTripsNow()).resolves.toBeUndefined()
+  })
+
+  it("resolves when the trip-list cache itself cannot be read", async () => {
+    mockLoadTripListCache.mockRejectedValue(new Error("no such table: trips"))
+
+    await expect(syncTripsNow()).resolves.toBeUndefined()
+  })
+
+  it("waits for a sweep already running instead of starting a second one", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    let release: () => void = () => undefined
+    mockSyncTrip.mockImplementation(() => new Promise<void>((resolve) => (release = resolve)))
+    const sweep = runSweep()
+    await waitForCalls(mockSyncTrip, 1)
+
+    let manualDone = false
+    const manual = syncTripsNow().then(() => {
+      manualDone = true
+    })
+    await new Promise((resolve) => setImmediate(resolve))
+
+    // The spinner on the button must not end while the pull it asked for is still going.
+    expect(manualDone).toBe(false)
+    release()
+    await Promise.all([sweep, manual])
+    expect(manualDone).toBe(true)
+    expect(mockSyncTrip).toHaveBeenCalledTimes(1)
+  })
+
+  it("is not doubled by a foreground sweep that fires while it is running", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    let release: () => void = () => undefined
+    mockSyncTrip.mockImplementation(() => new Promise<void>((resolve) => (release = resolve)))
+    const manual = syncTripsNow()
+    await waitForCalls(mockSyncTrip, 1)
+
+    await runSweep()
+
+    expect(mockSyncTrip).toHaveBeenCalledTimes(1)
+    release()
+    await manual
+  })
+
+  it("is what the banner's button reaches, with no import of the sweep", async () => {
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+
+    await manualSync()
+
+    expect(mockSyncTrip).toHaveBeenCalledWith("t1")
+  })
+})
+
 describe("runSweep — tier 3, kit and gear", () => {
   it("warms the gear closet, which is not scoped to any trip", async () => {
     mockLoadTripListCache.mockResolvedValue([])
