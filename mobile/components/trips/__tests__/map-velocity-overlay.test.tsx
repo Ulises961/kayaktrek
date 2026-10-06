@@ -8,12 +8,16 @@ import { WIND_SPEED_COLORS, windLegendLabels, windSpeedColor } from "@shared/wea
 
 import type { VelocityField } from "@mobile/lib/weather/velocity";
 import { meanSpeed } from "@mobile/lib/weather/velocity-frame";
+import { useHasCachedVelocity } from "@mobile/lib/weather/use-has-cached-velocity";
 import { useVelocityField } from "@mobile/lib/weather/use-velocity-field";
 
 import { MapVelocityOverlay, WIND_PARTICLE_MULTIPLIER, WIND_STROKE_WIDTH } from "../map-velocity-overlay";
 
 jest.mock("@mobile/lib/weather/use-velocity-field", () => ({
   useVelocityField: jest.fn(),
+}));
+jest.mock("@mobile/lib/weather/use-has-cached-velocity", () => ({
+  useHasCachedVelocity: jest.fn(),
 }));
 
 // The three Skia components are covered by their own tests. Here each is a marker that records
@@ -47,6 +51,7 @@ jest.mock("../forecast-ring", () => ({
 }));
 
 const mockUseVelocityField = useVelocityField as jest.Mock;
+const mockUseHasCachedVelocity = useHasCachedVelocity as jest.Mock;
 
 const DAY_ID = "01998e2a-0000-7000-8000-000000000001";
 
@@ -107,6 +112,8 @@ const baseProps = {
 
 beforeEach(() => {
   mockUseVelocityField.mockReset();
+  // The pull has saved the day, unless a test says it has not.
+  mockUseHasCachedVelocity.mockReset().mockReturnValue(true);
   hooks(idle, idle);
   handlers.onWindToggle.mockReset();
   handlers.onSwellToggle.mockReset();
@@ -216,8 +223,12 @@ describe("MapVelocityOverlay: what is fetched and drawn", () => {
   it("fetches only the layers that are on, for the selected day and hour", async () => {
     await render(<MapVelocityOverlay {...baseProps} windOn hour={15} />);
 
-    expect(mockUseVelocityField).toHaveBeenCalledWith({ dayId: DAY_ID, hour: 15, kind: "wind", enabled: true });
-    expect(mockUseVelocityField).toHaveBeenCalledWith({ dayId: DAY_ID, hour: 15, kind: "wave", enabled: false });
+    expect(mockUseVelocityField).toHaveBeenCalledWith({
+      dayId: DAY_ID, hour: 15, kind: "wind", enabled: true, offline: false,
+    });
+    expect(mockUseVelocityField).toHaveBeenCalledWith({
+      dayId: DAY_ID, hour: 15, kind: "wave", enabled: false, offline: false,
+    });
   });
 
   it("draws nothing while a layer is still loading", async () => {
@@ -392,13 +403,49 @@ describe("MapVelocityOverlay: saying what is going on, in the panel and not on t
 });
 
 describe("MapVelocityOverlay: when the overlay cannot be shown", () => {
-  it("is switched off, with the reason, when the phone is offline", async () => {
+  it("is switched off, with the reason, when the phone is offline and nothing is saved for the day", async () => {
+    mockUseHasCachedVelocity.mockReturnValue(false);
     const utils = await render(<MapVelocityOverlay {...baseProps} windOn offline />);
     await openPanel(utils);
 
     expect(utils.getByLabelText("Wind").props.accessibilityState).toMatchObject({ disabled: true });
-    expect(utils.getByText(/needs a connection/i)).toBeTruthy();
+    expect(utils.getByText(/not saved for offline use/i)).toBeTruthy();
     expect(mockUseVelocityField).toHaveBeenCalledWith(expect.objectContaining({ kind: "wind", enabled: false }));
+  });
+
+  it("is offered offline when the pull saved the day, and reads what was saved", async () => {
+    mockUseHasCachedVelocity.mockReturnValue(true);
+    const utils = await render(<MapVelocityOverlay {...baseProps} windOn offline />);
+    await openPanel(utils);
+
+    expect(utils.getByLabelText("Wind").props.accessibilityState).toMatchObject({ disabled: false });
+    expect(utils.queryByText(/not saved for offline use/i)).toBeNull();
+    expect(mockUseVelocityField).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "wind", enabled: true, offline: true }),
+    );
+    expect(mockUseVelocityField).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "wave", enabled: false, offline: true }),
+    );
+  });
+
+  it("holds the switches off, without a reason, while it is still checking what is saved", async () => {
+    mockUseHasCachedVelocity.mockReturnValue(null);
+    const utils = await render(<MapVelocityOverlay {...baseProps} windOn offline />);
+    await openPanel(utils);
+
+    expect(utils.getByLabelText("Wind").props.accessibilityState).toMatchObject({ disabled: true });
+    expect(utils.queryByText(/not saved for offline use/i)).toBeNull();
+  });
+
+  it("only looks at what is saved when the phone is offline, and online is never held up by it", async () => {
+    mockUseHasCachedVelocity.mockReturnValue(null);
+    const utils = await render(<MapVelocityOverlay {...baseProps} windOn />);
+    await openPanel(utils);
+
+    expect(utils.getByLabelText("Wind").props.accessibilityState).toMatchObject({ disabled: false });
+    expect(mockUseVelocityField).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "wind", enabled: true, offline: false }),
+    );
   });
 
   it("is switched off until a day is selected", async () => {
