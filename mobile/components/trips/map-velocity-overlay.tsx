@@ -10,6 +10,7 @@ import { windSpeedColor } from "@shared/weather/wind-scale"
 
 import type { MapViewState } from "../../lib/map/project-lng-lat"
 import { maskFieldToDisc } from "../../lib/weather/forecast-cell"
+import { useHasCachedVelocity } from "../../lib/weather/use-has-cached-velocity"
 import { useVelocityField, type VelocityKind } from "../../lib/weather/use-velocity-field"
 import { meanSpeed } from "../../lib/weather/velocity-frame"
 import { Text } from "../ui/text"
@@ -76,11 +77,12 @@ function LayerSwitch({
 // the weather panel does — a moving field reads as live, and must not — and says the flow
 // is one reading, not a map of varying wind.
 //
-// The overlay is online-only (velocity grids are not in the sync cache), so it is switched
-// off with the reason rather than left showing a field it cannot refresh. It needs a day
-// with points: web's forecast cell is a disc around that day's route (`discCell`), the field
-// is clipped to it (`maskGridToDisc`), and a dashed ring marks where the forecast stops —
-// both are web's own functions, shared rather than copied.
+// Online the fields come from the server; offline, or when it cannot be reached, from what the
+// last pull saved on the phone (lib/db/velocity-cache.ts), so the layers work without a
+// connection. Offline they are offered only for a day that was saved, and are switched off with
+// the reason otherwise. It needs a day with points: web's forecast cell is a disc around that
+// day's route (`discCell`), the field is clipped to it (`maskGridToDisc`), and a dashed ring
+// marks where the forecast stops — both are web's own functions, shared rather than copied.
 export function MapVelocityOverlay({
   day,
   dayPositions,
@@ -109,14 +111,19 @@ export function MapVelocityOverlay({
   const dayId = day?.id ?? null
   const disc = useMemo(() => (dayPositions.length > 0 ? discCell(dayPositions) : null), [dayPositions])
 
-  let unavailableReason: string | null = null
-  if (offline) unavailableReason = "Needs a connection."
-  else if (dayId === null) unavailableReason = "Select a day to show overlays."
-  else if (disc === null) unavailableReason = "This day has no points yet."
-  const unavailable = unavailableReason !== null
+  // Offline the layers draw from what the last pull saved on the phone, so they are offered only
+  // for a day that was saved. `saved` is null while that is being checked, and is only asked for
+  // offline: online never waits on it.
+  const saved = useHasCachedVelocity(offline ? dayId : null)
 
-  const wind = useVelocityField({ dayId, hour, kind: "wind", enabled: windOn && !unavailable })
-  const swell = useVelocityField({ dayId, hour, kind: "wave", enabled: swellOn && !unavailable })
+  let unavailableReason: string | null = null
+  if (dayId === null) unavailableReason = "Select a day to show overlays."
+  else if (disc === null) unavailableReason = "This day has no points yet."
+  else if (offline && saved === false) unavailableReason = "Not saved for offline use yet."
+  const unavailable = unavailableReason !== null || (offline && saved === null)
+
+  const wind = useVelocityField({ dayId, hour, kind: "wind", enabled: windOn && !unavailable, offline })
+  const swell = useVelocityField({ dayId, hour, kind: "wave", enabled: swellOn && !unavailable, offline })
 
   // Clipped to the disc once per field, so the overlay keeps a stable `field` and does not
   // restart its particles on every render.
