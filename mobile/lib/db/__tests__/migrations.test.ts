@@ -129,6 +129,18 @@ describe("migrations", () => {
     expect(covered).toEqual(expected)
   })
 
+  // M35: the wind and swell flow the pull carries for the map overlay, both in ONE bump.
+  it("has migration steps creating both velocity tables at v13", () => {
+    const v13 = migrations.sortedMigrations.find((migration) => migration.toVersion === 13)
+    expect(v13).toBeDefined()
+
+    const createdTables = v13!.steps
+      .filter((step) => step.type === "create_table")
+      .map((step) => (step.type === "create_table" ? step.schema.name : ""))
+
+    expect(createdTables.sort()).toEqual(["velocity_days", "velocity_hours"])
+  })
+
   // Stronger than the version check above, which only proves *a* migration
   // exists at each version — not that it creates the table the bump actually
   // added. A bump carrying a migration for the wrong table would pass that

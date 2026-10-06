@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 12,
+  version: 13,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -174,6 +174,33 @@ export const appDatabaseSchema = appSchema({
         { name: "wind_direction", type: "number", isOptional: true },
         { name: "wind_force", type: "number", isOptional: true },
         { name: "cloud", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // M35: the pieces of a day's wind and swell grids, so the map overlay draws offline.
+      // Not rows of weather in their own right: the server computes them from weather and sea
+      // states (spec §6.5) and sends them whole on every pull. `id` is the day id.
+      name: "velocity_days",
+      columns: [
+        { name: "day_id", type: "string", isIndexed: true },
+        { name: "south", type: "number" },
+        { name: "north", type: "number" },
+        { name: "west", type: "number" },
+        { name: "east", type: "number" },
+        { name: "size", type: "number" },
+        { name: "land_mask", type: "string" },
+      ],
+    }),
+    tableSchema({
+      // `id` is `<dayId>:<hour>`; the flow is null when the day has no forecast for that layer.
+      name: "velocity_hours",
+      columns: [
+        { name: "day_id", type: "string", isIndexed: true },
+        { name: "hour", type: "number" },
+        { name: "wind_u", type: "number", isOptional: true },
+        { name: "wind_v", type: "number", isOptional: true },
+        { name: "wave_u", type: "number", isOptional: true },
+        { name: "wave_v", type: "number", isOptional: true },
       ],
     }),
     tableSchema({

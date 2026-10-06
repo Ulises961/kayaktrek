@@ -72,6 +72,23 @@ const FIELD_MAPS: Record<string, Record<string, string>> = {
     currentSpeed: "current_speed",
     currentDirection: "current_direction",
   },
+  velocity_days: {
+    dayId: "day_id",
+    south: "south",
+    north: "north",
+    west: "west",
+    east: "east",
+    size: "size",
+    landMask: "land_mask",
+  },
+  velocity_hours: {
+    dayId: "day_id",
+    hour: "hour",
+    windU: "wind_u",
+    windV: "wind_v",
+    waveU: "wave_u",
+    waveV: "wave_v",
+  },
 }
 
 function remapRow(row: Record<string, unknown>, fieldMap: Record<string, string>): Record<string, unknown> {

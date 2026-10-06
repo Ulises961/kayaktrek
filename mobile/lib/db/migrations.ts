@@ -193,5 +193,34 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // M35 — the wind and swell flow the pull carries for the map overlay. Both tables in one bump.
+      toVersion: 13,
+      steps: [
+        createTable({
+          name: "velocity_days",
+          columns: [
+            { name: "day_id", type: "string", isIndexed: true },
+            { name: "south", type: "number" },
+            { name: "north", type: "number" },
+            { name: "west", type: "number" },
+            { name: "east", type: "number" },
+            { name: "size", type: "number" },
+            { name: "land_mask", type: "string" },
+          ],
+        }),
+        createTable({
+          name: "velocity_hours",
+          columns: [
+            { name: "day_id", type: "string", isIndexed: true },
+            { name: "hour", type: "number" },
+            { name: "wind_u", type: "number", isOptional: true },
+            { name: "wind_v", type: "number", isOptional: true },
+            { name: "wave_u", type: "number", isOptional: true },
+            { name: "wave_v", type: "number", isOptional: true },
+          ],
+        }),
+      ],
+    },
   ],
 })
