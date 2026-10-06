@@ -104,6 +104,41 @@ docker compose -f docker-compose.prod.yml ps
 curl http://localhost:5000/api/v1/health
 ```
 
+### Maintenance mode (M33)
+
+`scripts/deploy.sh` pulls first, then raises a flag file, runs `up -d`, polls until the backend
+and frontend answer, and drops the flag. While it exists, nginx answers `app.`, `api.` and
+`live.` with a styled **503** (`Retry-After: 120`) instead of a connection error. nginx runs on
+the host, so this works with every container stopped. `www.` and the apex are untouched.
+
+The flag is dropped on any exit, including a failed health check — a deploy that dies halfway
+does not leave the site behind a maintenance page (it leaves a broken app, which is the more
+honest state). If the deploy script itself lost its ssh connection, remove it by hand:
+
+```bash
+ssh <box> rm -f /var/www/kayak-maintenance/maintenance.flag
+```
+
+**One-time install per box** (nginx is deliberately outside the automated push — see below):
+
+```bash
+sudo install -d -o <deploy-user> /var/www/kayak-maintenance
+sudo install -m 644 nginx/maintenance.html /var/www/kayak-maintenance/maintenance.html
+# then re-install the nginx template as in "Deploying configuration to the box",
+# `sudo nginx -t && sudo systemctl reload nginx`
+```
+
+`deploy.sh` refuses to run if `/var/www/kayak-maintenance` is missing, so a half-installed box
+fails before anything changes. `DEPLOY_MAINTENANCE=0` deploys without it.
+
+Expect `uptime-kuma` and DO's uptime checks to see the 503 windows — that is the signal working,
+not an incident. To measure what a deploy looks like from outside (M33 WP0), run
+`KAYAK_DOMAIN=<domain> scripts/measure-deploy-window.sh` in a second terminal before deploying.
+
+**Cloudflare sits in front.** Cloudflare passes an origin's 503 body through by default, but
+confirm the first time that the styled page, not a Cloudflare error page, reaches a browser:
+`touch` the flag by hand and load `https://app.<domain>/`.
+
 ## Monitoring / admin tooling
 
 `docker-compose.monitoring.yml` — Portainer (containers), Glances (host CPU/RAM/disk/network),
