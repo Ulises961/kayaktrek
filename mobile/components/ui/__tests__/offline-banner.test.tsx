@@ -3,6 +3,7 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import NetInfo from "@react-native-community/netinfo"
 
 import { CachedSurfacesProvider, useCachedSurfaces } from "../../../lib/network/cached-surfaces"
+import { registerManualSync } from "../../../lib/network/manual-sync"
 import { registerPushRetry, setPushStatus } from "../../../lib/network/push-status"
 import { OfflineBanner } from "../offline-banner"
 
@@ -60,6 +61,7 @@ beforeEach(() => {
   // one test's failed push is not the next test's starting banner.
   setPushStatus({ state: "idle", retryAt: null })
   registerPushRetry(async () => "sent")
+  registerManualSync(null)
 })
 
 describe("OfflineBanner", () => {
@@ -157,6 +159,40 @@ describe("OfflineBanner", () => {
     await fireEvent.press(getByLabelText("Retry sync"))
 
     await waitFor(() => expect(retry).toHaveBeenCalledTimes(1))
+  })
+
+  // The button used to send and recheck but never pull, so a phone that had missed a sync (new
+  // data on the server since it last looked) stayed as it was however often it was pressed.
+  it("also pulls the trips, after sending what is waiting", async () => {
+    const order: string[] = []
+    registerPushRetry(async () => {
+      order.push("push")
+      return "sent"
+    })
+    registerManualSync(async () => {
+      order.push("pull")
+    })
+    const { getByText, getByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    connectivityHandler()({ isConnected: false })
+    await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+
+    await fireEvent.press(getByLabelText("Retry sync"))
+
+    await waitFor(() => expect(order).toEqual(["push", "pull"]))
+  })
+
+  it("keeps the spinner up until the pull has finished, not just the push", async () => {
+    let finishPull: () => void = () => {}
+    registerManualSync(() => new Promise<void>((resolve) => (finishPull = resolve)))
+    const { getByText, getByLabelText } = await render(<OfflineBanner />, { wrapper: CachedSurfacesProvider })
+    connectivityHandler()({ isConnected: false })
+    await waitFor(() => expect(getByText(/no internet connection/i)).toBeTruthy())
+
+    await fireEvent.press(getByLabelText("Retry sync"))
+    await waitFor(() => expect(getByLabelText("Retry sync").props.accessibilityState?.disabled).toBe(true))
+
+    await act(async () => finishPull())
+    await waitFor(() => expect(getByLabelText("Retry sync").props.accessibilityState?.disabled).toBeFalsy())
   })
 
   it("raises the banner when a push failed even though the device thinks it is online", async () => {
