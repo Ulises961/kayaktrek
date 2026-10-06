@@ -6,6 +6,7 @@ import { lightTokens, palette } from "@shared/tokens"
 import { formatTimeAgo } from "@shared/utils/date"
 
 import { type CachedSurfaceReport, useCachedSurfaces } from "../../lib/network/cached-surfaces"
+import { manualSync } from "../../lib/network/manual-sync"
 import { getPushStatus, retryPush, subscribePushStatus } from "../../lib/network/push-status"
 import { recheckConnectivity, useIsOffline } from "../../lib/network/use-is-offline"
 import { Text } from "./text"
@@ -85,13 +86,17 @@ export function OfflineBanner() {
   //   and a resolved one clears;
   // - changes still unsent on the phone — retryPush() sends them. A failed send
   //   leaves the push status failed, so the banner keeps saying so and the
-  //   automatic retries restart.
+  //   automatic retries restart;
+  // - trips whose data the phone missed (a sweep that failed offline, or a server that gained
+  //   something since): manualSync() pulls every trip now, after the push, so the button fixes
+  //   what it says it does instead of only re-reading the network.
   async function handleRecheck() {
     setRechecking(true)
     try {
       await recheckConnectivity()
       retryAll()
       await retryPush()
+      await manualSync()
     } finally {
       setRechecking(false)
     }

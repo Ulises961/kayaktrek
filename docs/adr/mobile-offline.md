@@ -348,6 +348,12 @@ device connected while the server is unreachable, or a push can fail at the inst
 reconnecting, and edits would then sit unsent with nothing on screen saying so. The banner stays
 one line; detail sits behind "Read more".
 
+The banner's "Retry sync" also pulls, after it pushes (2026-10-06): every syncable trip at once,
+ignoring the staleness budgets the foreground sweep honours, since pressing it means "now". It
+stops before the slow extras (map tiles, gear, buddies, profile) and waits for a sweep already
+running instead of starting a second. Without it a phone that had missed a sync could not be
+brought up to date from the one control that says it syncs.
+
 ### What can be mutated offline
 
 Only data the device owns or the user controls:
