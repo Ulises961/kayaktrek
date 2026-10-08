@@ -38,7 +38,7 @@ class LiveStreamService:
     def mint_changes_ticket(trip_id: str, user_id: str) -> str:
         """Unlike a position-stream ticket this names the user: the changes stream
         outlives a ticket's 5 minutes and must re-check that user's membership."""
-        return LiveStreamService._mint_ticket(CHANGES_TICKET_PURPOSE, trip_id, user_id=user_id)
+        return LiveStreamService._mint_ticket(CHANGES_TICKET_PURPOSE, trip_id, userId=user_id)
 
     @staticmethod
     def verify_changes_ticket(token: str, trip_id: str) -> Optional[str]:
