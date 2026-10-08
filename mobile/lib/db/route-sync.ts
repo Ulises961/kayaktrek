@@ -57,13 +57,24 @@ export async function pullRoute(
 
   const response = await apiGet<ApiRoutePullResponse>(`/api/sync/trip/${tripId}/route/pull`)
 
-  await database.write(async () => {
+  const applied = await database.write(async () => {
     const staleDays = await daysCollection.query(Q.where("trip_id", tripId)).fetch()
     const staleDayIds = staleDays.map((day) => day.id)
     const stalePoints = staleDayIds.length
       ? await pointsCollection.query(Q.where("day_id", Q.oneOf(staleDayIds))).fetch()
       : []
     const staleMeta = await routeMetaCollection.query(Q.where("trip_id", tripId)).fetch()
+
+    // Checked again here, under the write, not only before the fetch: the leader can edit, or a
+    // push can land, while the request is in the air, and replacing the route wholesale with what
+    // was fetched before that would put the older copy over the newer one and wipe the unsent-edits
+    // flag with it. A pull the leader explicitly asked for (their choice of the server's route)
+    // skips both checks.
+    if (!discardLocalChanges) {
+      const [current] = staleMeta
+      if (current?.hasLocalChanges || current?.inConflict) return false
+      if (current && response.routeVersion < current.routeVersion) return false
+    }
 
     const newDays = response.days.map((day) =>
       daysCollection.prepareCreateFromDirtyRaw({
@@ -103,7 +114,9 @@ export async function pullRoute(
       ...staleMeta.map((meta) => meta.prepareDestroyPermanently())
     )
     await database.batch(...newDays, ...newPoints, newMeta)
+    return true
   })
 
-  await markCacheFresh(CACHE_KEY.tripRoute(tripId), database)
+  // A pull that was skipped refreshed nothing, so it must not date the cache.
+  if (applied) await markCacheFresh(CACHE_KEY.tripRoute(tripId), database)
 }
