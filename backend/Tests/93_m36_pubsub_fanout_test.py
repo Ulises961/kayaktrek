@@ -244,6 +244,23 @@ def test_a_reader_that_ended_with_its_connection_does_not_leave_new_viewers_unse
     assert second.get_message(timeout=2)["data"] == "to-the-new-reader"
 
 
+def test_a_viewer_arriving_while_the_retired_reader_is_still_waking_is_served(redis_client):
+    """Found as a flake in the full suite. The last viewer leaves, closing the connection
+    while its reader is blocked in a read; a new viewer arrives before that reader has noticed
+    it was retired. If the new viewer were not given a reader of its own because the old one
+    was 'still running', the old one would then exit on seeing the connection had changed —
+    leaving a live subscription that nobody reads. A slow poll makes the window deterministic."""
+    slow = PubSubFanout(lambda: redis_client, poll_seconds=0.3, max_pending=4)
+    slow.subscribe("trip:a:changes").close()
+    time.sleep(0.05)  # the first reader is now inside its 0.3s read of the closed connection
+
+    again = slow.subscribe("trip:a:changes")
+    assert _wait_for(lambda: len(redis_client.pubsubs) == 2)
+    redis_client.pubsubs[1].publish("trip:a:changes", "to-the-new-reader")
+
+    assert again.get_message(timeout=2)["data"] == "to-the-new-reader"
+
+
 def test_a_closed_subscription_refuses_to_be_read(fanout):
     subscription = fanout.subscribe("trip:a:changes")
     subscription.close()

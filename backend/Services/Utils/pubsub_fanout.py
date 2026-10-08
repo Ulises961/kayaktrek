@@ -80,24 +80,26 @@ class PubSubFanout:
         self._lock = threading.Lock()
         self._viewers: dict[str, set[Subscription]] = {}
         self._pubsub: Optional[Any] = None
-        # Counts connections taken, so a reader can tell whether the one it was started for
-        # is still the current one without comparing connection objects.
+        # Counts connections taken. A reader belongs to one connection, and tells whether it is
+        # still current by comparing this, not connection objects.
         self._generation = 0
-        self._reader_running = False
 
     def subscribe(self, channel: str) -> Subscription:
         subscription = Subscription(self, channel, self._max_pending)
         with self._lock:
             if self._pubsub is None:
+                # A new connection gets a reader of its own, unconditionally. The previous
+                # connection's reader may still be inside a read of a socket that was just
+                # closed; it exits on seeing the generation changed, so reusing it — or
+                # skipping this because it "is still running" — would leave this connection
+                # subscribed and unread.
                 self._pubsub = self._redis_factory().pubsub()
                 self._generation += 1
+                threading.Thread(target=self._read, args=(self._generation,), daemon=True).start()
             viewers = self._viewers.setdefault(channel, set())
             if not viewers:
                 self._pubsub.subscribe(channel)
             viewers.add(subscription)
-            if not self._reader_running:
-                self._reader_running = True
-                threading.Thread(target=self._read, args=(self._generation,), daemon=True).start()
         return subscription
 
     def release(self, subscription: Subscription) -> None:
@@ -127,10 +129,6 @@ class PubSubFanout:
             with self._lock:
                 pubsub = self._pubsub
                 if self._generation != generation or pubsub is None or not self._viewers:
-                    # Only the reader of the current connection clears the flag; one that
-                    # was retired with its connection must not stop its successor.
-                    if self._generation == generation:
-                        self._reader_running = False
                     return
             try:
                 message = pubsub.get_message(ignore_subscribe_messages=True, timeout=self._poll_seconds)
