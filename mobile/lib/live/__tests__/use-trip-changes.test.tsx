@@ -27,23 +27,25 @@ describe("useTripChanges", () => {
     capturedListener = null
   })
 
-  it("subscribes for its trip and unsubscribes on unmount", () => {
-    const { unmount } = renderHook(() => useTripChanges(TRIP_ID, jest.fn()))
+  // This version of RNTL renders asynchronously: renderHook, rerender and unmount all
+  // return promises, and a sync call here leaves the effect that subscribes unrun.
+  it("subscribes for its trip and unsubscribes on unmount", async () => {
+    const { unmount } = await renderHook(() => useTripChanges(TRIP_ID, jest.fn()))
     expect(mockSubscribe).toHaveBeenCalledWith(TRIP_ID, expect.any(Function))
-    unmount()
+    await unmount()
     expect(mockUnsubscribe).toHaveBeenCalled()
   })
 
-  it("calls back on any change when no tables are given", () => {
+  it("calls back on any change when no tables are given", async () => {
     const onChange = jest.fn()
-    renderHook(() => useTripChanges(TRIP_ID, onChange))
+    await renderHook(() => useTripChanges(TRIP_ID, onChange))
     capturedListener?.([change("trip_member")])
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it("calls back only for the tables it was asked about", () => {
+  it("calls back only for the tables it was asked about", async () => {
     const onChange = jest.fn()
-    renderHook(() => useTripChanges(TRIP_ID, onChange, { tables: ["point", "day"] }))
+    await renderHook(() => useTripChanges(TRIP_ID, onChange, { tables: ["point", "day"] }))
 
     capturedListener?.([change("trip_requirement")])
     expect(onChange).not.toHaveBeenCalled()
@@ -52,21 +54,21 @@ describe("useTripChanges", () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it("always calls back when the delta is unknown, whatever tables it was asked about", () => {
+  it("always calls back when the delta is unknown, whatever tables it was asked about", async () => {
     const onChange = jest.fn()
-    renderHook(() => useTripChanges(TRIP_ID, onChange, { tables: ["point"] }))
+    await renderHook(() => useTripChanges(TRIP_ID, onChange, { tables: ["point"] }))
     capturedListener?.([])
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it("calls the latest callback without resubscribing", () => {
+  it("calls the latest callback without resubscribing", async () => {
     const first = jest.fn()
     const second = jest.fn()
-    const { rerender } = renderHook(
+    const { rerender } = await renderHook(
       ({ onChange }: { onChange: () => void }) => useTripChanges(TRIP_ID, onChange),
       { initialProps: { onChange: first } },
     )
-    rerender({ onChange: second })
+    await rerender({ onChange: second })
     capturedListener?.([change("point")])
 
     expect(first).not.toHaveBeenCalled()
@@ -74,8 +76,8 @@ describe("useTripChanges", () => {
     expect(mockSubscribe).toHaveBeenCalledTimes(1)
   })
 
-  it("does nothing without a trip id", () => {
-    renderHook(() => useTripChanges(undefined, jest.fn()))
+  it("does nothing without a trip id", async () => {
+    await renderHook(() => useTripChanges(undefined, jest.fn()))
     expect(mockSubscribe).not.toHaveBeenCalled()
   })
 })
