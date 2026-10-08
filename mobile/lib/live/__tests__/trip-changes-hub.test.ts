@@ -117,6 +117,35 @@ describe("createTripChangesHub", () => {
     expect(first).toHaveBeenCalledWith([POINT_CHANGE])
   })
 
+  it("treats a skipped revision as 'something changed, I do not know what'", async () => {
+    // Revision 8 never arrived (Redis blipped, or a message was dropped). Telling listeners
+    // only about 9's tables would let a screen that filters by table trust a delta that is
+    // missing a change; an empty delta makes every listener reload.
+    const { hub, connections } = harness()
+    const listener = jest.fn()
+    hub.subscribe(TRIP_ID, listener)
+    await flush()
+
+    connections[0].emit(hello(7))
+    connections[0].emit(change(9))
+    await flush()
+
+    expect(listener).toHaveBeenCalledWith([])
+  })
+
+  it("keeps the delta when revisions arrive in order", async () => {
+    const { hub, connections } = harness()
+    const listener = jest.fn()
+    hub.subscribe(TRIP_ID, listener)
+    await flush()
+
+    connections[0].emit(hello(7))
+    connections[0].emit(change(8))
+    await flush()
+
+    expect(listener).toHaveBeenCalledWith([POINT_CHANGE])
+  })
+
   it("ignores a change at or below the last revision seen", async () => {
     const { hub, connections, deps } = harness()
     hub.subscribe(TRIP_ID, jest.fn())

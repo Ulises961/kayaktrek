@@ -31,6 +31,10 @@ type TripStream = {
   refreshing: boolean
   dirty: boolean
   pendingChanges: TripChange[]
+  // Something changed that the pending list cannot describe: a revision that never
+  // arrived, or a reconnect that found the trip had moved on. Listeners are then told
+  // with an empty delta, which every listener treats as "reload everything".
+  unknownDelta: boolean
 }
 
 const BASE_BACKOFF_MS = 1000
@@ -48,8 +52,10 @@ export function createTripChangesHub(deps: TripChangesHubDeps) {
   const streams = new Map<string, TripStream>()
   let streamingEnabled = true
 
-  async function announce(tripId: string, stream: TripStream, changes: TripChange[]) {
-    stream.pendingChanges.push(...changes)
+  // `null` when what changed is not known — see `TripStream.unknownDelta`.
+  async function announce(tripId: string, stream: TripStream, changes: TripChange[] | null) {
+    if (changes === null) stream.unknownDelta = true
+    else stream.pendingChanges.push(...changes)
     stream.dirty = true
     if (stream.refreshing) return
 
@@ -57,8 +63,9 @@ export function createTripChangesHub(deps: TripChangesHubDeps) {
     try {
       while (stream.dirty) {
         stream.dirty = false
-        const batch = stream.pendingChanges
+        const batch = stream.unknownDelta ? [] : stream.pendingChanges
         stream.pendingChanges = []
+        stream.unknownDelta = false
         await deps.refreshCaches(tripId).catch(() => undefined)
         for (const listener of [...stream.listeners]) listener(batch)
       }
@@ -88,13 +95,18 @@ export function createTripChangesHub(deps: TripChangesHubDeps) {
         const missed = stream.lastRevision !== null && hello.data.rev !== stream.lastRevision
         stream.lastRevision = hello.data.rev
         backoffMs = BASE_BACKOFF_MS
-        if (missed) void announce(tripId, stream, [])
+        if (missed) void announce(tripId, stream, null)
       } else if (event.event === "change") {
         const message = TripChangeMessageSchema.safeParse(parseJson(event.data))
         if (!message.success) return
-        if (stream.lastRevision !== null && message.data.rev <= stream.lastRevision) return
+        const previous = stream.lastRevision
+        if (previous !== null && message.data.rev <= previous) return
         stream.lastRevision = message.data.rev
-        void announce(tripId, stream, message.data.changes)
+        // Revisions count commits, one each. A jump means a message was lost on the way
+        // (Redis blipped; this connection was cut loose and came back), so the changes
+        // this one lists are not all of them.
+        const skipped = previous !== null && message.data.rev > previous + 1
+        void announce(tripId, stream, skipped ? null : message.data.changes)
       } else if (event.event === "end") {
         // Membership lost or trip gone: reconnecting would only be refused.
         stream.ended = true
@@ -143,6 +155,7 @@ export function createTripChangesHub(deps: TripChangesHubDeps) {
           refreshing: false,
           dirty: false,
           pendingChanges: [],
+          unknownDelta: false,
         }
         streams.set(tripId, stream)
       }
