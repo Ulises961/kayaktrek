@@ -5,6 +5,7 @@ from uuid import uuid4
 from Resources.live_resource import LIVE_ENDPOINT
 from Services.live_stream_service import LiveStreamService
 from Services.trip_change_service import trip_changes_channel, trip_revision_key
+from Services.Utils.pubsub_fanout import SubscriptionClosed
 
 
 class _FakePubSub:
@@ -88,19 +89,119 @@ def test_stream_sends_hello_with_current_revision_then_relays_changes(app, trip_
     assert events[2] == f"event: change\ndata: {payload}\n\n"
 
 
-def test_stream_subscribes_to_the_trips_changes_channel(app, trip_with_user2_as_crew):
+class _FakeSubscription:
+    """What PubSubFanout.subscribe returns: the same get_message a PubSub has, plus close."""
+
+    def __init__(self, messages):
+        self._messages = list(messages)
+        self.closed = False
+
+    def get_message(self, timeout=None):
+        if not self._messages:
+            return None
+        message = self._messages.pop(0)
+        if isinstance(message, Exception):
+            raise message
+        return message
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeFanout:
+    def __init__(self, subscription):
+        self.subscription = subscription
+        self.channels = []
+
+    def subscribe(self, channel):
+        self.channels.append(channel)
+        return self.subscription
+
+
+def test_stream_takes_its_subscription_from_the_shared_fanout_and_gives_it_back(app, trip_with_user2_as_crew):
+    """No `pubsub()` per viewer: that is one Redis connection each, held for as long as
+    the viewer stays, which is what capped the sidecar."""
     trip_id = trip_with_user2_as_crew["trip"]["id"]
+    fanout = _FakeFanout(_FakeSubscription([]))
     with app.app_context():
-        pubsub = _FakePubSub([])
-        redis_client = _FakeRedis(pubsub=pubsub)
         list(
             LiveStreamService.stream_trip_changes(
-                trip_id, trip_with_user2_as_crew["crew_id"], redis_client=redis_client, max_ticks=0
+                trip_id,
+                trip_with_user2_as_crew["crew_id"],
+                fanout=fanout,
+                redis_client=_FakeRedis(),
+                max_ticks=0,
             )
         )
 
-    assert pubsub.subscribed_to == [trip_changes_channel(trip_id)]
-    assert pubsub.unsubscribed and pubsub.closed
+    assert fanout.channels == [trip_changes_channel(trip_id)]
+    assert fanout.subscription.closed is True
+
+
+def test_stream_ends_without_an_end_event_when_the_viewer_is_cut_loose(app, trip_with_user2_as_crew):
+    """`end` means membership was lost and the client must not reconnect. A viewer cut
+    loose for not reading should reconnect — the new `hello` tells it to refetch."""
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    fanout = _FakeFanout(_FakeSubscription([SubscriptionClosed()]))
+    with app.app_context():
+        events = list(
+            LiveStreamService.stream_trip_changes(
+                trip_id,
+                trip_with_user2_as_crew["crew_id"],
+                fanout=fanout,
+                redis_client=_FakeRedis(),
+                max_ticks=5,
+            )
+        )
+
+    assert "event: end\ndata: {}\n\n" not in events
+    assert events[-1].startswith("event: hello")
+    assert fanout.subscription.closed is True
+
+
+def test_changes_stream_is_refused_with_a_retry_after_when_the_sidecar_is_full(
+    client, trip_with_user2_as_crew, monkeypatch
+):
+    """A clean 503 the client backs off from, rather than a connection the worker can no
+    longer accept and that hangs until it times out."""
+    monkeypatch.setattr(LiveStreamService, "changes_streams_at_capacity", staticmethod(lambda: True))
+
+    response = client.get(
+        f"{LIVE_ENDPOINT}/trip/{trip_with_user2_as_crew['trip']['id']}/changes",
+        headers=trip_with_user2_as_crew["crew_headers"],
+    )
+
+    assert response.status_code == 503
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_a_non_member_is_told_404_not_503_even_when_the_sidecar_is_full(
+    client, outsider_headers, trip_with_user2_as_crew, monkeypatch
+):
+    """Capacity must not become a way to learn which trips exist."""
+    monkeypatch.setattr(LiveStreamService, "changes_streams_at_capacity", staticmethod(lambda: True))
+
+    response = client.get(
+        f"{LIVE_ENDPOINT}/trip/{trip_with_user2_as_crew['trip']['id']}/changes", headers=outsider_headers
+    )
+
+    assert response.status_code == 404
+
+
+def test_capacity_is_reached_at_the_configured_number_of_streams(app, monkeypatch):
+    class _Fanout:
+        def __init__(self, count):
+            self._count = count
+
+        def active_subscriptions(self):
+            return self._count
+
+    monkeypatch.setenv("TRIP_CHANGES_MAX_STREAMS", "3")
+    with app.app_context():
+        monkeypatch.setattr("Services.live_stream_service.trip_changes_fanout", lambda: _Fanout(2))
+        assert LiveStreamService.changes_streams_at_capacity() is False
+        monkeypatch.setattr("Services.live_stream_service.trip_changes_fanout", lambda: _Fanout(3))
+        assert LiveStreamService.changes_streams_at_capacity() is True
 
 
 def test_stream_with_no_revision_yet_says_zero(app, trip_with_user2_as_crew):

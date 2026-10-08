@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any, Callable, Iterator, Optional
 from uuid import UUID
 
@@ -15,12 +17,23 @@ from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember
 from Services.live_position_service import LivePositionService, live_channel
 from Services.trip_change_service import trip_changes_channel, trip_revision_key
+from Services.Utils.pubsub_fanout import PubSubFanout, SubscriptionClosed
 
 logger = logging.getLogger(__name__)
 
 STREAM_TICKET_PURPOSE = "live-stream"
 CHANGES_TICKET_PURPOSE = "trip-changes"
 STREAM_TICKET_TTL_MINUTES = 5
+# Provisional, until measured on the sidecar (plans/M36 risk 1): well under the worker's
+# 200 connections, leaving room for position streams and ordinary requests.
+DEFAULT_TRIP_CHANGES_MAX_STREAMS = 120
+
+
+@lru_cache(maxsize=1)
+def trip_changes_fanout() -> PubSubFanout:
+    """The process's single Redis subscription for change streams. One per process because
+    each gunicorn worker is its own process with its own connection to share."""
+    return PubSubFanout(live_redis)
 
 
 class LiveStreamService:
@@ -76,6 +89,7 @@ class LiveStreamService:
         user_id: str,
         *,
         pubsub: Optional[Any] = None,
+        fanout: Optional[Any] = None,
         redis_client: Optional[Any] = None,
         heartbeat_seconds: int = 15,
         membership_check_seconds: int = 60,
@@ -91,20 +105,26 @@ class LiveStreamService:
 
         Unlike `stream_events` this does not end when the trip leaves `happening`
         (collaboration is mostly before and after), and it re-checks membership on a slow
-        timer so a removed crew member's open stream closes. `pubsub`, `redis_client`,
-        `max_ticks` and `monotonic` are injectable for the same reason as in
-        `stream_events`: Flask's test client cannot consume an infinite stream.
+        timer so a removed crew member's open stream closes.
+
+        The subscription comes from the process-wide fan-out, not a `pubsub()` of its own:
+        one Redis connection serves every viewer in the process. A viewer the fan-out cuts
+        loose for not reading ends the stream *without* an `end` event — `end` tells the
+        client not to come back, and this one should, so that `hello`'s revision sends it
+        to refetch. `pubsub`, `fanout`, `redis_client`, `max_ticks` and `monotonic` are
+        injectable for the same reason as in `stream_events`: Flask's test client cannot
+        consume an infinite stream.
         """
         tick_count = 0
         change_events = 0
         with logfire.span("sse_connection", trip_id=trip_id, stream="trip_changes") as span:
             yield "retry: 5000\n\n"
 
-            owns_pubsub = pubsub is None
+            owns_subscription = pubsub is None
             client = redis_client if redis_client is not None else live_redis()
-            if owns_pubsub:
-                pubsub = client.pubsub()
-                pubsub.subscribe(trip_changes_channel(trip_id))
+            if owns_subscription:
+                shared_fanout = fanout if fanout is not None else trip_changes_fanout()
+                pubsub = shared_fanout.subscribe(trip_changes_channel(trip_id))
             assert pubsub is not None
 
             try:
@@ -122,7 +142,10 @@ class LiveStreamService:
 
                     tick += 1
                     tick_count = tick
-                    message = pubsub.get_message(timeout=heartbeat_seconds)
+                    try:
+                        message = pubsub.get_message(timeout=heartbeat_seconds)
+                    except SubscriptionClosed:
+                        return
                     if message is not None and message.get("type") == "message":
                         change_events += 1
                         yield f"event: change\ndata: {message['data']}\n\n"
@@ -131,9 +154,21 @@ class LiveStreamService:
             finally:
                 span.set_attribute("tick_count", tick_count)
                 span.set_attribute("change_events", change_events)
-                if owns_pubsub:
-                    pubsub.unsubscribe(trip_changes_channel(trip_id))
+                if owns_subscription:
                     pubsub.close()
+
+    @staticmethod
+    def changes_streams_at_capacity() -> bool:
+        """Whether the sidecar should turn another changes stream away.
+
+        The sidecar is one gevent worker with a fixed number of connections shared by every
+        stream it serves, positions included, and a changes stream is open for as long as
+        someone has a trip page up. Refusing cleanly at a limit we chose keeps the
+        position streams — the ones a paddler's safety can depend on — from being crowded
+        out by tabs left open on a desk.
+        """
+        limit = int(os.getenv("TRIP_CHANGES_MAX_STREAMS", str(DEFAULT_TRIP_CHANGES_MAX_STREAMS)))
+        return trip_changes_fanout().active_subscriptions() >= limit
 
     @staticmethod
     def _is_trip_member(trip_id: str, user_id: str) -> bool:

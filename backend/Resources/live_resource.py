@@ -29,6 +29,10 @@ live_api = Blueprint("live", __name__, url_prefix=LIVE_ENDPOINT)
 
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
+# What a client turned away from a full sidecar is told to wait. Longer than the stream's own
+# 5s reconnect: a sidecar at its limit is not helped by everyone retrying every few seconds.
+_CHANGES_RETRY_AFTER_SECONDS = "30"
+
 # Per-IP, since a stream can arrive with no resolved user yet (the ticket path).
 # Configurable because two browser contexts sharing one dev/CI machine's IP hit this
 # limit within a normal test run and then pay ~90s of client-side backoff
@@ -366,6 +370,12 @@ def trip_changes_stream(id: str):
 
     if user_id is None or not _check_trip_ownership(user_id, id):
         return Response(status=HTTPStatus.NOT_FOUND)
+
+    # After authorisation, so a stranger learns nothing about capacity or about which
+    # trips exist; before the stream, so a full sidecar answers with something the client
+    # can back off from instead of a connection the worker can no longer accept.
+    if LiveStreamService.changes_streams_at_capacity():
+        return Response(status=HTTPStatus.SERVICE_UNAVAILABLE, headers={"Retry-After": _CHANGES_RETRY_AFTER_SECONDS})
 
     return Response(
         stream_with_context(LiveStreamService.stream_trip_changes(id, user_id)),
