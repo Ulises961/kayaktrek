@@ -41,6 +41,13 @@ _CHANGES_RETRY_AFTER_SECONDS = "30"
 # one NAT/WiFi IP hit it too. Production keeps the conservative default.
 _LIVE_STREAM_RATE_LIMIT = os.getenv("LIVE_STREAM_RATE_LIMIT", "10 per minute")
 
+# The changes stream has its own, looser limit. The one above was sized for position
+# streams, which only exist while a trip is happening; this one opens for every trip page a
+# crew member has up, and reconnects every time a phone's signal blips. Sharing the tight
+# limit would have a campsite's worth of paddlers on one WiFi IP locking each other out of
+# live sync — the case the comment above already names.
+_CHANGES_STREAM_RATE_LIMIT = os.getenv("TRIP_CHANGES_STREAM_RATE_LIMIT", "60 per minute")
+
 
 @live_api.after_request
 def _add_cors_headers(response):
@@ -336,7 +343,7 @@ def post_changes_ticket(id: str):
 
 
 @live_api.route("/trip/<string:id>/changes", methods=["GET"])
-@limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
+@limiter.limit(_CHANGES_STREAM_RATE_LIMIT, key_func=get_remote_address)
 def trip_changes_stream(id: str):
     """Crew-only stream of trip change notifications, in any trip state. Accepts a normal
     access token or a `?ticket=` from POST .../changes-ticket, checked in that order.
