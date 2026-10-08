@@ -801,6 +801,22 @@ export default function TripMapScreen() {
             )}
           </MapLibreMap>
 
+          {/* Straight after the map, before everything else drawn over it: a later sibling
+            paints on top, and the particles fill the whole screen, so anything placed before
+            this (the new-point tooltip, the "Point moved" snackbar) sat behind them. */}
+          <MapVelocityOverlay
+            day={selectedDay}
+            dayPositions={selectedDayPositions}
+            windOn={windOn}
+            swellOn={swellOn}
+            onWindToggle={handleWindToggle}
+            onSwellToggle={handleSwellToggle}
+            hour={overlayHour}
+            viewRef={mapViewRef}
+            size={mapSize}
+            offline={isOffline}
+          />
+
           {draftPoint && draftScreenPoint && (
             // A plain RN overlay, not a map annotation — see draftScreenPoint's
             // own comment (state declarations, above) for why: MapLibre's
@@ -865,19 +881,6 @@ export default function TripMapScreen() {
               />
             </View>
           )}
-
-          <MapVelocityOverlay
-            day={selectedDay}
-            dayPositions={selectedDayPositions}
-            windOn={windOn}
-            swellOn={swellOn}
-            onWindToggle={handleWindToggle}
-            onSwellToggle={handleSwellToggle}
-            hour={overlayHour}
-            viewRef={mapViewRef}
-            size={mapSize}
-            offline={isOffline}
-          />
 
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
