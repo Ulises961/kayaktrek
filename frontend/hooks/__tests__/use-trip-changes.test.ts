@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { useTripChanges } from "../use-trip-changes"
 import { TRIP_CHANGE_OPERATION } from "@/lib/dtos/trip-change"
@@ -42,13 +42,19 @@ function change(overrides: Partial<{ t: string; id: string; op: string }> = {}) 
   return { t: "point", id: "p1", op: TRIP_CHANGE_OPERATION.UPDATE, ...overrides }
 }
 
-function setup(mintUrl = vi.fn().mockResolvedValue("http://sse/changes?ticket=a")) {
+type MintUrl = Mock<() => Promise<string | null>>
+
+function setup(
+  mintUrl: MintUrl = vi
+    .fn<() => Promise<string | null>>()
+    .mockResolvedValue("http://sse/changes?ticket=a"),
+) {
   const onChange = vi.fn()
   const hook = renderHook(() => useTripChanges(TRIP_ID, { mintUrl, onChange }))
   return { ...hook, mintUrl, onChange }
 }
 
-async function connected(mintUrl?: ReturnType<typeof vi.fn>) {
+async function connected(mintUrl?: MintUrl) {
   const rendered = setup(mintUrl)
   await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
   return { ...rendered, source: FakeEventSource.instances[0] }

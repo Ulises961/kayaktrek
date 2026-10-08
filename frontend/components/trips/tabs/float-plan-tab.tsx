@@ -80,11 +80,28 @@ function EmergencyReadOnly({ member }: { member: TripMember }) {
   )
 }
 
+function floatPlanFormValues(member: TripMember): FloatPlanFormValues {
+  return {
+    vesselMake: member.vesselMake ?? "",
+    vesselModel: member.vesselModel ?? "",
+    vesselLengthCm: member.vesselLengthCm != null ? String(member.vesselLengthCm) : "",
+    vesselColorPrimary: member.vesselColorPrimary ?? "",
+    vesselColorSecondary: member.vesselColorSecondary ?? "",
+    emergencyContactName: member.emergencyContactName ?? "",
+    emergencyContactPhone: member.emergencyContactPhone ?? "",
+    emergencyContactRelationship: member.emergencyContactRelationship ?? "",
+  }
+}
+
 export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: FloatPlanTabProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [isConfirmed, setIsConfirmed] = useState(!!currentMember.floatPlanConfirmedAt)
+  // Confirmed from this tab, or already confirmed on the server — the second is how a
+  // confirmation made on the user's other device arrives (M36), so it must not be frozen
+  // at the value the page loaded with.
+  const [confirmedHere, setConfirmedHere] = useState(false)
+  const isConfirmed = confirmedHere || !!currentMember.floatPlanConfirmedAt
 
   const {
     register,
@@ -93,21 +110,15 @@ export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: Flo
     formState: { errors },
   } = useForm<FloatPlanFormValues>({
     resolver: zodResolver(FloatPlanFormSchema),
-    defaultValues: {
-      vesselMake: currentMember.vesselMake ?? "",
-      vesselModel: currentMember.vesselModel ?? "",
-      vesselLengthCm:
-        currentMember.vesselLengthCm != null ? String(currentMember.vesselLengthCm) : "",
-      vesselColorPrimary: currentMember.vesselColorPrimary ?? "",
-      vesselColorSecondary: currentMember.vesselColorSecondary ?? "",
-      emergencyContactName: currentMember.emergencyContactName ?? "",
-      emergencyContactPhone: currentMember.emergencyContactPhone ?? "",
-      emergencyContactRelationship: currentMember.emergencyContactRelationship ?? "",
-    },
+    defaultValues: floatPlanFormValues(currentMember),
   })
 
   function handleEdit() {
     setError(null)
+    // The form's defaults were taken when the page loaded. If the same member changed
+    // their float plan on another device since, opening the form on those would silently
+    // save over the newer values — start from what the server has now.
+    reset(floatPlanFormValues(currentMember))
     setIsEditing(true)
   }
 
@@ -125,7 +136,7 @@ export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: Flo
         setError(result.error)
         return
       }
-      setIsConfirmed(true)
+      setConfirmedHere(true)
       setIsEditing(false)
     })
   }

@@ -17,6 +17,15 @@ interface EditLogisticsDialogProps {
   logistics: Logistics | null
 }
 
+function shoreContactValues(logistics: Logistics | null): LogisticsFields {
+  return {
+    shoreContactName: logistics?.shoreContactName ?? "",
+    shoreContactEmail: logistics?.shoreContactEmail ?? "",
+    shoreContactPhone: logistics?.shoreContactPhone ?? "",
+    shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
+  }
+}
+
 export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialogProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -24,17 +33,22 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
   const {
     register,
     handleSubmit,
+    reset,
     setError,
     formState: { errors },
   } = useForm<LogisticsFields>({
     resolver: zodResolver(LogisticsFieldsSchema),
-    defaultValues: {
-      shoreContactName: logistics?.shoreContactName ?? "",
-      shoreContactEmail: logistics?.shoreContactEmail ?? "",
-      shoreContactPhone: logistics?.shoreContactPhone ?? "",
-      shoreContactRelationship: logistics?.shoreContactRelationship ?? "",
-    },
+    defaultValues: shoreContactValues(logistics),
   })
+
+  // The form lives outside the dialog, so it outlasts the page's data: if someone else
+  // changed the contact since the page loaded (M36), opening on the load-time values and
+  // saving would put the old contact back — and this is who gets the missed-checkpoint
+  // alert. Start from what the server has now each time it opens.
+  function handleOpenChange(next: boolean) {
+    if (next) reset(shoreContactValues(logistics))
+    setOpen(next)
+  }
 
   const onSubmit = handleSubmit((data) => {
     startTransition(async () => {
@@ -48,7 +62,7 @@ export function EditShoreContactDialog({ tripId, logistics }: EditLogisticsDialo
   })
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="w-full sm:w-auto">
           <PencilIcon className="size-3.5" />

@@ -45,6 +45,24 @@ describe("EditLogisticsDialog", () => {
     expect((input as HTMLInputElement).value).toBe("Maria García")
   })
 
+  it("opens on the shore contact the server has now, not the one the page loaded with (M36)", async () => {
+    // Someone else changed the contact after this page rendered. Saving from the
+    // load-time values would put the old contact back — the person who receives the
+    // missed-checkpoint alert.
+    const { rerender } = render(<EditShoreContactDialog tripId={TRIP_ID} logistics={LOGISTICS} />)
+    rerender(
+      <EditShoreContactDialog
+        tripId={TRIP_ID}
+        logistics={{ ...LOGISTICS, shoreContactName: "Joan Serra" }}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: /edit contact/i }))
+
+    const input = screen.getByPlaceholderText(/shore contact name/i)
+    expect((input as HTMLInputElement).value).toBe("Joan Serra")
+  })
+
   it("uses empty strings when logistics is null", async () => {
     await openDialog(null)
     const input = screen.getByPlaceholderText(/shore contact name/i)

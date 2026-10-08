@@ -7,6 +7,7 @@ import { useCollapseSidebar } from "@/hooks/use-collapse-sidebar"
 import { useContentLayout } from "@/hooks/use-content-layout"
 import { usePositionWatch } from "@/hooks/use-position-watch"
 import { useLivePositions } from "@/hooks/use-live-positions"
+import { useServerItinerarySync } from "@/hooks/use-server-itinerary-sync"
 import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
 import { NavigateConsentDialog } from "./navigate-consent-dialog"
@@ -38,6 +39,8 @@ import { PointDetailSheet } from "./point-detail-sheet"
 const MapCore = dynamic(() => import("./map-core"), {
   ssr: false,
 }) as React.ComponentType<MapCoreProps>
+
+const SERVER_MOVED_TOAST_ID = "route-changed-by-someone-else"
 
 type MapBuilderProps = {
   itinerary: Itinerary
@@ -179,6 +182,45 @@ export function MapBuilder({
   )
 
   const isSaving = state.savingCount > 0
+
+  // ── Other people's edits (M36) ───────────────────────────────────────────
+  // The reducer above is seeded from `itinerary` once, so a `router.refresh()` that
+  // brings someone else's change changes nothing on screen unless it is applied here.
+  const applyServerItinerary = useCallback((next: Itinerary) => {
+    const days = next.days ?? []
+    dispatch({
+      type: "STATE_REPLACE",
+      state: initialMapState(
+        days.flatMap((d) => d.points ?? []),
+        days.filter((d) => d.dayNumber > 0),
+      ),
+    })
+    setDay0(days.find((d) => d.dayNumber === 0) ?? null)
+  }, [])
+  const discardLocalEdit = useCallback(() => {
+    setDraft(null)
+    setRemovedRealDayIds([])
+  }, [])
+  const { serverMovedWhileEditing, takeServerVersion } = useServerItinerarySync({
+    itinerary,
+    isEditing: draft !== null || state.pendingPointId !== null || removedRealDayIds.length > 0,
+    isSaving,
+    apply: applyServerItinerary,
+    discardLocalEdit,
+  })
+  useEffect(() => {
+    if (!serverMovedWhileEditing) {
+      toast.dismiss(SERVER_MOVED_TOAST_ID)
+      return
+    }
+    // Persistent and non-blocking, like the route-conflict banner on mobile: the user
+    // keeps what they are doing and chooses when to look.
+    toast.info("Someone else changed this route while you were editing.", {
+      id: SERVER_MOVED_TOAST_ID,
+      duration: Infinity,
+      action: { label: "Load their version", onClick: takeServerVersion },
+    })
+  }, [serverMovedWhileEditing, takeServerVersion])
 
   const orderedPoints = useMemo(
     () =>
