@@ -209,17 +209,19 @@ export function MapBuilder({
     discardLocalEdit,
   })
   useEffect(() => {
-    if (!serverMovedWhileEditing) {
-      toast.dismiss(SERVER_MOVED_TOAST_ID)
-      return
-    }
+    if (!serverMovedWhileEditing) return
     // Persistent and non-blocking, like the route-conflict banner on mobile: the user
-    // keeps what they are doing and chooses when to look.
+    // keeps what they are doing and chooses when to look. Dismissed by this effect's own
+    // cleanup, so it goes away when the change is applied, reverts, or the page unmounts —
+    // and a page that never showed it never touches the toaster.
     toast.info("Someone else changed this route while you were editing.", {
       id: SERVER_MOVED_TOAST_ID,
       duration: Infinity,
       action: { label: "Load their version", onClick: takeServerVersion },
     })
+    return () => {
+      toast.dismiss(SERVER_MOVED_TOAST_ID)
+    }
   }, [serverMovedWhileEditing, takeServerVersion])
 
   const orderedPoints = useMemo(

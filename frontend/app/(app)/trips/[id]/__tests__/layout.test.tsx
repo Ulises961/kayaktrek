@@ -16,6 +16,11 @@ vi.mock("@/components/trips/trip-detail-nav", () => ({
     <div data-testid="nav" data-live-href={liveHref ?? ""} />
   ),
 }))
+vi.mock("@/components/trips/trip-changes-listener", () => ({
+  TripChangesListener: ({ tripId }: { tripId: string }) => (
+    <div data-testid="changes-listener" data-trip-id={tripId} />
+  ),
+}))
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND")
@@ -49,6 +54,30 @@ describe("TripDetailLayout", () => {
     await expect(
       TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }),
     ).rejects.toThrow("NEXT_NOT_FOUND")
+  })
+})
+
+describe("TripDetailLayout — live sync (M36)", () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it("listens for other people's changes to the trip, for a member", async () => {
+    getTripCore.mockResolvedValue(trip({ state: "building" }))
+    getSession.mockResolvedValue({ userId: USER_ID })
+
+    render(await TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }))
+
+    expect(screen.getByTestId("changes-listener")).toHaveAttribute("data-trip-id", TRIP_ID)
+  })
+
+  it("does not open a stream for someone who is not a member", async () => {
+    // The stream would refuse them anyway; not opening it spares the sidecar a connection
+    // and the page a ticket mint that can only 403.
+    getTripCore.mockResolvedValue(trip({ state: "building" }))
+    getSession.mockResolvedValue({ userId: "someone-else" })
+
+    render(await TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }))
+
+    expect(screen.queryByTestId("changes-listener")).toBeNull()
   })
 })
 
