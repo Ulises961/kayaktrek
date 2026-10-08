@@ -276,12 +276,19 @@ export default function PaddlersScreen() {
 
       {tab === "buddies" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={connectionsOffline} cachedAt={connectionsCache.cachedAt}>
+          <OfflineNotice
+            visible={connectionsOffline}
+            cachedAt={connectionsCache.cachedAt}
+            onRetry={() => void connectionsCache.reload()}
+          >
             Buddies: accepting and removing need a connection.
           </OfflineNotice>
           {/* Nothing ever synced and no connection: expected at sea, so the
               banner says it rather than a red network error. */}
-          <NeedsConnectionNotice visible={isOfflineError(connectionsError)}>
+          <NeedsConnectionNotice
+            visible={isOfflineError(connectionsError)}
+            onRetry={() => void connectionsCache.reload()}
+          >
             Buddies need a connection.
           </NeedsConnectionNotice>
           {connectionsError && !isOfflineError(connectionsError) && (
@@ -310,10 +317,17 @@ export default function PaddlersScreen() {
 
       {tab === "blocked" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={blocksOffline} cachedAt={blocksCache.cachedAt}>
+          <OfflineNotice
+            visible={blocksOffline}
+            cachedAt={blocksCache.cachedAt}
+            onRetry={() => void blocksCache.reload()}
+          >
             Blocklist: unblocking needs a connection.
           </OfflineNotice>
-          <NeedsConnectionNotice visible={isOfflineError(blocksError)}>
+          <NeedsConnectionNotice
+            visible={isOfflineError(blocksError)}
+            onRetry={() => void blocksCache.reload()}
+          >
             The blocklist needs a connection.
           </NeedsConnectionNotice>
           {blocksError && !isOfflineError(blocksError) && (

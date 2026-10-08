@@ -17,6 +17,8 @@ import { SeaState } from "./SeaState"
 import { SyncCursor } from "./SyncCursor"
 import { TripMember } from "./TripMember"
 import { TripSummary } from "./TripSummary"
+import { VelocityDay } from "./VelocityDay"
+import { VelocityHour } from "./VelocityHour"
 import { Weather } from "./Weather"
 import { WeatherState } from "./WeatherState"
 
@@ -40,6 +42,8 @@ export {
   SyncCursor,
   TripMember,
   TripSummary,
+  VelocityDay,
+  VelocityHour,
   Weather,
   WeatherState,
 }
@@ -62,6 +66,8 @@ export const modelClasses = [
   TripMember,
   TripSummary,
   RequirementContribution,
+  VelocityDay,
+  VelocityHour,
   Weather,
   WeatherState,
   Sea,

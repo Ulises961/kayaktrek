@@ -5,6 +5,9 @@ import type { NextConfig } from "next"
 // for the enforcing, nonced Content-Security-Policy.
 
 const nextConfig: NextConfig = {
+  // Stops `next dev` writing its agent-rules block into CLAUDE.md/AGENTS.md when an AI coding
+  // agent starts it. frontend/CLAUDE.md is hand-maintained. Dev-server only; no build effect.
+  agentRules: false,
   // Lets a second `next build`/`next start` run (e.g. e2e/run-live-stack.sh) target its
   // own build output instead of the one your normal `pnpm dev` is using in the same
   // checkout — unset, this is exactly `.next`, the default.

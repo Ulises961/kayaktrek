@@ -4,18 +4,19 @@ import { Alert } from "react-native"
 
 import { TRIP_STATE } from "@shared/dtos/trip"
 
-import { MUTATION_STATUS, enqueueMutation, pushQueuedMutations } from "../../../lib/db/mutation-queue"
+import { MUTATION_STATUS, enqueueMutation } from "../../../lib/db/mutation-queue"
+import { requestPush } from "../../../lib/db/push-pending"
 import { QueuedChangesContext, type QueuedChanges } from "../../../lib/network/queued-changes"
 import { TripControls } from "../trip-controls"
 
 jest.mock("../../../lib/db/mutation-queue", () => ({
   ...jest.requireActual("../../../lib/db/mutation-queue"),
   enqueueMutation: jest.fn(),
-  pushQueuedMutations: jest.fn(),
 }))
+jest.mock("../../../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 
 const mockEnqueue = enqueueMutation as jest.Mock
-const mockPush = pushQueuedMutations as jest.Mock
+const mockPush = requestPush as jest.Mock
 
 const UNDER_WAY = { state: TRIP_STATE.HAPPENING, isPaused: false, dateTo: "2026-10-05" }
 
@@ -38,7 +39,6 @@ function confirm(text: string) {
 beforeEach(() => {
   jest.clearAllMocks()
   mockEnqueue.mockResolvedValue("m-1")
-  mockPush.mockResolvedValue({ applied: 1, rejected: 0, kept: 0 })
   jest.spyOn(Alert, "alert").mockImplementation(() => {})
 })
 

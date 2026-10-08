@@ -7,6 +7,56 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.2.0] - 2026-10-05
+
+### Added
+
+- **A banner photo on your profile.** Like a LinkedIn cover, it sits behind your avatar on your
+  profile page and on your public paddler page. Upload or remove it from Edit profile (images up
+  to 8 MB). It is deleted with your account.
+- **A way back from the Terms and Privacy pages.** They now have a back link that steps back to
+  where you came from, or goes home if you arrived directly.
+- **Groundwork for the mobile map's wind and swell working without signal.** The mobile sync now
+  carries each day's wind and swell flow (the area, its land mask and an hourly direction and
+  strength), computed by the same code that serves the map's wind and swell layers on the web, so
+  the two cannot disagree. The mobile app itself is not released yet, so nothing on the web
+  changes.
+
+### Changed
+
+- **The wind legend on the planner map now matches the colours it explains.** It was labelled
+  0 / 20 / 40+ m/s while the wind animation was coloured over 0–10 m/s, so a gentle breeze
+  looked like a strong one. It now reads 0 / 5 / 10+ m/s; the animation's colours are unchanged.
+
+### Fixed
+
+- **A new trip can no longer start in the past or end before it starts, and editing a trip can no
+  longer leave its end date before its start.** Both are rejected with a clear message.
+- **A place with no wave forecast says so.** For somewhere like a lake, the sea panel now says
+  there is no wave forecast instead of showing a row of dashes.
+- **Adding or removing a day now counts as a change to the route.** Previously a phone editing
+  the route offline could overwrite a day added or removed on the web without being told. The
+  mobile app is not released yet, so nothing visibly changes on the web.
+
+### Security
+
+- Updated `urllib3` (to 2.8.0) and `PyJWT` (to 2.15.1) for newly published advisories, along
+  with Next.js 16.3.6 and the web app's other dependency updates.
+
+### Deploy notes
+
+- **One additive migration**, `users.banner_url` (a nullable column). `migrate` applies it on
+  deploy; there is no forced logout and no downtime. Rolling back restores the code but not the
+  schema, which is harmless here since the old code ignores the column.
+- **The backend and SSE healthchecks changed**, and the image must move with the compose file.
+  They now run `busybox wget` instead of starting Python every ten seconds, and the backend image
+  installs busybox (and drops the compiler, `libpq-dev` and bundled package tests, over 200 MB
+  smaller). `./scripts/deploy.sh` syncs the compose file and pulls the images together, so a
+  normal deploy needs nothing extra. **Rolling back to an older image tag also needs the older
+  compose file**, or the healthchecks fail against an image with no busybox and the containers
+  report unhealthy.
+- No new environment variables.
+
 ## [1.1.0] - 2026-09-26
 
 ### Added

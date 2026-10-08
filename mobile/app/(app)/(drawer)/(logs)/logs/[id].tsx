@@ -124,7 +124,7 @@ export default function LogDetailScreen() {
     return (
       <Screen edges={["bottom"]}>
         {header}
-        <OfflineNotice cachedAt={cachedAt}>
+        <OfflineNotice cachedAt={cachedAt} onRetry={() => void load()}>
           Changes are saved here and sent when you have signal. Notes and endorsements need a
           connection to show.
         </OfflineNotice>
@@ -168,7 +168,7 @@ export default function LogDetailScreen() {
     return (
       <Screen edges={["bottom"]} className="gap-4 p-4">
         {header}
-        <OfflineNotice cachedAt={cachedAt}>
+        <OfflineNotice cachedAt={cachedAt} onRetry={() => void load()}>
           Notes, endorsements, and editing need a connection.
         </OfflineNotice>
         <Text className="text-lg font-semibold">{cachedLog.date}</Text>

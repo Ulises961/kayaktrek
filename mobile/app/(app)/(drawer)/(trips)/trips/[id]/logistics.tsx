@@ -236,7 +236,9 @@ export default function LogisticsScreen() {
   // the raw network error stays out of the screen.
   const needsConnection = isOfflineError(error)
   const notice = (
-    <NeedsConnectionNotice visible={needsConnection}>Logistics needs a connection.</NeedsConnectionNotice>
+    <NeedsConnectionNotice visible={needsConnection} onRetry={() => void load()}>
+      Logistics needs a connection.
+    </NeedsConnectionNotice>
   )
 
   if ((!trip && !isShowingCache) || documents === null || vehicles === null) {
@@ -274,7 +276,7 @@ export default function LogisticsScreen() {
     <Screen edges={["bottom"]}>
       {header}
       {notice}
-      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt}>
+      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt} onRetry={() => void load()}>
         Adding and removing documents or vehicles, and joining a vehicle, need a connection.
       </OfflineNotice>
       <ScrollView contentContainerClassName="gap-5 p-4">

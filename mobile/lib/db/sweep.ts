@@ -14,8 +14,8 @@ import { CACHE_KEY, readCachedAt } from "./cache-freshness"
 import { saveGearCache } from "./gear-cache"
 import { saveKitCache } from "./kit-cache"
 import { saveLogisticsCache } from "./logistics-cache"
-import { pushQueuedMutations } from "./mutation-queue"
-import { pushRouteChanges, tripsWithRouteChanges } from "./route-edit"
+import { registerManualSync } from "../network/manual-sync"
+import { pushPending } from "./push-pending"
 import { loadOfflineTrip } from "./offline-itinerary"
 import { saveBlocksCache, saveConnectionsCache } from "./paddlers-cache"
 import { saveLogStatsCache, saveMeCache } from "./profile-cache"
@@ -50,7 +50,7 @@ const MAX_CONCURRENT_TRIPS = 2
 // Foreground, reconnect and pull-to-refresh can all fire within a moment of
 // each other. Without this, every trigger starts its own full sweep and the
 // request count multiplies by the number of triggers.
-let sweepInFlight = false
+let sweepInFlight: Promise<void> | null = null
 
 async function freshnessOf(tripId: string): Promise<string | undefined> {
   const [syncedAt, routeAt] = await Promise.all([
@@ -222,19 +222,6 @@ async function warmProfile(): Promise<void> {
   reportSettled("log stats", [stats])
 }
 
-// Routes the leader edited offline (M9d), pushed first so their pulls in this
-// same sweep are not skipped for another pass. Each on its own: one trip's route
-// failing to push — or being parked as a conflict — costs no other trip anything.
-async function pushEditedRoutes(): Promise<void> {
-  try {
-    for (const tripId of await tripsWithRouteChanges()) {
-      await pushRouteChanges(tripId).catch((reason) => reportSweepFailure(`trip ${tripId} route push`, reason))
-    }
-  } catch (reason) {
-    reportSweepFailure("route pushes", reason)
-  }
-}
-
 // The trip-list cache is the sweep's index — but only the trip list screen
 // used to fill it, so a sweep that ran first (a fresh install, cleared app
 // data, or a trip created on web since) planned against an empty or stale
@@ -256,6 +243,49 @@ async function isWithinBudget(key: string, budgetMs: number): Promise<boolean> {
   return !!cachedAt && Date.now() - Date.parse(cachedAt) < budgetMs
 }
 
+// Send what is waiting, refresh the trip list, then pull every trip that is due, in priority
+// order. `force` treats every syncable trip as due, ignoring how recently it synced: that is what
+// a paddler asking for a sync means. Returns the trips it looked at.
+async function syncTrips({ force }: { force: boolean }): Promise<SweepTrip[]> {
+  // Up before down (M9d): a pull must never overwrite a change the paddler made
+  // offline with the server's older copy. Offline, this fails and the pulls then
+  // fail too — nothing is lost, the queue stays queued.
+  await pushPending()
+  await refreshTripIndex()
+  const cached = await loadTripListCache()
+  const trips: SweepTrip[] = cached.map((trip) => ({
+    id: trip.id,
+    state: trip.state,
+    dateFrom: trip.dateFrom,
+    dateTo: trip.dateTo,
+  }))
+  const freshness = force
+    ? {}
+    : Object.fromEntries(
+        await Promise.all(trips.map(async (trip) => [trip.id, await freshnessOf(trip.id)] as const)),
+      )
+
+  const due = planSweep({ trips, freshness })
+  for (let index = 0; index < due.length; index += MAX_CONCURRENT_TRIPS) {
+    const batch = due.slice(index, index + MAX_CONCURRENT_TRIPS)
+    await Promise.all(batch.map((item) => syncOneTrip(item.tripId)))
+  }
+  return trips
+}
+
+// Runs one sync at a time. Whatever it does, a failure is reported and never thrown: reading the
+// local cache can fail too (a migration mid-flight, a device stamped at a schema version whose
+// table doesn't exist yet), and nothing is waiting on a sweep to surface it.
+function startSync(work: () => Promise<void>): Promise<void> {
+  const run = work()
+    .catch((reason) => reportSweepFailure("sweep", reason))
+    .finally(() => {
+      sweepInFlight = null
+    })
+  sweepInFlight = run
+  return run
+}
+
 /**
  * Sweep every trip that is due, in priority order.
  *
@@ -264,32 +294,10 @@ async function isWithinBudget(key: string, budgetMs: number): Promise<boolean> {
  * case rather than an exceptional one. A rejection here would surface as an
  * unhandled promise rejection, which React Native renders as a red screen.
  */
-export async function runSweep(): Promise<void> {
-  if (sweepInFlight) return
-  sweepInFlight = true
-  try {
-    // Up before down (M9d): a pull must never overwrite a change the paddler made
-    // offline with the server's older copy. Offline, this fails and the pulls then
-    // fail too — nothing is lost, the queue stays queued.
-    await pushEditedRoutes()
-    await pushQueuedMutations().catch((reason) => reportSweepFailure("queued changes", reason))
-    await refreshTripIndex()
-    const cached = await loadTripListCache()
-    const trips: SweepTrip[] = cached.map((trip) => ({
-      id: trip.id,
-      state: trip.state,
-      dateFrom: trip.dateFrom,
-      dateTo: trip.dateTo,
-    }))
-    const freshness = Object.fromEntries(
-      await Promise.all(trips.map(async (trip) => [trip.id, await freshnessOf(trip.id)] as const)),
-    )
-
-    const due = planSweep({ trips, freshness })
-    for (let index = 0; index < due.length; index += MAX_CONCURRENT_TRIPS) {
-      const batch = due.slice(index, index + MAX_CONCURRENT_TRIPS)
-      await Promise.all(batch.map((item) => syncOneTrip(item.tripId)))
-    }
+export function runSweep(): Promise<void> {
+  if (sweepInFlight) return Promise.resolve()
+  return startSync(async () => {
+    const trips = await syncTrips({ force: false })
 
     await warmAllTiles(trips.filter((trip) => isSyncable(trip.state)).map((trip) => trip.id))
 
@@ -301,12 +309,25 @@ export async function runSweep(): Promise<void> {
     await warmGearCloset().catch((reason) => reportSweepFailure("gear closet", reason))
     await warmPaddlers()
     await warmProfile()
-  } catch (reason) {
-    // Reading the local cache can fail too (a migration mid-flight, a device
-    // stamped at a schema version whose table doesn't exist yet). Same rule:
-    // nothing is waiting on this.
-    reportSweepFailure("sweep", reason)
-  } finally {
-    sweepInFlight = false
-  }
+  })
 }
+
+/**
+ * The paddler's own pull, from the offline banner's "Retry sync": every syncable trip, however
+ * recently it synced, after sending what is waiting. It stops short of map tiles, gear, buddies and
+ * the profile — slow extras a button should not make anyone wait through, which the next foreground
+ * sweep does anyway. If a sweep is already running it waits for that one rather than starting a
+ * second, so the button's spinner ends when the pull it asked for has.
+ */
+export async function syncTripsNow(): Promise<void> {
+  if (sweepInFlight) {
+    await sweepInFlight
+    return
+  }
+  await startSync(async () => {
+    await syncTrips({ force: true })
+  })
+}
+
+// The banner reaches the manual pull through this, without importing the database.
+registerManualSync(syncTripsNow)

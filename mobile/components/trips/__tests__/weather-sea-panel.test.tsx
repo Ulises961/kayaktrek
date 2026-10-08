@@ -106,4 +106,58 @@ describe("WeatherSeaPanel", () => {
     expect(await findByText("Weather refresh requires a premium plan")).toBeTruthy()
     expect(onRefresh).not.toHaveBeenCalled()
   })
+
+  // M35 WP3: the hour a paddler taps in either grid is the hour the map overlay shows.
+  describe("hour selection for the map overlay", () => {
+    const dayWithSea = dayWith({
+      sea: {
+        dayId: DAY_ID,
+        seaStates: [
+          { dayId: DAY_ID, time: "12:00:00", waveHeight: 0.8, waveDirection: 210 },
+          { dayId: DAY_ID, time: "15:00:00", waveHeight: 1.1, waveDirection: 215 },
+        ],
+      },
+    })
+
+    it("reports the hour tapped in the wind grid", async () => {
+      const onHourChange = jest.fn()
+      const { getAllByLabelText } = await render(
+        <WeatherSeaPanel day={dayWithSea} onHourChange={onHourChange} />,
+      )
+
+      // The wind grid is first; the sea grid has the same 12:00 card after it.
+      await fireEvent.press(getAllByLabelText("Show 12:00 on the map")[0])
+
+      expect(onHourChange).toHaveBeenCalledWith(12)
+    })
+
+    it("reports the hour tapped in the sea grid", async () => {
+      const onHourChange = jest.fn()
+      const { getByLabelText } = await render(
+        <WeatherSeaPanel day={dayWithSea} onHourChange={onHourChange} />,
+      )
+
+      await fireEvent.press(getByLabelText("Show 15:00 on the map"))
+
+      expect(onHourChange).toHaveBeenCalledWith(15)
+    })
+
+    it("marks the selected hour in both grids", async () => {
+      const { getAllByLabelText } = await render(
+        <WeatherSeaPanel day={dayWithSea} selectedHour={12} onHourChange={jest.fn()} />,
+      )
+
+      const twelve = getAllByLabelText("Show 12:00 on the map")
+      expect(twelve).toHaveLength(2)
+      for (const card of twelve) {
+        expect(card.props.accessibilityState).toMatchObject({ selected: true })
+      }
+    })
+
+    it("leaves the grids as plain display when nothing is listening", async () => {
+      const { queryByLabelText } = await render(<WeatherSeaPanel day={dayWithSea} />)
+
+      expect(queryByLabelText("Show 12:00 on the map")).toBeNull()
+    })
+  })
 })

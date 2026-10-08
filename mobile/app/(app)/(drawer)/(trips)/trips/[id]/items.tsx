@@ -374,7 +374,11 @@ export default function InventoryScreen() {
 
       {tab === "group" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={requirementsCache.isOffline} cachedAt={requirementsCache.cachedAt}>
+          <OfflineNotice
+            visible={requirementsCache.isOffline}
+            cachedAt={requirementsCache.cachedAt}
+            onRetry={() => void requirementsCache.reload()}
+          >
             Covering an item is sent when you have signal. Adding, removing and withdrawing need a
             connection.
           </OfflineNotice>
@@ -511,7 +515,11 @@ export default function InventoryScreen() {
 
       {tab === "kit" && (
         <ScrollView contentContainerClassName="gap-3 p-4">
-          <OfflineNotice visible={kitCache.isOffline} cachedAt={kitCache.cachedAt}>
+          <OfflineNotice
+            visible={kitCache.isOffline}
+            cachedAt={kitCache.cachedAt}
+            onRetry={() => void kitCache.reload()}
+          >
             Packing, adding and removing are saved here and sent when you have signal.
           </OfflineNotice>
           {kitError && <Text className="text-sm text-destructive">{kitError}</Text>}

@@ -56,19 +56,11 @@ services:
       # kayak_net and never leaves the box, so there's nothing on the wire to protect.
       PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-kayak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kayak_prod}?sslmode=disable
 
-  # ADR-034: mitigates the home-hosted RabbitMQ silent-failure risk — a health-endpoint
-  # monitor + notification channel here pages the operator instead of a Celery-dispatched
-  # safety alert (missed-checkpoint shore-contact email) silently dropping during a home
-  # power/ISP outage. Monitors and notification channels are configured post-boot in its
-  # own web UI, not declaratively here — this block only brings the service up.
-  uptime-kuma:
-    image: louislam/uptime-kuma:1
-    container_name: kayak_uptime_kuma
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3001"
-    volumes:
-      - uptime_kuma_data:/app/data
+  # Uptime Kuma is deliberately not here. It used to be defined in this file and never started
+  # on the droplet: the real instance runs on the operator's home box, because the one thing
+  # Kuma is good for — noticing the droplet is gone — only works from somewhere else. A
+  # definition nothing ran was a second, misleading source of truth, and it got copied to the
+  # box on every sync. See DEPLOY.md "Uptime Kuma".
 
 volumes:
   # Pinned to the name the old `kayak-planner` project gave it, so renaming the project
@@ -76,7 +68,6 @@ volumes:
   # lives in here, and it survived the deploy that removed the containers themselves.
   portainer_data:
     name: kayak-planner_portainer_data
-  uptime_kuma_data:
 
 networks:
   default:

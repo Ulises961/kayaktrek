@@ -20,6 +20,19 @@ describe("UndoSnackbar", () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
+  it("calls onDismiss, not onUndo, when OK is pressed", async () => {
+    const onUndo = jest.fn();
+    const onDismiss = jest.fn();
+    const { getByLabelText } = await render(
+      <UndoSnackbar message="Point moved" onUndo={onUndo} onDismiss={onDismiss} />,
+    );
+
+    await fireEvent.press(getByLabelText("Keep move"));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
   it("dismisses itself once the window has passed, and not before", async () => {
     const onDismiss = jest.fn();
     await render(

@@ -128,7 +128,7 @@ export default function FloatPlanScreen() {
       <ScrollView contentContainerClassName="gap-4 p-4">
         {/* No detail for the banner: the shore contact card below already says it
             needs a connection, right where someone looking for it will look. */}
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void load()} />
         <Card>
           <CardHeader>
             <CardTitle>Shore contact</CardTitle>

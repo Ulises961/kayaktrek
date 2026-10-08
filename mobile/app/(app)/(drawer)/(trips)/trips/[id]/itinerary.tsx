@@ -34,6 +34,7 @@ import { lightTokens, palette } from "@shared/tokens";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
+import { MapVelocityOverlay } from "@mobile/components/trips/map-velocity-overlay";
 import { UndoSnackbar } from "@mobile/components/trips/undo-snackbar";
 import { ZoomControl } from "@mobile/components/trips/zoom-control";
 import { Screen } from "@mobile/components/ui/layout";
@@ -41,7 +42,8 @@ import { OfflineNotice } from "@mobile/components/ui/offline-notice";
 import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
-import { editRoute, loadRouteSyncState, pushRouteChanges } from "@mobile/lib/db/route-edit";
+import { requestPush } from "@mobile/lib/db/push-pending";
+import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { useTripChanges } from "@mobile/lib/live/use-trip-changes";
@@ -56,6 +58,7 @@ import {
   movePointByDrag,
 } from "@mobile/lib/itinerary/route-edits";
 import { boundsOf } from "@mobile/lib/map/bounds";
+import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
 import { uuidv7 } from "@mobile/lib/uuid";
@@ -85,7 +88,11 @@ type DraftPoint = { latitude: number; longitude: number; afterPointId: string | 
 // the tap point, queried against the rendered "route-line" layer. Mirrors web's
 // own hit-target widening (map-core.tsx's 18px invisible stroke over a 2.5px
 // visible line), achieved differently since MapLibre RN's Layer has no onPress.
-const ROUTE_LINE_TAP_TOLERANCE_PX = 12;
+// Wider than web's ±9px on purpose: a tap that close to an existing route is
+// clearly meant to refine it, and nobody travelling the chain back wants the
+// tip dragged to that spot, so there is no reason to make them zoom in first.
+// ±24px is a 48px target, the usual minimum for a finger.
+const ROUTE_LINE_TAP_TOLERANCE_PX = 24;
 
 // Wire names (TripChange.t) of everything this screen draws.
 const ROUTE_CHANGE_TABLES = [
@@ -158,6 +165,19 @@ export default function TripMapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  // M35: which forecast layer is drawn on the map, and for which hour. The hour is
+  // chosen in the weather sheet's grids, so both live here, where the sheet and the
+  // overlay can both reach them. 12:00 is the same representative hour the day
+  // strip uses.
+  // Wind and swell are independent layers, as on web, so both can be on at once.
+  const [windOn, setWindOn] = useState(false);
+  const [swellOn, setSwellOn] = useState(false);
+  const [overlayHour, setOverlayHour] = useState(12);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  // The map's latest view, kept in a ref: it changes many times a second during a
+  // gesture, and the overlay reads it every frame, so state would re-render this
+  // whole screen for each report.
+  const mapViewRef = useRef<MapViewState | null>(null);
   const cameraRef = useRef<CameraRef>(null);
   const mapRef = useRef<MapRef>(null);
   const router = useRouter();
@@ -279,7 +299,8 @@ export default function TripMapScreen() {
   async function handleDeletePoint(pointId: string) {
     try {
       await editRoute(id, (route) => deletePoint(route, pointId));
-      setSelectedPointId(null);
+      requestPush();
+      clearPointSelection();
       setLastMove((move) => (move?.pointId === pointId ? null : move));
       await reload();
     } catch (err) {
@@ -319,6 +340,15 @@ export default function TripMapScreen() {
   // without guessing at a timing window.
   const suppressNextMapPress = useRef(false);
 
+  // Deselecting a point also collapses the sheet. It was expanded to show that
+  // point, and left open it falls back to the weather body — the forecast
+  // popping up on a plain map tap. Weather expands only from the day strip
+  // (handleDayPress).
+  function clearPointSelection() {
+    setSelectedPointId(null);
+    setSheetExpanded(false);
+  }
+
   function handlePointPress(pointId: string) {
     suppressNextMapPress.current = true;
     setSelectedPointId(pointId);
@@ -350,6 +380,7 @@ export default function TripMapScreen() {
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
       setLastMove({ pointId, latitude: before.latitude, longitude: before.longitude });
+      requestPush();
     } catch (err) {
       Alert.alert(
         "Couldn't move point",
@@ -378,6 +409,7 @@ export default function TripMapScreen() {
     setLastMove(null);
     try {
       await editRoute(id, (route) => movePointByDrag(route, pointId, latitude, longitude));
+      requestPush();
       await reload();
     } catch (err) {
       Alert.alert(
@@ -395,6 +427,16 @@ export default function TripMapScreen() {
   const { points: routePoints, legs: routeLegs } = useMemo(
     () => buildDayColoredRoute(days),
     [days],
+  );
+
+  // The selected day's route, which the forecast disc is built around (web's map-core.tsx
+  // `selectedDayPositions`): the overlay shows conditions over that passage.
+  const selectedDayPositions = useMemo(
+    () =>
+      routePoints
+        .filter((point) => point.dayId === selectedDayId)
+        .map((point): [number, number] => [point.latitude, point.longitude]),
+    [routePoints, selectedDayId],
   );
 
   // M34 WP6 fix: while dragging, redraw the leg(s) touching the dragged point
@@ -446,7 +488,7 @@ export default function TripMapScreen() {
       return;
     }
     if (selectedPointId) {
-      setSelectedPointId(null);
+      clearPointSelection();
       return;
     }
     if (draftPoint) {
@@ -490,7 +532,34 @@ export default function TripMapScreen() {
   // Keeps the overlay tooltip tracking the draft point's geographic position
   // as the map is panned/zoomed — its screen position changes even though
   // the underlying lngLat doesn't.
-  function handleRegionChange(event: { nativeEvent: { zoom: number } }) {
+  function handleRegionMoving(event: { nativeEvent: MapViewState }) {
+    const { center, zoom: nextZoom, bearing, pitch } = event.nativeEvent;
+    mapViewRef.current = { center, zoom: nextZoom, bearing, pitch };
+  }
+
+  // The map only reports a view when it moves, so switching a layer on at rest has
+  // nothing to draw against until it is asked once.
+  function seedMapView() {
+    void mapRef.current
+      ?.getViewState()
+      .then(({ center, zoom: nextZoom, bearing, pitch }) => {
+        mapViewRef.current = { center, zoom: nextZoom, bearing, pitch };
+      })
+      .catch(() => undefined);
+  }
+
+  function handleWindToggle() {
+    if (!windOn) seedMapView();
+    setWindOn(!windOn);
+  }
+
+  function handleSwellToggle() {
+    if (!swellOn) seedMapView();
+    setSwellOn(!swellOn);
+  }
+
+  function handleRegionChange(event: { nativeEvent: MapViewState }) {
+    handleRegionMoving(event);
     setZoom(event.nativeEvent.zoom);
     if (!draftPoint) return;
     void mapRef.current
@@ -521,8 +590,7 @@ export default function TripMapScreen() {
           type: POINT_TYPE.STOP,
         });
       });
-      // Best effort: offline it fails and the sweep pushes later.
-      void pushRouteChanges(id).catch(() => undefined);
+      requestPush();
       setDraftPoint(null);
       setDraftScreenPoint(null);
       setTooltipSize(null);
@@ -576,7 +644,7 @@ export default function TripMapScreen() {
           see plans/M9b3.md's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void reload()} />
 
         {/* M9d WP4: a push refused because the route changed elsewhere is parked,
             never merged. The phone keeps showing its own route until the leader
@@ -604,11 +672,20 @@ export default function TripMapScreen() {
           onDayPress={handleDayPress}
         />
 
-        <View style={{ flex: 1 }}>
+        <View
+          style={{ flex: 1 }}
+          onLayout={(event) =>
+            setMapSize({
+              width: event.nativeEvent.layout.width,
+              height: event.nativeEvent.layout.height,
+            })
+          }
+        >
           <MapLibreMap
             ref={mapRef}
             mapStyle={MAP_STYLE}
             style={{ flex: 1 }}
+            onRegionIsChanging={handleRegionMoving}
             onRegionDidChange={handleRegionChange}
             onPress={(event) => void handleMapPress(event)}
             // Default "surface" renders via Android's GLSurfaceView, a separate hardware
@@ -791,6 +868,19 @@ export default function TripMapScreen() {
             </View>
           )}
 
+          <MapVelocityOverlay
+            day={selectedDay}
+            dayPositions={selectedDayPositions}
+            windOn={windOn}
+            swellOn={swellOn}
+            onWindToggle={handleWindToggle}
+            onSwellToggle={handleSwellToggle}
+            hour={overlayHour}
+            viewRef={mapViewRef}
+            size={mapSize}
+            offline={isOffline}
+          />
+
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
           <ItinerarySheet
@@ -798,13 +888,15 @@ export default function TripMapScreen() {
             selectedPointId={selectedPointId}
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
-            onClosePoint={() => setSelectedPointId(null)}
+            onClosePoint={clearPointSelection}
             onEditPoint={isLeader ? handleEditPoint : undefined}
             onDeletePoint={isLeader ? confirmDeletePoint : undefined}
             onViewPoint={handleEditPoint}
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}
             onRefreshWeather={reload}
+            selectedHour={overlayHour}
+            onHourChange={setOverlayHour}
             // A marker drag is still claiming the touch stream at this point
             // (draggingPointId only clears in handlePointDragEnd's finally) —
             // gorhom's own pan gesture must not compete for it.

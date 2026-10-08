@@ -104,11 +104,46 @@ docker compose -f docker-compose.prod.yml ps
 curl http://localhost:5000/api/v1/health
 ```
 
+### Maintenance mode (M33)
+
+`scripts/deploy.sh` pulls first, then raises a flag file, runs `up -d`, polls until the backend
+and frontend answer, and drops the flag. While it exists, nginx answers `app.`, `api.` and
+`live.` with a styled **503** (`Retry-After: 120`) instead of a connection error. nginx runs on
+the host, so this works with every container stopped. `www.` and the apex are untouched.
+
+The flag is dropped on any exit, including a failed health check — a deploy that dies halfway
+does not leave the site behind a maintenance page (it leaves a broken app, which is the more
+honest state). If the deploy script itself lost its ssh connection, remove it by hand:
+
+```bash
+ssh <box> rm -f /var/www/kayak-maintenance/maintenance.flag
+```
+
+**One-time install per box** (nginx is deliberately outside the automated push — see below):
+
+```bash
+sudo install -d -o <deploy-user> /var/www/kayak-maintenance
+sudo install -m 644 nginx/maintenance.html /var/www/kayak-maintenance/maintenance.html
+# then re-install the nginx template as in "Deploying configuration to the box",
+# `sudo nginx -t && sudo systemctl reload nginx`
+```
+
+`deploy.sh` refuses to run if `/var/www/kayak-maintenance` is missing, so a half-installed box
+fails before anything changes. `DEPLOY_MAINTENANCE=0` deploys without it.
+
+Expect the home-box Uptime Kuma and DO's uptime checks to see the 503 windows — that is the signal working,
+not an incident. To measure what a deploy looks like from outside (M33 WP0), run
+`KAYAK_DOMAIN=<domain> scripts/measure-deploy-window.sh` in a second terminal before deploying.
+
+**Cloudflare sits in front.** Cloudflare passes an origin's 503 body through by default, but
+confirm the first time that the styled page, not a Cloudflare error page, reaches a browser:
+`touch` the flag by hand and load `https://app.<domain>/`.
+
 ## Monitoring / admin tooling
 
 `docker-compose.monitoring.yml` — Portainer (containers), Glances (host CPU/RAM/disk/network),
-pgweb (browse Postgres), and a droplet-local Uptime Kuma service definition (kept in the file,
-**not started** — see below). Independent of the app stack's lifecycle — never touched by the
+and pgweb (browse Postgres). Uptime Kuma is not part of it — see "Uptime Kuma" below.
+Independent of the app stack's lifecycle — never touched by the
 redeploy loop above. **Must be brought up after `docker-compose.prod.yml` at least once** — it
 joins the `kayak_net` network that file creates, so pgweb can resolve `postgres` by name; a fresh
 box without the app stack running yet will fail with a "network not found" error.
@@ -128,19 +163,20 @@ evidence for another" gap the `INVITE_CODE` entry in root `CLAUDE.md` already na
 fixed now: the file is in `deploy-sync.sh`'s `FILES`, and `portainer`/`glances`/`pgweb` are
 running on `kayak-do`.
 
-**`uptime-kuma` is deliberately not started here**, despite being defined in the compose file.
-The real Uptime Kuma instance runs on the operator's own home box, external to the droplet — the
-one genuine advantage of that placement is that it can watch the droplet die, which a
-droplet-local Kuma structurally cannot (see "What this stack cannot do" below). Starting a second,
-droplet-local instance from this file would duplicate that role, not improve it, and the monitor
-table in the next section (targets like `127.0.0.1:5000`) describes a droplet-local Kuma that was
-never actually configured — treat that table as the design intent for if a droplet-local instance
-is ever wanted, not as current state.
+**Uptime Kuma is not in this file, on purpose.** It used to be defined here and was never
+started on the droplet — the real instance runs on the operator's own home box, because the one
+thing Kuma is for, noticing the droplet is gone, only works from somewhere else (see "What this
+stack cannot do" below). The definition was a second, misleading source of truth that was copied
+to the box on every sync.
 
-**Never pass `--remove-orphans` to the command above.** This file declares `uptime-kuma` but the
-command starts only the other three, so Compose sees Kuma as an orphan of its own project and the
-flag would delete it — and on a box where a droplet-local Kuma *was* ever started, that takes its
-data volume's container with it. Start services by name here, without the flag.
+If a droplet-local `kayak_uptime_kuma` container or its volume ever existed on a box (the
+documented setup never started one), remove it by hand: `docker rm -f kayak_uptime_kuma` and
+`docker volume rm kayak-monitoring_uptime_kuma_data`. Nothing in this file refers to it any more,
+so Compose will not clean it up.
+
+**Do not pass `--remove-orphans` to the command above.** It is not needed — the command names
+every service this file defines — and it is the flag that deleted this stack on every app deploy
+until the project got its own `name:` (below).
 
 **The two stacks are only isolated because `docker-compose.monitoring.yml` sets `name:
 kayak-monitoring`** (added 2026-09-20). Before that they were not: both files sit in the same
@@ -189,12 +225,11 @@ anything is wrong on their own. Uptime Kuma is the one push tool in this set, an
 that matters for the root `CLAUDE.md` alerting checklist item (second in that item's cost order,
 after a Logfire error-rate alert).
 
-**This section describes the real, external, home-box Uptime Kuma instance** — not the
-`uptime-kuma` service in `docker-compose.monitoring.yml`, which is defined but deliberately not
-started on the droplet (see above). The `127.0.0.1` targets below therefore do not apply as
-written to that instance; they describe what a droplet-local Kuma's own monitor list would look
-like if one is ever brought up. Confirm what the home-box instance is actually configured to
-watch before trusting this table as current state.
+**This section describes the real, external, home-box Uptime Kuma instance.** It is not deployed
+by anything in this repo. The `127.0.0.1` targets below come from when a droplet-local instance
+was planned and do not apply as written to a Kuma on another machine; the public-URL monitors do.
+Confirm what the home-box instance is actually configured to watch before trusting this table as
+current state.
 
 This is deliberately not scripted — first-run admin signup and typing an SMTP password into the
 notification form are both account/credential steps, done once by a human in the web UI:
@@ -512,9 +547,8 @@ restore it.
    nobody reads, and the job's real failure mode is *never running at all* — which produces
    no output anywhere. Set `BACKUP_HEARTBEAT_URL` in `.env` to a push-monitor URL and the
    script pings it only on success, so a missed run, a suspended box and a broken `PATH` all
-   surface the same way: as silence where a ping was expected. `uptime-kuma` is already in
-   `docker-compose.monitoring.yml` and supports push monitors; set the expected interval to
-   about 25 hours. Until then this has no alerting at all — see the Observability checklist.
+   surface the same way: as silence where a ping was expected. The home-box Uptime Kuma
+   supports push monitors; set the expected interval to about 25 hours. Until then this has no alerting at all — see the Observability checklist.
 
    On a DigitalOcean droplet (ADR-034) all of this moves across **unchanged**: a droplet is
    an ordinary Linux host with systemd, so there is no cron container to build. Only two

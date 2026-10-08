@@ -107,7 +107,9 @@ export default function ProfileScreen() {
       return (
         <Screen edges={["bottom"]}>
           {header}
-          <NeedsConnectionNotice>Profile needs a connection.</NeedsConnectionNotice>
+          <NeedsConnectionNotice onRetry={() => void reload()}>
+            Profile needs a connection.
+          </NeedsConnectionNotice>
         </Screen>
       )
     }
@@ -123,7 +125,11 @@ export default function ProfileScreen() {
   return (
     <Screen edges={["bottom"]}>
       {header}
-      <OfflineNotice visible={isShowingCache} cachedAt={profileCache.cachedAt}>
+      <OfflineNotice
+        visible={isShowingCache}
+        cachedAt={profileCache.cachedAt}
+        onRetry={() => void reload()}
+      >
         Editing your profile needs a connection.
       </OfflineNotice>
       <ScrollView contentContainerClassName="gap-4 p-4">

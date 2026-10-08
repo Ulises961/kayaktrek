@@ -148,7 +148,7 @@ export default function PublicRouteScreen() {
     return (
       <Screen className="p-4" edges={["bottom"]}>
         {header}
-        <NeedsConnectionNotice visible={isOfflineError(error)}>
+        <NeedsConnectionNotice visible={isOfflineError(error)} onRetry={() => void load()}>
           Explore needs a connection.
         </NeedsConnectionNotice>
         {!isOfflineError(error) && <Text className="text-sm text-destructive">{error}</Text>}

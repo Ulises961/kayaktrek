@@ -2,7 +2,8 @@ import type { Log, LogFields } from "@shared/dtos/log"
 
 import { isOfflineError } from "../api/client"
 import { type LogCardData, removeCachedLog, upsertCachedLog } from "../db/logs-cache"
-import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation, pushQueuedMutations } from "../db/mutation-queue"
+import { MUTATION_ENTITY, MUTATION_OPERATION, enqueueMutation } from "../db/mutation-queue"
+import { requestPush } from "../db/push-pending"
 import { uuidv7 } from "../uuid"
 import { createLog, deleteLog, updateLog } from "./actions"
 
@@ -29,7 +30,7 @@ async function queue(operation: "create" | "update" | "delete", entityId: string
     entityId,
     payload,
   })
-  void pushQueuedMutations().catch(() => undefined)
+  requestPush()
 }
 
 function card(id: string, fields: LogFields, endorsementCount: number | null): LogCardData {

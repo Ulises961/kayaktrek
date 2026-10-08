@@ -133,7 +133,7 @@ log "OK — ${REMOTE_NAME} (${LOCAL_SIZE} bytes) verified on B2"
 # This job's real failure mode is not "errors out loudly", it is "never runs at all":
 # under systemd its output goes to the journal, which nobody reads, and the box
 # suspends, so a missed window produces no output anywhere. A push monitor inverts
-# that — uptime-kuma (already in docker-compose.monitoring.yml) alerts when the ping
+# that — uptime-kuma (the home-box instance, see DEPLOY.md) alerts when the ping
 # does NOT arrive within the expected interval, so a timer that stopped firing, a box
 # that stayed asleep, and a PATH that lost `age` all surface the same way.
 #

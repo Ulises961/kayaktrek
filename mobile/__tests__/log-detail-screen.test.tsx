@@ -41,8 +41,8 @@ jest.mock("../lib/db/logs-cache", () => ({
 jest.mock("../lib/db/mutation-queue", () => ({
   ...jest.requireActual("../lib/db/mutation-queue"),
   enqueueMutation: jest.fn(async () => "mutation-1"),
-  pushQueuedMutations: jest.fn(async () => ({ applied: 0, rejected: 0, kept: 1 })),
 }))
+jest.mock("../lib/db/push-pending", () => ({ requestPush: jest.fn() }))
 
 // M9c WP7: every offline branch below now reads how old its cache is. The real
 // lookup needs a database; the age itself is asserted as a relative offset so

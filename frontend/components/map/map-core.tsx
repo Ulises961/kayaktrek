@@ -12,6 +12,7 @@ import { dayRouteGroups } from "@/lib/itinerary/day-points"
 import { getDayColor } from "@/lib/itinerary/colors"
 import { buildBoundaryColorMap, resolveLegDayNumber } from "@/lib/itinerary/day-boundaries"
 import { numberByOrder } from "@/lib/itinerary/linked-list"
+import { WIND_COLOR_OPTIONS } from "@/lib/weather/wind-scale"
 import { splitRingIcon, type RouteMarker } from "./ring-icon"
 import { cn } from "@/lib/utils"
 import { VelocityLayer } from "@/components/weather/velocity-layer"
@@ -131,27 +132,15 @@ export type MapCoreProps = {
 
 // Module-level constants so options objects are stable across renders.
 // leaflet-velocity needs hex colors — CSS custom properties are not resolved by canvas.
-// Wind: saturated calm-blue → gale-red ramp. The earlier Spectral palette had pastel
-// green/yellow midtones (the most common light-wind range) that washed out against the
-// light-blue sea tiles, so every stop here is high-chroma to stay legible over water.
-const WIND_SCALE = [
-  "#0d47a1",
-  "#0091ea",
-  "#00bfa5",
-  "#00c853",
-  "#aeea00",
-  "#ffd600",
-  "#ff9100",
-  "#ff3d00",
-  "#d50000",
-]
+// Wind's colours and speed window come from lib/weather/wind-scale.ts, which the layers
+// panel's legend reads too, so the bar and the particles cannot disagree.
 // Particle density (particleMultiplier) and lineWidth are tuned sparser + thicker
 // across all layers so individual streaks read clearly instead of blurring into a
 // dense field. velocityScale is left forecast-driven — particle speed reflects the
 // actual modelled wind/wave/stream speed, not a cosmetic constant.
 const WIND_OPTIONS = {
   velocityScale: 0.005,
-  colorScale: WIND_SCALE,
+  ...WIND_COLOR_OPTIONS,
   particleAge: 64,
   lineWidth: 2.5,
   particleMultiplier: 0.0016,
@@ -168,7 +157,7 @@ const SWELL_OPTIONS = {
 // §8b fills the data; for now the backend stub returns an empty grid.
 const GLOBAL_WIND_OPTIONS = {
   velocityScale: 0.003,
-  colorScale: WIND_SCALE,
+  ...WIND_COLOR_OPTIONS,
   particleAge: 120,
   lineWidth: 1,
   particleMultiplier: 0.002,

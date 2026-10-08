@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Back shortly — Kayaktrek</title>
+<!--
+  Served by nginx while /var/www/kayak-maintenance/maintenance.flag exists (M33 WP1).
+
+  Self-contained on purpose: no asset, font or script is fetched, because every origin that
+  could serve one is stopped while this page is up. So the rose is inlined, and the colours
+  are literals rather than the app's stylesheet.
+
+  The rose is the Reinel rose from the 404/500 pages (frontend/components/illustrations/
+  reinel-rose.tsx), "true" bearing: the instrument is fine, we are just re-trimming the
+  chart. Colours are the --rose-* values from frontend/app/globals.css, light and dark; if
+  those move, move these. The rose is CC BY 2.5 (docs/brand/licences.md), so the credit line
+  under it is a licence term, not decoration — keep it.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: oklch(0.986 0.007 88);
+    --fg: oklch(0.155 0.04 245);
+    --muted: oklch(0.45 0.065 240);
+    --rose-ink: oklch(0.22 0.048 245);
+    --rose-lit: oklch(0.6 0.145 240);
+    --rose-leaf: oklch(0.73 0.145 75);
+    --rose-ring: oklch(0.52 0.1 240);
+    --rose-north: oklch(0.3 0.1 243);
+    --rose-north-mark: oklch(0.73 0.145 75);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(0.155 0.04 245);
+      --fg: oklch(0.985 0.008 220);
+      --muted: oklch(0.73 0.06 225);
+      --rose-ink: oklch(0.9 0.02 220);
+      --rose-lit: oklch(0.58 0.12 232);
+      --rose-leaf: oklch(0.76 0.155 80);
+      --rose-ring: oklch(0.55 0.1 232);
+      --rose-north: oklch(0.74 0.09 235);
+      --rose-north-mark: oklch(0.76 0.155 80);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2rem 16px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    text-align: center;
+  }
+
+  /* Portrait rose: capped by height so it cannot run off a short viewport. */
+  .rose { max-height: min(56vh, 28rem); width: auto; }
+  .rose-turn {
+    transform-box: view-box;
+    transform-origin: 300px 420px; /* the hub: left and above of the viewBox */
+    animation: settle 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes settle {
+    from { transform: rotate(-38deg); }
+    62% { transform: rotate(8deg); }
+    to { transform: rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce) { .rose-turn { animation: none; } }
+
+  .eyebrow {
+    margin: 0;
+    font: 0.75rem/1 ui-monospace, "Geist Mono", "SFMono-Regular", Menlo, monospace;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 0.5rem 0 0;
+    font: 600 1.5rem/1.2 Fraunces, Georgia, "Times New Roman", serif;
+  }
+  p.lede { margin: 0.5rem auto 0; max-width: 20rem; font-size: 0.875rem; line-height: 1.55; color: var(--muted); }
+  .credit { margin: 0; max-width: 20rem; font-size: 0.6rem; line-height: 1.5; color: var(--muted); }
+  .credit a { color: inherit; text-underline-offset: 2px; }
+</style>
+</head>
+<body>
+<svg class="rose" viewBox="-300 -420 600 660" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <path id="point" d="M39.42 95.16c-5.77 8.79-8.66 15.34-10.49 22.02-13.69-3.75-15.39 9.97-5.89 13.82-9.33 14.8-15.2 42.93-23.04 81V103a103 103 0 0 0 39.42-7.84z"/>
+    <path id="leaf" d="M-91.11 136.36A164.01 164.01 0 0 0-32 160.85c-15.64 3.54-27.33 4.32-46.84 29.47 3.99-31.58-3.72-40.4-12.28-53.96z"/>
+    <path id="fleur" d="M0-215.7v-129.6c2 6 4.6 13.3 6.6 17.6 2.1 4.6 4.6 8 7.5 12.8-2.8 3.9-5.2 7.4-8.1 12.3-2.7 5.7-4.6 12.8-5.8 22.8L0-265.5l4.1-.3c5.8-.5 4.4-14.1 6.2-19.9 1.5-5.3 3.6-10 8.1-12.2 4.1-2.1 9.5-1.7 13.8 0 3.9 1.4 6.8 5.1 9.1 8.6 1.7 2.8 2.6 6.2 2.7 9.5.1 3.2-.4 6.9-2.8 9.8-2.9 3.6-6.2 5-10.8 5.2-1.9-4.7.6-8.9-1.7-11.5-2.2-2.5-7.6-3.7-10.7-2.4-2.9 1.4-3.8 5.6-4.7 8.7-1.2 4.1.3 9.1-2.4 12.5-1.7 2.1-4 2.4-6.6 2.5H0v4.2c0 3.3 5.9 1.5 8.5 3.7 2.2 1.8 1.9 8 4.4 9.4 4 2.2 9.8-1.4 13.8.8 2.9 1.6 4.2 4.9 6 7.7 1.9 2.8 3 5.6 4.2 8.8 1.5 4.3 6.3 17.3.4 9.8-2.2-2.8-6.1-3.8-9-5.9-3.4-2.3-6.4-5-9.9-7.1-2.8-1.7-6.2-2.5-9-4.3L0-233.7v5.1c0 8.2 16 8.2 20.8 14.9 1.9 2.6-6.6-1-9.8-1.2z"/>
+  </defs>
+  <g class="rose-turn">
+    <circle r="8" fill="var(--rose-ink)" stroke="var(--rose-north)" stroke-width="0.4"/>
+    <g stroke="var(--rose-ring)" stroke-width="8"><circle r="75"/><circle r="211"/></g>
+    <g stroke="var(--rose-ink)">
+      <circle r="71"/><circle r="79"/><circle r="94"/><circle r="152"/><circle r="164"/><circle r="207"/><circle r="215"/>
+    </g>
+    <!-- Eight octants: a principal point (shaded half, mirrored sunlit half) and a leaf. -->
+    <g stroke="var(--rose-ink)">
+      <g id="octant">
+        <use href="#point" fill="var(--rose-ink)"/>
+        <use href="#point" fill="var(--rose-lit)" transform="scale(-1 1)"/>
+        <use href="#leaf" fill="var(--rose-leaf)"/>
+      </g>
+      <use href="#octant" transform="rotate(45)"/>
+      <use href="#octant" transform="rotate(90)"/>
+      <use href="#octant" transform="rotate(135)"/>
+      <use href="#octant" transform="rotate(180)"/>
+      <use href="#octant" transform="rotate(225)"/>
+      <use href="#octant" transform="rotate(270)"/>
+      <use href="#octant" transform="rotate(315)"/>
+    </g>
+    <!-- Fleur-de-lys crowning north, one half mirrored onto the other. -->
+    <g stroke="var(--rose-ink)" fill="var(--rose-north-mark)">
+      <use href="#fleur" fill="var(--rose-north)" stroke-width="0.7"/>
+      <use href="#fleur" fill="var(--rose-north)" stroke-width="0.7" transform="scale(-1 1)"/>
+      <circle r="8" cx="37.2" cy="-248.2"/><circle r="8" cx="-37.2" cy="-248.2"/>
+      <circle r="8" cx="27.9" cy="-312.7"/><circle r="8" cx="-27.9" cy="-312.7"/>
+      <circle r="8" cy="-360"/>
+    </g>
+  </g>
+</svg>
+
+<div>
+  <p class="eyebrow">Kayaktrek · 503</p>
+  <h1>Re-trimming the chart</h1>
+  <p class="lede">We&rsquo;re updating Kayaktrek. This usually takes a minute or two, and anything you had saved is safe. Try again shortly.</p>
+</div>
+
+<p class="credit">
+  Compass rose after Pedro Reinel, 1504 · drawn by
+  <a href="https://commons.wikimedia.org/wiki/User:Alvesgaspar" rel="noreferrer noopener">Joaquim Alves Gaspar</a>,
+  <a href="https://creativecommons.org/licenses/by/2.5/" rel="noreferrer noopener">CC BY 2.5</a>
+</p>
+</body>
+</html>

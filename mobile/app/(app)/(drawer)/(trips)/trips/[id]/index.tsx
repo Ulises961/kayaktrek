@@ -154,7 +154,7 @@ export default function TripDetailScreen() {
     <Screen edges={["bottom"]}>
       {header}
       <Stack className="gap-4 p-4">
-        <OfflineNotice visible={isOffline} cachedAt={cachedAt} />
+        <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void reload()} />
         <Card>
           <CardContent className="gap-3">
             <Row className="justify-between">

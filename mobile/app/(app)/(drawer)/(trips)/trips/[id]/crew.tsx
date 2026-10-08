@@ -185,7 +185,11 @@ export default function CrewScreen() {
   // the raw network error stays out of the screen. With nothing ever loaded,
   // "No crew yet" below would be a false answer, so the body stays empty.
   const needsConnection = isOfflineError(error)
-  const notice = <NeedsConnectionNotice visible={needsConnection}>Crew needs a connection.</NeedsConnectionNotice>
+  const notice = (
+    <NeedsConnectionNotice visible={needsConnection} onRetry={() => void load()}>
+      Crew needs a connection.
+    </NeedsConnectionNotice>
+  )
 
   if (!trip && !isShowingCache && !error) {
     return (
@@ -209,7 +213,7 @@ export default function CrewScreen() {
     <Screen edges={["bottom"]}>
       {header}
       {notice}
-      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt}>
+      <OfflineNotice visible={isShowingCache} cachedAt={cachedAt} onRetry={() => void load()}>
         Inviting and removing crew need a connection.
       </OfflineNotice>
       <ScrollView contentContainerClassName="gap-5 p-4">

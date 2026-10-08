@@ -2,7 +2,7 @@ import { Database } from "nitromelondb"
 import LokiJSAdapter from "nitromelondb/adapters/lokijs"
 
 import { apiGet } from "../../api/client"
-import { modelClasses, TripMember, Weather } from "../models"
+import { modelClasses, TripMember, VelocityDay, VelocityHour, Weather } from "../models"
 import { appDatabaseSchema } from "../schema"
 import { syncTrip } from "../sync"
 
@@ -81,6 +81,37 @@ describe("syncTrip", () => {
     const weatherRow = await weather.find("day-1")
     expect(weatherRow.model).toBe("open-meteo")
     expect(weatherRow.fetchedAt).toBe(1_700_000_000_000)
+  })
+
+  // M35: the pull carries each day's wind and swell flow (a box, a land mask and 24 hours of
+  // u/v) so the map overlay can draw without a connection. They are sent whole every time.
+  it("keeps the velocity rows a pull carries, and updates them on the next pull", async () => {
+    const velocityChanges = (dayRow: Record<string, unknown>, hourRow: Record<string, unknown>, bucket: "created" | "updated") => ({
+      changes: {
+        velocity_days: { created: bucket === "created" ? [dayRow] : [], updated: bucket === "updated" ? [dayRow] : [], deleted: [] },
+        velocity_hours: { created: bucket === "created" ? [hourRow] : [], updated: bucket === "updated" ? [hourRow] : [], deleted: [] },
+      },
+      timestamp: 1_700_000_000_500,
+    })
+    const dayRow = { id: "day-1", dayId: "day-1", south: 53.5, north: 54.7, west: -5.2, east: -3.8, size: 2, landMask: "0100" }
+    const hourRow = { id: "day-1:12", dayId: "day-1", hour: 12, windU: -10, windV: 0, waveU: null, waveV: null }
+    const database = createTestDatabase()
+
+    mockedApiGet.mockResolvedValueOnce(velocityChanges(dayRow, hourRow, "created"))
+    await syncTrip("trip-1", database)
+    mockedApiGet.mockResolvedValueOnce(
+      velocityChanges({ ...dayRow, north: 55.1 }, { ...hourRow, windU: -6, waveU: 0.5, waveV: -1.2 }, "updated"),
+    )
+    await syncTrip("trip-1", database)
+
+    const day = await database.collections.get<VelocityDay>("velocity_days").find("day-1")
+    expect([day.dayId, day.south, day.north, day.west, day.east, day.size, day.landMask]).toEqual([
+      "day-1", 53.5, 55.1, -5.2, -3.8, 2, "0100",
+    ])
+    const hour = await database.collections.get<VelocityHour>("velocity_hours").find("day-1:12")
+    expect([hour.dayId, hour.hour, hour.windU, hour.windV, hour.waveU, hour.waveV]).toEqual([
+      "day-1", 12, -6, 0, 0.5, -1.2,
+    ])
   })
 
   it("passes lastPulledAt through on a subsequent sync", async () => {
