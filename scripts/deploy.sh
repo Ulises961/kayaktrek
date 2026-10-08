@@ -53,9 +53,12 @@ drop_maintenance() {
 }
 
 if [ "$MAINTENANCE" = "1" ]; then
-    ssh "$HOST" "[ -d \"\$(dirname ${MAINTENANCE_FLAG})\" ]" || {
-        echo "ERROR: $(dirname "$MAINTENANCE_FLAG") does not exist on ${HOST}." >&2
-        echo "  Install the maintenance page first (DEPLOY.md \"Maintenance mode\")," >&2
+    # -w, not just -d: the flag is created over ssh as the deploy user, so a directory that
+    # exists but is owned by root passes -d and then fails at `touch` — after the pull, in the
+    # middle of the deploy, which is exactly where this check is meant to have already said no.
+    ssh "$HOST" "[ -d \"\$(dirname ${MAINTENANCE_FLAG})\" ] && [ -w \"\$(dirname ${MAINTENANCE_FLAG})\" ]" || {
+        echo "ERROR: $(dirname "$MAINTENANCE_FLAG") is missing or not writable by the deploy user on ${HOST}." >&2
+        echo "  Install the maintenance page and chown the directory first (DEPLOY.md \"Maintenance mode\")," >&2
         echo "  or deploy without it: DEPLOY_MAINTENANCE=0 $0" >&2
         exit 2
     }
