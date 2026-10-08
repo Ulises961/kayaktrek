@@ -17,6 +17,7 @@ class _FakePubSub:
         self.unsubscribed = []
         self.closed = False
         self.connection_errors_to_raise = 0
+        self.closed_under_the_reader_errors_to_raise = 0
 
     def subscribe(self, channel):
         self.subscribed.append(channel)
@@ -33,6 +34,11 @@ class _FakePubSub:
         if self.connection_errors_to_raise:
             self.connection_errors_to_raise -= 1
             raise redis.ConnectionError("down")
+        if self.closed_under_the_reader_errors_to_raise:
+            # What redis-py raises when another greenlet closes the socket this one is
+            # blocked reading: not a ConnectionError, and seen on the real sidecar.
+            self.closed_under_the_reader_errors_to_raise -= 1
+            raise ValueError("I/O operation on closed file.")
         try:
             return self._inbox.get(timeout=timeout)
         except queue.Empty:
@@ -209,6 +215,33 @@ def test_the_reader_survives_a_dropped_redis_connection(fanout, redis_client):
     pubsub.publish("trip:a:changes", "back")
 
     assert subscription.get_message(timeout=2)["data"] == "back"
+
+
+def test_the_reader_survives_the_socket_being_closed_under_it(fanout, redis_client):
+    """Releasing the last viewer closes the connection another greenlet is blocked
+    reading. If that error killed the reader without clearing its running flag, every
+    later viewer would be subscribed and never told anything."""
+    subscription = fanout.subscribe("trip:a:changes")
+    pubsub = redis_client.pubsubs[0]
+    pubsub.closed_under_the_reader_errors_to_raise = 2
+
+    assert _wait_for(lambda: pubsub.closed_under_the_reader_errors_to_raise == 0)
+    pubsub.publish("trip:a:changes", "still-delivering")
+
+    assert subscription.get_message(timeout=2)["data"] == "still-delivering"
+
+
+def test_a_reader_that_ended_with_its_connection_does_not_leave_new_viewers_unserved(
+    fanout, redis_client
+):
+    first = fanout.subscribe("trip:a:changes")
+    first.close()
+
+    second = fanout.subscribe("trip:a:changes")
+    assert _wait_for(lambda: len(redis_client.pubsubs) == 2)
+    redis_client.pubsubs[1].publish("trip:a:changes", "to-the-new-reader")
+
+    assert second.get_message(timeout=2)["data"] == "to-the-new-reader"
 
 
 def test_a_closed_subscription_refuses_to_be_read(fanout):

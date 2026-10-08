@@ -24,6 +24,8 @@ DEFAULT_POLL_SECONDS = 1.0
 # client that is 64 behind is not reading.
 DEFAULT_MAX_PENDING = 64
 _RECONNECT_PAUSE_SECONDS = 1.0
+# Short, only to keep a connection that is closed-and-not-yet-retired from becoming a busy loop.
+_CLOSED_PAUSE_SECONDS = 0.01
 
 
 class SubscriptionClosed(Exception):
@@ -138,8 +140,18 @@ class PubSubFanout:
                 logger.warning("pubsub_fanout_connection_lost", exc_info=True)
                 time.sleep(_RECONNECT_PAUSE_SECONDS)
                 continue
-            except RuntimeError:
-                # The connection was closed under us because the last viewer left.
+            except (RuntimeError, ValueError, OSError):
+                # The connection was closed while this reader was blocked on it, because
+                # the last viewer left: redis-py reports that as any of these, depending on
+                # where the read was (the sidecar harness saw ValueError). The loop's next
+                # pass finds out whether this reader has been retired.
+                time.sleep(_CLOSED_PAUSE_SECONDS)
+                continue
+            except Exception:
+                # A reader that dies silently leaves its running flag set, and every
+                # viewer after it is subscribed to a connection nobody reads.
+                logger.exception("pubsub_fanout_reader_error")
+                time.sleep(_RECONNECT_PAUSE_SECONDS)
                 continue
             if message is not None and message.get("type") == "message":
                 self._dispatch(message["channel"], message["data"])

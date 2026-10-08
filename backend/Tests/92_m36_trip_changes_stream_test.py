@@ -1,9 +1,11 @@
 """M36 WP2 — trip-changes stream: tickets, generator, endpoint authorisation."""
 import json
+import threading
+import time
 from uuid import uuid4
 
 from Resources.live_resource import LIVE_ENDPOINT
-from Services.live_stream_service import LiveStreamService
+from Services.live_stream_service import REVISION_READ_CONCURRENCY, LiveStreamService
 from Services.trip_change_service import trip_changes_channel, trip_revision_key
 from Services.Utils.pubsub_fanout import SubscriptionClosed
 
@@ -217,6 +219,48 @@ def test_stream_with_no_revision_yet_says_zero(app, trip_with_user2_as_crew):
             )
         )
     assert events[1] == 'event: hello\ndata: {"rev": 0}\n\n'
+
+
+def test_a_burst_of_connections_does_not_read_the_revision_all_at_once(app, trip_with_user2_as_crew):
+    """Every connecting viewer reads the trip's revision from a pooled Redis client whose
+    pool is capped at 100. A reconnect storm doing those reads together exhausted it:
+    measured on the sidecar, the 100th viewer's stream died after its headers and was
+    left open, never saying hello."""
+
+    class _CountingRedis:
+        def __init__(self):
+            self.in_flight = 0
+            self.peak = 0
+            self._lock = threading.Lock()
+
+        def get(self, key):
+            with self._lock:
+                self.in_flight += 1
+                self.peak = max(self.peak, self.in_flight)
+            time.sleep(0.02)
+            with self._lock:
+                self.in_flight -= 1
+            return "7"
+
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    user_id = trip_with_user2_as_crew["crew_id"]
+    redis_client = _CountingRedis()
+
+    def connect():
+        with app.app_context():
+            list(
+                LiveStreamService.stream_trip_changes(
+                    trip_id, user_id, pubsub=_FakePubSub([]), redis_client=redis_client, max_ticks=0
+                )
+            )
+
+    viewers = [threading.Thread(target=connect) for _ in range(40)]
+    for viewer in viewers:
+        viewer.start()
+    for viewer in viewers:
+        viewer.join()
+
+    assert redis_client.peak <= REVISION_READ_CONCURRENCY
 
 
 def test_heartbeat_on_timeout(app, trip_with_user2_as_crew):

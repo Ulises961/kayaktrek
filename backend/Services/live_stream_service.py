@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -24,9 +25,20 @@ logger = logging.getLogger(__name__)
 STREAM_TICKET_PURPOSE = "live-stream"
 CHANGES_TICKET_PURPOSE = "trip-changes"
 STREAM_TICKET_TTL_MINUTES = 5
-# Provisional, until measured on the sidecar (plans/M36 risk 1): well under the worker's
-# 200 connections, leaving room for position streams and ordinary requests.
-DEFAULT_TRIP_CHANGES_MAX_STREAMS = 120
+# Sized from measurement (plans/M36 "Capacity, measured"). The sidecar itself is not what
+# binds: 1000 held streams cost ~40 MiB. nginx is — each proxied stream takes two of its
+# worker_connections (768 per worker on the droplet) and two file descriptors (soft limit
+# 1024) — so this stays well inside that, and inside the worker's 600 connections, leaving
+# the rest to position streams and ordinary requests.
+DEFAULT_TRIP_CHANGES_MAX_STREAMS = 300
+
+# Every connecting viewer reads the trip's revision once, from `live_redis()`'s pool, which
+# redis-py caps at 100 connections. A reconnect storm — the sidecar restarting, a bad
+# network healing — does those reads all at once, and the viewer that arrives when the pool is
+# empty gets "Too many connections" after its headers are already sent: a stream that is open
+# and silent. Measured on the sidecar harness. Queuing the reads costs milliseconds.
+REVISION_READ_CONCURRENCY = 16
+_revision_reads = threading.BoundedSemaphore(REVISION_READ_CONCURRENCY)
 
 
 @lru_cache(maxsize=1)
@@ -128,7 +140,8 @@ class LiveStreamService:
             assert pubsub is not None
 
             try:
-                revision = int(client.get(trip_revision_key(trip_id)) or 0)
+                with _revision_reads:
+                    revision = int(client.get(trip_revision_key(trip_id)) or 0)
                 yield f"event: hello\ndata: {json.dumps({'rev': revision})}\n\n"
 
                 last_membership_check = monotonic()
