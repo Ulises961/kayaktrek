@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom"
+import "@testing-library/jest-dom/vitest"
 import { configure } from "@testing-library/react"
 
 // RTL's waitFor/findBy* default to a 1000ms timeout, independent of vitest's own

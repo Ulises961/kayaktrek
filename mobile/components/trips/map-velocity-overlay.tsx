@@ -20,8 +20,10 @@ import { VelocityOverlay } from "./velocity-overlay"
 import { WindGradient, WindLegend } from "./wind-legend"
 
 // Wind's look: web's planner values (map-core.tsx WIND_OPTIONS: 2.5 px lines), with the density
-// raised on the device from web's 0.0016, where a phone's small screen read as sparse.
-export const WIND_PARTICLE_MULTIPLIER = 0.0026
+// a little above web's 0.0016, where a phone's small screen read as sparse. It was 0.0026, but on a
+// release build on the Mi 8 about a quarter of frames ran late with the layers on, so it was cut by
+// roughly 30% to give the JavaScript thread less to move each frame.
+export const WIND_PARTICLE_MULTIPLIER = 0.0018
 export const WIND_STROKE_WIDTH = 2.5
 
 function hourLabel(hour: number): string {

@@ -43,6 +43,9 @@ import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
 import { requestPush } from "@mobile/lib/db/push-pending";
+import { isPointDraggable } from "@mobile/lib/itinerary/point-drag";
+import { routeIsOnPhone, type RouteSample } from "@mobile/lib/itinerary/route-source";
+import { getPushStatus } from "@mobile/lib/network/push-status";
 import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
@@ -189,19 +192,30 @@ export default function TripMapScreen() {
   // duplicating it.
   const reload = useCallback(async () => {
     try {
+      // Asked before the fetch as well as after (see routeIsOnPhone): an edit and its push can
+      // both finish while the server's copy is on its way, and asking only afterwards would show
+      // that older copy over the leader's newer edit.
+      const sampleRoute = async (): Promise<RouteSample> => {
+        const state = await loadRouteSyncState(id);
+        return {
+          hasLocalChanges: !!state?.hasLocalChanges,
+          inConflict: !!state?.inConflict,
+          pushing: getPushStatus().state === "pushing",
+        };
+      };
+      const before = await sampleRoute();
       const t = await getTrip(id);
       // Filtered at ingestion, not at render: Day 0 sorts first, so leaving it in the
       // array also made it the default selection below.
       // M9d: a route the leader edited on this phone and hasn't pushed yet — or a
       // parked conflict — is shown from the phone, not the server: the server's
       // copy doesn't have the edits, and hiding them would look like they'd vanished.
-      const sync = await loadRouteSyncState(id);
-      setInConflict(!!sync?.inConflict);
+      const after = await sampleRoute();
+      setInConflict(after.inConflict);
       const liveDays = t.itinerary?.days ?? [];
-      const rawDays =
-        sync?.hasLocalChanges || sync?.inConflict
-          ? (await loadOfflineTrip(id)).days
-          : liveDays;
+      const rawDays = routeIsOnPhone([before, after])
+        ? (await loadOfflineTrip(id)).days
+        : liveDays;
       const days = numberedDays(withLiveImages(rawDays, liveDays));
       setTrip({
         destination: t.destination ?? null,
@@ -725,9 +739,9 @@ export default function TripMapScreen() {
                 key={point.id ?? index}
                 id={point.id ?? String(index)}
                 lngLat={[point.longitude, point.latitude]}
-                // M34 WP1: leader-only, same gating as long-press-to-add and "Add stop
-                // here" — a crew member reads the route, only the leader edits it.
-                draggable={isLeader}
+                // Leader-only, and only the selected point: any point being draggable let a
+                // swipe or pan that crossed one carry it off. Tap a point, then drag it.
+                draggable={isPointDraggable({ isLeader, pointId: point.id, selectedPointId })}
                 onPress={() => point.id && handlePointPress(point.id)}
                 // Selects the point but deliberately does NOT expand the sheet
                 // (unlike handlePointPress) — see handlePointDragEnd's own note.
@@ -803,6 +817,22 @@ export default function TripMapScreen() {
             )}
           </MapLibreMap>
 
+          {/* Straight after the map, before everything else drawn over it: a later sibling
+            paints on top, and the particles fill the whole screen, so anything placed before
+            this (the new-point tooltip, the "Point moved" snackbar) sat behind them. */}
+          <MapVelocityOverlay
+            day={selectedDay}
+            dayPositions={selectedDayPositions}
+            windOn={windOn}
+            swellOn={swellOn}
+            onWindToggle={handleWindToggle}
+            onSwellToggle={handleSwellToggle}
+            hour={overlayHour}
+            viewRef={mapViewRef}
+            size={mapSize}
+            offline={isOffline}
+          />
+
           {draftPoint && draftScreenPoint && (
             // A plain RN overlay, not a map annotation — see draftScreenPoint's
             // own comment (state declarations, above) for why: MapLibre's
@@ -867,19 +897,6 @@ export default function TripMapScreen() {
               />
             </View>
           )}
-
-          <MapVelocityOverlay
-            day={selectedDay}
-            dayPositions={selectedDayPositions}
-            windOn={windOn}
-            swellOn={swellOn}
-            onWindToggle={handleWindToggle}
-            onSwellToggle={handleSwellToggle}
-            hour={overlayHour}
-            viewRef={mapViewRef}
-            size={mapSize}
-            offline={isOffline}
-          />
 
           <ZoomControl cameraRef={cameraRef} zoom={zoom} />
 
