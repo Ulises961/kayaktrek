@@ -24,6 +24,7 @@ function renderListener() {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.clearAllMocks()
+  mockUseTripChanges.mockReturnValue({ status: "connecting" })
 })
 
 afterEach(() => {
@@ -31,9 +32,20 @@ afterEach(() => {
 })
 
 describe("TripChangesListener", () => {
-  it("renders nothing", () => {
+  it("shows nothing to the viewer", () => {
     const { container } = renderListener()
-    expect(container).toBeEmptyDOMElement()
+    expect(container).toBeVisible()
+    expect(container.textContent).toBe("")
+    expect(container.querySelector("[hidden]")).not.toBeNull()
+  })
+
+  it("exposes the stream status, so a test can wait for the stream to be live", () => {
+    mockUseTripChanges.mockReturnValue({ status: "live" })
+    const { container } = renderListener()
+    expect(container.querySelector("[data-trip-changes-status]")).toHaveAttribute(
+      "data-trip-changes-status",
+      "live",
+    )
   })
 
   it("subscribes for its own trip, minting through the changes ticket action", async () => {

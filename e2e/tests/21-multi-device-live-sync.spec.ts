@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import {
   apiGetAccessToken,
@@ -26,6 +26,16 @@ import { API_URL } from "../playwright.config"
 // and well under the minute a membership re-check takes.
 const APPLIED_WITHIN_MS = 15_000
 
+// A change made before the stream's `hello` is not replayed, so wait for the page to be
+// listening before anyone changes anything.
+async function expectStreamLive(page: Page) {
+  await expect(page.locator("[data-trip-changes-status]")).toHaveAttribute(
+    "data-trip-changes-status",
+    "live",
+    { timeout: APPLIED_WITHIN_MS },
+  )
+}
+
 test.describe("Multi-device live sync (M36)", () => {
   let tripId: string
   let leaderToken: string
@@ -45,6 +55,7 @@ test.describe("Multi-device live sync (M36)", () => {
   test("a change made elsewhere appears on an already-open page", async ({ page, request }) => {
     await page.goto(`/trips/${tripId}/crew`)
     await expect(page.getByText("No pending invitations.")).toBeVisible()
+    await expectStreamLive(page)
 
     // Someone — another device, or another crew member — invites a paddler.
     await apiInviteByEmail(request, leaderToken, tripId, CREW.mail)
@@ -67,6 +78,7 @@ test.describe("Multi-device live sync (M36)", () => {
     const crewPage = await crewContext.newPage()
     await crewPage.goto(`/trips/${tripId}/crew`)
     await expect(crewPage.getByText(CREW.name).first()).toBeVisible()
+    await expectStreamLive(crewPage)
 
     const me = await request.get(`${API_URL}/api/v1/user/me`, {
       headers: { Authorization: `Bearer ${crewToken}` },

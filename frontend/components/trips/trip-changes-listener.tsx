@@ -11,8 +11,8 @@ type TripChangesListenerProps = {
   tripId: string
 }
 
-// Keeps a trip's pages current when another crew member or device changes it. Renders
-// nothing: a change event only says *that* something changed, so the reaction is to
+// Keeps a trip's pages current when another crew member or device changes it. Shows
+// nothing to the viewer: a change event only says *that* something changed, so the reaction is to
 // re-render the server components through their normal reads. Client state, including a
 // form someone is part-way through, survives a refresh.
 export function TripChangesListener({ tripId }: TripChangesListenerProps) {
@@ -36,7 +36,9 @@ export function TripChangesListener({ tripId }: TripChangesListenerProps) {
   )
 
   const mintUrl = useCallback(() => getChangesStreamUrl(tripId), [tripId])
-  useTripChanges(tripId, { mintUrl, onChange })
+  const { status } = useTripChanges(tripId, { mintUrl, onChange })
 
-  return null
+  // Hidden, but present so the e2e spec can wait for the stream's `hello` before it changes
+  // anything: an event that lands between render and connect is not replayed.
+  return <span hidden data-trip-changes-status={status} />
 }
