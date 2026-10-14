@@ -12,6 +12,7 @@ from Schemas.medical_notes_access_log_schema import MedicalNotesAccessLogSchema
 from Api.features import require_medical_notes
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
+from Services.trip_change_service import TripChangeService
 from Services.trip_service import TripService
 from Services.trip_member_service import TripMemberService
 from Services.trip_leadership_service import TripLeadershipService
@@ -42,7 +43,10 @@ def get_trip(id: str):
     ---
     get:
       summary: Get a trip by id
-      description: Medical notes are redacted for non-leader travellers.
+      description: >
+        Medical notes are redacted for non-leader travellers. `changeRev` is the revision of
+        the trip's change log at the moment of the read — what a client polls
+        GET /live/trip/<id>/changes from — or null when the log could not be reached.
       responses:
         200:
           description: The trip
@@ -54,9 +58,13 @@ def get_trip(id: str):
     """
     try:
         logger.info(f"Retrieving trip with id {id}")
+        # Before the data, so a change committed in between is reported by the first poll
+        # from this revision rather than lost to the gap.
+        change_rev = TripChangeService.current_revision(id)
         trip = TripService.get_trip_by_id(id)
         TripService.touch_last_accessed(trip)
         data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
+        data["changeRev"] = change_rev
 
         current_user_id = str(g.current_user_id)
         is_leader = any(

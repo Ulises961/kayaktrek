@@ -176,19 +176,59 @@ def denylist(app):
 
 
 class FakeTripChangeRedis:
-    """Records what the trip-change publisher sends (M36). Autouse below so no test
-    depends on a reachable Redis just because a commit now publishes."""
+    """The trip change log (M36), as far as the service uses it. Autouse below so no test
+    depends on a reachable Redis just because a commit now publishes.
+
+    `eval` stands in for the append script: it does what the script's comments say it does,
+    and `Tests/94_m36_trip_change_log_redis_test.py` runs the real script against a real Redis
+    (when one is reachable) so this stand-in cannot drift from it unnoticed."""
 
     def __init__(self):
-        self.published: list[tuple[str, str]] = []
         self.revisions: dict[str, int] = {}
+        self.logs: dict[str, dict[str, int]] = {}
+        self.ttls: dict[str, int] = {}
 
-    def incr(self, key):
-        self.revisions[key] = self.revisions.get(key, 0) + 1
-        return self.revisions[key]
+    def get(self, key):
+        revision = self.revisions.get(key)
+        return None if revision is None else str(revision)
 
-    def publish(self, channel, message):
-        self.published.append((channel, message))
+    def eval(self, script, numkeys, *keys_and_args):
+        revision_key, log_key = keys_and_args[:2]
+        payload, max_entries, ttl_seconds = keys_and_args[numkeys], int(keys_and_args[numkeys + 1]), int(
+            keys_and_args[numkeys + 2]
+        )
+        revision = self.revisions[revision_key] = self.revisions.get(revision_key, 0) + 1
+        log = self.logs.setdefault(log_key, {})
+        log[f"{revision}|{payload}"] = revision
+        for member in sorted(log, key=log.__getitem__)[:-max_entries]:
+            del log[member]
+        self.ttls[log_key] = ttl_seconds
+        return revision
+
+    def zrangebyscore(self, key, minimum, maximum):
+        assert maximum == "+inf"
+        log = self.logs.get(key, {})
+        return [member for member in sorted(log, key=log.__getitem__) if log[member] >= minimum]
+
+    def expire_log(self, trip_id):
+        """What the log's TTL does to a trip nobody has changed for an hour: the entries go,
+        the revision counter stays."""
+        self.logs.pop(f"trip:{trip_id}:log", None)
+
+    def entries(self, trip_id) -> list[dict]:
+        """Every logged commit for a trip, oldest first, as `{rev, changes}` — or `{rev,
+        changes: None}` for one too large to list."""
+        log = self.logs.get(f"trip:{trip_id}:log", {})
+        entries = []
+        for member in sorted(log, key=log.__getitem__):
+            revision, _, payload = member.partition("|")
+            entries.append({"rev": int(revision), "changes": None if payload == "!" else json.loads(payload)})
+        return entries
+
+    def reset(self):
+        """Forget what was logged so far, keeping revisions: a test's setup writes are not
+        what it asserts on."""
+        self.logs.clear()
 
 
 @pytest.fixture(autouse=True)

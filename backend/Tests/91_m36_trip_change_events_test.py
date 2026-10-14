@@ -7,12 +7,10 @@ from Models.point import Point
 from Resources.point_resource import POINT_ENDPOINT
 from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Utils.trip_change_events import EXCLUDED_MODELS, TRIP_SCOPED_RESOLVERS
-from Services.trip_change_service import trip_changes_channel
 
 
 def _messages_for(fake_redis, trip_id):
-    channel = trip_changes_channel(trip_id)
-    return [json.loads(message) for published_channel, message in fake_redis.published if published_channel == channel]
+    return fake_redis.entries(trip_id)
 
 
 def _changes(fake_redis, trip_id):
@@ -34,7 +32,7 @@ def test_excluded_models_carry_a_reason():
 
 def test_creating_a_point_notifies_its_trip(client, auth_headers, itinerary, trip_w_o_itinerary, trip_change_redis):
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     response = client.post(
         f"{POINT_ENDPOINT}/create",
@@ -51,7 +49,7 @@ def test_message_carries_identity_only_never_field_values(
     client, auth_headers, itinerary, trip_w_o_itinerary, trip_change_redis
 ):
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     client.post(
         f"{POINT_ENDPOINT}/create",
@@ -80,7 +78,7 @@ def test_deleting_a_point_notifies_with_the_deleted_id(
         json={"dayId": itinerary["days"][0]["id"], "type": "position"},
     )
     point_id = created.json["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     response = client.delete(f"{POINT_ENDPOINT}/{point_id}", headers=auth_headers)
     assert response.status_code in (200, 204)
@@ -100,7 +98,7 @@ def test_one_commit_is_one_message_per_trip(client, auth_headers, itinerary, tri
         )
         assert created.status_code == 201
         point_ids.append(created.json["id"])
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     response = client.delete(f"{POINT_ENDPOINT}/{point_ids[1]}", headers=auth_headers)
     assert response.status_code in (200, 204)
@@ -114,7 +112,7 @@ def test_one_commit_is_one_message_per_trip(client, auth_headers, itinerary, tri
 
 def test_revision_increases_per_trip(client, auth_headers, itinerary, trip_w_o_itinerary, trip_change_redis):
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
     for _ in range(2):
         client.post(
             f"{POINT_ENDPOINT}/create",
@@ -129,7 +127,7 @@ def test_revision_increases_per_trip(client, auth_headers, itinerary, trip_w_o_i
 
 def test_rolled_back_write_notifies_no_one(app, itinerary, trip_w_o_itinerary, trip_change_redis):
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     db.session.add(Point(day_id=itinerary["days"][0]["id"], type="position"))
     db.session.flush()
@@ -140,10 +138,7 @@ def test_rolled_back_write_notifies_no_one(app, itinerary, trip_w_o_itinerary, t
 
 def test_publish_failure_never_fails_the_write(client, auth_headers, itinerary):
     class _BrokenRedis:
-        def incr(self, key):
-            raise ConnectionError("redis unreachable")
-
-        def publish(self, channel, message):
+        def eval(self, script, numkeys, *keys_and_args):
             raise ConnectionError("redis unreachable")
 
     with patch("Services.trip_change_service.live_redis", return_value=_BrokenRedis()):
@@ -162,7 +157,7 @@ def test_viewing_a_trip_notifies_no_one(client, auth_headers, trip_w_o_itinerary
     a change, every viewer's refresh would re-read the trip, bump it again and publish again:
     a loop that never lets a page settle, and that every other viewer joins."""
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     response = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
 
@@ -172,7 +167,7 @@ def test_viewing_a_trip_notifies_no_one(client, auth_headers, trip_w_o_itinerary
 
 def test_editing_a_trip_still_notifies_its_crew(client, auth_headers, trip_w_o_itinerary, trip_change_redis):
     trip_id = trip_w_o_itinerary["id"]
-    trip_change_redis.published.clear()
+    trip_change_redis.reset()
 
     response = client.patch(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers, json={"destination": "Somewhere new"})
 

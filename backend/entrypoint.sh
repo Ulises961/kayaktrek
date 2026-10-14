@@ -10,7 +10,7 @@ elif [ "$SERVICE_ROLE" = "sse" ]; then
         --bind 0.0.0.0:5000 \
         --workers 1 \
         --worker-class gevent \
-        --worker-connections 600 \
+        --worker-connections 200 \
         --timeout 120 \
         --access-logfile - \
         --error-logfile - \

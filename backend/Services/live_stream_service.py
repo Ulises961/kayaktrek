@@ -1,7 +1,5 @@
 import json
 import logging
-import os
-import threading
 import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -17,7 +15,6 @@ from Api.redis import live_redis
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember
 from Services.live_position_service import LivePositionService, live_channel
-from Services.trip_change_service import trip_changes_channel, trip_revision_key
 from Services.Utils.pubsub_fanout import PubSubFanout, SubscriptionClosed
 
 logger = logging.getLogger(__name__)
@@ -25,26 +22,22 @@ logger = logging.getLogger(__name__)
 STREAM_TICKET_PURPOSE = "live-stream"
 CHANGES_TICKET_PURPOSE = "trip-changes"
 STREAM_TICKET_TTL_MINUTES = 5
-# Sized from measurement (plans/M36 "Capacity, measured"). The sidecar itself is not what
-# binds: 1000 held streams cost ~40 MiB. nginx is — each proxied stream takes two of its
-# worker_connections (768 per worker on the droplet) and two file descriptors (soft limit
-# 1024) — so this stays well inside that, and inside the worker's 600 connections, leaving
-# the rest to position streams and ordinary requests.
-DEFAULT_TRIP_CHANGES_MAX_STREAMS = 300
 
-# Every connecting viewer reads the trip's revision once, from `live_redis()`'s pool, which
-# redis-py caps at 100 connections. A reconnect storm — the sidecar restarting, a bad
-# network healing — does those reads all at once, and the viewer that arrives when the pool is
-# empty gets "Too many connections" after its headers are already sent: a stream that is open
-# and silent. Measured on the sidecar harness. Queuing the reads costs milliseconds.
-REVISION_READ_CONCURRENCY = 16
-_revision_reads = threading.BoundedSemaphore(REVISION_READ_CONCURRENCY)
+# A poll asks "is this person still on the trip?" every few seconds. Asking the database each
+# time would make the poll as expensive as the page it is checking on, so a confirmed member
+# is remembered briefly. Only a yes is remembered: someone just invited must not wait out the
+# window to be let in. The cost is that a removed member's polls keep being answered — with
+# identities, never field values — for up to this long.
+MEMBERSHIP_CACHE_SECONDS = 30
+_MEMBERSHIP_CACHE_MAX_ENTRIES = 4096
+_confirmed_members: dict[tuple[str, str], float] = {}
 
 
 @lru_cache(maxsize=1)
-def trip_changes_fanout() -> PubSubFanout:
-    """The process's single Redis subscription for change streams. One per process because
-    each gunicorn worker is its own process with its own connection to share."""
+def live_fanout() -> PubSubFanout:
+    """The process's single Redis subscription for position streams. One per process because
+    each gunicorn worker is its own process with its own connection to share: a viewer used to
+    take a pooled connection of its own, and `live_redis()`'s pool is capped at 100."""
     return PubSubFanout(live_redis)
 
 
@@ -61,8 +54,8 @@ class LiveStreamService:
 
     @staticmethod
     def mint_changes_ticket(trip_id: str, user_id: str) -> str:
-        """Unlike a position-stream ticket this names the user: the changes stream
-        outlives a ticket's 5 minutes and must re-check that user's membership."""
+        """Unlike a position-stream ticket this names the user: the poll has no other way to
+        know whose membership to check, and to key its rate limit on."""
         return LiveStreamService._mint_ticket(CHANGES_TICKET_PURPOSE, trip_id, userId=user_id)
 
     @staticmethod
@@ -96,99 +89,39 @@ class LiveStreamService:
         return payload
 
     @staticmethod
-    def stream_trip_changes(
-        trip_id: str,
-        user_id: str,
-        *,
-        pubsub: Optional[Any] = None,
-        fanout: Optional[Any] = None,
-        redis_client: Optional[Any] = None,
-        heartbeat_seconds: int = 15,
-        membership_check_seconds: int = 60,
-        max_ticks: Optional[int] = None,
-        monotonic: Callable[[], float] = time.monotonic,
-    ) -> Iterator[str]:
-        """Trip change notifications for one crew member (M36 §WP2).
+    def is_trip_member_cached(
+        trip_id: str, user_id: str, *, monotonic: Callable[[], float] = time.monotonic
+    ) -> bool:
+        """Whether `user_id` is on the trip, remembered for `MEMBERSHIP_CACHE_SECONDS` once
+        confirmed. For the change poll, which asks every few seconds per open page."""
+        key = (user_id, trip_id)
+        now = monotonic()
+        expires_at = _confirmed_members.get(key)
+        if expires_at is not None and expires_at > now:
+            return True
 
-        Sends no data snapshot: `hello` carries only the trip's current revision, and a
-        client whose last-seen revision differs refetches what it is showing — the same
-        path serves a reconnect and a flushed Redis. Subscribes *before* reading the
-        revision so a change landing in between is delivered rather than lost.
-
-        Unlike `stream_events` this does not end when the trip leaves `happening`
-        (collaboration is mostly before and after), and it re-checks membership on a slow
-        timer so a removed crew member's open stream closes.
-
-        The subscription comes from the process-wide fan-out, not a `pubsub()` of its own:
-        one Redis connection serves every viewer in the process. A viewer the fan-out cuts
-        loose for not reading ends the stream *without* an `end` event — `end` tells the
-        client not to come back, and this one should, so that `hello`'s revision sends it
-        to refetch. `pubsub`, `fanout`, `redis_client`, `max_ticks` and `monotonic` are
-        injectable for the same reason as in `stream_events`: Flask's test client cannot
-        consume an infinite stream.
-        """
-        tick_count = 0
-        change_events = 0
-        with logfire.span("sse_connection", trip_id=trip_id, stream="trip_changes") as span:
-            yield "retry: 5000\n\n"
-
-            owns_subscription = pubsub is None
-            client = redis_client if redis_client is not None else live_redis()
-            if owns_subscription:
-                shared_fanout = fanout if fanout is not None else trip_changes_fanout()
-                pubsub = shared_fanout.subscribe(trip_changes_channel(trip_id))
-            assert pubsub is not None
-
-            try:
-                with _revision_reads:
-                    revision = int(client.get(trip_revision_key(trip_id)) or 0)
-                yield f"event: hello\ndata: {json.dumps({'rev': revision})}\n\n"
-
-                last_membership_check = monotonic()
-                tick = 0
-                while max_ticks is None or tick < max_ticks:
-                    if monotonic() - last_membership_check >= membership_check_seconds:
-                        last_membership_check = monotonic()
-                        if not LiveStreamService._is_trip_member(trip_id, user_id):
-                            yield "event: end\ndata: {}\n\n"
-                            return
-
-                    tick += 1
-                    tick_count = tick
-                    try:
-                        message = pubsub.get_message(timeout=heartbeat_seconds)
-                    except SubscriptionClosed:
-                        return
-                    if message is not None and message.get("type") == "message":
-                        change_events += 1
-                        yield f"event: change\ndata: {message['data']}\n\n"
-                    else:
-                        yield ": hb\n\n"
-            finally:
-                span.set_attribute("tick_count", tick_count)
-                span.set_attribute("change_events", change_events)
-                if owns_subscription:
-                    pubsub.close()
-
-    @staticmethod
-    def changes_streams_at_capacity() -> bool:
-        """Whether the sidecar should turn another changes stream away.
-
-        The sidecar is one gevent worker with a fixed number of connections shared by every
-        stream it serves, positions included, and a changes stream is open for as long as
-        someone has a trip page up. Refusing cleanly at a limit we chose keeps the
-        position streams — the ones a paddler's safety can depend on — from being crowded
-        out by tabs left open on a desk.
-        """
-        limit = int(os.getenv("TRIP_CHANGES_MAX_STREAMS", str(DEFAULT_TRIP_CHANGES_MAX_STREAMS)))
-        return trip_changes_fanout().active_subscriptions() >= limit
+        is_member = LiveStreamService._is_trip_member(trip_id, user_id)
+        if not is_member:
+            _confirmed_members.pop(key, None)
+            return False
+        if len(_confirmed_members) >= _MEMBERSHIP_CACHE_MAX_ENTRIES:
+            for stale_key in [k for k, expiry in _confirmed_members.items() if expiry <= now]:
+                del _confirmed_members[stale_key]
+            if len(_confirmed_members) >= _MEMBERSHIP_CACHE_MAX_ENTRIES:
+                _confirmed_members.clear()
+        _confirmed_members[key] = now + MEMBERSHIP_CACHE_SECONDS
+        return True
 
     @staticmethod
     def _is_trip_member(trip_id: str, user_id: str) -> bool:
+        try:
+            trip_uuid, user_uuid = UUID(trip_id), UUID(user_id)
+        except ValueError:
+            return False
         with logfire.suppress_instrumentation():
             membership = (
                 db.session.query(TripMember.id)
-                .filter(TripMember.trip_id == UUID(trip_id), TripMember.user_id == UUID(user_id))
+                .filter(TripMember.trip_id == trip_uuid, TripMember.user_id == user_uuid)
                 .first()
             )
             # Released on every check: a long-lived generator must not pin a pool
@@ -201,14 +134,21 @@ class LiveStreamService:
         trip_id: str,
         *,
         pubsub: Optional[Any] = None,
+        fanout: Optional[Any] = None,
         heartbeat_seconds: int = 15,
         max_ticks: Optional[int] = None,
     ) -> Iterator[str]:
         """Stateless snapshot-then-stream generator (§D4).
 
-        `pubsub`/`max_ticks` are injectable so tests can drive this directly with a
+        `pubsub`/`fanout`/`max_ticks` are injectable so tests can drive this directly with a
         scripted fake — Flask's test client buffers full responses and cannot consume
         an infinite stream. Do not remove that seam.
+
+        The subscription comes from the process-wide fan-out, not a `pubsub()` of its own, so
+        however many people watch — a crew, plus anyone with the public story link — the
+        process holds one Redis connection for them all. A viewer the fan-out cuts loose for
+        not reading ends the stream *without* an `end` event: `end` tells the client not to
+        come back, and this one should, to take a fresh snapshot.
 
         The whole connection lifetime is one manual Logfire span (M13 §A.2), not the
         default per-request auto-instrumented span — the route is excluded from Flask
@@ -231,8 +171,8 @@ class LiveStreamService:
 
             owns_pubsub = pubsub is None
             if owns_pubsub:
-                pubsub = live_redis().pubsub()
-                pubsub.subscribe(live_channel(trip_id))
+                shared_fanout = fanout if fanout is not None else live_fanout()
+                pubsub = shared_fanout.subscribe(live_channel(trip_id))
             assert pubsub is not None
 
             try:
@@ -264,7 +204,10 @@ class LiveStreamService:
 
                     tick += 1
                     tick_count = tick
-                    message = pubsub.get_message(timeout=heartbeat_seconds)
+                    try:
+                        message = pubsub.get_message(timeout=heartbeat_seconds)
+                    except SubscriptionClosed:
+                        return
                     if message is not None and message.get("type") == "message":
                         position_events += 1
                         yield f"event: position\ndata: {message['data']}\n\n"
@@ -274,5 +217,4 @@ class LiveStreamService:
                 span.set_attribute("tick_count", tick_count)
                 span.set_attribute("position_events", position_events)
                 if owns_pubsub:
-                    pubsub.unsubscribe(live_channel(trip_id))
                     pubsub.close()

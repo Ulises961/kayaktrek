@@ -69,6 +69,11 @@ class ItineraryService:
         return itinerary
 
     @staticmethod
+    def get_trip_id(itinerary_id: str) -> Optional[UUID]:
+        """The trip an itinerary belongs to, without loading its days and points."""
+        return db.session.query(Itinerary.trip_id).filter_by(id=UUID(itinerary_id)).scalar()
+
+    @staticmethod
     def get_itineraries_by_user(user_id: str) -> List[Itinerary]:
         """Return all itineraries owned by this user (user_id FK, not junction table)."""
         return (

@@ -413,10 +413,6 @@ services:
       CACHE_REDIS_URL: ${CACHE_REDIS_URL:-redis://redis:6379/1}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
       LIVE_REDIS_URL: ${LIVE_REDIS_URL:-redis://redis:6379/3}
-      # How many trip-changes streams (M36) this sidecar holds before answering 503 with a
-      # Retry-After. Sized from measurement (plans/M36 "Capacity, measured"): the sidecar
-      # could hold far more, but each stream takes two of nginx's worker_connections.
-      TRIP_CHANGES_MAX_STREAMS: ${TRIP_CHANGES_MAX_STREAMS:-300}
       # Its own instance, not a DB on the shared one — see the redis-auth service for why.
       # DB 0 because a single-purpose instance has no other tenants to number around.
       #

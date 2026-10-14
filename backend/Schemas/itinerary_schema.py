@@ -32,6 +32,9 @@ class ItinerarySchema(BaseSchema):
     created_from_id = fields.UUID(allow_none=True, dump_only=True)
     # Optimistic-concurrency token for mobile sync-down (M9c) — see Models.itinerary.
     route_version = fields.Integer(dump_only=True)
+    # Set by the single-itinerary read only (M36), and only for a trip's itinerary: where the
+    # trip's change log stood when the data was read.
+    change_rev = fields.Integer(dump_only=True, allow_none=True)
     days = fields.List(
         fields.Nested(DaySchema),
         allow_none=True,
