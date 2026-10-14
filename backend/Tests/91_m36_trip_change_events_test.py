@@ -5,6 +5,7 @@ from unittest.mock import patch
 from Api.database import Base, db
 from Models.point import Point
 from Resources.point_resource import POINT_ENDPOINT
+from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Utils.trip_change_events import EXCLUDED_MODELS, TRIP_SCOPED_RESOLVERS
 from Services.trip_change_service import trip_changes_channel
 
@@ -154,3 +155,26 @@ def test_publish_failure_never_fails_the_write(client, auth_headers, itinerary):
 
     assert response.status_code == 201
     assert db.session.get(Point, response.json["id"]) is not None
+
+
+def test_viewing_a_trip_notifies_no_one(client, auth_headers, trip_w_o_itinerary, trip_change_redis):
+    """GET /trip/<id> bumps Trip.last_accessed_at for the weather attention gate. Published as
+    a change, every viewer's refresh would re-read the trip, bump it again and publish again:
+    a loop that never lets a page settle, and that every other viewer joins."""
+    trip_id = trip_w_o_itinerary["id"]
+    trip_change_redis.published.clear()
+
+    response = client.get(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert _changes(trip_change_redis, trip_id) == []
+
+
+def test_editing_a_trip_still_notifies_its_crew(client, auth_headers, trip_w_o_itinerary, trip_change_redis):
+    trip_id = trip_w_o_itinerary["id"]
+    trip_change_redis.published.clear()
+
+    response = client.patch(f"{TRIP_ENDPOINT}/{trip_id}", headers=auth_headers, json={"destination": "Somewhere new"})
+
+    assert response.status_code == 200
+    assert {"t": "trip", "id": trip_id, "op": "update"} in _changes(trip_change_redis, trip_id)

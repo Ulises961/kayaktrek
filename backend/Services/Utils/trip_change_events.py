@@ -23,7 +23,7 @@ from collections import defaultdict
 from typing import Any, Callable, Optional
 from uuid import UUID
 
-from sqlalchemy import event, select
+from sqlalchemy import event, inspect, select
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
@@ -214,6 +214,23 @@ EXCLUDED_MODELS: dict[type, str] = {
 }
 
 
+QUIET_COLUMNS: dict[type, frozenset[str]] = {
+    Trip: frozenset({"last_accessed_at"}),
+}
+"""Columns whose change, alone, is bookkeeping rather than something a viewer could see.
+
+`Trip.last_accessed_at` is written by every `GET /trip/<id>`; published, each viewer's refresh
+would re-read the trip, write it again and publish again, indefinitely."""
+
+
+def _only_quiet_columns_changed(instance: Any) -> bool:
+    quiet = QUIET_COLUMNS.get(type(instance))
+    if quiet is None:
+        return False
+    changed = {attribute.key for attribute in inspect(instance).attrs if attribute.history.has_changes()}
+    return changed <= quiet
+
+
 def _collected(session: Session) -> set[tuple[UUID, str, UUID, str]]:
     return session.info.setdefault(_COLLECTED_KEY, set())
 
@@ -248,7 +265,7 @@ def _collect_creates_and_updates(session: Session, flush_context) -> None:
     for instance in list(session.new):
         _record(session, connection, instance, "create")
     for instance in list(session.dirty):
-        if session.is_modified(instance, include_collections=False):
+        if session.is_modified(instance, include_collections=False) and not _only_quiet_columns_changed(instance):
             _record(session, connection, instance, "update")
 
 
