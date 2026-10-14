@@ -18,6 +18,9 @@ export const ItinerarySchema = z.object({
   days: DaysSchema.nullish(),
   tripId: z.uuidv7().nullish(),
   userId: z.uuidv7().nullish(),
+  // Where the trip's change log stood when this itinerary was read (M36) — present on the
+  // single-itinerary read of a trip's itinerary only.
+  changeRev: z.number().int().nonnegative().nullish(),
   // Unlisted trip-narrative share link (M7d) — only ever dumped back to the owner,
   // right after generate/regenerate (POST /<id>/story-share).
   storyShareToken: z.string().nullish(),

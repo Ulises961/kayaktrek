@@ -32,7 +32,7 @@ export default async function TripDetailLayout({
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      {isMember && <TripChangesListener tripId={id} />}
+      {isMember && <TripChangesListener tripId={id} initialRev={trip.changeRev ?? null} />}
       <SetBreadcrumbs
         crumbs={[
           { label: "Trips", href: "/trips" },

@@ -1,6 +1,6 @@
 "use server"
 
-import { apiPost, isRedirectError } from "@/lib/api/client"
+import { ApiError, apiPost, isRedirectError } from "@/lib/api/client"
 import { API_PREFIX, SSE_URL } from "@/lib/api/config"
 
 export type PositionPingInput = {
@@ -39,10 +39,13 @@ export async function closeDay(tripId: string, date?: string): Promise<CloseDayR
   }
 }
 
-// Mints a trip-changes ticket (M36) and returns the sidecar URL for the crew-only change
-// stream, or null on failure. Distinct from getStreamTicket: that one opens the position
-// stream and ends when a trip is no longer happening; this one is valid in every state.
-export async function getChangesStreamUrl(tripId: string): Promise<string | null> {
+// Mints a trip-changes ticket (M36) and returns the sidecar URL the browser polls for the
+// crew's changes. Distinct from getStreamTicket: that one opens the position stream and ends
+// when a trip is no longer happening; this one is valid in every state.
+//
+// `null` means the server said no — the caller is not on the trip. Anything else that goes
+// wrong throws: the poller must not take a backend that is down for a removed member.
+export async function getChangesPollUrl(tripId: string): Promise<string | null> {
   try {
     const { ticket } = await apiPost<{ ticket: string }>(
       `/api/live/trip/${tripId}/changes-ticket`,
@@ -51,7 +54,8 @@ export async function getChangesStreamUrl(tripId: string): Promise<string | null
     return `${SSE_URL}${API_PREFIX}/live/trip/${tripId}/changes?ticket=${ticket}`
   } catch (e) {
     if (isRedirectError(e)) throw e
-    return null
+    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null
+    throw e
   }
 }
 

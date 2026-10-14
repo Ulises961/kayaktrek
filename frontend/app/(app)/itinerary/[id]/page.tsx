@@ -59,7 +59,9 @@ export default async function ItineraryBuilderPage({
 
   return (
     <>
-      {isTripMember && itinerary.tripId && <TripChangesListener tripId={itinerary.tripId} />}
+      {isTripMember && itinerary.tripId && (
+        <TripChangesListener tripId={itinerary.tripId} initialRev={itinerary.changeRev ?? null} />
+      )}
       <MapBuilder
         itinerary={itinerary}
         tripId={itinerary.tripId ?? null}

@@ -18,12 +18,14 @@ export const TripChangeSchema = z.object({
   ]),
 })
 
-export const TripChangeHelloSchema = z.object({ rev: z.number().int().nonnegative() })
-
-export const TripChangeMessageSchema = z.object({
+// One poll's answer. `truncated` means the exact list of changes since the cursor cannot be
+// given (the server's log was trimmed, expired or lost), so `changes` is empty and the
+// client should refresh everything it shows.
+export const TripChangesPageSchema = z.object({
   rev: z.number().int().nonnegative(),
   changes: z.array(TripChangeSchema),
+  truncated: z.boolean(),
 })
 
 export type TripChange = z.infer<typeof TripChangeSchema>
-export type TripChangeMessage = z.infer<typeof TripChangeMessageSchema>
+export type TripChangesPage = z.infer<typeof TripChangesPageSchema>

@@ -1,13 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const { mockApiPost } = vi.hoisted(() => ({ mockApiPost: vi.fn() }))
+const { mockApiPost, MockApiError } = vi.hoisted(() => ({
+  mockApiPost: vi.fn(),
+  MockApiError: class extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+    ) {
+      super(message)
+    }
+  },
+}))
 
 vi.mock("@/lib/api/client", () => ({
   apiPost: mockApiPost,
   isRedirectError: () => false,
+  ApiError: MockApiError,
 }))
 
-import { sendPositionPing, getStreamTicket, getChangesStreamUrl, closeDay } from "../actions"
+import { sendPositionPing, getStreamTicket, getChangesPollUrl, closeDay } from "../actions"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 
@@ -72,17 +83,33 @@ describe("getStreamTicket", () => {
   })
 })
 
-describe("getChangesStreamUrl", () => {
+describe("getChangesPollUrl", () => {
   it("returns the sidecar changes URL with the minted ticket", async () => {
     mockApiPost.mockResolvedValue({ ticket: "tok-xyz" })
-    const url = await getChangesStreamUrl(TRIP_ID)
+    const url = await getChangesPollUrl(TRIP_ID)
     expect(mockApiPost).toHaveBeenCalledWith(`/api/live/trip/${TRIP_ID}/changes-ticket`, {})
     expect(url).toBe(`http://localhost:5001/api/v1/live/trip/${TRIP_ID}/changes?ticket=tok-xyz`)
   })
 
-  it("returns null on failure", async () => {
-    mockApiPost.mockRejectedValue(new Error("nope"))
-    expect(await getChangesStreamUrl(TRIP_ID)).toBeNull()
+  it.each([403, 404])(
+    "returns null when the server refuses with %s: not on the trip",
+    async (status) => {
+      mockApiPost.mockRejectedValue(new MockApiError("refused", status))
+      expect(await getChangesPollUrl(TRIP_ID)).toBeNull()
+    },
+  )
+
+  it.each([500, 503, 429])(
+    "throws on %s, so the poller backs off instead of concluding anything",
+    async (status) => {
+      mockApiPost.mockRejectedValue(new MockApiError("struggling", status))
+      await expect(getChangesPollUrl(TRIP_ID)).rejects.toThrow("struggling")
+    },
+  )
+
+  it("throws on a network failure", async () => {
+    mockApiPost.mockRejectedValue(new Error("fetch failed"))
+    await expect(getChangesPollUrl(TRIP_ID)).rejects.toThrow("fetch failed")
   })
 })
 
