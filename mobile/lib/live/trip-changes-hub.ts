@@ -1,187 +1,115 @@
-import {
-  TripChangeHelloSchema,
-  TripChangeMessageSchema,
-  type TripChange,
-} from "@shared/dtos/trip-change"
-
-import type { SseEvent } from "./sse-parser"
+import type { TripChange } from "@shared/dtos/trip-change"
+import type { TripChangesPollerOptions } from "@shared/live/trip-changes-poller"
 
 export type TripChangeListener = (changes: TripChange[]) => void
 
+export type TripChangesPoller = {
+  start: () => void
+  setActive: (active: boolean) => void
+  stop: () => void
+}
+
 export type TripChangesHubDeps = {
-  // A ticketed stream URL. Re-minted on every connection: a ticket lives 5 minutes.
-  mintUrl: (tripId: string) => Promise<string>
-  readStream: (
-    url: string,
-    signal: AbortSignal,
-    onEvent: (event: SseEvent) => void,
-  ) => Promise<void>
+  // A ticketed poll URL for the trip. `null` means the server refused: not on the trip.
+  mintUrl: (tripId: string) => Promise<string | null>
   // Brings the local cache up to date. Failing is expected (offline) and never blocks the
   // listeners: a screen that cannot reach the server falls back to its cache anyway.
   refreshCaches: (tripId: string) => Promise<void>
-  // Resolves early when the signal aborts.
-  wait: (ms: number, signal: AbortSignal) => Promise<void>
+  // The shared poller (`@shared/live/trip-changes-poller`), which owns the protocol.
+  createPoller: (options: TripChangesPollerOptions) => TripChangesPoller
 }
 
-type TripStream = {
+type TripFeed = {
   listeners: Set<TripChangeListener>
-  controller: AbortController | null
+  poller: TripChangesPoller | null
+  // The poller found the viewer is no longer on the trip: polling again would only be refused.
   ended: boolean
-  lastRevision: number | null
   refreshing: boolean
   dirty: boolean
   pendingChanges: TripChange[]
-  // Something changed that the pending list cannot describe: a revision that never
-  // arrived, or a reconnect that found the trip had moved on. Listeners are then told
-  // with an empty delta, which every listener treats as "reload everything".
+  // Something changed that the pending list cannot describe. Listeners are then told with an
+  // empty delta, which every listener treats as "reload everything".
   unknownDelta: boolean
 }
 
-const BASE_BACKOFF_MS = 1000
-// Longer than the web client's: a phone that cannot reach the stream is usually out of
-// signal, and retrying every 10 seconds there only spends battery.
-const MAX_BACKOFF_MS = 30000
-
-// One shared connection per trip, however many screens are showing it. A screen subscribes;
-// the first subscriber opens the stream and the last one closes it.
+// One shared poller per trip, however many screens are showing it. A screen subscribes; the
+// first subscriber starts polling and the last one stops it.
 //
-// Events are hints, never data (M36). A change refreshes the local caches through the
+// Changes are hints, never data (M36). A change refreshes the local caches through the
 // existing sync paths and then tells the listeners to re-read — the same reads they do on
-// focus — so a dropped or duplicated event cannot corrupt anything.
+// focus — so a dropped or duplicated change cannot corrupt anything.
 export function createTripChangesHub(deps: TripChangesHubDeps) {
-  const streams = new Map<string, TripStream>()
+  const feeds = new Map<string, TripFeed>()
   let streamingEnabled = true
 
-  // `null` when what changed is not known — see `TripStream.unknownDelta`.
-  async function announce(tripId: string, stream: TripStream, changes: TripChange[] | null) {
-    if (changes === null) stream.unknownDelta = true
-    else stream.pendingChanges.push(...changes)
-    stream.dirty = true
-    if (stream.refreshing) return
-
-    stream.refreshing = true
+  // `null` when what changed is not known — see `TripFeed.unknownDelta`.
+  async function announce(tripId: string, feed: TripFeed, changes: TripChange[] | null) {
+    if (changes === null) feed.unknownDelta = true
+    else feed.pendingChanges.push(...changes)
+    feed.dirty = true
+    if (feed.refreshing) return
+    feed.refreshing = true
     try {
-      while (stream.dirty) {
-        stream.dirty = false
-        const batch = stream.unknownDelta ? [] : stream.pendingChanges
-        stream.pendingChanges = []
-        stream.unknownDelta = false
+      while (feed.dirty) {
+        feed.dirty = false
+        const batch = feed.unknownDelta ? [] : feed.pendingChanges
+        feed.pendingChanges = []
+        feed.unknownDelta = false
         await deps.refreshCaches(tripId).catch(() => undefined)
-        for (const listener of [...stream.listeners]) listener(batch)
+        for (const listener of [...feed.listeners]) listener(batch)
       }
     } finally {
-      stream.refreshing = false
+      feed.refreshing = false
     }
   }
 
-  function parseJson(raw: string): unknown {
-    try {
-      return JSON.parse(raw)
-    } catch {
-      return null
-    }
-  }
-
-  async function run(tripId: string, stream: TripStream, controller: AbortController) {
-    let backoffMs = BASE_BACKOFF_MS
-
-    function handle(event: SseEvent) {
-      if (event.event === "hello") {
-        const hello = TripChangeHelloSchema.safeParse(parseJson(event.data))
-        if (!hello.success) return
-        // First hello since subscribing: the screens just loaded fresh. Any later hello that
-        // disagrees means changes were missed while disconnected, or the counter went
-        // backwards after a Redis flush — refresh either way.
-        const missed = stream.lastRevision !== null && hello.data.rev !== stream.lastRevision
-        stream.lastRevision = hello.data.rev
-        backoffMs = BASE_BACKOFF_MS
-        if (missed) void announce(tripId, stream, null)
-      } else if (event.event === "change") {
-        const message = TripChangeMessageSchema.safeParse(parseJson(event.data))
-        if (!message.success) return
-        const previous = stream.lastRevision
-        if (previous !== null && message.data.rev <= previous) return
-        stream.lastRevision = message.data.rev
-        // Revisions count commits, one each. A jump means a message was lost on the way
-        // (Redis blipped; this connection was cut loose and came back), so the changes
-        // this one lists are not all of them.
-        const skipped = previous !== null && message.data.rev > previous + 1
-        void announce(tripId, stream, skipped ? null : message.data.changes)
-      } else if (event.event === "end") {
-        // Membership lost or trip gone: reconnecting would only be refused.
-        stream.ended = true
-        controller.abort()
-      }
-    }
-
-    while (!controller.signal.aborted) {
-      try {
-        const url = await deps.mintUrl(tripId)
-        if (controller.signal.aborted) return
-        await deps.readStream(url, controller.signal, handle)
-      } catch {
-        // Fall through to the backoff: offline, a refused ticket and a dropped
-        // connection are all the same to the caller — wait, re-mint, retry.
-      }
-      if (controller.signal.aborted) return
-      await deps.wait(backoffMs, controller.signal)
-      backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS)
-    }
-  }
-
-  function ensureRunning(tripId: string, stream: TripStream) {
-    if (!streamingEnabled || stream.controller || stream.ended || stream.listeners.size === 0) {
-      return
-    }
-    const controller = new AbortController()
-    stream.controller = controller
-    void run(tripId, stream, controller)
-  }
-
-  function stop(stream: TripStream) {
-    stream.controller?.abort()
-    stream.controller = null
+  function ensureRunning(tripId: string, feed: TripFeed) {
+    if (feed.poller || feed.ended || feed.listeners.size === 0) return
+    feed.poller = deps.createPoller({
+      mintUrl: () => deps.mintUrl(tripId),
+      onChange: (changes) => void announce(tripId, feed, changes.length === 0 ? null : changes),
+      onStatus: (status) => {
+        if (status === "ended") feed.ended = true
+      },
+      // A poller for a screen that opens while the app is backgrounded waits for the gate.
+      startActive: streamingEnabled,
+    })
+    feed.poller.start()
   }
 
   return {
     subscribe(tripId: string, listener: TripChangeListener): () => void {
-      let stream = streams.get(tripId)
-      if (!stream) {
-        stream = {
+      let feed = feeds.get(tripId)
+      if (!feed) {
+        feed = {
           listeners: new Set(),
-          controller: null,
+          poller: null,
           ended: false,
-          lastRevision: null,
           refreshing: false,
           dirty: false,
           pendingChanges: [],
           unknownDelta: false,
         }
-        streams.set(tripId, stream)
+        feeds.set(tripId, feed)
       }
-      stream.listeners.add(listener)
-      ensureRunning(tripId, stream)
-
+      feed.listeners.add(listener)
+      ensureRunning(tripId, feed)
       return () => {
-        const current = streams.get(tripId)
+        const current = feeds.get(tripId)
         if (!current) return
         current.listeners.delete(listener)
         if (current.listeners.size === 0) {
-          stop(current)
-          streams.delete(tripId)
+          current.poller?.stop()
+          feeds.delete(tripId)
         }
       }
     },
-
-    // Foreground and reachable. Off while backgrounded or offline: a stream held open on a
-    // phone in a drybag only spends battery, and the sweep (sync-trigger.ts) catches up on
-    // the next foreground or reconnect.
+    // Foreground and reachable. Off while backgrounded or offline: polling a phone in a
+    // drybag only spends battery, and the sweep (sync-trigger.ts) catches up on the next
+    // foreground or reconnect. Turning it back on polls at once.
     setStreaming(enabled: boolean) {
       streamingEnabled = enabled
-      for (const [tripId, stream] of streams) {
-        if (enabled) ensureRunning(tripId, stream)
-        else stop(stream)
-      }
+      for (const feed of feeds.values()) feed.poller?.setActive(enabled)
     },
   }
 }

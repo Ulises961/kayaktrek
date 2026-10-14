@@ -36,7 +36,7 @@ export default function AppLayout() {
     return startSyncTrigger()
   }, [status])
 
-  // Holds the trip-change stream open only while foregrounded and reachable (M36).
+  // Polls the trip's change log only while foregrounded and reachable (M36).
   useEffect(() => {
     if (status !== "authenticated") return
     return startTripChanges()
