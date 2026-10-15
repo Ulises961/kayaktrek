@@ -18,7 +18,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/hooks/use-trip-changes", () => ({ useTripChanges: mockUseTripChanges }))
 vi.mock("@/lib/live/actions", () => ({ getChangesPollUrl: mockGetChangesPollUrl }))
 
-import { TripChangesListener, TRIP_CHANGES_REFRESH_DEBOUNCE_MS } from "../trip-changes-listener"
+import {
+  TripChangesListener,
+  TRIP_CHANGES_REFRESH_DEBOUNCE_MS,
+  TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS,
+} from "../trip-changes-listener"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const CREW_PAGE = `/trips/${TRIP_ID}/crew`
@@ -139,6 +143,46 @@ describe("TripChangesListener", () => {
       vi.advanceTimersByTime(50)
     })
     expect(mockRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it("holds a second refresh back until the minimum interval since the last one has passed", () => {
+    const { onChange } = renderListener()
+    act(() => onChange([change("invitation")]))
+    elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+
+    act(() => onChange([change("invitation")]))
+    elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+
+    elapse(TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS - TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+    expect(mockRefresh).toHaveBeenCalledTimes(2)
+  })
+
+  it("answers a change at the debounce once the page has been quiet for the interval", () => {
+    const { onChange } = renderListener()
+    act(() => onChange([change("invitation")]))
+    elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+    elapse(TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS)
+
+    act(() => onChange([change("invitation")]))
+    elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+    expect(mockRefresh).toHaveBeenCalledTimes(2)
+  })
+
+  it("turns every change made while it waits into one refresh when the wait ends", () => {
+    const { onChange } = renderListener()
+    act(() => onChange([change("invitation")]))
+    elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+
+    for (let i = 0; i < 5; i++) {
+      act(() => onChange([change("invitation")]))
+      elapse(TRIP_CHANGES_REFRESH_DEBOUNCE_MS * 4)
+    }
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+
+    elapse(TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS)
+    expect(mockRefresh).toHaveBeenCalledTimes(2)
   })
 
   it("does not refresh after unmounting", () => {

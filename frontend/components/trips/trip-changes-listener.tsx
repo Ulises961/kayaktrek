@@ -9,6 +9,12 @@ import { changesAffectPage } from "@/lib/trips/change-relevance"
 
 export const TRIP_CHANGES_REFRESH_DEBOUNCE_MS = 250
 
+// A refresh re-runs the whole layout's reads (the account, connections and invitations calls
+// among them), and the backend limits each of those routes to 200 an hour per user. Polling
+// every 7 s could otherwise refresh ~500 times an hour on a busy trip; at one every 30 s a
+// page spends at most 120 of that budget and leaves the rest for navigating.
+export const TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS = 30_000
+
 type TripChangesListenerProps = {
   tripId: string
   // Where the trip's change log stood when this page's data was read.
@@ -25,19 +31,29 @@ export function TripChangesListener({ tripId, initialRev = null }: TripChangesLi
   const pathname = usePathname()
   const pathnameRef = useRef(pathname)
   const pendingRefresh = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastRefreshAt = useRef<number | null>(null)
   useEffect(() => {
     pathnameRef.current = pathname
   }, [pathname])
 
-  // A coalesced burst, or several quick commits, becomes one refresh.
+  // A coalesced burst, or several quick commits, becomes one refresh; and a refresh never
+  // follows the previous one by less than the minimum interval, so whatever changed in
+  // between is shown by that one.
   const onChange = useCallback(
     (changes: TripChange[]) => {
       if (!changesAffectPage(pathnameRef.current, changes)) return
       if (pendingRefresh.current) clearTimeout(pendingRefresh.current)
+      const sinceLastRefresh =
+        lastRefreshAt.current === null ? Infinity : Date.now() - lastRefreshAt.current
+      const wait = Math.max(
+        TRIP_CHANGES_REFRESH_DEBOUNCE_MS,
+        TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS - sinceLastRefresh,
+      )
       pendingRefresh.current = setTimeout(() => {
         pendingRefresh.current = null
+        lastRefreshAt.current = Date.now()
         router.refresh()
-      }, TRIP_CHANGES_REFRESH_DEBOUNCE_MS)
+      }, wait)
     },
     [router],
   )
