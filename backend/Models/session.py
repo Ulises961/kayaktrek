@@ -10,7 +10,7 @@ from Models.base_model import BaseModel
 
 class Session(BaseModel):
     """
-    One device's refresh-token chain (M17).
+    One device's refresh-token chain.
 
     The row id is the `sid` claim carried by every access and refresh token issued to
     this device, which is what makes revocation family-scoped: revoking one session

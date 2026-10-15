@@ -10,8 +10,8 @@ from Services.SatelliteFeeds.types import SatelliteProvider
 
 
 class SatelliteFeed(BaseModel):
-    """A user-registered satellite communicator feed (M29) — Garmin inReach MapShare
-    for v1 (`SatelliteProvider`). Not trip-scoped: this is a profile-level setting,
+    """A user-registered satellite communicator feed — Garmin inReach MapShare is the
+    only provider so far (`SatelliteProvider`). Not trip-scoped: this is a profile-level setting,
     like a saved feed URL. The Celery beat task resolves which HAPPENING trip(s) to
     record into at poll time (Tasks/satellite_feed_beat_task.py), the same way a phone
     GPS ping is trip-scoped only once it reaches LivePositionService.

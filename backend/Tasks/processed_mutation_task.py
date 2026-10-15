@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name="Tasks.processed_mutation_task.prune_processed_mutations", bind=True)
 def prune_processed_mutations(self, request_id: Optional[str] = None) -> int:
-    """Forget offline changes processed longer ago than the retention window (M9d).
+    """Forget offline changes processed longer ago than the retention window.
 
     The record exists so a phone resending a batch does not apply it twice; a resend
     months later is not a case worth an ever-growing table. Runs nightly (see

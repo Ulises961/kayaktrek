@@ -26,14 +26,13 @@ class Log(BaseModel):
     user_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True
     )
-    # The trip this log documents — the endorsement key (M7a). Nullable: a manually-created
-    # standalone log has no trip and is non-endorsable. ondelete=SET NULL so deleting a trip
-    # detaches a member's personal logbook entry rather than deleting it (and silently makes
-    # it non-endorsable, which is correct).
+    # The trip this log documents — the endorsement key. Nullable: a manually-created standalone
+    # log has no trip and is non-endorsable. ondelete=SET NULL so deleting a trip detaches a
+    # member's personal logbook entry rather than deleting it, which also makes it non-endorsable.
     trip_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey('trip.id', ondelete='SET NULL'), nullable=True, index=True
     )
-    # GeoJSON LineString of ordered position pings for the day (M8 §8.2), [lon, lat] pairs.
+    # GeoJSON LineString of ordered position pings for the day, [lon, lat] pairs.
     # Null for manual logs and stub auto-logs with no ping data.
     route_geojson: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default='manual', server_default='manual')

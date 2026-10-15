@@ -32,18 +32,18 @@ class Itinerary(BaseModel):
     created_from_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey("itinerary.id", ondelete="SET NULL"), nullable=True
     )
-    # Unlisted "share this trip's story" link (M7d) — independent of is_public/explore
-    # discoverability. Regenerating overwrites the old token, which is the only revoke
-    # path (mirrors Logistics.share_token). No automatic expiry: a story is a keepsake,
-    # not a time-boxed float plan.
+    # Unlisted "share this trip's story" link, independent of is_public/explore discoverability.
+    # Regenerating overwrites the old token, which is the only way to revoke it (as with
+    # Logistics.share_token). No automatic expiry: a story is a keepsake, not a time-boxed
+    # float plan.
     story_share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     story_share_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     # Route-level optimistic-concurrency token, bumped on every structural change
-    # (point add/delete/reorder, day boundary move). Lets mobile sync-down (M9c)
-    # detect a diverged route as one version mismatch instead of diffing every
-    # point — see docs/mobile/sync-protocol-spec.md §8.1.
+    # (point add/delete/reorder, day boundary move). Lets mobile sync-down detect a diverged
+    # route as one version mismatch instead of diffing every point — see
+    # docs/mobile/sync-protocol-spec.md §8.1.
     route_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     days: Mapped[List["Day"]] = relationship(
         lazy="select", cascade="all, delete,save-update"
