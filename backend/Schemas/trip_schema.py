@@ -40,8 +40,8 @@ class TripSchema(BaseSchema):
     outcome = fields.Enum(TripOutcomeType, by_value=True, dump_only=True, allow_none=True)
     last_checkpoint_alert_at = fields.DateTime(dump_only=True, allow_none=True)
     timezone_name = fields.String(dump_only=True, allow_none=True)
-    # Set by the single-trip read only (M36): where the trip's change log stood when the data
-    # was read. Absent from every other projection of a trip.
+    # Set by the single-trip read only: where the trip's change log stood when the data was
+    # read. Absent from every other projection of a trip.
     change_rev = fields.Integer(dump_only=True, allow_none=True)
 
     @pre_load
