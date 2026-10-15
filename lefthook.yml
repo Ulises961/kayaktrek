@@ -108,6 +108,14 @@ local-verify:
       run: cd frontend && pnpm tsc --noEmit
     frontend-tests:
       run: cd frontend && pnpm test:run
+    # Mobile has no formatter; these mirror the three gates mobile-ci.yml runs. They read
+    # frontend/ through the `@shared` alias, so frontend's node_modules must be installed.
+    mobile-typecheck:
+      run: cd mobile && pnpm run typecheck
+    mobile-lint:
+      run: cd mobile && pnpm run lint
+    mobile-tests:
+      run: cd mobile && pnpm run test:run
     # Checks the docs that instruct the next change against the code they describe.
     # Cheap (no deps, sub-second), so it costs nothing to carry beside the real gates.
     docs-match-code:
