@@ -145,3 +145,20 @@ def register_error_handlers(app):
             "error": "Internal Server Error",
             "message": "An unexpected error occurred"
         }), 500
+
+    @app.errorhandler(PermissionError)
+    def handle_permission_error(error):
+        """A service refused the caller; the message it raised was written for them.
+
+        The builtin PermissionError is also what the OS raises for a file it cannot open,
+        and that text names a path. Those carry an `errno`; the message-only form a service
+        raises does not, so only the latter is passed through and the former is treated as
+        the unexpected failure it is.
+        """
+        if error.errno is not None:
+            return handle_unexpected_error(error)
+        logger.warning(f"Permission denied: {str(error)}")
+        return jsonify({
+            "error": "Forbidden",
+            "message": str(error) or "Access denied"
+        }), 403
