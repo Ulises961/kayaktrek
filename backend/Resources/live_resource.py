@@ -35,11 +35,10 @@ _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 _CHANGES_RETRY_AFTER_SECONDS = "30"
 
 # Per-IP, since a stream can arrive with no resolved user yet (the ticket path).
-# Configurable because two browser contexts sharing one dev/CI machine's IP hit this
-# limit within a normal test run and then pay ~90s of client-side backoff
-# (frontend/hooks/use-live-positions.ts) before reconnecting — not a bug in the limit
-# itself, which exists for the same reason noted in the frontend: real crews sharing
-# one NAT/WiFi IP hit it too. Production keeps the conservative default.
+# Configurable because two browser contexts sharing one dev/CI machine's IP hit it within
+# a normal test run and then wait out ~90s of client-side backoff
+# (frontend/hooks/use-live-positions.ts); real crews sharing one NAT/WiFi IP can hit it
+# too. Production keeps the conservative default.
 _LIVE_STREAM_RATE_LIMIT = os.getenv("LIVE_STREAM_RATE_LIMIT", "10 per minute")
 
 # The change poll's limit. A visible trip page polls every ~7 s, about nine requests a minute,
@@ -191,7 +190,7 @@ def close_day(id: str):
 @live_api.route("/story/<string:token>/stream", methods=["GET"])
 @limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
 def story_stream(token: str):
-    """Public, unauthenticated live layer on the M7d story share link. 404 no-oracle:
+    """Public, unauthenticated live layer on the story share link. 404 no-oracle:
     unknown token, tokenless/standalone itinerary, no trip, or trip not happening are
     all indistinguishable — EventSource treats any non-200 as terminal, so this is
     also the correct signal once the trip finishes and the frontend should stop
@@ -257,9 +256,8 @@ def post_stream_ticket(id: str):
 @live_api.route("/trip/<string:id>/stream", methods=["GET"])
 @limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
 def trip_stream(id: str):
-    """Crew stream: accepts either a normal access token (reserved for M9 — the web
-    frontend only ever sends a ticket) or a short-lived stream ticket (§D5), checked
-    in that order. Undecorated because path 2 must succeed with no Authorization
+    """Crew stream: accepts either a normal access token (the web frontend only ever
+    sends a ticket) or a short-lived stream ticket, checked in that order. Undecorated because path 2 must succeed with no Authorization
     header at all. Either credential succeeding satisfies the gate; both failing,
     or the trip not being happening, is a single undifferentiated 404.
     ---

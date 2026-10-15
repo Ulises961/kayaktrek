@@ -19,8 +19,8 @@ session_api = Blueprint("session", __name__, url_prefix=SESSION_ENDPOINT)
 def list_sessions():
     """
     Lists the caller's own active devices. This is the pull channel for suspicious-activity
-    disclosure (M17): rather than emailing on every reuse signal, a user can look at where
-    their account is signed in whenever they want to.
+    disclosure: rather than emailing on every reuse signal, a user can look at where their
+    account is signed in whenever they want to.
     ---
     get:
       summary: List the caller's active sessions

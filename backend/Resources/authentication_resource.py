@@ -110,7 +110,7 @@ def login_user():
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     # Lets the client backfill a missing X25519 keypair while it still holds
-                    # the password (M22 keeps key derivation in the browser, so sign-in is the
+                    # the password (key derivation happens in the browser, so sign-in is the
                     # only moment it can). False for accounts whose keypair a password reset
                     # cleared; the user row is already loaded here, so reporting it is free.
                     "has_keypair": user.public_key is not None,
@@ -592,8 +592,8 @@ def refresh_token():
             user,
             payload,
             location_label=resolve_location_label(),
-            # Also re-resolved so sessions opened before the web client forwarded the
-            # browser's User-Agent stop reading "Unknown device" on their own next refresh.
+            # Also re-resolved, so a session opened without a device label gets one on its
+            # next refresh.
             device_label=resolve_device_label(request.headers.get("User-Agent")),
         )
     except ValueError as e:

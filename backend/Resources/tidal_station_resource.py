@@ -19,7 +19,7 @@ tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tid
 def _may_see_full_content(station) -> bool:
     """Atlas-seeded stations (no owning itinerary) are public reference data.
     A user-created diamond's full content stays gated to the itinerary's own
-    members (M27) — everyone else gets the position-only projection."""
+    members — everyone else gets the position-only projection."""
     if station.itinerary_id is None:
         return True
     return bool(check_resource_ownership(
