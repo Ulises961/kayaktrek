@@ -103,9 +103,9 @@ _KIND_MAX_SIZE: dict[FileKind, int] = {
 
 BucketRole = Literal["public", "private"]
 
-# Which bucket each kind lives in. This is the access boundary the prefix-scoped MinIO
-# policy used to express: avatars and public point images are anonymously readable, the
-# rest require a presigned URL.
+# Which bucket each kind lives in. This is the access boundary: avatars and public point
+# images are anonymously readable, the rest require a presigned URL (single-bucket MinIO
+# expresses the same boundary per prefix).
 _KIND_ROLES: dict[FileKind, BucketRole] = {
     "avatar": "public",
     "banner": "public",
