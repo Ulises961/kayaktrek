@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 
 import Resources.live_resource as live_resource
+from Api.database import db
 from Resources.live_resource import LIVE_ENDPOINT
 from Services import live_stream_service
 from Services.live_stream_service import MEMBERSHIP_CACHE_SECONDS, LiveStreamService
@@ -296,3 +297,14 @@ def test_the_membership_cache_cannot_grow_without_bound(membership_queries, monk
 def test_a_malformed_id_is_not_a_member_rather_than_an_error(app):
     with app.app_context():
         assert LiveStreamService._is_trip_member("not-a-uuid", str(uuid4())) is False
+
+
+def test_the_membership_check_leaves_the_callers_session_in_place(app):
+    """The poll is one short request, and its app context releases the session when it ends.
+    Releasing it here too detaches everything else held in that session; the suite's
+    session-scoped users are among those, so later tests on the same worker fail, at random."""
+    session_before = db.session()
+
+    LiveStreamService._is_trip_member(str(uuid4()), str(uuid4()))
+
+    assert db.session() is session_before

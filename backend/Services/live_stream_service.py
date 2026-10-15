@@ -124,9 +124,6 @@ class LiveStreamService:
                 .filter(TripMember.trip_id == trip_uuid, TripMember.user_id == user_uuid)
                 .first()
             )
-            # Released on every check: a long-lived generator must not pin a pool
-            # connection between checks (see `stream_events`).
-            db.session.remove()
         return membership is not None
 
     @staticmethod
