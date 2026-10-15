@@ -104,7 +104,7 @@ test.describe("Itinerary builder — Edit mode (M14 flat draft surface)", () => 
       await expect(page.getByRole("button", { name: /edit days/i })).toHaveCount(0)
 
       const saveButton = page.getByRole("button", { name: "Save days" })
-      const discardButton = page.getByRole("button", { name: "Discard" })
+      const discardButton = page.getByRole("button", { name: "Discard", exact: true })
       await expect(saveButton).toBeDisabled()
       await expect(discardButton).toBeDisabled()
 
@@ -182,9 +182,9 @@ test.describe("Itinerary builder — Edit mode (M14 flat draft surface)", () => 
       await page.getByRole("button", { name: "Add day after day 2" }).click()
       await expect(page.getByTestId("boundary-drag-handle")).toHaveCount(2)
 
-      await page.getByRole("button", { name: "Discard" }).click()
+      await page.getByRole("button", { name: "Discard", exact: true }).click()
       await expect(page.getByRole("button", { name: "Save days" })).toBeDisabled()
-      await expect(page.getByRole("button", { name: "Discard" })).toBeDisabled()
+      await expect(page.getByRole("button", { name: "Discard", exact: true })).toBeDisabled()
 
       // Nothing was ever sent to the server for this draft — no "Save" was
       // clicked. Confirm directly against the DB: this is the M12/M14
