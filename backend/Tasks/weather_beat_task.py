@@ -2,6 +2,10 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
+from celery import Task
+from sqlalchemy.orm import Query
+from sqlalchemy.sql.elements import ColumnElement
+
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.day import Day
@@ -42,7 +46,7 @@ def _attention_cutoff() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=ATTENTION_TIMEOUT_DAYS)
 
 
-def _due_days(today: date):
+def _due_days(today: date) -> Query[Day]:
     """Every day either sweep may fetch: a building/happening trip viewed within
     ATTENTION_TIMEOUT_DAYS, dated inside the forecast horizon. A NULL
     last_accessed_at is skipped — there is no view to measure dormancy from.
@@ -65,7 +69,7 @@ def _due_days(today: date):
     )
 
 
-def _is_urgent(today: date):
+def _is_urgent(today: date) -> ColumnElement[bool]:
     """A happening trip, or a day today or tomorrow. Day.date has no time, so
     "within 48h" rounds down to whole days: a day two dates out can be as much
     as ~72h away."""
@@ -79,7 +83,7 @@ def _dispatch(days: list[Day], request_id: Optional[str]) -> int:
 
 
 @celery_app.task(name="Tasks.weather_beat_task.refresh_upcoming_weather", bind=True)
-def refresh_upcoming_weather(self, request_id: Optional[str] = None) -> None:
+def refresh_upcoming_weather(self: Task, request_id: Optional[str] = None) -> None:
     """Once-daily sweep of the due days the 6h sweep doesn't own, so no day is
     fetched by both. docs/adr/features.md §1a."""
     today = date.today()
@@ -90,7 +94,7 @@ def refresh_upcoming_weather(self, request_id: Optional[str] = None) -> None:
 
 
 @celery_app.task(name="Tasks.weather_beat_task.refresh_urgent_weather", bind=True)
-def refresh_urgent_weather(self, request_id: Optional[str] = None) -> None:
+def refresh_urgent_weather(self: Task, request_id: Optional[str] = None) -> None:
     """Every-6h sweep of due days on happening trips or dated today/tomorrow.
     docs/adr/features.md §1a."""
     today = date.today()

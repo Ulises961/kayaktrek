@@ -1,7 +1,7 @@
 import logging
 import math
 from datetime import datetime, time, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -68,9 +68,9 @@ def _land_cells(lat_min: float, lat_max: float, lon_min: float, lon_max: float) 
     return land_mask.is_land(lat_grid, lon_grid).ravel()
 
 
-def _closest_state(states: list, hour: int):
+def _closest_state(states: list[Any], hour: int) -> Any:
     """The hourly state whose hour is nearest ``hour``."""
-    def hour_of(state) -> int:
+    def hour_of(state: Any) -> int:
         return state.time.hour if hasattr(state.time, "hour") else 0
 
     return min(states, key=lambda state: abs(hour_of(state) - hour))
@@ -377,7 +377,7 @@ class TidalService:
         return _flow_components(float(best.wave_height), float(best.wave_direction))
 
     @staticmethod
-    def day_bounding_box(day, pad: float = 0.5) -> tuple:
+    def day_bounding_box(day: Day, pad: float = 0.5) -> tuple[float, float, float, float]:
         """(lat_min, lat_max, lon_min, lon_max) of the day's route points, padded; a UK
         coastal box when the day has none."""
         lats = [float(p.latitude) for p in (day.points or []) if p.latitude is not None]

@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ def _load() -> tuple:
     return _state
 
 
-def _to_index(values, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
+def _to_index(values: npt.ArrayLike, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
     if np.any(np.abs(values) > limit):
         raise ValueError(f"{name} must be within +/-{limit:g}")
 
@@ -149,7 +150,7 @@ def _to_index(values, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
     return ((clamped - axis[0]) / step).astype(int)
 
 
-def is_land(lat, lon) -> np.ndarray:
+def is_land(lat: npt.ArrayLike, lon: npt.ArrayLike) -> np.ndarray:
     """Return a boolean array (matching the inputs' shape) — True where the point is land.
 
     Equivalent to `global_land_mask.globe.is_land`, including its clamping at the poles

@@ -1,5 +1,6 @@
 import logging
 from email.utils import parseaddr
+from typing import Any
 
 import requests
 from flask import current_app, render_template
@@ -71,7 +72,7 @@ def _send_via_brevo_api(to: str, subject: str, text_body: str, html_body: str, a
     response.raise_for_status()
 
 
-def send_template_email(to: str, subject: str, template: str, **ctx) -> None:
+def send_template_email(to: str, subject: str, template: str, **ctx: Any) -> None:
     """
     Render and send a dual-part (plain text + HTML) email from templates.
 

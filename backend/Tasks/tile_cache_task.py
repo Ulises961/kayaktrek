@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Services import tile_cache
 
@@ -8,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="Tasks.tile_cache_task.prune_tile_cache", bind=True)
-def prune_tile_cache(self, request_id: Optional[str] = None) -> dict:
+def prune_tile_cache(self: Task, request_id: Optional[str] = None) -> dict:
     """Evict old tiles until the cache is under its cap and the disk has headroom.
 
     Nothing here affects correctness — an evicted tile is one upstream refetch. This exists

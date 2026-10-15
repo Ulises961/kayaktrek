@@ -15,11 +15,12 @@ time); Api/app.py imports it once for that side effect, same convention as the
 "Models without resources" import block just above it.
 """
 import logging
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from sqlalchemy import event, insert, select
 from sqlalchemy.engine import Connection
+from sqlalchemy.orm import Mapper
 
 from Models.day import Day
 from Models.inventory import Inventory
@@ -55,7 +56,7 @@ def _write_tombstone(
 
 
 @event.listens_for(Weather, "after_delete")
-def _tombstone_weather(mapper, connection: Connection, target: Weather) -> None:
+def _tombstone_weather(mapper: Mapper[Any], connection: Connection, target: Weather) -> None:
     trip_id = connection.execute(
         select(Itinerary.__table__.c.trip_id)
         .select_from(Day.__table__.join(Itinerary.__table__, Day.itinerary_id == Itinerary.id))
@@ -65,7 +66,7 @@ def _tombstone_weather(mapper, connection: Connection, target: Weather) -> None:
 
 
 @event.listens_for(Sea, "after_delete")
-def _tombstone_sea(mapper, connection: Connection, target: Sea) -> None:
+def _tombstone_sea(mapper: Mapper[Any], connection: Connection, target: Sea) -> None:
     trip_id = connection.execute(
         select(Itinerary.__table__.c.trip_id)
         .select_from(Day.__table__.join(Itinerary.__table__, Day.itinerary_id == Itinerary.id))
@@ -75,13 +76,13 @@ def _tombstone_sea(mapper, connection: Connection, target: Sea) -> None:
 
 
 @event.listens_for(TripMember, "after_delete")
-def _tombstone_trip_member(mapper, connection: Connection, target: TripMember) -> None:
+def _tombstone_trip_member(mapper: Mapper[Any], connection: Connection, target: TripMember) -> None:
     _write_tombstone(connection, "trip_member", target.id, target.trip_id)
 
 
 @event.listens_for(RequirementContribution, "after_delete")
 def _tombstone_requirement_contribution(
-    mapper, connection: Connection, target: RequirementContribution
+    mapper: Mapper[Any], connection: Connection, target: RequirementContribution
 ) -> None:
     trip_id = connection.execute(
         select(Inventory.__table__.c.trip_id)

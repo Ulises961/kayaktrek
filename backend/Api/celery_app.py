@@ -17,11 +17,13 @@ Usage (inside a task):
 """
 import logging
 import os
+from typing import Any
 
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import after_setup_logger
 from dotenv import load_dotenv
+from flask import Flask
 from kombu.transport.pyamqp import Transport as _AMQPTransport
 
 # Kombu returns False for RabbitMQ >= 3.3, which causes Celery to call
@@ -113,13 +115,13 @@ celery_app.conf.update(
 
 
 @after_setup_logger.connect
-def _configure_celery_logger(logger, **kwargs):
+def _configure_celery_logger(logger: logging.Logger, **kwargs: Any) -> None:
     root = logging.getLogger()
     logger.handlers = root.handlers
     logger.setLevel(root.level)
 
 
-def init_celery(app):
+def init_celery(app: Flask) -> Celery:
     """
     Bind Celery to a Flask app so that tasks run inside an application context.
 
@@ -128,8 +130,8 @@ def init_celery(app):
     Args:
         app: The Flask application instance.
     """
-    class ContextTask(celery_app.Task):
-        def __call__(self, *args, **kwargs):
+    class ContextTask(celery_app.Task):  # type: ignore[name-defined]  # the app-bound Task class
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
             with app.app_context():
                 return self.run(*args, **kwargs)
 

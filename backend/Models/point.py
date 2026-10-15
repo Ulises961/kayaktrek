@@ -65,5 +65,5 @@ class Point(BaseModel):
         secondary=PointHasImage, lazy="subquery", cascade='all, delete'
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Point "({self.latitude}, {self.longitude}), type {self.type}">'

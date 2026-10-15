@@ -49,5 +49,5 @@ class Itinerary(BaseModel):
         lazy="select", cascade="all, delete,save-update"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Itinerary "{self.id}, {self.name}, {self.trip_id}">'

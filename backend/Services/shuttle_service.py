@@ -25,7 +25,7 @@ def _require_editable(trip: Trip) -> None:
         raise ValueError("Shuttle cannot be edited on a completed trip")
 
 
-def _require_arranger_or_leader(vehicle: ShuttleVehicle, user_id: str, trip_id) -> None:
+def _require_arranger_or_leader(vehicle: ShuttleVehicle, user_id: str, trip_id: UUID) -> None:
     membership = db.session.query(TripMember).filter_by(
         user_id=UUID(user_id), trip_id=trip_id
     ).first()

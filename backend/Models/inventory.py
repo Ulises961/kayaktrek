@@ -14,5 +14,5 @@ class Inventory(BaseModel):
         "TripRequirement", cascade="all, delete-orphan", lazy="subquery"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Inventory "{self.id}">'

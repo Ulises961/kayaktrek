@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Services.mutation_queue_service import MutationQueueService
 
@@ -8,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="Tasks.processed_mutation_task.prune_processed_mutations", bind=True)
-def prune_processed_mutations(self, request_id: Optional[str] = None) -> int:
+def prune_processed_mutations(self: Task, request_id: Optional[str] = None) -> int:
     """Forget offline changes processed longer ago than the retention window.
 
     The record exists so a phone resending a batch does not apply it twice; a resend

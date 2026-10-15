@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from celery import Task
 from sqlalchemy import or_
 
 from Api.celery_app import celery_app
@@ -17,7 +18,7 @@ _RETENTION = timedelta(days=30)
 
 
 @celery_app.task(name="Tasks.session_cleanup_task.purge_dead_sessions", bind=True)
-def purge_dead_sessions(self, request_id: Optional[str] = None) -> int:
+def purge_dead_sessions(self: Task, request_id: Optional[str] = None) -> int:
     """Delete sessions that expired or were revoked more than the retention window ago.
 
     Nothing here affects authentication — an expired or revoked session already fails
