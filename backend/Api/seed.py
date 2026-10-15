@@ -22,10 +22,8 @@ DEFAULT_CATEGORIES = [
 
 # Default SHARED trip requirements — the group's collective kit, seeded leader-owned
 # into every new trip's inventory at creation so the gear checklist never starts
-# empty. One member brings each. The private per-paddler kit lives in
-# DEFAULT_PERSONAL_KIT (seeded per-member at TripMember mint), not here. Flat
-# hardcoded list for now; a first-class CatalogItem template entity stays deferred.
-# Categories reference DEFAULT_CATEGORIES slugs above.
+# empty. One member brings each. The private per-paddler kit is DEFAULT_PERSONAL_KIT,
+# seeded per member. Categories reference DEFAULT_CATEGORIES slugs above.
 DEFAULT_TRIP_REQUIREMENTS = [
     {"name": "Spare paddle (split)",        "category": "gear"},
     {"name": "Group tow line",              "category": "gear"},
