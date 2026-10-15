@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy.exc import IntegrityError
@@ -85,30 +84,26 @@ def get_logs():
                   pages:
                     type: integer
     """
-    try:
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        sort = request.args.get("sort", "newest")
-        result = LogService.get_logs_by_user(
-            g.current_user_id,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-            min_sea=request.args.get("min_sea", type=int),
-            max_sea=request.args.get("max_sea", type=int),
-            min_distance=request.args.get("min_distance", type=float),
-            max_distance=request.args.get("max_distance", type=float),
-        )
-        schema = LogSchema()
-        return jsonify({
-            "items": [schema.dump(log) for log in result["items"]],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving logs: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    sort = request.args.get("sort", "newest")
+    result = LogService.get_logs_by_user(
+        g.current_user_id,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        min_sea=request.args.get("min_sea", type=int),
+        max_sea=request.args.get("max_sea", type=int),
+        min_distance=request.args.get("min_distance", type=float),
+        max_distance=request.args.get("max_distance", type=float),
+    )
+    schema = LogSchema()
+    return jsonify({
+        "items": [schema.dump(log) for log in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 
@@ -179,30 +174,26 @@ def get_endorsed_logs():
                   pages:
                     type: integer
     """
-    try:
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        sort = request.args.get("sort", "newest")
-        result = LogService.get_endorsed_logs(
-            g.current_user_id,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-            min_sea=request.args.get("min_sea", type=int),
-            max_sea=request.args.get("max_sea", type=int),
-            min_distance=request.args.get("min_distance", type=float),
-            max_distance=request.args.get("max_distance", type=float),
-        )
-        schema = LogSchema()
-        return jsonify({
-            "items": [schema.dump(log) for log in result["items"]],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving logs: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    sort = request.args.get("sort", "newest")
+    result = LogService.get_endorsed_logs(
+        g.current_user_id,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        min_sea=request.args.get("min_sea", type=int),
+        max_sea=request.args.get("max_sea", type=int),
+        min_distance=request.args.get("min_distance", type=float),
+        max_distance=request.args.get("max_distance", type=float),
+    )
+    schema = LogSchema()
+    return jsonify({
+        "items": [schema.dump(log) for log in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 @log_api.route("/stats", methods=["GET"])
@@ -250,11 +241,7 @@ def get_stats():
                         count:
                           type: integer
     """
-    try:
-        return jsonify(LogService.stats_for_user(g.current_user_id)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving log stats: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    return jsonify(LogService.stats_for_user(g.current_user_id)), HTTPStatus.OK
 
 
 @log_api.route("/<string:id>/endorse", methods=["POST"])
@@ -290,18 +277,12 @@ def endorse_log(id: str):
     try:
         LogService.endorse_log(id, g.current_user_id)
         return jsonify({"message": "Log endorsed"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except LogNotEndorsableError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=str(e))
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
-    except Exception as e:
-        logger.error(f"Error endorsing log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @log_api.route("/<string:id>/endorse", methods=["DELETE"])
@@ -329,14 +310,8 @@ def unendorse_log(id: str):
     try:
         LogService.unendorse_log(id, g.current_user_id)
         return jsonify({"message": "Endorsement withdrawn"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
-    except Exception as e:
-        logger.error(f"Error withdrawing endorsement: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @log_api.route("/create", methods=["POST"])
@@ -369,8 +344,6 @@ def post():
         log_json = request.get_json()
         log = LogService.create_log(log_json)
         return jsonify(LogSchema().dump(log)), HTTPStatus.CREATED
-    except HTTPException:
-        raise
     except ValidationError as e:
         logger.error(f"Validation error creating log: {e.messages}")
         db.session.rollback()
@@ -381,11 +354,6 @@ def post():
         )
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error creating log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @log_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
@@ -408,8 +376,7 @@ def get_log(id: str):
     try:
         log = LogService.get_log_by_id(id)
         return jsonify(LogSchema().dump(log)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving log: {e}")
+    except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
 
 
@@ -446,9 +413,6 @@ def update_log(id: str):
         updated_log = LogService.update_log(id, request.get_json())
 
         return jsonify(LogSchema().dump(updated_log)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
@@ -457,11 +421,6 @@ def update_log(id: str):
         )
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error updating log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @log_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
@@ -492,9 +451,6 @@ def delete_log(id: str):
 
         LogService.delete_log(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
@@ -503,8 +459,3 @@ def delete_log(id: str):
         )
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error deleting log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -54,9 +54,6 @@ def list_requests():
         return jsonify(EndorsementRequestSchema(many=True).dump(requests)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error listing endorsement requests: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @endorsement_request_api.route("", methods=["POST"])

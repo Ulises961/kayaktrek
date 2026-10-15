@@ -76,9 +76,6 @@ def upsert_logistics(trip_id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except ValidationError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
-    except Exception as e:
-        logger.error("logistics_upsert_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @logistics_api.route("/<trip_id>/share", methods=["POST"])
@@ -109,9 +106,6 @@ def generate_share(trip_id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("float_plan_share_generate_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @logistics_api.route("/<trip_id>/share/email", methods=["POST"])
@@ -143,6 +137,3 @@ def send_share_email(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error("float_plan_share_email_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -75,9 +75,6 @@ def create_vehicle(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error("shuttle_vehicle_create_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @shuttle_api.route("/vehicle/<vehicle_id>", methods=["PATCH"])
@@ -120,9 +117,6 @@ def update_vehicle(vehicle_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValidationError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
-    except Exception as e:
-        logger.error("shuttle_vehicle_update_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @shuttle_api.route("/vehicle/<vehicle_id>", methods=["DELETE"])
@@ -151,9 +145,6 @@ def delete_vehicle(vehicle_id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("shuttle_vehicle_delete_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @shuttle_api.route("/vehicle/<vehicle_id>/passenger", methods=["POST"])
@@ -204,9 +195,6 @@ def add_passenger(vehicle_id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("shuttle_passenger_add_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @shuttle_api.route("/vehicle/<vehicle_id>/passenger/<member_id>", methods=["DELETE"])
@@ -237,6 +225,3 @@ def remove_passenger(vehicle_id: str, member_id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("shuttle_passenger_remove_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

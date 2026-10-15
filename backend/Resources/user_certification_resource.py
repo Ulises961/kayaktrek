@@ -39,8 +39,6 @@ def list_certifications():
         return jsonify(UserCertificationSchema(many=True).dump(certs)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("", methods=["POST"])
@@ -78,8 +76,6 @@ def add_certification():
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("/<cert_id>", methods=["PATCH"])
@@ -119,8 +115,6 @@ def update_certification(cert_id: str):
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Certification not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("/<cert_id>", methods=["DELETE"])
@@ -147,5 +141,3 @@ def delete_certification(cert_id: str):
         return "", HTTPStatus.NO_CONTENT
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Certification not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

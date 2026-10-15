@@ -3,7 +3,6 @@ import logging
 
 from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy.exc import NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_leader, require_owner
@@ -147,11 +146,6 @@ def push_route(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("route_push_error", extra={"trip_id": trip_id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @mobile_sync_api.route("/trip/<string:trip_id>/route/resolve", methods=["POST"])
@@ -187,8 +181,3 @@ def resolve_route(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("route_resolve_error", extra={"trip_id": trip_id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

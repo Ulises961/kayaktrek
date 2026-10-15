@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
@@ -63,18 +62,12 @@ def create_point():
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity Error creating point: {e}")
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-    except Exception as e:
-        logger.error(f"Error creating point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["PATCH"])
@@ -119,14 +112,8 @@ def update_point(id: str):
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error updating point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["GET"])
@@ -159,9 +146,6 @@ def get_point(id: str):
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error retrieving point: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["DELETE"])
@@ -199,15 +183,8 @@ def delete(id: str):
         logger.info(f"Deleting point {id}")
         PointService.delete_point(id)
         return {"message": "Deletion successful"}, 200
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error deleting point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images", methods=["POST"])
@@ -266,10 +243,6 @@ def upload_image(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error("Error uploading image for point %s: %s", id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["PATCH"])
@@ -340,10 +313,6 @@ def update_image(id: str, image_id: str):
 
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("Error updating visibility for image %s: %s", image_id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["DELETE"])
@@ -377,7 +346,3 @@ def delete_image(id: str, image_id: str):
 
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("Error deleting image %s from point %s: %s", image_id, id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

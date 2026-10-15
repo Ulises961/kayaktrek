@@ -10,7 +10,6 @@ from Services.travel_document_service import TravelDocumentService
 from Services.storage_service import StorageValidationError
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
-from Api.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +73,6 @@ def create_document(trip_id: str):
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_create_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>", methods=["PATCH"])
@@ -119,9 +115,6 @@ def update_document(id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValidationError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
-    except Exception as e:
-        logger.error("travel_document_update_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>", methods=["DELETE"])
@@ -154,10 +147,6 @@ def delete_document(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_delete_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["POST"])
@@ -210,10 +199,6 @@ def upload_attachment(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_upload_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["DELETE"])
@@ -248,10 +233,6 @@ def delete_attachment(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_delete_attachment_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["GET"])
@@ -281,6 +262,3 @@ def get_attachment_url(id: str):
         return jsonify({"url": url}), HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_attachment_url_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

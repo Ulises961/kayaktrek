@@ -599,17 +599,10 @@ def apply_boundaries(id: str):
         schema = ItinerarySchema()
         schema.include_staging = True  # type: ignore[attr-defined]
         return jsonify(schema.dump(itinerary)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception:
-        db.session.rollback()
-        logger.exception("apply_boundaries_error", extra={"itinerary_id": id})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 @itinerary_api.route("/<string:id>/export", methods=["GET"])
@@ -731,7 +724,3 @@ def import_gpx():
 
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception:
-        db.session.rollback()
-        logger.exception("gpx_import_error")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR)

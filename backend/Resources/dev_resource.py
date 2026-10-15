@@ -31,5 +31,3 @@ def send_test_email():
         return jsonify({"message": f"Test email sent to {user.mail}"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

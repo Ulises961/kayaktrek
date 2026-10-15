@@ -86,6 +86,27 @@ def test_a_refusal_without_a_message_still_says_something(error_app):
     assert response.get_json()["message"] == "Access denied"
 
 
+def test_a_real_resource_lets_an_unexpected_error_reach_the_central_handler(client, monkeypatch, caplog):
+    """Item categories is public, so no login is needed; the schema blowing up stands in for any
+    bug in a resource. A resource that caught it would log a message with no traceback."""
+
+    class ExplodingSchema:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def dump(self, *args, **kwargs):
+            raise RuntimeError("boom from the schema")
+
+    monkeypatch.setattr("Resources.item_category_resource.ItemCategorySchema", ExplodingSchema)
+
+    with caplog.at_level(logging.ERROR, logger="Api.error_handlers"):
+        response = client.get("/api/v1/item-categories")
+
+    assert response.status_code == 500
+    assert response.get_json() == GENERIC_500
+    assert [str(error) for error in _logged_exceptions(caplog)] == ["boom from the schema"]
+
+
 def test_an_operating_system_permission_error_is_not_a_403_and_leaks_no_path(error_app, caplog):
     app, database = error_app
 

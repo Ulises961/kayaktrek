@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from marshmallow import ValidationError
@@ -61,8 +60,6 @@ def get_me():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/search", methods=["GET"])
@@ -118,13 +115,9 @@ def search_users():
     if len(query) < 2:
         abort(HTTPStatus.BAD_REQUEST, description="Search query must be at least 2 characters")
 
-    try:
-        users = UserService.search_users(query)
-        schema = UserSchema(only=("id", "name", "surname", "mail", "avatar_url"))
-        return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
-
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    users = UserService.search_users(query)
+    schema = UserSchema(only=("id", "name", "surname", "mail", "avatar_url"))
+    return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
 
 
 @user_api.route("/search/paddlers", methods=["GET"])
@@ -179,22 +172,18 @@ def search_paddlers():
                   pages:
                     type: integer
     """
-    try:
-        query = request.args.get("q", "")
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = UserService.search_paddlers(
-            str(g.current_user_id), query, page=page, per_page=per_page
-        )
-        return jsonify({
-            "items": result["items"],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error searching paddlers: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    query = request.args.get("q", "")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    result = UserService.search_paddlers(
+        str(g.current_user_id), query, page=page, per_page=per_page
+    )
+    return jsonify({
+        "items": result["items"],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 @user_api.route("/<string:username>/public", methods=["GET"])
@@ -239,9 +228,6 @@ def get_public_profile(username: str):
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Profile not found")
-    except Exception as e:
-        logger.error(f"Error retrieving public profile for {username}: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["GET"])
@@ -277,13 +263,8 @@ def get(id: str):
     try:
         user = UserService.get_user_by_id(id)
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["PATCH"])
@@ -343,14 +324,10 @@ def update_user(id: str):
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description=f"Error updating user with id {id}")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"Error: {e}")
 
 
 @user_api.route("/me/password", methods=["PATCH"])
@@ -414,15 +391,10 @@ def change_password():
             raw.get("privateKeySalt"),
         )
         return "", HTTPStatus.NO_CONTENT
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/keypair", methods=["POST"])
@@ -495,15 +467,10 @@ def store_keypair():
             raw["privateKeySalt"],
         )
         return jsonify({"hasKeypair": True}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError:
         abort(HTTPStatus.CONFLICT, description="Keypair already exists")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/keypair", methods=["GET"])
@@ -542,15 +509,10 @@ def get_keypair():
     """
     try:
         return jsonify(UserService.get_keypair(str(g.current_user_id))), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/re-auth", methods=["POST"])
@@ -600,13 +562,8 @@ def re_auth():
             abort(HTTPStatus.UNAUTHORIZED, description="Password incorrect")
         token = JWTService.generate_elevated_token(str(g.current_user_id))
         return jsonify({"elevatedToken": token}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/email-change", methods=["POST"])
@@ -652,15 +609,10 @@ def request_email_change():
             abort(HTTPStatus.BAD_REQUEST, description="newMail is required")
         UserService.request_email_change(str(g.current_user_id), raw["newMail"].strip())
         return "", HTTPStatus.ACCEPTED
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-consent", methods=["POST"])
@@ -717,13 +669,8 @@ def grant_medical_consent():
             str(g.current_user_id), raw["ciphertext"], raw["nonce"], raw["salt"]
         )
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-consent", methods=["DELETE"])
@@ -753,8 +700,6 @@ def revoke_medical_consent():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-notes", methods=["GET"])
@@ -796,13 +741,8 @@ def get_medical_notes():
     """
     try:
         return jsonify(UserService.get_medical_notes(str(g.current_user_id))), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/avatar", methods=["POST"])
@@ -861,8 +801,6 @@ def upload_avatar():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/avatar", methods=["DELETE"])
@@ -888,8 +826,6 @@ def delete_avatar():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/banner", methods=["POST"])
@@ -948,8 +884,6 @@ def upload_banner():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/banner", methods=["DELETE"])
@@ -975,8 +909,6 @@ def delete_banner():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/data-export", methods=["POST"])
@@ -1094,8 +1026,6 @@ def request_deletion():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/deletion-request", methods=["DELETE"])
@@ -1147,8 +1077,6 @@ def cancel_deletion():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["DELETE"])
@@ -1184,12 +1112,7 @@ def delete(id: str):
     try:
         UserService.delete_user(id)
         return "", HTTPStatus.NO_CONTENT
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description=f"Error deleting user with id {id}")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

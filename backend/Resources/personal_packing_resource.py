@@ -2,7 +2,6 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort
-from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import NoResultFound
 
 from Schemas.personal_packing_item_schema import PersonalPackingItemSchema
@@ -36,13 +35,8 @@ def list_packing(trip_id: str):
     try:
         items = PersonalPackingService.list_for_trip(trip_id)
         return jsonify([PersonalPackingItemSchema().dump(i) for i in items]), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error(f"Error listing packing items: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @personal_packing_api.route("/create", methods=["POST"])
@@ -87,17 +81,12 @@ def add_packing():
             abort(HTTPStatus.BAD_REQUEST, description="tripId and itemId are required")
         entry = PersonalPackingService.add_item(trip_id, item_id)
         return jsonify(PersonalPackingItemSchema().dump(entry)), HTTPStatus.CREATED
-    except HTTPException:
-        raise
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error adding packing item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @personal_packing_api.route("/<string:id>", methods=["PATCH"])
@@ -139,15 +128,10 @@ def update_packing(id: str):
             abort(HTTPStatus.BAD_REQUEST, description="checked must be a boolean")
         entry = PersonalPackingService.set_checked(id, checked)
         return jsonify(PersonalPackingItemSchema().dump(entry)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error(f"Error updating packing item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @personal_packing_api.route("/<string:id>", methods=["DELETE"])
@@ -173,10 +157,5 @@ def delete_packing(id: str):
     try:
         PersonalPackingService.remove(id)
         return jsonify({"message": "Packing item removed"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error(f"Error removing packing item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
