@@ -1,22 +1,24 @@
-"""Hold N trip-changes streams open against the harness sidecar and report what it costs.
+"""Poll the harness sidecar like N open trip pages would, and report what it costs.
 
-For each stage it opens connections up to the stage's total, lets them settle, publishes one
-change per trip and counts how many viewers received it, then samples the sidecar worker's
-resident memory and the Redis server's connected-client count. Prints numbers only.
+Each viewer polls GET .../changes?since=<rev> every INTERVAL seconds (jittered, over one
+keep-alive connection) for a stage's duration, while a publisher commits one change per trip
+every few seconds so some polls return something. Prints requests per second, latency
+percentiles, errors, and the sidecar worker's CPU, resident memory and open descriptors.
 
-    load_client.py <port> <gunicorn master pid> <stages, e.g. 100,300,600,1000> <trips> <env file>
+    load_client.py <port> <gunicorn master pid> <viewers, e.g. 100,300,600> <trips>
+                   <poll interval seconds> <seconds per stage> <env file>
 
 The env file is read by python-dotenv only to find LIVE_REDIS_URL; nothing from it is printed.
-A viewer that was answered 200 but never received `hello` is listed with the bytes it did get
-— that is how the Redis-pool exhaustion in plans/M36 "Capacity, measured" was found. See
-harness_sidecar.py for how to start the sidecar this talks to.
+See harness_sidecar.py for how to start the sidecar this talks to.
 """
 from gevent import monkey
 
 monkey.patch_all()
 
+import http.client  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
+import random  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 import urllib.request  # noqa: E402
@@ -26,16 +28,22 @@ import gevent  # noqa: E402
 import redis  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 
+sys.path.insert(0, os.getcwd())  # run from backend/, so the real publisher can be imported
+from Services.trip_change_service import TripChange, TripChangeService  # noqa: E402
+
 PORT = int(sys.argv[1])
 MASTER_PID = int(sys.argv[2])
 STAGES = [int(part) for part in sys.argv[3].split(",")]
 TRIPS = int(sys.argv[4])
-BACKEND_ENV = sys.argv[5]
+INTERVAL = float(sys.argv[5])
+STAGE_SECONDS = float(sys.argv[6])
+BACKEND_ENV = sys.argv[7]
+PUBLISH_EVERY_SECONDS = 5
 
 load_dotenv(BACKEND_ENV)
 redis_client = redis.Redis.from_url(os.getenv("LIVE_REDIS_URL", "redis://localhost:6379/3"), decode_responses=True)
 
-trip_ids = [str(uuid.uuid4()) for _ in range(TRIPS)]
+trip_ids = [uuid.uuid4() for _ in range(TRIPS)]
 tickets = {}
 for trip_id in trip_ids:
     with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/__ticket/{trip_id}") as response:
@@ -47,104 +55,94 @@ def worker_pid() -> int:
         return int(handle.read().split()[0])
 
 
-def memory_kib(pid: int) -> dict:
-    values = {}
+def cpu_seconds(pid: int) -> float:
+    with open(f"/proc/{pid}/stat") as handle:
+        fields = handle.read().rsplit(")", 1)[1].split()
+    return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+
+
+def rss_mib(pid: int) -> float:
     with open(f"/proc/{pid}/status") as handle:
         for line in handle:
-            if line.startswith(("VmRSS", "VmHWM")):
-                key, value = line.split(":")
-                values[key] = int(value.split()[0])
-    return values
+            if line.startswith("VmRSS"):
+                return int(line.split()[1]) / 1024
+    return 0.0
 
 
 def open_descriptors(pid: int) -> int:
     return len(os.listdir(f"/proc/{pid}/fd"))
 
 
-class Viewer:
-    def __init__(self, trip_id: str) -> None:
-        self.trip_id = trip_id
-        self.status = None
-        self.hello = False
-        self.changes = 0
-        self.error = None
-        self.socket = None
-        self.raw = b""
+class Stage:
+    def __init__(self):
+        self.latencies: list[float] = []
+        self.errors = 0
+        self.with_changes = 0
+        self.running = True
 
-    def run(self) -> None:
-        import socket
 
+def viewer(trip_id: uuid.UUID, stage: Stage) -> None:
+    # A new connection per poll, as nginx makes to the sidecar: its upstream has no keepalive,
+    # and gunicorn closes an idle one after two seconds anyway.
+    since = None
+    gevent.sleep(random.random() * INTERVAL)
+    while stage.running:
+        query = f"ticket={tickets[trip_id]}" + (f"&since={since}" if since is not None else "")
+        connection = http.client.HTTPConnection("127.0.0.1", PORT, timeout=30)
+        started = time.monotonic()
         try:
-            self.socket = socket.create_connection(("127.0.0.1", PORT), timeout=30)
-            request = (
-                f"GET /api/v1/live/trip/{self.trip_id}/changes?ticket={tickets[self.trip_id]} HTTP/1.1\r\n"
-                f"Host: 127.0.0.1\r\nAccept: text/event-stream\r\n\r\n"
-            )
-            self.socket.sendall(request.encode())
-            self.socket.settimeout(None)
-            buffer = b""
-            while True:
-                chunk = self.socket.recv(4096)
-                if not chunk:
-                    break
-                buffer += chunk
-                if len(self.raw) < 600:
-                    self.raw += chunk
-                if self.status is None and b"\r\n" in buffer:
-                    self.status = int(buffer.split(b" ", 2)[1])
-                self.hello = self.hello or b"event: hello" in buffer
-                self.changes += buffer.count(b"event: change")
-                buffer = buffer[-32:]  # keep a tail so a marker split across reads is not lost
-        except Exception as error:  # noqa: BLE001
-            self.error = type(error).__name__
+            connection.request("GET", f"/api/v1/live/trip/{trip_id}/changes?{query}", headers={"Connection": "close"})
+            response = connection.getresponse()
+            body = response.read()
+            stage.latencies.append((time.monotonic() - started) * 1000)
+            if response.status != 200:
+                stage.errors += 1
+            else:
+                page = json.loads(body)
+                since = page["rev"]
+                stage.with_changes += bool(page["changes"])
+        except Exception:  # noqa: BLE001
+            stage.errors += 1
+        finally:
+            connection.close()
+        gevent.sleep(INTERVAL * (0.8 + random.random() * 0.4))
 
 
-def redis_clients() -> int:
-    return int(redis_client.info("clients")["connected_clients"])
+def publisher(stage: Stage) -> None:
+    while stage.running:
+        for trip_id in trip_ids:
+            TripChangeService.publish(trip_id, [TripChange("point", uuid.uuid4(), "update")])
+        gevent.sleep(PUBLISH_EVERY_SECONDS)
 
 
-viewers: list[Viewer] = []
-greenlets = []
+def percentile(sorted_values: list[float], fraction: float) -> float:
+    return sorted_values[min(len(sorted_values) - 1, int(len(sorted_values) * fraction))] if sorted_values else 0.0
+
+
 pid = worker_pid()
-baseline_clients = redis_clients()
-baseline = memory_kib(pid)
-print(f"worker pid {pid}  baseline RSS {baseline['VmRSS'] / 1024:.1f} MiB  redis clients {baseline_clients}")
-print(f"{'viewers':>8} {'trips':>5} {'hello':>6} {'503':>5} {'err':>4} {'RSS MiB':>8} {'KiB/conn':>9} {'fds':>5} {'redis +':>8} {'delivered':>10}")
+print(f"worker pid {pid}  baseline RSS {rss_mib(pid):.1f} MiB  poll every {INTERVAL:g}s  {TRIPS} trips")
+print(
+    f"{'viewers':>8} {'req/s':>7} {'p50 ms':>7} {'p95 ms':>7} {'p99 ms':>7} {'errors':>6} "
+    f"{'w/ data':>7} {'CPU %':>6} {'RSS MiB':>8} {'fds':>5}"
+)
 
-for stage in STAGES:
-    while len(viewers) < stage:
-        viewer = Viewer(trip_ids[len(viewers) % TRIPS])
-        viewers.append(viewer)
-        greenlets.append(gevent.spawn(viewer.run))
-        if len(viewers) % 25 == 0:
-            gevent.sleep(0.05)
-    gevent.sleep(3)
-
-    for viewer in viewers:
-        viewer.changes = 0
-    for trip_id in trip_ids:
-        redis_client.publish(f"trip:{trip_id}:changes", json.dumps({"rev": 1, "changes": [{"t": "point", "id": "x", "op": "update"}]}))
-    gevent.sleep(2)
-
-    live = [viewer for viewer in viewers if viewer.status == 200]
-    delivered = sum(1 for viewer in live if viewer.changes >= 1)
-    refused = sum(1 for viewer in viewers if viewer.status == 503)
-    errors = sum(1 for viewer in viewers if viewer.error)
-    memory = memory_kib(pid)
-    per_connection = (memory["VmRSS"] - baseline["VmRSS"]) / max(1, len(live))
+for count in STAGES:
+    stage = Stage()
+    cpu_before, wall_before = cpu_seconds(pid), time.monotonic()
+    greenlets = [gevent.spawn(viewer, trip_ids[index % TRIPS], stage) for index in range(count)]
+    greenlets.append(gevent.spawn(publisher, stage))
+    gevent.sleep(STAGE_SECONDS)
+    stage.running = False
+    elapsed = time.monotonic() - wall_before
+    cpu_percent = (cpu_seconds(pid) - cpu_before) / elapsed * 100
+    gevent.joinall(greenlets, timeout=INTERVAL * 2)
+    latencies = sorted(stage.latencies)
     print(
-        f"{len(viewers):>8} {TRIPS:>5} {sum(v.hello for v in viewers):>6} {refused:>5} {errors:>4} "
-        f"{memory['VmRSS'] / 1024:>8.1f} {per_connection:>9.1f} {open_descriptors(pid):>5} "
-        f"{redis_clients() - baseline_clients:>8} {delivered:>5}/{len(live):<4}"
+        f"{count:>8} {len(latencies) / elapsed:>7.1f} {percentile(latencies, 0.5):>7.1f} "
+        f"{percentile(latencies, 0.95):>7.1f} {percentile(latencies, 0.99):>7.1f} {stage.errors:>6} "
+        f"{stage.with_changes:>7} {cpu_percent:>6.1f} {rss_mib(pid):>8.1f} {open_descriptors(pid):>5}"
     )
     sys.stdout.flush()
 
-for index, viewer in enumerate(viewers):
-    if viewer.status == 200 and not viewer.hello:
-        print("NO HELLO: viewer", index, "trip", viewer.trip_id[:8], "raw:", viewer.raw[-220:])
-print(f"peak RSS (VmHWM) {memory_kib(pid)['VmHWM'] / 1024:.1f} MiB")
-for viewer in viewers:
-    if viewer.socket:
-        viewer.socket.close()
-gevent.sleep(1)
-print(f"after closing everything: RSS {memory_kib(pid)['VmRSS'] / 1024:.1f} MiB  redis +{redis_clients() - baseline_clients}")
+for trip_id in trip_ids:
+    redis_client.delete(f"trip:{trip_id}:rev", f"trip:{trip_id}:log")
