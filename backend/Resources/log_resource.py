@@ -4,7 +4,6 @@ from flask import Blueprint, abort, g, jsonify, request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import NoResultFound
 from Schemas.log_schema import LogSchema
-from Api.database import db
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.log_service import LogService, LogNotEndorsableError
@@ -346,13 +345,11 @@ def post():
         return jsonify(LogSchema().dump(log)), HTTPStatus.CREATED
     except ValidationError as e:
         logger.error(f"Validation error creating log: {e.messages}")
-        db.session.rollback()
         abort(HTTPStatus.BAD_REQUEST, description=str(e.messages))
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
 
 @log_api.route("/<string:id>", methods=["GET"])
@@ -419,7 +416,6 @@ def update_log(id: str):
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
 
 @log_api.route("/<string:id>", methods=["DELETE"])
@@ -457,5 +453,4 @@ def delete_log(id: str):
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")

@@ -2,9 +2,8 @@ from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify
 
-from Models.item_category import ItemCategory
 from Schemas.item_category_schema import ItemCategorySchema
-from Api.database import db
+from Services.item_category_service import ItemCategoryService
 
 logger = logging.getLogger(__name__)
 
@@ -28,5 +27,5 @@ def get_item_categories():
                 type: array
                 items: ItemCategorySchema
     """
-    categories = db.session.query(ItemCategory).order_by(ItemCategory.name).all()
+    categories = ItemCategoryService.get_all()
     return jsonify(ItemCategorySchema(many=True).dump(categories)), HTTPStatus.OK

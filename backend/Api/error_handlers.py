@@ -146,6 +146,18 @@ def register_error_handlers(app):
             "message": "An unexpected error occurred"
         }), 500
 
+    @app.after_request
+    def roll_back_failed_requests(response):
+        """A request that ends in an error response leaves no half-done work behind.
+
+        Holds however the error was produced — a resource's own abort(), a mapped exception,
+        an unexpected one — so no resource needs to roll the session back before aborting.
+        Committed work is untouched; only what was never committed is discarded.
+        """
+        if response.status_code >= 400:
+            db.session.rollback()
+        return response
+
     @app.errorhandler(PermissionError)
     def handle_permission_error(error):
         """A service refused the caller; the message it raised was written for them.

@@ -70,6 +70,21 @@ class TripService:
         return trip
 
     @staticmethod
+    def find_happening_trip(trip_id: str) -> Optional[Trip]:
+        """The trip with this id if it is happening, otherwise None.
+
+        Missing, not yet started, finished, and an id that is not a UUID are all the same
+        answer, so a caller cannot tell them apart — the live endpoints rely on that.
+        """
+        try:
+            trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        except ValueError:
+            return None
+        if trip is None or trip.state != TripStateType.HAPPENING:
+            return None
+        return trip
+
+    @staticmethod
     def touch_last_accessed(trip: Trip) -> None:
         """Bump Trip.last_accessed_at — drives the weather-fetch beat tasks'
         attention gate (docs/adr/features.md §1a). Called only from an

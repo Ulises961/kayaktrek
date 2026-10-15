@@ -8,7 +8,7 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from flask import Flask
+from flask import Flask, abort
 
 from Api.error_handlers import register_error_handlers
 
@@ -38,6 +38,22 @@ def error_app(monkeypatch):
     def os_denied():
         raise PermissionError(13, "Permission denied", "/var/lib/kayak/private.key")
 
+    @app.route("/ok")
+    def ok():
+        return {"status": "fine"}
+
+    @app.route("/conflict")
+    def conflict():
+        abort(409, description="Already exists")
+
+    @app.route("/bad-value")
+    def bad_value():
+        raise ValueError("not a number")
+
+    @app.route("/created")
+    def created():
+        return {"id": 1}, 201
+
     return app, database
 
 
@@ -64,17 +80,16 @@ def test_an_unexpected_error_logs_its_traceback_and_rolls_the_session_back(error
     raised = _logged_exceptions(caplog)
     assert [type(error) for error in raised] == [RuntimeError]
     assert str(raised[0]) == "secret internals"
-    database.session.rollback.assert_called_once()
+    database.session.rollback.assert_called()
 
 
 def test_a_service_refusal_is_a_403_carrying_its_message(error_app):
-    app, database = error_app
+    app, _ = error_app
 
     response = app.test_client().get("/refused")
 
     assert response.status_code == 403
     assert response.get_json() == {"error": "Forbidden", "message": "Only the trip leader can do that"}
-    database.session.rollback.assert_not_called()
 
 
 def test_a_refusal_without_a_message_still_says_something(error_app):
@@ -84,6 +99,35 @@ def test_a_refusal_without_a_message_still_says_something(error_app):
 
     assert response.status_code == 403
     assert response.get_json()["message"] == "Access denied"
+
+
+@pytest.mark.parametrize(
+    "path, status",
+    [
+        ("/conflict", 409),  # a resource's own abort
+        ("/bad-value", 400),  # a service error mapped centrally
+        ("/boom", 500),  # an unexpected error
+        ("/refused", 403),
+        ("/no-such-route", 404),
+    ],
+)
+def test_every_error_response_discards_the_requests_uncommitted_work(error_app, path, status):
+    app, database = error_app
+
+    response = app.test_client().get(path)
+
+    assert response.status_code == status
+    database.session.rollback.assert_called()
+
+
+@pytest.mark.parametrize("path", ["/ok", "/created"])
+def test_a_successful_response_is_not_rolled_back(error_app, path):
+    app, database = error_app
+
+    response = app.test_client().get(path)
+
+    assert response.status_code < 400
+    database.session.rollback.assert_not_called()
 
 
 def test_a_real_resource_lets_an_unexpected_error_reach_the_central_handler(client, monkeypatch, caplog):
@@ -117,4 +161,4 @@ def test_an_operating_system_permission_error_is_not_a_403_and_leaks_no_path(err
     assert response.get_json() == GENERIC_500
     assert "/var/lib/kayak" not in response.get_data(as_text=True)
     assert [type(error) for error in _logged_exceptions(caplog)] == [PermissionError]
-    database.session.rollback.assert_called_once()
+    database.session.rollback.assert_called()

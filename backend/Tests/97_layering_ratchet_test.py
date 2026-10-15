@@ -37,33 +37,19 @@ BROAD_EXCEPT_HANDLERS = {
 # error it caught, which discards the traceback. `abort` is for decisions, not exceptions.
 ABORT_500_CALLS: dict[str, int] = {}
 
-# `db.session` in a resource: a query that belongs in the service owning the entity.
+# `db.session` in a resource: a query that belongs in the service owning the entity. A
+# resource does not roll the session back either — `Api/error_handlers.py` does that for
+# every error response. Only the health check keeps one: its `SELECT 1` is the point.
 DB_SESSION_USES = {
-    "authentication_resource.py": 2,
-    "catalog_item_resource.py": 1,
     "health_resource.py": 1,
-    "item_category_resource.py": 1,
-    "item_resource.py": 1,
-    "itinerary_resource.py": 4,
-    "live_resource.py": 1,
-    "log_resource.py": 4,
-    "point_resource.py": 1,
-    "sea_resource.py": 1,
 }
 
-# Resources that import `Api.database` or `Models.*` at all.
+# Resources that import `Api.database` or `Models.*` at all:
+#   - health_resource: the database ping above.
+#   - user_resource: the `AuthTokenType` enum, a domain constant rather than data access.
 DATA_LAYER_IMPORTERS = frozenset(
     {
-        "authentication_resource.py",
-        "catalog_item_resource.py",
         "health_resource.py",
-        "item_category_resource.py",
-        "item_resource.py",
-        "itinerary_resource.py",
-        "live_resource.py",
-        "log_resource.py",
-        "point_resource.py",
-        "sea_resource.py",
         "user_resource.py",
     }
 )

@@ -37,6 +37,23 @@ class AuthService:
     )
 
     @staticmethod
+    def activate_by_mail(mail: str) -> User:
+        """
+        Mark the account with this address active, skipping the emailed link. Backs the
+        development-only activate-test-user route, so a test can sign a user in without
+        reading mail.
+
+        Raises:
+            NoResultFound: If no account has this address
+        """
+        user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
+        if user is None:
+            raise NoResultFound(f"No account with mail {mail}")
+        user.active = True
+        db.session.commit()
+        return user
+
+    @staticmethod
     def authenticate_user(password: str, mail_addr: Optional[str] = None, username: Optional[str] = None) -> Optional[User]:
         """
         Authenticate a user by password plus either email or username (one is required).
