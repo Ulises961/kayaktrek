@@ -39,7 +39,7 @@ _DEFAULT_START_MIN = 9 * 60  # 09:00
 # Resolution (per axis) of the uniform velocity grid. The field is a single
 # stamped value, so densifying it is information-neutral (every cell keeps the
 # same u/v) but is required for a smooth forecast-cell disc edge and a
-# reasonable land coastline when masking (M5b). Tuned to the landing cell.
+# reasonable land coastline when masking. Tuned to the landing cell.
 VELOCITY_GRID_RESOLUTION = 24
 
 

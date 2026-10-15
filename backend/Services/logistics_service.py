@@ -129,7 +129,7 @@ class LogisticsService:
                 "mail": u.mail,
                 "role": m.role.value,
                 "floatPlanConfirmedAt": m.float_plan_confirmed_at.isoformat() if m.float_plan_confirmed_at else None,
-                # Recorded by the leader when this paddler left the trip (M9d).
+                # Recorded by the leader when this paddler left the trip.
                 "leftAt": m.left_at.astimezone(timezone.utc).isoformat() if m.left_at else None,
                 "leftNote": m.left_note,
                 "vessel": {

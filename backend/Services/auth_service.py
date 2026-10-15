@@ -95,9 +95,9 @@ class AuthService:
                 AuthService._send_already_registered_email(existing)
             return existing
 
-        # Full name is optional at signup (simplify-register) — collected later in
-        # Settings, same pattern as phone (M12 §F). name stays NOT NULL on the model,
-        # so default it to the username rather than relaxing the column.
+        # Full name is optional at signup — collected later in Settings, like phone. name
+        # stays NOT NULL on the model, so default it to the username rather than relaxing
+        # the column.
         if not user_json.get("name"):
             user_json["name"] = username
 
@@ -125,12 +125,11 @@ class AuthService:
             raise ValueError("User generated incorrectly")
         user = persisted_user
 
-        # Medical-notes keypair (M22): generated on the client and posted alongside the
-        # registration fields, so the server never sees the password that wraps it.
-        # Optional — a client that omits it (or an older one) gets an account with no
-        # keypair, which POST /api/v1/user/me/keypair fills in later. This runs only
-        # for a genuinely new user: every "already registered" path above returns
-        # early, so a repeat registration can never overwrite the keys of the existing
+        # Medical-notes keypair: generated on the client and posted alongside the registration
+        # fields, so the server never sees the password that wraps it. Optional — a client that
+        # omits it gets an account with no keypair, which POST /api/v1/user/me/keypair fills in
+        # later. This runs only for a genuinely new user: every "already registered" path above
+        # returns early, so a repeat registration can never overwrite the keys of the existing
         # account and orphan its notes.
         keypair = {field: user_json.get(field) for field in AuthService._KEYPAIR_FIELDS}
         if all(keypair.values()):
@@ -315,7 +314,7 @@ class AuthService:
         already exchanged once — either the legitimate client raced a retry, or the token
         was stolen and is being replayed. Either way it is treated as theft, but the
         blast radius is one device: that session is revoked and its access tokens are
-        denylisted, while the user's other devices stay signed in (M17). The global
+        denylisted, while the user's other devices stay signed in. The global
         token_version kill switch is reserved for actions the user actually took.
 
         Raises:

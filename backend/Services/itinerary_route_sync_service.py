@@ -1,5 +1,5 @@
-"""The route's dedicated sync channel (M9c WP1 items 7-8) — deliberately
-outside pullChanges/pushChanges (Services/mobile_sync_service.py).
+"""The route's dedicated sync channel — deliberately outside
+pullChanges/pushChanges (Services/mobile_sync_service.py).
 
 Why separate: the route is the one aggregate whose correctness is global
 (docs/mobile/sync-protocol-spec.md §7.1) — a per-record delta cannot hold a

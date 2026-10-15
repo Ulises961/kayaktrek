@@ -489,7 +489,6 @@ def _check_point_ownership(user_id: str, point_id: str) -> Optional[bool]:
 
 def _check_log_ownership(user_id: str, log_id: str) -> Optional[bool]:
     """Check if user owns or has access to the log."""
-    # log_id is actually a id (string)
     log = db.session.query(Log).filter_by(id=UUID(log_id)).first()
     if not log:
         return None  # Log doesn't exist
@@ -510,9 +509,8 @@ def _check_image_ownership(user_id: str, image_id: str) -> Optional[bool]:
     if not image:
         return None  # Image doesn't exist
 
-    # Check if image belongs to user's point or is user's profile picture
-    # This depends on your specific image relationships
-    # For now, check if user owns related points
+    # An image is reachable through the points it is attached to; the user owns it if they
+    # own any of them.
     points_with_image = (
         db.session.query(Point).join(Point.images).filter(Image.id == UUID(image_id)).all()
     )

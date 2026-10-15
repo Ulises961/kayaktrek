@@ -1,5 +1,5 @@
 """Collects row-level changes to trip-scoped models and publishes them once the
-transaction commits (M36 WP1).
+transaction commits.
 
 Trip-scoped writes are spread over most services plus the mobile mutation queue, so
 instead of a publish call in each one, ORM session events watch every flush — the same

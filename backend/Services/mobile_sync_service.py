@@ -2,14 +2,14 @@
 everything EXCEPT the route (docs/mobile/sync-protocol-spec.md §4's per-row
 aggregates: trip_members, requirement_contributions; and the per-day weather/sea
 cache). The route (days + points) is deliberately not here — it syncs through its
-own atomic whole-subtree channel, ItineraryRouteSyncService (WP1 item 7), because
-a per-row delta cannot hold its chain invariant (§7.1).
+own atomic whole-subtree channel, ItineraryRouteSyncService, because a per-row
+delta cannot hold its chain invariant (§7.1).
 
 `pullChanges` naming and shape follow WatermelonDB's own sync contract (§2):
 `{ <table>: { created, updated, deleted } }`, deletions as IDs only (server-side
 tombstones fill the gap SyncTombstone was built for — §5). Sync-up is not here:
 changes made on the phone arrive through the mutation queue
-(Services/mutation_queue_service.py, M9d).
+(Services/mutation_queue_service.py).
 """
 import logging
 from datetime import datetime, timezone
@@ -93,7 +93,7 @@ class MobileSyncService:
         snapshot_timestamp = datetime.now(timezone.utc)
 
         # Bumps the weather-fetch beat tasks' attention gate (docs/adr/features.md
-        # §1a, M32) — a pullChanges call is always a real foreground/reconnect event
+        # §1a) — a pullChanges call is always a real foreground/reconnect event
         # (mobile has no periodic background poll, docs/adr/mobile-offline.md), so
         # this never fires from an automated ping with nobody actually looking.
         db.session.query(Trip).filter(Trip.id == trip_uuid).update(
@@ -144,7 +144,7 @@ class MobileSyncService:
                 "tripId": str(member.trip_id),
                 "userId": str(member.user_id),
                 # Carried so an offline float-plan crew manifest can attribute a
-                # vessel/emergency contact to a name, not just an opaque userId (M9c WP6).
+                # vessel/emergency contact to a name, not just an opaque userId.
                 "userName": member.user.name,
                 "userSurname": member.user.surname,
                 "userUsername": member.user.username,

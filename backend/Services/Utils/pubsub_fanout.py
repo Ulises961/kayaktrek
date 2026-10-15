@@ -1,10 +1,9 @@
-"""One Redis subscription per process, fanned out to that process's viewers (M36).
+"""One Redis subscription per process, fanned out to that process's viewers.
 
-An SSE stream used to take its own `pubsub()` — its own Redis connection — so N people
-watching one trip meant N subscriptions to one channel, and N connections held open for as
-long as those people stayed. On the sidecar that is the second ceiling after the worker's
-connection limit. Here the process holds a single Redis connection, subscribes it to each
-channel while anyone is watching it, and hands every message to the local viewers' queues.
+A `pubsub()` per SSE stream would mean N people watching one trip hold N Redis connections for
+as long as they stay, which on the sidecar is the second ceiling after the worker's connection
+limit. Here the process holds a single Redis connection, subscribes it to each channel while
+anyone is watching it, and hands every message to the local viewers' queues.
 """
 import logging
 import queue
