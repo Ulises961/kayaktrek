@@ -1,7 +1,9 @@
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterator, Optional
+from functools import lru_cache
+from typing import Any, Callable, Iterator, Optional
 from uuid import UUID
 
 import jwt
@@ -11,12 +13,32 @@ from flask import current_app
 from Api.database import db
 from Api.redis import live_redis
 from Models.trip import Trip, TripStateType
+from Models.trip_member import TripMember
 from Services.live_position_service import LivePositionService, live_channel
+from Services.Utils.pubsub_fanout import PubSubFanout, SubscriptionClosed
 
 logger = logging.getLogger(__name__)
 
 STREAM_TICKET_PURPOSE = "live-stream"
+CHANGES_TICKET_PURPOSE = "trip-changes"
 STREAM_TICKET_TTL_MINUTES = 5
+
+# A poll asks "is this person still on the trip?" every few seconds. Asking the database each
+# time would make the poll as expensive as the page it is checking on, so a confirmed member
+# is remembered briefly. Only a yes is remembered: someone just invited must not wait out the
+# window to be let in. The cost is that a removed member's polls keep being answered — with
+# identities, never field values — for up to this long.
+MEMBERSHIP_CACHE_SECONDS = 30
+_MEMBERSHIP_CACHE_MAX_ENTRIES = 4096
+_confirmed_members: dict[tuple[str, str], float] = {}
+
+
+@lru_cache(maxsize=1)
+def live_fanout() -> PubSubFanout:
+    """The process's single Redis subscription for position streams. One per process because
+    each gunicorn worker is its own process with its own connection to share: a viewer used to
+    take a pooled connection of its own, and `live_redis()`'s pool is capped at 100."""
+    return PubSubFanout(live_redis)
 
 
 class LiveStreamService:
@@ -24,37 +46,106 @@ class LiveStreamService:
 
     @staticmethod
     def mint_stream_ticket(trip_id: str) -> str:
+        return LiveStreamService._mint_ticket(STREAM_TICKET_PURPOSE, trip_id)
+
+    @staticmethod
+    def verify_stream_ticket(token: str, trip_id: str) -> bool:
+        return LiveStreamService._decode_ticket(token, STREAM_TICKET_PURPOSE, trip_id) is not None
+
+    @staticmethod
+    def mint_changes_ticket(trip_id: str, user_id: str) -> str:
+        """Unlike a position-stream ticket this names the user: the poll has no other way to
+        know whose membership to check, and to key its rate limit on."""
+        return LiveStreamService._mint_ticket(CHANGES_TICKET_PURPOSE, trip_id, userId=user_id)
+
+    @staticmethod
+    def verify_changes_ticket(token: str, trip_id: str) -> Optional[str]:
+        """The ticket's user id, or None when it is invalid, expired, for another trip, or
+        minted for another stream."""
+        payload = LiveStreamService._decode_ticket(token, CHANGES_TICKET_PURPOSE, trip_id)
+        return None if payload is None else payload.get("userId")
+
+    @staticmethod
+    def _mint_ticket(purpose: str, trip_id: str, **extra_claims: str) -> str:
         secret_key = current_app.config["JWT_SECRET_KEY"]
         payload = {
-            "purpose": STREAM_TICKET_PURPOSE,
+            "purpose": purpose,
             "tripId": trip_id,
             "iat": datetime.now(timezone.utc),
             "exp": datetime.now(timezone.utc) + timedelta(minutes=STREAM_TICKET_TTL_MINUTES),
+            **extra_claims,
         }
         return jwt.encode(payload, secret_key, algorithm="HS256")
 
     @staticmethod
-    def verify_stream_ticket(token: str, trip_id: str) -> bool:
+    def _decode_ticket(token: str, purpose: str, trip_id: str) -> Optional[dict[str, Any]]:
         secret_key = current_app.config["JWT_SECRET_KEY"]
         try:
             payload = jwt.decode(token, secret_key, algorithms=["HS256"])
         except jwt.InvalidTokenError:
+            return None
+        if payload.get("purpose") != purpose or payload.get("tripId") != trip_id:
+            return None
+        return payload
+
+    @staticmethod
+    def is_trip_member_cached(
+        trip_id: str, user_id: str, *, monotonic: Callable[[], float] = time.monotonic
+    ) -> bool:
+        """Whether `user_id` is on the trip, remembered for `MEMBERSHIP_CACHE_SECONDS` once
+        confirmed. For the change poll, which asks every few seconds per open page."""
+        key = (user_id, trip_id)
+        now = monotonic()
+        expires_at = _confirmed_members.get(key)
+        if expires_at is not None and expires_at > now:
+            return True
+
+        is_member = LiveStreamService._is_trip_member(trip_id, user_id)
+        if not is_member:
+            _confirmed_members.pop(key, None)
             return False
-        return payload.get("purpose") == STREAM_TICKET_PURPOSE and payload.get("tripId") == trip_id
+        if len(_confirmed_members) >= _MEMBERSHIP_CACHE_MAX_ENTRIES:
+            for stale_key in [k for k, expiry in _confirmed_members.items() if expiry <= now]:
+                del _confirmed_members[stale_key]
+            if len(_confirmed_members) >= _MEMBERSHIP_CACHE_MAX_ENTRIES:
+                _confirmed_members.clear()
+        _confirmed_members[key] = now + MEMBERSHIP_CACHE_SECONDS
+        return True
+
+    @staticmethod
+    def _is_trip_member(trip_id: str, user_id: str) -> bool:
+        try:
+            trip_uuid, user_uuid = UUID(trip_id), UUID(user_id)
+        except ValueError:
+            return False
+        with logfire.suppress_instrumentation():
+            membership = (
+                db.session.query(TripMember.id)
+                .filter(TripMember.trip_id == trip_uuid, TripMember.user_id == user_uuid)
+                .first()
+            )
+        return membership is not None
 
     @staticmethod
     def stream_events(
         trip_id: str,
         *,
         pubsub: Optional[Any] = None,
+        fanout: Optional[Any] = None,
         heartbeat_seconds: int = 15,
         max_ticks: Optional[int] = None,
     ) -> Iterator[str]:
         """Stateless snapshot-then-stream generator (§D4).
 
-        `pubsub`/`max_ticks` are injectable so tests can drive this directly with a
+        `pubsub`/`fanout`/`max_ticks` are injectable so tests can drive this directly with a
         scripted fake — Flask's test client buffers full responses and cannot consume
         an infinite stream. Do not remove that seam.
+
+        The subscription comes from the process-wide fan-out, not a `pubsub()` of its own, so
+        however many people watch — a crew, plus anyone with the public story link — the
+        process holds one Redis connection for them all. A viewer the fan-out cuts loose for
+        not reading ends the stream *without* an `end` event: `end` tells the client not to
+        come back, and this one should, to take a fresh snapshot.
 
         The whole connection lifetime is one manual Logfire span (M13 §A.2), not the
         default per-request auto-instrumented span — the route is excluded from Flask
@@ -77,8 +168,8 @@ class LiveStreamService:
 
             owns_pubsub = pubsub is None
             if owns_pubsub:
-                pubsub = live_redis().pubsub()
-                pubsub.subscribe(live_channel(trip_id))
+                shared_fanout = fanout if fanout is not None else live_fanout()
+                pubsub = shared_fanout.subscribe(live_channel(trip_id))
             assert pubsub is not None
 
             try:
@@ -110,7 +201,10 @@ class LiveStreamService:
 
                     tick += 1
                     tick_count = tick
-                    message = pubsub.get_message(timeout=heartbeat_seconds)
+                    try:
+                        message = pubsub.get_message(timeout=heartbeat_seconds)
+                    except SubscriptionClosed:
+                        return
                     if message is not None and message.get("type") == "message":
                         position_events += 1
                         yield f"event: position\ndata: {message['data']}\n\n"
@@ -120,5 +214,4 @@ class LiveStreamService:
                 span.set_attribute("tick_count", tick_count)
                 span.set_attribute("position_events", position_events)
                 if owns_pubsub:
-                    pubsub.unsubscribe(live_channel(trip_id))
                     pubsub.close()

@@ -3,14 +3,18 @@ import { defineConfig, devices } from "@playwright/test"
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000"
 const API_URL = process.env.E2E_API_URL ?? "http://localhost:5000"
 
-// The two live specs need Redis and the M8 SSE sidecar (ADR-033). Only
-// e2e/run-live-stack.sh provides those; the act mirror
-// (.github/workflows/e2e-ci.yml) boots postgres and a bare gunicorn to reproduce
-// the free runner's resource envelope, so EventSource there never connects and
-// both specs fail for want of infrastructure rather than for anything they test.
+// The live specs need Redis and the M8 SSE sidecar (ADR-033) — 15 and 16 for the position
+// stream, 21 (M36) for the sidecar's trip-changes poll. Only e2e/run-live-stack.sh provides
+// those; the act mirror (.github/workflows/e2e-ci.yml) boots postgres and a bare gunicorn
+// to reproduce the free runner's resource envelope, so the stream never connects and the
+// specs fail for want of infrastructure rather than for anything they test.
 // Default is to run them — a plain `playwright test` against the live stack must
 // not silently lose coverage; the mirror opts out explicitly instead.
-const LIVE_SPECS = [/15-live-expedition\.spec\.ts/, /16-story-live-layer\.spec\.ts/]
+const LIVE_SPECS = [
+  /15-live-expedition\.spec\.ts/,
+  /16-story-live-layer\.spec\.ts/,
+  /21-multi-device-live-sync\.spec\.ts/,
+]
 
 // M18's responsive specs, which run in the `mobile-320` project below rather than the
 // desktop one. Kept as one constant because both projects reference it — the mobile one

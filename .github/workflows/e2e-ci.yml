@@ -169,8 +169,8 @@ jobs:
       - name: Wait for services
         run: npx --yes wait-on tcp:localhost:${{ env.CI_BACKEND_PORT }} http://localhost:${{ env.CI_FRONTEND_PORT }} --timeout 60000
 
-      # E2E_SKIP_LIVE excludes 15-live-expedition and 16-story-live-layer, which need
-      # Redis and the M8 SSE sidecar (ADR-033). This job deliberately boots postgres and
+      # E2E_SKIP_LIVE excludes 15-live-expedition, 16-story-live-layer and
+      # 21-multi-device-live-sync, which need Redis and the M8 SSE sidecar (ADR-033). This job deliberately boots postgres and
       # a bare gunicorn only, to reproduce the free runner's resource envelope — see
       # e2e/run-live-stack.sh, which brings up the full stack and is where those two are
       # meant to run. The exclusion was always the intent (run-live-stack.sh's header

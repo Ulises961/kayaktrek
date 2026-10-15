@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor, within } from "@testing-library/react"
+import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const {
@@ -28,8 +28,14 @@ const {
   mockCloseDay: vi.fn().mockResolvedValue({ success: true }),
 }))
 
-const { mockToastError } = vi.hoisted(() => ({ mockToastError: vi.fn() }))
-vi.mock("sonner", () => ({ toast: { error: mockToastError } }))
+const { mockToastError, mockToastInfo, mockToastDismiss } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+  mockToastInfo: vi.fn(),
+  mockToastDismiss: vi.fn(),
+}))
+vi.mock("sonner", () => ({
+  toast: { error: mockToastError, info: mockToastInfo, dismiss: mockToastDismiss },
+}))
 
 vi.mock("@/hooks/use-collapse-sidebar", () => ({
   useCollapseSidebar: mockUseCollapseSidebar,
@@ -1033,5 +1039,105 @@ describe("MapBuilder — Navigate mode", () => {
     )
     expect(screen.queryByRole("button", { name: "Navigate" })).not.toBeInTheDocument()
     expect(screen.getByTestId("day-rail")).toBeInTheDocument()
+  })
+})
+
+describe("MapBuilder — other people's changes (M36)", () => {
+  // The builder seeds its reducer from the itinerary prop once, so a router.refresh() that
+  // brings someone else's edit changed nothing on screen until it applied the new props.
+  function itineraryWithPointNamed(name: string): Itinerary {
+    return {
+      ...ITINERARY,
+      days: [
+        {
+          id: "day-0",
+          dayNumber: 0,
+          points: [
+            {
+              id: "p1",
+              name,
+              type: "position",
+              latitude: 44.1,
+              longitude: 14.1,
+              dayId: "day-0",
+            },
+          ],
+        },
+      ],
+    } as unknown as Itinerary
+  }
+
+  it("shows another person's edit once the page re-renders with it, with nothing to confirm", () => {
+    const { rerender } = render(
+      <MapBuilder
+        itinerary={itineraryWithPointNamed("Cala")}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+      />,
+    )
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent("Cala")
+
+    rerender(
+      <MapBuilder
+        itinerary={itineraryWithPointNamed("Cala Mondragó")}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+      />,
+    )
+
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent("Cala Mondragó")
+    expect(mockToastInfo).not.toHaveBeenCalled()
+  })
+
+  it("leaves a point the user is still naming alone, and offers the other version instead", async () => {
+    vi.mocked(createPoint).mockResolvedValue({
+      success: true,
+      point: {
+        id: "confirmed-1",
+        type: "position",
+        latitude: 44.5,
+        longitude: 14.5,
+        dayId: "day-0",
+      },
+    })
+    const { rerender } = render(
+      <MapBuilder
+        itinerary={itineraryWithPointNamed("Cala")}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+      />,
+    )
+    // A dropped point stays "pending" — waiting to be named — after it is saved.
+    await userEvent.click(screen.getByText("simulate-map-click"))
+    await waitFor(() =>
+      expect(screen.getByTestId("map-core-points")).toHaveTextContent("confirmed-1"),
+    )
+
+    rerender(
+      <MapBuilder
+        itinerary={itineraryWithPointNamed("Cala Mondragó")}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+      />,
+    )
+
+    await waitFor(() =>
+      expect(mockToastInfo).toHaveBeenCalledWith(
+        expect.stringMatching(/someone else changed this route/i),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Load their version" }),
+        }),
+      ),
+    )
+    // Their edit is not applied over the point being named...
+    expect(screen.getByTestId("map-core-points")).not.toHaveTextContent("Cala Mondragó")
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent("confirmed-1")
+
+    // ...until the user chooses it, which drops the unsaved point and shows theirs.
+    const offer = mockToastInfo.mock.calls[0][1] as { action: { onClick: () => void } }
+    act(() => offer.action.onClick())
+
+    expect(screen.getByTestId("map-core-points")).toHaveTextContent("Cala Mondragó")
+    expect(screen.getByTestId("map-core-points")).not.toHaveTextContent("confirmed-1")
   })
 })

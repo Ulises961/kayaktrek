@@ -14,9 +14,9 @@ from Services.Middleware.auth_middleware import JWTService
 from Tests.auth_helpers import access_token_for
 from Services.trip_service import TripService
 import Services.live_position_service as live_position_service
-import Services.live_stream_service as live_stream_service
 import Resources.live_resource as live_resource
 from Services.live_stream_service import LiveStreamService, STREAM_TICKET_PURPOSE
+from Services.Utils.pubsub_fanout import SubscriptionClosed
 
 
 class _NoopRedis:
@@ -179,28 +179,65 @@ def test_stream_events_ends_when_trip_flips_to_past_mid_stream(app, client, trip
         assert fake_pubsub.unsubscribed is False  # caller-supplied pubsub is never closed by the generator
 
 
-def test_stream_events_unsubscribes_and_closes_owned_pubsub(app, client, trip_with_user2_as_crew, monkeypatch):
+class _FakeSubscription:
+    """What the shared fan-out hands a viewer: reads like a PubSub, closes by releasing."""
+
+    def __init__(self, messages=()):
+        self._messages = list(messages)
+        self.closed = False
+
+    def get_message(self, timeout=None):
+        if not self._messages:
+            return None
+        message = self._messages.pop(0)
+        if isinstance(message, Exception):
+            raise message
+        return message
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeFanout:
+    def __init__(self, subscription):
+        self.subscription = subscription
+        self.channels = []
+
+    def subscribe(self, channel):
+        self.channels.append(channel)
+        return self.subscription
+
+
+def test_stream_events_takes_its_subscription_from_the_shared_fanout_and_gives_it_back(
+    app, client, trip_with_user2_as_crew
+):
+    """One Redis connection per process serves every viewer, so a story link read by hundreds
+    cannot exhaust `live_redis()`'s pool of 100."""
     trip = trip_with_user2_as_crew["trip"]
-    leader_headers = trip_with_user2_as_crew["leader_headers"]
-    _promote_to_happening(client, leader_headers, trip["id"])
-
-    owned_pubsub = _FakePubSub([None])
-
-    class _FakeRedisClient:
-        def pubsub(self_inner):
-            return owned_pubsub
-
-        def publish(self_inner, channel, message):
-            pass
-
-    monkeypatch.setattr(live_position_service, "live_redis", lambda: _FakeRedisClient())
-    monkeypatch.setattr(live_stream_service, "live_redis", lambda: _FakeRedisClient())
+    _promote_to_happening(client, trip_with_user2_as_crew["leader_headers"], trip["id"])
+    subscription = _FakeSubscription([{"type": "message", "data": '{"lat": 1}'}])
+    fanout = _FakeFanout(subscription)
 
     with app.app_context():
-        list(LiveStreamService.stream_events(trip["id"], max_ticks=1))
+        events = list(LiveStreamService.stream_events(trip["id"], fanout=fanout, max_ticks=1))
 
-    assert owned_pubsub.unsubscribed is True
-    assert owned_pubsub.closed is True
+    assert fanout.channels == [live_position_service.live_channel(trip["id"])]
+    assert 'event: position\ndata: {"lat": 1}\n\n' in events
+    assert subscription.closed is True
+
+
+def test_stream_events_ends_quietly_when_the_fanout_cuts_a_slow_viewer_loose(app, client, trip_with_user2_as_crew):
+    """No `end` event: that tells the client not to come back, and a viewer that fell behind
+    should — it takes a fresh snapshot."""
+    trip = trip_with_user2_as_crew["trip"]
+    _promote_to_happening(client, trip_with_user2_as_crew["leader_headers"], trip["id"])
+    subscription = _FakeSubscription([SubscriptionClosed()])
+
+    with app.app_context():
+        events = list(LiveStreamService.stream_events(trip["id"], fanout=_FakeFanout(subscription), max_ticks=3))
+
+    assert "event: end\ndata: {}\n\n" not in events
+    assert subscription.closed is True
 
 
 def test_stream_ticket_round_trip(app, trip_with_user2_as_crew):

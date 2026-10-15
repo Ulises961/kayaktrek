@@ -5,6 +5,7 @@ import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import AppLayout from "../app/(app)/_layout"
 import { useAuth } from "../lib/auth/auth-context"
 import { startSyncTrigger } from "../lib/db/sync-trigger"
+import { startTripChanges } from "../lib/live/trip-changes"
 
 jest.mock("../lib/auth/auth-context", () => ({
   useAuth: jest.fn(),
@@ -32,11 +33,19 @@ jest.mock("expo-router", () => {
   }
 })
 
+// The global stub in jest.setup.ts is inert; this suite needs to observe the call.
+jest.mock("../lib/live/trip-changes", () => ({
+  startTripChanges: jest.fn(),
+}))
+
 const mockUseAuth = useAuth as jest.Mock
 const mockStartSyncTrigger = startSyncTrigger as jest.Mock
+const mockStartTripChanges = startTripChanges as jest.Mock
 
 describe("AppLayout", () => {
   beforeEach(() => {
+    mockStartTripChanges.mockReset()
+    mockStartTripChanges.mockReturnValue(jest.fn())
     mockUseAuth.mockReset()
     mockStartSyncTrigger.mockReset()
     mockStartSyncTrigger.mockReturnValue(jest.fn())
@@ -95,6 +104,27 @@ describe("AppLayout", () => {
     await render(<AppLayout />, { wrapper: WithCachedSurfaces })
 
     expect(mockStartSyncTrigger).not.toHaveBeenCalled()
+  })
+
+  it("holds the trip-change stream's lifecycle only while authenticated", async () => {
+    mockUseAuth.mockReturnValue({ status: "unauthenticated" })
+    await render(<AppLayout />, { wrapper: WithCachedSurfaces })
+    expect(mockStartTripChanges).not.toHaveBeenCalled()
+
+    mockUseAuth.mockReturnValue({ status: "authenticated" })
+    await render(<AppLayout />, { wrapper: WithCachedSurfaces })
+    expect(mockStartTripChanges).toHaveBeenCalledTimes(1)
+  })
+
+  it("stops the trip-change stream's listeners on unmount", async () => {
+    const stop = jest.fn()
+    mockStartTripChanges.mockReturnValue(stop)
+    mockUseAuth.mockReturnValue({ status: "authenticated" })
+
+    const { unmount } = await render(<AppLayout />, { wrapper: WithCachedSurfaces })
+    unmount()
+
+    await waitFor(() => expect(stop).toHaveBeenCalled())
   })
 
   it("stops the sweep's listeners on unmount", async () => {

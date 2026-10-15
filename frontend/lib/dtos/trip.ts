@@ -56,6 +56,9 @@ export const TripSchema = z.object({
   outcome: z.enum(TRIP_OUTCOMES).nullish(),
   lastCheckpointAlertAt: z.string().nullish(),
   timezoneName: z.string().nullish(),
+  // Where the trip's change log stood when this was read (M36) — present on the single-trip
+  // read only, and null when the log could not be reached.
+  changeRev: z.number().int().nonnegative().nullish(),
 })
 
 export const TripPageSchema = z.object({

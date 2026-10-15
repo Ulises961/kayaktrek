@@ -75,6 +75,33 @@ describe("FloatPlanTab — viewing state", () => {
   })
 })
 
+describe("FloatPlanTab — the same member changing it on another device (M36)", () => {
+  it("drops the review banner once the server says the plan was confirmed elsewhere", () => {
+    const { rerender } = render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    expect(screen.getByText(/review.*float plan/i)).toBeDefined()
+
+    rerender(
+      <FloatPlanTab
+        tripId={TRIP_ID}
+        currentMember={{ ...BASE_MEMBER, floatPlanConfirmedAt: "2026-05-14T10:00:00" }}
+      />,
+    )
+
+    expect(screen.queryByText(/review.*float plan/i)).toBeNull()
+  })
+
+  it("opens the form on what the server has now, not on what the page loaded with", async () => {
+    const { rerender } = render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+
+    rerender(
+      <FloatPlanTab tripId={TRIP_ID} currentMember={{ ...BASE_MEMBER, vesselMake: "Valley" }} />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }))
+
+    expect((screen.getByLabelText(/make/i) as HTMLInputElement).value).toBe("Valley")
+  })
+})
+
 describe("FloatPlanTab — editing state", () => {
   it("shows form inputs after clicking Edit", async () => {
     render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)

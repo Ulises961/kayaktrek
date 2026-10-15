@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import cast
 import logging
 from flask import Blueprint, g, jsonify, request, abort, Response
 from flask_limiter.util import get_remote_address
@@ -17,6 +18,7 @@ from Api.limiter import limiter
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
 from Services.itinerary_service import ItineraryService, PointOrderMismatchError
+from Services.trip_change_service import TripChangeService
 
 logger = logging.getLogger(__name__)
 
@@ -229,10 +231,16 @@ def get_itinerary(id: str):
             application/json:
               schema: ItinerarySchema
     """
+    # Before the data, so a change committed in between is reported by the first poll from
+    # this revision rather than lost to the gap.
+    trip_id = ItineraryService.get_trip_id(id)
+    change_rev = TripChangeService.current_revision(trip_id) if trip_id is not None else None
     itinerary = ItineraryService.get_itinerary_by_id(id)
     schema = ItinerarySchema()
     schema.include_staging = True  # type: ignore[attr-defined]
-    return jsonify(schema.dump(itinerary)), HTTPStatus.OK
+    data = cast(dict, schema.dump(itinerary))
+    data["changeRev"] = change_rev
+    return jsonify(data), HTTPStatus.OK
 
 
 @itinerary_api.route("/create", methods=["POST"])

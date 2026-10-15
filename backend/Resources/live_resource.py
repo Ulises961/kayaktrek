@@ -20,6 +20,7 @@ from Services.expedition_log_service import ExpeditionLogService
 from Services.itinerary_service import ItineraryService
 from Services.live_position_service import LivePositionService
 from Services.live_stream_service import LiveStreamService
+from Services.trip_change_service import TripChangeService
 from Tasks.expedition_log_task import generate_trip_day_logs
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,10 @@ live_api = Blueprint("live", __name__, url_prefix=LIVE_ENDPOINT)
 
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
+# What a client is told to wait when the change log cannot be read. Longer than the poll
+# interval: an unreachable Redis is not helped by everyone retrying every few seconds.
+_CHANGES_RETRY_AFTER_SECONDS = "30"
+
 # Per-IP, since a stream can arrive with no resolved user yet (the ticket path).
 # Configurable because two browser contexts sharing one dev/CI machine's IP hit this
 # limit within a normal test run and then pay ~90s of client-side backoff
@@ -36,6 +41,12 @@ _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 # itself, which exists for the same reason noted in the frontend: real crews sharing
 # one NAT/WiFi IP hit it too. Production keeps the conservative default.
 _LIVE_STREAM_RATE_LIMIT = os.getenv("LIVE_STREAM_RATE_LIMIT", "10 per minute")
+
+# The change poll's limit. A visible trip page polls every ~7 s, about nine requests a minute,
+# and someone with a few trips open is a few times that; this blocks a runaway loop, not a
+# person. Keyed on the user, never the address: the droplet's nginx does not restore the
+# visitor's IP from Cloudflare, so an address key could be one key for every visitor.
+_CHANGES_POLL_RATE_LIMIT = os.getenv("TRIP_CHANGES_POLL_RATE_LIMIT", "120 per minute")
 
 
 @live_api.after_request
@@ -303,3 +314,118 @@ def trip_stream(id: str):
 # the auth-invariant canary (Tests/40_auth_invariants_test.py) recognises this
 # as populated, not a silent gap.
 trip_stream._populates_current_user = True  # type: ignore[attr-defined]
+
+
+@live_api.route("/trip/<string:id>/changes-ticket", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+def post_changes_ticket(id: str):
+    """
+    ---
+    post:
+      summary: Mint a short-lived trip-changes stream ticket
+      description: >
+        For the browser's EventSource, which can't send an Authorization header. Valid
+        for the changes stream of this trip only — a position-stream ticket does not
+        open it, nor this one that.
+      responses:
+        200:
+          description: The ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    type: string
+    """
+    return jsonify({"ticket": LiveStreamService.mint_changes_ticket(id, str(g.current_user_id))}), HTTPStatus.OK
+
+
+def _changes_caller(trip_id: str) -> Optional[str]:
+    """Who is polling `trip_id`'s change log: a normal access token, else a `?ticket=` from
+    POST .../changes-ticket. The rate limiter needs this before the view does, so it runs
+    twice per request; verifying a ticket is a signature check."""
+    user_id = JWTService.resolve_user_id_from_bearer_header()
+    if user_id is None:
+        ticket = request.args.get("ticket")
+        if ticket is not None:
+            user_id = LiveStreamService.verify_changes_ticket(ticket, trip_id)
+    return user_id
+
+
+def _changes_rate_key() -> str:
+    user_id = _changes_caller((request.view_args or {}).get("id", ""))
+    return f"user:{user_id}" if user_id is not None else f"ip:{get_remote_address()}"
+
+
+@live_api.route("/trip/<string:id>/changes", methods=["GET"])
+@limiter.limit(_CHANGES_POLL_RATE_LIMIT, key_func=_changes_rate_key)
+def trip_changes(id: str):
+    """What changed on a trip since revision `since`, for a crew member, in any trip state.
+    Missing, forbidden and unauthenticated are one undifferentiated 404.
+    ---
+    get:
+      summary: Trip changes since a revision
+      description: >
+        Poll while the page is visible. Returns `{rev, changes:[{t, id, op}], truncated}` —
+        identities only, never field values; a client refetches through its normal read
+        path. Without `since` it only reports the current `rev`, to start from. `truncated`
+        means the exact changes cannot be given (the log was trimmed or expired, or was lost),
+        and the client should refresh everything it shows.
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: ticket
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: The changes since `since`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rev:
+                    type: integer
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        t:
+                          type: string
+                        id:
+                          type: string
+                        op:
+                          type: string
+                  truncated:
+                    type: boolean
+        404:
+          description: Not authorized, or no such trip
+        503:
+          description: The change log cannot be read; retry after the interval given
+    """
+    user_id = _changes_caller(id)
+    if user_id is None or not LiveStreamService.is_trip_member_cached(id, user_id):
+        return Response(status=HTTPStatus.NOT_FOUND)
+
+    try:
+        page = TripChangeService.changes_since(id, request.args.get("since", type=int))
+    except Exception:
+        logger.warning("trip_changes_unavailable", extra={"trip_id": id}, exc_info=True)
+        return Response(status=HTTPStatus.SERVICE_UNAVAILABLE, headers={"Retry-After": _CHANGES_RETRY_AFTER_SECONDS})
+
+    response = jsonify(page.to_wire())
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+# Self-authenticating, for the same reason as `trip_stream` above.
+trip_changes._populates_current_user = True  # type: ignore[attr-defined]

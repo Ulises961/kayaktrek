@@ -25,6 +25,7 @@ import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
 import { loadTripListCache } from "@mobile/lib/db/trip-list-cache"
 import { isTripLeader } from "@mobile/lib/db/trip-role"
 import { useLiveCache } from "@mobile/lib/db/use-live-cache"
+import { useTripChanges } from "@mobile/lib/live/use-trip-changes"
 import { getTrip } from "@mobile/lib/trips/actions"
 
 const header = <RouterStack.Screen options={{ title: "Trip" }} />
@@ -102,6 +103,8 @@ export default function TripDetailScreen() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  useTripChanges(id, () => void reload(), { tables: ["trip", "trip_member"] })
 
   // Leader-only trip changes (M9d), known offline from the synced crew rows.
   const [isLeader, setIsLeader] = useState(false)

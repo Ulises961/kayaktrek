@@ -6,6 +6,7 @@ import { liveMapHref } from "@/lib/trips/live"
 import { deriveMembership } from "@/lib/trips/membership"
 import { TripIdentityHeader } from "@/components/trips/trip-identity-header"
 import { TripDetailNav } from "@/components/trips/trip-detail-nav"
+import { TripChangesListener } from "@/components/trips/trip-changes-listener"
 import { Card, CardContent } from "@/components/ui/card"
 import { CardTopRule } from "@/components/common/card-top-rule"
 import { SetBreadcrumbs } from "@/components/common/set-breadcrumbs"
@@ -31,6 +32,7 @@ export default async function TripDetailLayout({
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
+      {isMember && <TripChangesListener tripId={id} initialRev={trip.changeRev ?? null} />}
       <SetBreadcrumbs
         crumbs={[
           { label: "Trips", href: "/trips" },

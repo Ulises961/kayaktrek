@@ -53,6 +53,7 @@ _EXCLUDED_URL_PATTERNS = ",".join([
     r"/api/v1/tiles/.*",
     r"/api/v1/health",
     r"/api/v1/live/trip/[^/]+/stream(\?|$)",
+    r"/api/v1/live/trip/[^/]+/changes(\?|$)",
     r"/api/v1/live/story/[^/]+/stream(\?|$)",
 ])
 
