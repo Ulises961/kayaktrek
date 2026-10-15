@@ -323,3 +323,84 @@ def test_leave_trip_makes_trip_leaderless_but_still_visible_to_crew(app, client,
     assert r.status_code == 200
     trip = json.loads(r.data)
     assert all(m["role"] != "leader" for m in trip["travellers"])
+
+
+# =============================================================================
+# Who may see when a member shared their medical notes
+# =============================================================================
+
+def _share_notes_with_leader(client, trip_id, member_headers):
+    """The member stores sealed notes and then seals a copy to the leader — the flow that
+    stamps their consent time."""
+    elevated = _elevated_headers(client, member_headers, "CrewPass9$")
+    ciphertext, nonce, salt = encrypt("Allergic to bee stings.", "CrewPass9$")
+    stored = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/medical-consent",
+        json={"ciphertext": ciphertext, "nonce": nonce, "salt": salt},
+        headers=elevated,
+    )
+    assert stored.status_code == 200
+    leader_key = json.loads(client.get(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/leader-public-key", headers=member_headers,
+    ).data)["publicKey"]
+    sealed, leader_nonce, ephemeral = encrypt_for_recipient("Allergic to bee stings.", leader_key)
+    elevated = _elevated_headers(client, member_headers, "CrewPass9$")
+    shared = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/member/me/share-medical-notes",
+        json={"ciphertext": sealed, "nonce": leader_nonce, "ephemeralKey": ephemeral},
+        headers=elevated,
+    )
+    assert shared.status_code == 200
+
+
+@pytest.fixture
+def crew_who_both_shared_notes(client, trip_with_two_crew):
+    t = trip_with_two_crew
+    for headers in (t["crew_a_headers"], t["crew_b_headers"]):
+        _share_notes_with_leader(client, t["trip_id"], headers)
+    return t
+
+
+def _consent_times(travellers):
+    return {m["user"]["id"]: m["medicalNotesConsentAt"] for m in travellers}
+
+
+def test_the_leader_sees_when_every_member_shared(client, crew_who_both_shared_notes):
+    t = crew_who_both_shared_notes
+
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["leader_headers"]).data)
+
+    times = _consent_times(trip["travellers"])
+    assert times[t["crew_a_id"]] is not None
+    assert times[t["crew_b_id"]] is not None
+
+
+def test_a_crew_member_sees_their_own_consent_time_but_not_a_crewmates(client, crew_who_both_shared_notes):
+    t = crew_who_both_shared_notes
+
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["crew_b_headers"]).data)
+
+    times = _consent_times(trip["travellers"])
+    assert times[t["crew_b_id"]] is not None
+    assert times[t["crew_a_id"]] is None
+
+
+def test_every_trip_listing_hides_a_crewmates_consent_time_too(client, crew_who_both_shared_notes):
+    """The rule belongs to the serialiser, not to one endpoint: the paginated list a crew member
+    opens their trips from carries the same travellers."""
+    t = crew_who_both_shared_notes
+
+    page = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['crew_b_id']}/all", headers=t["crew_b_headers"]).data)
+
+    trip = next(item for item in page["items"] if item["id"] == t["trip_id"])
+    times = _consent_times(trip["travellers"])
+    assert times[t["crew_b_id"]] is not None
+    assert times[t["crew_a_id"]] is None
+
+
+def test_a_crew_members_view_of_the_trip_carries_no_phantom_notes_field(client, crew_who_both_shared_notes):
+    t = crew_who_both_shared_notes
+
+    trip = json.loads(client.get(f"{TRIP_ENDPOINT}/{t['trip_id']}", headers=t["crew_b_headers"]).data)
+
+    assert all("medicalNotes" not in member for member in trip["travellers"])
