@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
 from Schemas.image_schema import ImageSchema, ImageUpdateSchema
@@ -24,7 +25,7 @@ point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 @JWTService.authenticate_restful
 @limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point", parent_resource=("day", "dayId"), from_body=True)
-def create_point():
+def create_point() -> ResponseReturnValue:
     """
     PointResource POST method. Adds a new point to the database.
 
@@ -72,7 +73,7 @@ def create_point():
 @JWTService.authenticate_restful
 @limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point")
-def update_point(id: str):
+def update_point(id: str) -> ResponseReturnValue:
     """
     PATCH /api/point/<id> — Partially update an existing point.
 
@@ -117,7 +118,7 @@ def update_point(id: str):
 @point_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def get_point(id: str):
+def get_point(id: str) -> ResponseReturnValue:
     """
     PointResource GET method. Retrieves a single point by ID.
 
@@ -149,7 +150,7 @@ def get_point(id: str):
 @point_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def delete(id: str):
+def delete(id: str) -> ResponseReturnValue:
     """
     PointResource DELETE method. Deletes a point by ID.
 
@@ -188,7 +189,7 @@ def delete(id: str):
 @point_api.route("/<string:id>/images", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def upload_image(id: str):
+def upload_image(id: str) -> ResponseReturnValue:
     """
     Upload an image and attach it to a point.
 
@@ -246,7 +247,7 @@ def upload_image(id: str):
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def update_image(id: str, image_id: str):
+def update_image(id: str, image_id: str) -> ResponseReturnValue:
     """
     PATCH /api/point/<id>/images/<image_id> — update an image's visibility, its
     caption, or both. Only the fields present in the body are applied.
@@ -316,7 +317,7 @@ def update_image(id: str, image_id: str):
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def delete_image(id: str, image_id: str):
+def delete_image(id: str, image_id: str) -> ResponseReturnValue:
     """
     Detach and permanently delete an image from a point.
 

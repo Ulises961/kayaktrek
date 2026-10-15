@@ -4,6 +4,7 @@ from http import HTTPStatus
 from typing import Optional
 
 from flask import Blueprint, Response, abort, current_app, g, jsonify, request, stream_with_context
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
@@ -47,7 +48,7 @@ _CHANGES_POLL_RATE_LIMIT = os.getenv("TRIP_CHANGES_POLL_RATE_LIMIT", "120 per mi
 
 
 @live_api.after_request
-def _add_cors_headers(response):
+def _add_cors_headers(response: Response) -> Response:
     """The browser's EventSource connects to this blueprint's routes directly —
     the public story stream (main backend) and the ticketed crew stream (SSE
     sidecar) are both genuinely cross-origin from the Next.js origin, unlike
@@ -64,7 +65,7 @@ def _add_cors_headers(response):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @limiter.limit("12 per minute")
-def post_position(id: str):
+def post_position(id: str) -> ResponseReturnValue:
     """
     Record a GPS position ping for a happening trip.
 
@@ -117,7 +118,7 @@ _CLOSE_DAY_ERROR_MESSAGES = {
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def close_day(id: str):
+def close_day(id: str) -> ResponseReturnValue:
     """
     Close out a happening trip's day and trigger expedition-log generation.
 
@@ -177,7 +178,7 @@ def close_day(id: str):
 
 @live_api.route("/story/<string:token>/stream", methods=["GET"])
 @limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
-def story_stream(token: str):
+def story_stream(token: str) -> ResponseReturnValue:
     """Public, unauthenticated live layer on the story share link. 404 no-oracle:
     unknown token, tokenless/standalone itinerary, no trip, or trip not happening are
     all indistinguishable — EventSource treats any non-200 as terminal, so this is
@@ -219,7 +220,7 @@ def story_stream(token: str):
 @live_api.route("/trip/<string:id>/stream-ticket", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def post_stream_ticket(id: str):
+def post_stream_ticket(id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -243,7 +244,7 @@ def post_stream_ticket(id: str):
 
 @live_api.route("/trip/<string:id>/stream", methods=["GET"])
 @limiter.limit(_LIVE_STREAM_RATE_LIMIT, key_func=get_remote_address)
-def trip_stream(id: str):
+def trip_stream(id: str) -> ResponseReturnValue:
     """Crew stream: accepts either a normal access token (the web frontend only ever
     sends a ticket) or a short-lived stream ticket, checked in that order. Undecorated because path 2 must succeed with no Authorization
     header at all. Either credential succeeding satisfies the gate; both failing,
@@ -305,7 +306,7 @@ trip_stream._populates_current_user = True  # type: ignore[attr-defined]
 @live_api.route("/trip/<string:id>/changes-ticket", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def post_changes_ticket(id: str):
+def post_changes_ticket(id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -347,7 +348,7 @@ def _changes_rate_key() -> str:
 
 @live_api.route("/trip/<string:id>/changes", methods=["GET"])
 @limiter.limit(_CHANGES_POLL_RATE_LIMIT, key_func=_changes_rate_key)
-def trip_changes(id: str):
+def trip_changes(id: str) -> ResponseReturnValue:
     """What changed on a trip since revision `since`, for a crew member, in any trip state.
     Missing, forbidden and unauthenticated are one undifferentiated 404.
     ---

@@ -1,7 +1,9 @@
 from http import HTTPStatus
 import logging
+from typing import TYPE_CHECKING
 
 from flask import Blueprint, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
@@ -10,12 +12,15 @@ from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_admin, check_resource_ownership
 from Services.tidal_station_service import TidalStationService
 
+if TYPE_CHECKING:
+    from Models.tidal_station import TidalStation
+
 logger = logging.getLogger(__name__)
 
 tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tidal-station')
 
 
-def _may_see_full_content(station) -> bool:
+def _may_see_full_content(station: "TidalStation") -> bool:
     """Atlas-seeded stations (no owning itinerary) are public reference data.
     A user-created diamond's full content stays gated to the itinerary's own
     members — everyone else gets the position-only projection."""
@@ -28,7 +33,7 @@ def _may_see_full_content(station) -> bool:
 
 @tidal_station_api.route('/nearby', methods=['GET'])
 @JWTService.authenticate_restful
-def get_nearby_stations():
+def get_nearby_stations() -> ResponseReturnValue:
     """GET /api/tidal-station/nearby?lat=&lng=&range=
     ---
     get:
@@ -92,7 +97,7 @@ def get_nearby_stations():
 @tidal_station_api.route('/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_admin()
-def create_station():
+def create_station() -> ResponseReturnValue:
     """
     TidalStationResource POST method. Creates an admin-curated reference tidal station.
     ---
@@ -128,7 +133,7 @@ def create_station():
 @tidal_station_api.route('/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_admin()
-def update_station(id: str):
+def update_station(id: str) -> ResponseReturnValue:
     """
     TidalStationResource PATCH method. Updates a reference tidal station.
     ---
@@ -164,7 +169,7 @@ def update_station(id: str):
 @tidal_station_api.route('/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_admin()
-def delete_station(id: str):
+def delete_station(id: str) -> ResponseReturnValue:
     """
     TidalStationResource DELETE method. Deletes a reference tidal station.
     ---

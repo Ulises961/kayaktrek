@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 
 from Schemas.hazard_diamond_schema import HazardDiamondPositionSchema
 from Services.Middleware.auth_middleware import JWTService
@@ -19,7 +20,7 @@ _position_schema = HazardDiamondPositionSchema(many=True)
 
 @hazard_diamond_api.route('/nearby', methods=['GET'])
 @JWTService.authenticate_restful
-def get_nearby_hazard_diamonds():
+def get_nearby_hazard_diamonds() -> ResponseReturnValue:
     """
     ---
     get:

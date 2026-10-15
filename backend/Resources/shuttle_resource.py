@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, g, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -20,7 +21,7 @@ shuttle_api = Blueprint("shuttle", __name__, url_prefix=SHUTTLE_ENDPOINT)
 @shuttle_api.route("/<trip_id>/all", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def list_vehicles(trip_id: str):
+def list_vehicles(trip_id: str) -> ResponseReturnValue:
     """
     List all shuttle vehicles arranged for a trip.
     ---
@@ -43,7 +44,7 @@ def list_vehicles(trip_id: str):
 @shuttle_api.route("/<trip_id>/create", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def create_vehicle(trip_id: str):
+def create_vehicle(trip_id: str) -> ResponseReturnValue:
     """
     Arrange a shuttle vehicle for a trip. The calling member becomes the arranger.
     ---
@@ -80,7 +81,7 @@ def create_vehicle(trip_id: str):
 @shuttle_api.route("/vehicle/<vehicle_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("shuttle_vehicle", id_param="vehicle_id")
-def update_vehicle(vehicle_id: str):
+def update_vehicle(vehicle_id: str) -> ResponseReturnValue:
     """
     Partially update a shuttle vehicle. Only the arranger or trip leader may update.
     ---
@@ -122,7 +123,7 @@ def update_vehicle(vehicle_id: str):
 @shuttle_api.route("/vehicle/<vehicle_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("shuttle_vehicle", id_param="vehicle_id")
-def delete_vehicle(vehicle_id: str):
+def delete_vehicle(vehicle_id: str) -> ResponseReturnValue:
     """
     Delete a shuttle vehicle and all its passengers. Only the arranger or trip leader may delete.
     ---
@@ -150,7 +151,7 @@ def delete_vehicle(vehicle_id: str):
 @shuttle_api.route("/vehicle/<vehicle_id>/passenger", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("shuttle_vehicle", id_param="vehicle_id")
-def add_passenger(vehicle_id: str):
+def add_passenger(vehicle_id: str) -> ResponseReturnValue:
     """
     Add a trip member as a passenger in a shuttle vehicle.
 
@@ -200,7 +201,7 @@ def add_passenger(vehicle_id: str):
 @shuttle_api.route("/vehicle/<vehicle_id>/passenger/<member_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("shuttle_vehicle", id_param="vehicle_id")
-def remove_passenger(vehicle_id: str, member_id: str):
+def remove_passenger(vehicle_id: str, member_id: str) -> ResponseReturnValue:
     """
     Remove a passenger from a shuttle vehicle.
 

@@ -3,6 +3,7 @@ import logging
 from uuid import UUID
 
 from flask import Blueprint, request, jsonify, abort, current_app, g
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from sqlalchemy.exc import NoResultFound
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 api = Blueprint("auth", __name__)
 
 
-def _resend_key():
+def _resend_key() -> str:
     data = request.get_json(silent=True) or {}
     mail = data.get("mail")
     return mail if mail else get_remote_address()
@@ -29,7 +30,7 @@ def _resend_key():
 @api.route("/api/v1/auth/login", methods=["POST"])
 @limiter.limit("10 per minute")
 @limiter.limit("50 per hour")
-def login_user():
+def login_user() -> ResponseReturnValue:
     """
     ---
     post:
@@ -135,7 +136,7 @@ def _invite_code_valid(submitted: str) -> bool:
 
 
 @api.route("/api/v1/auth/registration-status", methods=["GET"])
-def registration_status():
+def registration_status() -> ResponseReturnValue:
     """
     Whether the invite-code kill switch (DEPLOY.md "Closing registration in a hurry") is
     currently armed, so the register form can show or hide its invite-code field without a
@@ -162,7 +163,7 @@ def registration_status():
 
 @api.route("/api/v1/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
-def register_user():
+def register_user() -> ResponseReturnValue:
     """
     ---
     post:
@@ -213,7 +214,7 @@ def register_user():
 
 
 @api.route("/api/v1/auth/activate-test", methods=["POST"])
-def activate_test_user():
+def activate_test_user() -> ResponseReturnValue:
     """Bypass email verification for E2E tests. Only available in development/testing.
     ---
     post:
@@ -248,7 +249,7 @@ def activate_test_user():
 
 
 @api.route("/api/v1/auth/verify", methods=["GET"])
-def verify_account():
+def verify_account() -> ResponseReturnValue:
     """
     ---
     get:
@@ -277,7 +278,7 @@ def verify_account():
 
 @api.route("/api/v1/auth/verify", methods=["POST"])
 @limiter.limit("10 per hour")
-def verify_account_and_sign_in():
+def verify_account_and_sign_in() -> ResponseReturnValue:
     """
     ---
     post:
@@ -330,7 +331,7 @@ def verify_account_and_sign_in():
 
 
 @api.route("/api/v1/auth/verify-email-change", methods=["GET"])
-def verify_email_change():
+def verify_email_change() -> ResponseReturnValue:
     """
     ---
     get:
@@ -359,7 +360,7 @@ def verify_email_change():
 
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
-def resend_verification():
+def resend_verification() -> ResponseReturnValue:
     """
     ---
     post:
@@ -394,7 +395,7 @@ def resend_verification():
 
 @api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
-def resend_deletion_cancel():
+def resend_deletion_cancel() -> ResponseReturnValue:
     """
     ---
     post:
@@ -436,7 +437,7 @@ def resend_deletion_cancel():
 
 @api.route("/api/v1/auth/forgot-password", methods=["POST"])
 @limiter.limit("5 per hour")
-def forgot_password():
+def forgot_password() -> ResponseReturnValue:
     """
     ---
     post:
@@ -465,7 +466,7 @@ def forgot_password():
 
 
 @api.route("/api/v1/auth/reset-password", methods=["POST"])
-def reset_password():
+def reset_password() -> ResponseReturnValue:
     """
     ---
     post:
@@ -500,7 +501,7 @@ def reset_password():
 
 @api.route("/api/v1/auth/refresh", methods=["POST"])
 @limiter.limit("10 per minute")
-def refresh_token():
+def refresh_token() -> ResponseReturnValue:
     """
     ---
     post:
@@ -582,7 +583,7 @@ def refresh_token():
 
 @api.route("/api/v1/auth/logout", methods=["POST"])
 @JWTService.authenticate_restful
-def logout():
+def logout() -> ResponseReturnValue:
     """
     ---
     post:
@@ -602,7 +603,7 @@ def logout():
 
 @api.route("/api/v1/auth/logout-all", methods=["POST"])
 @JWTService.authenticate_restful
-def logout_all():
+def logout_all() -> ResponseReturnValue:
     """
     ---
     post:

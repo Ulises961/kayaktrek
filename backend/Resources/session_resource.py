@@ -3,6 +3,7 @@ from http import HTTPStatus
 from uuid import UUID
 
 from flask import Blueprint, abort, g, jsonify
+from flask.typing import ResponseReturnValue
 
 from Schemas.session_schema import SessionSchema
 from Services.session_service import SessionService
@@ -16,7 +17,7 @@ session_api = Blueprint("session", __name__, url_prefix=SESSION_ENDPOINT)
 
 @session_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def list_sessions():
+def list_sessions() -> ResponseReturnValue:
     """
     Lists the caller's own active devices. This is the pull channel for suspicious-activity
     disclosure: rather than emailing on every reuse signal, a user can look at where their
@@ -41,7 +42,7 @@ def list_sessions():
 
 @session_api.route("/<uuid:session_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def revoke_session(session_id):
+def revoke_session(session_id: UUID) -> ResponseReturnValue:
     """
     ---
     delete:

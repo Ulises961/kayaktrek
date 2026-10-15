@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -16,7 +17,7 @@ float_plan_api = Blueprint("float_plan", __name__, url_prefix=FLOAT_PLAN_ENDPOIN
 
 @float_plan_api.route("/public/<token>", methods=["GET"])
 @limiter.limit("30 per minute", key_func=get_remote_address)
-def get_public_float_plan(token: str):
+def get_public_float_plan(token: str) -> ResponseReturnValue:
     """
     ---
     get:

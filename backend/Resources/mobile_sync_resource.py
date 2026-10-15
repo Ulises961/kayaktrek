@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
 
 from Services.Middleware.auth_middleware import JWTService
@@ -19,7 +20,7 @@ mobile_sync_api = Blueprint("mobile_sync", __name__, url_prefix=MOBILE_SYNC_ENDP
 @mobile_sync_api.route("/trip/<string:trip_id>/pull", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def pull_changes(trip_id: str):
+def pull_changes(trip_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -51,7 +52,7 @@ def pull_changes(trip_id: str):
 
 @mobile_sync_api.route("/mutations", methods=["POST"])
 @JWTService.authenticate_restful
-def apply_mutations():
+def apply_mutations() -> ResponseReturnValue:
     """
     ---
     post:
@@ -83,7 +84,7 @@ def apply_mutations():
 @mobile_sync_api.route("/trip/<string:trip_id>/route/pull", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def pull_route(trip_id: str):
+def pull_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -109,7 +110,7 @@ def pull_route(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 @require_leader(id_param="trip_id")
-def push_route(trip_id: str):
+def push_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -152,7 +153,7 @@ def push_route(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 @require_leader(id_param="trip_id")
-def resolve_route(trip_id: str):
+def resolve_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     post:

@@ -3,6 +3,7 @@ from http import HTTPStatus
 from uuid import UUID
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 
 from Schemas.satellite_feed_schema import SatelliteFeedSchema
@@ -17,7 +18,7 @@ satellite_feed_api = Blueprint("satellite_feed", __name__, url_prefix=SATELLITE_
 
 @satellite_feed_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def list_satellite_feeds():
+def list_satellite_feeds() -> ResponseReturnValue:
     """
     ---
     get:
@@ -37,7 +38,7 @@ def list_satellite_feeds():
 
 @satellite_feed_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_satellite_feed():
+def create_satellite_feed() -> ResponseReturnValue:
     """
     ---
     post:
@@ -70,7 +71,7 @@ def create_satellite_feed():
 
 @satellite_feed_api.route("/<uuid:feed_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
-def update_satellite_feed(feed_id):
+def update_satellite_feed(feed_id: UUID) -> ResponseReturnValue:
     """
     ---
     patch:
@@ -99,7 +100,7 @@ def update_satellite_feed(feed_id):
 
 @satellite_feed_api.route("/<uuid:feed_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def delete_satellite_feed(feed_id):
+def delete_satellite_feed(feed_id: UUID) -> ResponseReturnValue:
     """
     ---
     delete:

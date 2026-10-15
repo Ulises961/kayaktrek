@@ -72,10 +72,12 @@ class ItinerarySchema(BaseSchema):
         if value is not None and not (0.5 <= value <= 20.0):
             raise ValidationError("Average speed must be between 0.5 and 20.0 knots")
 
+    # Dumps drop the staging Day 0 unless a caller sets this to True before dumping.
+    include_staging: bool = False
+
     @post_dump
     def exclude_day_zero(self, data, **kwargs):
-        # Set schema.include_staging = True before dumping to keep Day 0 in the response.
-        if not getattr(self, "include_staging", False) and data.get("days"):
+        if not self.include_staging and data.get("days"):
             data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
         return data
 

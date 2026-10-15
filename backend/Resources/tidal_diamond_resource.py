@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
@@ -30,7 +31,7 @@ _edit_schema = TidalDiamondEditSchema()
 @tidal_diamond_api.route('/api/v1/tidal-diamond/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def create_diamond():
+def create_diamond() -> ResponseReturnValue:
     """
     TidalDiamondResource POST method. Adds a user-created tidal diamond to an itinerary.
 
@@ -69,7 +70,7 @@ def create_diamond():
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def get_diamond(id: str):
+def get_diamond(id: str) -> ResponseReturnValue:
     """Raw editable view of a user diamond, for prefilling the edit form.
     ---
     get:
@@ -96,7 +97,7 @@ def get_diamond(id: str):
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def update_diamond(id: str):
+def update_diamond(id: str) -> ResponseReturnValue:
     """
     TidalDiamondResource PATCH method. Partially updates a user tidal diamond.
 
@@ -136,7 +137,7 @@ def update_diamond(id: str):
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def delete_diamond(id: str):
+def delete_diamond(id: str) -> ResponseReturnValue:
     """
     TidalDiamondResource DELETE method. Deletes a user tidal diamond.
     ---
