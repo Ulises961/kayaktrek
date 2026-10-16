@@ -11,7 +11,6 @@ import hashlib
 import json
 import logging
 from datetime import UTC, date, datetime
-from typing import cast
 from uuid import UUID
 
 from Api.celery_app import celery_app
@@ -19,6 +18,7 @@ from Api.database import db
 from celery import Task
 from flask import current_app
 from Models.auth_token import AuthTokenType
+from Models.log import Log
 from Models.user import User
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
@@ -64,6 +64,12 @@ def _json_default(obj: object) -> str:
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj)} is not JSON serialisable")
+
+
+def _distance_km(log: Log) -> float | None:
+    # `Log.distance` is a Numeric column, so it is a Decimal here, which json.dumps rejects.
+    # `is not None`, not truthiness: a stored 0 is a distance, not a missing one.
+    return float(log.distance) if log.distance is not None else None
 
 
 def _build_export(user: User) -> dict:
@@ -117,7 +123,7 @@ def _build_export(user: User) -> dict:
             {
                 "id": str(log.id),
                 "date": log.date.isoformat() if log.date else None,
-                "distanceKm": cast(float, log.distance) if log.distance else None,
+                "distanceKm": _distance_km(log),
                 "notes": log.notes,
             }
             for log in user.logs
@@ -126,7 +132,7 @@ def _build_export(user: User) -> dict:
             {
                 "id": str(log.id),
                 "date": log.date.isoformat() if log.date else None,
-                "distanceKm": cast(float, log.distance) if log.distance else None,
+                "distanceKm": _distance_km(log),
                 "notes": log.notes,
                 "authorId": str(log.user_id) if log.user_id else None,
             }
