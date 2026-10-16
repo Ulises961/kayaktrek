@@ -126,7 +126,7 @@ class LogService:
 
         Args:
             log_data: Dictionary containing log information
-            log_id: The id a phone gave the log while offline (M9d), so later queued
+            log_id: The id a phone gave the log while offline, so later queued
                 edits can refer to it; omitted, the server generates one
 
         Returns:
@@ -270,7 +270,7 @@ class LogService:
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
-        # Resolve any pending endorsement request the author sent this endorser (M7b §2b).
+        # Resolve any pending endorsement request the author sent this endorser.
         pending_request = (
             db.session.query(EndorsementRequest)
             .filter_by(

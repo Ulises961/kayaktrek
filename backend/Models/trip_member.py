@@ -63,15 +63,16 @@ class TripMember(BaseModel):
     emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     emergency_contact_relationship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    # Per-trip encrypted medical notes — independent copy, not derived from User profile at read time.
-    # User authenticates with their password to read or edit these; they are stored AES-GCM encrypted.
+    # Per-trip medical notes — an independent copy, not derived from the User profile at read time.
+    # Sealed on the client with a key derived from the member's password (AES-GCM); the server
+    # stores only the ciphertext, nonce and salt.
     medical_notes_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     medical_notes_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
-    # Leader-visible copy encrypted with the leader's X25519 public key (ECIES, ADR-023).
-    # Written by share_medical_notes(); nulled by revoke_trip_medical_notes().
-    # The leader decrypts on demand by providing their password — never stored as plaintext.
+    # Leader-visible copy, sealed on the client to the leader's X25519 public key (ECIES,
+    # ADR-023), so only the leader can open it. Written by share_medical_notes(); nulled by
+    # revoke_trip_medical_notes().
     medical_notes_leader_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     medical_notes_leader_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_leader_ephemeral_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -81,7 +82,7 @@ class TripMember(BaseModel):
     float_plan_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Set by the leader when this paddler leaves a trip under way — injury, evacuation,
-    # picked up by the support boat (M9d). Distinct from removal, which erases the person
+    # picked up by the support boat. Distinct from removal, which erases the person
     # from the trip's record: the float plan and shore contact need to know who was on
     # the water, and until when.
     left_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

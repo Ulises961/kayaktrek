@@ -22,9 +22,9 @@ class Place(BaseModel):
     a campsite, a slipway, a hazard, a viewpoint. Deliberately NOT a Point: it
     takes no part in the route linked list (no next_id, no day, no ordering) and
     carries none of a Point's route consequences. It is its own entity, queried by
-    proximity. Trip-scoped while planning; a null itinerary_id is a global community
-    place (the public gazetteer tier, deferred to M7). Modelled on the tidal-diamond
-    pattern (TidalStation). See docs/adr/features.md (Map Annotations) and
+    proximity. Trip-scoped while planning; a null itinerary_id is reserved for a global
+    community place (a public gazetteer tier that is not built). Modelled on the
+    tidal-diamond pattern (TidalStation). See docs/adr/features.md (Map Annotations) and
     docs/adr/itinerary-frontend.md (point-type simplification)."""
 
     __tablename__ = "place"
@@ -38,7 +38,7 @@ class Place(BaseModel):
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Trip-scoped while planning; null = a global community place (M7 public tier).
+    # Trip-scoped while planning; null is reserved for a global community place.
     itinerary_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey("itinerary.id", ondelete="CASCADE"), nullable=True, index=True
     )

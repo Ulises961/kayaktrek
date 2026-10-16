@@ -24,14 +24,11 @@ class Day(BaseModel):
     start_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
     end_point_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("point.id", ondelete="SET NULL"), nullable=True)
 
-    # cascade="all, delete" mirrors weather/sea below: without it, SQLAlchemy's
-    # unit-of-work merely NULLs a loaded child's day_id (the ORM's default
-    # "disassociate" behavior for a non-cascaded one-to-many) before issuing the
-    # Day DELETE, so the DB-level ondelete="CASCADE" on Point.day_id never gets a
-    # chance to fire — the itinerary/day/point objects are eager-loaded by
-    # ItineraryService.get_itinerary_by_id, so this bites on every real
-    # DELETE /api/v1/itinerary/<id> and orphaned Point rows (day_id=NULL) survive
-    # the parent Day's deletion instead of being removed with it.
+    # cascade="all, delete" mirrors weather/sea below. Without it SQLAlchemy NULLs a loaded
+    # child's day_id (its default "disassociate" for a non-cascaded one-to-many) before the Day
+    # DELETE, so the DB-level ondelete="CASCADE" on Point.day_id never fires and the Points
+    # survive as orphans with day_id=NULL. Deleting an itinerary always hits this, because
+    # ItineraryService.get_itinerary_by_id eager-loads its days and points.
     points: Mapped[Optional[List["Point"]]] = relationship(
         foreign_keys="Point.day_id", cascade="all, delete, save-update"
     )

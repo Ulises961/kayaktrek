@@ -83,11 +83,11 @@ class JWTService:
         
     @staticmethod
     def session_is_live(payload: Dict) -> bool:
-        """Whether the session this token was issued for is still current (M17).
+        """Whether the session this token was issued for is still current.
 
-        A token with no `sid` predates per-device sessions and is not honoured — that is
-        the one-time logout the rollout accepts, rather than a fifteen-minute window in
-        which revocation cannot be enforced.
+        A token with no `sid` predates per-device sessions and is not honoured: that costs
+        a one-time logout, but avoids a fifteen-minute window in which revocation cannot
+        be enforced.
         """
         session_id = payload.get("sid")
         if not session_id:
@@ -132,7 +132,7 @@ class JWTService:
         """Verify the current request's Authorization header exactly as
         `authenticate_restful` does, but return the user id (or None) instead of
         aborting/setting `g`. For routes that must also succeed with no header at
-        all (M8's SSE stream route accepts either an access token or a stream
+        all (the SSE stream route accepts either an access token or a stream
         ticket) — never a substitute for `authenticate_restful` on a route that
         actually requires auth."""
         auth_header = request.headers.get("Authorization", None)
@@ -167,7 +167,6 @@ class JWTService:
             if not auth_header:
                 abort(HTTPStatus.UNAUTHORIZED, description="Valid token missing")
             try:
-                    # Extract token from "Bearer <token>" format
                     if auth_header.startswith("Bearer "):
                         token = auth_header.split(" ")[1]
                     else:
@@ -213,7 +212,7 @@ class JWTService:
         decorator._populates_current_user = True
         # Distinct from the above: authenticate_optional also populates g.current_user_id but
         # never requires a token, so it can't share this marker. The OpenAPI spec builder
-        # (Api/openapi.py, M13 §B.1) reads this to map onto the "security" field automatically —
+        # (Api/openapi.py) reads this to map onto the "security" field automatically —
         # functools.wraps copies __dict__ on every further stacked decorator (require_owner,
         # require_leader, ...), so this propagates to the outermost wrapper Flask actually
         # registers without each of those decorators needing to know about it.

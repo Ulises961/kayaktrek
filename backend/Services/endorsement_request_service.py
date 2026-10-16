@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class EndorsementRequestService:
-    """Author-initiated asks to endorse a trip-linked log (M7b §2b).
+    """Author-initiated asks to endorse a trip-linked log.
 
     The author asks a fellow trip member to endorse one of their logs. The addressee
     fulfils the ask through the existing endorse endpoint, which resolves the matching

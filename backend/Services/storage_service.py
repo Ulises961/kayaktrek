@@ -27,12 +27,10 @@ _SECRET_KEY = os.environ.get("STORAGE_SECRET_KEY", "")
 _BUCKET = os.environ.get("STORAGE_BUCKET") or "kayak"
 
 # SigV4 requires a region in the signing scope even when the backend has no concept of
-# regions. MinIO accepts anything here (nothing pins MINIO_REGION in either compose file),
-# which is why a hardcoded `eu-south-1` went unnoticed for as long as MinIO was the only
-# backend. R2 validates it against a fixed list — wnam, enam, weur, eeur, apac, oc, auto —
-# and rejects everything else with InvalidRegionName, failing every PutObject and every
-# presigned URL. `auto` is R2's own answer and is equally fine for MinIO, so it is the
-# default rather than something each deployment has to remember to set.
+# regions. MinIO accepts anything here; R2 validates it against a fixed list — wnam, enam,
+# weur, eeur, apac, oc, auto — and rejects everything else with InvalidRegionName, failing
+# every PutObject and every presigned URL. `auto` is R2's own answer and is equally fine for
+# MinIO, so it is the default rather than something each deployment has to remember to set.
 _REGION = os.environ.get("STORAGE_REGION") or "auto"
 
 # Two buckets, not one. MinIO scopes anonymous read by *prefix* (`minio-init` runs
@@ -40,9 +38,8 @@ _REGION = os.environ.get("STORAGE_REGION") or "auto"
 # it by *bucket*. So directly-fetchable objects and presigned-only objects have to live in
 # separate buckets to keep the same access boundary.
 #
-# Both default to STORAGE_BUCKET, so a single-bucket MinIO — local dev, CI, and production
-# until the migration runs — behaves exactly as it did before. The split is switched on by
-# setting these two vars, not by a code change.
+# Both default to STORAGE_BUCKET, so a single-bucket MinIO (local dev, CI) works unchanged.
+# The split is switched on by setting these two vars, not by a code change.
 # `or` rather than a get() default: docker-compose writes `VAR: ${VAR:-}` as an *empty
 # string*, not an absent key, so a get() default would never fire and both roles would
 # resolve to "" — every object written to a nameless bucket.
@@ -82,7 +79,6 @@ FileKind = Literal["image", "image-private", "document", "avatar", "banner"]
 _KIND_PREFIXES: dict[FileKind, str] = {
     "image": "point-images/",
     # Private point images — on non-public itineraries. Served via presigned_url().
-    # Routing to this kind is wired in M1 when the itinerary is_public flag ships.
     "image-private": "point-images-private/",
     "document": "documents/",
     "avatar": "avatars/",
@@ -107,9 +103,9 @@ _KIND_MAX_SIZE: dict[FileKind, int] = {
 
 BucketRole = Literal["public", "private"]
 
-# Which bucket each kind lives in. This is the access boundary the prefix-scoped MinIO
-# policy used to express: avatars and public point images are anonymously readable, the
-# rest require a presigned URL.
+# Which bucket each kind lives in. This is the access boundary: avatars and public point
+# images are anonymously readable, the rest require a presigned URL (single-bucket MinIO
+# expresses the same boundary per prefix).
 _KIND_ROLES: dict[FileKind, BucketRole] = {
     "avatar": "public",
     "banner": "public",
@@ -183,8 +179,7 @@ def _build_client(endpoint: str, access_key: str, secret_key: str, region: str):
     Every value the client captures is part of the cache key, not just the endpoint —
     keying on the endpoint alone would hand back a client built with the previous region or
     credentials, so a test monkeypatching `_REGION` would assert against a client that never
-    saw it. That is the same trap the region test was written to catch one level up.
-    `_client()` resolves the globals and passes them in, so this function reads none.
+    saw it. `_client()` resolves the globals and passes them in, so this function reads none.
     """
     return boto3.client(
         "s3",
@@ -204,24 +199,22 @@ def _client(endpoint: str | None = None):
 
 
 # Only avatars and public point images are directly accessible. documents/,
-# point-images-private/, exports/ and the tile cache are not — objects there require a
-# presigned URL (StorageService.presigned_url) or are streamed back through the backend.
+# point-images-private/ and exports/ are not — objects there require a presigned URL
+# (StorageService.presigned_url) or are streamed back through the backend.
 #
 # How that boundary is enforced depends on the backend:
 #   - MinIO (local dev, CI): one bucket, anonymous read set per *prefix* by the
 #     `minio-init` compose service (mc mb + mc anonymous set download).
-#   - R2 (production, once migrated): two buckets, since R2 scopes public access per
-#     *bucket*. Provisioned in the Cloudflare dashboard, with the public one behind a
-#     custom domain.
-# Either way it is provisioned once, out of band — not by the app at request time (M11 §4).
-# The runtime credential only needs object CRUD, not bucket-policy-write, and a
-# bucket-existence check no longer costs an extra round-trip on every upload.
+#   - R2 (production): two buckets, since R2 scopes public access per *bucket*. Provisioned
+#     in the Cloudflare dashboard, with the public one behind a custom domain.
+# Either way it is provisioned once, out of band — not by the app at request time. The
+# runtime credential only needs object CRUD, not bucket-policy-write, and there is no
+# bucket-existence check costing an extra round-trip on every upload.
 #
-# The tile cache used to live here too, in the private bucket. It does not any more — see
-# Services/tile_cache.py. The short version: the proxy reads tile bytes into Flask and
-# re-serves them, so the browser never fetches them from the object store and R2's free
-# egress bought nothing, while every cache *hit* paid a WAN round trip. Tiles are also the
-# only objects here with no durability requirement at all.
+# Map tiles are not stored here: the proxy reads tile bytes into Flask and re-serves them, so
+# the browser never fetches them from the object store, R2's free egress would buy nothing,
+# and every cache hit would pay a WAN round trip. Tiles are also the only objects with no
+# durability requirement. See Services/tile_cache.py.
 
 
 class StorageValidationError(ValueError):

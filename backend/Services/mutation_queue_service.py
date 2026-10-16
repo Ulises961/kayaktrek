@@ -1,5 +1,5 @@
 """
-Mutation Queue Service — applies the changes a phone queued while offline (M9d).
+Mutation Queue Service — applies the changes a phone queued while offline.
 
 The phone sends a batch of envelopes (docs/adr/mobile-offline.md "Sync up"): what kind of
 thing changed, how, its id, the new values, and when on the device it happened. Each is

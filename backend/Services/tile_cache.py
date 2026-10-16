@@ -1,17 +1,15 @@
 """On-disk cache for proxied map tiles.
 
-Tiles used to be cached in the object store, which was right while that store was a MinIO
-container on the same Docker network and wrong the moment production moved to Cloudflare R2:
-the proxy reads tile bytes into Flask and re-serves them, so the browser never talks to the
-object store directly and R2's free egress buys nothing here. Every cache *hit* became a WAN
-round trip out to Cloudflare and back before the box could answer — all the cost of proxying,
-plus a hop, with none of the CDN benefit that justified the migration. `storage_service.py`
-flagged this at the time and deliberately left it alone as behaviour-preserving.
+A plain directory, not an object-store bucket. The proxy reads tile bytes into Flask and
+re-serves them, so the browser never talks to the object store directly and R2's free egress
+buys nothing here. With the store on R2, every cache *hit* would be a WAN round trip out to
+Cloudflare and back before the box could answer — all the cost of proxying, plus a hop, with
+none of the CDN benefit.
 
-Tiles are also the one thing in the store with no durability requirement whatsoever: a lost
-tile is one upstream refetch. They have a single reader (only `backend` serves the proxy) and
-no cross-host consumer. So this is a plain directory, not an S3 bucket — no per-request
-signing, no client, and eviction is a walk instead of a lifecycle rule.
+Tiles are also the one thing with no durability requirement whatsoever: a lost tile is one
+upstream refetch. They have a single reader (only `backend` serves the proxy) and no
+cross-host consumer. So there is no per-request signing and no client, and eviction is a walk
+instead of a lifecycle rule.
 
 **Sizing is not a cost control.** Storage is pennies either way. The cap exists because on a
 one-box deployment the tile cache shares a filesystem with Postgres, and a full disk stops

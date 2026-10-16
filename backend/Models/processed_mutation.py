@@ -8,7 +8,7 @@ from Models.base_model import BaseModel
 
 
 class ProcessedMutation(BaseModel):
-    """One offline change a phone has sent, and what became of it (M9d).
+    """One offline change a phone has sent, and what became of it.
 
     `id` is the phone's own `mutation_id`, not a server-generated one: it is what makes
     a retried batch safe, since a change whose id is already here is answered from this

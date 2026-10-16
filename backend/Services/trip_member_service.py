@@ -104,7 +104,7 @@ class TripMemberService:
     def get_trip_medical_notes(trip_id: str) -> Dict[str, str | None]:
         """
         Return the member's own sealed trip-level medical notes for the client to
-        decrypt (M22). All three fields are None when nothing has been stored yet —
+        decrypt. All three fields are None when nothing has been stored yet —
         the ordinary state of a new membership, not an error.
 
         Raises:
@@ -123,7 +123,7 @@ class TripMemberService:
     ) -> TripMember:
         """
         Store client-encrypted notes in the TripMember's own
-        medical_notes_ciphertext/nonce/salt (M22).
+        medical_notes_ciphertext/nonce/salt.
 
         Raises:
             NoResultFound: If the user is not a member of the trip
@@ -166,7 +166,7 @@ class TripMemberService:
     def get_leader_public_key(trip_id: str) -> str:
         """
         Return the trip leader's X25519 public key so a crew member's client can
-        ECIES-seal their notes for the leader itself (M22).
+        ECIES-seal their notes for the leader itself.
 
         A public key is public by definition; the gate is membership of the trip, which
         get_my_membership enforces, and it keeps the key off every broadly-dumped schema.
@@ -195,7 +195,7 @@ class TripMemberService:
     ) -> TripMember:
         """
         Store the leader-readable copy of the member's notes, ECIES-sealed on the
-        client to the leader's public key (M22).
+        client to the leader's public key.
 
         The member must already have their own sealed copy stored: sharing without
         saving would leave a leader-readable note the member cannot read back, and the
@@ -230,7 +230,7 @@ class TripMemberService:
     def read_shared_medical_notes(trip_id: str, member_id: str) -> Dict[str, str]:
         """
         Return the ECIES-sealed leader copy of a member's notes for the leader's client
-        to decrypt (M22). Caller must be the trip leader.
+        to decrypt. Caller must be the trip leader.
 
         Raises:
             NoResultFound: If the trip or member does not exist
@@ -255,13 +255,11 @@ class TripMemberService:
         if not leader or not leader.private_key_ciphertext:
             raise ValueError("Leader keypair not found — set up your keypair first")
 
-        # Accountability record (ADR-023). Since M22 the decryption happens on the
-        # leader's device, so this logs the leader taking possession of the ciphertext
-        # rather than a proven-successful decrypt. That is over-inclusive against the
-        # old behaviour — a leader who fetches and then mistypes their password is now
-        # logged — and it is the right trade: handing over the sealed notes is the
-        # access the member is entitled to see, and it is the only part of the exchange
-        # the server can still witness.
+        # Accountability record (ADR-023). Decryption happens on the leader's device, so this
+        # logs the leader taking possession of the ciphertext, not a proven-successful decrypt.
+        # That over-includes a leader who fetches and then mistypes their password, and it is
+        # the right trade: handing over the sealed notes is the access the member is entitled
+        # to see, and the only part of the exchange the server can witness.
         db.session.add(MedicalNotesAccessLog(
             trip_member_id=target_membership.id,
             leader_id=leader.id,

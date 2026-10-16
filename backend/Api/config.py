@@ -36,27 +36,23 @@ class Config:
     # Rendered in every email footer when set, omitted entirely when not. Left unset by default:
     # publishing a postal address is a trader-identity decision (DSA), not a template default.
     MAIL_POSTAL_ADDRESS = os.getenv("MAIL_POSTAL_ADDRESS", "")
-    # Brevo's transactional HTTP API, used instead of SMTP when set. DigitalOcean blocks
-    # outbound SMTP (25/465/587) on every droplet, unconditionally — confirmed 2026-09-06,
-    # not liftable by a support ticket. Empty (the default) keeps the SMTP path, which is
-    # what local dev/mailpit and CI/testing use. See Services/mail_service.py.
+    # Brevo's transactional HTTP API, used instead of SMTP when set: DigitalOcean blocks
+    # outbound SMTP (25/465/587) on every droplet. Empty (the default) keeps the SMTP path
+    # that local dev (mailpit), CI and testing use. See Services/mail_service.py.
     BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
     FRONTEND_URL = _frontend_url()
     # Closed-beta registration gate (single shared code). Empty = gate disabled — every
     # environment that hasn't set one (local dev, CI, testing) registers exactly as before.
     INVITE_CODE = os.getenv("INVITE_CODE", "")
-    # Medical notes (M3g, client-side crypto since M22) — parked 2026-09-02, off unless a
-    # deployment opts in. The code, schema and tests all stay; only the surface is closed.
-    # Off is the default precisely because the reason for parking is legal exposure: an
-    # environment that forgets to configure this must not end up collecting health data.
-    # See docs/adr/safety-privacy.md "Parked" and Api/features.py.
+    # Medical notes are parked: off unless a deployment opts in. The reason is legal exposure
+    # (special-category health data), so an environment that forgets to configure this must not
+    # end up collecting it. See docs/adr/safety-privacy.md "Parked" and Api/features.py.
     MEDICAL_NOTES_ENABLED = os.getenv("MEDICAL_NOTES_ENABLED", "").lower() in {"1", "true", "yes"}
     CACHE_TYPE = "RedisCache"
-    # M29 satellite feed credential encryption key (Services/Utils/server_secret_crypto.py) —
-    # a plain application secret, not user-derived (the beat task decrypts unattended, no
-    # user present to supply a passphrase). Empty by default: satellite feeds are opt-in, so
-    # an environment that hasn't configured this shouldn't be blocked from booting over it —
-    # the key is only required at the point a feed is actually created/polled.
+    # Key for satellite feed credentials (Services/Utils/server_secret_crypto.py): an application
+    # secret rather than a user-derived one, because the beat task decrypts unattended. Empty by
+    # default so an environment without satellite feeds still boots; it is required only when a
+    # feed is created or polled.
     FEED_CREDENTIAL_KEY = os.getenv("FEED_CREDENTIAL_KEY", "")
     CACHE_DEFAULT_TIMEOUT = 21600  # 6 hours
     CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/1")
@@ -85,13 +81,11 @@ class TestingConfig(Config):
     RATELIMIT_STORAGE_URI = "memory://"
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = 0
-    # Forced on so the parked feature keeps its whole test suite — parking it must not
-    # quietly stop testing it. The flag-off path has its own file
-    # (Tests/80_medical_notes_parked_test.py), which overrides this back to False.
+    # Forced on so the parked feature keeps its test coverage; the flag-off path is covered by
+    # Tests/81_medical_notes_parked_test.py, which overrides this.
     MEDICAL_NOTES_ENABLED = True
-    # Same reasoning as SECRET_KEY/JWT_SECRET_KEY above — a real value can come from a
-    # local .env, but the test suite must not require every contributor to add one just
-    # to exercise M29.
+    # A real value may come from a local .env, but the suite must not require every
+    # contributor to set one (same as SECRET_KEY above).
     FEED_CREDENTIAL_KEY = os.getenv("FEED_CREDENTIAL_KEY", "00" * 32)
 
 

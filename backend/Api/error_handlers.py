@@ -105,13 +105,12 @@ def register_error_handlers(app):
 
         Two different things arrive here: no route matched the URL, or a handler
         called abort(404, description=...) because what it was asked for is absent,
-        private, or blocked. Only the first is about the endpoint, so answering both
-        with the endpoint wording reported every specific reason as a URL mistake —
-        a caller reads it and hunts for a typo that isn't there.
+        private, or blocked. Only the first is about the endpoint, so the endpoint
+        wording is reserved for it; the second keeps its own reason.
 
         Werkzeug fills in its own generic description when a handler supplied none,
-        which is exactly how the two are told apart. That default is written for a
-        browser ("check your spelling"), so it is replaced rather than passed on.
+        which is how the two are told apart. That default is written for a browser
+        ("check your spelling"), so it is replaced rather than passed on.
         """
         described = error.description and error.description != NotFound.description
         logger.info(f"HTTP exception: 404 - {error.description}")

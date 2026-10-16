@@ -58,7 +58,7 @@ def get_place_categories():
 @require_admin()
 def create_place_category():
     """Admin-only: extend the seeded place-category catalogue without a migration or a
-    raw DB insert. A bridge tool — the public/community taxonomy is M7.
+    raw DB insert.
     ---
     post:
       summary: Create a place category

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 USER_ENDPOINT = "/api/v1/user"
 user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
 
-# Client-supplied crypto material (M22). The server validates that the fields are
+# Client-supplied crypto material. The server validates that the fields are
 # present and non-empty and nothing more — it cannot tell a real ciphertext from a
 # plausible-looking string, and deliberately holds nothing that would let it try.
 _KEYPAIR_FIELDS = ("publicKey", "privateKeyCiphertext", "privateKeyNonce", "privateKeySalt")
@@ -131,7 +131,7 @@ def search_users():
 @JWTService.authenticate_restful
 @limiter.limit("30 per minute", key_func=lambda: str(g.current_user_id))
 def search_paddlers():
-    """Buddy finder — search public paddlers by username / name / surname (M7b).
+    """Buddy finder — search public paddlers by username / name / surname.
 
     Query params: q (search term), page, per_page. Returns a paginated, block-filtered
     list of public profiles, each annotated with the caller's relationship

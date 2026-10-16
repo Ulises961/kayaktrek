@@ -46,14 +46,13 @@ def health():
                     example: error
     """
     try:
-        # Suppressed, or this ping is the highest-volume record the app produces:
-        # both the backend and the SSE sidecar poll this every 10s, forever, which
-        # is ~17k spans a day saying "the database answered". `/api/v1/health` is
-        # already in Api/observability.py's exclusion list, but that only drops the
-        # Flask span — the SQLAlchemy one underneath survived it, and with no parent
-        # left to nest under it arrived as a top-level trace. Deliberately narrower
-        # than the whole request: the failure path below is the one thing here worth
-        # alerting on, so it must still reach Logfire.
+        # Suppressed, or this ping is the app's highest-volume record: the backend and the
+        # SSE sidecar each poll it every 10s, forever, ~17k spans a day saying "the database
+        # answered". `/api/v1/health` is already in Api/observability.py's exclusion list,
+        # but that drops only the Flask span; the SQLAlchemy span underneath would arrive
+        # as a top-level trace with no parent. Deliberately narrower than the whole
+        # request: the failure path below is the one thing here worth alerting on, so it
+        # must still reach Logfire.
         with logfire.suppress_instrumentation():
             db.session.execute(text("SELECT 1"))
         return jsonify({"status": "ok"}), HTTPStatus.OK

@@ -10,7 +10,7 @@ from Services.hazard_diamond_service import HazardDiamondService
 
 logger = logging.getLogger(__name__)
 
-# Position-only cross-trip view of tidal and wind diamonds (M27). The only
+# Position-only cross-trip view of tidal and wind diamonds. The only
 # resource allowed to know about both diamond types, so the two CRUD
 # resources (tidal_diamond, wind_diamond) stay independent of each other.
 hazard_diamond_api = Blueprint('hazard_diamond', __name__, url_prefix='/api/v1/hazard-diamond')

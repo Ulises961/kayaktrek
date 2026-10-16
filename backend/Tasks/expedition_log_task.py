@@ -30,11 +30,9 @@ def generate_trip_day_logs(self, trip_id: str, day_date_iso: str, request_id: Op
             if ExpeditionLogService.generate_day_log(trip_id, str(member.user_id), day_date) is not None:
                 generated += 1
         except Exception:
-            # Isolate one member's failure from the rest of the fan-out — without
-            # this, one bad record (e.g. a malformed ping) would abort the loop and
-            # silently skip every crew member after the failing one, with no retry:
-            # nightly_log_fallback only ever dispatches for *yesterday* relative to
-            # the night it runs, so a day missed here is never revisited.
+            # One member's failure must not stop the fan-out: a bad record (say a malformed ping)
+            # would otherwise skip every later crew member with no retry, because
+            # nightly_log_fallback only dispatches for yesterday, so a missed day is never revisited.
             logger.exception(
                 "expedition_log_generation_failed",
                 extra={"trip_id": trip_id, "user_id": str(member.user_id), "day_date": day_date_iso},

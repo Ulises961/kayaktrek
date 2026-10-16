@@ -26,7 +26,8 @@ class TripRequirement(BaseModel):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    # Provenance: NULL until CatalogItem templates (future)
+    # Provenance: the CatalogItem this requirement was seeded from. NULL for the hardcoded
+    # defaults and for requirements added by hand.
     catalog_item_id: Mapped[Optional[_UUID]] = mapped_column(UUID, nullable=True)
 
     # Authorship: the member who proposed this requirement. Template/default

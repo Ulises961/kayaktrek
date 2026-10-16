@@ -11,7 +11,7 @@ from Services.Middleware.privileges_middleware import require_owner
 from Services.log_service import LogService, LogNotEndorsableError
 
 
-logger = logging.getLogger(__name__) # It will print the name of this module when the main app is running
+logger = logging.getLogger(__name__)
 
 LOG_ENDPOINT = "/api/v1/log"
 log_api = Blueprint('log', __name__, url_prefix=LOG_ENDPOINT)

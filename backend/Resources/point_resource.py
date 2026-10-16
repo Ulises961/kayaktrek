@@ -20,10 +20,8 @@ POINT_ENDPOINT = "/api/v1/point"
 point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 
 
-# Points of interest are no longer route points — they are standalone Place
-# entities, queried by proximity through the place API (GET /api/place/by-itinerary/
-# <id>/range). The old GET /api/point/pois range query was removed with the
-# `interest` PointType in M4e §1.
+# Points are route points only. Points of interest are standalone Place entities,
+# queried by proximity through the place API (GET /api/place/by-itinerary/<id>/range).
 @point_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
 @limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))

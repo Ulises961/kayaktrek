@@ -14,7 +14,7 @@ class UserSchema(BaseSchema):
     """
     mail = fields.Email(required=True, validate=lambda x: len(x) <= 255)
     pwd = fields.String(required=True, load_only=True, validate=lambda x: len(x) >= 8)
-    # Optional since M12 §F — signup no longer asks for it; collected in Settings.
+    # Optional: signup does not ask for it; it is collected in Settings.
     phone = fields.String(allow_none=True, load_default=None, validate=lambda x: x is None or len(x) <= 20)
     username = fields.String(required=True, validate=lambda x: 3 <= len(x.strip()) <= 50)
     name = fields.String(required=True, validate=lambda x: 1 <= len(x.strip()) <= 100)
@@ -40,7 +40,7 @@ class UserSchema(BaseSchema):
 
     certifications = fields.List(fields.Nested(UserCertificationSchema), dump_only=True)
 
-    # Public profile (M7a) — opt-in, privacy-first. bio/home_location are free text;
+    # Public profile — opt-in, privacy-first. bio/home_location are free text;
     # profile_is_public gates the entire public projection.
     bio = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 1000)
     home_location = fields.String(allow_none=True, validate=lambda x: x is None or len(x) <= 255)
@@ -162,10 +162,9 @@ class UserUpdateSchema(UserSchema):
     (Services.user_service.UserService.change_password), which verifies the
     current password, bumps token_version, revokes other sessions, and (for an
     account with an X25519 keypair) stores the private key re-wrapped under the
-    new password — the client does the rewrap locally and posts the result (M22);
-    the server never derives or re-wraps it. Accepting pwd here would silently
-    skip all of that and corrupt the encrypted medical-notes keypair for any user
-    who has one.
+    new password — the client does the rewrap locally and posts the result; the server
+    never derives or re-wraps it. Accepting pwd here would silently skip all of that
+    and corrupt the encrypted medical-notes keypair for any user who has one.
     Medical notes fields are excluded — managed via dedicated consent endpoints.
     """
     mail = fields.Email(dump_only=True)
@@ -190,7 +189,7 @@ class UserUpdateSchema(UserSchema):
 
 
 class PublicUserSchema(BaseSchema):
-    """Privacy-safe public projection of a paddler (M7a).
+    """Privacy-safe public projection of a paddler.
 
     Exposes ONLY self-presentation + opt-in certifications. Aggregate `stats` are
     attached by the resource. Deliberately NEVER serialises: mail, phone, vessel,

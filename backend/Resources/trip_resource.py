@@ -20,11 +20,9 @@ from Services.trip_leadership_service import TripLeadershipService
 logger = logging.getLogger(__name__)
 
 TRIP_ENDPOINT = "/api/v1/trip"
-## TODO: Trip creation needs a separate microservice different from trip execution to avoid bogging down service through trip creation
-## TODO: A trip created is published in Kafka and then stored in db
 trip_api = Blueprint("trip", __name__, url_prefix=TRIP_ENDPOINT)
 
-# Client-supplied crypto material (M22) — see the same constants in user_resource.py.
+# Client-supplied crypto material — see the same constants in user_resource.py.
 # A member's own notes are sealed with a password-derived key (salt); the leader's copy
 # is sealed with ECIES, which carries an ephemeral public key instead.
 _SEALED_FIELDS = ("ciphertext", "nonce", "salt")
@@ -518,7 +516,7 @@ def invite_user(id: str):
     POST /api/trip/<id>/invite — Leader invites a user to the trip.
 
     Body: {"userId": "<uuid>"} — sourced from the buddy picker or paddler search, never
-    a blind email/username guess (M12 §N closed that enumeration oracle). A block in
+    a blind email/username guess, which would be an enumeration oracle. A block in
     either direction between leader and invitee forbids the invitation (403).
     Returns 201, 404 if no account found, 409 if already invited or member.
     ---
@@ -917,7 +915,7 @@ def revoke_trip_medical_notes(id: str):
 def get_leader_public_key(id: str):
     """
     GET /api/trip/<id>/member/me/leader-public-key — The trip leader's X25519 public
-    key, so a crew member's client can seal its notes for the leader itself (M22).
+    key, so a crew member's client can seal its notes for the leader itself.
     ---
     get:
       summary: Get the trip leader's public key
