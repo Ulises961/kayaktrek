@@ -8,6 +8,7 @@ from Models.item_category import ItemCategory
 from Models.item import Item, ItemStatusType
 from Models.personal_packing_item import PersonalPackingItem
 from Models.place_category import PlaceCategory
+from Models.trip_member import TripMember
 
 DEFAULT_CATEGORIES = [
     {"slug": "gear",       "name": "Gear"},
@@ -22,10 +23,8 @@ DEFAULT_CATEGORIES = [
 
 # Default SHARED trip requirements — the group's collective kit, seeded leader-owned
 # into every new trip's inventory at creation so the gear checklist never starts
-# empty. One member brings each. The private per-paddler kit lives in
-# DEFAULT_PERSONAL_KIT (seeded per-member at TripMember mint), not here. Flat
-# hardcoded list for now; a first-class CatalogItem template entity stays deferred.
-# Categories reference DEFAULT_CATEGORIES slugs above.
+# empty. One member brings each. The private per-paddler kit is DEFAULT_PERSONAL_KIT,
+# seeded per member. Categories reference DEFAULT_CATEGORIES slugs above.
 DEFAULT_TRIP_REQUIREMENTS = [
     {"name": "Spare paddle (split)",        "category": "gear"},
     {"name": "Group tow line",              "category": "gear"},
@@ -153,7 +152,7 @@ def seed_item_categories() -> None:
     db.session.commit()
 
 
-def seed_member_packing(member) -> None:
+def seed_member_packing(member: TripMember) -> None:
     """Seed a trip member's private packing list from the default personal kit.
 
     Called wherever a TripMember is minted — the leader at trip creation, crew on

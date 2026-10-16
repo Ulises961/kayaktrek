@@ -1,7 +1,9 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
+from celery import Task
 import requests
 
 from Api.celery_app import celery_app
@@ -45,7 +47,7 @@ def _fetch(request: PreparedFeedRequest) -> bytes:
     return response.content
 
 
-def _happening_trip_ids(user_id) -> list:
+def _happening_trip_ids(user_id: UUID) -> list[UUID]:
     return [
         trip_id
         for (trip_id,) in db.session.query(TripMember.trip_id)
@@ -56,7 +58,7 @@ def _happening_trip_ids(user_id) -> list:
 
 
 @celery_app.task(name="Tasks.satellite_feed_beat_task.poll_satellite_feeds", bind=True)
-def poll_satellite_feeds(self, request_id: Optional[str] = None) -> None:
+def poll_satellite_feeds(self: Task, request_id: Optional[str] = None) -> None:
     """Poll every enabled satellite feed and ingest new positions into any of the
     user's currently HAPPENING trips through LivePositionService (M8's pipeline).
 

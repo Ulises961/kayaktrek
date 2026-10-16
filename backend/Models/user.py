@@ -15,7 +15,7 @@ from Models.block import Block
 from datetime import datetime
 from sqlalchemy import String, Boolean, Integer, Text, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from Models.log import Log
@@ -35,7 +35,14 @@ class UnitPreferenceType(enum.Enum):
 class User(BaseModel):
     __tablename__ = "users"
 
-    def __init__(self, pwd=None, endorsed_logs=None, logs=None, id=None, **kwargs):
+    def __init__(
+        self,
+        pwd: Optional[str] = None,
+        endorsed_logs: Optional[List["Log"]] = None,
+        logs: Optional[List["Log"]] = None,
+        id: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         if pwd:
             self.pwd = generate_password_hash(pwd).decode("UTF-8")
 
@@ -50,8 +57,8 @@ class User(BaseModel):
     # address. Cleared on verify (swapped into `mail`) or superseded by a newer request.
     pending_mail: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     pwd: Mapped[str] = mapped_column(String(255), nullable=False)
-    # Optional since M12 §F — collected in Settings, not at signup (multiple NULLs
-    # coexist with unique=True under Postgres).
+    # Optional: collected in Settings, not at signup (multiple NULLs coexist with
+    # unique=True under Postgres).
     phone: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
     username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -61,7 +68,7 @@ class User(BaseModel):
     admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Public profile (M7a) — opt-in, privacy-first. profile_is_public gates the entire
+    # Public profile — opt-in, privacy-first. profile_is_public gates the entire
     # public projection (stats + certifications); bio and home_location are free text.
     bio: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     home_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -71,7 +78,7 @@ class User(BaseModel):
 
     # Distance-unit display preference (nm/km) — respected by the planner, Add-log
     # form, and stats dashboard. Storage stays km-denominated everywhere; this only
-    # controls presentation. See plans/M12.md §C.
+    # controls presentation.
     unit_preference: Mapped[UnitPreferenceType] = mapped_column(
         Enum(UnitPreferenceType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
@@ -91,13 +98,10 @@ class User(BaseModel):
     emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     emergency_contact_relationship: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    # Encrypted at rest with a user-derived key (PBKDF2-HMAC-SHA256 → AES-256-GCM).
-    # Server never stores the plaintext or the derived key — only ciphertext, nonce, and salt.
-    # Re-auth (password) is the decryption instrument. Requires prior consent to save.
-    # When the user confirms their float plan for a trip, the server derives the key from
-    # the re-auth password, decrypts in memory, and copies plaintext to TripMember
-    # (server-side AES-GCM from that point — user has explicitly shared it).
-    # Revoking consent nulls both this record and all TripMember rows for this user.
+    # Sealed on the client with a key derived from the user's password (PBKDF2-HMAC-SHA256 →
+    # AES-256-GCM). The server stores only the ciphertext, nonce and salt, and never sees the
+    # password, the key or the plaintext. Requires prior consent to save. Revoking consent nulls
+    # this record and every TripMember copy for this user.
     medical_notes_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     medical_notes_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     medical_notes_salt: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -108,10 +112,9 @@ class User(BaseModel):
     # your medical notes" prompt in the UI; cleared once the user grants consent again.
     medical_notes_reset_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # X25519 keypair — public key stored in plaintext; private key AES-GCM encrypted with
-    # the user's password (same PBKDF2+AES-GCM pattern as medical_notes_ciphertext).
-    # Generated at registration. Used to encrypt TripMember leader-visible medical notes
-    # so they are never stored as plaintext in the DB. See ADR-023.
+    # X25519 keypair — public key stored in plaintext; private key sealed on the client with the
+    # user's password (the same PBKDF2 + AES-GCM scheme as medical_notes_ciphertext). Used to seal
+    # TripMember leader-visible medical notes so they are never stored as plaintext. See ADR-023.
     public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     private_key_ciphertext: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     private_key_nonce: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -129,11 +132,9 @@ class User(BaseModel):
     # logout, account deletion request). Checked on every authenticated request.
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
-    # Rotation counter for refresh tokens specifically — separate from token_version (the
-    # full-session kill switch for password change/logout/theft). Bumped on every successful
-    # /auth/refresh. A refresh token presented with a stale value indicates reuse (the token
-    # was already exchanged once, e.g. stolen and replayed), which additionally bumps
-    # token_version to revoke every outstanding session. See ADR-032 / M11 §2.
+    # Superseded by the per-device Session.token_version and no longer read or written. Kept for
+    # one release so a rollback still finds the column; drop it in a follow-up migration.
+    # token_version above remains the global kill switch.
     refresh_token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # Association object: full role-aware access
@@ -189,7 +190,5 @@ class User(BaseModel):
         viewonly=True,
     )
 
-    def __repr__(self):
-        return (
-            f'<User "{self.id} {self.mail}, {self.name}, {self.surname}, {self.pwd}">'
-        )
+    def __repr__(self) -> str:
+        return f'<User "{self.id} {self.mail}, {self.name}, {self.surname}">'

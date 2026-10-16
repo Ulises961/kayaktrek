@@ -1,5 +1,5 @@
 """Collects row-level changes to trip-scoped models and publishes them once the
-transaction commits (M36 WP1).
+transaction commits.
 
 Trip-scoped writes are spread over most services plus the mobile mutation queue, so
 instead of a publish call in each one, ORM session events watch every flush — the same
@@ -26,6 +26,8 @@ from uuid import UUID
 from sqlalchemy import event, inspect, select
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.unitofwork import UOWTransaction
+from sqlalchemy.sql.expression import Executable
 
 from Models.auth_token import AuthToken
 from Models.block import Block
@@ -77,7 +79,7 @@ _COLLECTED_KEY = "trip_changes_collected"
 Resolver = Callable[[Connection, Any], Optional[UUID]]
 
 
-def _scalar(connection: Connection, statement) -> Optional[UUID]:
+def _scalar(connection: Connection, statement: Executable) -> Optional[UUID]:
     return connection.execute(statement).scalar()
 
 
@@ -253,14 +255,14 @@ def _record(session: Session, connection: Connection, instance: Any, operation: 
 
 
 @event.listens_for(Session, "before_flush")
-def _collect_deletes(session: Session, flush_context, instances) -> None:
+def _collect_deletes(session: Session, flush_context: UOWTransaction, instances: Optional[Any]) -> None:
     connection = session.connection()
     for instance in list(session.deleted):
         _record(session, connection, instance, "delete")
 
 
 @event.listens_for(Session, "after_flush")
-def _collect_creates_and_updates(session: Session, flush_context) -> None:
+def _collect_creates_and_updates(session: Session, flush_context: UOWTransaction) -> None:
     connection = session.connection()
     for instance in list(session.new):
         _record(session, connection, instance, "create")

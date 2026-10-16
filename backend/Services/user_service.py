@@ -88,9 +88,9 @@ class UserService:
         Returns:
             List of matching User objects
         """
-        # TODO M7: add a GIN index using pg_trgm on users.mail for efficient
-        # case-insensitive substring search once community discovery is needed.
-        # Migration: CREATE INDEX ix_users_mail_trgm ON users USING GIN (mail gin_trgm_ops);
+        # Case-insensitive prefix search on mail is a sequential scan. If community discovery
+        # needs it faster, a pg_trgm GIN index fits:
+        # CREATE INDEX ix_users_mail_trgm ON users USING GIN (mail gin_trgm_ops);
         pattern = f"{query}%"
         return (
             db.session.query(User)
@@ -112,9 +112,8 @@ class UserService:
         deletion-pending account, or profile_is_public = False. These are deliberately
         indistinguishable to avoid an existence/enumeration oracle.
 
-        `viewer_id` (the optional authenticated caller) is accepted now so M7b can fold a
-        block check into this one method without changing the signature or any caller — the
-        block-awareness seam. Unused in M7a.
+        `viewer_id` (the optional authenticated caller) lets a block in either direction
+        hide the profile behind the same neutral 404.
 
         Raises:
             NoResultFound: If the profile does not exist or is not publicly visible.
@@ -452,7 +451,7 @@ class UserService:
         Verify current password then replace with the new one.
 
         If the user has an X25519 keypair, the caller must supply it re-wrapped under the
-        new password (M22) — the client derives both keys and re-encrypts locally, since the
+        new password — the client derives both keys and re-encrypts locally, since the
         server no longer receives a password it can use to unwrap the old ciphertext. Nothing
         here decrypts the private key or sees it in the clear; the three fields are stored
         exactly as given, the same trust boundary as POST /me/keypair.
@@ -500,7 +499,7 @@ class UserService:
         Store a client-generated X25519 keypair for an existing user without one.
 
         The private key arrives already wrapped under a key the client derived from the
-        user's password (M22) — the server never sees the password or the private key.
+        user's password — the server never sees the password or the private key.
         It cannot verify that the blob unwraps, so a caller sending garbage stores
         garbage; the elevated-token requirement on the endpoint is what establishes that
         the caller is the account holder.
@@ -525,7 +524,7 @@ class UserService:
     @staticmethod
     def get_keypair(id: str) -> Dict[str, str]:
         """
-        Return the user's own public key and password-wrapped private key (M22).
+        Return the user's own public key and password-wrapped private key.
 
         The private key is useless without the password that wraps it, which is why
         handing it to its owner is safe — the client unwraps it in memory to decrypt
@@ -594,8 +593,8 @@ class UserService:
         Store client-encrypted medical notes and record the consent timestamp.
         Requires the caller to have already verified their identity (elevated token).
 
-        Since M22 the ciphertext arrives already sealed — the server stores three
-        opaque strings and never holds the plaintext or the password.
+        The ciphertext arrives already sealed — the server stores three opaque
+        strings and never holds the plaintext or the password.
 
         Raises:
             NoResultFound: If user does not exist
@@ -643,7 +642,7 @@ class UserService:
     @staticmethod
     def get_medical_notes(id: str) -> Dict[str, Optional[str]]:
         """
-        Return the user's own sealed medical notes for the client to decrypt (M22).
+        Return the user's own sealed medical notes for the client to decrypt.
 
         Having no notes yet is the ordinary state of a new account, not an error, so
         the fields come back null rather than as a 404 the client would have to

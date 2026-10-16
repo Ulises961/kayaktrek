@@ -4,7 +4,7 @@ from Schemas.base_schema import BaseSchema
 
 
 class SessionSchema(BaseSchema):
-    """Read-only projection of a device session for the "Your devices" list (M17).
+    """Read-only projection of a device session for the "Your devices" list.
 
     Everything is dump_only: sessions are created by logging in and ended by revoking
     them, never edited. `isCurrent` marks the device making the request so the UI can

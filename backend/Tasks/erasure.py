@@ -11,6 +11,8 @@ Schedule: daily via Celery Beat (registered in Api/celery_app.py).
 import logging
 from datetime import datetime, timedelta, timezone
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.log import Log
@@ -25,7 +27,7 @@ _GRACE_PERIOD = timedelta(days=30)
 
 
 @celery_app.task(bind=True, name="Tasks.erasure.run_erasure")
-def run_erasure(self, request_id: str | None = None) -> dict:
+def run_erasure(self: Task, request_id: str | None = None) -> dict:
     logger.info("task_started", extra={"task_id": self.request.id, "request_id": request_id})
     cutoff = datetime.now(timezone.utc) - _GRACE_PERIOD
 
@@ -69,17 +71,12 @@ def _erase_user(user: User) -> None:
         trip = db.session.query(Trip).filter_by(id=membership.trip_id).first()
         if trip and trip.state != TripStateType.ARCHIVED:
             trip.state = TripStateType.ARCHIVED
-        # Itinerary.user_id carries ON DELETE CASCADE (it also owns standalone,
-        # non-trip itineraries, where cascading on user delete is correct). For a
-        # trip itinerary we are archiving specifically to preserve it for the
-        # remaining crew, that same cascade would otherwise silently delete the
-        # route (Day/Point chain included, since those cascade off Itinerary) the
-        # moment the user row goes — leaving an "archived" trip with no itinerary
-        # at all. Null the ownership pointer first so the cascade has nothing to
-        # walk. Note this is erasure, not anonymization: the leader's own
-        # TripMember row (and AuthToken/Invitation/UserCertification rows) still
-        # hard-cascade-delete below — there is no "Deleted User" placeholder, so
-        # an archived trip retains its route but loses any record of who led it.
+        # Itinerary.user_id cascades on user delete, which is right for standalone itineraries
+        # but would silently delete the route (Day/Point chain included) of a trip archived to
+        # preserve it for the remaining crew. Null the ownership pointer first so the cascade
+        # has nothing to walk. This is erasure, not anonymization: the leader's own TripMember
+        # row (and AuthToken, Invitation and UserCertification rows) still cascade-delete below,
+        # so an archived trip keeps its route but loses any record of who led it.
         if trip and trip.itinerary is not None:
             trip.itinerary.user_id = None
 

@@ -3,9 +3,12 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.day import Day
+from Models.point import Point
 from Models.sea import Sea
 from Models.sea_state import SeaState
 from Models.weather import Weather
@@ -17,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name="Tasks.weather_fetch_task.fetch_weather", bind=True)
 def fetch_weather(
-    self, day_id: str, request_id: Optional[str] = None, force_refresh: bool = False
+    self: Task, day_id: str, request_id: Optional[str] = None, force_refresh: bool = False
 ) -> None:
     logger.info(
         "weather_fetch_started",
@@ -63,7 +66,7 @@ def fetch_weather(
     )
 
 
-def _midpoint_of_route(day) -> tuple[float, float] | None:
+def _midpoint_of_route(day: Day) -> tuple[float, float] | None:
     """Return (lat, lng) of the midpoint of the day's ordered route.
 
     Walking the linked list guarantees we use an actual on-water coordinate
@@ -81,15 +84,19 @@ def _midpoint_of_route(day) -> tuple[float, float] | None:
     heads = [p for p in candidates.values() if p.id not in next_ids]
     head = heads[0] if heads else next(iter(candidates.values()))
 
-    ordered: list = []
-    current = head
-    seen: set = set()
+    ordered: list[Point] = []
+    current: Optional[Point] = head
+    seen: set[UUID] = set()
     while current is not None and current.id not in seen:
         ordered.append(current)
         seen.add(current.id)
-        current = candidates.get(current.next_id)
+        current = candidates.get(current.next_id) if current.next_id is not None else None
 
     mid = ordered[len(ordered) // 2]
+    # `candidates` only holds placed points, so this never returns None; the check narrows
+    # the column type, which is Optional.
+    if mid.latitude is None or mid.longitude is None:
+        return None
     return float(mid.latitude), float(mid.longitude)
 
 

@@ -8,7 +8,7 @@ def _ordered_placed_points(days: Iterable) -> List[Tuple[int, Any]]:
     """The route's placed points in paddling order, each paired with its day_number.
 
     The ordering rules live here rather than in each caller: numbered days only (day 0 is
-    the internal staging tail, M20 §1), sorted by `day_number`, walked per day and then
+    the internal staging tail), sorted by `day_number`, walked per day and then
     concatenated. A single global walk is NOT deterministic — see `compute_total_miles`.
     """
     days_sorted = sorted(
@@ -30,11 +30,10 @@ def _ordered_placed_points(days: Iterable) -> List[Tuple[int, Any]]:
 def compute_day_miles(days: Iterable) -> Dict[int, float]:
     """Nautical miles paddled on each numbered day, keyed by `day_number`.
 
-    A leg is attributed to the day of the point it ARRIVES at, which is M20 §2's rule
-    applied to the aggregate: the overnight stop belongs to the day that ends there, so
-    the crossing into a day is that day's first leg. Walking each day's own points in
-    isolation instead would drop one leg per day boundary and report nothing at all for
-    a day whose only point is its arrival.
+    A leg is attributed to the day of the point it ARRIVES at: the overnight stop belongs
+    to the day that ends there, so the crossing into a day is that day's first leg. Walking
+    each day's own points in isolation would drop one leg per day boundary and report
+    nothing at all for a day whose only point is its arrival.
 
     Summing the result therefore equals `compute_total_miles` exactly.
     """
@@ -61,8 +60,7 @@ def compute_total_miles(days: Iterable) -> float:
     next, and `walk_linked_list` orders disconnected heads by UUIDv7 string —
     points created in the same millisecond tie on the timestamp prefix and sort
     by their random bits, letting a later day's head sort first and inflating
-    the distance (observed 10.8 nm vs the true 7.2 nm on the e2e seed route,
-    2026-07-10).
+    the distance.
     """
     placed = [point for _, point in _ordered_placed_points(days)]
 

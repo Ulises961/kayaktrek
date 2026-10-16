@@ -1,14 +1,13 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
-from werkzeug.exceptions import HTTPException
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.item_schema import ItemSchema
 from Services.item_service import ItemService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
-from Api.database import db
 logger = logging.getLogger(__name__)
 
 ITEM_ENDPOINT = "/api/v1/item"
@@ -16,7 +15,7 @@ item_api = Blueprint('item', __name__, url_prefix=ITEM_ENDPOINT)
 
 @item_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_items():
+def get_all_items() -> ResponseReturnValue:
     """GET /api/item/all - Retrieve all personal items owned by the current user.
     ---
     get:
@@ -31,20 +30,13 @@ def get_all_items():
                 items:
                   $ref: '#/components/schemas/ItemSchema'
     """
-    try:
-        items = ItemService.get_items_by_user(g.current_user_id)
-        return jsonify([ItemSchema().dump(item) for item in items]), HTTPStatus.OK
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving items: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    items = ItemService.get_items_by_user(g.current_user_id)
+    return jsonify([ItemSchema().dump(item) for item in items]), HTTPStatus.OK
 
 @item_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def get_item(id: str):
+def get_item(id: str) -> ResponseReturnValue:
     """GET /api/item/<id> - Retrieve item by ID
     ---
     get:
@@ -61,18 +53,12 @@ def get_item(id: str):
     try:
         item = ItemService.get_item_by_id(id)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Item with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error retrieving item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @item_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_item():
+def create_item() -> ResponseReturnValue:
     """POST /api/item/create - Create a new personal item.
 
     Items are personal gear owned by the authenticated user (stamped from the
@@ -98,19 +84,13 @@ def create_item():
         item_data = request.get_json()
         item = ItemService.create_item(item_data)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.CREATED
-
-    except HTTPException:
-        raise
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error creating item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @item_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def update_item(id: str):
+def update_item(id: str) -> ResponseReturnValue:
     """
     PATCH /api/item/<id> — Partially update an existing item.
 
@@ -146,21 +126,15 @@ def update_item(id: str):
         item_data = request.get_json()
         item = ItemService.update_item(id, item_data)
         return jsonify(ItemSchema().dump(item)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Item with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error updating item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @item_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def delete_item(id: str):
+def delete_item(id: str) -> ResponseReturnValue:
     """DELETE /api/item/<id> - Delete item by ID
     ---
     delete:
@@ -184,14 +158,6 @@ def delete_item(id: str):
         logger.info(f"Deleting item {id}")
         ItemService.delete_item(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except IntegrityError as e:
         logger.error(f"Integrity error deleting item: {e}")
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete item due to existing references")
-    except Exception as e:
-        logger.error(f"Error deleting item: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -2,12 +2,11 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Api.cache import cache
-from Api.database import db
 from Schemas.sea_schema import SeaSchema, _diamond_schema, _gate_schema
 from Schemas.weather_schema import WeatherSchema
 from Services.Middleware.auth_middleware import JWTService
@@ -34,7 +33,7 @@ _WEATHER_REFRESH_COOLDOWN_SECONDS = 300
 @sea_api.route('/<string:id>/sea', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_sea(id: str):
+def get_sea(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Retrieves the sea/tidal record for a day.
     ---
@@ -54,17 +53,12 @@ def get_sea(id: str):
         return jsonify(_schema.dump(sea)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Sea record not found for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/sea', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def create_sea(id: str):
+def create_sea(id: str) -> ResponseReturnValue:
     """
     SeaResource POST method. Creates the sea/tidal record for a day.
     ---
@@ -93,19 +87,13 @@ def create_sea(id: str):
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except IntegrityError:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="A sea record already exists for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/sea', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def update_sea(id: str):
+def update_sea(id: str) -> ResponseReturnValue:
     """
     SeaResource PATCH method. Partially updates the sea/tidal record for a day.
 
@@ -137,17 +125,12 @@ def update_sea(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Sea record not found for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/tidal-gates', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_tidal_gates(id: str):
+def get_tidal_gates(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Resolves tidal-gate warnings for a day's route points.
     ---
@@ -175,17 +158,12 @@ def get_tidal_gates(id: str):
         return jsonify(_gate_schema.dump(gates)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_tidal_gates_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_weather(id: str):
+def get_weather(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Retrieves the weather record for a day.
     ---
@@ -207,17 +185,12 @@ def get_weather(id: str):
         return jsonify(_weather_schema.dump(day.weather)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_weather_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather/fetch', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def trigger_weather_fetch(id: str):
+def trigger_weather_fetch(id: str) -> ResponseReturnValue:
     """
     SeaResource POST method. Queues a Celery task to fetch weather for a day from OpenMeteo.
     ---
@@ -246,17 +219,12 @@ def trigger_weather_fetch(id: str):
         return jsonify({"taskId": result.id}), HTTPStatus.ACCEPTED
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("weather_fetch_trigger_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather/refresh', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def trigger_weather_refresh(id: str):
+def trigger_weather_refresh(id: str) -> ResponseReturnValue:
     """
     SeaResource POST method. Device-initiated forecast refresh for a paddler about to
     launch — bypasses OpenMeteo's planning-desk cache (docs/mobile/sync-protocol-spec.md
@@ -300,16 +268,11 @@ def trigger_weather_refresh(id: str):
         return jsonify({"taskId": result.id}), HTTPStatus.ACCEPTED
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("weather_refresh_trigger_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/global-wind-vectors', methods=['GET'])
 @JWTService.authenticate_restful
-def get_global_wind_vectors():
+def get_global_wind_vectors() -> ResponseReturnValue:
     """
     SeaResource GET method. Fetches a global 10-degree wind velocity grid from OpenMeteo,
     for the planner's map-wide wind overlay (independent of any single day/trip).
@@ -347,23 +310,17 @@ def get_global_wind_vectors():
           description: date parameter required
     """
     date_str = request.args.get("date")
-    try:
-        if not date_str:
-            abort(HTTPStatus.BAD_REQUEST, description="date parameter required")
-        hour = int(request.args.get("hour", 12))
-        grid = OpenMeteoService.fetch_global_wind(date_str, hour)
-        return jsonify(grid), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("global_wind_vectors_error", extra={"date": date_str, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    if not date_str:
+        abort(HTTPStatus.BAD_REQUEST, description="date parameter required")
+    hour = int(request.args.get("hour", 12))
+    grid = OpenMeteoService.fetch_global_wind(date_str, hour)
+    return jsonify(grid), HTTPStatus.OK
 
 
 @sea_api.route('/<string:id>/wind-vectors', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_wind_vectors(id: str):
+def get_wind_vectors(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Builds a leaflet-velocity wind grid for a day, from its
     Weather record's hourly states at the given UTC hour (bounded to the day's route).
@@ -404,17 +361,12 @@ def get_wind_vectors(id: str):
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("wind_vectors_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/wave-vectors', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_wave_vectors(id: str):
+def get_wave_vectors(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Builds a leaflet-velocity wave grid for a day, from its
     Sea record's hourly states at the given UTC hour (land-masked, bounded to the day's route).
@@ -455,17 +407,12 @@ def get_wave_vectors(id: str):
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("wave_vectors_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/tidal-diamonds', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def get_tidal_diamonds(id: str):
+def get_tidal_diamonds(id: str) -> ResponseReturnValue:
     """
     SeaResource GET method. Resolves every tidal diamond relevant to a day at the given
     clock hour (the itinerary's user-created diamonds plus any seeded atlas stations
@@ -499,8 +446,3 @@ def get_tidal_diamonds(id: str):
         return jsonify(_diamond_schema.dump(diamonds)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("tidal_diamonds_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

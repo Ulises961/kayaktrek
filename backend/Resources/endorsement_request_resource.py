@@ -3,6 +3,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
 
 from Schemas.endorsement_request_schema import EndorsementRequestSchema
@@ -20,7 +21,7 @@ endorsement_request_api = Blueprint(
 
 @endorsement_request_api.route("", methods=["GET"])
 @JWTService.authenticate_restful
-def list_requests():
+def list_requests() -> ResponseReturnValue:
     """GET /api/v1/endorsement-requests?direction=incoming|outgoing — pending requests.
     ---
     get:
@@ -54,14 +55,11 @@ def list_requests():
         return jsonify(EndorsementRequestSchema(many=True).dump(requests)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error listing endorsement requests: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @endorsement_request_api.route("", methods=["POST"])
 @JWTService.authenticate_restful
-def create_request():
+def create_request() -> ResponseReturnValue:
     """POST /api/v1/endorsement-requests — author asks a trip-mate to endorse a log.
 
     Body: {"logId": "<uuid>", "addresseeUsername": "<name>" | "addresseeId": "<uuid>"}.
@@ -132,7 +130,7 @@ def create_request():
 
 @endorsement_request_api.route("/<request_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def remove_request(request_id: str):
+def remove_request(request_id: str) -> ResponseReturnValue:
     """DELETE /api/v1/endorsement-requests/<id> — author cancels or addressee declines.
     ---
     delete:

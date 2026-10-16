@@ -135,7 +135,7 @@ class LiveStreamService:
         heartbeat_seconds: int = 15,
         max_ticks: Optional[int] = None,
     ) -> Iterator[str]:
-        """Stateless snapshot-then-stream generator (§D4).
+        """Stateless snapshot-then-stream generator.
 
         `pubsub`/`fanout`/`max_ticks` are injectable so tests can drive this directly with a
         scripted fake — Flask's test client buffers full responses and cannot consume
@@ -147,13 +147,12 @@ class LiveStreamService:
         not reading ends the stream *without* an `end` event: `end` tells the client not to
         come back, and this one should, to take a fresh snapshot.
 
-        The whole connection lifetime is one manual Logfire span (M13 §A.2), not the
-        default per-request auto-instrumented span — the route is excluded from Flask
-        auto-instrumentation (Api/observability.py _EXCLUDED_URL_PATTERNS) precisely so
-        this is the only top-level span a connection produces. It is also the *only*
-        span a connection produces: the per-tick liveness query underneath is
-        explicitly suppressed (see the loop), so a connection costs one record no
-        matter how many hours it stays open.
+        The whole connection lifetime is one manual Logfire span, not the default
+        per-request auto-instrumented span: the route is excluded from Flask
+        auto-instrumentation (Api/observability.py _EXCLUDED_URL_PATTERNS) so this is the
+        only top-level span a connection produces, and the per-tick liveness query
+        underneath is suppressed (see the loop), so a connection costs one record however
+        many hours it stays open.
         """
         tick_count = 0
         position_events = 0
@@ -175,18 +174,16 @@ class LiveStreamService:
             try:
                 tick = 0
                 while max_ticks is None or tick < max_ticks:
-                    # Suppressed, because this liveness re-query is the single largest
-                    # span producer in the app: one identical `SELECT trips` per tick,
-                    # per open connection, for the connection's whole lifetime — and a
-                    # tick is *not* only the 15s heartbeat, the loop also turns on every
-                    # relayed position. A day-long Navigate session emits thousands of
-                    # them and none says anything the connection span's tick_count
-                    # doesn't. Excluding the route from Flask auto-instrumentation
-                    # (Api/observability.py) only re-parented these under sse_connection;
-                    # it never stopped them being emitted, so the M13 §A.0.4 cost
-                    # guardrail was only ever half-applied. A failure here still shows
-                    # up — it propagates out of the generator and is recorded on the
-                    # enclosing sse_connection span.
+                    # Suppressed because this liveness re-query is the app's largest span
+                    # producer: one identical `SELECT trips` per tick per open connection for
+                    # the connection's whole lifetime, and a tick is not only the 15s
+                    # heartbeat — the loop also turns on every relayed position. A day-long
+                    # Navigate session emits thousands, none saying anything the connection
+                    # span's tick_count doesn't. Excluding the route from Flask
+                    # auto-instrumentation (Api/observability.py) only re-parents these under
+                    # sse_connection; it does not stop them being emitted. A failure here
+                    # still shows up: it propagates out of the generator and is recorded on
+                    # the enclosing sse_connection span.
                     with logfire.suppress_instrumentation():
                         trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
                         state = trip.state if trip else None

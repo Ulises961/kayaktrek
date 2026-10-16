@@ -1,6 +1,7 @@
 import base64
 from datetime import datetime, timezone
 from typing import ClassVar, Optional
+from xml.etree.ElementTree import Element
 
 import defusedxml.ElementTree
 
@@ -70,7 +71,7 @@ class InReachMapShareSource(SatelliteFeedSource):
         return positions
 
     @staticmethod
-    def _extract_timestamp(placemark) -> Optional[datetime]:
+    def _extract_timestamp(placemark: Element) -> Optional[datetime]:
         # ExtendedData "Time UTC" is preferred — it's explicitly UTC, unlike the
         # placemark <name> which the KML feed docs describe as ISO 8601 UTC but which
         # some MapShare configurations have been observed to render in local time.
@@ -96,7 +97,7 @@ class InReachMapShareSource(SatelliteFeedSource):
         return parsed.astimezone(timezone.utc)
 
     @staticmethod
-    def _extract_coordinates(placemark) -> Optional[tuple[float, float]]:
+    def _extract_coordinates(placemark: Element) -> Optional[tuple[float, float]]:
         point = placemark.find(
             "{http://www.opengis.net/kml/2.2}Point/{http://www.opengis.net/kml/2.2}coordinates"
         )

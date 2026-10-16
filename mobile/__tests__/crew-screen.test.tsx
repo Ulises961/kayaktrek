@@ -162,10 +162,10 @@ describe("CrewScreen", () => {
     const { findByText, getByText } = await render(<CrewScreen />, { wrapper: WithCachedSurfaces })
     await findByText("Lea Der")
 
-    fireEvent.press(getByText("Invite a buddy"))
+    await fireEvent.press(getByText("Invite a buddy"))
     expect(await findByText("Ada")).toBeTruthy()
 
-    fireEvent.press(getByText("Invite"))
+    await fireEvent.press(getByText("Invite"))
 
     await waitFor(() => {
       expect(mockInviteBuddy).toHaveBeenCalledWith("trip-1", "buddy-1")
@@ -185,7 +185,7 @@ describe("CrewScreen", () => {
     const { findByText, getByLabelText } = await render(<CrewScreen />, { wrapper: WithCachedSurfaces })
     await findByText("Pat Pending")
 
-    fireEvent.press(getByLabelText(/cancel/i))
+    await fireEvent.press(getByLabelText(/cancel/i))
 
     await waitFor(() => {
       expect(mockCancelInvitation).toHaveBeenCalledWith("trip-1", "pending-1")
@@ -204,7 +204,7 @@ describe("CrewScreen", () => {
     const removeButtons = getAllByLabelText(/remove/i)
     expect(removeButtons).toHaveLength(1)
 
-    fireEvent.press(removeButtons[0])
+    await fireEvent.press(removeButtons[0])
 
     await waitFor(() => {
       expect(mockRemoveMember).toHaveBeenCalledWith("trip-1", "crew-1")

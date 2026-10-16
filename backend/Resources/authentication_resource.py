@@ -3,13 +3,12 @@ import logging
 from uuid import UUID
 
 from flask import Blueprint, request, jsonify, abort, current_app, g
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from sqlalchemy.exc import NoResultFound
 
-from Api.database import db
 from Api.limiter import limiter
-from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 api = Blueprint("auth", __name__)
 
 
-def _resend_key():
+def _resend_key() -> str:
     data = request.get_json(silent=True) or {}
     mail = data.get("mail")
     return mail if mail else get_remote_address()
@@ -31,7 +30,7 @@ def _resend_key():
 @api.route("/api/v1/auth/login", methods=["POST"])
 @limiter.limit("10 per minute")
 @limiter.limit("50 per hour")
-def login_user():
+def login_user() -> ResponseReturnValue:
     """
     ---
     post:
@@ -110,7 +109,7 @@ def login_user():
                     "access_token": access_token,
                     "refresh_token": refresh_token,
                     # Lets the client backfill a missing X25519 keypair while it still holds
-                    # the password (M22 keeps key derivation in the browser, so sign-in is the
+                    # the password (key derivation happens in the browser, so sign-in is the
                     # only moment it can). False for accounts whose keypair a password reset
                     # cleared; the user row is already loaded here, so reporting it is free.
                     "has_keypair": user.public_key is not None,
@@ -127,9 +126,6 @@ def login_user():
         if str(e) == "deletion_pending":
             return jsonify({"status": "fail", "code": "deletion_pending", "message": "This account is scheduled for deletion."}), HTTPStatus.FORBIDDEN
         abort(HTTPStatus.FORBIDDEN, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        raise e
 
 
 def _invite_code_valid(submitted: str) -> bool:
@@ -140,7 +136,7 @@ def _invite_code_valid(submitted: str) -> bool:
 
 
 @api.route("/api/v1/auth/registration-status", methods=["GET"])
-def registration_status():
+def registration_status() -> ResponseReturnValue:
     """
     Whether the invite-code kill switch (DEPLOY.md "Closing registration in a hurry") is
     currently armed, so the register form can show or hide its invite-code field without a
@@ -167,7 +163,7 @@ def registration_status():
 
 @api.route("/api/v1/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
-def register_user():
+def register_user() -> ResponseReturnValue:
     """
     ---
     post:
@@ -218,7 +214,7 @@ def register_user():
 
 
 @api.route("/api/v1/auth/activate-test", methods=["POST"])
-def activate_test_user():
+def activate_test_user() -> ResponseReturnValue:
     """Bypass email verification for E2E tests. Only available in development/testing.
     ---
     post:
@@ -246,19 +242,14 @@ def activate_test_user():
     if not mail:
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
     try:
-        user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
-        if not user:
-            abort(HTTPStatus.NOT_FOUND, description="User not found")
-        user.active = True
-        db.session.commit()
-        return jsonify({"status": "activated"}), HTTPStatus.OK
-    except Exception as e:
-        logger.error("activate_test_user_failed", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR)
+        AuthService.activate_by_mail(mail)
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description="User not found")
+    return jsonify({"status": "activated"}), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/verify", methods=["GET"])
-def verify_account():
+def verify_account() -> ResponseReturnValue:
     """
     ---
     get:
@@ -283,14 +274,11 @@ def verify_account():
         return jsonify({"status": "success", "message": "Account activated", "user": UserSchema().dump(user)}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
 
 @api.route("/api/v1/auth/verify", methods=["POST"])
 @limiter.limit("10 per hour")
-def verify_account_and_sign_in():
+def verify_account_and_sign_in() -> ResponseReturnValue:
     """
     ---
     post:
@@ -325,9 +313,6 @@ def verify_account_and_sign_in():
         user = AuthService.verify_account(token)
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
     session = SessionService.start(
         user.id,
@@ -346,7 +331,7 @@ def verify_account_and_sign_in():
 
 
 @api.route("/api/v1/auth/verify-email-change", methods=["GET"])
-def verify_email_change():
+def verify_email_change() -> ResponseReturnValue:
     """
     ---
     get:
@@ -371,14 +356,11 @@ def verify_email_change():
         return jsonify({"status": "success", "message": "Email address updated", "mail": user.mail}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Email change verification failed")
 
 
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
-def resend_verification():
+def resend_verification() -> ResponseReturnValue:
     """
     ---
     post:
@@ -409,14 +391,11 @@ def resend_verification():
         abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend verification")
 
 
 @api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
-def resend_deletion_cancel():
+def resend_deletion_cancel() -> ResponseReturnValue:
     """
     ---
     post:
@@ -440,29 +419,25 @@ def resend_deletion_cancel():
     data = request.get_json()
     if not data or not data.get("mail"):
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
-    try:
-        result = UserService.resend_deletion_cancel(data["mail"])
-        if result:
-            raw_token, user_name = result
-            frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-            cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
-            send_template_email(
-                data["mail"],
-                "Your Kayaktrek account deletion request",
-                "deletion_request",
-                name=user_name,
-                cancel_url=cancel_url,
-            )
-        # Always return 200 — do not reveal whether the account exists
-        return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK
-    except Exception as e:
-        logger.error("resend_deletion_cancel_failed", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend cancellation email")
+    result = UserService.resend_deletion_cancel(data["mail"])
+    if result:
+        raw_token, user_name = result
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
+        send_template_email(
+            data["mail"],
+            "Your Kayaktrek account deletion request",
+            "deletion_request",
+            name=user_name,
+            cancel_url=cancel_url,
+        )
+    # Always return 200 — do not reveal whether the account exists
+    return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/forgot-password", methods=["POST"])
 @limiter.limit("5 per hour")
-def forgot_password():
+def forgot_password() -> ResponseReturnValue:
     """
     ---
     post:
@@ -491,7 +466,7 @@ def forgot_password():
 
 
 @api.route("/api/v1/auth/reset-password", methods=["POST"])
-def reset_password():
+def reset_password() -> ResponseReturnValue:
     """
     ---
     post:
@@ -522,14 +497,11 @@ def reset_password():
         return jsonify({"status": "success", "message": "Password updated"}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Password reset failed")
 
 
 @api.route("/api/v1/auth/refresh", methods=["POST"])
 @limiter.limit("10 per minute")
-def refresh_token():
+def refresh_token() -> ResponseReturnValue:
     """
     ---
     post:
@@ -592,8 +564,8 @@ def refresh_token():
             user,
             payload,
             location_label=resolve_location_label(),
-            # Also re-resolved so sessions opened before the web client forwarded the
-            # browser's User-Agent stop reading "Unknown device" on their own next refresh.
+            # Also re-resolved, so a session opened without a device label gets one on its
+            # next refresh.
             device_label=resolve_device_label(request.headers.get("User-Agent")),
         )
     except ValueError as e:
@@ -611,7 +583,7 @@ def refresh_token():
 
 @api.route("/api/v1/auth/logout", methods=["POST"])
 @JWTService.authenticate_restful
-def logout():
+def logout() -> ResponseReturnValue:
     """
     ---
     post:
@@ -631,7 +603,7 @@ def logout():
 
 @api.route("/api/v1/auth/logout-all", methods=["POST"])
 @JWTService.authenticate_restful
-def logout_all():
+def logout_all() -> ResponseReturnValue:
     """
     ---
     post:

@@ -1,6 +1,7 @@
 from http import HTTPStatus
 from sqlalchemy.exc import NoResultFound
 from flask import Blueprint, jsonify, current_app, abort
+from flask.typing import ResponseReturnValue
 
 from flask_mail import Message
 
@@ -12,14 +13,14 @@ dev_api = Blueprint("dev", __name__, url_prefix="/api/v1/dev")
 
 
 @dev_api.before_request
-def dev_only():
+def dev_only() -> None:
     if not current_app.config.get("DEVELOPMENT"):
         abort(HTTPStatus.NOT_FOUND)
 
 
 @dev_api.route("/test-email", methods=["POST"])
 @JWTService.authenticate_restful
-def send_test_email():
+def send_test_email() -> ResponseReturnValue:
     try:
         user = UserService.get_current_user()
         msg = Message(
@@ -31,5 +32,3 @@ def send_test_email():
         return jsonify({"message": f"Test email sent to {user.mail}"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

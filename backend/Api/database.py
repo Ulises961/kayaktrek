@@ -1,4 +1,3 @@
-# database.py
 from typing import TYPE_CHECKING
 
 from flask_sqlalchemy import SQLAlchemy

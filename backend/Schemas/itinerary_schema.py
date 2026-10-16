@@ -30,10 +30,10 @@ class ItinerarySchema(BaseSchema):
         allow_none=True, validate=lambda x: x is None or (0 <= x <= 50000)
     )
     created_from_id = fields.UUID(allow_none=True, dump_only=True)
-    # Optimistic-concurrency token for mobile sync-down (M9c) — see Models.itinerary.
+    # Optimistic-concurrency token for mobile sync-down — see Models.itinerary.
     route_version = fields.Integer(dump_only=True)
-    # Set by the single-itinerary read only (M36), and only for a trip's itinerary: where the
-    # trip's change log stood when the data was read.
+    # Set by the single-itinerary read only, and only for a trip's itinerary: where the trip's
+    # change log stood when the data was read.
     change_rev = fields.Integer(dump_only=True, allow_none=True)
     days = fields.List(
         fields.Nested(DaySchema),
@@ -43,8 +43,8 @@ class ItinerarySchema(BaseSchema):
     )
     trip_id = fields.UUID(allow_none=True, load_default=None)
     user_id = fields.UUID(dump_only=True)
-    # Unlisted story-share token (M7d) — only ever dumped back to the owner right
-    # after generate/regenerate; never present on the public/explore projections.
+    # Unlisted story-share token — only ever dumped back to the owner right after
+    # generate/regenerate; never present on the public/explore projections.
     story_share_token = fields.String(dump_only=True, allow_none=True)
 
     def get_total_miles(self, itinerary: Itinerary) -> float:
@@ -72,10 +72,12 @@ class ItinerarySchema(BaseSchema):
         if value is not None and not (0.5 <= value <= 20.0):
             raise ValidationError("Average speed must be between 0.5 and 20.0 knots")
 
+    # Dumps drop the staging Day 0 unless a caller sets this to True before dumping.
+    include_staging: bool = False
+
     @post_dump
     def exclude_day_zero(self, data, **kwargs):
-        # Set schema.include_staging = True before dumping to keep Day 0 in the response.
-        if not getattr(self, "include_staging", False) and data.get("days"):
+        if not self.include_staging and data.get("days"):
             data["days"] = [d for d in data["days"] if d.get("dayNumber") != 0]
         return data
 
@@ -142,7 +144,7 @@ class ItineraryExploreItemSchema(BaseSchema):
     derived from the route's own points/dates; no Trip data is present.
     """
     name = fields.String(dump_only=True)
-    # Clamped, not hidden, on the card (M19 decision 9) — the frontend line-clamps it.
+    # Clamped, not hidden, on the card — the frontend line-clamps it.
     description = fields.String(dump_only=True, allow_none=True)
     # Plain string, not fields.Enum: this schema is fed snake_case dicts, so the
     # service emits difficulty.value the same way it emits `season`.
@@ -162,12 +164,12 @@ class ItineraryExploreItemSchema(BaseSchema):
     original_author = fields.Nested(
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
-    # M23 §3 — signals derivable without an author writing anything, which is what the
-    # library needs: its routes have null description and null difficulty in practice.
+    # Signals derivable without an author writing anything, which is what the library needs:
+    # its routes have a null description and difficulty in practice.
     #
-    # `author` is who wrote THIS route, and is distinct from `original_author` (who wrote
-    # the route a fork came from). Same projection, since both feed the same card and
-    # both must respect profile_is_public before linking.
+    # `author` is who wrote THIS route, distinct from `original_author` (who wrote the route a
+    # fork came from). Same projection, since both feed the same card and both must respect
+    # profile_is_public before linking.
     author = fields.Nested(OriginalAuthorSchema, dump_only=True, allow_none=True)
     # The hardest day, not the average — the closest stand-in for the missing difficulty.
     longest_day_miles = fields.Float(dump_only=True, allow_none=True)
@@ -182,11 +184,10 @@ class ItineraryPublicSchema(BaseSchema):
     """Stripped schema for unauthenticated public itinerary access.
 
     Excludes user_id, trip_id, notes, and private images. `created_from_id` +
-    `original_author` surface fork attribution (M7c); the resource injects
-    `original_author` via ItineraryService.resolve_original_author before dumping.
-    `trip_state` (M7d) exposes only the parent trip's lifecycle state — never any
-    other trip field — as the seam a future live-position feature (M8) attaches to
-    while `happening`.
+    `original_author` surface fork attribution; the resource injects `original_author`
+    via ItineraryService.resolve_original_author before dumping. `trip_state` exposes only
+    the parent trip's lifecycle state — never any other trip field — as the seam live
+    position display attaches to while `happening`.
     """
     name = fields.String(dump_only=True)
     description = fields.String(dump_only=True, allow_none=True)
@@ -201,18 +202,17 @@ class ItineraryPublicSchema(BaseSchema):
         OriginalAuthorSchema, dump_only=True, allow_none=True
     )
     days = fields.List(fields.Nested(DayPublicSchema), dump_only=True)
-    # Only the author's own PUBLIC places (M19 §4). This is not the deferred community
-    # gazetteer: these belong to one itinerary and are published with it, so there is
-    # no shared object, no dedup and no moderation queue.
+    # Only the author's own PUBLIC places. These belong to one itinerary and are published
+    # with it — not a shared community gazetteer — so there is no shared object, no dedup
+    # and no moderation queue.
     places = fields.Method("get_public_places", dump_only=True)
     trip_state = fields.Method("get_trip_state", dump_only=True)
 
     def get_public_places(self, itinerary: Itinerary) -> list:
-        # Queried rather than reached through a relationship: Place.itinerary_id
-        # already carries ondelete="CASCADE", and adding an ORM relationship without
-        # passive_deletes would have SQLAlchemy null the children before deleting the
-        # parent — the asymmetric-cascade shape M16 found three real bugs in. Same
-        # session-query approach get_trip_state already uses here.
+        # Queried rather than reached through a relationship: Place.itinerary_id already
+        # carries ondelete="CASCADE", and an ORM relationship without passive_deletes would
+        # have SQLAlchemy null the children before deleting the parent. Same session-query
+        # approach get_trip_state uses.
         places = (
             db.session.query(Place)
             .filter(

@@ -1,4 +1,4 @@
-"""Coarse device and origin labels for the sessions list (M17).
+"""Coarse device and origin labels for the sessions list.
 
 Both labels answer one question — "was that me?" — so both are deliberately lossy.
 The raw User-Agent is never persisted, and neither is the client's IP address: the
@@ -50,7 +50,7 @@ _PLATFORMS = [
 _LOCATION_PART = re.compile(r"^[\w\s.'\-()]{1,60}$", re.UNICODE)
 
 # Our own clients identify themselves rather than being guessed at: React Native's default
-# User-Agent (okhttp/…) matches no token above, so every phone read "Unknown device".
+# User-Agent (okhttp/…) matches no token above.
 _APP_USER_AGENT = re.compile(r"^Kayaktrek/\S+(?:\s+\((?P<detail>[^)]*)\))?")
 
 
@@ -132,8 +132,8 @@ def resolve_location_label() -> Optional[str]:
     # Our frontend's forwarded copy wins, and does not need the trusted-hops gate: that gate
     # exists because Cloudflare's headers are client-spoofable, and these already proved
     # themselves with the shared secret. It also has to stand on its own, since the Next
-    # server's own origin is not the paddler's — without this every refresh relabelled a
-    # session with the datacentre it passed through.
+    # server's own origin is not the paddler's and would label every session with the
+    # datacentre it passed through.
     if _forwarding_is_proven():
         country_code = request.headers.get(_FORWARDED_COUNTRY)
         parts = [

@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from sqlalchemy import UUID, Boolean, DateTime, Integer, Numeric, ForeignKey, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
@@ -25,29 +26,29 @@ class Itinerary(BaseModel):
     )
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     avg_speed_knots: Mapped[float] = mapped_column(Float, nullable=False, default=2.5)
-    total_miles: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
-    expected_total_miles: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    total_miles: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
+    expected_total_miles: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     trip_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("trip.id"), nullable=True, unique=True)
     user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     created_from_id: Mapped[Optional[_UUID]] = mapped_column(
         UUID, ForeignKey("itinerary.id", ondelete="SET NULL"), nullable=True
     )
-    # Unlisted "share this trip's story" link (M7d) — independent of is_public/explore
-    # discoverability. Regenerating overwrites the old token, which is the only revoke
-    # path (mirrors Logistics.share_token). No automatic expiry: a story is a keepsake,
-    # not a time-boxed float plan.
+    # Unlisted "share this trip's story" link, independent of is_public/explore discoverability.
+    # Regenerating overwrites the old token, which is the only way to revoke it (as with
+    # Logistics.share_token). No automatic expiry: a story is a keepsake, not a time-boxed
+    # float plan.
     story_share_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     story_share_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     # Route-level optimistic-concurrency token, bumped on every structural change
-    # (point add/delete/reorder, day boundary move). Lets mobile sync-down (M9c)
-    # detect a diverged route as one version mismatch instead of diffing every
-    # point — see docs/mobile/sync-protocol-spec.md §8.1.
+    # (point add/delete/reorder, day boundary move). Lets mobile sync-down detect a diverged
+    # route as one version mismatch instead of diffing every point — see
+    # docs/mobile/sync-protocol-spec.md §8.1.
     route_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     days: Mapped[List["Day"]] = relationship(
         lazy="select", cascade="all, delete,save-update"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Itinerary "{self.id}, {self.name}, {self.trip_id}">'

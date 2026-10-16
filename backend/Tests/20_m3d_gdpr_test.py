@@ -209,6 +209,29 @@ def test_export_task_uploads_to_object_storage(app, export_user):
     mock_mail.assert_called_once()
 
 
+def test_export_task_writes_log_distances(app, client, export_user):
+    """`Log.distance` is a Numeric column, so the export reads it back as a Decimal, which
+    `json.dumps` cannot write. A user with any logged distance used to get no export at
+    all — the task failed before uploading. The mocked-user export tests all had no logs."""
+    for distance in (12.5, 0):
+        created = client.post(
+            f"{LOG_ENDPOINT}/create",
+            json={"hours": 3.5, "distance": distance},
+            headers=export_user["headers"],
+        )
+        assert created.status_code == 201
+
+    with app.app_context(), \
+         patch("Tasks.data_export.StorageService.upload_export") as mock_upload, \
+         patch("Tasks.data_export.send_template_email"):
+        export_user_data.apply(args=[export_user["id"]])
+
+    mock_upload.assert_called_once()
+    exported = json.loads(mock_upload.call_args.args[1])
+    # A stored zero is a distance, not a missing one.
+    assert sorted(entry["distanceKm"] for entry in exported["logs"]) == [0.0, 12.5]
+
+
 def test_download_export_invalid_token_returns_400(client):
     r = client.get(f"{USER_ENDPOINT}/me/data-export/not-a-real-token-at-all")
     assert r.status_code == 400

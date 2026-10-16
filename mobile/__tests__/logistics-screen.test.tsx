@@ -124,11 +124,11 @@ describe("LogisticsScreen", () => {
     )
     await findByText("No travel documents yet")
 
-    fireEvent.press(getByLabelText("Add travel document"))
+    await fireEvent.press(getByLabelText("Add travel document"))
     const nameInput = await findByPlaceholderText("Name (e.g. Ferry booking)")
-    fireEvent.changeText(nameInput, "Hostel booking")
+    await fireEvent.changeText(nameInput, "Hostel booking")
     await waitFor(() => expect(nameInput.props.value).toBe("Hostel booking"))
-    fireEvent.press(getByText("Add document"))
+    await fireEvent.press(getByText("Add document"))
 
     await waitFor(() => {
       expect(mockCreateTravelDocument).toHaveBeenCalledWith(

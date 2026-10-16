@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, g, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -10,7 +11,6 @@ from Services.travel_document_service import TravelDocumentService
 from Services.storage_service import StorageValidationError
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
-from Api.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ travel_document_api = Blueprint("travel_document", __name__, url_prefix=TRAVEL_D
 @travel_document_api.route("/<trip_id>/all", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def list_documents(trip_id: str):
+def list_documents(trip_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -46,7 +46,7 @@ def list_documents(trip_id: str):
 @travel_document_api.route("/<trip_id>/create", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def create_document(trip_id: str):
+def create_document(trip_id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -74,15 +74,12 @@ def create_document(trip_id: str):
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_create_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("travel_document")
-def update_document(id: str):
+def update_document(id: str) -> ResponseReturnValue:
     """
     ---
     patch:
@@ -119,15 +116,12 @@ def update_document(id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValidationError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
-    except Exception as e:
-        logger.error("travel_document_update_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("travel_document")
-def delete_document(id: str):
+def delete_document(id: str) -> ResponseReturnValue:
     """
     ---
     delete:
@@ -154,16 +148,12 @@ def delete_document(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_delete_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("travel_document")
-def upload_attachment(id: str):
+def upload_attachment(id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -210,16 +200,12 @@ def upload_attachment(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_upload_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("travel_document")
-def delete_attachment(id: str):
+def delete_attachment(id: str) -> ResponseReturnValue:
     """
     ---
     delete:
@@ -248,16 +234,12 @@ def delete_attachment(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_delete_attachment_error", extra={"error": str(e)})
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @travel_document_api.route("/<id>/attachment", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("travel_document")
-def get_attachment_url(id: str):
+def get_attachment_url(id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -281,6 +263,3 @@ def get_attachment_url(id: str):
         return jsonify({"url": url}), HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("travel_document_attachment_url_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

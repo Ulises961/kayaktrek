@@ -1,17 +1,16 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import NoResultFound
 from Schemas.log_schema import LogSchema
-from Api.database import db
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.log_service import LogService, LogNotEndorsableError
 
 
-logger = logging.getLogger(__name__) # It will print the name of this module when the main app is running
+logger = logging.getLogger(__name__)
 
 LOG_ENDPOINT = "/api/v1/log"
 log_api = Blueprint('log', __name__, url_prefix=LOG_ENDPOINT)
@@ -19,7 +18,7 @@ log_api = Blueprint('log', __name__, url_prefix=LOG_ENDPOINT)
 
 @log_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_logs():
+def get_logs() -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paginated, sorted, filterable page of a
     user's own logs. Query params: page, per_page (capped 100), sort
@@ -85,36 +84,32 @@ def get_logs():
                   pages:
                     type: integer
     """
-    try:
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        sort = request.args.get("sort", "newest")
-        result = LogService.get_logs_by_user(
-            g.current_user_id,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-            min_sea=request.args.get("min_sea", type=int),
-            max_sea=request.args.get("max_sea", type=int),
-            min_distance=request.args.get("min_distance", type=float),
-            max_distance=request.args.get("max_distance", type=float),
-        )
-        schema = LogSchema()
-        return jsonify({
-            "items": [schema.dump(log) for log in result["items"]],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving logs: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    sort = request.args.get("sort", "newest")
+    result = LogService.get_logs_by_user(
+        g.current_user_id,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        min_sea=request.args.get("min_sea", type=int),
+        max_sea=request.args.get("max_sea", type=int),
+        min_distance=request.args.get("min_distance", type=float),
+        max_distance=request.args.get("max_distance", type=float),
+    )
+    schema = LogSchema()
+    return jsonify({
+        "items": [schema.dump(log) for log in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 
 @log_api.route("/endorsed", methods=["GET"])
 @JWTService.authenticate_restful
-def get_endorsed_logs():
+def get_endorsed_logs() -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paginated, sorted, filterable page of logs
     endorsed by the current user. Same query params as GET /api/log/all.
@@ -179,35 +174,31 @@ def get_endorsed_logs():
                   pages:
                     type: integer
     """
-    try:
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        sort = request.args.get("sort", "newest")
-        result = LogService.get_endorsed_logs(
-            g.current_user_id,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-            min_sea=request.args.get("min_sea", type=int),
-            max_sea=request.args.get("max_sea", type=int),
-            min_distance=request.args.get("min_distance", type=float),
-            max_distance=request.args.get("max_distance", type=float),
-        )
-        schema = LogSchema()
-        return jsonify({
-            "items": [schema.dump(log) for log in result["items"]],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving logs: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"{e}")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    sort = request.args.get("sort", "newest")
+    result = LogService.get_endorsed_logs(
+        g.current_user_id,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        min_sea=request.args.get("min_sea", type=int),
+        max_sea=request.args.get("max_sea", type=int),
+        min_distance=request.args.get("min_distance", type=float),
+        max_distance=request.args.get("max_distance", type=float),
+    )
+    schema = LogSchema()
+    return jsonify({
+        "items": [schema.dump(log) for log in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 @log_api.route("/stats", methods=["GET"])
 @JWTService.authenticate_restful
-def get_stats():
+def get_stats() -> ResponseReturnValue:
     """GET /api/log/stats — aggregate logbook stats for the authenticated user.
     ---
     get:
@@ -250,16 +241,12 @@ def get_stats():
                         count:
                           type: integer
     """
-    try:
-        return jsonify(LogService.stats_for_user(g.current_user_id)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving log stats: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    return jsonify(LogService.stats_for_user(g.current_user_id)), HTTPStatus.OK
 
 
 @log_api.route("/<string:id>/endorse", methods=["POST"])
 @JWTService.authenticate_restful
-def endorse_log(id: str):
+def endorse_log(id: str) -> ResponseReturnValue:
     """POST /api/log/<id>/endorse — endorse another paddler's log under the same-trip rule.
 
     Deliberately NOT @require_owner: the endorser is by definition not the author. The
@@ -290,23 +277,17 @@ def endorse_log(id: str):
     try:
         LogService.endorse_log(id, g.current_user_id)
         return jsonify({"message": "Log endorsed"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except LogNotEndorsableError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=str(e))
     except PermissionError as e:
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
-    except Exception as e:
-        logger.error(f"Error endorsing log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @log_api.route("/<string:id>/endorse", methods=["DELETE"])
 @JWTService.authenticate_restful
-def unendorse_log(id: str):
+def unendorse_log(id: str) -> ResponseReturnValue:
     """DELETE /api/log/<id>/endorse — withdraw the caller's own endorsement.
 
     Caller-scoped: removing your own endorsement needs no shared-trip recheck.
@@ -329,19 +310,13 @@ def unendorse_log(id: str):
     try:
         LogService.unendorse_log(id, g.current_user_id)
         return jsonify({"message": "Endorsement withdrawn"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
-    except Exception as e:
-        logger.error(f"Error withdrawing endorsement: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @log_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def post():
+def post() -> ResponseReturnValue:
     """
     LogResource POST method. Adds a new log to the database.
 
@@ -369,28 +344,19 @@ def post():
         log_json = request.get_json()
         log = LogService.create_log(log_json)
         return jsonify(LogSchema().dump(log)), HTTPStatus.CREATED
-    except HTTPException:
-        raise
     except ValidationError as e:
         logger.error(f"Validation error creating log: {e.messages}")
-        db.session.rollback()
         abort(HTTPStatus.BAD_REQUEST, description=str(e.messages))
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error creating log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @log_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def get_log(id: str):
+def get_log(id: str) -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paddling log by id.
     ---
@@ -408,15 +374,14 @@ def get_log(id: str):
     try:
         log = LogService.get_log_by_id(id)
         return jsonify(LogSchema().dump(log)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving log: {e}")
+    except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
 
 
 @log_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def update_log(id: str):
+def update_log(id: str) -> ResponseReturnValue:
     """
     PATCH /api/log/<id> — Partially update an existing paddling log.
 
@@ -446,27 +411,18 @@ def update_log(id: str):
         updated_log = LogService.update_log(id, request.get_json())
 
         return jsonify(LogSchema().dump(updated_log)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error updating log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @log_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def delete_log(id: str):
+def delete_log(id: str) -> ResponseReturnValue:
     """
     LogResource DELETE method. Deletes a paddling log by id.
     ---
@@ -492,19 +448,10 @@ def delete_log(id: str):
 
         LogService.delete_log(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Log {id} not found")
     except IntegrityError as e:
         logger.error(
             f"Integrity Error, this log is already in the database. Error: {e}"
         )
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-
-    except Exception as e:
-        logger.error(f"Error deleting log: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

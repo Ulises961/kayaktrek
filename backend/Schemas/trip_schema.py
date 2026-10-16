@@ -1,4 +1,5 @@
-from marshmallow import fields, post_load, pre_load, validates, validates_schema, ValidationError
+from flask import g
+from marshmallow import fields, post_dump, post_load, pre_load, validates, validates_schema, ValidationError
 from Models.difficulty import DifficultyType
 from Models.trip import Trip, TripOutcomeType, TripStateType
 from Schemas.base_schema import BaseSchema, camelcase
@@ -40,8 +41,8 @@ class TripSchema(BaseSchema):
     outcome = fields.Enum(TripOutcomeType, by_value=True, dump_only=True, allow_none=True)
     last_checkpoint_alert_at = fields.DateTime(dump_only=True, allow_none=True)
     timezone_name = fields.String(dump_only=True, allow_none=True)
-    # Set by the single-trip read only (M36): where the trip's change log stood when the data
-    # was read. Absent from every other projection of a trip.
+    # Set by the single-trip read only: where the trip's change log stood when the data was
+    # read. Absent from every other projection of a trip.
     change_rev = fields.Integer(dump_only=True, allow_none=True)
 
     @pre_load
@@ -67,6 +68,25 @@ class TripSchema(BaseSchema):
         date_to = data.get('date_to')
         if date_from and date_to and date_to < date_from:
             raise ValidationError("date_to must be on or after date_from", field_name="date_to")
+
+    @post_dump
+    def hide_crewmates_consent_times(self, data, **kwargs):
+        """Only the leader sees when another member shared their medical notes; everyone else
+        sees their own and nobody else's. Done here, not in one endpoint, so every response
+        that carries a trip's travellers applies it. With no signed-in caller nobody is the
+        leader, so the times are hidden."""
+        travellers = data.get("travellers") or []
+        viewer_id = str(g.get("current_user_id") or "")
+        viewer_is_leader = any(
+            str(traveller.get("user", {}).get("id")) == viewer_id and traveller.get("role") == "leader"
+            for traveller in travellers
+        )
+        if viewer_is_leader:
+            return data
+        for traveller in travellers:
+            if str(traveller.get("user", {}).get("id")) != viewer_id:
+                traveller["medicalNotesConsentAt"] = None
+        return data
 
     @post_load
     def make_trip(self, data, **kwargs):

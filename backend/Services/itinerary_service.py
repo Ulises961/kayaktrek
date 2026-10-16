@@ -576,7 +576,7 @@ class ItineraryService:
         always read-only — fork it to change the path. Its pitch fields,
         `is_public` itself, `avg_speed_knots` and `trip_id` stay editable while
         public, but **only by its author** (`itinerary.user_id`): `@require_owner`
-        also admits a trip member with no pitch-authoring role at all (M2's
+        also admits a trip member with no pitch-authoring role at all (the
         ownership hierarchy grants a trip member full itinerary access), and
         that person having trip access is not the same as having written the
         public listing — they haven't forked it, and shouldn't be able to edit
@@ -645,10 +645,9 @@ class ItineraryService:
     def set_point_order(itinerary_id: str, order: List[str]) -> List[str]:
         """Rewrite the route's `next_id` chain to follow the given id order.
 
-        `pointOrder` has been the frontend's canonical route order since M4b, with
-        no verb to send it back — points could only ever be appended to the tail.
-        This is that verb, and it is deliberately general rather than
-        insert-specific: reordering is the same operation.
+        `pointOrder` is the frontend's canonical route order; this is the verb that
+        sends it back. It is deliberately general rather than insert-specific:
+        reordering is the same operation.
 
         The submitted ids must be exactly the itinerary's own points, no more and
         no fewer (see PointOrderMismatchError).

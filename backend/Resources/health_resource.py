@@ -3,6 +3,7 @@ from http import HTTPStatus
 
 import logfire
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 from sqlalchemy import text
 
 from Api.database import db
@@ -14,7 +15,7 @@ health_api = Blueprint("health", __name__, url_prefix="/api/v1")
 
 @health_api.route("/health", methods=["GET"])
 @limiter.exempt
-def health():
+def health() -> ResponseReturnValue:
     """Liveness/readiness probe for the compose healthcheck / a future load balancer.
     No auth (a prerequisite for a healthcheck) and exempt from the default rate limit
     (polled far more often than the 200/hour default allows). Pings the DB so a backend
@@ -46,14 +47,13 @@ def health():
                     example: error
     """
     try:
-        # Suppressed, or this ping is the highest-volume record the app produces:
-        # both the backend and the SSE sidecar poll this every 10s, forever, which
-        # is ~17k spans a day saying "the database answered". `/api/v1/health` is
-        # already in Api/observability.py's exclusion list, but that only drops the
-        # Flask span — the SQLAlchemy one underneath survived it, and with no parent
-        # left to nest under it arrived as a top-level trace. Deliberately narrower
-        # than the whole request: the failure path below is the one thing here worth
-        # alerting on, so it must still reach Logfire.
+        # Suppressed, or this ping is the app's highest-volume record: the backend and the
+        # SSE sidecar each poll it every 10s, forever, ~17k spans a day saying "the database
+        # answered". `/api/v1/health` is already in Api/observability.py's exclusion list,
+        # but that drops only the Flask span; the SQLAlchemy span underneath would arrive
+        # as a top-level trace with no parent. Deliberately narrower than the whole
+        # request: the failure path below is the one thing here worth alerting on, so it
+        # must still reach Logfire.
         with logfire.suppress_instrumentation():
             db.session.execute(text("SELECT 1"))
         return jsonify({"status": "ok"}), HTTPStatus.OK

@@ -1,10 +1,10 @@
 from datetime import date
 from http import HTTPStatus
 from typing import Any, Dict, cast
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
@@ -20,11 +20,9 @@ from Services.trip_leadership_service import TripLeadershipService
 logger = logging.getLogger(__name__)
 
 TRIP_ENDPOINT = "/api/v1/trip"
-## TODO: Trip creation needs a separate microservice different from trip execution to avoid bogging down service through trip creation
-## TODO: A trip created is published in Kafka and then stored in db
 trip_api = Blueprint("trip", __name__, url_prefix=TRIP_ENDPOINT)
 
-# Client-supplied crypto material (M22) — see the same constants in user_resource.py.
+# Client-supplied crypto material — see the same constants in user_resource.py.
 # A member's own notes are sealed with a password-derived key (salt); the leader's copy
 # is sealed with ECIES, which carries an ephemeral public key instead.
 _SEALED_FIELDS = ("ciphertext", "nonce", "salt")
@@ -34,7 +32,7 @@ _LEADER_SEALED_FIELDS = ("ciphertext", "nonce", "ephemeralKey")
 @trip_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def get_trip(id: str):
+def get_trip(id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves trip by id.
 
@@ -65,31 +63,14 @@ def get_trip(id: str):
         TripService.touch_last_accessed(trip)
         data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
         data["changeRev"] = change_rev
-
-        current_user_id = str(g.current_user_id)
-        is_leader = any(
-            str(t.get("user", {}).get("id")) == current_user_id and t.get("role") == "leader"
-            for t in data.get("travellers", [])
-        )
-        if not is_leader:
-            for t in data.get("travellers", []):
-                if str(t.get("user", {}).get("id")) != current_user_id:
-                    t["medicalNotes"] = None
-                    t["medicalNotesConsentAt"] = None
-
         return jsonify(data), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:user_id>/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_user_trips(user_id: str):
+def get_all_user_trips(user_id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves a paginated, filterable page of a user's trips.
 
@@ -183,20 +164,15 @@ def get_all_user_trips(user_id: str):
             "page": result["page"],
             "pages": result["pages"],
         }), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:user_id>/invitations", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_user_invitations(user_id: str):
+def get_all_user_invitations(user_id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves trip(s) by ID or all trips.
 
@@ -222,18 +198,13 @@ def get_all_user_invitations(user_id: str):
         logger.info(f"Retrieving trip with id {id}")
         trips = TripService.get_invitations_by_user(user_id)
         return jsonify([TripSchema().dump(trip) for trip in trips]), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def post():
+def post() -> ResponseReturnValue:
     """
     TripResource POST method. Adds a new trip to the database.
 
@@ -258,19 +229,14 @@ def post():
         trip_data = request.get_json()
         trip = TripService.create_trip(trip_data)
         return jsonify(TripSchema().dump(trip)), HTTPStatus.CREATED
-    except HTTPException:
-        raise
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.exception(f"Error creating trip: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @trip_api.route("/<string:id>/state", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def transition_state(id: str):
+def transition_state(id: str) -> ResponseReturnValue:
     """
     Transition a trip's state forward (draft → planning → happening → past).
 
@@ -314,19 +280,15 @@ def transition_state(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/pause", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def pause_trip(id: str):
+def pause_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/pause — Leader pauses a happening expedition.
 
@@ -350,19 +312,15 @@ def pause_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/resume", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def resume_trip(id: str):
+def resume_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/resume — Leader resumes a paused expedition.
 
@@ -411,19 +369,15 @@ def resume_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/abort", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def abort_trip(id: str):
+def abort_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/abort — Leader ends a paused expedition early.
 
@@ -449,18 +403,14 @@ def abort_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def update_trip(id: str):
+def update_trip(id: str) -> ResponseReturnValue:
     """
     PATCH /api/trip/<id> — Partially update an existing trip.
 
@@ -502,23 +452,19 @@ def update_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @trip_api.route("/<string:id>/invite", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def invite_user(id: str):
+def invite_user(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/invite — Leader invites a user to the trip.
 
     Body: {"userId": "<uuid>"} — sourced from the buddy picker or paddler search, never
-    a blind email/username guess (M12 §N closed that enumeration oracle). A block in
+    a blind email/username guess, which would be an enumeration oracle. A block in
     either direction between leader and invitee forbids the invitation (403).
     Returns 201, 404 if no account found, 409 if already invited or member.
     ---
@@ -570,19 +516,15 @@ def invite_user(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/invite/<string:invitee_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def cancel_invitation(id: str, invitee_id: str):
+def cancel_invitation(id: str, invitee_id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/invite/<invitee_id> — Leader cancels a pending invitation.
 
@@ -606,17 +548,13 @@ def cancel_invitation(id: str, invitee_id: str):
     try:
         TripService.cancel_invitation(id, invitee_id)
         return jsonify({"message": "Invitation cancelled"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/invitation", methods=["POST"])
 @JWTService.authenticate_restful
-def handle_invitation(id: str):
+def handle_invitation(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/invitation — Current user accepts or declines their invitation.
 
@@ -657,19 +595,15 @@ def handle_invitation(id: str):
         TripService.handle_invitation(id, bool(body["accepted"]))
         action = "accepted" if body["accepted"] else "declined"
         return jsonify({"message": f"Invitation {action}"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:user_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def remove_member(id: str, user_id: str):
+def remove_member(id: str, user_id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/member/<user_id> — Leader removes a crew member from the trip.
 
@@ -697,17 +631,13 @@ def remove_member(id: str, user_id: str):
         return jsonify({"message": "Member removed"}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me", methods=["GET"])
 @JWTService.authenticate_restful
-def get_my_membership(id: str):
+def get_my_membership(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me — Get the caller's own membership/float-plan record.
     ---
@@ -727,13 +657,11 @@ def get_my_membership(id: str):
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me", methods=["PATCH"])
 @JWTService.authenticate_restful
-def update_my_float_plan(id: str):
+def update_my_float_plan(id: str) -> ResponseReturnValue:
     """
     PATCH /api/trip/<id>/member/me — Update the caller's own float-plan fields
     (vessel and emergency contact details). Medical notes are managed via the
@@ -767,17 +695,13 @@ def update_my_float_plan(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except HTTPException:
-        raise
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["GET"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def get_trip_medical_notes(id: str):
+def get_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me/medical-notes — Return the caller's own sealed trip
     medical notes for their client to decrypt. Requires an elevated (re-authenticated)
@@ -813,19 +737,15 @@ def get_trip_medical_notes(id: str):
     """
     try:
         return jsonify(TripMemberService.get_trip_medical_notes(id)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["POST"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def set_trip_medical_notes(id: str):
+def set_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/member/me/medical-consent — Encrypt and store the
     caller's own trip medical notes. Requires an elevated (re-authenticated) token.
@@ -873,21 +793,17 @@ def set_trip_medical_notes(id: str):
             id, raw["ciphertext"], raw["nonce"], raw["salt"]
         )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["DELETE"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def revoke_trip_medical_notes(id: str):
+def revoke_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/member/me/medical-consent — Clear the caller's own
     stored trip medical notes. Requires an elevated (re-authenticated) token.
@@ -908,16 +824,14 @@ def revoke_trip_medical_notes(id: str):
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/leader-public-key", methods=["GET"])
 @JWTService.authenticate_restful
-def get_leader_public_key(id: str):
+def get_leader_public_key(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me/leader-public-key — The trip leader's X25519 public
-    key, so a crew member's client can seal its notes for the leader itself (M22).
+    key, so a crew member's client can seal its notes for the leader itself.
     ---
     get:
       summary: Get the trip leader's public key
@@ -941,21 +855,17 @@ def get_leader_public_key(id: str):
     """
     try:
         return jsonify({"publicKey": TripMemberService.get_leader_public_key(id)}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def share_medical_notes(id: str):
+def share_medical_notes(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/member/me/share-medical-notes — Store the leader-readable copy
     of the caller's own trip medical notes, ECIES-sealed on the client to the leader's
@@ -1005,21 +915,17 @@ def share_medical_notes(id: str):
             id, raw["ciphertext"], raw["nonce"], raw["ephemeralKey"]
         )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["GET"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def read_member_medical_notes(id: str, member_id: str):
+def read_member_medical_notes(id: str, member_id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/<member_id>/medical-notes — The leader-sealed copy of a
     crew member's shared trip medical notes, for the leader's own client to decrypt.
@@ -1055,22 +961,18 @@ def read_member_medical_notes(id: str, member_id: str):
     try:
         sealed = TripMemberService.read_shared_medical_notes(id, member_id)
         return jsonify(sealed), HTTPStatus.OK
-    except HTTPException:
-        raise
     except PermissionError:
         abort(HTTPStatus.FORBIDDEN, description="Only the trip leader can read shared medical notes")
     except ValueError as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Member not found in this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes/access-log", methods=["GET"])
 @require_medical_notes
 @JWTService.authenticate_restful
-def get_medical_notes_access_log(id: str):
+def get_medical_notes_access_log(id: str) -> ResponseReturnValue:
     """Who has read the caller's own shared medical notes on this trip, and when.
     Metadata only (no notes content), so — unlike the decrypt endpoints above — this
     does not require an elevated token.
@@ -1093,15 +995,13 @@ def get_medical_notes_access_log(id: str):
         return jsonify(MedicalNotesAccessLogSchema(many=True).dump(logs)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def delete(id: str):
+def delete(id: str) -> ResponseReturnValue:
     """
     TripResource DELETE method. Leader-only — deletes the trip for everyone.
 
@@ -1129,14 +1029,12 @@ def delete(id: str):
         return {"message": "Deletion successful"}, HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/leave", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def leave(id: str):
+def leave(id: str) -> ResponseReturnValue:
     """
     Remove the caller's own membership from the trip. Any member (leader or
     crew) may call this. If the leader leaves and crew remain, the trip
@@ -1168,15 +1066,13 @@ def leave(id: str):
         return {"message": "Left trip"}, HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:user_id>/nominate-successor", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def nominate_successor(id: str, user_id: str):
+def nominate_successor(id: str, user_id: str) -> ResponseReturnValue:
     """Leader designates a crew member as the trip's successor.
     ---
     post:
@@ -1202,15 +1098,13 @@ def nominate_successor(id: str, user_id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/nominate-successor", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def clear_successor_nomination(id: str):
+def clear_successor_nomination(id: str) -> ResponseReturnValue:
     """Leader clears whichever member is currently nominated (no-op if none).
     ---
     delete:
@@ -1227,17 +1121,14 @@ def clear_successor_nomination(id: str):
                   message:
                     type: string
     """
-    try:
-        TripLeadershipService.clear_nomination(id)
-        return {"message": "Nomination cleared"}, HTTPStatus.OK
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    TripLeadershipService.clear_nomination(id)
+    return {"message": "Nomination cleared"}, HTTPStatus.OK
 
 
 @trip_api.route("/<string:id>/claim-leadership", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def claim_leadership(id: str):
+def claim_leadership(id: str) -> ResponseReturnValue:
     """
     A crew member claims leadership of a trip that currently has none. If a
     successor was nominated, only they may claim; otherwise first-come-first-serve.
@@ -1272,6 +1163,4 @@ def claim_leadership(id: str):
         abort(HTTPStatus.CONFLICT, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

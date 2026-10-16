@@ -115,10 +115,9 @@ class Trip(BaseModel):
     )
     last_checkpoint_alert_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Bumped by any web page load of the trip or mobile pullChanges referencing it
-    # (docs/adr/features.md §1a, M32) — drives the weather-fetch beat tasks' attention
-    # gate. Set on insert, so a new trip is fetched from creation and ages out like any
-    # other. The beat sweeps skip a NULL: with no view recorded there is nothing to
-    # measure dormancy from.
+    # (docs/adr/features.md §1a) — drives the weather-fetch beat tasks' attention gate. Set on
+    # insert, so a new trip is fetched from creation and ages out like any other. The beat
+    # sweeps skip a NULL: with no view recorded there is nothing to measure dormancy from.
     last_accessed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc)
     )
@@ -129,12 +128,11 @@ class Trip(BaseModel):
     def transition_state(self, new_state: TripStateType) -> None:
         """Advance the trip state forward. Raises ValueError for invalid transitions.
 
-        A paused trip cannot transition state through this generic path — per
-        ADR-025 (docs/adr/trip-lifecycle.md), abort() is "the only way to reach
-        past without resuming" while paused. Without this guard, POST .../state
-        could carry a paused happening trip straight to past, leaving is_paused/
-        paused_at stale on a supposedly-terminal trip and defaulting outcome to
-        COMPLETED instead of the INTERRUPTED an aborted trip should record.
+        A paused trip cannot transition state through this generic path: per ADR-025
+        (docs/adr/trip-lifecycle.md), abort() is the only way to reach past without
+        resuming. Letting POST .../state do it would leave is_paused/paused_at stale on
+        a terminal trip and default the outcome to COMPLETED instead of the INTERRUPTED
+        an aborted trip records.
         """
         if self.is_paused:
             raise ValueError(

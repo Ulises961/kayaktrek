@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 import numpy as np
 import openmeteo_requests
@@ -11,17 +12,14 @@ from Api.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Commercial-use correction (docs/adr/features.md §1a, M32): Open-Meteo's free tier
-# is scoped to non-commercial use regardless of call volume, and this app is a
-# commercial deployment the moment any premium feature (weather refresh, extended
-# forecast — both PremiumEntitlementService stubs, closed by default) is real, not
-# only once one has a paying user. Unset (the default — every environment until
-# this is actually flipped on in production) keeps today's free-tier hosts exactly
-# as before; setting OPEN_METEO_WEATHER_BASE_URL/OPEN_METEO_MARINE_BASE_URL to
-# `customer-api.open-meteo.com`'s endpoints plus OPEN_METEO_API_KEY switches to the
-# paid API Standard plan. Config/env change only — no fetch-logic change.
-# Read with `or`, not a get() default: compose passes an unset variable as an
-# empty string, and blank has to mean the free tier too.
+# Open-Meteo's free tier is scoped to non-commercial use regardless of call volume, and this
+# app counts as commercial the moment any premium feature (weather refresh, extended
+# forecast — both PremiumEntitlementService stubs, closed by default) is real, not only
+# once someone is paying. Unset (the default) keeps the free-tier hosts; setting
+# OPEN_METEO_WEATHER_BASE_URL/OPEN_METEO_MARINE_BASE_URL to `customer-api.open-meteo.com`'s
+# endpoints plus OPEN_METEO_API_KEY switches to the paid API Standard plan — a config change
+# only. Read with `or`, not a get() default: compose passes an unset variable as an empty
+# string, and blank has to mean the free tier too. See docs/adr/features.md §1a.
 _WEATHER_URL = os.environ.get("OPEN_METEO_WEATHER_BASE_URL") or "https://api.open-meteo.com/v1/forecast"
 _MARINE_URL = os.environ.get("OPEN_METEO_MARINE_BASE_URL") or "https://marine-api.open-meteo.com/v1/marine"
 _API_KEY = os.environ.get("OPEN_METEO_API_KEY") or None
@@ -97,7 +95,7 @@ def _reindex_to_hourly_grid(records: list[dict], var_names: list[str]) -> list[d
     return grid
 
 
-def _parse_hourly(response, var_names: list[str]) -> list[dict]:
+def _parse_hourly(response: Any, var_names: list[str]) -> list[dict]:
     hourly = response.Hourly()
     start_ts = hourly.Time()
     interval = hourly.Interval()
@@ -145,10 +143,10 @@ class OpenMeteoService:
     def fetch_global_wind(date_str: str, hour: int) -> dict:
         """Fetch a global 10° wind velocity grid from OpenMeteo.
 
-        §8b — stub: returns empty grid. Real implementation queries OpenMeteo
-        at all 595 grid points (_GLOBAL_LATS × _GLOBAL_LONS), extracts U/V at
-        the requested hour, reverses row order (la1=80 north-first), and caches
-        with a 6 h TTL keyed by global_wind:{date}:{hour}.
+        Not implemented: returns an empty grid. A real one would query OpenMeteo
+        at all 595 grid points (_GLOBAL_LATS × _GLOBAL_LONS), extract U/V at the
+        requested hour, reverse row order (la1=80 north-first), and cache with a
+        6 h TTL keyed by global_wind:{date}:{hour}.
         """
         return {"source": "global_weather", "grid": []}
 

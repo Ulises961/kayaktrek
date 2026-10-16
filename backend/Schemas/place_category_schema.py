@@ -28,9 +28,8 @@ class PlaceCategoryCreateSchema(BaseSchema):
     """Admin-only create body for a new place category. Returns a dict; the service
     builds the row. The catalogue is an entity (not an enum) precisely so it can grow
     without a migration — this is the admin tool that extends the seeded set. The
-    public/community taxonomy + moderation is M7. Note: the `icon` only renders as a
-    distinct glyph if its name is in the frontend's place-icons map; unknown names
-    fall back to a plain pin."""
+    `icon` only renders as a distinct glyph if its name is in the frontend's
+    place-icons map; unknown names fall back to a plain pin."""
 
     slug = fields.String(required=True)
     name = fields.String(required=True)

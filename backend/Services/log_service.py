@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Query, selectinload
 
 from Schemas.base_schema import camelcase
 
@@ -102,12 +102,12 @@ class LogService:
 
     @staticmethod
     def _apply_log_filters(
-        query,
+        query: Query[Log],
         min_sea: Optional[int],
         max_sea: Optional[int],
         min_distance: Optional[float],
         max_distance: Optional[float],
-    ):
+    ) -> Query[Log]:
         """Shared range-filter application for the /all and /endorsed log listings."""
         if min_sea is not None:
             query = query.filter(Log.avg_sea >= min_sea)
@@ -126,7 +126,7 @@ class LogService:
 
         Args:
             log_data: Dictionary containing log information
-            log_id: The id a phone gave the log while offline (M9d), so later queued
+            log_id: The id a phone gave the log while offline, so later queued
                 edits can refer to it; omitted, the server generates one
 
         Returns:
@@ -270,7 +270,7 @@ class LogService:
         if not user:
             raise NoResultFound(f"User {user_id} not found")
 
-        # Resolve any pending endorsement request the author sent this endorser (M7b §2b).
+        # Resolve any pending endorsement request the author sent this endorser.
         pending_request = (
             db.session.query(EndorsementRequest)
             .filter_by(

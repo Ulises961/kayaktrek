@@ -21,8 +21,8 @@ class ConnectionService:
 
     A request is created `pending` and flips to `accepted` when the addressee accepts.
     There is exactly one row per pair of users; a mirror duplicate (B->A while A->B
-    exists) is rejected on create. Block-awareness is added in M7b §2: the block check
-    layers into `_resolve_target` and `request_connection` without changing signatures.
+    exists) is rejected on create. The block check layers into `_resolve_target` and
+    `request_connection` without changing their signatures.
     """
 
     @staticmethod

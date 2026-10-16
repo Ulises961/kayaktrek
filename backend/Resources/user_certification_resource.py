@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -17,7 +18,7 @@ user_certification_api = Blueprint("user_certification", __name__, url_prefix=CE
 
 @user_certification_api.route("", methods=["GET"])
 @JWTService.authenticate_restful
-def list_certifications():
+def list_certifications() -> ResponseReturnValue:
     """
     UserCertificationResource GET method. Lists the caller's own certifications.
     ---
@@ -39,14 +40,12 @@ def list_certifications():
         return jsonify(UserCertificationSchema(many=True).dump(certs)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def add_certification():
+def add_certification() -> ResponseReturnValue:
     """
     UserCertificationResource POST method. Adds a certification to the caller's profile.
 
@@ -78,14 +77,12 @@ def add_certification():
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("/<cert_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def update_certification(cert_id: str):
+def update_certification(cert_id: str) -> ResponseReturnValue:
     """
     UserCertificationResource PATCH method. Updates one of the caller's certifications.
 
@@ -119,14 +116,12 @@ def update_certification(cert_id: str):
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Certification not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_certification_api.route("/<cert_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def delete_certification(cert_id: str):
+def delete_certification(cert_id: str) -> ResponseReturnValue:
     """
     UserCertificationResource DELETE method. Removes one of the caller's certifications.
 
@@ -147,5 +142,3 @@ def delete_certification(cert_id: str):
         return "", HTTPStatus.NO_CONTENT
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Certification not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

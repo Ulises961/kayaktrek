@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, current_app, g, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
@@ -19,7 +20,7 @@ logistics_api = Blueprint("logistics", __name__, url_prefix=LOGISTICS_ENDPOINT)
 @logistics_api.route("/<trip_id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def get_logistics(trip_id: str):
+def get_logistics(trip_id: str) -> ResponseReturnValue:
     """
     LogisticsResource GET method. Retrieves the float plan logistics for a trip.
     ---
@@ -42,7 +43,7 @@ def get_logistics(trip_id: str):
 @logistics_api.route("/<trip_id>", methods=["PUT"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def upsert_logistics(trip_id: str):
+def upsert_logistics(trip_id: str) -> ResponseReturnValue:
     """
     LogisticsResource PUT method. Creates or replaces a trip's logistics.
     ---
@@ -76,15 +77,12 @@ def upsert_logistics(trip_id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except ValidationError as e:
         abort(HTTPStatus.UNPROCESSABLE_ENTITY, description=e.messages)
-    except Exception as e:
-        logger.error("logistics_upsert_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @logistics_api.route("/<trip_id>/share", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def generate_share(trip_id: str):
+def generate_share(trip_id: str) -> ResponseReturnValue:
     """
     LogisticsResource POST method. Generates (or rotates) the trip's public float plan share token.
     ---
@@ -109,15 +107,12 @@ def generate_share(trip_id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("float_plan_share_generate_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @logistics_api.route("/<trip_id>/share/email", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def send_share_email(trip_id: str):
+def send_share_email(trip_id: str) -> ResponseReturnValue:
     """
     LogisticsResource POST method. Emails the float plan share link to the shore contact.
     ---
@@ -143,6 +138,3 @@ def send_share_email(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error("float_plan_share_email_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -1,4 +1,4 @@
-"""Per-device sessions and instant revocation (M17).
+"""Per-device sessions and instant revocation.
 
 A Session row is one device's refresh-token chain. Its id travels as the `sid` claim on
 every token issued to that device, which is what makes revocation family-scoped —
@@ -78,10 +78,8 @@ class SessionService:
 
         The location is re-resolved on every refresh so a device that has moved shows
         where it is now rather than where it first signed in. The device is re-resolved
-        for a narrower reason: sessions opened before the web client forwarded the
-        browser's User-Agent carry no label at all, and this heals them on their own next
-        refresh rather than asking the paddler to sign out everywhere to clear "Unknown
-        device" from the list.
+        for a narrower reason: a session opened without a label heals on its next refresh
+        instead of needing the paddler to sign out everywhere to clear "Unknown device".
 
         Both are only written when resolved. A refresh from a client that sends nothing
         usable must leave a good label alone rather than blank it.
@@ -137,9 +135,9 @@ class SessionService:
         """Whether this session id is on the denylist.
 
         Fails open. An unreachable Redis lets a revoked access token live out its
-        remaining lifetime — at most ACCESS_TOKEN_LIFETIME, which is exactly the
-        pre-M17 behaviour. Failing closed would turn a Redis blip into a forced logout
-        for every user on the platform, a worse failure than the one it prevents.
+        remaining lifetime — at most ACCESS_TOKEN_LIFETIME. Failing closed would turn a
+        Redis blip into a forced logout for every user on the platform, a worse failure
+        than the one it prevents.
         """
         try:
             return revocation_redis().exists(f"{_DENYLIST_PREFIX}{session_id}") > 0

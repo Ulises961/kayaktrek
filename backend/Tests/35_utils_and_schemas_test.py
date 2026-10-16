@@ -3,6 +3,7 @@ import json
 import math
 import types
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -263,6 +264,17 @@ def test_build_export_is_json_serialisable():
     result = _build_export(_mock_user())
     serialised = json.dumps(result, default=_json_default)
     assert "test@example.com" in serialised
+
+
+def test_build_export_writes_endorsed_log_distances_as_numbers():
+    # Log.distance is a Numeric column, so it is a Decimal at runtime; zero and missing differ.
+    user = _mock_user()
+    user.endorsed_logs = [
+        types.SimpleNamespace(id=uuid4(), date=None, distance=distance, notes=None, user_id=None)
+        for distance in (Decimal("7.25"), Decimal("0"), None)
+    ]
+    exported = json.loads(json.dumps(_build_export(user), default=_json_default))
+    assert [entry["distanceKm"] for entry in exported["endorsedLogs"]] == [7.25, 0.0, None]
 
 
 # ── SeaStateSchema @validates ─────────────────────────────────────────────────

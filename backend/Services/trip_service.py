@@ -70,9 +70,24 @@ class TripService:
         return trip
 
     @staticmethod
+    def find_happening_trip(trip_id: str) -> Optional[Trip]:
+        """The trip with this id if it is happening, otherwise None.
+
+        Missing, not yet started, finished, and an id that is not a UUID are all the same
+        answer, so a caller cannot tell them apart — the live endpoints rely on that.
+        """
+        try:
+            trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        except ValueError:
+            return None
+        if trip is None or trip.state != TripStateType.HAPPENING:
+            return None
+        return trip
+
+    @staticmethod
     def touch_last_accessed(trip: Trip) -> None:
         """Bump Trip.last_accessed_at — drives the weather-fetch beat tasks'
-        attention gate (docs/adr/features.md §1a, M32). Called only from an
+        attention gate (docs/adr/features.md §1a). Called only from an
         actual view (the GET /trip/<id> resource, mobile pullChanges) — never
         from get_trip_by_id itself, which privileges_middleware also calls on
         every authorization check for an unrelated mutation.
@@ -227,9 +242,9 @@ class TripService:
             # That same bypass means nothing writes the payload's point order into
             # the next_id chain either. The array a client posts *is* the route's
             # order, but without a chain every point is a disconnected head and
-            # readers fall back to sorting by UUID — which is creation order only
-            # until two points share a millisecond, after which their random bits
-            # decide. A route's distance and its drawn line were undefined.
+            # readers fall back to sorting by UUID — creation order only until two
+            # points share a millisecond, after which their random bits decide, which
+            # leaves the route's distance and drawn line undefined.
             #
             # Unconditional: PointSchema makes next_id dump_only, so the array
             # order is the only order a nested payload can express.
@@ -249,7 +264,7 @@ class TripService:
         if membership:
             # Seed shared requirements from the leader's curated CatalogItem
             # template when they have one; first-timers (empty template) fall
-            # back to the hardcoded default list, unchanged from pre-M10 behaviour.
+            # back to the hardcoded default list.
             catalog_items = CatalogItemService.get_items_by_owner(str(current_user.id))
             if catalog_items:
                 for catalog_item in catalog_items:
@@ -372,7 +387,7 @@ class TripService:
 
         Args:
             paused_on: The day the pause happened (defaults to today). A pause queued
-                offline (M9d) arrives days later and carries the day it was made.
+                offline arrives days later and carries the day it was made.
 
         Raises:
             NoResultFound: If trip doesn't exist
@@ -500,7 +515,7 @@ class TripService:
         Create an invitation for invitee_id to join trip_id.
 
         When `inviter_id` is provided (the authenticated leader), a block in either
-        direction between inviter and invitee forbids the invitation (M7b).
+        direction between inviter and invitee forbids the invitation.
 
         Raises:
             NoResultFound: If the trip or invitee doesn't exist

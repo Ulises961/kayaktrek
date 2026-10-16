@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from celery import Task
 from flask import current_app
 from sqlalchemy.orm import selectinload
 
@@ -26,22 +27,20 @@ def _alert_threshold() -> timedelta:
     """How stale a trip's last position ping must be before its shore contact is
     emailed — and the cooldown before re-alerting the same trip.
 
-    Read per call rather than at import: at module level the value is fixed when the
-    worker process starts, so changing it needs a worker restart rather than a
-    redeploy, and no test can vary it without importlib.reload (which rebinds this
-    module's exception classes and breaks `except` elsewhere in the same worker).
+    Read per call rather than at import, so a test can vary it without importlib.reload
+    (which rebinds this module's exception classes and breaks `except` elsewhere in the
+    same worker).
 
-    Note this is a threshold, not a schedule. How often the task runs is
-    Api/celery_app.py's beat_schedule (hourly), and beat carries no configuration in
-    the message it publishes — so this must be set on the *worker*, the only process
-    that ever executes a task body.
+    This is a threshold, not a schedule. How often the task runs is Api/celery_app.py's
+    beat_schedule (hourly), and beat carries no configuration in the message it publishes,
+    so the value must be set on the *worker*, the only process that executes a task body.
     """
     hours = int(os.getenv("CHECKPOINT_ALERT_HOURS", str(DEFAULT_CHECKPOINT_ALERT_HOURS)))
     return timedelta(hours=hours)
 
 
 @celery_app.task(name="Tasks.checkpoint_beat_task.check_missed_checkpoints", bind=True)
-def check_missed_checkpoints(self, request_id: Optional[str] = None) -> None:
+def check_missed_checkpoints(self: Task, request_id: Optional[str] = None) -> None:
     """Alert the shore contact when a happening trip has gone quiet on a day it
     expected a checkpoint. Runs hourly (see Api/celery_app.py beat_schedule).
 
@@ -92,12 +91,10 @@ def check_missed_checkpoints(self, request_id: Optional[str] = None) -> None:
             db.session.commit()
             alerted += 1
         except Exception:
-            # Isolate one trip's failure (e.g. mail service down) from the rest of
-            # the batch — committing per-trip means a mid-batch exception can only
-            # discard *this* trip's uncommitted change, not the alerts already
-            # confirmed sent for trips processed earlier in the same hourly run.
-            # Not re-alerting here is correct: last_checkpoint_alert_at stays
-            # unset, so the trip is retried on the next hourly beat tick.
+            # One trip's failure (say the mail service is down) must not affect the rest of the
+            # batch. Committing per trip means a mid-batch exception discards only this trip's
+            # uncommitted change, not the alerts already sent for earlier trips. The trip is
+            # retried on the next hourly tick, because last_checkpoint_alert_at stays unset.
             logger.exception("checkpoint_alert_failed", extra={"trip_id": str(trip.id)})
             db.session.rollback()
 
@@ -126,8 +123,8 @@ def _send_checkpoint_alert(trip: Trip, today_day: Day, now: datetime) -> None:
         {
             "name": member.user.name + (f" {member.user.surname}" if member.user.surname else ""),
             "role": member.role.value,
-            # Recorded by the leader when this paddler left the trip (M9d): not
-            # someone the shore contact should be looking for on the water.
+            # Recorded by the leader when this paddler left the trip: not someone the shore
+            # contact should be looking for on the water.
             # Converted first: the database hands back its session's timezone.
             "leftAt": (
                 member.left_at.astimezone(timezone.utc).strftime("%d %b %Y, %H:%M UTC")

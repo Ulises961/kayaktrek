@@ -100,8 +100,8 @@ class PointPublicSchema(BaseSchema):
     type = fields.Enum(PointType, by_value=True, dump_only=True, allow_none=True)
     day_id = fields.UUID(dump_only=True, allow_none=True)
     next_id = fields.UUID(dump_only=True, allow_none=True)
-    # Photo-level opt-in (M7d) — only images the owner explicitly made public, never
-    # the full point.images list.
+    # Photo-level opt-in — only images the owner explicitly made public, never the full
+    # point.images list.
     images = fields.Method("get_public_images", dump_only=True)
 
     def get_public_images(self, point: Point) -> list:

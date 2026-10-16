@@ -8,8 +8,8 @@ def bump_route_version(itinerary: Itinerary) -> None:
     """Bump the route's optimistic-concurrency token.
 
     Call this on every structural route change — point add/delete/reorder, day
-    boundary move — so mobile sync-down (M9c) can detect a diverged route as a
-    single version mismatch rather than diffing every point. See
+    boundary move — so mobile sync-down can detect a diverged route as a single
+    version mismatch rather than diffing every point. See
     docs/mobile/sync-protocol-spec.md §8.1. Caller is responsible for the
     session commit, same as chain_in_order below.
     """
@@ -42,7 +42,7 @@ def walk_linked_list(points: List[Point]) -> List[str]:
 def assign_order_keys(points_in_order: List[Point]) -> None:
     """Write a fresh, widely-spaced `order_key` to each point in `points_in_order`.
 
-    Called on every mobile pull (M9c WP4) after walking the current `next_id`
+    Called on every mobile pull after walking the current `next_id`
     chain with `walk_linked_list` — the device never sees `next_id`, only this
     column (docs/mobile/sync-protocol-spec.md §7.2). Regenerated wholesale each
     time, so the keys need no fractional-insert support themselves; the wide
@@ -80,7 +80,7 @@ def chain_in_order(points: List[Point]) -> None:
 def chain_from_order_keys(points: List[Point]) -> None:
     """Rebuild the `next_id` chain from each point's `order_key`.
 
-    The inverse of `assign_order_keys`, applied on push (M9c WP4/M9d) — the
+    The inverse of `assign_order_keys`, applied on push — the
     device sends order keys, never `next_id`, and the server is the only party
     that converts back to the linked-list storage representation, atomically,
     in one transaction (§7.2). Ties (two points landing on the same key under

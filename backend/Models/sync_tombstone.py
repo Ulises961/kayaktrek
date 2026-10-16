@@ -7,7 +7,7 @@ from Models.base_model import BaseModel
 
 
 class SyncTombstone(BaseModel):
-    """Deletion log for mobile sync-down (M9c WP1 item 1).
+    """Deletion log for mobile sync-down.
 
     `pullChanges` cannot see a row that no longer exists — absence is not
     queryable — so a device that missed a deletion keeps showing it forever.
@@ -16,7 +16,7 @@ class SyncTombstone(BaseModel):
     query compares against a device's `lastPulledAt`.
 
     Route tables (Day, Point) are deliberately excluded — they sync through
-    their own atomic whole-subtree channel (WP1 item 7), where a point
+    their own atomic whole-subtree channel, where a point
     missing from the resent set already means "deleted"; a per-record
     tombstone for them would be redundant. See
     Services.Utils.sync_tombstones' module docstring for which tables write

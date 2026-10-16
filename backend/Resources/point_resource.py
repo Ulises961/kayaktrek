@@ -1,8 +1,8 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from Schemas.point_schema import PointSchema, PointUpdateSchema
 from Schemas.image_schema import ImageSchema, ImageUpdateSchema
@@ -11,7 +11,6 @@ from Services.Middleware.privileges_middleware import require_owner
 from Services.point_service import PointService
 from Services.image_service import ImageService
 from Services.storage_service import StorageValidationError
-from Api.database import db
 from Api.limiter import limiter
 
 logger = logging.getLogger(__name__)
@@ -20,15 +19,13 @@ POINT_ENDPOINT = "/api/v1/point"
 point_api = Blueprint('point', __name__, url_prefix=POINT_ENDPOINT)
 
 
-# Points of interest are no longer route points — they are standalone Place
-# entities, queried by proximity through the place API (GET /api/place/by-itinerary/
-# <id>/range). The old GET /api/point/pois range query was removed with the
-# `interest` PointType in M4e §1.
+# Points are route points only. Points of interest are standalone Place entities,
+# queried by proximity through the place API (GET /api/place/by-itinerary/<id>/range).
 @point_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
 @limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point", parent_resource=("day", "dayId"), from_body=True)
-def create_point():
+def create_point() -> ResponseReturnValue:
     """
     PointResource POST method. Adds a new point to the database.
 
@@ -65,25 +62,18 @@ def create_point():
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity Error creating point: {e}")
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
-    except Exception as e:
-        logger.error(f"Error creating point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @limiter.limit("1000 per hour", key_func=lambda: str(g.current_user_id))
 @require_owner("point")
-def update_point(id: str):
+def update_point(id: str) -> ResponseReturnValue:
     """
     PATCH /api/point/<id> — Partially update an existing point.
 
@@ -121,20 +111,14 @@ def update_point(id: str):
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error updating point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def get_point(id: str):
+def get_point(id: str) -> ResponseReturnValue:
     """
     PointResource GET method. Retrieves a single point by ID.
 
@@ -161,15 +145,12 @@ def get_point(id: str):
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error retrieving point: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def delete(id: str):
+def delete(id: str) -> ResponseReturnValue:
     """
     PointResource DELETE method. Deletes a point by ID.
 
@@ -201,21 +182,14 @@ def delete(id: str):
         logger.info(f"Deleting point {id}")
         PointService.delete_point(id)
         return {"message": "Deletion successful"}, 200
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error(f"Error deleting point: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def upload_image(id: str):
+def upload_image(id: str) -> ResponseReturnValue:
     """
     Upload an image and attach it to a point.
 
@@ -268,16 +242,12 @@ def upload_image(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Point with id {id} not found")
-    except Exception as e:
-        logger.error("Error uploading image for point %s: %s", id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def update_image(id: str, image_id: str):
+def update_image(id: str, image_id: str) -> ResponseReturnValue:
     """
     PATCH /api/point/<id>/images/<image_id> — update an image's visibility, its
     caption, or both. Only the fields present in the body are applied.
@@ -342,16 +312,12 @@ def update_image(id: str, image_id: str):
 
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("Error updating visibility for image %s: %s", image_id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @point_api.route("/<string:id>/images/<string:image_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner("point")
-def delete_image(id: str, image_id: str):
+def delete_image(id: str, image_id: str) -> ResponseReturnValue:
     """
     Detach and permanently delete an image from a point.
 
@@ -379,7 +345,3 @@ def delete_image(id: str, image_id: str):
 
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        logger.error("Error deleting image %s from point %s: %s", image_id, id, e)
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

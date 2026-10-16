@@ -7,8 +7,9 @@ import marshmallow
 from apispec import APISpec, yaml_utils
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec_webframeworks.flask import FlaskPlugin
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
+from werkzeug.routing import Rule
 
 import Schemas
 
@@ -16,7 +17,7 @@ OPENAPI_SPEC_ENDPOINT = "/api/v1/openapi.json"
 DOCS_URL_PREFIX = "/api/v1/docs"
 
 # Dev-only routes (404 outside DEVELOPMENT, backend/CLAUDE.md) aren't part of the public
-# contract a client generator (M9) should ever see.
+# contract a client generator should ever see.
 _EXCLUDED_BLUEPRINTS = {"dev"}
 
 # Werkzeug converter class name -> OpenAPI schema for path parameters. Falls back to string for
@@ -29,7 +30,7 @@ _CONVERTER_SCHEMAS = {
 _DEFAULT_PARAM_SCHEMA = {"type": "string"}
 
 
-def _path_parameters(rule) -> list[dict]:
+def _path_parameters(rule: Rule) -> list[dict]:
     """OpenAPI requires every {param} in a path template to have a matching `parameters` entry
     (openapi-spec-validator enforces this — UnresolvableParameterError otherwise). apispec's
     FlaskPlugin substitutes <converter:name> into {name} in the path string but doesn't declare
@@ -48,18 +49,14 @@ def _path_parameters(rule) -> list[dict]:
 
 
 def _register_marshmallow_schemas(spec: APISpec) -> None:
-    """Registers every Marshmallow schema in Schemas/ as an OpenAPI component — the Part B
-    acceptance bar is "no second, hand-maintained schema definition exists anywhere", so this
-    discovers schema classes by walking the package rather than hand-listing 35+ imports that
-    would silently drift the moment a new Schemas/*.py file is added. Only classes actually
-    *defined* in a Schemas/ module are registered (`cls.__module__` check) — importing a schema
-    into another schema file for composition shouldn't double-register it under two names.
-    BaseSchema itself is excluded: it's the abstract base every real schema extends, never
-    instantiated directly for serialization. Leading-underscore classes (`_BlockedUserSchema`,
-    `_ShallowUserSchema`, ...) are this codebase's own convention for schemas private to one
-    parent schema, used only as a nested field — MarshmallowPlugin already auto-registers those
-    as referenced types when their parent is registered, so registering them again here too
-    would just be a duplicate, noisier registration of the same component.
+    """Registers every Marshmallow schema in Schemas/ as an OpenAPI component. Schemas are
+    discovered by walking the package, so no second hand-maintained list can drift when a
+    Schemas/*.py file is added. Only classes *defined* in a Schemas/ module are registered
+    (`cls.__module__`), so a schema imported into another for composition is not registered
+    twice under two names. BaseSchema is the abstract base and is skipped. Leading-underscore
+    classes (`_BlockedUserSchema`, `_ShallowUserSchema`, ...) are schemas private to one parent,
+    used only as a nested field; MarshmallowPlugin registers them when the parent is, so doing it
+    here would duplicate the component.
     """
     marshmallow_plugin = next(p for p in spec.plugins if isinstance(p, MarshmallowPlugin))
     assert marshmallow_plugin.converter is not None
@@ -85,12 +82,10 @@ def _register_marshmallow_schemas(spec: APISpec) -> None:
 
 def _build_spec(app: Flask) -> APISpec:
     """Walks every registered route and derives its OpenAPI path from the Flask rule itself
-    (method, URL, path params) — B.0.1: a central builder rather than per-view YAML docstrings,
-    so path/method coverage can never drift from the actual registered routes the way a second,
-    hand-maintained list could. A view's own YAML docstring (when present — being rolled out
-    progressively, starting with trip/live/itinerary/tile per B.1) is still read and merged in
-    for real Marshmallow-schema request/response detail; routes without one just get a bare path
-    entry rather than being skipped.
+    (method, URL, path params), so path and method coverage cannot drift from the routes
+    actually registered. A view's own YAML docstring, where present, is merged in for the
+    request/response detail the Marshmallow schemas provide; a route without one gets a bare
+    path entry rather than being skipped.
     """
     spec = APISpec(
         title="Kayaktrek API",
@@ -103,11 +98,9 @@ def _build_spec(app: Flask) -> APISpec:
                 "tables, and sound seamanship."
             )
         },
-        # No /api/v1 prefix here — FlaskPlugin derives each path from the Flask rule's full
-        # rule.rule, which already includes the blueprint's own url_prefix (e.g.
-        # "/api/v1/auth/login"). A servers entry of "/api/v1" on top of that produced
-        # "/api/v1/api/v1/auth/login" once Swagger UI/Postman concatenated servers.url + path —
-        # found live, a real double-prefix 404 on every request built from the spec.
+        # No /api/v1 prefix here: FlaskPlugin derives each path from the rule's full URL, which
+        # already includes the blueprint's url_prefix, so a servers entry of "/api/v1" would
+        # double it ("/api/v1/api/v1/auth/login") once a client joins servers.url and the path.
         servers=[{"url": "/"}],
     )
     spec.components.security_scheme(
@@ -144,14 +137,13 @@ def _build_spec(app: Flask) -> APISpec:
             # authenticate_optional also sets despite never requiring one.
             auth_required = getattr(view, "_auth_required", False)
 
-            # FlaskPlugin.path_helper's own docstring handling is `operations.update(doc_ops)` —
-            # a shallow *replace* per HTTP method, not a merge, so passing a docstring-bearing
-            # view straight to spec.path() would silently drop the auto-injected `security` key
-            # below for any route with a YAML docstring (found live: it did). Parsing the
-            # docstring here instead lets each piece take the right precedence — baseline
-            # defaults < docstring content < auto-injected security, unless the docstring sets
-            # its own security, which wins — then the view's docstring is blanked for the actual
-            # spec.path() call so FlaskPlugin's internal parse has nothing left to clobber it with.
+            # FlaskPlugin.path_helper handles a docstring with `operations.update(doc_ops)` — a
+            # shallow replace per HTTP method, not a merge — so passing a docstring-bearing view
+            # straight to spec.path() would drop the auto-injected `security` key below. The
+            # docstring is parsed here instead, so the pieces take precedence in this order:
+            # baseline defaults < docstring content < auto-injected security (unless the docstring
+            # sets its own, which wins). The view's docstring is then blanked for the spec.path()
+            # call so FlaskPlugin has nothing left to clobber the result with.
             doc_operations = yaml_utils.load_operations_from_docstring(view.__doc__ or "")
 
             methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
@@ -175,18 +167,17 @@ def _build_spec(app: Flask) -> APISpec:
 
 
 def setup_openapi(app: Flask) -> None:
-    """B.1/B.2: publishes the generated spec at OPENAPI_SPEC_ENDPOINT and a Swagger UI at
-    DOCS_URL_PREFIX. Public, no auth (B.0.3, decided 2026-07-24) — read-only schema metadata;
-    every mutating route documented here still requires its own JWT regardless of who can read
-    the contract describing it. Built once at app-factory time, not per-request: the spec is
-    derived from the same route table for the whole process lifetime, so caching it costs
-    nothing and avoids rebuilding on every hit to a public, potentially-crawled endpoint.
+    """Publishes the generated spec at OPENAPI_SPEC_ENDPOINT and a Swagger UI at DOCS_URL_PREFIX.
+    Public and unauthenticated: it is read-only schema metadata, and every mutating route it
+    describes still requires its own JWT. Built once at app-factory time rather than per request,
+    since the route table is fixed for the process lifetime and the endpoint is public and may
+    be crawled.
     """
     spec = _build_spec(app)
     spec_dict = spec.to_dict()
 
     @app.route(OPENAPI_SPEC_ENDPOINT)
-    def openapi_json():
+    def openapi_json() -> Response:
         return jsonify(spec_dict)
 
     swagger_ui_blueprint = get_swaggerui_blueprint(

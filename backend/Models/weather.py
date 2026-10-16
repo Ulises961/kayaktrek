@@ -26,5 +26,5 @@ class Weather(Base):
 
     weather_states: Mapped[List["WeatherState"]] = relationship(foreign_keys="WeatherState.day_id", cascade='all, delete,save-update')
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Weather "Day id {self.day_id}, Model {self.model} Weather states {self.weather_states}">'

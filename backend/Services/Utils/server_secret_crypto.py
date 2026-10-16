@@ -16,8 +16,8 @@ from flask import current_app
 # inside a Flask app context, so this picks up TestingConfig's safe test default
 # (Api/config.py) without sniffing CONFIG_MODE directly — that env var reflects
 # whatever a contributor's own .env sets it to, not what createApp() was actually
-# built with, and the two can (and did) diverge in practice. Falls back to a bare
-# env read for the rare caller with no app context (e.g. a standalone script).
+# built with. Falls back to a bare env read for the rare caller with no app context
+# (e.g. a standalone script).
 
 
 def _key() -> bytes:

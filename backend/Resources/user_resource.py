@@ -1,9 +1,9 @@
 from http import HTTPStatus
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from marshmallow import ValidationError
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 
 import hashlib
 from io import BytesIO
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 USER_ENDPOINT = "/api/v1/user"
 user_api = Blueprint('user', __name__, url_prefix=USER_ENDPOINT)
 
-# Client-supplied crypto material (M22). The server validates that the fields are
+# Client-supplied crypto material. The server validates that the fields are
 # present and non-empty and nothing more — it cannot tell a real ciphertext from a
 # plausible-looking string, and deliberately holds nothing that would let it try.
 _KEYPAIR_FIELDS = ("publicKey", "privateKeyCiphertext", "privateKeyNonce", "privateKeySalt")
@@ -37,7 +37,7 @@ _SEALED_FIELDS = ("ciphertext", "nonce", "salt")
 
 @user_api.route("/me", methods=["GET"])
 @JWTService.authenticate_restful
-def get_me():
+def get_me() -> ResponseReturnValue:
     """
     Retrieve the profile of the currently authenticated user.
 
@@ -61,13 +61,11 @@ def get_me():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/search", methods=["GET"])
 @JWTService.authenticate_restful
-def search_users():
+def search_users() -> ResponseReturnValue:
     """
     Search active users by email prefix for the purpose of sending trip invitations.
 
@@ -118,20 +116,16 @@ def search_users():
     if len(query) < 2:
         abort(HTTPStatus.BAD_REQUEST, description="Search query must be at least 2 characters")
 
-    try:
-        users = UserService.search_users(query)
-        schema = UserSchema(only=("id", "name", "surname", "mail", "avatar_url"))
-        return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
-
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    users = UserService.search_users(query)
+    schema = UserSchema(only=("id", "name", "surname", "mail", "avatar_url"))
+    return jsonify(schema.dump(users, many=True)), HTTPStatus.OK
 
 
 @user_api.route("/search/paddlers", methods=["GET"])
 @JWTService.authenticate_restful
 @limiter.limit("30 per minute", key_func=lambda: str(g.current_user_id))
-def search_paddlers():
-    """Buddy finder — search public paddlers by username / name / surname (M7b).
+def search_paddlers() -> ResponseReturnValue:
+    """Buddy finder — search public paddlers by username / name / surname.
 
     Query params: q (search term), page, per_page. Returns a paginated, block-filtered
     list of public profiles, each annotated with the caller's relationship
@@ -179,27 +173,23 @@ def search_paddlers():
                   pages:
                     type: integer
     """
-    try:
-        query = request.args.get("q", "")
-        page = request.args.get("page", 1, type=int)
-        per_page = min(request.args.get("per_page", 20, type=int), 100)
-        result = UserService.search_paddlers(
-            str(g.current_user_id), query, page=page, per_page=per_page
-        )
-        return jsonify({
-            "items": result["items"],
-            "total": result["total"],
-            "page": result["page"],
-            "pages": result["pages"],
-        }), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error searching paddlers: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    query = request.args.get("q", "")
+    page = request.args.get("page", 1, type=int)
+    per_page = min(request.args.get("per_page", 20, type=int), 100)
+    result = UserService.search_paddlers(
+        str(g.current_user_id), query, page=page, per_page=per_page
+    )
+    return jsonify({
+        "items": result["items"],
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }), HTTPStatus.OK
 
 
 @user_api.route("/<string:username>/public", methods=["GET"])
 @JWTService.authenticate_optional
-def get_public_profile(username: str):
+def get_public_profile(username: str) -> ResponseReturnValue:
     """
     Retrieve a paddler's public profile by username. Auth-optional (mirrors
     GET /api/itinerary/explore): anonymous and authenticated callers both allowed.
@@ -239,15 +229,12 @@ def get_public_profile(username: str):
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Profile not found")
-    except Exception as e:
-        logger.error(f"Error retrieving public profile for {username}: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_self()
-def get(id: str):
+def get(id: str) -> ResponseReturnValue:
     """
     Retrieve a user's full profile by ID.
 
@@ -277,19 +264,14 @@ def get(id: str):
     try:
         user = UserService.get_user_by_id(id)
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_self()
-def update_user(id: str):
+def update_user(id: str) -> ResponseReturnValue:
     """
     Partially update a user's profile (name, surname, phone, username, and other
     profile fields).
@@ -343,19 +325,15 @@ def update_user(id: str):
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description=f"Error updating user with id {id}")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=f"Error: {e}")
 
 
 @user_api.route("/me/password", methods=["PATCH"])
 @JWTService.authenticate_restful
-def change_password():
+def change_password() -> ResponseReturnValue:
     """
     ---
     patch:
@@ -414,21 +392,16 @@ def change_password():
             raw.get("privateKeySalt"),
         )
         return "", HTTPStatus.NO_CONTENT
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/keypair", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def store_keypair():
+def store_keypair() -> ResponseReturnValue:
     """
     ---
     post:
@@ -495,21 +468,16 @@ def store_keypair():
             raw["privateKeySalt"],
         )
         return jsonify({"hasKeypair": True}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError:
         abort(HTTPStatus.CONFLICT, description="Keypair already exists")
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/keypair", methods=["GET"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def get_keypair():
+def get_keypair() -> ResponseReturnValue:
     """
     ---
     get:
@@ -542,21 +510,16 @@ def get_keypair():
     """
     try:
         return jsonify(UserService.get_keypair(str(g.current_user_id))), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/re-auth", methods=["POST"])
 @JWTService.authenticate_restful
 @limiter.limit("10 per minute", key_func=lambda: str(g.current_user_id))
-def re_auth():
+def re_auth() -> ResponseReturnValue:
     """
     ---
     post:
@@ -600,20 +563,15 @@ def re_auth():
             abort(HTTPStatus.UNAUTHORIZED, description="Password incorrect")
         token = JWTService.generate_elevated_token(str(g.current_user_id))
         return jsonify({"elevatedToken": token}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/email-change", methods=["POST"])
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
 @limiter.limit("5 per minute", key_func=lambda: str(g.current_user_id))
-def request_email_change():
+def request_email_change() -> ResponseReturnValue:
     """
     ---
     post:
@@ -652,22 +610,17 @@ def request_email_change():
             abort(HTTPStatus.BAD_REQUEST, description="newMail is required")
         UserService.request_email_change(str(g.current_user_id), raw["newMail"].strip())
         return "", HTTPStatus.ACCEPTED
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-consent", methods=["POST"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def grant_medical_consent():
+def grant_medical_consent() -> ResponseReturnValue:
     """
     ---
     post:
@@ -717,20 +670,15 @@ def grant_medical_consent():
             str(g.current_user_id), raw["ciphertext"], raw["nonce"], raw["salt"]
         )
         return jsonify(UserSchema().dump(user)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-consent", methods=["DELETE"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def revoke_medical_consent():
+def revoke_medical_consent() -> ResponseReturnValue:
     """
     ---
     delete:
@@ -753,15 +701,13 @@ def revoke_medical_consent():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/medical-notes", methods=["GET"])
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def get_medical_notes():
+def get_medical_notes() -> ResponseReturnValue:
     """
     ---
     get:
@@ -796,18 +742,13 @@ def get_medical_notes():
     """
     try:
         return jsonify(UserService.get_medical_notes(str(g.current_user_id))), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/avatar", methods=["POST"])
 @JWTService.authenticate_restful
-def upload_avatar():
+def upload_avatar() -> ResponseReturnValue:
     """
     Upload or replace the avatar for the authenticated user.
 
@@ -861,13 +802,11 @@ def upload_avatar():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/avatar", methods=["DELETE"])
 @JWTService.authenticate_restful
-def delete_avatar():
+def delete_avatar() -> ResponseReturnValue:
     """
     Remove the avatar for the authenticated user.
 
@@ -888,13 +827,11 @@ def delete_avatar():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/banner", methods=["POST"])
 @JWTService.authenticate_restful
-def upload_banner():
+def upload_banner() -> ResponseReturnValue:
     """
     Upload or replace the profile banner for the authenticated user.
 
@@ -948,13 +885,11 @@ def upload_banner():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/banner", methods=["DELETE"])
 @JWTService.authenticate_restful
-def delete_banner():
+def delete_banner() -> ResponseReturnValue:
     """
     Remove the profile banner for the authenticated user.
 
@@ -975,14 +910,12 @@ def delete_banner():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Authenticated user not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/data-export", methods=["POST"])
 @JWTService.authenticate_restful
 @limiter.limit("1 per day", key_func=lambda: str(g.current_user_id))
-def request_data_export():
+def request_data_export() -> ResponseReturnValue:
     """
     Queue a GDPR data export for the authenticated user (Art. 15 / 20).
     The user will receive an email with a one-time download link (24 h TTL).
@@ -1004,7 +937,7 @@ def request_data_export():
 
 
 @user_api.route("/me/data-export/<string:token>", methods=["GET"])
-def download_data_export(token: str):
+def download_data_export(token: str) -> ResponseReturnValue:
     """
     Stream and then delete a previously generated data export file.
     The token is single-use; the file is removed after download.
@@ -1053,7 +986,7 @@ def download_data_export(token: str):
 
 @user_api.route("/me", methods=["DELETE"])
 @JWTService.authenticate_restful
-def request_deletion():
+def request_deletion() -> ResponseReturnValue:
     """
     Begin the GDPR erasure grace period (Art. 17).
 
@@ -1094,12 +1027,10 @@ def request_deletion():
 
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/me/deletion-request", methods=["DELETE"])
-def cancel_deletion():
+def cancel_deletion() -> ResponseReturnValue:
     """
     Cancel a pending account deletion using the emailed token.
     No authentication required — the token is the credential.
@@ -1147,14 +1078,12 @@ def cancel_deletion():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @user_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_admin()
-def delete(id: str):
+def delete(id: str) -> ResponseReturnValue:
     """
     Admin-only: immediately hard-delete a user account, bypassing the grace period.
 
@@ -1184,12 +1113,7 @@ def delete(id: str):
     try:
         UserService.delete_user(id)
         return "", HTTPStatus.NO_CONTENT
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description=f"Error deleting user with id {id}")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

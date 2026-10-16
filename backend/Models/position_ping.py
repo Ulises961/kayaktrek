@@ -36,5 +36,5 @@ class PositionPing(BaseModel):
     trip: Mapped["Trip"] = relationship("Trip", passive_deletes=True)
     user: Mapped["User"] = relationship("User", passive_deletes=True)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<PositionPing "trip {self.trip_id}, user {self.user_id}, {self.recorded_at}">'

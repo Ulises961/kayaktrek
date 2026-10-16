@@ -1,25 +1,29 @@
 from http import HTTPStatus
 import logging
+from typing import TYPE_CHECKING
 
 from flask import Blueprint, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Schemas.tidal_station_schema import TidalStationSchema, TidalStationUpdateSchema, TidalStationPositionSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_admin, check_resource_ownership
 from Services.tidal_station_service import TidalStationService
 
+if TYPE_CHECKING:
+    from Models.tidal_station import TidalStation
+
 logger = logging.getLogger(__name__)
 
 tidal_station_api = Blueprint('tidal_station', __name__, url_prefix='/api/v1/tidal-station')
 
 
-def _may_see_full_content(station) -> bool:
+def _may_see_full_content(station: "TidalStation") -> bool:
     """Atlas-seeded stations (no owning itinerary) are public reference data.
     A user-created diamond's full content stays gated to the itinerary's own
-    members (M27) — everyone else gets the position-only projection."""
+    members — everyone else gets the position-only projection."""
     if station.itinerary_id is None:
         return True
     return bool(check_resource_ownership(
@@ -29,7 +33,7 @@ def _may_see_full_content(station) -> bool:
 
 @tidal_station_api.route('/nearby', methods=['GET'])
 @JWTService.authenticate_restful
-def get_nearby_stations():
+def get_nearby_stations() -> ResponseReturnValue:
     """GET /api/tidal-station/nearby?lat=&lng=&range=
     ---
     get:
@@ -69,37 +73,31 @@ def get_nearby_stations():
         400:
           description: Missing or out-of-range lat/lng/range
     """
-    try:
-        lat = request.args.get('lat', type=float)
-        lng = request.args.get('lng', type=float)
-        range_km = request.args.get('range', default=5.0, type=float)
+    lat = request.args.get('lat', type=float)
+    lng = request.args.get('lng', type=float)
+    range_km = request.args.get('range', default=5.0, type=float)
 
-        if lat is None or lng is None:
-            abort(HTTPStatus.BAD_REQUEST, description="lat and lng query parameters are required")
-        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
-            abort(HTTPStatus.BAD_REQUEST, description="lat/lng out of range")
-        if range_km <= 0 or range_km > 100:
-            abort(HTTPStatus.BAD_REQUEST, description="range must be between 0 and 100 km")
+    if lat is None or lng is None:
+        abort(HTTPStatus.BAD_REQUEST, description="lat and lng query parameters are required")
+    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        abort(HTTPStatus.BAD_REQUEST, description="lat/lng out of range")
+    if range_km <= 0 or range_km > 100:
+        abort(HTTPStatus.BAD_REQUEST, description="range must be between 0 and 100 km")
 
-        stations = TidalStationService.get_nearby(lat, lng, range_km)
-        full_schema = TidalStationSchema()
-        position_schema = TidalStationPositionSchema()
-        payload = [
-            full_schema.dump(station) if _may_see_full_content(station) else position_schema.dump(station)
-            for station in stations
-        ]
-        return jsonify(payload), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_nearby_stations_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    stations = TidalStationService.get_nearby(lat, lng, range_km)
+    full_schema = TidalStationSchema()
+    position_schema = TidalStationPositionSchema()
+    payload = [
+        full_schema.dump(station) if _may_see_full_content(station) else position_schema.dump(station)
+        for station in stations
+    ]
+    return jsonify(payload), HTTPStatus.OK
 
 
 @tidal_station_api.route('/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_admin()
-def create_station():
+def create_station() -> ResponseReturnValue:
     """
     TidalStationResource POST method. Creates an admin-curated reference tidal station.
     ---
@@ -130,17 +128,12 @@ def create_station():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Station already exists")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_station_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_station_api.route('/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_admin()
-def update_station(id: str):
+def update_station(id: str) -> ResponseReturnValue:
     """
     TidalStationResource PATCH method. Updates a reference tidal station.
     ---
@@ -171,17 +164,12 @@ def update_station(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Station not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_station_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_station_api.route('/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_admin()
-def delete_station(id: str):
+def delete_station(id: str) -> ResponseReturnValue:
     """
     TidalStationResource DELETE method. Deletes a reference tidal station.
     ---
@@ -206,8 +194,3 @@ def delete_station(id: str):
         return jsonify({"message": "Station deleted"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Station not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("delete_station_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

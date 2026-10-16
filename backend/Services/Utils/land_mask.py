@@ -14,7 +14,7 @@ read through `mmap`, so only the pages actually touched become resident, and tho
 page cache the kernel can reclaim under pressure and share between processes.
 
 The call site is a 24x24 velocity grid: 576 points. Reading 933 million booleans to test
-576 of them was the whole problem.
+576 of them is the cost this module avoids.
 
 Two rules this module must not break:
 
@@ -37,17 +37,15 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
-# Where the decompressed mask is cached.
-#
-# Defaults to a temp directory, and the deployment opts *in* to a persistent one by setting
-# LAND_MASK_CACHE_DIR (both compose files point the backend and worker at the volume mounted
-# on /var/cache/kayak/land-mask). That direction matters: the default has to work unprivileged
-# — on a dev machine, in CI, and under pytest, none of which can write to /var/cache — and a
-# default that only works inside a container turns into a fallback, which would silently
-# re-decompress ~890 MiB on every production start with nothing to show for it.
+# Where the decompressed mask is cached. Defaults to a temp directory; a deployment opts in to a
+# persistent one with LAND_MASK_CACHE_DIR (both compose files mount a volume at
+# /var/cache/kayak/land-mask for the backend and worker). The default has to work unprivileged —
+# dev machines, CI and pytest cannot write to /var/cache — and a default that only worked inside a
+# container would silently re-decompress ~890 MiB on every production start.
 _CACHE_DIR = Path(
     os.environ.get("LAND_MASK_CACHE_DIR") or Path(tempfile.gettempdir()) / "kayak-land-mask"
 )
@@ -131,7 +129,7 @@ def _load() -> tuple:
     return _state
 
 
-def _to_index(values, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
+def _to_index(values: npt.ArrayLike, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
     if np.any(np.abs(values) > limit):
         raise ValueError(f"{name} must be within +/-{limit:g}")
 
@@ -152,7 +150,7 @@ def _to_index(values, axis: np.ndarray, limit: float, name: str) -> np.ndarray:
     return ((clamped - axis[0]) / step).astype(int)
 
 
-def is_land(lat, lon) -> np.ndarray:
+def is_land(lat: npt.ArrayLike, lon: npt.ArrayLike) -> np.ndarray:
     """Return a boolean array (matching the inputs' shape) — True where the point is land.
 
     Equivalent to `global_land_mask.globe.is_land`, including its clamping at the poles

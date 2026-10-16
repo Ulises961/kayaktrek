@@ -17,11 +17,13 @@ Usage (inside a task):
 """
 import logging
 import os
+from typing import Any
 
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import after_setup_logger
 from dotenv import load_dotenv
+from flask import Flask
 from kombu.transport.pyamqp import Transport as _AMQPTransport
 
 # Kombu returns False for RabbitMQ >= 3.3, which causes Celery to call
@@ -57,23 +59,20 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     worker_enable_remote_control=False,
-    # Celery's default (True) wipes the root logger's handlers — including our JsonFormatter
-    # + RequestContextFilter from setup_logging() — the moment the worker bootstraps, replacing
-    # them with Celery's own plain-text formatter. Every app-level task logger (Tasks.*, a child
-    # of root, not of the separate "celery" namespace) silently lost JSON formatting and
-    # trace_id/request_id correlation as a result. _configure_celery_logger below only re-applies
-    # our handlers to the "celery" namespace itself; it never protected root.
+    # Celery's default (True) wipes the root logger's handlers — including our JsonFormatter and
+    # RequestContextFilter from setup_logging() — when the worker bootstraps, replacing them with
+    # a plain-text formatter. Task loggers (Tasks.*) hang off root, not the "celery" namespace
+    # that _configure_celery_logger covers, so they would lose JSON formatting and trace correlation.
     worker_hijack_root_logger=False,
     beat_schedule={
         "daily-gdpr-erasure": {
             "task": "Tasks.erasure.run_erasure",
             "schedule": 86400,
         },
-        # M32 (docs/adr/features.md §1a). crontab, not a seconds interval: beat's
-        # schedule file lives in /tmp, so an interval's countdown restarts on every
-        # deploy and a 24h one never fires on a box released more often than daily.
-        # The two sweeps own disjoint days (Tasks/weather_beat_task.py), and run at
-        # :20 to stay clear of the hourly checkpoint alerts.
+        # crontab, not a seconds interval: beat's schedule file lives in /tmp, so an interval's
+        # countdown restarts on every deploy and a 24h one never fires on a box released more
+        # often than daily. The two sweeps own disjoint days (Tasks/weather_beat_task.py) and run
+        # at :20 to stay clear of the hourly checkpoint alerts. See docs/adr/features.md §1a.
         "weather-refresh": {
             "task": "Tasks.weather_beat_task.refresh_upcoming_weather",
             "schedule": crontab(minute=20, hour=3),
@@ -100,13 +99,13 @@ celery_app.conf.update(
             "task": "Tasks.tile_cache_task.prune_tile_cache",
             "schedule": crontab(minute=15, hour=4),
         },
-        # M9d: offline changes processed more than 90 days ago.
+        # Drops the idempotency record of offline changes processed more than 90 days ago.
         "processed-mutation-prune": {
             "task": "Tasks.processed_mutation_task.prune_processed_mutations",
             "schedule": crontab(minute=50, hour=3),
         },
-        # ~10 minutes, matching inReach's own typical tracking interval
-        # (satellite-feed-spec.md §3.1). M29 — Garmin inReach only for v1.
+        # Every ~10 minutes, matching inReach's own typical tracking interval
+        # (satellite-feed-spec.md §3.1).
         "satellite-feed-poll": {
             "task": "Tasks.satellite_feed_beat_task.poll_satellite_feeds",
             "schedule": crontab(minute="*/10"),
@@ -116,13 +115,13 @@ celery_app.conf.update(
 
 
 @after_setup_logger.connect
-def _configure_celery_logger(logger, **kwargs):
+def _configure_celery_logger(logger: logging.Logger, **kwargs: Any) -> None:
     root = logging.getLogger()
     logger.handlers = root.handlers
     logger.setLevel(root.level)
 
 
-def init_celery(app):
+def init_celery(app: Flask) -> Celery:
     """
     Bind Celery to a Flask app so that tasks run inside an application context.
 
@@ -131,8 +130,8 @@ def init_celery(app):
     Args:
         app: The Flask application instance.
     """
-    class ContextTask(celery_app.Task):
-        def __call__(self, *args, **kwargs):
+    class ContextTask(celery_app.Task):  # type: ignore[name-defined]  # the app-bound Task class
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
             with app.app_context():
                 return self.run(*args, **kwargs)
 

@@ -2,8 +2,8 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_leader, require_owner
@@ -20,7 +20,7 @@ mobile_sync_api = Blueprint("mobile_sync", __name__, url_prefix=MOBILE_SYNC_ENDP
 @mobile_sync_api.route("/trip/<string:trip_id>/pull", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def pull_changes(trip_id: str):
+def pull_changes(trip_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -52,7 +52,7 @@ def pull_changes(trip_id: str):
 
 @mobile_sync_api.route("/mutations", methods=["POST"])
 @JWTService.authenticate_restful
-def apply_mutations():
+def apply_mutations() -> ResponseReturnValue:
     """
     ---
     post:
@@ -84,7 +84,7 @@ def apply_mutations():
 @mobile_sync_api.route("/trip/<string:trip_id>/route/pull", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
-def pull_route(trip_id: str):
+def pull_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -110,7 +110,7 @@ def pull_route(trip_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 @require_leader(id_param="trip_id")
-def push_route(trip_id: str):
+def push_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -147,18 +147,13 @@ def push_route(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("route_push_error", extra={"trip_id": trip_id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @mobile_sync_api.route("/trip/<string:trip_id>/route/resolve", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip", id_param="trip_id")
 @require_leader(id_param="trip_id")
-def resolve_route(trip_id: str):
+def resolve_route(trip_id: str) -> ResponseReturnValue:
     """
     ---
     post:
@@ -187,8 +182,3 @@ def resolve_route(trip_id: str):
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("route_resolve_error", extra={"trip_id": trip_id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

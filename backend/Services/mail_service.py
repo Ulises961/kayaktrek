@@ -1,5 +1,6 @@
 import logging
 from email.utils import parseaddr
+from typing import Any
 
 import requests
 from flask import current_app, render_template
@@ -21,12 +22,9 @@ def _identity_context() -> dict[str, str]:
     """
     The sender-identity block every footer renders, resolved from config in one place.
 
-    Call sites used to each build `support_email` themselves, and two of them
-    (`checkpoint_beat_task`, `logistics_service`) hardcoded a literal rather than
-    reading config at all — so the missed-checkpoint alert and the float-plan share
-    told recipients to write to a domain nobody owns. Resolving it here means a call
-    site cannot get it wrong by omission, and there is no fallback literal to go
-    stale: an unset sender renders nothing rather than something false.
+    Resolving it here means a call site cannot get it wrong by omission, and there is
+    no fallback literal to go stale: an unset sender renders nothing rather than
+    something false.
 
     `postal_address` is deliberately unset by default. Publishing a postal address is
     a decision about trader identity (DSA), not a template default, so an operator
@@ -48,12 +46,11 @@ def _send_via_brevo_api(to: str, subject: str, text_body: str, html_body: str, a
     """
     Brevo's transactional email HTTP API, not SMTP.
 
-    DigitalOcean blocks outbound SMTP (ports 25, 465, 587) on every droplet, unconditionally
-    — confirmed 2026-09-06 in production, not liftable by a support ticket. The API sends the
-    same mail over 443, which nothing blocks, and needs its own credential (Brevo dashboard >
-    SMTP & API > API Keys) — distinct from the SMTP key MAIL_PASSWORD holds, which stays
-    configured for local dev/mailpit. Only the transport changes: same domain, same
-    SPF/DKIM/DMARC setup (DEPLOY.md "Mail").
+    DigitalOcean blocks outbound SMTP (ports 25, 465, 587) on every droplet. The API sends
+    the same mail over 443, which nothing blocks, and needs its own credential (Brevo
+    dashboard > SMTP & API > API Keys) — distinct from the SMTP key MAIL_PASSWORD holds,
+    which stays configured for local dev/mailpit. Only the transport changes: same domain,
+    same SPF/DKIM/DMARC setup (DEPLOY.md "Mail").
     """
     sender_name, sender_email = parseaddr(current_app.config.get("MAIL_DEFAULT_SENDER") or "")
     response = requests.post(
@@ -75,7 +72,7 @@ def _send_via_brevo_api(to: str, subject: str, text_body: str, html_body: str, a
     response.raise_for_status()
 
 
-def send_template_email(to: str, subject: str, template: str, **ctx) -> None:
+def send_template_email(to: str, subject: str, template: str, **ctx: Any) -> None:
     """
     Render and send a dual-part (plain text + HTML) email from templates.
 

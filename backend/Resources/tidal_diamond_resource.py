@@ -2,9 +2,9 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Schemas.tidal_station_schema import (
     TidalDiamondCreateSchema,
@@ -31,7 +31,7 @@ _edit_schema = TidalDiamondEditSchema()
 @tidal_diamond_api.route('/api/v1/tidal-diamond/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def create_diamond():
+def create_diamond() -> ResponseReturnValue:
     """
     TidalDiamondResource POST method. Adds a user-created tidal diamond to an itinerary.
 
@@ -65,17 +65,12 @@ def create_diamond():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_diamond_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def get_diamond(id: str):
+def get_diamond(id: str) -> ResponseReturnValue:
     """Raw editable view of a user diamond, for prefilling the edit form.
     ---
     get:
@@ -97,17 +92,12 @@ def get_diamond(id: str):
         return jsonify(_edit_schema.dump(view)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def update_diamond(id: str):
+def update_diamond(id: str) -> ResponseReturnValue:
     """
     TidalDiamondResource PATCH method. Partially updates a user tidal diamond.
 
@@ -142,17 +132,12 @@ def update_diamond(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('tidal_diamond')
-def delete_diamond(id: str):
+def delete_diamond(id: str) -> ResponseReturnValue:
     """
     TidalDiamondResource DELETE method. Deletes a user tidal diamond.
     ---
@@ -176,8 +161,3 @@ def delete_diamond(id: str):
         return jsonify({"message": "Tidal diamond deleted"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("delete_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

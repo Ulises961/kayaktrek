@@ -63,15 +63,14 @@ from Models.sync_tombstone import SyncTombstone  # noqa: F401
 from Models.satellite_feed import SatelliteFeed  # noqa: F401
 from Models.processed_mutation import ProcessedMutation  # noqa: F401
 
-# Registers ORM after_delete listeners (M9c WP1 item 1) — import for the
-# side effect, same convention as the model imports just above.
+# Imported for the side effect: registers the ORM after_delete listeners that write sync tombstones.
 from Services.Utils import sync_tombstones  # noqa: F401
 
-# Registers the session listeners that publish trip change notifications (M36 WP1).
+# Imported for the side effect: registers the session listeners that publish trip change notifications.
 from Services.Utils import trip_change_events  # noqa: F401
 
 
-def createApp(config_mode: str, *, schema: str | None = None):
+def createApp(config_mode: str, *, schema: str | None = None) -> Flask:
     """
     Creates and configurates the Flask app, the logger to be used throughout  the application
     and the database to use. Returns the configured app that is to be used in the main function.
@@ -88,7 +87,6 @@ def createApp(config_mode: str, *, schema: str | None = None):
         __name__,
         template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"),
     )
-    # Get current config from the config.py file using the config_mode set in .env file
     app.config.from_object(config[config_mode])
 
     if schema:
@@ -137,12 +135,11 @@ def createApp(config_mode: str, *, schema: str | None = None):
     cache.init_app(app)
 
     @app.cli.command("seed")
-    def seed_command():
-        """Seed static reference data (item/place categories) and the public demo
-        itinerary. Idempotent — safe to run on every deploy. Invoked from the `migrate`
-        compose step after `alembic upgrade head`, not at app-factory time: that ran on
-        every gunicorn worker (and the Celery/migrate processes too, since they also call
-        createApp()), racing identical inserts at cold start (M11 §4)."""
+    def seed_command() -> None:
+        """Seed static reference data (item/place categories). Idempotent — safe to run
+        on every deploy. Invoked from the `migrate` compose step after `alembic upgrade
+        head`, not at app-factory time, where every gunicorn worker and every Celery and
+        migrate process (all of which call createApp()) would race identical inserts."""
         seed_item_categories()
         seed_place_categories()
         click.echo("Seed complete.")
@@ -150,17 +147,15 @@ def createApp(config_mode: str, *, schema: str | None = None):
     migrate = Migrate()
     migrate.init_app(app, db, directory='alembic')
 
-    # Configure logging
     setup_logging(app)
     setup_logfire(app, config_mode)
 
-    # Rate limiting (Api/limiter.py) keys on the peer address; behind a reverse proxy every
-    # request otherwise arrives from the proxy's IP, either throttling every client together
-    # or, if X-Forwarded-For were trusted blindly, becoming spoofable. Off by default (0 hops)
-    # so local/dev/direct-exposure setups are unaffected; a deploy behind N proxies sets
-    # PROXY_TRUSTED_HOPS=N deliberately (M11 §4). Applied after setup_logfire() so ProxyFix
-    # is the outermost WSGI layer — it must resolve the real client IP before the OTel
-    # instrumentation wrapped around app.wsgi_app tags spans with it.
+    # Rate limiting (Api/limiter.py) keys on the peer address, so behind a reverse proxy every
+    # client would share the proxy's IP; trusting X-Forwarded-For blindly would make the key
+    # spoofable, hence an explicit hop count. Off by default (0 hops) so local and
+    # direct-exposure setups are unaffected; a deploy behind N proxies sets PROXY_TRUSTED_HOPS=N.
+    # Applied after setup_logfire() so ProxyFix is the outermost WSGI layer: it must resolve the
+    # real client IP before the OTel instrumentation wrapped around app.wsgi_app tags spans with it.
     trusted_hops = int(os.environ.get("PROXY_TRUSTED_HOPS", "0"))
     if trusted_hops > 0:
         app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
@@ -168,18 +163,16 @@ def createApp(config_mode: str, *, schema: str | None = None):
         )
 
     @app.before_request
-    def attach_request_id():
+    def attach_request_id() -> None:
         g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
 
-    # Register error handlers
     register_error_handlers(app)
 
     app.json_provider_class = CustomJSONProvider
 
     init_celery(app)
 
-    # Built from the now-fully-registered url_map (M13 Part B) — every blueprint above must
-    # already be registered for path coverage to be complete.
+    # The spec is built from the url_map, so every blueprint must be registered before this.
     setup_openapi(app)
 
     return app
