@@ -7,6 +7,52 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.3.0] - 2026-10-16
+
+### Added
+
+- **What your crew changes now appears on your open trip page, without reloading.** When someone
+  else edits the trip — moves a point or a day boundary, ticks or adds a packing item, invites or
+  removes a member, changes the float plan or the shore contact — every other crew member's page
+  for that trip updates on its own, within about seven seconds while the tab is open and in front.
+  A page ignores changes it has nothing to show for (a route edit does not re-draw the crew
+  list), and refreshes at most once every 30 seconds however busy the trip is.
+- **Your own half-finished work is never overwritten.** If the route changes under a draft you
+  are part-way through, the planner keeps your draft and shows "Someone else changed this route",
+  with a "Load their version" button.
+
+### Changed
+
+- **Deploys now show a maintenance page.** While the app is being updated, visitors see a short,
+  styled "back shortly" page instead of a browser error. It is served by the web server, so it
+  stays up even while the whole app is down.
+- **The mobile app polls for the same changes.** The mobile app is not released yet, so nothing
+  visibly changes.
+
+### Fixed
+
+- **Editing the float plan or the shore contact could save an older value over a newer one.**
+  Both forms opened on whatever was loaded with the page, so if a crew member changed the shore
+  contact — the person who gets the missed-checkpoint alert — and you then saved the form, your
+  copy of the old one went back in. They now open on the latest saved values.
+- **The planner map did not show another person's route edit until you reloaded.** It now does,
+  unless you are in the middle of editing.
+
+### Security
+
+- Updated Next.js to 16.4.0, which clears advisories in `next`, `sharp` and `source-map-js`, along
+  with werkzeug 3.1.9, a `handlebars` override and the web app's other dependency updates.
+
+### Deploy notes
+
+- **No migration, no new required environment variable, no forced logout.** One optional
+  variable, `TRIP_CHANGES_POLL_RATE_LIMIT` (default `120 per minute` per user), is deliberately
+  not in `docker-compose.prod.yml`; the default is the production value.
+- **Nothing to change on the box's nginx for this feature.** The page only makes short requests,
+  not held connections. The maintenance page above was installed on the production box on
+  2026-10-08; a new box needs the one-off setup under "Maintenance mode" in `DEPLOY.md`, and
+  `deploy.sh` refuses to run without it (`DEPLOY_MAINTENANCE=0` skips it).
+
 ## [1.2.0] - 2026-10-05
 
 ### Added
