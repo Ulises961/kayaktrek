@@ -1,6 +1,7 @@
 import "../global.css"
 
-import { Slot } from "expo-router"
+import { Link, Slot } from "expo-router"
+import { StyleSheet, View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -36,6 +37,25 @@ export default function RootLayout() {
             </AuthProvider>
           </QueuedChangesProvider>
         </CachedSurfacesProvider>
+        {/* M9e WP0 spike: always-visible way back to the spike screen after the app is
+            relaunched on a walk, with no computer to deep-link from. Removed with the spike. */}
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <Link
+            href="/spike-location"
+            style={{
+              position: "absolute",
+              bottom: 24,
+              left: 8,
+              padding: 10,
+              backgroundColor: "#000000bb",
+              color: "#ffffff",
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            spike
+          </Link>
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
