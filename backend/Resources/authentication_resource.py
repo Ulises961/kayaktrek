@@ -7,9 +7,7 @@ from flask_limiter.util import get_remote_address
 from http import HTTPStatus
 from sqlalchemy.exc import NoResultFound
 
-from Api.database import db
 from Api.limiter import limiter
-from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
@@ -242,11 +240,10 @@ def activate_test_user():
     mail = data.get("mail")
     if not mail:
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
-    user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
-    if not user:
+    try:
+        AuthService.activate_by_mail(mail)
+    except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="User not found")
-    user.active = True
-    db.session.commit()
     return jsonify({"status": "activated"}), HTTPStatus.OK
 
 

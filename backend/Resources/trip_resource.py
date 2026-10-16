@@ -62,18 +62,6 @@ def get_trip(id: str):
         TripService.touch_last_accessed(trip)
         data: Dict[str, Any] = cast(dict, TripSchema().dump(trip))
         data["changeRev"] = change_rev
-
-        current_user_id = str(g.current_user_id)
-        is_leader = any(
-            str(t.get("user", {}).get("id")) == current_user_id and t.get("role") == "leader"
-            for t in data.get("travellers", [])
-        )
-        if not is_leader:
-            for t in data.get("travellers", []):
-                if str(t.get("user", {}).get("id")) != current_user_id:
-                    t["medicalNotes"] = None
-                    t["medicalNotesConsentAt"] = None
-
         return jsonify(data), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")

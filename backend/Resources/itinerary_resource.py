@@ -13,7 +13,6 @@ from Schemas.itinerary_schema import (
     ItineraryExploreItemSchema,
 )
 from Schemas.day_schema import DaySchema
-from Api.database import db
 from Api.limiter import limiter
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, check_resource_ownership
@@ -300,7 +299,6 @@ def create_itinerary():
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except IntegrityError:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
 
 
@@ -353,7 +351,6 @@ def update_itinerary(id: str):
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except IntegrityError:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
 
 
@@ -389,7 +386,6 @@ def delete_itinerary(id: str):
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")
     except IntegrityError:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete itinerary due to existing references")
 
 
@@ -461,7 +457,6 @@ def set_point_order(id: str):
         applied = ItineraryService.set_point_order(id, order)
         return jsonify({"order": applied}), HTTPStatus.OK
     except PointOrderMismatchError as e:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Itinerary {id} not found")

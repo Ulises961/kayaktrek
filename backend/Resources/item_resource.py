@@ -7,7 +7,6 @@ from Schemas.item_schema import ItemSchema
 from Services.item_service import ItemService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
-from Api.database import db
 logger = logging.getLogger(__name__)
 
 ITEM_ENDPOINT = "/api/v1/item"
@@ -160,5 +159,4 @@ def delete_item(id: str):
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
     except IntegrityError as e:
         logger.error(f"Integrity error deleting item: {e}")
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete item due to existing references")

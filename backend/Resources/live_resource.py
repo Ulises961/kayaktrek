@@ -2,7 +2,6 @@ import os
 from datetime import date
 from http import HTTPStatus
 from typing import Optional
-from uuid import UUID
 
 from flask import Blueprint, Response, abort, current_app, g, jsonify, request, stream_with_context
 from flask_limiter.util import get_remote_address
@@ -10,9 +9,7 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 import logging
 
-from Api.database import db
 from Api.limiter import limiter
-from Models.trip import Trip, TripStateType
 from Schemas.position_ping_schema import PositionPingSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader, _check_trip_ownership
@@ -21,6 +18,7 @@ from Services.itinerary_service import ItineraryService
 from Services.live_position_service import LivePositionService
 from Services.live_stream_service import LiveStreamService
 from Services.trip_change_service import TripChangeService
+from Services.trip_service import TripService
 from Tasks.expedition_log_task import generate_trip_day_logs
 
 logger = logging.getLogger(__name__)
@@ -60,16 +58,6 @@ def _add_cors_headers(response):
     frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
     response.headers["Access-Control-Allow-Origin"] = frontend_url
     return response
-
-
-def _get_happening_trip(trip_id: str) -> Optional[Trip]:
-    try:
-        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
-    except ValueError:
-        return None
-    if trip is None or trip.state != TripStateType.HAPPENING:
-        return None
-    return trip
 
 
 @live_api.route("/trip/<string:id>/position", methods=["POST"])
@@ -217,7 +205,7 @@ def story_stream(token: str):
     if itinerary.trip_id is None:
         return Response(status=HTTPStatus.NOT_FOUND)
 
-    trip = _get_happening_trip(str(itinerary.trip_id))
+    trip = TripService.find_happening_trip(str(itinerary.trip_id))
     if trip is None:
         return Response(status=HTTPStatus.NOT_FOUND)
 
@@ -294,7 +282,7 @@ def trip_stream(id: str):
     if not authorized:
         return Response(status=HTTPStatus.NOT_FOUND)
 
-    trip = _get_happening_trip(id)
+    trip = TripService.find_happening_trip(id)
     if trip is None:
         return Response(status=HTTPStatus.NOT_FOUND)
 

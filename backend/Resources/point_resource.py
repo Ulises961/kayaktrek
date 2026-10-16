@@ -10,7 +10,6 @@ from Services.Middleware.privileges_middleware import require_owner
 from Services.point_service import PointService
 from Services.image_service import ImageService
 from Services.storage_service import StorageValidationError
-from Api.database import db
 from Api.limiter import limiter
 
 logger = logging.getLogger(__name__)
@@ -66,7 +65,6 @@ def create_point():
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity Error creating point: {e}")
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Database integrity violated")
 
 

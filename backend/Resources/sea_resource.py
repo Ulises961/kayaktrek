@@ -6,7 +6,6 @@ from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Api.cache import cache
-from Api.database import db
 from Schemas.sea_schema import SeaSchema, _diamond_schema, _gate_schema
 from Schemas.weather_schema import WeatherSchema
 from Services.Middleware.auth_middleware import JWTService
@@ -87,7 +86,6 @@ def create_sea(id: str):
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except IntegrityError:
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="A sea record already exists for this day")
 
 

@@ -8,7 +8,6 @@ from Schemas.catalog_item_schema import CatalogItemSchema
 from Services.catalog_item_service import CatalogItemService
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
-from Api.database import db
 logger = logging.getLogger(__name__)
 
 CATALOG_ITEM_ENDPOINT = "/api/v1/catalog-item"
@@ -170,5 +169,4 @@ def delete_catalog_item(id: str):
         abort(HTTPStatus.NOT_FOUND, description=f"Catalog item with id {id} not found")
     except IntegrityError:
         logger.error("Integrity error deleting catalog item")
-        db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete catalog item due to existing references")
