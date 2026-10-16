@@ -1,4 +1,5 @@
 from datetime import date as _date
+from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID as _UUID
 
@@ -15,9 +16,9 @@ if TYPE_CHECKING:
 
 
 class Log(BaseModel):
-    hours: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    hours: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     avg_sea: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    distance: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    distance: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     date: Mapped[Optional[_date]] = mapped_column(Date, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     # ondelete=CASCADE matches actual intended behaviour: Tasks/erasure.py explicitly
