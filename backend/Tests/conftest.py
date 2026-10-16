@@ -20,6 +20,7 @@ from Resources.trip_resource import TRIP_ENDPOINT
 from Services.Middleware.auth_middleware import JWTService
 from Services.crypto_service import generate_keypair
 from Tests.auth_helpers import FakeDenylist, access_token_for
+from Tests.isolated_client import PerRequestContextClient
 from Api.app import createApp
 from Api.database import db as _db
 from Api.seed import seed_item_categories, seed_place_categories
@@ -66,6 +67,7 @@ def app(request):
     bootstrap.dispose()
 
     app = createApp('testing', schema=schema)
+    app.test_client_class = PerRequestContextClient
     ctx = app.app_context()
     ctx.push()
     # NOT _db.create_all() — Flask-SQLAlchemy's create_all() always checkfirst=True, and
