@@ -4,6 +4,8 @@ import { Slot } from "expo-router"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
+// M9e WP0 spike: registers the background location task before any fix can arrive.
+import "../lib/spike/location-task"
 import { AuthProvider } from "../lib/auth/auth-context"
 import { QueuedChangesProvider } from "../lib/db/queued-changes-provider"
 import { CachedSurfacesProvider } from "../lib/network/cached-surfaces"
