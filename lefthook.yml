@@ -27,6 +27,11 @@ commit-msg:
 
 pre-commit:
   parallel: true
+  # Local stand-in for branch protection, which this GitHub plan does not offer (403): refuses
+  # a commit on master/main. Lives in .lefthook/pre-commit/, along with what it does not stop.
+  scripts:
+    "default-branch-guard.sh":
+      runner: bash
   commands:
     backend-flake8:
       glob: "backend/**/*.py"
@@ -53,7 +58,16 @@ pre-commit:
       root: "frontend"
       run: pnpm prettier --check {staged_files}
 
-# Full test suite + full lint/typecheck. Deliberately NOT wired to `pre-push`: it held
+# The push half of the same stand-in: refuses to update or delete master/main on the remote.
+# pre-push passes the refs being pushed on stdin, which is how the script sees the remote ref.
+pre-push:
+  scripts:
+    "default-branch-guard.sh":
+      runner: bash
+      use_stdin: true
+
+# Full test suite + full lint/typecheck. Deliberately NOT wired to `pre-push` (which now
+# carries only the instant default-branch guard above, nothing that touches the network): it held
 # the network connection open long enough (backend pytest -n auto + frontend
 # pnpm test:run alone run 100s+) to time out `git push` on a slow connection.
 # backend-ci.yml/frontend-ci.yml already re-run all of this remotely on every push and
