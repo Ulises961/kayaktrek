@@ -48,9 +48,6 @@ def list_connections():
         return jsonify(ConnectionSchema(many=True).dump(connections)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error listing connections: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @connection_api.route("/request", methods=["POST"])

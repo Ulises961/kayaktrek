@@ -1,6 +1,6 @@
 from http import HTTPStatus
 import logging
-from flask import Blueprint, jsonify, abort
+from flask import Blueprint, jsonify
 
 from Models.item_category import ItemCategory
 from Schemas.item_category_schema import ItemCategorySchema
@@ -28,9 +28,5 @@ def get_item_categories():
                 type: array
                 items: ItemCategorySchema
     """
-    try:
-        categories = db.session.query(ItemCategory).order_by(ItemCategory.name).all()
-        return jsonify(ItemCategorySchema(many=True).dump(categories)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error retrieving item categories: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    categories = db.session.query(ItemCategory).order_by(ItemCategory.name).all()
+    return jsonify(ItemCategorySchema(many=True).dump(categories)), HTTPStatus.OK

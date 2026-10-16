@@ -24,84 +24,31 @@ SERVICES_DIR = BACKEND_ROOT / "Services"
 TESTS_DIR = BACKEND_ROOT / "Tests"
 
 # `except Exception` / `except BaseException` / bare `except:` in a resource. The central
-# handlers already return a generic 500, log the traceback and roll the session back.
+# handlers already return a generic 500, log the traceback and roll the session back, so a
+# resource only keeps one where it must answer with something other than a 500:
+#   - health_resource: a failed database ping is a 503, which is what an orchestrator acts on.
+#   - live_resource: an unreadable change log is a 503 with Retry-After, so clients back off.
 BROAD_EXCEPT_HANDLERS = {
-    "authentication_resource.py": 8,
-    "block_resource.py": 1,
-    "catalog_item_resource.py": 5,
-    "connection_resource.py": 1,
-    "day_resource.py": 6,
-    "dev_resource.py": 1,
-    "endorsement_request_resource.py": 1,
-    "hazard_diamond_resource.py": 1,
     "health_resource.py": 1,
-    "inventory_resource.py": 9,
-    "item_category_resource.py": 1,
-    "item_resource.py": 5,
-    "itinerary_resource.py": 2,
     "live_resource.py": 1,
-    "log_resource.py": 9,
-    "logistics_resource.py": 3,
-    "mobile_sync_resource.py": 2,
-    "personal_packing_resource.py": 4,
-    "place_resource.py": 8,
-    "point_resource.py": 7,
-    "sea_resource.py": 11,
-    "shuttle_resource.py": 5,
-    "tidal_diamond_resource.py": 4,
-    "tidal_station_resource.py": 4,
-    "travel_document_resource.py": 6,
-    "trip_resource.py": 27,
-    "user_certification_resource.py": 4,
-    "user_resource.py": 21,
-    "wind_diamond_resource.py": 5,
 }
 
 # `abort(500, ...)` / `abort(HTTPStatus.INTERNAL_SERVER_ERROR, ...)`: a resource declaring an
 # error it caught, which discards the traceback. `abort` is for decisions, not exceptions.
-ABORT_500_CALLS = {
-    "authentication_resource.py": 7,
-    "block_resource.py": 1,
-    "catalog_item_resource.py": 5,
-    "connection_resource.py": 1,
-    "day_resource.py": 6,
-    "dev_resource.py": 1,
-    "endorsement_request_resource.py": 1,
-    "hazard_diamond_resource.py": 1,
-    "inventory_resource.py": 9,
-    "item_category_resource.py": 1,
-    "item_resource.py": 5,
-    "itinerary_resource.py": 2,
-    "log_resource.py": 8,
-    "logistics_resource.py": 3,
-    "mobile_sync_resource.py": 2,
-    "personal_packing_resource.py": 4,
-    "place_resource.py": 8,
-    "point_resource.py": 7,
-    "sea_resource.py": 11,
-    "shuttle_resource.py": 5,
-    "tidal_diamond_resource.py": 4,
-    "tidal_station_resource.py": 4,
-    "travel_document_resource.py": 6,
-    "trip_resource.py": 27,
-    "user_certification_resource.py": 4,
-    "user_resource.py": 21,
-    "wind_diamond_resource.py": 5,
-}
+ABORT_500_CALLS: dict[str, int] = {}
 
 # `db.session` in a resource: a query that belongs in the service owning the entity.
 DB_SESSION_USES = {
     "authentication_resource.py": 2,
-    "catalog_item_resource.py": 2,
+    "catalog_item_resource.py": 1,
     "health_resource.py": 1,
     "item_category_resource.py": 1,
-    "item_resource.py": 2,
-    "itinerary_resource.py": 6,
+    "item_resource.py": 1,
+    "itinerary_resource.py": 4,
     "live_resource.py": 1,
-    "log_resource.py": 9,
-    "point_resource.py": 7,
+    "log_resource.py": 4,
+    "point_resource.py": 1,
     "sea_resource.py": 1,
-    "travel_document_resource.py": 3,
 }
 
 # Resources that import `Api.database` or `Models.*` at all.
@@ -117,7 +64,6 @@ DATA_LAYER_IMPORTERS = frozenset(
         "log_resource.py",
         "point_resource.py",
         "sea_resource.py",
-        "travel_document_resource.py",
         "user_resource.py",
     }
 )

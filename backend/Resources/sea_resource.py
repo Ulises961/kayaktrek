@@ -4,7 +4,6 @@ import logging
 from flask import Blueprint, jsonify, request, abort, g
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Api.cache import cache
 from Api.database import db
@@ -54,11 +53,6 @@ def get_sea(id: str):
         return jsonify(_schema.dump(sea)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Sea record not found for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/sea', methods=['POST'])
@@ -95,11 +89,6 @@ def create_sea(id: str):
     except IntegrityError:
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="A sea record already exists for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/sea', methods=['PATCH'])
@@ -137,11 +126,6 @@ def update_sea(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Sea record not found for this day")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_sea_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/tidal-gates', methods=['GET'])
@@ -175,11 +159,6 @@ def get_tidal_gates(id: str):
         return jsonify(_gate_schema.dump(gates)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_tidal_gates_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather', methods=['GET'])
@@ -207,11 +186,6 @@ def get_weather(id: str):
         return jsonify(_weather_schema.dump(day.weather)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_weather_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather/fetch', methods=['POST'])
@@ -246,11 +220,6 @@ def trigger_weather_fetch(id: str):
         return jsonify({"taskId": result.id}), HTTPStatus.ACCEPTED
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("weather_fetch_trigger_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/weather/refresh', methods=['POST'])
@@ -300,11 +269,6 @@ def trigger_weather_refresh(id: str):
         return jsonify({"taskId": result.id}), HTTPStatus.ACCEPTED
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("weather_refresh_trigger_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/global-wind-vectors', methods=['GET'])
@@ -347,17 +311,11 @@ def get_global_wind_vectors():
           description: date parameter required
     """
     date_str = request.args.get("date")
-    try:
-        if not date_str:
-            abort(HTTPStatus.BAD_REQUEST, description="date parameter required")
-        hour = int(request.args.get("hour", 12))
-        grid = OpenMeteoService.fetch_global_wind(date_str, hour)
-        return jsonify(grid), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("global_wind_vectors_error", extra={"date": date_str, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    if not date_str:
+        abort(HTTPStatus.BAD_REQUEST, description="date parameter required")
+    hour = int(request.args.get("hour", 12))
+    grid = OpenMeteoService.fetch_global_wind(date_str, hour)
+    return jsonify(grid), HTTPStatus.OK
 
 
 @sea_api.route('/<string:id>/wind-vectors', methods=['GET'])
@@ -404,11 +362,6 @@ def get_wind_vectors(id: str):
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("wind_vectors_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/wave-vectors', methods=['GET'])
@@ -455,11 +408,6 @@ def get_wave_vectors(id: str):
         return jsonify(grid), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("wave_vectors_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @sea_api.route('/<string:id>/tidal-diamonds', methods=['GET'])
@@ -499,8 +447,3 @@ def get_tidal_diamonds(id: str):
         return jsonify(_diamond_schema.dump(diamonds)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Day not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("tidal_diamonds_error", extra={"day_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

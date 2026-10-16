@@ -1,7 +1,6 @@
 from datetime import date
 from http import HTTPStatus
 from typing import Any, Dict, cast
-from werkzeug.exceptions import HTTPException
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
@@ -76,13 +75,8 @@ def get_trip(id: str):
                     t["medicalNotesConsentAt"] = None
 
         return jsonify(data), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:user_id>/all", methods=["GET"])
@@ -181,15 +175,10 @@ def get_all_user_trips(user_id: str):
             "page": result["page"],
             "pages": result["pages"],
         }), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:user_id>/invitations", methods=["GET"])
@@ -220,13 +209,8 @@ def get_all_user_invitations(user_id: str):
         logger.info(f"Retrieving trip with id {id}")
         trips = TripService.get_invitations_by_user(user_id)
         return jsonify([TripSchema().dump(trip) for trip in trips]), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip with id {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/create", methods=["POST"])
@@ -256,13 +240,8 @@ def post():
         trip_data = request.get_json()
         trip = TripService.create_trip(trip_data)
         return jsonify(TripSchema().dump(trip)), HTTPStatus.CREATED
-    except HTTPException:
-        raise
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.exception(f"Error creating trip: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @trip_api.route("/<string:id>/state", methods=["POST"])
 @JWTService.authenticate_restful
@@ -312,12 +291,8 @@ def transition_state(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Trip {id} not found")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/pause", methods=["POST"])
@@ -348,12 +323,8 @@ def pause_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/resume", methods=["POST"])
@@ -409,12 +380,8 @@ def resume_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/abort", methods=["POST"])
@@ -447,12 +414,8 @@ def abort_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>", methods=["PATCH"])
@@ -500,12 +463,8 @@ def update_trip(id: str):
         return jsonify(TripSchema().dump(trip)), HTTPStatus.OK
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @trip_api.route("/<string:id>/invite", methods=["POST"])
 @JWTService.authenticate_restful
@@ -568,12 +527,8 @@ def invite_user(id: str):
         abort(HTTPStatus.FORBIDDEN, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/invite/<string:invitee_id>", methods=["DELETE"])
@@ -604,12 +559,8 @@ def cancel_invitation(id: str, invitee_id: str):
     try:
         TripService.cancel_invitation(id, invitee_id)
         return jsonify({"message": "Invitation cancelled"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/invitation", methods=["POST"])
@@ -655,12 +606,8 @@ def handle_invitation(id: str):
         TripService.handle_invitation(id, bool(body["accepted"]))
         action = "accepted" if body["accepted"] else "declined"
         return jsonify({"message": f"Invitation {action}"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:user_id>", methods=["DELETE"])
@@ -695,12 +642,8 @@ def remove_member(id: str, user_id: str):
         return jsonify({"message": "Member removed"}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.CONFLICT, description=str(e))
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me", methods=["GET"])
@@ -725,8 +668,6 @@ def get_my_membership(id: str):
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me", methods=["PATCH"])
@@ -765,10 +706,6 @@ def update_my_float_plan(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except HTTPException:
-        raise
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["GET"])
@@ -811,12 +748,8 @@ def get_trip_medical_notes(id: str):
     """
     try:
         return jsonify(TripMemberService.get_trip_medical_notes(id)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["POST"])
@@ -871,14 +804,10 @@ def set_trip_medical_notes(id: str):
             id, raw["ciphertext"], raw["nonce"], raw["salt"]
         )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-consent", methods=["DELETE"])
@@ -906,8 +835,6 @@ def revoke_trip_medical_notes(id: str):
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/leader-public-key", methods=["GET"])
@@ -939,14 +866,10 @@ def get_leader_public_key(id: str):
     """
     try:
         return jsonify({"publicKey": TripMemberService.get_leader_public_key(id)}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/share-medical-notes", methods=["POST"])
@@ -1003,14 +926,10 @@ def share_medical_notes(id: str):
             id, raw["ciphertext"], raw["nonce"], raw["ephemeralKey"]
         )
         return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:member_id>/medical-notes", methods=["GET"])
@@ -1053,16 +972,12 @@ def read_member_medical_notes(id: str, member_id: str):
     try:
         sealed = TripMemberService.read_shared_medical_notes(id, member_id)
         return jsonify(sealed), HTTPStatus.OK
-    except HTTPException:
-        raise
     except PermissionError:
         abort(HTTPStatus.FORBIDDEN, description="Only the trip leader can read shared medical notes")
     except ValueError as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Member not found in this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes/access-log", methods=["GET"])
@@ -1091,8 +1006,6 @@ def get_medical_notes_access_log(id: str):
         return jsonify(MedicalNotesAccessLogSchema(many=True).dump(logs)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>", methods=["DELETE"])
@@ -1127,8 +1040,6 @@ def delete(id: str):
         return {"message": "Deletion successful"}, HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/leave", methods=["POST"])
@@ -1166,8 +1077,6 @@ def leave(id: str):
         return {"message": "Left trip"}, HTTPStatus.OK
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/member/<string:user_id>/nominate-successor", methods=["POST"])
@@ -1200,8 +1109,6 @@ def nominate_successor(id: str, user_id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @trip_api.route("/<string:id>/nominate-successor", methods=["DELETE"])
@@ -1225,11 +1132,8 @@ def clear_successor_nomination(id: str):
                   message:
                     type: string
     """
-    try:
-        TripLeadershipService.clear_nomination(id)
-        return {"message": "Nomination cleared"}, HTTPStatus.OK
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    TripLeadershipService.clear_nomination(id)
+    return {"message": "Nomination cleared"}, HTTPStatus.OK
 
 
 @trip_api.route("/<string:id>/claim-leadership", methods=["POST"])
@@ -1270,6 +1174,4 @@ def claim_leadership(id: str):
         abort(HTTPStatus.CONFLICT, description=str(e))
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 

@@ -4,7 +4,6 @@ import logging
 from flask import Blueprint, jsonify, request, abort
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Schemas.tidal_station_schema import TidalStationSchema, TidalStationUpdateSchema, TidalStationPositionSchema
 from Services.Middleware.auth_middleware import JWTService
@@ -69,31 +68,25 @@ def get_nearby_stations():
         400:
           description: Missing or out-of-range lat/lng/range
     """
-    try:
-        lat = request.args.get('lat', type=float)
-        lng = request.args.get('lng', type=float)
-        range_km = request.args.get('range', default=5.0, type=float)
+    lat = request.args.get('lat', type=float)
+    lng = request.args.get('lng', type=float)
+    range_km = request.args.get('range', default=5.0, type=float)
 
-        if lat is None or lng is None:
-            abort(HTTPStatus.BAD_REQUEST, description="lat and lng query parameters are required")
-        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
-            abort(HTTPStatus.BAD_REQUEST, description="lat/lng out of range")
-        if range_km <= 0 or range_km > 100:
-            abort(HTTPStatus.BAD_REQUEST, description="range must be between 0 and 100 km")
+    if lat is None or lng is None:
+        abort(HTTPStatus.BAD_REQUEST, description="lat and lng query parameters are required")
+    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        abort(HTTPStatus.BAD_REQUEST, description="lat/lng out of range")
+    if range_km <= 0 or range_km > 100:
+        abort(HTTPStatus.BAD_REQUEST, description="range must be between 0 and 100 km")
 
-        stations = TidalStationService.get_nearby(lat, lng, range_km)
-        full_schema = TidalStationSchema()
-        position_schema = TidalStationPositionSchema()
-        payload = [
-            full_schema.dump(station) if _may_see_full_content(station) else position_schema.dump(station)
-            for station in stations
-        ]
-        return jsonify(payload), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_nearby_stations_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    stations = TidalStationService.get_nearby(lat, lng, range_km)
+    full_schema = TidalStationSchema()
+    position_schema = TidalStationPositionSchema()
+    payload = [
+        full_schema.dump(station) if _may_see_full_content(station) else position_schema.dump(station)
+        for station in stations
+    ]
+    return jsonify(payload), HTTPStatus.OK
 
 
 @tidal_station_api.route('/create', methods=['POST'])
@@ -130,11 +123,6 @@ def create_station():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Station already exists")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_station_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_station_api.route('/<string:id>', methods=['PATCH'])
@@ -171,11 +159,6 @@ def update_station(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Station not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_station_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_station_api.route('/<string:id>', methods=['DELETE'])
@@ -206,8 +189,3 @@ def delete_station(id: str):
         return jsonify({"message": "Station deleted"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Station not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("delete_station_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

@@ -127,9 +127,6 @@ def login_user():
         if str(e) == "deletion_pending":
             return jsonify({"status": "fail", "code": "deletion_pending", "message": "This account is scheduled for deletion."}), HTTPStatus.FORBIDDEN
         abort(HTTPStatus.FORBIDDEN, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        raise e
 
 
 def _invite_code_valid(submitted: str) -> bool:
@@ -245,16 +242,12 @@ def activate_test_user():
     mail = data.get("mail")
     if not mail:
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
-    try:
-        user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
-        if not user:
-            abort(HTTPStatus.NOT_FOUND, description="User not found")
-        user.active = True
-        db.session.commit()
-        return jsonify({"status": "activated"}), HTTPStatus.OK
-    except Exception as e:
-        logger.error("activate_test_user_failed", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR)
+    user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
+    if not user:
+        abort(HTTPStatus.NOT_FOUND, description="User not found")
+    user.active = True
+    db.session.commit()
+    return jsonify({"status": "activated"}), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/verify", methods=["GET"])
@@ -283,9 +276,6 @@ def verify_account():
         return jsonify({"status": "success", "message": "Account activated", "user": UserSchema().dump(user)}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
 
 @api.route("/api/v1/auth/verify", methods=["POST"])
@@ -325,9 +315,6 @@ def verify_account_and_sign_in():
         user = AuthService.verify_account(token)
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Verification failed")
 
     session = SessionService.start(
         user.id,
@@ -371,9 +358,6 @@ def verify_email_change():
         return jsonify({"status": "success", "message": "Email address updated", "mail": user.mail}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Email change verification failed")
 
 
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
@@ -409,9 +393,6 @@ def resend_verification():
         abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend verification")
 
 
 @api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])
@@ -440,24 +421,20 @@ def resend_deletion_cancel():
     data = request.get_json()
     if not data or not data.get("mail"):
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
-    try:
-        result = UserService.resend_deletion_cancel(data["mail"])
-        if result:
-            raw_token, user_name = result
-            frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
-            cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
-            send_template_email(
-                data["mail"],
-                "Your Kayaktrek account deletion request",
-                "deletion_request",
-                name=user_name,
-                cancel_url=cancel_url,
-            )
-        # Always return 200 — do not reveal whether the account exists
-        return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK
-    except Exception as e:
-        logger.error("resend_deletion_cancel_failed", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Could not resend cancellation email")
+    result = UserService.resend_deletion_cancel(data["mail"])
+    if result:
+        raw_token, user_name = result
+        frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+        cancel_url = f"{frontend_url}/cancel-deletion?token={raw_token}"
+        send_template_email(
+            data["mail"],
+            "Your Kayaktrek account deletion request",
+            "deletion_request",
+            name=user_name,
+            cancel_url=cancel_url,
+        )
+    # Always return 200 — do not reveal whether the account exists
+    return jsonify({"message": "If an account with that email has a pending deletion, a new cancellation link has been sent."}), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/forgot-password", methods=["POST"])
@@ -522,9 +499,6 @@ def reset_password():
         return jsonify({"status": "success", "message": "Password updated"}), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(e)
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description="Password reset failed")
 
 
 @api.route("/api/v1/auth/refresh", methods=["POST"])

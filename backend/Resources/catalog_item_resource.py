@@ -1,7 +1,6 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
-from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
@@ -33,15 +32,8 @@ def get_all_catalog_items():
                 items:
                   $ref: '#/components/schemas/CatalogItemSchema'
     """
-    try:
-        items = CatalogItemService.get_items_by_owner(g.current_user_id)
-        return jsonify([CatalogItemSchema().dump(item) for item in items]), HTTPStatus.OK
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving catalog items: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    items = CatalogItemService.get_items_by_owner(g.current_user_id)
+    return jsonify([CatalogItemSchema().dump(item) for item in items]), HTTPStatus.OK
 
 
 @catalog_item_api.route("/create", methods=["POST"])
@@ -77,13 +69,8 @@ def create_catalog_item():
 
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error creating catalog item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @catalog_item_api.route("/reset-to-default", methods=["POST"])
@@ -109,14 +96,8 @@ def reset_catalog_to_default():
     try:
         items = CatalogItemService.reset_to_default(g.current_user_id)
         return jsonify([CatalogItemSchema().dump(item) for item in items]), HTTPStatus.CREATED
-
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error resetting catalog to default: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @catalog_item_api.route("/<string:id>", methods=["PATCH"])
@@ -152,16 +133,10 @@ def update_catalog_item(id: str):
         item_data = request.get_json()
         item = CatalogItemService.update_item(id, item_data)
         return jsonify(CatalogItemSchema().dump(item)), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Catalog item with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error updating catalog item: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @catalog_item_api.route("/<string:id>", methods=["DELETE"])
@@ -191,16 +166,9 @@ def delete_catalog_item(id: str):
         logger.info(f"Deleting catalog item {id}")
         CatalogItemService.delete_item(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-
-    except HTTPException:
-        raise
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description=f"Catalog item with id {id} not found")
     except IntegrityError:
         logger.error("Integrity error deleting catalog item")
         db.session.rollback()
         abort(HTTPStatus.CONFLICT, description="Cannot delete catalog item due to existing references")
-    except Exception as e:
-        logger.error(f"Error deleting catalog item: {e}")
-        db.session.rollback()
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

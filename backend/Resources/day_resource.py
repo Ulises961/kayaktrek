@@ -1,7 +1,6 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort
-from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from marshmallow import ValidationError
 from Schemas.day_schema import DaySchema, DayUpdateSchema
@@ -56,12 +55,8 @@ def read_by_id(id: str):
     try:
         day = DayService.get_day_by_id(id)
         return jsonify(DaySchema().dump(day)), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
-    except Exception as e:
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @day_api.route("/by-key", methods=['POST'])
 @JWTService.authenticate_restful
@@ -95,19 +90,13 @@ def read_by_key():
         400:
           description: Missing or incomplete day key
     """
-    try:
-        body = request.get_json()
+    body = request.get_json()
 
-        if not body or not body.get("itineraryId") or not body.get("dayNumber") or not body.get("date"):
-            abort(HTTPStatus.BAD_REQUEST, description="Missing or incomplete day key")
+    if not body or not body.get("itineraryId") or not body.get("dayNumber") or not body.get("date"):
+        abort(HTTPStatus.BAD_REQUEST, description="Missing or incomplete day key")
 
-        day = DayService.get_by_key_from_dict(body)
-        return jsonify(DaySchema().dump(day)), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error reading day by key: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    day = DayService.get_by_key_from_dict(body)
+    return jsonify(DaySchema().dump(day)), HTTPStatus.OK
 
 
 @day_api.route("/create", methods=["POST"])
@@ -142,16 +131,11 @@ def create_day():
         return jsonify(DaySchema().dump(created_day)), HTTPStatus.CREATED
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity error creating day: {e}")
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error creating day: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @day_api.route("/<string:id>", methods=['PATCH'])
 @JWTService.authenticate_restful
@@ -193,16 +177,11 @@ def update_day(id: str):
         return jsonify(DaySchema().dump(updated_day)), HTTPStatus.OK
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity error updating day: {e}")
         abort(HTTPStatus.CONFLICT, description="Database integrity constraint violated")
-    except Exception as e:
-        logger.error(f"Error updating day: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 @day_api.route("/<string:id>/assign", methods=["POST"])
 @JWTService.authenticate_restful
@@ -248,15 +227,10 @@ def assign_points(id: str):
             abort(HTTPStatus.BAD_REQUEST, description="startPointId and endPointId are required")
         DayService.assign_points(id, body["startPointId"], body["endPointId"])
         return jsonify({"message": "Points assigned"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except Exception as e:
-        logger.error(f"Error assigning points to day {id}: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @day_api.route("/<string:id>", methods=["DELETE"])
@@ -285,13 +259,8 @@ def delete_day_by_id(id: str):
     try:
         DayService.delete_day(id)
         return jsonify({"message": "Deletion successful"}), HTTPStatus.OK
-    except HTTPException:
-        raise
     except NoResultFound as e:
         abort(HTTPStatus.NOT_FOUND, description=str(e))
     except IntegrityError as e:
         logger.error(f"Integrity error deleting day: {e}")
         abort(HTTPStatus.CONFLICT, description="Cannot delete day due to existing references")
-    except Exception as e:
-        logger.error(f"Error deleting day: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

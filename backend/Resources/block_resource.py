@@ -34,12 +34,8 @@ def list_blocks():
                 items:
                   $ref: '#/components/schemas/BlockSchema'
     """
-    try:
-        blocks = BlockService.list_blocks(g.current_user_id)
-        return jsonify(BlockSchema(many=True).dump(blocks)), HTTPStatus.OK
-    except Exception as e:
-        logger.error(f"Error listing blocks: {e}")
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    blocks = BlockService.list_blocks(g.current_user_id)
+    return jsonify(BlockSchema(many=True).dump(blocks)), HTTPStatus.OK
 
 
 @block_api.route("", methods=["POST"])

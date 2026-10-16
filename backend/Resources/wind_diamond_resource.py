@@ -4,7 +4,6 @@ import logging
 from flask import Blueprint, jsonify, request, abort, g
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Schemas.wind_diamond_schema import WindDiamondSchema, WindDiamondUpdateSchema
 from Services.Middleware.auth_middleware import JWTService
@@ -58,11 +57,6 @@ def create_wind_diamond():
         return jsonify(_dump_schema.dump(diamond)), HTTPStatus.CREATED
     except ValidationError as e:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_wind_diamond_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @wind_diamond_api.route('/api/v1/wind-diamond/by-itinerary/<string:itinerary_id>', methods=['GET'])
@@ -83,14 +77,8 @@ def list_wind_diamonds(itinerary_id: str):
                 items:
                   $ref: '#/components/schemas/WindDiamondSchema'
     """
-    try:
-        diamonds = WindDiamondService.list_by_itinerary(itinerary_id)
-        return jsonify(_dump_schema.dump(diamonds, many=True)), HTTPStatus.OK
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("list_wind_diamonds_error", extra={"itinerary_id": itinerary_id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
+    diamonds = WindDiamondService.list_by_itinerary(itinerary_id)
+    return jsonify(_dump_schema.dump(diamonds, many=True)), HTTPStatus.OK
 
 
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['GET'])
@@ -115,11 +103,6 @@ def get_wind_diamond(id: str):
         return jsonify(_dump_schema.dump(diamond)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Wind diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_wind_diamond_error", extra={"wind_diamond_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['PATCH'])
@@ -155,11 +138,6 @@ def update_wind_diamond(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Wind diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_wind_diamond_error", extra={"wind_diamond_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['DELETE'])
@@ -188,8 +166,3 @@ def delete_wind_diamond(id: str):
         return jsonify({"message": "Wind diamond deleted"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Wind diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("delete_wind_diamond_error", extra={"wind_diamond_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))

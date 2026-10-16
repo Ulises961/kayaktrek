@@ -4,7 +4,6 @@ import logging
 from flask import Blueprint, jsonify, request, abort, g
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
-from werkzeug.exceptions import HTTPException
 
 from Schemas.tidal_station_schema import (
     TidalDiamondCreateSchema,
@@ -65,11 +64,6 @@ def create_diamond():
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("create_diamond_error", extra={"error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['GET'])
@@ -97,11 +91,6 @@ def get_diamond(id: str):
         return jsonify(_edit_schema.dump(view)), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("get_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['PATCH'])
@@ -142,11 +131,6 @@ def update_diamond(id: str):
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("update_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
 
 
 @tidal_diamond_api.route('/api/v1/tidal-diamond/<string:id>', methods=['DELETE'])
@@ -176,8 +160,3 @@ def delete_diamond(id: str):
         return jsonify({"message": "Tidal diamond deleted"}), HTTPStatus.OK
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="Tidal diamond not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("delete_diamond_error", extra={"station_id": id, "error": str(e)})
-        abort(HTTPStatus.INTERNAL_SERVER_ERROR, description=str(e))
