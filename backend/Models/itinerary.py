@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from sqlalchemy import UUID, Boolean, DateTime, Integer, Numeric, ForeignKey, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
@@ -25,8 +26,8 @@ class Itinerary(BaseModel):
     )
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     avg_speed_knots: Mapped[float] = mapped_column(Float, nullable=False, default=2.5)
-    total_miles: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
-    expected_total_miles: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    total_miles: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
+    expected_total_miles: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     trip_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("trip.id"), nullable=True, unique=True)
     user_id: Mapped[Optional[_UUID]] = mapped_column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     created_from_id: Mapped[Optional[_UUID]] = mapped_column(
