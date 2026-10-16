@@ -1,9 +1,9 @@
 ---
 id: mobile-offline
 title: "Mobile & Offline: Sync Protocol, Conflict Resolution, GPS Integration"
-abstract: Backend, web, and mobile are the product together (2026-08-23) — mobile is at parity with web, not a stripped-down companion. M9 (built) is that parity, network-mutate-first, no offline requirement. The offline-native layer this document actually specifies — WatermelonDB sync, device mutation queue, conflict resolution, GPS integration — is its own milestone, M26 (split 2026-09-07), not yet built. Expo managed + EAS, MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
-implementation: not-built
-implementation_note: mobile/ exists and ships real, verified code — M9a/M9b/M9b2/M9b3/M9i are built and on real devices. What remains not-built is specifically this document's own subject — no WatermelonDB dependency, no device mutation queue, no sync-down/sync-up implementation anywhere in mobile/package.json. Design only, awaiting M26.
+abstract: Backend, web, and mobile are the product together (2026-08-23) — mobile is at parity with web, not a stripped-down companion. M9 (built) is that parity, network-mutate-first, no offline requirement. The offline-native layer this document actually specifies — WatermelonDB sync, device mutation queue, conflict resolution, GPS integration — is its own milestone, M26 (split 2026-09-07), partly built. Expo managed + EAS, MapLibre RN, BLE/NMEA GPS, satellite communicator feed polling.
+implementation: partial
+implementation_note: Sync-down (M9c) and the offline mutation queue, route editor and conflict flow (M9d, minus WP9 check-in) are built, merged and device-tested; the free-tier offline map tiles (part of M9g) are built. Not built — live tracking (M9e), external GPS (M9f), the premium tile tier and store hardening (M9h). The mobile app itself is unreleased. Status per sub-milestone is in plans/M26.md.
 status: accepted
 date: 2026-06-10
 deciders: []
@@ -20,10 +20,11 @@ tags: [mobile, offline, sync, gps]
 > justification; it was conflated into M9's number for lack of a second one at the time. It has one
 > now. Read every "M9" reference below dated before 2026-09-07 as "M26."
 >
-> `implementation: not-built` remains accurate for M26 specifically: there is no WatermelonDB or
-> device-mutation-queue dependency in `mobile/package.json`, and no sync-down/sync-up code
-> anywhere in `mobile/`. Everything below is design awaiting M26, not a description of anything
-> running.
+> `implementation: partial` for M26 as of 2026-10-16: sync-down (M9c), the mutation queue and
+> offline route editor (M9d) and free-tier map tiles (M9g) are built — see `mobile/lib/db/` and
+> `Services/mobile_sync_service.py` — while live tracking (M9e), external GPS (M9f) and store
+> hardening (M9h) are design only. `plans/M26.md` holds the per-sub-milestone status; where this
+> document and the code disagree about a built part, the code is right.
 >
 > Historical note, kept for the record rather than because it still matters operationally: this
 > document also used to record, as a settled decision, that a **PWA-offline tier ships first**
@@ -32,8 +33,9 @@ tags: [mobile, offline, sync, gps]
 > step between M18 and M9/M26. Every PWA mention in the phasing section below survives as history,
 > not as a plan.
 >
-> Treat every mechanism here as a proposal to be checked against the schema and the client as they
-> actually are when M26 starts, not as a description of anything running.
+> For the parts still unbuilt (live tracking, external GPS, hardening), treat each mechanism here
+> as a proposal to be checked against the schema and the client as they actually are when that
+> sub-milestone starts.
 
 This document covers the design of the React Native mobile client's offline-native layer (M26) — why offline-first is non-negotiable for a maritime app, how the local and server databases are kept in sync, how conflicts are resolved, what gets synced and what doesn't, and how external GPS devices fit into the position-tracking model.
 
