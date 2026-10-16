@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 import numpy as np
 import openmeteo_requests
@@ -94,7 +95,7 @@ def _reindex_to_hourly_grid(records: list[dict], var_names: list[str]) -> list[d
     return grid
 
 
-def _parse_hourly(response, var_names: list[str]) -> list[dict]:
+def _parse_hourly(response: Any, var_names: list[str]) -> list[dict]:
     hourly = response.Hourly()
     start_ts = hourly.Time()
     interval = hourly.Interval()

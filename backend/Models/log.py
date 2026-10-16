@@ -43,5 +43,5 @@ class Log(BaseModel):
         secondary=user_endorses_log, back_populates='endorsed_logs'
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Log "{self.id}, User {self.user_id}">'

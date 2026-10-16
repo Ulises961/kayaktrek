@@ -17,6 +17,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy import or_
+from sqlalchemy.orm import Query
 
 from Api.database import db
 from Models.day import Day
@@ -187,7 +188,7 @@ class MobileSyncService:
         ]
 
     @staticmethod
-    def _weather_query(trip_id: UUID, cutoff: Optional[datetime]):
+    def _weather_query(trip_id: UUID, cutoff: Optional[datetime]) -> Query[Weather]:
         query = (
             db.session.query(Weather)
             .join(Day, Weather.day_id == Day.id)
@@ -287,7 +288,7 @@ class MobileSyncService:
         return rows
 
     @staticmethod
-    def _sea_query(trip_id: UUID, cutoff: Optional[datetime]):
+    def _sea_query(trip_id: UUID, cutoff: Optional[datetime]) -> Query[Sea]:
         query = (
             db.session.query(Sea)
             .join(Day, Sea.day_id == Day.id)

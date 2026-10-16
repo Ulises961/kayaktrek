@@ -2,10 +2,12 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
+from flask import Flask
+
 from Services.Utils.logging_utils import JsonFormatter, RequestContextFilter
 
 
-def setup_logging(app) -> None:
+def setup_logging(app: Flask) -> None:
     if app.config.get("DEBUG"):
         log_level = logging.DEBUG
     elif app.config.get("TESTING"):

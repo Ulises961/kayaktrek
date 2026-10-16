@@ -17,5 +17,5 @@ class Image(BaseModel):
     # showing an anonymous photo, because most authors will not write one.
     caption: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Image "{self.name} @ {self.location}">'

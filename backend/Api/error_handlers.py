@@ -2,7 +2,7 @@
 Centralized error handlers for the application.
 Register these handlers in the app factory.
 """
-from flask import jsonify
+from flask import Flask, Response, jsonify
 from flask_limiter.errors import RateLimitExceeded
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError, NoResultFound
 from marshmallow import ValidationError
@@ -13,8 +13,11 @@ from Api.database import db
 
 logger = logging.getLogger(__name__)
 
+# What every handler returns: a JSON body and the status to send it with.
+ErrorResponse = tuple[Response, int]
 
-def register_error_handlers(app):
+
+def register_error_handlers(app: Flask) -> None:
     """
     Register all error handlers with the Flask application.
 
@@ -23,7 +26,7 @@ def register_error_handlers(app):
     """
 
     @app.errorhandler(NoResultFound)
-    def handle_no_result_found(error):
+    def handle_no_result_found(error: NoResultFound) -> ErrorResponse:
         """Handle database query with no results."""
         logger.warning(f"Resource not found: {str(error)}")
         return jsonify({
@@ -32,7 +35,7 @@ def register_error_handlers(app):
         }), 404
 
     @app.errorhandler(IntegrityError)
-    def handle_integrity_error(error):
+    def handle_integrity_error(error: IntegrityError) -> ErrorResponse:
         """Handle database integrity constraint violations."""
         db.session.rollback()
         logger.error(f"Database integrity error: {str(error)}")
@@ -42,7 +45,7 @@ def register_error_handlers(app):
         }), 400
 
     @app.errorhandler(ValidationError)
-    def handle_validation_error(error):
+    def handle_validation_error(error: ValidationError) -> ErrorResponse:
         """Handle Marshmallow schema validation errors."""
         logger.warning(f"Validation error: {error.messages}")
         return jsonify({
@@ -52,7 +55,7 @@ def register_error_handlers(app):
         }), 422
 
     @app.errorhandler(SQLAlchemyError)
-    def handle_sqlalchemy_error(error):
+    def handle_sqlalchemy_error(error: SQLAlchemyError) -> ErrorResponse:
         """Handle general SQLAlchemy database errors."""
         db.session.rollback()
         logger.error(f"Database error: {str(error)}")
@@ -62,7 +65,7 @@ def register_error_handlers(app):
         }), 500
 
     @app.errorhandler(ValueError)
-    def handle_value_error(error):
+    def handle_value_error(error: ValueError) -> ErrorResponse:
         """Handle ValueError exceptions."""
         logger.warning(f"Value error: {str(error)}")
         return jsonify({
@@ -71,7 +74,7 @@ def register_error_handlers(app):
         }), 400
 
     @app.errorhandler(KeyError)
-    def handle_key_error(error):
+    def handle_key_error(error: KeyError) -> ErrorResponse:
         """Handle missing required fields. The key name is logged (useful for debugging)
         but not echoed to the client — same posture as the ValueError handler, and this
         one can fire from internal config/env-var lookups, not just request payloads."""
@@ -82,7 +85,7 @@ def register_error_handlers(app):
         }), 400
 
     @app.errorhandler(RateLimitExceeded)
-    def handle_rate_limit(error):
+    def handle_rate_limit(error: RateLimitExceeded) -> Response:
         """Handle rate limit breaches — always includes Retry-After."""
         logger.info(f"HTTP exception: 429 - {error.description}")
         response = jsonify({"error": "Too Many Requests", "message": error.description})
@@ -91,16 +94,16 @@ def register_error_handlers(app):
         return response
 
     @app.errorhandler(HTTPException)
-    def handle_http_exception(error):
+    def handle_http_exception(error: HTTPException) -> ErrorResponse:
         """Handle Flask/Werkzeug HTTP exceptions."""
         logger.info(f"HTTP exception: {error.code} - {error.description}")
         return jsonify({
             "error": error.name,
             "message": error.description
-        }), error.code
+        }), error.code or 500
 
     @app.errorhandler(404)
-    def handle_404(error):
+    def handle_404(error: NotFound) -> ErrorResponse:
         """Handle 404 Not Found errors.
 
         Two different things arrive here: no route matched the URL, or a handler
@@ -120,7 +123,7 @@ def register_error_handlers(app):
         }), 404
 
     @app.errorhandler(405)
-    def handle_405(error):
+    def handle_405(error: HTTPException) -> ErrorResponse:
         """Handle 405 Method Not Allowed errors."""
         return jsonify({
             "error": "Method Not Allowed",
@@ -128,7 +131,7 @@ def register_error_handlers(app):
         }), 405
 
     @app.errorhandler(500)
-    def handle_500(error):
+    def handle_500(error: HTTPException) -> ErrorResponse:
         """Handle 500 Internal Server Error."""
         logger.error(f"Internal server error: {str(error)}")
         return jsonify({
@@ -137,7 +140,7 @@ def register_error_handlers(app):
         }), 500
 
     @app.errorhandler(Exception)
-    def handle_unexpected_error(error):
+    def handle_unexpected_error(error: Exception) -> ErrorResponse:
         """Catch-all handler for unexpected errors."""
         db.session.rollback()
         logger.exception(f"Unexpected error: {str(error)}")
@@ -147,7 +150,7 @@ def register_error_handlers(app):
         }), 500
 
     @app.after_request
-    def roll_back_failed_requests(response):
+    def roll_back_failed_requests(response: Response) -> Response:
         """A request that ends in an error response leaves no half-done work behind.
 
         Holds however the error was produced — a resource's own abort(), a mapped exception,
@@ -159,7 +162,7 @@ def register_error_handlers(app):
         return response
 
     @app.errorhandler(PermissionError)
-    def handle_permission_error(error):
+    def handle_permission_error(error: PermissionError) -> ErrorResponse:
         """A service refused the caller; the message it raised was written for them.
 
         The builtin PermissionError is also what the OS raises for a file it cannot open,

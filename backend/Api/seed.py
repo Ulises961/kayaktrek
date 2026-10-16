@@ -8,6 +8,7 @@ from Models.item_category import ItemCategory
 from Models.item import Item, ItemStatusType
 from Models.personal_packing_item import PersonalPackingItem
 from Models.place_category import PlaceCategory
+from Models.trip_member import TripMember
 
 DEFAULT_CATEGORIES = [
     {"slug": "gear",       "name": "Gear"},
@@ -151,7 +152,7 @@ def seed_item_categories() -> None:
     db.session.commit()
 
 
-def seed_member_packing(member) -> None:
+def seed_member_packing(member: TripMember) -> None:
     """Seed a trip member's private packing list from the default personal kit.
 
     Called wherever a TripMember is minted — the leader at trip creation, crew on

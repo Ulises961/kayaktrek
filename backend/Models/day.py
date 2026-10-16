@@ -39,5 +39,5 @@ class Day(BaseModel):
         foreign_keys="Sea.day_id", uselist=False, cascade="all, delete,save-update"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Day "{self.day_number}, Date {self.date}, Itinerary {self.itinerary_id}">'

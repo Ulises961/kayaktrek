@@ -24,7 +24,7 @@ itinerary_route_sync_service.py), since its correctness spans many records.
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from uuid import UUID
 
 from flask import g
@@ -265,7 +265,7 @@ def _reason(error: Exception) -> str:
     return str(error) or error.__class__.__name__
 
 
-def _result(mutation_id: object, status: str, reason: Optional[str] = None, **extra) -> dict:
+def _result(mutation_id: object, status: str, reason: Optional[str] = None, **extra: Any) -> dict:
     result = {"mutationId": str(mutation_id), "status": status, **extra}
     if reason:
         result["reason"] = reason

@@ -8,7 +8,7 @@ by checking ownership chains through the database relationships.
 from functools import wraps
 from http import HTTPStatus
 import logging
-from typing import Optional
+from typing import Any, Callable, Optional
 from uuid import UUID
 
 from flask import abort, g, request
@@ -37,15 +37,18 @@ from Services.trip_service import TripService
 
 logger = logging.getLogger(__name__)
 
+# What each `require_*` factory returns: a decorator that wraps a view function.
+ViewDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
-def require_admin():
+
+def require_admin() -> ViewDecorator:
     """
     Decorator that allows only admin users to call the endpoint.
     Looks up the user from the DB; admins bypass all ownership checks.
     """
-    def decorator(f):
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             current_user_id = g.get("current_user_id")
             if not current_user_id:
                 abort(HTTPStatus.UNAUTHORIZED, description="Authentication required")
@@ -57,15 +60,15 @@ def require_admin():
     return decorator
 
 
-def require_self(id_param: str = "id"):
+def require_self(id_param: str = "id") -> ViewDecorator:
     """
     Decorator that requires the authenticated user to be the same user identified
     by the URL parameter ``id_param``. Admins bypass the check.
     """
 
-    def decorator(f):
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             current_user_id = g.get("current_user_id")
             target_id = kwargs.get(id_param)
             if not current_user_id:
@@ -79,7 +82,7 @@ def require_self(id_param: str = "id"):
     return decorator
 
 
-def require_leader(id_param: str = "id"):
+def require_leader(id_param: str = "id") -> ViewDecorator:
     """
     Decorator that requires the current user to be the leader of the trip.
 
@@ -89,9 +92,9 @@ def require_leader(id_param: str = "id"):
     Returns 403 if the user is crew (not a leader).
     """
 
-    def decorator(f):
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             user_id = g.get("current_user_id")
             trip_id = kwargs.get(id_param)
             if not user_id or not trip_id:
@@ -115,8 +118,13 @@ def require_leader(id_param: str = "id"):
 
 
 def require_owner(
-    resource_type, *, id_param="id", from_body=False, parent_resource=None, read_only=False
-):
+    resource_type: str,
+    *,
+    id_param: str = "id",
+    from_body: bool = False,
+    parent_resource: Optional[tuple[str, str]] = None,
+    read_only: bool = False,
+) -> ViewDecorator:
     """
     Decorator to ensure user owns the resource or has access to it.
 
@@ -143,9 +151,9 @@ def require_owner(
         @require_owner('day', id_param='id')
     """
 
-    def decorator(f):
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def decorator_function(*args, **kwargs):
+        def decorator_function(*args: Any, **kwargs: Any) -> Any:
             # Get current user from g (set by authenticate_restful)
             user_id = g.get("current_user_id")
             if not user_id:

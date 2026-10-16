@@ -11,11 +11,12 @@ to come back and probe it, which is the opposite of what parking is for.
 
 from functools import wraps
 from http import HTTPStatus
+from typing import Any, Callable
 
 from flask import abort, current_app
 
 
-def require_medical_notes(view):
+def require_medical_notes(view: Callable[..., Any]) -> Callable[..., Any]:
     """404 every medical-notes endpoint unless `MEDICAL_NOTES_ENABLED` is set.
 
     Stack this directly under `@blueprint.route(...)`, above the auth decorators, so an
@@ -30,7 +31,7 @@ def require_medical_notes(view):
     """
 
     @wraps(view)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not current_app.config.get("MEDICAL_NOTES_ENABLED"):
             abort(HTTPStatus.NOT_FOUND)
         return view(*args, **kwargs)
@@ -38,5 +39,5 @@ def require_medical_notes(view):
     # Read by Api/openapi.py, which omits gated paths from the published contract while
     # their flag is off. Set after @wraps, which would otherwise copy the wrapped view's
     # __dict__ over it.
-    wrapper._feature_flag = "MEDICAL_NOTES_ENABLED"
+    wrapper._feature_flag = "MEDICAL_NOTES_ENABLED"  # type: ignore[attr-defined]
     return wrapper

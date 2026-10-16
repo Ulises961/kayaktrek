@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 import logging
 
@@ -119,7 +119,7 @@ class TravelDocumentService:
                     value = TravelDocumentType(value)
                 setattr(doc, field, value)
 
-        def _as_date(v):
+        def _as_date(v: Any) -> Optional[date]:
             if v is None:
                 return None
             if isinstance(v, date):

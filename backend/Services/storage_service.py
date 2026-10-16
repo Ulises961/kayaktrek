@@ -5,7 +5,7 @@ from typing import Literal
 import boto3
 from functools import lru_cache
 import magic
-from botocore.client import Config
+from botocore.client import BaseClient, Config
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
@@ -167,7 +167,7 @@ def public_asset_url(key: str) -> str:
 
 
 @lru_cache(maxsize=8)
-def _build_client(endpoint: str, access_key: str, secret_key: str, region: str):
+def _build_client(endpoint: str, access_key: str, secret_key: str, region: str) -> BaseClient:
     """One client per endpoint, reused.
 
     A fresh boto3 client per operation costs a TLS handshake on every upload. Against a
@@ -191,7 +191,7 @@ def _build_client(endpoint: str, access_key: str, secret_key: str, region: str):
     )
 
 
-def _client(endpoint: str | None = None):
+def _client(endpoint: str | None = None) -> BaseClient:
     # `endpoint or _ENDPOINT` rather than a default argument: a default is bound once at
     # definition time, so `monkeypatch.setattr(storage_service, "_ENDPOINT", ...)` in a
     # test would set a value this function never reads.

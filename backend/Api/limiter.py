@@ -5,7 +5,7 @@ from flask_limiter.util import get_remote_address
 
 from flask import g
 
-def user_or_ip():
+def user_or_ip() -> str:
     if hasattr(g, "current_user_id") and g.current_user_id:
         return f"user:{g.current_user_id}"
     return get_remote_address()

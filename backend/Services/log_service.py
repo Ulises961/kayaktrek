@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, cast
 from uuid import UUID
 from sqlalchemy.exc import NoResultFound, IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Query, selectinload
 
 from Schemas.base_schema import camelcase
 
@@ -102,12 +102,12 @@ class LogService:
 
     @staticmethod
     def _apply_log_filters(
-        query,
+        query: Query[Log],
         min_sea: Optional[int],
         max_sea: Optional[int],
         min_distance: Optional[float],
         max_distance: Optional[float],
-    ):
+    ) -> Query[Log]:
         """Shared range-filter application for the /all and /endorsed log listings."""
         if min_sea is not None:
             query = query.filter(Log.avg_sea >= min_sea)

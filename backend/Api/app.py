@@ -70,7 +70,7 @@ from Services.Utils import sync_tombstones  # noqa: F401
 from Services.Utils import trip_change_events  # noqa: F401
 
 
-def createApp(config_mode: str, *, schema: str | None = None):
+def createApp(config_mode: str, *, schema: str | None = None) -> Flask:
     """
     Creates and configurates the Flask app, the logger to be used throughout  the application
     and the database to use. Returns the configured app that is to be used in the main function.
@@ -135,7 +135,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
     cache.init_app(app)
 
     @app.cli.command("seed")
-    def seed_command():
+    def seed_command() -> None:
         """Seed static reference data (item/place categories). Idempotent — safe to run
         on every deploy. Invoked from the `migrate` compose step after `alembic upgrade
         head`, not at app-factory time, where every gunicorn worker and every Celery and
@@ -163,7 +163,7 @@ def createApp(config_mode: str, *, schema: str | None = None):
         )
 
     @app.before_request
-    def attach_request_id():
+    def attach_request_id() -> None:
         g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
 
     register_error_handlers(app)

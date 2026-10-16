@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.day import Day
@@ -19,7 +21,7 @@ _RETENTION_DAYS = 30
 
 
 @celery_app.task(name="Tasks.expedition_log_task.generate_trip_day_logs", bind=True)
-def generate_trip_day_logs(self, trip_id: str, day_date_iso: str, request_id: Optional[str] = None) -> None:
+def generate_trip_day_logs(self: Task, trip_id: str, day_date_iso: str, request_id: Optional[str] = None) -> None:
     """Generate an auto Log for every crew member of `trip_id` for one trip-local day."""
     day_date = date.fromisoformat(day_date_iso)
     members = db.session.query(TripMember).filter(TripMember.trip_id == UUID(trip_id)).all()
@@ -53,7 +55,7 @@ def generate_trip_day_logs(self, trip_id: str, day_date_iso: str, request_id: Op
 
 
 @celery_app.task(name="Tasks.expedition_log_task.nightly_log_fallback", bind=True)
-def nightly_log_fallback(self, request_id: Optional[str] = None) -> None:
+def nightly_log_fallback(self: Task, request_id: Optional[str] = None) -> None:
     """Nightly safety net: close out yesterday's Day for every happening trip that
     hasn't had its logs generated another way (the primary trigger is the leader's
     Navigate-mode "close day" action, §8.3). Also runs the D3 position-ping

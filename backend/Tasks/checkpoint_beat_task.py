@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from celery import Task
 from flask import current_app
 from sqlalchemy.orm import selectinload
 
@@ -39,7 +40,7 @@ def _alert_threshold() -> timedelta:
 
 
 @celery_app.task(name="Tasks.checkpoint_beat_task.check_missed_checkpoints", bind=True)
-def check_missed_checkpoints(self, request_id: Optional[str] = None) -> None:
+def check_missed_checkpoints(self: Task, request_id: Optional[str] = None) -> None:
     """Alert the shore contact when a happening trip has gone quiet on a day it
     expected a checkpoint. Runs hourly (see Api/celery_app.py beat_schedule).
 

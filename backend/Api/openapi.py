@@ -7,8 +7,9 @@ import marshmallow
 from apispec import APISpec, yaml_utils
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec_webframeworks.flask import FlaskPlugin
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
+from werkzeug.routing import Rule
 
 import Schemas
 
@@ -29,7 +30,7 @@ _CONVERTER_SCHEMAS = {
 _DEFAULT_PARAM_SCHEMA = {"type": "string"}
 
 
-def _path_parameters(rule) -> list[dict]:
+def _path_parameters(rule: Rule) -> list[dict]:
     """OpenAPI requires every {param} in a path template to have a matching `parameters` entry
     (openapi-spec-validator enforces this — UnresolvableParameterError otherwise). apispec's
     FlaskPlugin substitutes <converter:name> into {name} in the path string but doesn't declare
@@ -176,7 +177,7 @@ def setup_openapi(app: Flask) -> None:
     spec_dict = spec.to_dict()
 
     @app.route(OPENAPI_SPEC_ENDPOINT)
-    def openapi_json():
+    def openapi_json() -> Response:
         return jsonify(spec_dict)
 
     swagger_ui_blueprint = get_swaggerui_blueprint(

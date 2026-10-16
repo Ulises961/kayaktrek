@@ -1,3 +1,4 @@
+from datetime import time as _time
 from Api.database import Base
 from sqlalchemy import UUID, Time, Numeric, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,7 +17,7 @@ class SeaState(Base):
     )
 
     day_id: Mapped[_UUID] = mapped_column(UUID, primary_key=True)
-    time: Mapped[Time] = mapped_column(Time, primary_key=True)
+    time: Mapped[_time] = mapped_column(Time, primary_key=True)
     wave_height: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     wave_direction: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)
     swell_wave_height: Mapped[Optional[float]] = mapped_column(Numeric(asdecimal=False), nullable=True)

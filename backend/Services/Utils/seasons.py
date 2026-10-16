@@ -4,6 +4,7 @@ Season is a *derived* facet of a public itinerary — inferred from its days' ca
 dates and the route's latitude — never stored. A June paddle is summer in the northern
 hemisphere but winter in the southern, so every mapping takes a representative latitude.
 """
+from typing import Iterable, Optional
 
 VALID_SEASONS = frozenset({"winter", "spring", "summer", "autumn"})
 
@@ -24,12 +25,12 @@ _OPPOSITE = {
 }
 
 
-def season_months(seasons, hemisphere_lat: float) -> set:
+def season_months(seasons: Optional[Iterable[object]], hemisphere_lat: float) -> set[int]:
     """Calendar months (1-12) that count as in-season for the requested seasons.
 
     Unknown tokens are ignored. `hemisphere_lat >= 0` is treated as northern.
     """
-    months: set = set()
+    months: set[int] = set()
     for season in seasons or []:
         token = str(season).strip().lower()
         if token not in VALID_SEASONS:

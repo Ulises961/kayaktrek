@@ -3,7 +3,7 @@ from http import HTTPStatus
 import jwt
 from werkzeug.exceptions import HTTPException
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Dict
+from typing import Any, Callable, Optional, Dict
 from flask import current_app, abort, g, request
 from Services.session_service import ACCESS_TOKEN_LIFETIME, REFRESH_TOKEN_LIFETIME, SessionService
 from Services.user_service import UserService
@@ -108,11 +108,11 @@ class JWTService:
         return JWTService.generate_token(payload)
 
     @staticmethod
-    def require_elevated_token(f):
+    def require_elevated_token(f: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator: verifies X-Elevated-Token header carries a valid elevated JWT
         issued for the same user as the active session."""
         @wraps(f)
-        def decorator(*args, **kwargs):
+        def decorator(*args: Any, **kwargs: Any) -> Any:
             token = request.headers.get("X-Elevated-Token")
             if not token:
                 abort(HTTPStatus.FORBIDDEN, description="Re-authentication required")
@@ -160,9 +160,9 @@ class JWTService:
             return None
 
     @staticmethod
-    def authenticate_restful(f):
+    def authenticate_restful(f: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(f)
-        def decorator(*args, **kwargs):
+        def decorator(*args: Any, **kwargs: Any) -> Any:
             auth_header = request.headers.get("Authorization", None)
             if not auth_header:
                 abort(HTTPStatus.UNAUTHORIZED, description="Valid token missing")
@@ -209,18 +209,18 @@ class JWTService:
         # Marks this decorator as one that populates g.current_user_id. The
         # auth-invariant canary test relies on this tag to distinguish routes
         # that legitimately read the current user from a silent auth gap.
-        decorator._populates_current_user = True
+        decorator._populates_current_user = True  # type: ignore[attr-defined]
         # Distinct from the above: authenticate_optional also populates g.current_user_id but
         # never requires a token, so it can't share this marker. The OpenAPI spec builder
         # (Api/openapi.py) reads this to map onto the "security" field automatically —
         # functools.wraps copies __dict__ on every further stacked decorator (require_owner,
         # require_leader, ...), so this propagates to the outermost wrapper Flask actually
         # registers without each of those decorators needing to know about it.
-        decorator._auth_required = True
+        decorator._auth_required = True  # type: ignore[attr-defined]
         return decorator
 
     @staticmethod
-    def authenticate_optional(f):
+    def authenticate_optional(f: Callable[..., Any]) -> Callable[..., Any]:
         """Populate g.current_user_id from a valid token when present, otherwise proceed
         unauthenticated. Never aborts on missing or invalid credentials — the view decides
         what an anonymous caller may see.
@@ -229,7 +229,7 @@ class JWTService:
         request's headers, never on an ambient value left over from a prior request sharing
         the same application context."""
         @wraps(f)
-        def decorator(*args, **kwargs):
+        def decorator(*args: Any, **kwargs: Any) -> Any:
             g.current_user_id = None
             g.current_user_mail = None
             g.current_session_id = None
@@ -255,7 +255,7 @@ class JWTService:
                 except Exception:
                     pass  # malformed/invalid token → remain unauthenticated
             return f(*args, **kwargs)
-        decorator._populates_current_user = True
+        decorator._populates_current_user = True  # type: ignore[attr-defined]
         return decorator
 
    

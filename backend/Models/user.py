@@ -15,7 +15,7 @@ from Models.block import Block
 from datetime import datetime
 from sqlalchemy import String, Boolean, Integer, Text, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from Models.log import Log
@@ -35,7 +35,14 @@ class UnitPreferenceType(enum.Enum):
 class User(BaseModel):
     __tablename__ = "users"
 
-    def __init__(self, pwd=None, endorsed_logs=None, logs=None, id=None, **kwargs):
+    def __init__(
+        self,
+        pwd: Optional[str] = None,
+        endorsed_logs: Optional[List["Log"]] = None,
+        logs: Optional[List["Log"]] = None,
+        id: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         if pwd:
             self.pwd = generate_password_hash(pwd).decode("UTF-8")
 
@@ -183,7 +190,5 @@ class User(BaseModel):
         viewonly=True,
     )
 
-    def __repr__(self):
-        return (
-            f'<User "{self.id} {self.mail}, {self.name}, {self.surname}, {self.pwd}">'
-        )
+    def __repr__(self) -> str:
+        return f'<User "{self.id} {self.mail}, {self.name}, {self.surname}">'

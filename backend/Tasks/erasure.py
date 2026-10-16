@@ -11,6 +11,8 @@ Schedule: daily via Celery Beat (registered in Api/celery_app.py).
 import logging
 from datetime import datetime, timedelta, timezone
 
+from celery import Task
+
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.log import Log
@@ -25,7 +27,7 @@ _GRACE_PERIOD = timedelta(days=30)
 
 
 @celery_app.task(bind=True, name="Tasks.erasure.run_erasure")
-def run_erasure(self, request_id: str | None = None) -> dict:
+def run_erasure(self: Task, request_id: str | None = None) -> dict:
     logger.info("task_started", extra={"task_id": self.request.id, "request_id": request_id})
     cutoff = datetime.now(timezone.utc) - _GRACE_PERIOD
 

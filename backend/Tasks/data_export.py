@@ -16,6 +16,7 @@ from uuid import UUID
 
 from Api.celery_app import celery_app
 from Api.database import db
+from celery import Task
 from flask import current_app
 from Models.auth_token import AuthTokenType
 from Models.user import User
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, name="Tasks.data_export.export_user_data")
-def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
+def export_user_data(self: Task, user_id: str, request_id: str | None = None) -> None:
     logger.info("task_started", extra={"task_id": self.request.id, "request_id": request_id, "user_id": user_id})
     try:
         user = db.session.query(User).filter_by(id=UUID(user_id)).first()
@@ -59,7 +60,7 @@ def export_user_data(self, user_id: str, request_id: str | None = None) -> None:
         raise
 
 
-def _json_default(obj):
+def _json_default(obj: object) -> str:
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Object of type {type(obj)} is not JSON serialisable")
