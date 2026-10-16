@@ -6,6 +6,7 @@ import {
   LockIcon,
   MailIcon,
   RulerIcon,
+  SatelliteDishIcon,
   ScaleIcon,
   ShieldIcon,
 } from "lucide-react-native"
@@ -18,6 +19,7 @@ import { formatDayDate } from "@shared/utils/date"
 import { DISTANCE_UNIT, type DistanceUnit } from "@shared/itinerary/distance"
 import { palette } from "@shared/tokens"
 
+import { SatelliteFeedSection } from "@mobile/components/settings/satellite-feed-section"
 import { Badge } from "@mobile/components/ui/badge"
 import { Button } from "@mobile/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@mobile/components/ui/card"
@@ -152,6 +154,12 @@ export default function SettingsScreen() {
                 loadError={sessionsError}
                 onRevoked={loadSessions}
               />
+
+              {/* Needs the server for everything it does, so it sits beside the other
+                  online-only cards and leaves with them when the device is offline. */}
+              <SectionCard icon={SatelliteDishIcon} title="Satellite tracking">
+                <SatelliteFeedSection />
+              </SectionCard>
 
               <DataCard onNotice={setNotice} />
             </>
