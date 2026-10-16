@@ -20,14 +20,22 @@ Phone connected, USB debugging on, `adb devices` showing it.
 cd mobile
 # the Mi 8 is arm64; the default builds four ABIs and the first build took 31 minutes
 #   edit android/gradle.properties: reactNativeArchitectures=arm64-v8a
-pnpm exec expo prebuild --platform android          # applies the location plugin to android/
-EXPO_PUBLIC_API_URL=https://api.kayaktrek.app pnpm exec expo run:android --variant release --no-bundler
+pnpm exec expo prebuild --platform android --no-install   # applies the location plugin to android/
+#   prebuild regenerates android/ and RESETS gradle.properties: re-apply the arm64 line afterwards
+EXPO_PUBLIC_API_URL=https://api.kayaktrek.app EXPO_PUBLIC_SSE_URL=https://live.kayaktrek.app \
+  pnpm exec expo run:android --variant release --no-bundler
 ```
+
+Both URLs are needed: a release build crashes on launch if either is unset (the first attempt did,
+on `EXPO_PUBLIC_SSE_URL`). The values are the repo's Actions variables. If you rebuild after only a
+JS change, delete `android/app/build/generated/assets/react/release` first.
 
 Release, not debug: a debug build's JS comes from Metro, which is not there on a walk. A release
 build cannot be read with `run-as`, which is fine; the screen summarises the log itself.
 
-Open the spike screen (works in release too):
+**Built and installed on the Mi 8 on 2026-10-17 (00:48).** The app is a release build pointed at
+production, so the normal screens ask for a login; the spike screen does not. Reach it from the
+small **spike** link at the bottom-left of any screen, or, from a computer:
 
 ```bash
 adb shell am start -a android.intent.action.VIEW -d "kayaktrek:///spike-location"
