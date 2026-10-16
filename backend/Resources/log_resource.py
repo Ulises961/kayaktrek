@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import NoResultFound
 from Schemas.log_schema import LogSchema
@@ -17,7 +18,7 @@ log_api = Blueprint('log', __name__, url_prefix=LOG_ENDPOINT)
 
 @log_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_logs():
+def get_logs() -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paginated, sorted, filterable page of a
     user's own logs. Query params: page, per_page (capped 100), sort
@@ -108,7 +109,7 @@ def get_logs():
 
 @log_api.route("/endorsed", methods=["GET"])
 @JWTService.authenticate_restful
-def get_endorsed_logs():
+def get_endorsed_logs() -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paginated, sorted, filterable page of logs
     endorsed by the current user. Same query params as GET /api/log/all.
@@ -197,7 +198,7 @@ def get_endorsed_logs():
 
 @log_api.route("/stats", methods=["GET"])
 @JWTService.authenticate_restful
-def get_stats():
+def get_stats() -> ResponseReturnValue:
     """GET /api/log/stats — aggregate logbook stats for the authenticated user.
     ---
     get:
@@ -245,7 +246,7 @@ def get_stats():
 
 @log_api.route("/<string:id>/endorse", methods=["POST"])
 @JWTService.authenticate_restful
-def endorse_log(id: str):
+def endorse_log(id: str) -> ResponseReturnValue:
     """POST /api/log/<id>/endorse — endorse another paddler's log under the same-trip rule.
 
     Deliberately NOT @require_owner: the endorser is by definition not the author. The
@@ -286,7 +287,7 @@ def endorse_log(id: str):
 
 @log_api.route("/<string:id>/endorse", methods=["DELETE"])
 @JWTService.authenticate_restful
-def unendorse_log(id: str):
+def unendorse_log(id: str) -> ResponseReturnValue:
     """DELETE /api/log/<id>/endorse — withdraw the caller's own endorsement.
 
     Caller-scoped: removing your own endorsement needs no shared-trip recheck.
@@ -315,7 +316,7 @@ def unendorse_log(id: str):
 
 @log_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def post():
+def post() -> ResponseReturnValue:
     """
     LogResource POST method. Adds a new log to the database.
 
@@ -355,7 +356,7 @@ def post():
 @log_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def get_log(id: str):
+def get_log(id: str) -> ResponseReturnValue:
     """
     LogResource GET method. Retrieves a paddling log by id.
     ---
@@ -380,7 +381,7 @@ def get_log(id: str):
 @log_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def update_log(id: str):
+def update_log(id: str) -> ResponseReturnValue:
     """
     PATCH /api/log/<id> — Partially update an existing paddling log.
 
@@ -421,7 +422,7 @@ def update_log(id: str):
 @log_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('log', id_param='id')
-def delete_log(id: str):
+def delete_log(id: str) -> ResponseReturnValue:
     """
     LogResource DELETE method. Deletes a paddling log by id.
     ---

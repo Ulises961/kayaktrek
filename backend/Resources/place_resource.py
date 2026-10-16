@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
@@ -27,7 +28,7 @@ _category_create_schema = PlaceCategoryCreateSchema()
 
 @place_api.route('/api/v1/place-categories', methods=['GET'])
 @JWTService.authenticate_restful
-def get_place_categories():
+def get_place_categories() -> ResponseReturnValue:
     """The seeded catalogue of place kinds, for the create picker and marker icons.
     ---
     get:
@@ -49,7 +50,7 @@ def get_place_categories():
 @place_api.route('/api/v1/place-categories', methods=['POST'])
 @JWTService.authenticate_restful
 @require_admin()
-def create_place_category():
+def create_place_category() -> ResponseReturnValue:
     """Admin-only: extend the seeded place-category catalogue without a migration or a
     raw DB insert.
     ---
@@ -84,7 +85,7 @@ def create_place_category():
 @place_api.route('/api/v1/place/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def create_place():
+def create_place() -> ResponseReturnValue:
     """
     ---
     post:
@@ -120,7 +121,7 @@ def create_place():
 @place_api.route('/api/v1/place/by-itinerary/<string:itinerary_id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
-def list_places(itinerary_id: str):
+def list_places(itinerary_id: str) -> ResponseReturnValue:
     """All places of an itinerary — the marker layer reads this.
     ---
     get:
@@ -142,7 +143,7 @@ def list_places(itinerary_id: str):
 @place_api.route('/api/v1/place/by-itinerary/<string:itinerary_id>/range', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
-def list_places_in_range(itinerary_id: str):
+def list_places_in_range(itinerary_id: str) -> ResponseReturnValue:
     """Places of an itinerary within range_km of (lat, lng), nearest first. The Place
     equivalent of the retired GET /api/point/pois.
     ---
@@ -204,7 +205,7 @@ def list_places_in_range(itinerary_id: str):
 @place_api.route('/api/v1/place/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('place', read_only=True)
-def get_place(id: str):
+def get_place(id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -228,7 +229,7 @@ def get_place(id: str):
 @place_api.route('/api/v1/place/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('place')
-def update_place(id: str):
+def update_place(id: str) -> ResponseReturnValue:
     """
     ---
     patch:
@@ -267,7 +268,7 @@ def update_place(id: str):
 @place_api.route('/api/v1/place/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('place')
-def delete_place(id: str):
+def delete_place(id: str) -> ResponseReturnValue:
     """
     ---
     delete:

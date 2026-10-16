@@ -66,11 +66,12 @@ ignore_missing_imports = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 # Strictness is tightened per layer in the override below, and only once a layer has no
-# unannotated function left: a layer on the list can never gain one. Resources and Schemas
-# are still outside it (plans/M37-discipline-pass.md WP3).
+# unannotated function left: a layer on the list can never gain one. Schemas stay outside
+# on purpose — their functions are marshmallow hooks and validators whose signatures the
+# library dictates, so annotating 175 of them would mostly mean `Any` (plans/M37-discipline-pass.md WP3).
 
 [[tool.mypy.overrides]]
-module = ["Api.*", "Models.*", "Services.*", "Tasks.*"]
+module = ["Api.*", "Models.*", "Resources.*", "Services.*", "Tasks.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 

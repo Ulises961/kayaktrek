@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoResultFound
 
@@ -25,7 +26,7 @@ _dump_schema = WindDiamondSchema()
 @wind_diamond_api.route('/api/v1/wind-diamond/create', methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def create_wind_diamond():
+def create_wind_diamond() -> ResponseReturnValue:
     """
     ---
     post:
@@ -62,7 +63,7 @@ def create_wind_diamond():
 @wind_diamond_api.route('/api/v1/wind-diamond/by-itinerary/<string:itinerary_id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('itinerary', id_param='itinerary_id', read_only=True)
-def list_wind_diamonds(itinerary_id: str):
+def list_wind_diamonds(itinerary_id: str) -> ResponseReturnValue:
     """All wind diamonds of an itinerary — the marker layer reads this.
     ---
     get:
@@ -84,7 +85,7 @@ def list_wind_diamonds(itinerary_id: str):
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('wind_diamond', read_only=True)
-def get_wind_diamond(id: str):
+def get_wind_diamond(id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -108,7 +109,7 @@ def get_wind_diamond(id: str):
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('wind_diamond')
-def update_wind_diamond(id: str):
+def update_wind_diamond(id: str) -> ResponseReturnValue:
     """
     ---
     patch:
@@ -143,7 +144,7 @@ def update_wind_diamond(id: str):
 @wind_diamond_api.route('/api/v1/wind-diamond/<string:id>', methods=['DELETE'])
 @JWTService.authenticate_restful
 @require_owner('wind_diamond')
-def delete_wind_diamond(id: str):
+def delete_wind_diamond(id: str) -> ResponseReturnValue:
     """
     ---
     delete:

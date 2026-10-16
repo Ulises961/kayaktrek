@@ -2,6 +2,7 @@ from http import HTTPStatus
 from typing import cast
 import logging
 from flask import Blueprint, g, jsonify, request, abort, Response
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError
@@ -27,7 +28,7 @@ itinerary_api = Blueprint("itinerary", __name__, url_prefix=ITINERARY_ENDPOINT)
 
 @itinerary_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_itineraries():
+def get_all_itineraries() -> ResponseReturnValue:
     """GET /api/itinerary/all — Return all itineraries owned by the current user.
     ---
     get:
@@ -47,7 +48,7 @@ def get_all_itineraries():
 
 @itinerary_api.route("/explore", methods=["GET"])
 @limiter.limit("30 per minute", key_func=get_remote_address)
-def get_explore():
+def get_explore() -> ResponseReturnValue:
     """GET /api/itinerary/explore — Unauthenticated. Filterable, paginated public-route
     discovery. Query params: page, per_page (capped 100); bbox minLat/minLng/maxLat/maxLng;
     season (repeatable); minMiles/maxMiles; minDays/maxDays; name; sort
@@ -165,7 +166,7 @@ def get_explore():
 
 
 @itinerary_api.route("/<string:id>/public", methods=["GET"])
-def get_public_itinerary(id: str):
+def get_public_itinerary(id: str) -> ResponseReturnValue:
     """GET /api/itinerary/<id>/public — Unauthenticated. Returns 404 if not public.
     ---
     get:
@@ -191,7 +192,7 @@ def get_public_itinerary(id: str):
 
 @itinerary_api.route("/story/public/<token>", methods=["GET"])
 @limiter.limit("30 per minute", key_func=get_remote_address)
-def get_story_by_token(token: str):
+def get_story_by_token(token: str) -> ResponseReturnValue:
     """GET /api/itinerary/story/public/<token> — Unauthenticated, unlisted story link.
     ---
     get:
@@ -218,7 +219,7 @@ def get_story_by_token(token: str):
 @itinerary_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('itinerary', read_only=True)
-def get_itinerary(id: str):
+def get_itinerary(id: str) -> ResponseReturnValue:
     """GET /api/itinerary/<id> — Return itinerary by ID (owner or trip member).
     ---
     get:
@@ -236,7 +237,7 @@ def get_itinerary(id: str):
     change_rev = TripChangeService.current_revision(trip_id) if trip_id is not None else None
     itinerary = ItineraryService.get_itinerary_by_id(id)
     schema = ItinerarySchema()
-    schema.include_staging = True  # type: ignore[attr-defined]
+    schema.include_staging = True
     data = cast(dict, schema.dump(itinerary))
     data["changeRev"] = change_rev
     return jsonify(data), HTTPStatus.OK
@@ -244,7 +245,7 @@ def get_itinerary(id: str):
 
 @itinerary_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_itinerary():
+def create_itinerary() -> ResponseReturnValue:
     """POST /api/itinerary/create — Create a new itinerary.
 
     tripId is optional. If provided, user must be a member of that trip.
@@ -305,7 +306,7 @@ def create_itinerary():
 @itinerary_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def update_itinerary(id: str):
+def update_itinerary(id: str) -> ResponseReturnValue:
     """PATCH /api/itinerary/<id> — Partially update an itinerary (owner only).
     ---
     patch:
@@ -357,7 +358,7 @@ def update_itinerary(id: str):
 @itinerary_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def delete_itinerary(id: str):
+def delete_itinerary(id: str) -> ResponseReturnValue:
     """DELETE /api/itinerary/<id> — Delete an itinerary (owner only).
     ---
     delete:
@@ -392,7 +393,7 @@ def delete_itinerary(id: str):
 @itinerary_api.route("/<string:id>/story-share", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def generate_story_share(id: str):
+def generate_story_share(id: str) -> ResponseReturnValue:
     """POST /api/itinerary/<id>/story-share — Generate/regenerate the unlisted
     story-share link. Regenerating invalidates the previous link.
     ---
@@ -418,7 +419,7 @@ def generate_story_share(id: str):
 @itinerary_api.route("/<string:id>/point-order", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def set_point_order(id: str):
+def set_point_order(id: str) -> ResponseReturnValue:
     """POST /api/itinerary/<id>/point-order — Rewrite the route's order.
     ---
     post:
@@ -467,7 +468,7 @@ def set_point_order(id: str):
 @itinerary_api.route("/<string:id>/staging-day", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def provision_staging_day(id: str):
+def provision_staging_day(id: str) -> ResponseReturnValue:
     """POST /api/itinerary/<id>/staging-day — Return Day 0, creating it if absent.
     ---
     post:
@@ -496,7 +497,7 @@ def provision_staging_day(id: str):
 
 @itinerary_api.route("/<string:id>/fork", methods=["POST"])
 @JWTService.authenticate_restful
-def fork_itinerary(id: str):
+def fork_itinerary(id: str) -> ResponseReturnValue:
     """POST /api/itinerary/<id>/fork — Fork a public itinerary into a private copy.
     ---
     post:
@@ -530,7 +531,7 @@ def fork_itinerary(id: str):
 @itinerary_api.route("/<string:id>/apply-boundaries", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('itinerary')
-def apply_boundaries(id: str):
+def apply_boundaries(id: str) -> ResponseReturnValue:
     """POST /api/itinerary/<id>/apply-boundaries — Batch-apply day boundaries (owner only).
     ---
     post:
@@ -592,7 +593,7 @@ def apply_boundaries(id: str):
     try:
         itinerary = ItineraryService.apply_boundaries(id, boundaries, point_updates)
         schema = ItinerarySchema()
-        schema.include_staging = True  # type: ignore[attr-defined]
+        schema.include_staging = True
         return jsonify(schema.dump(itinerary)), HTTPStatus.OK
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
@@ -602,7 +603,7 @@ def apply_boundaries(id: str):
 
 @itinerary_api.route("/<string:id>/export", methods=["GET"])
 @JWTService.authenticate_optional
-def export_gpx(id: str):
+def export_gpx(id: str) -> ResponseReturnValue:
     """GET /api/itinerary/<id>/export?format=gpx
 
     Authenticated owner/member: full export including notes.
@@ -662,7 +663,7 @@ def export_gpx(id: str):
 
 @itinerary_api.route("/import", methods=["POST"])
 @JWTService.authenticate_restful
-def import_gpx():
+def import_gpx() -> ResponseReturnValue:
     """POST /api/itinerary/import — Import a GPX file (multipart, field name 'file').
     ---
     post:

@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
@@ -16,7 +17,7 @@ catalog_item_api = Blueprint('catalog_item', __name__, url_prefix=CATALOG_ITEM_E
 
 @catalog_item_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_catalog_items():
+def get_all_catalog_items() -> ResponseReturnValue:
     """GET /api/v1/catalog-item/all - Retrieve the caller's shared-requirement template.
     ---
     get:
@@ -37,7 +38,7 @@ def get_all_catalog_items():
 
 @catalog_item_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_catalog_item():
+def create_catalog_item() -> ResponseReturnValue:
     """POST /api/v1/catalog-item/create - Add an item to the caller's template.
 
     Catalog items are personal templates owned by the authenticated user
@@ -74,7 +75,7 @@ def create_catalog_item():
 
 @catalog_item_api.route("/reset-to-default", methods=["POST"])
 @JWTService.authenticate_restful
-def reset_catalog_to_default():
+def reset_catalog_to_default() -> ResponseReturnValue:
     """POST /api/v1/catalog-item/reset-to-default - Bootstrap the caller's empty
     template from DEFAULT_TRIP_REQUIREMENTS. 400 if the caller already has rows.
     ---
@@ -102,7 +103,7 @@ def reset_catalog_to_default():
 @catalog_item_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('catalog_item')
-def update_catalog_item(id: str):
+def update_catalog_item(id: str) -> ResponseReturnValue:
     """
     PATCH /api/v1/catalog-item/<id> — Partially update a catalog item.
 
@@ -141,7 +142,7 @@ def update_catalog_item(id: str):
 @catalog_item_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('catalog_item')
-def delete_catalog_item(id: str):
+def delete_catalog_item(id: str) -> ResponseReturnValue:
     """DELETE /api/v1/catalog-item/<id> - Delete a catalog item by ID
     ---
     delete:

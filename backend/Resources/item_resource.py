@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.item_schema import ItemSchema
@@ -14,7 +15,7 @@ item_api = Blueprint('item', __name__, url_prefix=ITEM_ENDPOINT)
 
 @item_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_items():
+def get_all_items() -> ResponseReturnValue:
     """GET /api/item/all - Retrieve all personal items owned by the current user.
     ---
     get:
@@ -35,7 +36,7 @@ def get_all_items():
 @item_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def get_item(id: str):
+def get_item(id: str) -> ResponseReturnValue:
     """GET /api/item/<id> - Retrieve item by ID
     ---
     get:
@@ -57,7 +58,7 @@ def get_item(id: str):
 
 @item_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_item():
+def create_item() -> ResponseReturnValue:
     """POST /api/item/create - Create a new personal item.
 
     Items are personal gear owned by the authenticated user (stamped from the
@@ -89,7 +90,7 @@ def create_item():
 @item_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def update_item(id: str):
+def update_item(id: str) -> ResponseReturnValue:
     """
     PATCH /api/item/<id> — Partially update an existing item.
 
@@ -133,7 +134,7 @@ def update_item(id: str):
 @item_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('item')
-def delete_item(id: str):
+def delete_item(id: str) -> ResponseReturnValue:
     """DELETE /api/item/<id> - Delete item by ID
     ---
     delete:

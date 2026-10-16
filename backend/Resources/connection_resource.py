@@ -3,6 +3,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
 
 from Schemas.connection_schema import ConnectionSchema
@@ -17,7 +18,7 @@ connection_api = Blueprint("connection", __name__, url_prefix=CONNECTION_ENDPOIN
 
 @connection_api.route("", methods=["GET"])
 @JWTService.authenticate_restful
-def list_connections():
+def list_connections() -> ResponseReturnValue:
     """GET /api/v1/connections?status=pending|accepted — the caller's connections.
     ---
     get:
@@ -52,7 +53,7 @@ def list_connections():
 
 @connection_api.route("/request", methods=["POST"])
 @JWTService.authenticate_restful
-def request_connection():
+def request_connection() -> ResponseReturnValue:
     """POST /api/v1/connections/request — send a buddy request.
 
     Body: {"addresseeUsername": "<name>"} or {"addresseeId": "<uuid>"}.
@@ -111,7 +112,7 @@ def request_connection():
 
 @connection_api.route("/<connection_id>/accept", methods=["POST"])
 @JWTService.authenticate_restful
-def accept_connection(connection_id: str):
+def accept_connection(connection_id: str) -> ResponseReturnValue:
     """POST /api/v1/connections/<id>/accept — addressee accepts a pending request.
     ---
     post:
@@ -139,7 +140,7 @@ def accept_connection(connection_id: str):
 
 @connection_api.route("/<connection_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def remove_connection(connection_id: str):
+def remove_connection(connection_id: str) -> ResponseReturnValue:
     """DELETE /api/v1/connections/<id> — decline a pending request or unfriend.
     ---
     delete:

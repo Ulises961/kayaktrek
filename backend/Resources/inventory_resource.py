@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort, g
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from Schemas.inventory_schema import InventorySchema
@@ -16,7 +17,7 @@ inventory_api = Blueprint('inventory', __name__, url_prefix=INVENTORY_ENDPOINT)
 
 @inventory_api.route("/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_inventories():
+def get_all_inventories() -> ResponseReturnValue:
     """
     GET /api/inventory/all - Retrieve all inventories for current user
     ---
@@ -40,7 +41,7 @@ def get_all_inventories():
 @inventory_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def get_inventory(id: str):
+def get_inventory(id: str) -> ResponseReturnValue:
     """
     GET /api/inventory/<id> - Retrieve inventory by ID
     ---
@@ -64,7 +65,7 @@ def get_inventory(id: str):
 
 @inventory_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def create_inventory():
+def create_inventory() -> ResponseReturnValue:
     """
     POST /api/inventory/create - Create new inventory
     ---
@@ -97,7 +98,7 @@ def create_inventory():
 @inventory_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def update_inventory(id: str):
+def update_inventory(id: str) -> ResponseReturnValue:
     """
     PATCH /api/inventory/<id> — Partially update an existing inventory.
 
@@ -142,7 +143,7 @@ def update_inventory(id: str):
 @inventory_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def delete_inventory(id: str):
+def delete_inventory(id: str) -> ResponseReturnValue:
     """
     DELETE /api/inventory/<id> - Delete inventory by ID
     ---
@@ -177,7 +178,7 @@ def delete_inventory(id: str):
 @inventory_api.route("/<string:id>/requirements", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def add_requirement(id: str):
+def add_requirement(id: str) -> ResponseReturnValue:
     """
     POST /api/inventory/<id>/requirements — Add a requirement to the inventory.
     ---
@@ -207,7 +208,7 @@ def add_requirement(id: str):
 @inventory_api.route("/<string:id>/requirements/<string:req_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def remove_requirement(id: str, req_id: str):
+def remove_requirement(id: str, req_id: str) -> ResponseReturnValue:
     """
     DELETE /api/inventory/<id>/requirements/<req_id> — Remove a requirement.
     ---
@@ -246,7 +247,7 @@ def remove_requirement(id: str, req_id: str):
 @JWTService.authenticate_restful
 @require_owner('inventory')
 @require_owner('item', id_param='itemId', from_body=True)
-def contribute_item(id: str, req_id: str):
+def contribute_item(id: str, req_id: str) -> ResponseReturnValue:
     """
     POST /api/inventory/<id>/requirements/<req_id>/contribute
     Body: {"itemId": "<uuid>"}
@@ -293,7 +294,7 @@ def contribute_item(id: str, req_id: str):
 )
 @JWTService.authenticate_restful
 @require_owner('inventory')
-def unclaim_requirement(id: str, req_id: str):
+def unclaim_requirement(id: str, req_id: str) -> ResponseReturnValue:
     """
     DELETE /api/inventory/<id>/requirements/<req_id>/contribute
     Removes the caller's contribution from the requirement.

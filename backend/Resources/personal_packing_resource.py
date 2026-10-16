@@ -2,6 +2,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
 
 from Schemas.personal_packing_item_schema import PersonalPackingItemSchema
@@ -16,7 +17,7 @@ personal_packing_api = Blueprint('personal_packing', __name__, url_prefix=PACKIN
 
 @personal_packing_api.route("/trip/<string:trip_id>", methods=["GET"])
 @JWTService.authenticate_restful
-def list_packing(trip_id: str):
+def list_packing(trip_id: str) -> ResponseReturnValue:
     """GET /api/packing/trip/<trip_id> — the caller's own packing list for a trip.
     ---
     get:
@@ -41,7 +42,7 @@ def list_packing(trip_id: str):
 
 @personal_packing_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def add_packing():
+def add_packing() -> ResponseReturnValue:
     """POST /api/packing/create — Body: {"tripId": "<uuid>", "itemId": "<uuid>"}.
     Adds one of the caller's owned items to their private packing list for the trip.
     ---
@@ -91,7 +92,7 @@ def add_packing():
 
 @personal_packing_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
-def update_packing(id: str):
+def update_packing(id: str) -> ResponseReturnValue:
     """PATCH /api/packing/<id> — Body: {"checked": bool}. Toggles packed state on the
     caller's own entry.
     ---
@@ -136,7 +137,7 @@ def update_packing(id: str):
 
 @personal_packing_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def delete_packing(id: str):
+def delete_packing(id: str) -> ResponseReturnValue:
     """DELETE /api/packing/<id> — Remove the caller's own packing entry.
     ---
     delete:

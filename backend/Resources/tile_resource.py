@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from flask import Blueprint, Response
+from flask.typing import ResponseReturnValue
 from flask_limiter.util import get_remote_address
 import logging
 
@@ -17,7 +18,7 @@ tile_api = Blueprint("tile", __name__, url_prefix=TILE_ENDPOINT)
 # Sized for one device downloading a map region at full speed, not just panning. Kept
 # bounded because the route is public and every cache miss is a request to OSM.
 @limiter.limit("3000 per minute", key_func=get_remote_address)
-def get_tile(layer: str, z: int, x: int, y: int):
+def get_tile(layer: str, z: int, x: int, y: int) -> ResponseReturnValue:
     """
     ---
     get:

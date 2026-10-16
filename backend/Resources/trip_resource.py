@@ -4,6 +4,7 @@ from typing import Any, Dict, cast
 import logging
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
 from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
@@ -31,7 +32,7 @@ _LEADER_SEALED_FIELDS = ("ciphertext", "nonce", "ephemeralKey")
 @trip_api.route("/<string:id>", methods=["GET"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def get_trip(id: str):
+def get_trip(id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves trip by id.
 
@@ -69,7 +70,7 @@ def get_trip(id: str):
 
 @trip_api.route("/<string:user_id>/all", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_user_trips(user_id: str):
+def get_all_user_trips(user_id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves a paginated, filterable page of a user's trips.
 
@@ -171,7 +172,7 @@ def get_all_user_trips(user_id: str):
 
 @trip_api.route("/<string:user_id>/invitations", methods=["GET"])
 @JWTService.authenticate_restful
-def get_all_user_invitations(user_id: str):
+def get_all_user_invitations(user_id: str) -> ResponseReturnValue:
     """
     TripResource GET method. Retrieves trip(s) by ID or all trips.
 
@@ -203,7 +204,7 @@ def get_all_user_invitations(user_id: str):
 
 @trip_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
-def post():
+def post() -> ResponseReturnValue:
     """
     TripResource POST method. Adds a new trip to the database.
 
@@ -235,7 +236,7 @@ def post():
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def transition_state(id: str):
+def transition_state(id: str) -> ResponseReturnValue:
     """
     Transition a trip's state forward (draft → planning → happening → past).
 
@@ -287,7 +288,7 @@ def transition_state(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def pause_trip(id: str):
+def pause_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/pause — Leader pauses a happening expedition.
 
@@ -319,7 +320,7 @@ def pause_trip(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def resume_trip(id: str):
+def resume_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/resume — Leader resumes a paused expedition.
 
@@ -376,7 +377,7 @@ def resume_trip(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def abort_trip(id: str):
+def abort_trip(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/abort — Leader ends a paused expedition early.
 
@@ -409,7 +410,7 @@ def abort_trip(id: str):
 @trip_api.route("/<string:id>", methods=["PATCH"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def update_trip(id: str):
+def update_trip(id: str) -> ResponseReturnValue:
     """
     PATCH /api/trip/<id> — Partially update an existing trip.
 
@@ -458,7 +459,7 @@ def update_trip(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def invite_user(id: str):
+def invite_user(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/invite — Leader invites a user to the trip.
 
@@ -523,7 +524,7 @@ def invite_user(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def cancel_invitation(id: str, invitee_id: str):
+def cancel_invitation(id: str, invitee_id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/invite/<invitee_id> — Leader cancels a pending invitation.
 
@@ -553,7 +554,7 @@ def cancel_invitation(id: str, invitee_id: str):
 
 @trip_api.route("/<string:id>/invitation", methods=["POST"])
 @JWTService.authenticate_restful
-def handle_invitation(id: str):
+def handle_invitation(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/invitation — Current user accepts or declines their invitation.
 
@@ -602,7 +603,7 @@ def handle_invitation(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def remove_member(id: str, user_id: str):
+def remove_member(id: str, user_id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/member/<user_id> — Leader removes a crew member from the trip.
 
@@ -636,7 +637,7 @@ def remove_member(id: str, user_id: str):
 
 @trip_api.route("/<string:id>/member/me", methods=["GET"])
 @JWTService.authenticate_restful
-def get_my_membership(id: str):
+def get_my_membership(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me — Get the caller's own membership/float-plan record.
     ---
@@ -660,7 +661,7 @@ def get_my_membership(id: str):
 
 @trip_api.route("/<string:id>/member/me", methods=["PATCH"])
 @JWTService.authenticate_restful
-def update_my_float_plan(id: str):
+def update_my_float_plan(id: str) -> ResponseReturnValue:
     """
     PATCH /api/trip/<id>/member/me — Update the caller's own float-plan fields
     (vessel and emergency contact details). Medical notes are managed via the
@@ -700,7 +701,7 @@ def update_my_float_plan(id: str):
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def get_trip_medical_notes(id: str):
+def get_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me/medical-notes — Return the caller's own sealed trip
     medical notes for their client to decrypt. Requires an elevated (re-authenticated)
@@ -744,7 +745,7 @@ def get_trip_medical_notes(id: str):
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def set_trip_medical_notes(id: str):
+def set_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/member/me/medical-consent — Encrypt and store the
     caller's own trip medical notes. Requires an elevated (re-authenticated) token.
@@ -802,7 +803,7 @@ def set_trip_medical_notes(id: str):
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def revoke_trip_medical_notes(id: str):
+def revoke_trip_medical_notes(id: str) -> ResponseReturnValue:
     """
     DELETE /api/trip/<id>/member/me/medical-consent — Clear the caller's own
     stored trip medical notes. Requires an elevated (re-authenticated) token.
@@ -827,7 +828,7 @@ def revoke_trip_medical_notes(id: str):
 
 @trip_api.route("/<string:id>/member/me/leader-public-key", methods=["GET"])
 @JWTService.authenticate_restful
-def get_leader_public_key(id: str):
+def get_leader_public_key(id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/me/leader-public-key — The trip leader's X25519 public
     key, so a crew member's client can seal its notes for the leader itself.
@@ -864,7 +865,7 @@ def get_leader_public_key(id: str):
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def share_medical_notes(id: str):
+def share_medical_notes(id: str) -> ResponseReturnValue:
     """
     POST /api/trip/<id>/member/me/share-medical-notes — Store the leader-readable copy
     of the caller's own trip medical notes, ECIES-sealed on the client to the leader's
@@ -924,7 +925,7 @@ def share_medical_notes(id: str):
 @require_medical_notes
 @JWTService.authenticate_restful
 @JWTService.require_elevated_token
-def read_member_medical_notes(id: str, member_id: str):
+def read_member_medical_notes(id: str, member_id: str) -> ResponseReturnValue:
     """
     GET /api/trip/<id>/member/<member_id>/medical-notes — The leader-sealed copy of a
     crew member's shared trip medical notes, for the leader's own client to decrypt.
@@ -971,7 +972,7 @@ def read_member_medical_notes(id: str, member_id: str):
 @trip_api.route("/<string:id>/member/me/medical-notes/access-log", methods=["GET"])
 @require_medical_notes
 @JWTService.authenticate_restful
-def get_medical_notes_access_log(id: str):
+def get_medical_notes_access_log(id: str) -> ResponseReturnValue:
     """Who has read the caller's own shared medical notes on this trip, and when.
     Metadata only (no notes content), so — unlike the decrypt endpoints above — this
     does not require an elevated token.
@@ -1000,7 +1001,7 @@ def get_medical_notes_access_log(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def delete(id: str):
+def delete(id: str) -> ResponseReturnValue:
     """
     TripResource DELETE method. Leader-only — deletes the trip for everyone.
 
@@ -1033,7 +1034,7 @@ def delete(id: str):
 @trip_api.route("/<string:id>/leave", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def leave(id: str):
+def leave(id: str) -> ResponseReturnValue:
     """
     Remove the caller's own membership from the trip. Any member (leader or
     crew) may call this. If the leader leaves and crew remain, the trip
@@ -1071,7 +1072,7 @@ def leave(id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def nominate_successor(id: str, user_id: str):
+def nominate_successor(id: str, user_id: str) -> ResponseReturnValue:
     """Leader designates a crew member as the trip's successor.
     ---
     post:
@@ -1103,7 +1104,7 @@ def nominate_successor(id: str, user_id: str):
 @JWTService.authenticate_restful
 @require_owner("trip")
 @require_leader()
-def clear_successor_nomination(id: str):
+def clear_successor_nomination(id: str) -> ResponseReturnValue:
     """Leader clears whichever member is currently nominated (no-op if none).
     ---
     delete:
@@ -1127,7 +1128,7 @@ def clear_successor_nomination(id: str):
 @trip_api.route("/<string:id>/claim-leadership", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner("trip")
-def claim_leadership(id: str):
+def claim_leadership(id: str) -> ResponseReturnValue:
     """
     A crew member claims leadership of a trip that currently has none. If a
     successor was nominated, only they may claim; otherwise first-come-first-serve.

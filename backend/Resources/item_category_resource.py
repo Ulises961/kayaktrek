@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 
 from Schemas.item_category_schema import ItemCategorySchema
 from Services.item_category_service import ItemCategoryService
@@ -12,7 +13,7 @@ item_category_api = Blueprint('item_category', __name__, url_prefix=ITEM_CATEGOR
 
 
 @item_category_api.route("", methods=["GET"])
-def get_item_categories():
+def get_item_categories() -> ResponseReturnValue:
     """GET /api/item-categories — returns all categories (public, no auth required).
     ---
     get:

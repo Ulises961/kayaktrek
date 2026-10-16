@@ -44,7 +44,8 @@ DB_SESSION_USES = {
     "health_resource.py": 1,
 }
 
-# Resources that import `Api.database` or `Models.*` at all:
+# Resources that import `Api.database` or `Models.*` at run time (an import under
+# `if TYPE_CHECKING:` never runs and couples nothing, so it does not count):
 #   - health_resource: the database ping above.
 #   - user_resource: the `AuthTokenType` enum, a domain constant rather than data access.
 DATA_LAYER_IMPORTERS = frozenset(
@@ -92,8 +93,21 @@ def _is_db_session(node: ast.AST) -> bool:
     )
 
 
-def _imports_data_layer(tree: ast.Module) -> bool:
+def _type_only_imports(tree: ast.Module) -> set[int]:
+    """Ids of the nodes under `if TYPE_CHECKING:` — imports that never run, so they couple nothing."""
+    guarded: set[int] = set()
     for node in ast.walk(tree):
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+            for child in node.body:
+                guarded.update(id(inner) for inner in ast.walk(child))
+    return guarded
+
+
+def _imports_data_layer(tree: ast.Module) -> bool:
+    type_only = _type_only_imports(tree)
+    for node in ast.walk(tree):
+        if id(node) in type_only:
+            continue
         if isinstance(node, ast.ImportFrom) and node.module:
             if node.module == "Api.database" or node.module.split(".")[0] == "Models":
                 return True

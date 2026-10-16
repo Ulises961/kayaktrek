@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import logging
 from flask import Blueprint, jsonify, request, abort
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from marshmallow import ValidationError
 from Schemas.day_schema import DaySchema, DayUpdateSchema
@@ -16,7 +17,7 @@ day_api = Blueprint('day', __name__, url_prefix=DAY_ENDPOINT)
 @day_api.route("/itinerary/<string:itinerary_id>", methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itinerary_id'))
-def read_by_itinerary(itinerary_id: str):
+def read_by_itinerary(itinerary_id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -38,7 +39,7 @@ def read_by_itinerary(itinerary_id: str):
 @day_api.route("/<string:id>", methods=['GET'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def read_by_id(id: str):
+def read_by_id(id: str) -> ResponseReturnValue:
     """
     ---
     get:
@@ -61,7 +62,7 @@ def read_by_id(id: str):
 @day_api.route("/by-key", methods=['POST'])
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def read_by_key():
+def read_by_key() -> ResponseReturnValue:
     """
     ---
     post:
@@ -102,7 +103,7 @@ def read_by_key():
 @day_api.route("/create", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('day', parent_resource=('itinerary', 'itineraryId'), from_body=True)
-def create_day():
+def create_day() -> ResponseReturnValue:
     """POST /api/day - Create new day
     ---
     post:
@@ -140,7 +141,7 @@ def create_day():
 @day_api.route("/<string:id>", methods=['PATCH'])
 @JWTService.authenticate_restful
 @require_owner('day')
-def update_day(id: str):
+def update_day(id: str) -> ResponseReturnValue:
     """
     PATCH /api/day/<id> — Partially update an existing day.
 
@@ -186,7 +187,7 @@ def update_day(id: str):
 @day_api.route("/<string:id>/assign", methods=["POST"])
 @JWTService.authenticate_restful
 @require_owner('day')
-def assign_points(id: str):
+def assign_points(id: str) -> ResponseReturnValue:
     """POST /api/day/<id>/assign — Assign a range of points to this day.
 
     Body: { startPointId: uuid, endPointId: uuid }
@@ -236,7 +237,7 @@ def assign_points(id: str):
 @day_api.route("/<string:id>", methods=["DELETE"])
 @JWTService.authenticate_restful
 @require_owner('day')
-def delete_day_by_id(id: str):
+def delete_day_by_id(id: str) -> ResponseReturnValue:
     """DELETE /api/day/<id> - Delete day by ID
     ---
     delete:

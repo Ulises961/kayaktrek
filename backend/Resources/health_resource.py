@@ -3,6 +3,7 @@ from http import HTTPStatus
 
 import logfire
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 from sqlalchemy import text
 
 from Api.database import db
@@ -14,7 +15,7 @@ health_api = Blueprint("health", __name__, url_prefix="/api/v1")
 
 @health_api.route("/health", methods=["GET"])
 @limiter.exempt
-def health():
+def health() -> ResponseReturnValue:
     """Liveness/readiness probe for the compose healthcheck / a future load balancer.
     No auth (a prerequisite for a healthcheck) and exempt from the default rate limit
     (polled far more often than the 200/hour default allows). Pings the DB so a backend

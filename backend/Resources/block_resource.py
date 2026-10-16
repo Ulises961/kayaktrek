@@ -3,6 +3,7 @@ from http import HTTPStatus
 import logging
 
 from flask import Blueprint, abort, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from sqlalchemy.exc import NoResultFound
 
 from Schemas.block_schema import BlockSchema
@@ -17,7 +18,7 @@ block_api = Blueprint("block", __name__, url_prefix=BLOCK_ENDPOINT)
 
 @block_api.route("", methods=["GET"])
 @JWTService.authenticate_restful
-def list_blocks():
+def list_blocks() -> ResponseReturnValue:
     """
     GET /api/v1/blocks — the caller's block list.
     ---
@@ -40,7 +41,7 @@ def list_blocks():
 
 @block_api.route("", methods=["POST"])
 @JWTService.authenticate_restful
-def create_block():
+def create_block() -> ResponseReturnValue:
     """
     POST /api/v1/blocks — block a paddler.
 
@@ -102,7 +103,7 @@ def create_block():
 
 @block_api.route("/<block_id>", methods=["DELETE"])
 @JWTService.authenticate_restful
-def remove_block(block_id: str):
+def remove_block(block_id: str) -> ResponseReturnValue:
     """
     DELETE /api/v1/blocks/<id> — unblock (does not restore the prior relationship).
     ---
