@@ -38,17 +38,30 @@ def _register_feed(user) -> SatelliteFeed:
     return feed
 
 
-def _build_trip(user, *, state: TripStateType = TripStateType.HAPPENING) -> UUID:
+def _build_trip(
+    user,
+    *,
+    state: TripStateType = TripStateType.HAPPENING,
+    sharing: bool = True,
+    left_at: datetime | None = None,
+    suffix: str = "",
+) -> UUID:
     today = datetime.now(timezone.utc).date()
     trip = Trip(
         state=state,
-        destination=_DESTINATION,
+        destination=f"{_DESTINATION}{suffix}",
         date_from=today,
         date_to=today + timedelta(days=2),
     )
     _db.session.add(trip)
     _db.session.flush()
-    _db.session.add(TripMember(user_id=user.id, trip_id=trip.id, role=MemberRoleType.LEADER))
+    _db.session.add(TripMember(
+        user_id=user.id,
+        trip_id=trip.id,
+        role=MemberRoleType.LEADER,
+        shares_satellite_position=sharing,
+        left_at=left_at,
+    ))
     _db.session.commit()
     return trip.id
 
@@ -103,3 +116,101 @@ def test_ping_without_course_or_velocity_is_still_posted(app, user_1):
     (ping,) = _pings(trip_id)
     assert ping.heading_deg is None
     assert ping.speed_ms is None
+
+
+class TestWhichTripsReceiveThePosition:
+    def test_a_happening_trip_the_member_switched_on_receives_it(self, app, user_1):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1)
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert len(_pings(trip_id)) == 1
+
+    def test_a_trip_the_member_has_not_switched_on_receives_nothing(self, app, user_1):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1, sharing=False)
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert _pings(trip_id) == []
+
+    @pytest.mark.parametrize("state", [TripStateType.BUILDING, TripStateType.PAST, TripStateType.ARCHIVED])
+    def test_a_trip_that_is_not_happening_receives_nothing_even_when_switched_on(self, app, user_1, state):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1, state=state)
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert _pings(trip_id) == []
+
+    def test_a_member_who_has_left_receives_nothing_even_when_switched_on(self, app, user_1):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1, left_at=datetime.now(timezone.utc) - timedelta(hours=1))
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert _pings(trip_id) == []
+
+    def test_clearing_a_departure_made_by_mistake_resumes_the_next_position(self, app, user_1):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1, left_at=datetime.now(timezone.utc) - timedelta(hours=1))
+        _poll(_kml(_five_minutes_ago() - timedelta(minutes=10)))
+        assert _pings(trip_id) == []
+
+        member = _db.session.query(TripMember).filter_by(trip_id=trip_id).one()
+        member.left_at = None
+        _db.session.commit()
+        _poll(_kml(_five_minutes_ago()))
+
+        assert len(_pings(trip_id)) == 1
+
+    def test_leaving_the_trip_stops_the_positions(self, app, user_1):
+        _register_feed(user_1)
+        trip_id = _build_trip(user_1)
+        _poll(_kml(_five_minutes_ago() - timedelta(minutes=10)))
+        assert len(_pings(trip_id)) == 1
+
+        _db.session.query(TripMember).filter_by(trip_id=trip_id).delete()
+        _db.session.commit()
+        _poll(_kml(_five_minutes_ago()))
+
+        assert len(_pings(trip_id)) == 1
+
+    def test_only_the_switched_on_trip_of_two_happening_trips_receives_it(self, app, user_1):
+        _register_feed(user_1)
+        wanted = _build_trip(user_1, suffix=" A")
+        forgotten = _build_trip(user_1, sharing=False, suffix=" B")
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert len(_pings(wanted)) == 1
+        assert _pings(forgotten) == []
+
+    def test_two_switched_on_trips_both_receive_it(self, app, user_1):
+        _register_feed(user_1)
+        first = _build_trip(user_1, suffix=" A")
+        second = _build_trip(user_1, suffix=" B")
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert len(_pings(first)) == 1
+        assert len(_pings(second)) == 1
+
+    def test_another_members_switch_does_not_send_this_users_feed_to_their_trip(self, app, user_1, user_2):
+        _register_feed(user_1)
+        theirs = _build_trip(user_2)
+
+        _poll(_kml(_five_minutes_ago()))
+
+        assert _pings(theirs) == []
+
+    def test_positions_with_no_receiving_trip_are_not_replayed_when_one_appears(self, app, user_1):
+        _register_feed(user_1)
+        earlier_point = _kml(_five_minutes_ago() - timedelta(minutes=10))
+        _poll(earlier_point)
+        trip_id = _build_trip(user_1)
+
+        _poll(earlier_point)
+
+        assert _pings(trip_id) == []

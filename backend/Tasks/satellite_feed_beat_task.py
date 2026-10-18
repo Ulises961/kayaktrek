@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID
 
 from celery import Task
 import requests
@@ -9,8 +8,6 @@ import requests
 from Api.celery_app import celery_app
 from Api.database import db
 from Models.satellite_feed import SatelliteFeed
-from Models.trip import Trip, TripStateType
-from Models.trip_member import TripMember
 from Services.live_position_service import LivePositionService
 from Services.SatelliteFeeds.base import (
     FeedAuthError,
@@ -19,6 +16,7 @@ from Services.SatelliteFeeds.base import (
     PreparedFeedRequest,
 )
 from Services.SatelliteFeeds.registry import get_source
+from Services.trip_member_service import TripMemberService
 from Services.Utils import server_secret_crypto
 
 logger = logging.getLogger(__name__)
@@ -47,24 +45,15 @@ def _fetch(request: PreparedFeedRequest) -> bytes:
     return response.content
 
 
-def _happening_trip_ids(user_id: UUID) -> list[UUID]:
-    return [
-        trip_id
-        for (trip_id,) in db.session.query(TripMember.trip_id)
-        .join(Trip, Trip.id == TripMember.trip_id)
-        .filter(TripMember.user_id == user_id, Trip.state == TripStateType.HAPPENING)
-        .all()
-    ]
-
-
 @celery_app.task(name="Tasks.satellite_feed_beat_task.poll_satellite_feeds", bind=True)
 def poll_satellite_feeds(self: Task, request_id: Optional[str] = None) -> None:
-    """Poll every enabled satellite feed and ingest new positions into any of the
-    user's currently HAPPENING trips through LivePositionService (M8's pipeline).
+    """Poll every enabled satellite feed and post its new positions to the trips the
+    user has switched it on for (TripMemberService.trip_ids_receiving_satellite_position),
+    through LivePositionService (M8's pipeline).
 
     Runs on a fixed interval (see Api/celery_app.py beat_schedule) — matches inReach's
     own typical ~10-minute tracking interval (satellite-feed-spec.md §3.1). A feed with
-    no HAPPENING trip still advances `last_ingested_at`, so a paddler between trips
+    no receiving trip still advances `last_ingested_at`, so a paddler between trips
     doesn't build up an unbounded backlog the next feed poll would have to re-parse.
     """
     now = datetime.now(timezone.utc)
@@ -80,7 +69,7 @@ def poll_satellite_feeds(self: Task, request_id: Optional[str] = None) -> None:
             raw = _fetch(prepared)
             positions = source.parse(raw, feed.last_ingested_at)
 
-            trip_ids = _happening_trip_ids(feed.user_id)
+            trip_ids = TripMemberService.trip_ids_receiving_satellite_position(feed.user_id)
             for position in positions:
                 for trip_id in trip_ids:
                     try:

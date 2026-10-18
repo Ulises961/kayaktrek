@@ -7,14 +7,18 @@ from flask import Blueprint, abort, g, jsonify, request
 from flask.typing import ResponseReturnValue
 from marshmallow import ValidationError
 from Schemas.trip_schema import TripSchema, TripUpdateSchema
-from Schemas.trip_member_schema import TripMemberSchema, TripMemberUpdateSchema
+from Schemas.trip_member_schema import (
+    TripMemberSatelliteTrackingSchema,
+    TripMemberSchema,
+    TripMemberUpdateSchema,
+)
 from Schemas.medical_notes_access_log_schema import MedicalNotesAccessLogSchema
 from Api.features import require_medical_notes
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader
 from Services.trip_change_service import TripChangeService
 from Services.trip_service import TripService
-from Services.trip_member_service import TripMemberService
+from Services.trip_member_service import SatelliteTrackingRefusedError, TripMemberService
 from Services.trip_leadership_service import TripLeadershipService
 
 logger = logging.getLogger(__name__)
@@ -695,6 +699,50 @@ def update_my_float_plan(id: str) -> ResponseReturnValue:
         abort(HTTPStatus.BAD_REQUEST, description=e.messages)
     except NoResultFound:
         abort(HTTPStatus.NOT_FOUND, description="You are not a member of this trip")
+
+
+_SATELLITE_TRACKING_REFUSALS = {
+    "member_has_left": "You have left this trip, so your inReach can no longer be shared on it.",
+    "trip_finished": "This trip is over, so your inReach can no longer be shared on it.",
+    "satellite_feed_required": "Register your inReach feed in Settings first.",
+}
+
+
+@trip_api.route("/<string:id>/member/me/satellite-tracking", methods=["PUT"])
+@JWTService.authenticate_restful
+def set_my_satellite_tracking(id: str) -> ResponseReturnValue:
+    """
+    PUT /api/trip/<id>/member/me/satellite-tracking — Switch the caller's satellite feed
+    (registered in their settings) on or off for this trip. While it is on, the trip is
+    happening and the caller has not left, the feed's positions are posted to the trip.
+    ---
+    put:
+      summary: Switch the caller's satellite feed on or off for this trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: TripMemberSatelliteTrackingSchema
+      responses:
+        200:
+          description: The updated membership record
+          content:
+            application/json:
+              schema: TripMemberSchema
+        404:
+          description: You are not a member of this trip
+        409:
+          description: Switching on is refused (no feed registered, the trip is over, or you have left it). Switching off is always accepted.
+        422:
+          description: "'enabled' is missing or not a boolean"
+    """
+    body = request.get_json(silent=True)
+    data = cast(dict, TripMemberSatelliteTrackingSchema().load(body if isinstance(body, dict) else {}))
+    try:
+        membership = TripMemberService.set_satellite_tracking(id, data["enabled"])
+    except SatelliteTrackingRefusedError as refusal:
+        abort(HTTPStatus.CONFLICT, description=_SATELLITE_TRACKING_REFUSALS[refusal.reason])
+    return jsonify(TripMemberSchema().dump(membership)), HTTPStatus.OK
 
 
 @trip_api.route("/<string:id>/member/me/medical-notes", methods=["GET"])

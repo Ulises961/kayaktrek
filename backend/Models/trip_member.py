@@ -88,5 +88,12 @@ class TripMember(BaseModel):
     left_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     left_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    # The paddler's own switch for the satellite feed registered in their settings. The
+    # feed's positions are posted to this trip only while the switch is on, the trip is
+    # happening and left_at is empty. Off until the paddler turns it on for this trip.
+    shares_satellite_position: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+
     user: Mapped["User"] = relationship(back_populates="trip_memberships", passive_deletes=True)
     trip: Mapped["Trip"] = relationship(back_populates="trip_members", passive_deletes=True)
