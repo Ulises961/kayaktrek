@@ -48,6 +48,17 @@ describe("splitRuns", () => {
     expect(runs.map((run) => run.events.filter((event) => event.ev === "fix").length)).toEqual([2, 1, 1])
   })
 
+  it("ends the earlier-log run at its last fix, not at whatever the phone logged after it", () => {
+    // The first walk predates run markers; everything logged since (app state, heartbeats, the screen)
+    // belongs to no run, and must not stretch that walk to the present.
+    const events: SpikeEvent[] = [fix(0), fix(15), { ev: "app", t: at(5000), state: "active" }, screen(6000, false)]
+
+    const [earlier] = reportRuns(events)
+
+    expect(earlier.label).toBe("Earlier log (no run marker)")
+    expect(earlier.endedAt).toBe(at(15))
+  })
+
   it("has no runs when the log holds only phone events", () => {
     expect(splitRuns([screen(0, true)])).toEqual([])
   })

@@ -106,7 +106,9 @@ export default function SpikeLocationScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerClassName="gap-4 p-4" contentContainerStyle={{ paddingBottom: 160 }}>
+      {/* One style object: a contentContainerStyle replaces the class-based one, so the page padding
+          and the clearance for the floating "spike" link have to be set together. */}
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 160 }}>
         <Text className="text-lg font-semibold text-foreground">M9e spike: does sharing survive a locked screen?</Text>
         <Text className="text-muted-foreground">
           Tap Start, lock the phone, walk 30 minutes or more with it in a pocket, and do not open the app. Then

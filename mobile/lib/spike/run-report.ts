@@ -146,13 +146,17 @@ export function splitRuns(events: SpikeEvent[]): Run[] {
   const runs: Run[] = []
 
   const firstStart = starts.length > 0 ? starts[0].t : Infinity
-  const earlierFirstFix = sorted.find((event) => event.ev === "fix" && event.t < firstStart)
-  if (earlierFirstFix) {
+  const earlierFixes = sorted.filter((event) => event.ev === "fix" && event.t < firstStart)
+  if (earlierFixes.length > 0) {
+    // Fixes with no run marker came from a build that predates markers. What the phone logged after
+    // the last of them belongs to no run, so the run stops there instead of stretching to now.
+    const startedAt = earlierFixes[0].t
+    const lastFixAt = earlierFixes[earlierFixes.length - 1].t
     runs.push({
       label: EARLIER_LOG_LABEL,
-      startedAt: earlierFirstFix.t,
+      startedAt,
       endsBefore: firstStart,
-      events: sorted.filter((event) => event.t >= earlierFirstFix.t && event.t < firstStart),
+      events: sorted.filter((event) => event.t >= startedAt && event.t <= lastFixAt),
     })
   }
   starts.forEach((start, index) => {
