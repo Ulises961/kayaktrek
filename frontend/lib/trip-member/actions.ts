@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPatch, apiPost, apiDelete, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPatch, apiPost, apiPut, apiDelete, isRedirectError } from "@/lib/api/client"
 import { TripMemberSchema } from "@/lib/dtos/trip-member"
 import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 import type { SealedValue } from "@/lib/crypto/medical"
@@ -65,6 +65,28 @@ export async function updateMyFloatPlan(
     return {
       success: false,
       error: e instanceof Error ? e.message : "Failed to update float plan.",
+    }
+  }
+}
+
+/**
+ * Switches the caller's registered satellite feed on or off for one trip (M29). Its own
+ * endpoint rather than the float-plan PATCH, which stamps the plan as confirmed.
+ */
+export async function setSatelliteTracking(
+  tripId: string,
+  enabled: boolean,
+): Promise<FloatPlanActionResult> {
+  try {
+    await apiPut(`/api/trip/${tripId}/member/me/satellite-tracking`, { enabled })
+    revalidatePath(`/trips/${tripId}/my-float-plan`)
+    revalidatePath(`/trips/float-plan/${tripId}`)
+    return { success: true }
+  } catch (e) {
+    if (isRedirectError(e)) throw e
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update inReach sharing.",
     }
   }
 }

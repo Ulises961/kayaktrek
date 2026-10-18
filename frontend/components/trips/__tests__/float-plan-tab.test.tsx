@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event"
 vi.mock("@/lib/trip-member/actions", () => ({
   updateMyFloatPlan: vi.fn(),
   shareMedicalNotes: vi.fn(),
+  setSatelliteTracking: vi.fn(),
 }))
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock("@/lib/profile/actions", () => ({
 
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
 import { FloatPlanTab } from "../tabs/float-plan-tab"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -40,49 +42,55 @@ const BASE_MEMBER: TripMember = {
   floatPlanConfirmedAt: null,
 }
 
+const TAB_PROPS = {
+  tripId: TRIP_ID,
+  tripState: TRIP_STATE.BUILDING,
+  hasSatelliteFeed: true,
+}
+
 beforeEach(() => vi.clearAllMocks())
 
 describe("FloatPlanTab — viewing state", () => {
   it("shows amber banner when floatPlanConfirmedAt is null", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.getByText(/review.*float plan/i)).toBeDefined()
   })
 
   it("does not show amber banner when floatPlanConfirmedAt is set", () => {
     const member = { ...BASE_MEMBER, floatPlanConfirmedAt: "2026-05-14T10:00:00" }
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={member} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={member} />)
     expect(screen.queryByText(/review.*float plan/i)).toBeNull()
   })
 
   it("shows vessel make and model in read-only view", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.getByText("Wilderness Systems Tempest 170")).toBeDefined()
   })
 
   it("shows emergency contact name in read-only view", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.getByText("Bob Smith")).toBeDefined()
   })
 
   it("does not show form inputs by default", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.queryByLabelText(/make/i)).toBeNull()
   })
 
   it("shows an Edit button", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.getByRole("button", { name: /edit/i })).toBeDefined()
   })
 })
 
 describe("FloatPlanTab — the same member changing it on another device (M36)", () => {
   it("drops the review banner once the server says the plan was confirmed elsewhere", () => {
-    const { rerender } = render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    const { rerender } = render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     expect(screen.getByText(/review.*float plan/i)).toBeDefined()
 
     rerender(
       <FloatPlanTab
-        tripId={TRIP_ID}
+        {...TAB_PROPS}
         currentMember={{ ...BASE_MEMBER, floatPlanConfirmedAt: "2026-05-14T10:00:00" }}
       />,
     )
@@ -91,10 +99,10 @@ describe("FloatPlanTab — the same member changing it on another device (M36)",
   })
 
   it("opens the form on what the server has now, not on what the page loaded with", async () => {
-    const { rerender } = render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    const { rerender } = render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
 
     rerender(
-      <FloatPlanTab tripId={TRIP_ID} currentMember={{ ...BASE_MEMBER, vesselMake: "Valley" }} />,
+      <FloatPlanTab {...TAB_PROPS} currentMember={{ ...BASE_MEMBER, vesselMake: "Valley" }} />,
     )
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
 
@@ -102,16 +110,71 @@ describe("FloatPlanTab — the same member changing it on another device (M36)",
   })
 })
 
+describe("FloatPlanTab — inReach tracking (M29)", () => {
+  const SWITCH_NAME = /share my inreach on this trip/i
+
+  it.each([TRIP_STATE.BUILDING, TRIP_STATE.HAPPENING])(
+    "offers the switch while the trip is %s",
+    (tripState) => {
+      render(<FloatPlanTab {...TAB_PROPS} tripState={tripState} currentMember={BASE_MEMBER} />)
+
+      expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+    },
+  )
+
+  it.each([TRIP_STATE.PAST, null, undefined])(
+    "offers no switch when the trip is %s",
+    (tripState) => {
+      render(<FloatPlanTab {...TAB_PROPS} tripState={tripState} currentMember={BASE_MEMBER} />)
+
+      expect(screen.queryByRole("switch", { name: SWITCH_NAME })).toBeNull()
+      expect(screen.queryByText(/inreach/i)).toBeNull()
+    },
+  )
+
+  it("offers no switch to a member who has left the trip", () => {
+    const member = { ...BASE_MEMBER, leftAt: "2026-10-02T09:30:00" }
+    render(<FloatPlanTab {...TAB_PROPS} tripState={TRIP_STATE.HAPPENING} currentMember={member} />)
+
+    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).toBeNull()
+  })
+
+  it("shows the switch on when the member has it on, and off when the field is absent", () => {
+    const { rerender } = render(
+      <FloatPlanTab
+        {...TAB_PROPS}
+        currentMember={{ ...BASE_MEMBER, sharesSatellitePosition: true }}
+      />,
+    )
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+
+    rerender(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+  })
+
+  it("cannot be switched on without a registered feed", () => {
+    render(<FloatPlanTab {...TAB_PROPS} hasSatelliteFeed={false} currentMember={BASE_MEMBER} />)
+
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeDisabled()
+  })
+})
+
 describe("FloatPlanTab — editing state", () => {
   it("shows form inputs after clicking Edit", async () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     expect(screen.getByLabelText(/make/i)).toBeDefined()
     expect((screen.getByLabelText(/make/i) as HTMLInputElement).value).toBe("Wilderness Systems")
   })
 
   it("returns to read-only on Cancel", async () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
     expect(screen.queryByLabelText(/make/i)).toBeNull()
@@ -120,7 +183,7 @@ describe("FloatPlanTab — editing state", () => {
 
   it("calls updateMyFloatPlan and returns to read-only on Save", async () => {
     vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: true })
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
     await waitFor(() =>
@@ -137,7 +200,7 @@ describe("FloatPlanTab — editing state", () => {
       success: false,
       error: "Failed to update float plan.",
     })
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={BASE_MEMBER} />)
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
     await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
     await waitFor(() => expect(screen.getByText("Failed to update float plan.")).toBeDefined())

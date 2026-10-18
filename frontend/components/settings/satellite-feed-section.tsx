@@ -64,9 +64,10 @@ export function SatelliteFeedSection({ feeds }: SatelliteFeedSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm">
-        Share your inReach position with your crew automatically. Paste your MapShare feed URL and
-        it is polled about every 10 minutes while a trip is under way. Your device&apos;s SOS button
-        is unaffected — it goes straight to Garmin, never through this app.
+        Paste your MapShare feed URL here, then switch your inReach on for each trip in that
+        trip&apos;s float plan. A trip you have switched on gets your position about every 10
+        minutes while it is under way; a trip you have not switched on gets nothing. Your
+        device&apos;s SOS button is unaffected — it goes straight to Garmin, never through this app.
       </p>
 
       {feeds.map((feed) => (
