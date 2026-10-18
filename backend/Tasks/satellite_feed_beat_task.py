@@ -87,7 +87,13 @@ def poll_satellite_feeds(self: Task, request_id: Optional[str] = None) -> None:
                         LivePositionService.record_ping(
                             str(trip_id),
                             str(feed.user_id),
-                            {"lat": position.lat, "lon": position.lng, "recorded_at": position.timestamp},
+                            {
+                                "lat": position.lat,
+                                "lon": position.lng,
+                                "heading_deg": position.heading_deg,
+                                "speed_ms": position.speed_ms,
+                                "recorded_at": position.timestamp,
+                            },
                         )
                     except ValueError:
                         # Trip state changed between the query above and this ping
