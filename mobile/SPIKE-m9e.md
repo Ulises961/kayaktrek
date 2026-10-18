@@ -22,6 +22,12 @@ declares it nor catches the `IllegalArgumentException` (it only catches `Illegal
 - Declaring the permission in `app.json` was **not** enough on this phone: it showed as granted and
   the same exception was thrown. MIUI keeps its own "Autostart" switch (`MIUIOP(10008)`, "ignore" by
   default), and the check follows it. Setting that op to allow over adb did not stop the crash either.
+- A first patch of the library's Java source changed nothing: **Expo SDK 57 links its native modules
+  as prebuilt `.aar` files**, so the source is never compiled (no `:expo-task-manager:compile…` task
+  in the Gradle log). `package.json` therefore carries
+  `expo.autolinking.android.buildFromSource: ["expo-task-manager", "unimodules-app-loader"]` (the
+  second because the task manager's own build file depends on it), which makes Gradle build both
+  from source. Check a patch took by looking for that compile task.
 - So the library is patched instead (`patches/expo-task-manager@57.0.21.patch`, applied by pnpm):
   `setPersisted(false)`. A position fix is worth nothing after a reboot, and without the permission
   the boot broadcast is never delivered, so a location task cannot come back by itself when the phone

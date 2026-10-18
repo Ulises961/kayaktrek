@@ -64,6 +64,13 @@
     "generate:theme": "node --experimental-strip-types scripts/generate-theme-css.js"
   },
   "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": ["expo-task-manager", "unimodules-app-loader"]
+      }
+    }
+  },
   "jest": {
     "preset": "jest-expo",
     "setupFiles": [
