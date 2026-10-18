@@ -8,7 +8,7 @@ import { ScrollView, Text } from "react-native"
 
 import { Button } from "../components/ui/button"
 import { Row, Screen, Stack } from "../components/ui/layout"
-import { parseLog, summarise, type SpikeSummary } from "../lib/spike/location-log"
+import { parseLog, parseProcessStarts, summarise, type SpikeSummary } from "../lib/spike/location-log"
 import {
   PRESETS,
   clearLog,
@@ -36,12 +36,15 @@ export default function SpikeLocationScreen() {
   const [killOnDestroy, setKillOnDestroy] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [summary, setSummary] = useState<SpikeSummary | null>(null)
+  const [starts, setStarts] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setSharing(await isSharing())
     const preset = PRESETS[presetIndex]
-    setSummary(summarise(parseLog(readLog()), preset.timeIntervalMs * 3))
+    const log = readLog()
+    setSummary(summarise(parseLog(log), preset.timeIntervalMs * 3))
+    setStarts(parseProcessStarts(log))
   }, [presetIndex])
 
   useEffect(() => {
@@ -109,6 +112,10 @@ export default function SpikeLocationScreen() {
 
         <Stack>
           <Text className="font-semibold text-foreground">Service: {sharing ? "RUNNING" : "stopped"}</Text>
+          <Text className="text-foreground">
+            App process started {starts.length} time(s), last {clock(starts[starts.length - 1] ?? null)}
+            {starts.length > 1 ? " (more than one: Android killed it at least once)" : ""}
+          </Text>
           {summary ? (
             <>
               <Text className="text-foreground">Fixes logged: {summary.count}</Text>

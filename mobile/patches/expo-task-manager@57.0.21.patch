@@ -1,0 +1,20 @@
+diff --git a/android/src/main/java/expo/modules/taskManager/TaskManagerUtils.java b/android/src/main/java/expo/modules/taskManager/TaskManagerUtils.java
+index 82bc0db7573cec9b00054a30d371b2b90c24badb..96d95ca047a4b92920a304b615041d56a8da8d36 100644
+--- a/android/src/main/java/expo/modules/taskManager/TaskManagerUtils.java
++++ b/android/src/main/java/expo/modules/taskManager/TaskManagerUtils.java
+@@ -200,9 +200,14 @@ public class TaskManagerUtils implements TaskManagerUtilsInterface {
+   }
+ 
+   private JobInfo createJobInfo(int jobId, ComponentName jobService, PersistableBundle extras) {
++    // Kayaktrek patch: not persisted. A persisted job needs RECEIVE_BOOT_COMPLETED, which MIUI
++    // withholds while "Autostart" is off, and the resulting IllegalArgumentException (the catch
++    // blocks above only take IllegalStateException) killed the app on every location fix. A
++    // position fix is also worth nothing after a reboot, and not holding the permission is what
++    // stops a location task coming back by itself when the phone restarts.
+     JobInfo.Builder jobBuilder = new JobInfo.Builder(jobId, jobService)
+         .setExtras(extras)
+-        .setPersisted(true)
++        .setPersisted(false)
+         .setRequiresDeviceIdle(false);
+ 
+     if (Build.VERSION.SDK_INT < 28) {

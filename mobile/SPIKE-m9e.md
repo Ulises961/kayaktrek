@@ -12,34 +12,48 @@ start unless the app is in the foreground at that moment, and it needs `FOREGROU
 `ACCESS_BACKGROUND_LOCATION` **off**. This is read from source, not yet observed: the test below
 is what confirms that "While using the app" is enough with the screen locked.
 
+## What the first two builds found (2026-10-18, on the Mi 8)
+
+Both crashed on the first location fix, nine times in a row. `expo-task-manager` hands every fix to
+the app through a **persisted** `JobScheduler` job (`TaskManagerUtils.java`, `setPersisted(true)`),
+Android only lets an app persist jobs if it holds `RECEIVE_BOOT_COMPLETED`, and the library neither
+declares it nor catches the `IllegalArgumentException` (it only catches `IllegalStateException`).
+
+- Declaring the permission in `app.json` was **not** enough on this phone: it showed as granted and
+  the same exception was thrown. MIUI keeps its own "Autostart" switch (`MIUIOP(10008)`, "ignore" by
+  default), and the check follows it. Setting that op to allow over adb did not stop the crash either.
+- So the library is patched instead (`patches/expo-task-manager@57.0.21.patch`, applied by pnpm):
+  `setPersisted(false)`. A position fix is worth nothing after a reboot, and without the permission
+  the boot broadcast is never delivered, so a location task cannot come back by itself when the phone
+  restarts. The permission is **not** declared. Production needs a decision (keep the patch, send it
+  upstream, or use another mechanism); that belongs to WP1, not this spike.
+
 ## Build and install
 
-Phone connected, USB debugging on, `adb devices` showing it.
+The build needs no phone. Only putting the APK on the phone needs a cable, once; the test itself
+needs neither a cable nor adb: permission, start, stop and the results are all in the app.
 
 ```bash
 cd mobile
-# the Mi 8 is arm64; the default builds four ABIs and the first build took 31 minutes
-#   edit android/gradle.properties: reactNativeArchitectures=arm64-v8a
-pnpm exec expo prebuild --platform android --no-install   # applies the location plugin to android/
-#   prebuild regenerates android/ and RESETS gradle.properties: re-apply the arm64 line afterwards
+pnpm exec expo prebuild --platform android --no-install   # applies the config plugins to android/
+#   prebuild regenerates android/ and RESETS gradle.properties: set
+#   reactNativeArchitectures=arm64-v8a again (the Mi 8; four ABIs took 31 minutes)
+cd android
 EXPO_PUBLIC_API_URL=https://api.kayaktrek.app EXPO_PUBLIC_SSE_URL=https://live.kayaktrek.app \
-  pnpm exec expo run:android --variant release --no-bundler
+  ./gradlew assembleRelease
+# -> android/app/build/outputs/apk/release/app-release.apk
 ```
 
 Both URLs are needed: a release build crashes on launch if either is unset (the first attempt did,
 on `EXPO_PUBLIC_SSE_URL`). The values are the repo's Actions variables. If you rebuild after only a
-JS change, delete `android/app/build/generated/assets/react/release` first.
+JS change, delete `android/app/build/generated/assets/react/release` first. `expo run:android` is
+avoided on purpose: with no phone attached it can start an emulator.
 
-Release, not debug: a debug build's JS comes from Metro, which is not there on a walk. A release
-build cannot be read with `run-as`, which is fine; the screen summarises the log itself.
+Release, not debug: a debug build's JS comes from Metro, which is not there on a walk.
 
-**Built and installed on the Mi 8 on 2026-10-17 (00:48).** The app is a release build pointed at
-production, so the normal screens ask for a login; the spike screen does not. Reach it from the
-small **spike** link at the bottom-left of any screen, or, from a computer:
-
-```bash
-adb shell am start -a android.intent.action.VIEW -d "kayaktrek:///spike-location"
-```
+Install: `adb install -r app-release.apk` with the phone attached (or copy the file across and open
+it). The app is a release build pointed at production, so the normal screens ask for a login; the
+spike screen does not. Reach it from the small **spike** link at the bottom-left of any screen.
 
 Tap **Ask for location permission** and choose **While using the app** (not "Allow all the time").
 
@@ -60,8 +74,11 @@ MIUI exemptions to try if A fails: Settings → Apps → Manage apps → Kayaktr
 **Battery saver: No restrictions**; and lock the app in the recents screen.
 
 Record per run: settings, start and end battery %, duration, fixes logged, median and longest gap,
-gaps over three intervals, worst delivery delay, and whether the foreground notification was
-visible (Android 13+ may hide it without the notification permission; the spike does not ask).
+gaps over three intervals, worst delivery delay, **how many times the app process started** (more
+than one means Android killed it and something brought it back; the screen says so), and whether
+the foreground notification was visible (Android 13+ may hide it without the notification
+permission; the spike does not ask). If the app crashes again, say when: the log keeps every fix
+that arrived before it.
 
 ## Teardown
 

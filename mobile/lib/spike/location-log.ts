@@ -45,6 +45,22 @@ export function parseLog(text: string): SpikeFix[] {
   return fixes.sort((a, b) => a.t - b.t)
 }
 
+// One entry per launch of the app process (the task module writes one when it loads). More than
+// one over a walk means Android killed the process and something brought it back.
+export function parseProcessStarts(text: string): number[] {
+  const starts: number[] = []
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue
+    try {
+      const parsed = JSON.parse(line) as { start?: unknown }
+      if (typeof parsed.start === "number") starts.push(parsed.start)
+    } catch {
+      // A cut-off line is not a start.
+    }
+  }
+  return starts.sort((a, b) => a - b)
+}
+
 // `gapThresholdMs` is what counts as a missed beat: a few intervals, since a stationary kayak with
 // a distance filter legitimately sends nothing.
 export function summarise(fixes: SpikeFix[], gapThresholdMs: number): SpikeSummary {

@@ -39,6 +39,14 @@ function append(line: string): void {
   file.write(`${line}\n`, { append: true })
 }
 
+// A mark for every launch of the process, so a walk that Android killed and restarted shows up
+// in the summary instead of looking like one unbroken run.
+try {
+  append(JSON.stringify({ start: Date.now() }))
+} catch {
+  // Not being able to log a start must not stop the task from being defined.
+}
+
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(SPIKE_TASK, async ({ data, error }) => {
   const receivedAt = Date.now()
   try {

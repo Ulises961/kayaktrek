@@ -19,7 +19,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["RECEIVE_BOOT_COMPLETED"],
       "package": "app.kayaktrek"
     },
     "web": {
