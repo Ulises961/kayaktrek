@@ -23,44 +23,6 @@ export type SpikeSummary = {
   maxDeliveryDelayMs: number
 }
 
-export function parseLog(text: string): SpikeFix[] {
-  const fixes: SpikeFix[] = []
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue
-    try {
-      const parsed = JSON.parse(line) as Partial<SpikeFix>
-      if (typeof parsed.t === "number" && typeof parsed.rx === "number") {
-        fixes.push({
-          t: parsed.t,
-          rx: parsed.rx,
-          lat: Number(parsed.lat),
-          lon: Number(parsed.lon),
-          accuracyM: parsed.accuracyM ?? null,
-        })
-      }
-    } catch {
-      // A line cut short by the process dying mid-write is itself a finding, not a crash.
-    }
-  }
-  return fixes.sort((a, b) => a.t - b.t)
-}
-
-// One entry per launch of the app process (the task module writes one when it loads). More than
-// one over a walk means Android killed the process and something brought it back.
-export function parseProcessStarts(text: string): number[] {
-  const starts: number[] = []
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue
-    try {
-      const parsed = JSON.parse(line) as { start?: unknown }
-      if (typeof parsed.start === "number") starts.push(parsed.start)
-    } catch {
-      // A cut-off line is not a start.
-    }
-  }
-  return starts.sort((a, b) => a - b)
-}
-
 // `gapThresholdMs` is what counts as a missed beat: a few intervals, since a stationary kayak with
 // a distance filter legitimately sends nothing.
 export function summarise(fixes: SpikeFix[], gapThresholdMs: number): SpikeSummary {

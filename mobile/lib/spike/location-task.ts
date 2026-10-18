@@ -2,16 +2,15 @@
 //
 // The task is defined at module scope and this module is imported by the root layout, because
 // expo-task-manager looks a task up by name in the JS runtime and that runtime must already know
-// it when a fix arrives. Every fix is appended to a file so a walk with the phone in a pocket can
-// be read back afterwards (the screen summarises it; `adb exec-out run-as app.kayaktrek cat
-// files/m9e-spike-fixes.jsonl` gives the raw lines). Throwaway with the rest of lib/spike.
+// it when a fix arrives. Every fix, and every Start and Stop, is appended to the evidence log
+// (events.ts); the screen turns the log into a report. Throwaway with the rest of lib/spike.
 
-import { File, Paths } from "expo-file-system"
 import * as Location from "expo-location"
 import * as TaskManager from "expo-task-manager"
 
+import { logEvent } from "./events"
+
 export const SPIKE_TASK = "m9e-spike-location"
-const LOG_NAME = "m9e-spike-fixes.jsonl"
 
 export type SpikePreset = {
   label: string
@@ -29,67 +28,61 @@ export const PRESETS: SpikePreset[] = [
   { label: "Balanced, 15 s, no filter", accuracy: Location.Accuracy.Balanced, timeIntervalMs: 15_000, distanceM: 0 },
 ]
 
-function logFile(): File {
-  return new File(Paths.document, LOG_NAME)
-}
-
-function append(line: string): void {
-  const file = logFile()
-  if (!file.exists) file.create()
-  file.write(`${line}\n`, { append: true })
-}
-
-// A mark for every launch of the process, so a walk that Android killed and restarted shows up
-// in the summary instead of looking like one unbroken run.
-try {
-  append(JSON.stringify({ start: Date.now() }))
-} catch {
-  // Not being able to log a start must not stop the task from being defined.
-}
-
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(SPIKE_TASK, async ({ data, error }) => {
   const receivedAt = Date.now()
-  try {
-    if (error) {
-      append(JSON.stringify({ error: error.message, rx: receivedAt }))
-      return
-    }
-    for (const location of data.locations) {
-      append(
-        JSON.stringify({
-          t: location.timestamp,
-          rx: receivedAt,
-          lat: location.coords.latitude,
-          lon: location.coords.longitude,
-          accuracyM: location.coords.accuracy,
-        }),
-      )
-    }
-  } catch {
-    // Nothing to do: a task that throws here would only hide the symptom being measured.
+  if (error) {
+    logEvent({ ev: "error", t: receivedAt, message: error.message })
+    return
+  }
+  for (const location of data.locations) {
+    const speed = location.coords.speed
+    logEvent({
+      ev: "fix",
+      t: location.timestamp,
+      rx: receivedAt,
+      lat: location.coords.latitude,
+      lon: location.coords.longitude,
+      accuracyM: location.coords.accuracy,
+      // Android reports -1 for "no speed".
+      speedMs: speed !== null && speed >= 0 ? speed : null,
+    })
   }
 })
 
+export async function currentPermission(): Promise<Location.PermissionStatus> {
+  const { status } = await Location.getForegroundPermissionsAsync()
+  return status
+}
+
 export async function ensureForegroundPermission(): Promise<Location.PermissionStatus> {
   const { status } = await Location.requestForegroundPermissionsAsync()
+  logEvent({ ev: "perm", t: Date.now(), status })
   return status
 }
 
 export async function startSharing(preset: SpikePreset, killServiceOnDestroy: boolean): Promise<void> {
-  await Location.startLocationUpdatesAsync(SPIKE_TASK, {
-    accuracy: preset.accuracy,
-    timeInterval: preset.timeIntervalMs,
-    distanceInterval: preset.distanceM,
-    pausesUpdatesAutomatically: false,
-    foregroundService: {
-      notificationTitle: "Kayaktrek",
-      notificationBody: "Sharing your position (spike)",
-      killServiceOnDestroy,
-    },
-  })
+  // Logged first, so that every fix of the run falls after its marker.
+  logEvent({ ev: "run-start", t: Date.now(), label: preset.label, killOnDestroy: killServiceOnDestroy })
+  try {
+    await Location.startLocationUpdatesAsync(SPIKE_TASK, {
+      accuracy: preset.accuracy,
+      timeInterval: preset.timeIntervalMs,
+      distanceInterval: preset.distanceM,
+      pausesUpdatesAutomatically: false,
+      foregroundService: {
+        notificationTitle: "Kayaktrek",
+        notificationBody: "Sharing your position (spike)",
+        killServiceOnDestroy,
+      },
+    })
+  } catch (error) {
+    logEvent({ ev: "error", t: Date.now(), message: `start failed: ${error instanceof Error ? error.message : String(error)}` })
+    throw error
+  }
 }
 
 export async function stopSharing(): Promise<void> {
+  logEvent({ ev: "run-stop", t: Date.now() })
   if (await Location.hasStartedLocationUpdatesAsync(SPIKE_TASK)) {
     await Location.stopLocationUpdatesAsync(SPIKE_TASK)
   }
@@ -97,14 +90,4 @@ export async function stopSharing(): Promise<void> {
 
 export function isSharing(): Promise<boolean> {
   return Location.hasStartedLocationUpdatesAsync(SPIKE_TASK)
-}
-
-export function readLog(): string {
-  const file = logFile()
-  return file.exists ? file.textSync() : ""
-}
-
-export function clearLog(): void {
-  const file = logFile()
-  if (file.exists) file.delete()
 }

@@ -1,4 +1,4 @@
-import { parseLog, parseProcessStarts, summarise, type SpikeFix } from "../location-log"
+import { summarise, type SpikeFix } from "../location-log"
 
 const START = 1_700_000_000_000
 
@@ -11,40 +11,6 @@ function fix(secondsIn: number, deliveredAfterMs = 0): SpikeFix {
     accuracyM: 12,
   }
 }
-
-describe("parseLog", () => {
-  it("skips blank lines and a line cut short by the process dying, and sorts by fix time", () => {
-    const text = [
-      JSON.stringify(fix(30)),
-      "",
-      JSON.stringify(fix(0)),
-      '{"t": 17000000',
-      JSON.stringify({ error: "location unavailable", rx: START }),
-    ].join("\n")
-
-    expect(parseLog(text).map((parsed) => parsed.t)).toEqual([fix(0).t, fix(30).t])
-  })
-})
-
-describe("parseProcessStarts", () => {
-  it("lists when the app process started, in order, ignoring fixes, errors and cut-off lines", () => {
-    // Each launch of the process writes one of these, so a walk that was killed and restarted
-    // by Android shows up as more than one.
-    const text = [
-      JSON.stringify({ start: START + 5000 }),
-      JSON.stringify(fix(1)),
-      JSON.stringify({ start: START }),
-      JSON.stringify({ error: "location unavailable", rx: START }),
-      '{"start": 17000',
-    ].join("\n")
-
-    expect(parseProcessStarts(text)).toEqual([START, START + 5000])
-  })
-
-  it("returns nothing for an empty log", () => {
-    expect(parseProcessStarts("")).toEqual([])
-  })
-})
 
 describe("summarise", () => {
   it("reports an empty log as zeros, not NaN", () => {

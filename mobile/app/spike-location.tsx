@@ -1,53 +1,89 @@
-// M9e WP0 spike screen (plans/M9e.md): throwaway. Open it with
-//   adb shell am start -a android.intent.action.VIEW -d "kayaktrek:///spike-location"
-// start sharing, lock the phone and walk. The numbers below come from the file the background
-// task writes, so they are what really arrived while the screen was off.
+// M9e WP0 spike screen (plans/M9e.md): throwaway. Start sharing, lock the phone and walk. The report
+// below is built from the evidence log the app and the phone wrote while the screen was off, so it
+// is what really happened. Nothing here needs a cable, and nothing here can clear the log.
 
 import { useCallback, useEffect, useState } from "react"
-import { ScrollView, Text } from "react-native"
+import { ScrollView, Share, Text } from "react-native"
 
 import { Button } from "../components/ui/button"
 import { Row, Screen, Stack } from "../components/ui/layout"
-import { parseLog, parseProcessStarts, summarise, type SpikeSummary } from "../lib/spike/location-log"
+import { deviceSnapshot, type DeviceSnapshot } from "../modules/spike-device-events"
+import { readAllLogText } from "../lib/spike/events"
 import {
   PRESETS,
-  clearLog,
+  currentPermission,
   ensureForegroundPermission,
   isSharing,
-  readLog,
   startSharing,
   stopSharing,
 } from "../lib/spike/location-task"
+import { clock, duration, formatEvent, formatReport } from "../lib/spike/report-format"
+import { parseEvents, reportRuns, type RunReport, type SpikeEvent } from "../lib/spike/run-report"
 
 const REFRESH_MS = 5_000
+const RECENT_SHOWN = 25
+const RECENT_SHARED = 80
 
-function clock(ms: number | null): string {
-  return ms === null ? "-" : new Date(ms).toLocaleTimeString()
+const STANDBY_BUCKETS: Record<number, string> = {
+  10: "active",
+  20: "working set",
+  30: "frequent",
+  40: "rare",
+  45: "restricted",
 }
 
-function duration(ms: number): string {
-  const seconds = Math.round(ms / 1000)
-  return seconds < 120 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`
+function phoneLines(phone: DeviceSnapshot | null): string[] {
+  if (!phone) return ["Phone: no reading"]
+  const bucket = phone.standbyBucket === null ? "?" : `${phone.standbyBucket} (${STANDBY_BUCKETS[phone.standbyBucket] ?? "other"})`
+  return [
+    `Phone: ${phone.manufacturer} ${phone.model}, Android API ${phone.sdk}`,
+    `Screen ${phone.interactive ? "on" : "off"}, deep sleep ${phone.idle ? "ON" : "off"}, battery saver ${phone.powerSave ? "ON" : "off"}`,
+    `Battery ${phone.battery}%${phone.charging ? " charging" : ""}, standby bucket ${bucket}`,
+    `Exempt from battery optimisation: ${phone.ignoringBatteryOptimizations ? "yes" : "no"}`,
+  ]
+}
+
+function earlierRunLine(report: RunReport): string {
+  return `${clock(report.startedAt)}  ${report.label}: ${report.fixes.count} fixes, ${duration(report.endedAt - report.startedAt)}`
+}
+
+function shareText(reports: RunReport[], recent: SpikeEvent[], phone: DeviceSnapshot | null): string {
+  const newestFirst = [...reports].reverse()
+  return [
+    "M9e spike report",
+    ...phoneLines(phone),
+    "",
+    ...newestFirst.map((report) => formatReport(report)).join("\n\n").split("\n"),
+    "",
+    `Last ${RECENT_SHARED} events, newest first:`,
+    ...recent.slice(0, RECENT_SHARED).map(formatEvent),
+  ].join("\n")
 }
 
 export default function SpikeLocationScreen() {
-  const [permission, setPermission] = useState<string>("not asked")
+  const [permission, setPermission] = useState("checking")
   const [presetIndex, setPresetIndex] = useState(0)
   const [killOnDestroy, setKillOnDestroy] = useState(false)
   const [sharing, setSharing] = useState(false)
-  const [summary, setSummary] = useState<SpikeSummary | null>(null)
-  const [starts, setStarts] = useState<number[]>([])
+  const [reports, setReports] = useState<RunReport[]>([])
+  const [events, setEvents] = useState<SpikeEvent[]>([])
+  const [phone, setPhone] = useState<DeviceSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setSharing(await isSharing())
-    const preset = PRESETS[presetIndex]
-    const log = readLog()
-    setSummary(summarise(parseLog(log), preset.timeIntervalMs * 3))
-    setStarts(parseProcessStarts(log))
-  }, [presetIndex])
+    const parsed = parseEvents(readAllLogText())
+    setEvents(parsed)
+    setReports(reportRuns(parsed))
+    try {
+      setPhone(deviceSnapshot())
+    } catch {
+      setPhone(null)
+    }
+  }, [])
 
   useEffect(() => {
+    void currentPermission().then(setPermission)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the state is set inside refresh's async body
     void refresh()
     const timer = setInterval(() => void refresh(), REFRESH_MS)
@@ -64,16 +100,29 @@ export default function SpikeLocationScreen() {
     await refresh()
   }
 
+  const recent = [...events].reverse()
+  const latest = reports.length > 0 ? reports[reports.length - 1] : null
+  const earlier = reports.slice(0, -1).reverse()
+
   return (
     <Screen>
-      <ScrollView contentContainerClassName="gap-4 p-4">
+      <ScrollView contentContainerClassName="gap-4 p-4" contentContainerStyle={{ paddingBottom: 160 }}>
         <Text className="text-lg font-semibold text-foreground">M9e spike: does sharing survive a locked screen?</Text>
+        <Text className="text-muted-foreground">
+          Tap Start, lock the phone, walk 30 minutes or more with it in a pocket, and do not open the app. Then
+          open it and read the report, or tap Share report. Nothing here needs a cable and nothing can clear the
+          log.
+        </Text>
 
         <Stack>
           <Text className="text-muted-foreground">Location permission: {permission}</Text>
           <Button
             variant="outline"
-            onPress={() => run(async () => setPermission(await ensureForegroundPermission()))}
+            onPress={() =>
+              run(async () => {
+                setPermission(await ensureForegroundPermission())
+              })
+            }
           >
             Ask for location permission
           </Button>
@@ -103,37 +152,45 @@ export default function SpikeLocationScreen() {
           <Button variant="destructive" disabled={!sharing} onPress={() => run(stopSharing)}>
             Stop
           </Button>
-          <Button variant="outline" onPress={() => run(clearLog)}>
-            Clear log
+          <Button variant="outline" onPress={() => run(() => Share.share({ message: shareText(reports, recent, phone) }).then(() => undefined))}>
+            Share report
           </Button>
         </Row>
 
         {error ? <Text className="text-destructive">{error}</Text> : null}
 
         <Stack>
-          <Text className="font-semibold text-foreground">Service: {sharing ? "RUNNING" : "stopped"}</Text>
-          <Text className="text-foreground">
-            App process started {starts.length} time(s), last {clock(starts[starts.length - 1] ?? null)}
-            {starts.length > 1 ? " (more than one: Android killed it at least once)" : ""}
+          <Text className="font-semibold text-foreground">Location service: {sharing ? "RUNNING" : "stopped"}</Text>
+          <Text selectable style={{ fontFamily: "monospace", fontSize: 12 }} className="text-foreground">
+            {phoneLines(phone).join("\n")}
           </Text>
-          {summary ? (
-            <>
-              <Text className="text-foreground">Fixes logged: {summary.count}</Text>
-              <Text className="text-foreground">
-                First {clock(summary.firstAt)}, last {clock(summary.lastAt)}, span {duration(summary.spanMs)}
-              </Text>
-              <Text className="text-foreground">
-                Median gap {duration(summary.medianGapMs)}, longest gap {duration(summary.longestGapMs)}
-                {summary.longestGapEndedAt ? ` (ended ${clock(summary.longestGapEndedAt)})` : ""}
-              </Text>
-              <Text className="text-foreground">
-                Gaps over {duration(PRESETS[presetIndex].timeIntervalMs * 3)}: {summary.gapsOverThreshold}
-              </Text>
-              <Text className="text-foreground">
-                Worst delay between a fix and its delivery: {duration(summary.maxDeliveryDelayMs)}
-              </Text>
-            </>
-          ) : null}
+        </Stack>
+
+        <Stack>
+          <Text className="font-semibold text-foreground">Latest run</Text>
+          {latest ? (
+            <Text selectable style={{ fontFamily: "monospace", fontSize: 12 }} className="text-foreground">
+              {formatReport(latest)}
+            </Text>
+          ) : (
+            <Text className="text-muted-foreground">No run yet. Tap Start.</Text>
+          )}
+        </Stack>
+
+        {earlier.length > 0 ? (
+          <Stack>
+            <Text className="font-semibold text-foreground">Earlier runs</Text>
+            <Text selectable style={{ fontFamily: "monospace", fontSize: 12 }} className="text-foreground">
+              {earlier.map(earlierRunLine).join("\n")}
+            </Text>
+          </Stack>
+        ) : null}
+
+        <Stack>
+          <Text className="font-semibold text-foreground">Recent events, newest first</Text>
+          <Text selectable style={{ fontFamily: "monospace", fontSize: 11 }} className="text-foreground">
+            {recent.slice(0, RECENT_SHOWN).map(formatEvent).join("\n") || "none yet"}
+          </Text>
         </Stack>
       </ScrollView>
     </Screen>
