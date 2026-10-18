@@ -65,9 +65,20 @@ Tap **Ask for location permission** and choose **While using the app** (not "All
 
 ## Runs
 
-For each run: pick the settings, tap **Start**, note the battery % and the time, lock the phone,
-put it in a pocket (the dry bag for run C), **do not open the app**, and walk for at least 30
-minutes. Then open the app and read the numbers on screen; screenshot them.
+For each run: **unplug the phone**, pick the settings, tap **Start**, lock the phone, put it in a
+pocket (the dry bag for run C), **do not open the app**, and walk for at least 30 minutes. Then open
+the app and tap **Share report** (or screenshot the report). Nothing needs a cable, and the app
+cannot clear its own log: every run stays, each with its own report.
+
+The screen builds the report from an evidence log with two writers: the app (fixes, Start and Stop,
+the app going to the background, network changes, a heartbeat every minute) and a small native module
+(`modules/spike-device-events`) that writes the phone's own **screen on/off, unlock, deep sleep,
+battery saver and battery level** straight to a file, so it keeps logging while JavaScript is paused.
+The report sets the fixes against that timeline: how many arrived with the screen off, the longest
+silence wholly under a locked screen, the three longest gaps with the screen state and the speed
+either side (standing still or lost fixes), battery drop per hour, time in deep sleep, the longest
+heartbeat silence (a frozen app) and process launches. The heartbeat itself costs a little battery.
+Do not plug the phone in during a run: a charging phone gives no battery figure.
 
 | Run | Settings | Extra |
 | --- | --- | --- |
@@ -79,12 +90,10 @@ minutes. Then open the app and read the numbers on screen; screenshot them.
 MIUI exemptions to try if A fails: Settings → Apps → Manage apps → Kayaktrek → **Autostart** on,
 **Battery saver: No restrictions**; and lock the app in the recents screen.
 
-Record per run: settings, start and end battery %, duration, fixes logged, median and longest gap,
-gaps over three intervals, worst delivery delay, **how many times the app process started** (more
-than one means Android killed it and something brought it back; the screen says so), and whether
-the foreground notification was visible (Android 13+ may hide it without the notification
-permission; the spike does not ask). If the app crashes again, say when: the log keeps every fix
-that arrived before it.
+Besides the report, say whether the foreground notification was visible (Android 13+ may hide it
+without the notification permission; the spike does not ask) and whether you changed any MIUI
+setting. If the app crashes, say when: the log keeps everything that arrived before it, and the
+report shows process launches.
 
 ## Teardown
 
