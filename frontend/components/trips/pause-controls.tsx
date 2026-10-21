@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { PauseIcon, PlayIcon, OctagonXIcon } from "lucide-react"
+import { PlayIcon, OctagonXIcon } from "lucide-react"
 import { toast } from "sonner"
 import { pauseTrip, resumeTrip, abortTrip } from "@/lib/trips/actions"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
@@ -29,17 +29,21 @@ interface PauseControlsProps {
   isLeader: boolean
 }
 
-export function PauseControls({ trip, isLeader }: PauseControlsProps) {
+interface PauseTripDialogProps {
+  tripId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+// Opened from the trip menu, which owns `open`: a dialog rendered inside a dropdown item
+// would unmount with the menu the moment the item is chosen.
+export function PauseTripDialog({ tripId, open, onOpenChange }: PauseTripDialogProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [resumeOpen, setResumeOpen] = useState(false)
-  const [resumeDate, setResumeDate] = useState("")
-
-  if (!isLeader || trip.state !== TRIP_STATE.HAPPENING) return null
 
   function handlePause() {
     startTransition(async () => {
-      const result = await pauseTrip(trip.id!)
+      const result = await pauseTrip(tripId)
       if (!result.success) {
         toast.error(result.error)
         return
@@ -47,6 +51,37 @@ export function PauseControls({ trip, isLeader }: PauseControlsProps) {
       router.refresh()
     })
   }
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Pause expedition?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Checkpoint alerts pause until you resume. Resuming shifts the remaining days forward by
+            however long the pause lasted.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handlePause} disabled={isPending}>
+            Pause
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+// The paused state: the banner that says so, and Resume and Abort. Pausing itself lives in
+// the trip menu; this stays on the page because a paused trip is a state, not an action.
+export function PauseControls({ trip, isLeader }: PauseControlsProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [resumeOpen, setResumeOpen] = useState(false)
+  const [resumeDate, setResumeDate] = useState("")
+
+  if (!isLeader || trip.state !== TRIP_STATE.HAPPENING || !trip.isPaused) return null
 
   function handleResume() {
     startTransition(async () => {
@@ -69,39 +104,6 @@ export function PauseControls({ trip, isLeader }: PauseControlsProps) {
       }
       router.refresh()
     })
-  }
-
-  if (!trip.isPaused) {
-    return (
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isPending}
-            className="w-full sm:w-auto sm:self-start"
-          >
-            <PauseIcon className="size-3.5" />
-            Pause expedition
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pause expedition?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Checkpoint alerts pause until you resume. Resuming shifts the remaining days forward
-              by however long the pause lasted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePause} disabled={isPending}>
-              Pause
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    )
   }
 
   return (

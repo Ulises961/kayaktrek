@@ -110,7 +110,7 @@ test.describe("Multi-device live sync (M36)", () => {
   }) => {
     await apiTransitionState(request, leaderToken, tripId, "happening")
     await page.goto(`/trips/${tripId}/crew`)
-    await expect(page.getByRole("button", { name: /pause expedition/i })).toBeVisible()
+    await expect(page.getByRole("button", { name: /mark as past/i })).toBeVisible()
     await expectStreamLive(page)
 
     // What the phone's queue does when it comes back online: one batch of envelopes. This is

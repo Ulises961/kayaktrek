@@ -1,9 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { Trash2Icon } from "lucide-react"
 import { deleteTripForEveryone } from "@/lib/trips/actions"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,15 +11,23 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-interface DeleteTripButtonProps {
+interface DeleteTripDialogProps {
   tripId: string
   destination: string | null | undefined
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps) {
+// Opened from the trip menu, which owns `open`: a dialog rendered inside a dropdown item
+// would unmount with the menu the moment the item is chosen.
+export function DeleteTripDialog({
+  tripId,
+  destination,
+  open,
+  onOpenChange,
+}: DeleteTripDialogProps) {
   const [isPending, startTransition] = useTransition()
   const label = destination ?? "this trip"
 
@@ -32,18 +38,7 @@ export function DeleteTripButton({ tripId, destination }: DeleteTripButtonProps)
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Delete trip"
-          className="text-muted-foreground hover:text-destructive size-7 shrink-0"
-          disabled={isPending}
-        >
-          <Trash2Icon className="size-3.5" />
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {label}?</AlertDialogTitle>

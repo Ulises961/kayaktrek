@@ -1,0 +1,170 @@
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}))
+
+vi.mock("@/lib/trips/actions", () => ({
+  updateTrip: vi.fn(),
+  deleteTripForEveryone: vi.fn(),
+  leaveTrip: vi.fn(),
+  pauseTrip: vi.fn(),
+}))
+
+import { TripActionsMenu } from "../trip-actions-menu"
+import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
+import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
+import { MEMBER_ROLE } from "@/lib/dtos/trip-member"
+import { leaveTrip, pauseTrip, deleteTripForEveryone } from "@/lib/trips/actions"
+
+const TRIP: Trip = {
+  id: "01952f1a-0000-7000-8000-000000000001",
+  destination: "Cinque Terre",
+  description: "A coastal paddle",
+  dateFrom: "2026-07-01",
+  dateTo: "2026-07-05",
+  difficulty: "moderate",
+  state: TRIP_STATE.BUILDING,
+  travellers: [
+    {
+      id: "member-1",
+      role: MEMBER_ROLE.LEADER,
+      user: { id: "u1", name: "Ada", surname: "Lovelace", mail: "a@example.com", username: "ada" },
+    },
+    {
+      id: "member-2",
+      role: MEMBER_ROLE.CREW,
+      user: {
+        id: "u2",
+        name: "Grace",
+        surname: "Hopper",
+        mail: "g@example.com",
+        username: "grace",
+      },
+    },
+  ],
+}
+
+const HAPPENING: Trip = { ...TRIP, state: TRIP_STATE.HAPPENING }
+
+beforeEach(() => vi.clearAllMocks())
+
+async function openMenu() {
+  await userEvent.click(screen.getByRole("button", { name: /trip actions/i }))
+}
+
+function item(name: RegExp) {
+  return screen.queryByRole("menuitem", { name })
+}
+
+describe("TripActionsMenu — what each person is offered", () => {
+  it("offers the leader edit, leave and delete, and pause only while the trip is happening", async () => {
+    const { unmount } = render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    expect(item(/edit trip/i)).toBeInTheDocument()
+    expect(item(/leave trip/i)).toBeInTheDocument()
+    expect(item(/delete trip/i)).toBeInTheDocument()
+    expect(item(/pause expedition/i)).not.toBeInTheDocument()
+    unmount()
+
+    render(<TripActionsMenu trip={HAPPENING} isLeader isMember />)
+    await openMenu()
+    expect(item(/pause expedition/i)).toBeInTheDocument()
+  })
+
+  it("offers no pause while the trip is already paused: Resume lives on the page", async () => {
+    render(<TripActionsMenu trip={{ ...HAPPENING, isPaused: true }} isLeader isMember />)
+    await openMenu()
+    expect(item(/pause expedition/i)).not.toBeInTheDocument()
+  })
+
+  it("offers crew only Leave", async () => {
+    render(<TripActionsMenu trip={HAPPENING} isLeader={false} isMember />)
+    await openMenu()
+    expect(item(/leave trip/i)).toBeInTheDocument()
+    expect(item(/edit trip/i)).not.toBeInTheDocument()
+    expect(item(/pause expedition/i)).not.toBeInTheDocument()
+    expect(item(/delete trip/i)).not.toBeInTheDocument()
+  })
+
+  it("shows the difficulty as plain text, not as an item", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader={false} isMember />)
+    await openMenu()
+    const label = `Difficulty: ${DIFFICULTY_LABELS[TRIP.difficulty!]}`
+    expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: label })).not.toBeInTheDocument()
+  })
+
+  it("renders nothing for someone with no actions and no difficulty to show", () => {
+    const { container } = render(
+      <TripActionsMenu trip={{ ...TRIP, difficulty: null }} isLeader={false} isMember={false} />,
+    )
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it("still shows the difficulty to someone who is not a member", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader={false} isMember={false} />)
+    await openMenu()
+    expect(screen.getByText(/difficulty: moderate/i)).toBeInTheDocument()
+    expect(item(/leave trip/i)).not.toBeInTheDocument()
+  })
+})
+
+describe("TripActionsMenu — each item opens its own confirmation, and nothing happens before it", () => {
+  it("opens the edit dialog on the trip's current values", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/edit trip/i)!)
+
+    expect(await screen.findByRole("dialog", { name: /edit trip/i })).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: /destination/i })).toHaveValue("Cinque Terre")
+  })
+
+  it("asks before pausing, and pauses this trip once confirmed", async () => {
+    vi.mocked(pauseTrip).mockResolvedValue({ success: true })
+    render(<TripActionsMenu trip={HAPPENING} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/pause expedition/i)!)
+
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument()
+    expect(pauseTrip).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole("button", { name: /^pause$/i }))
+    expect(pauseTrip).toHaveBeenCalledWith(TRIP.id)
+  })
+
+  it("asks before leaving, and leaves this trip once confirmed", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader={false} isMember />)
+    await openMenu()
+    await userEvent.click(item(/leave trip/i)!)
+
+    expect(await screen.findByText("Leave this trip?")).toBeInTheDocument()
+    expect(leaveTrip).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole("button", { name: "Leave" }))
+    expect(leaveTrip).toHaveBeenCalledWith(TRIP.id)
+  })
+
+  it("warns that leaving as the only member deletes the trip", async () => {
+    const solo: Trip = { ...TRIP, travellers: [TRIP.travellers![0]] }
+    render(<TripActionsMenu trip={solo} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/leave trip/i)!)
+
+    expect(await screen.findByText(/delete this trip and all its data/i)).toBeInTheDocument()
+  })
+
+  it("asks before deleting, names the trip, and deletes nothing when cancelled", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/delete trip/i)!)
+
+    expect(await screen.findByText("Delete Cinque Terre?")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }))
+
+    expect(deleteTripForEveryone).not.toHaveBeenCalled()
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+  })
+})

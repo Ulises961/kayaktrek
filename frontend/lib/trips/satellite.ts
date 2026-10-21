@@ -17,3 +17,23 @@ export function canShareSatellitePosition(
   if (!currentMember || currentMember.leftAt) return false
   return tripState === TRIP_STATE.BUILDING || tripState === TRIP_STATE.HAPPENING
 }
+
+/**
+ * Whether the header should warn that the member's inReach is not sharing.
+ *
+ * Only for a happening trip, for a member who registered a feed and left the switch off:
+ * that is a paddler who can share and is not. Without the feed condition every paddler
+ * with no inReach would carry a permanent warning they cannot act on.
+ */
+export function satelliteTrackingIsOff(
+  tripState: TripState | null | undefined,
+  currentMember: TripMember | undefined,
+  hasFeed: boolean,
+): boolean {
+  return (
+    tripState === TRIP_STATE.HAPPENING &&
+    hasFeed &&
+    canShareSatellitePosition(tripState, currentMember) &&
+    !currentMember?.sharesSatellitePosition
+  )
+}

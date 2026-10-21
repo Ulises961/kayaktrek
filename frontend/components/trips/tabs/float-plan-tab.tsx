@@ -1,22 +1,37 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AnchorIcon, PencilIcon, ShieldAlertIcon } from "lucide-react"
+import {
+  AnchorIcon,
+  FileTextIcon,
+  PencilIcon,
+  SatelliteDishIcon,
+  ShieldAlertIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { FloatPlanMedicalTabSection } from "@/components/trips/float-plan-medical-tab-section"
+import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
 import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
+import { canShareSatellitePosition } from "@/lib/trips/satellite"
+import type { TripState } from "@/lib/dtos/trip"
 import { FloatPlanFormSchema } from "@/lib/dtos/trip-member"
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
 import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 
 interface FloatPlanTabProps {
   tripId: string
+  tripState: TripState | null | undefined
   currentMember: TripMember
+  /** Whether the user has a satellite feed registered in Settings (M29). */
+  hasSatelliteFeed: boolean
+  /** The leader also gets the printable float plan. */
+  isLeader: boolean
   /** Current user's medical-notes reset flag — drives the re-entry prompt. */
   medicalNotesResetAt?: string | null
 }
@@ -93,7 +108,15 @@ function floatPlanFormValues(member: TripMember): FloatPlanFormValues {
   }
 }
 
-export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: FloatPlanTabProps) {
+export function FloatPlanTab({
+  tripId,
+  tripState,
+  currentMember,
+  hasSatelliteFeed,
+  isLeader,
+  medicalNotesResetAt,
+}: FloatPlanTabProps) {
+  const canShareSatelliteFeed = canShareSatellitePosition(tripState, currentMember)
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -281,6 +304,39 @@ export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: Flo
             <EmergencyReadOnly member={currentMember} />
           </div>
         </div>
+      )}
+
+      {canShareSatelliteFeed && (
+        <>
+          <Separator />
+
+          <div className="flex flex-col gap-3">
+            <SectionLabel icon={<SatelliteDishIcon className="size-4" />}>
+              inReach tracking
+            </SectionLabel>
+            <SatelliteTrackingSwitch
+              tripId={tripId}
+              enabled={!!currentMember.sharesSatellitePosition}
+              hasFeed={hasSatelliteFeed}
+            />
+          </div>
+        </>
+      )}
+
+      {isLeader && (
+        <>
+          <Separator />
+
+          <div className="flex flex-col gap-3">
+            <SectionLabel icon={<FileTextIcon className="size-4" />}>Float plan</SectionLabel>
+            <Button variant="outline" size="sm" className="w-fit" asChild>
+              <Link href={`/trips/float-plan/${tripId}`}>
+                <AnchorIcon className="size-3.5" />
+                Printable float plan
+              </Link>
+            </Button>
+          </div>
+        </>
       )}
 
       {MEDICAL_NOTES_ENABLED && (

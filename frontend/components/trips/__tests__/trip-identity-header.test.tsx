@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -9,30 +8,30 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/trips/actions", () => ({
   updateTrip: vi.fn(),
-  deleteTrip: vi.fn(),
+  deleteTripForEveryone: vi.fn(),
+  leaveTrip: vi.fn(),
   advanceState: vi.fn(),
   pauseTrip: vi.fn(),
   resumeTrip: vi.fn(),
   abortTrip: vi.fn(),
 }))
 
-vi.mock("@/lib/trip-member/actions", () => ({
-  setSatelliteTracking: vi.fn(),
-}))
-
 import { TripIdentityHeader as Header } from "../trip-identity-header"
-import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
-import type { TripMember } from "@/lib/dtos/trip-member"
+import { MEMBER_ROLE, type TripMember } from "@/lib/dtos/trip-member"
 import type { Membership } from "@/lib/trips/membership"
-import { setSatelliteTracking } from "@/lib/trip-member/actions"
+import { addDaysIso, todayIso } from "@/lib/utils/date"
+import { daysBetween, formatDateRange } from "@/lib/trips/format"
 
-// Most of these tests are about the rest of the header, where a registered feed is
-// the ordinary case; the inReach tests below say so explicitly when they need otherwise.
+const TODAY = todayIso()
+
+// Most of these tests are not about the inReach warning, so the feed and today's date
+// default to the ordinary case; the tests that need otherwise say so.
 function TripIdentityHeader(
-  props: Omit<ComponentProps<typeof Header>, "hasSatelliteFeed"> & { hasSatelliteFeed?: boolean },
+  props: Omit<ComponentProps<typeof Header>, "hasSatelliteFeed" | "today"> &
+    Partial<Pick<ComponentProps<typeof Header>, "hasSatelliteFeed" | "today">>,
 ) {
-  return <Header hasSatelliteFeed {...props} />
+  return <Header hasSatelliteFeed today={TODAY} {...props} />
 }
 
 const TRIP: Trip = {
@@ -42,16 +41,16 @@ const TRIP: Trip = {
   dateFrom: "2026-07-01",
   dateTo: "2026-07-05",
   difficulty: "moderate",
-  state: "building",
+  state: TRIP_STATE.BUILDING,
   travellers: [
     {
       id: "member-1",
-      role: "leader",
+      role: MEMBER_ROLE.LEADER,
       user: { id: "u1", name: "Ada", surname: "Lovelace", mail: "a@example.com", username: "ada" },
     },
     {
       id: "member-2",
-      role: "crew",
+      role: MEMBER_ROLE.CREW,
       user: {
         id: "u2",
         name: "Grace",
@@ -82,7 +81,9 @@ const NON_MEMBER: Membership = {
   isMember: false,
 }
 
-describe("TripIdentityHeader", () => {
+beforeEach(() => vi.clearAllMocks())
+
+describe("TripIdentityHeader — identity", () => {
   it("shows the trip destination as the title", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     expect(screen.getByRole("heading", { name: "Cinque Terre" })).toBeInTheDocument()
@@ -100,145 +101,24 @@ describe("TripIdentityHeader", () => {
     expect(screen.getByText("Planning")).toBeInTheDocument()
   })
 
-  it("shows the date range with an inclusive day count", () => {
+  it("shows the date range with an inclusive day count while the trip is not happening", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    expect(screen.getByText(/5 days/)).toBeInTheDocument()
+    expect(screen.getByText(formatDateRange(TRIP.dateFrom, TRIP.dateTo))).toBeInTheDocument()
+    expect(
+      screen.getByText(`(${daysBetween(TRIP.dateFrom!, TRIP.dateTo!)} days)`),
+    ).toBeInTheDocument()
   })
 
-  it("shows one avatar per traveller", () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    // UserAvatar falls back to initials when there's no imageUrl.
-    expect(screen.getByText("AL")).toBeInTheDocument()
-    expect(screen.getByText("GH")).toBeInTheDocument()
-  })
-
-  it("opens the edit dialog for the leader on pencil click", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /edit trip/i }))
-    expect(screen.getByRole("dialog", { name: /edit trip/i })).toBeInTheDocument()
-    expect(screen.getByRole("textbox", { name: /destination/i })).toHaveValue("Cinque Terre")
-  })
-
-  it("does not show an edit affordance for crew", () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    expect(screen.queryByRole("button", { name: /edit trip/i })).not.toBeInTheDocument()
-  })
-
-  it("shows a delete affordance for the leader that opens a confirm dialog", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await userEvent.click(screen.getByRole("button", { name: /delete trip/i }))
-    expect(screen.getByRole("alertdialog")).toBeInTheDocument()
-    expect(screen.getByText(/delete cinque terre\?/i)).toBeInTheDocument()
-  })
-
-  it("does not show a delete affordance for crew", () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument()
-  })
-
-  async function openDetails() {
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
-  }
-
-  it("keeps the Details disclosure collapsed by default", () => {
+  it("carries no description and no Details disclosure: the trip card and the Edit dialog hold them", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
-  })
-
-  it("shows description/difficulty once Details is expanded, each under its own label", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.getByText("A coastal paddle")).toBeInTheDocument()
-    expect(screen.getByText(DIFFICULTY_LABELS[TRIP.difficulty!])).toBeInTheDocument()
-    // Labelled the same way as the action sub-sections below them, so every block
-    // inside Details is introduced rather than only some.
-    expect(screen.getByText("Description")).toBeInTheDocument()
-    expect(screen.getByText("Difficulty")).toBeInTheDocument()
-  })
-
-  it("collapses Details again on a second click", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    await openDetails()
-    expect(screen.queryByText("A coastal paddle")).not.toBeInTheDocument()
-  })
-
-  it("shows the advance-state action inside Details for the leader on a non-past trip", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.getByRole("button", { name: /begin expedition/i })).toBeInTheDocument()
-  })
-
-  it("does not show the advance-state action for crew", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
-  })
-
-  it("shows a Printable float plan link inside Details for the leader", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await openDetails()
-    const link = screen.getByRole("link", { name: /printable float plan/i })
-    expect(link.getAttribute("href")).toBe(`/trips/float-plan/${TRIP.id}`)
-  })
-
-  it("shows the trip-state timeline inside Details for the leader on a non-past trip", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.getByText("Happening")).toBeInTheDocument()
-    expect(screen.getByText("Past")).toBeInTheDocument()
-  })
-
-  it("does not show the trip-state timeline for crew", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.queryByText("Happening")).not.toBeInTheDocument()
-  })
-
-  it("shows pause controls inside Details for the leader on a happening trip", async () => {
-    render(
-      <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={LEADER_MEMBERSHIP} />,
-    )
-    await openDetails()
-    expect(screen.getByRole("button", { name: /pause expedition/i })).toBeInTheDocument()
-  })
-
-  it("does not show pause controls for crew", async () => {
-    render(
-      <TripIdentityHeader trip={{ ...TRIP, state: "happening" }} membership={CREW_MEMBERSHIP} />,
-    )
-    await openDetails()
-    expect(screen.queryByRole("button", { name: /pause expedition/i })).not.toBeInTheDocument()
-  })
-
-  it("does not render a Details disclosure when there is nothing to show (crew, no description/difficulty)", () => {
-    const bare: Trip = { ...TRIP, description: null, difficulty: null }
-    render(<TripIdentityHeader trip={bare} membership={NON_MEMBER} />)
     expect(screen.queryByRole("button", { name: /details/i })).not.toBeInTheDocument()
-  })
-
-  it("shows a Leave trip affordance inside Details for any member", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.getByRole("button", { name: /leave trip/i })).toBeInTheDocument()
-  })
-
-  it("shows a successor-nomination affordance inside Details for the leader only", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.getByRole("button", { name: /nominate a successor/i })).toBeInTheDocument()
-  })
-
-  it("does not show a successor-nomination affordance for crew", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    await openDetails()
-    expect(screen.queryByRole("button", { name: /nominate a successor/i })).not.toBeInTheDocument()
   })
 
   it("shows the leaderless banner when no traveller is the leader", () => {
     const leaderless: Trip = {
       ...TRIP,
-      travellers: TRIP.travellers!.map((m) => ({ ...m, role: "crew" })),
+      travellers: TRIP.travellers!.map((m) => ({ ...m, role: MEMBER_ROLE.CREW })),
     }
     render(<TripIdentityHeader trip={leaderless} membership={CREW_MEMBERSHIP} />)
     expect(screen.getByText(/this trip has no leader/i)).toBeInTheDocument()
@@ -251,10 +131,132 @@ describe("TripIdentityHeader", () => {
   })
 })
 
-describe("TripIdentityHeader, inReach switch (M29)", () => {
-  const SWITCH_NAME = "Share my inReach on this trip"
+describe("TripIdentityHeader — day label", () => {
+  const underway: Trip = {
+    ...TRIP,
+    state: TRIP_STATE.HAPPENING,
+    dateFrom: addDaysIso(TODAY, -2),
+    dateTo: addDaysIso(TODAY, 4),
+  }
 
-  beforeEach(() => vi.clearAllMocks())
+  it("says which day of the trip it is while the trip is happening, in place of the count", () => {
+    render(<TripIdentityHeader trip={underway} membership={CREW_MEMBERSHIP} />)
+    expect(screen.getByText("Day 3 of 7")).toBeInTheDocument()
+    expect(screen.queryByText(/\(7 days\)/)).not.toBeInTheDocument()
+  })
+
+  it("says the trip is paused, and on which day", () => {
+    const paused: Trip = {
+      ...underway,
+      isPaused: true,
+      pausedAt: `${addDaysIso(TODAY, -1)}T09:30:00`,
+    }
+    render(<TripIdentityHeader trip={paused} membership={CREW_MEMBERSHIP} />)
+    expect(screen.getByText("Paused on day 2")).toBeInTheDocument()
+  })
+
+  it("falls back to the plain count when today is outside the trip's dates", () => {
+    const early: Trip = {
+      ...underway,
+      dateFrom: addDaysIso(TODAY, 3),
+      dateTo: addDaysIso(TODAY, 5),
+    }
+    render(<TripIdentityHeader trip={early} membership={CREW_MEMBERSHIP} />)
+    expect(screen.queryByText(/^Day \d/)).not.toBeInTheDocument()
+    expect(screen.getByText("(3 days)")).toBeInTheDocument()
+  })
+})
+
+describe("TripIdentityHeader — crew", () => {
+  it("shows one avatar per traveller", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    // UserAvatar falls back to initials when there's no imageUrl.
+    expect(screen.getByText("AL")).toBeInTheDocument()
+    expect(screen.getByText("GH")).toBeInTheDocument()
+  })
+
+  it("links the avatars to the Crew tab", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    expect(screen.getByRole("link", { name: /crew, 2/i })).toHaveAttribute(
+      "href",
+      `/trips/${TRIP.id}/crew`,
+    )
+  })
+
+  it("counts the travellers beyond the avatars it shows", () => {
+    const crowd: Trip = {
+      ...TRIP,
+      travellers: Array.from({ length: 8 }, (_, i) => ({
+        id: `member-${i}`,
+        role: i === 0 ? MEMBER_ROLE.LEADER : MEMBER_ROLE.CREW,
+        user: {
+          id: `u${i}`,
+          name: "P",
+          surname: String(i),
+          mail: `p${i}@e.com`,
+          username: `p${i}`,
+        },
+      })),
+    }
+    render(<TripIdentityHeader trip={crowd} membership={CREW_MEMBERSHIP} />)
+    expect(screen.getByText("+3")).toBeInTheDocument()
+  })
+})
+
+describe("TripIdentityHeader — the next state step", () => {
+  it("shows the leader the advance button, in the open, on a trip being planned", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    expect(screen.getByRole("button", { name: /begin expedition/i })).toBeInTheDocument()
+  })
+
+  it("shows the leader 'Mark as past' on a happening trip", () => {
+    render(
+      <TripIdentityHeader
+        trip={{ ...TRIP, state: TRIP_STATE.HAPPENING }}
+        membership={LEADER_MEMBERSHIP}
+      />,
+    )
+    expect(screen.getByRole("button", { name: /mark as past/i })).toBeInTheDocument()
+  })
+
+  it("shows no advance button once the trip is past", () => {
+    render(
+      <TripIdentityHeader
+        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
+        membership={LEADER_MEMBERSHIP}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /mark as past|begin expedition/i })).toBeNull()
+  })
+
+  it("shows crew no advance button", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
+  })
+
+  it("keeps the trip menu out of the way: nothing it holds is on the page until it is opened", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
+    expect(screen.getByRole("button", { name: /trip actions/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /leave trip|delete trip|edit trip/i })).toBeNull()
+    expect(screen.queryByText(/nominate a successor/i)).not.toBeInTheDocument()
+  })
+
+  it("shows the paused banner with Resume and Abort on the page, for the leader", () => {
+    const paused: Trip = {
+      ...TRIP,
+      state: TRIP_STATE.HAPPENING,
+      isPaused: true,
+      pausedAt: "2026-07-03",
+    }
+    render(<TripIdentityHeader trip={paused} membership={LEADER_MEMBERSHIP} />)
+    expect(screen.getByText(/expedition paused since/i)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^resume$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /abort expedition/i })).toBeInTheDocument()
+  })
+})
+
+describe("TripIdentityHeader — inReach not sharing (M29)", () => {
+  const WARNING = /inreach not sharing/i
 
   function crewMembership(overrides: Partial<TripMember> = {}): Membership {
     const currentMember: TripMember = { ...TRIP.travellers![1], ...overrides }
@@ -267,110 +269,54 @@ describe("TripIdentityHeader, inReach switch (M29)", () => {
     }
   }
 
-  async function openDetails() {
-    await userEvent.click(screen.getByRole("button", { name: /details/i }))
-  }
+  const HAPPENING: Trip = { ...TRIP, state: TRIP_STATE.HAPPENING }
 
-  it("keeps the switch inside Details, out of sight until it is opened", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
-    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
-
-    await openDetails()
-
-    expect(screen.getByText("inReach tracking")).toBeInTheDocument()
-    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+  it("warns a member of a happening trip whose registered feed is switched off, and links to the Float plan", () => {
+    render(<TripIdentityHeader trip={HAPPENING} membership={crewMembership()} />)
+    expect(screen.getByRole("link", { name: WARNING })).toHaveAttribute(
+      "href",
+      `/trips/${TRIP.id}/my-float-plan`,
+    )
   })
 
-  it.each([TRIP_STATE.BUILDING, TRIP_STATE.HAPPENING])(
-    "offers the switch to a member while the trip is %s",
-    async (state) => {
-      render(<TripIdentityHeader trip={{ ...TRIP, state }} membership={crewMembership()} />)
-      await openDetails()
-      expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
-    },
-  )
-
-  it("offers it to the leader too: it is every member's own switch", async () => {
-    const leader = TRIP.travellers![0]
+  it("does not warn when the feed is on", () => {
     render(
       <TripIdentityHeader
-        trip={TRIP}
-        membership={{ ...LEADER_MEMBERSHIP, currentMember: leader }}
-      />,
-    )
-    await openDetails()
-    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
-  })
-
-  it("offers no switch once the trip is past", async () => {
-    render(
-      <TripIdentityHeader
-        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
-        membership={crewMembership()}
-      />,
-    )
-    await openDetails()
-    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
-    expect(screen.queryByText("inReach tracking")).not.toBeInTheDocument()
-  })
-
-  it("offers no switch to someone who is not a member", async () => {
-    render(<TripIdentityHeader trip={TRIP} membership={NON_MEMBER} />)
-    await openDetails()
-    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
-  })
-
-  it("offers no switch to a member who has left", async () => {
-    render(
-      <TripIdentityHeader
-        trip={TRIP}
-        membership={crewMembership({ leftAt: "2026-10-02T09:30:00" })}
-      />,
-    )
-    await openDetails()
-    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
-  })
-
-  it("shows the member's own setting: on when they have it on, off when the field is absent", async () => {
-    const { unmount } = render(
-      <TripIdentityHeader
-        trip={TRIP}
+        trip={HAPPENING}
         membership={crewMembership({ sharesSatellitePosition: true })}
       />,
     )
-    await openDetails()
-    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    )
-    unmount()
-
-    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
-    await openDetails()
-    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
-      "aria-checked",
-      "false",
-    )
+    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
   })
 
-  it("cannot be switched on without a registered feed, and points at Settings", async () => {
+  it("does not warn a paddler with no feed registered", () => {
     render(
-      <TripIdentityHeader trip={TRIP} membership={crewMembership()} hasSatelliteFeed={false} />,
+      <TripIdentityHeader
+        trip={HAPPENING}
+        membership={crewMembership()}
+        hasSatelliteFeed={false}
+      />,
     )
-    await openDetails()
-
-    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeDisabled()
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings")
+    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
   })
 
-  it("switches the feed on for this trip, not another", async () => {
-    vi.mocked(setSatelliteTracking).mockResolvedValue({ success: true })
-    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
-    await openDetails()
+  it("does not warn before the trip has started or after it is over", () => {
+    const { rerender } = render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
+    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole("switch", { name: SWITCH_NAME }))
-    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
+    rerender(
+      <TripIdentityHeader
+        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
+        membership={crewMembership()}
+        hasSatelliteFeed
+        today={TODAY}
+      />,
+    )
+    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
+  })
 
-    expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP.id, true)
+  it("does not warn someone who is not a member", () => {
+    render(<TripIdentityHeader trip={HAPPENING} membership={NON_MEMBER} />)
+    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
   })
 })

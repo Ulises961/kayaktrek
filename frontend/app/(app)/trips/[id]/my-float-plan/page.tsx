@@ -3,6 +3,7 @@ import { apiGet } from "@/lib/api/client"
 import { UserSchema } from "@/lib/dtos/user"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
+import { hasRegisteredFeed } from "@/lib/satellite-feeds/registered"
 import { deriveMembership } from "@/lib/trips/membership"
 import { FloatPlanTab } from "@/components/trips/tabs/float-plan-tab"
 
@@ -13,12 +14,15 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   if (!trip) notFound()
 
   const session = await getSession()
-  const { currentMember } = deriveMembership(trip, session)
+  const { currentMember, isLeader } = deriveMembership(trip, session)
   if (!currentMember) redirect(`/trips/${id}`)
 
-  const userProfile = await apiGet("/api/user/me")
-    .then((raw) => UserSchema.parse(raw))
-    .catch(() => null)
+  const [userProfile, hasSatelliteFeed] = await Promise.all([
+    apiGet("/api/user/me")
+      .then((raw) => UserSchema.parse(raw))
+      .catch(() => null),
+    hasRegisteredFeed(),
+  ])
 
   // TripMember snapshot always wins; profile fills gaps (e.g. profile updated
   // after the trip was created).
@@ -43,7 +47,10 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   return (
     <FloatPlanTab
       tripId={id}
+      tripState={trip.state}
       currentMember={mergedCurrentMember}
+      hasSatelliteFeed={hasSatelliteFeed}
+      isLeader={isLeader}
       medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
     />
   )

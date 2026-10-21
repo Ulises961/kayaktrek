@@ -11,8 +11,18 @@ vi.mock("@/lib/auth/session", () => ({ getSession }))
 vi.mock("@/lib/satellite-feeds/actions", () => ({ listSatelliteFeeds }))
 vi.mock("@/components/common/set-breadcrumbs", () => ({ SetBreadcrumbs: () => null }))
 vi.mock("@/components/trips/trip-identity-header", () => ({
-  TripIdentityHeader: ({ hasSatelliteFeed }: { hasSatelliteFeed: boolean }) => (
-    <div data-testid="identity-header" data-has-satellite-feed={String(hasSatelliteFeed)} />
+  TripIdentityHeader: ({
+    hasSatelliteFeed,
+    today,
+  }: {
+    hasSatelliteFeed: boolean
+    today: string
+  }) => (
+    <div
+      data-testid="identity-header"
+      data-has-satellite-feed={String(hasSatelliteFeed)}
+      data-today={today}
+    />
   ),
 }))
 vi.mock("@/components/trips/trip-detail-nav", () => ({
@@ -32,6 +42,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import TripDetailLayout from "../layout"
+import { todayIso } from "@/lib/utils/date"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -164,6 +175,19 @@ describe("TripDetailLayout — inReach switch (M29)", () => {
 
     expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "false")
     expect(listSatelliteFeeds).not.toHaveBeenCalled()
+  })
+})
+
+describe("TripDetailLayout — day label", () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it("hands the header today's date, so the server and the browser render the same day", async () => {
+    getTripCore.mockResolvedValue(trip())
+    getSession.mockResolvedValue({ userId: USER_ID })
+
+    render(await TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }))
+
+    expect(screen.getByTestId("identity-header")).toHaveAttribute("data-today", todayIso())
   })
 })
 

@@ -44,7 +44,8 @@ test.describe("Trip CRUD", () => {
     // Edit destination inline. Locate by label, not placeholder — the
     // create-trip dialog and the edit-trip form use different placeholder
     // text for the same "Destination" field.
-    await page.getByRole("button", { name: /edit trip/i }).click()
+    await page.getByRole("button", { name: /trip actions/i }).click()
+    await page.getByRole("menuitem", { name: /edit trip/i }).click()
     const destInput = page.getByLabel("Destination")
     await destInput.fill("Faroe Islands")
     await mutateAndSettle(page, () => page.getByRole("button", { name: /save/i }).click(), {

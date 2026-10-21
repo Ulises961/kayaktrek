@@ -7,7 +7,9 @@ import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { InviteBuddyPicker } from "@/components/trips/invite-buddy-picker"
 import { CancelInvitationButton } from "@/components/trips/cancel-invitation-button"
+import { SuccessorPicker } from "@/components/trips/successor-picker"
 import type { Trip } from "@/lib/dtos/trip"
+import { MEMBER_ROLE } from "@/lib/dtos/trip-member"
 import { EmptyState } from "@/components/common/empty-state"
 
 interface CrewTabProps {
@@ -20,6 +22,7 @@ interface CrewTabProps {
 export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
   const travellers = trip.travellers ?? []
   const pendingTravellers = trip.pendingTravellers ?? []
+  const hasCrew = travellers.some((m) => m.role === MEMBER_ROLE.CREW)
 
   return (
     <div className="divide-border divide-y">
@@ -44,6 +47,14 @@ export function CrewTab({ tripId, trip, isLeader, leaderId }: CrewTabProps) {
           />
         )}
       </div>
+
+      {isLeader && hasCrew && (
+        <div className="flex flex-col gap-3 py-5">
+          <SectionLabel>Successor</SectionLabel>
+          <p className="text-muted-foreground text-xs">Who takes over if you leave the trip.</p>
+          <SuccessorPicker tripId={tripId} travellers={travellers} />
+        </div>
+      )}
 
       {isLeader && (
         <div className="flex flex-col gap-3 py-5">
