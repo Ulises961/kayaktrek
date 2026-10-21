@@ -26,13 +26,12 @@ import { daysBetween, formatDateRange } from "@/lib/trips/format"
 
 const TODAY = todayIso()
 
-// Most of these tests are not about the inReach warning, so the feed and today's date
-// default to the ordinary case; the tests that need otherwise say so.
+// Today's date defaults to the real one; the day-label tests build their dates around it.
 function TripIdentityHeader(
-  props: Omit<ComponentProps<typeof Header>, "hasSatelliteFeed" | "today"> &
-    Partial<Pick<ComponentProps<typeof Header>, "hasSatelliteFeed" | "today">>,
+  props: Omit<ComponentProps<typeof Header>, "today"> &
+    Partial<Pick<ComponentProps<typeof Header>, "today">>,
 ) {
-  return <Header hasSatelliteFeed today={TODAY} {...props} />
+  return <Header today={TODAY} {...props} />
 }
 
 const TRIP: Trip = {
@@ -245,70 +244,21 @@ describe("TripIdentityHeader — the trip menu and the state controls", () => {
   })
 })
 
-describe("TripIdentityHeader — inReach not sharing (M29)", () => {
-  // The notice says what is wrong and offers the one way to fix it.
-  const WARNING = /turn it on/i
-
-  function crewMembership(overrides: Partial<TripMember> = {}): Membership {
-    const currentMember: TripMember = { ...TRIP.travellers![1], ...overrides }
-    return {
-      isLeader: false,
-      isMember: true,
-      currentMember,
-      currentMemberId: currentMember.id,
-      leaderId: "u1",
-    }
-  }
-
-  const HAPPENING: Trip = { ...TRIP, state: TRIP_STATE.HAPPENING }
-
-  it("warns a member of a happening trip whose registered feed is switched off, and links to the Float plan", () => {
-    render(<TripIdentityHeader trip={HAPPENING} membership={crewMembership()} />)
-    expect(screen.getByText(/your position is not being shared/i)).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: WARNING })).toHaveAttribute(
-      "href",
-      `/trips/${TRIP.id}/my-float-plan`,
-    )
-  })
-
-  it("does not warn when the feed is on", () => {
+describe("TripIdentityHeader — what is not here", () => {
+  it("carries no inReach notice: it belongs to the inReach section of the Float plan tab", () => {
+    const member: TripMember = { ...TRIP.travellers![1], sharesSatellitePosition: false }
     render(
       <TripIdentityHeader
-        trip={HAPPENING}
-        membership={crewMembership({ sharesSatellitePosition: true })}
+        trip={{ ...TRIP, state: TRIP_STATE.HAPPENING }}
+        membership={{ ...CREW_MEMBERSHIP, currentMember: member }}
       />,
     )
-    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
+    expect(screen.queryByText(/inreach/i)).not.toBeInTheDocument()
   })
 
-  it("does not warn a paddler with no feed registered", () => {
-    render(
-      <TripIdentityHeader
-        trip={HAPPENING}
-        membership={crewMembership()}
-        hasSatelliteFeed={false}
-      />,
-    )
-    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
-  })
-
-  it("does not warn before the trip has started or after it is over", () => {
-    const { rerender } = render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
-    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
-
-    rerender(
-      <TripIdentityHeader
-        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
-        membership={crewMembership()}
-        hasSatelliteFeed
-        today={TODAY}
-      />,
-    )
-    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
-  })
-
-  it("does not warn someone who is not a member", () => {
-    render(<TripIdentityHeader trip={HAPPENING} membership={NON_MEMBER} />)
-    expect(screen.queryByRole("link", { name: WARNING })).not.toBeInTheDocument()
+  it("offers someone who is not a member the trip but no menu of actions", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={NON_MEMBER} />)
+    expect(screen.getByRole("heading", { name: "Cinque Terre" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /trip actions/i })).not.toBeInTheDocument()
   })
 })

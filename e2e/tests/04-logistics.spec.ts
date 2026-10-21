@@ -27,6 +27,8 @@ test.describe("Logistics — shore contact and float plan", () => {
     // Shore contact lives on the Float plan tab, not the logistics segment. The printable
     // /trips/float-plan/:id page only shows it.
     await page.goto(`/trips/${tripId}/my-float-plan`)
+    // The Shore section starts folded.
+    await page.getByRole("button", { name: /^shore/i }).click()
 
     const shore = page.getByRole("region", { name: "Shore contact" })
     await shore.getByRole("button", { name: "Edit", exact: true }).click()
@@ -51,6 +53,7 @@ test.describe("Logistics — shore contact and float plan", () => {
 
   test("leader generates float plan share link", async ({ page }) => {
     await page.goto(`/trips/${tripId}/my-float-plan`)
+    await page.getByRole("button", { name: /^shore/i }).click()
     const share = page.getByRole("region", { name: "Share and print" })
     await share.getByRole("button", { name: /generate float plan link/i }).click()
     await expect(share.getByRole("button", { name: /copy link/i })).toBeVisible()

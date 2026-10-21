@@ -23,6 +23,7 @@ import { updateMyFloatPlan, setSatelliteTracking } from "@/lib/trip-member/actio
 import { upsertLogistics } from "@/lib/logistics/actions"
 import { FloatPlanTab } from "../tabs/float-plan-tab"
 import { TRIP_STATE } from "@/lib/dtos/trip"
+import { formatDayDate } from "@/lib/utils/date"
 import type { Logistics } from "@/lib/dtos/logistics"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
@@ -69,6 +70,16 @@ describe("FloatPlanTab — viewing state", () => {
     const member = { ...BASE_MEMBER, floatPlanConfirmedAt: "2026-05-14T10:00:00" }
     render(<FloatPlanTab {...TAB_PROPS} currentMember={member} />)
     expect(screen.queryByText(/review.*float plan/i)).toBeNull()
+  })
+
+  it("says when the plan was confirmed, and not before it was", () => {
+    const { unmount } = render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
+    expect(screen.queryByText(/^confirmed/i)).toBeNull()
+    unmount()
+
+    const member = { ...BASE_MEMBER, floatPlanConfirmedAt: "2026-05-14T10:00:00" }
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={member} />)
+    expect(screen.getByText(`Confirmed ${formatDayDate("2026-05-14")}`)).toBeInTheDocument()
   })
 
   it("shows vessel make and model in read-only view", () => {
@@ -183,6 +194,45 @@ describe("FloatPlanTab — inReach tracking (M29)", () => {
 
     expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP_ID, true)
   })
+
+  describe("the notice that it is off", () => {
+    const NOTICE = /your position is not being shared/i
+    const HAPPENING = { tripState: TRIP_STATE.HAPPENING }
+
+    it("warns, in the inReach section, when a registered feed is off on a happening trip", () => {
+      render(<FloatPlanTab {...TAB_PROPS} {...HAPPENING} currentMember={BASE_MEMBER} />)
+
+      const section = screen.getByRole("region", { name: "inReach" })
+      expect(within(section).getByText(NOTICE)).toBeInTheDocument()
+      expect(within(section).getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+    })
+
+    it("says nothing once the switch is on", () => {
+      const member = { ...BASE_MEMBER, sharesSatellitePosition: true }
+      render(<FloatPlanTab {...TAB_PROPS} {...HAPPENING} currentMember={member} />)
+
+      expect(screen.queryByText(NOTICE)).toBeNull()
+    })
+
+    it("says nothing to a paddler with no feed registered: they cannot act on it", () => {
+      render(
+        <FloatPlanTab
+          {...TAB_PROPS}
+          {...HAPPENING}
+          hasSatelliteFeed={false}
+          currentMember={BASE_MEMBER}
+        />,
+      )
+
+      expect(screen.queryByText(NOTICE)).toBeNull()
+    })
+
+    it("says nothing before the trip has started, when nothing is yet expected to be sharing", () => {
+      render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
+
+      expect(screen.queryByText(NOTICE)).toBeNull()
+    })
+  })
 })
 
 describe("FloatPlanTab — the shore side, which is the leader's", () => {
@@ -201,8 +251,37 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
     )
   }
 
-  it("shows the leader the shore contact as saved", () => {
+  async function openShore() {
+    await userEvent.click(screen.getByRole("button", { name: /^shore/i }))
+  }
+
+  it("starts folded, with a line saying where the shore side stands", () => {
     renderForLeader()
+
+    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+      "Marguerite Vandersteen, no link yet",
+    )
+    expect(screen.queryByRole("region", { name: "Shore contact" })).toBeNull()
+  })
+
+  it("says so when there is no contact yet, and when the link is live", () => {
+    const { unmount } = render(
+      <FloatPlanTab {...TAB_PROPS} isLeader logistics={null} currentMember={BASE_MEMBER} />,
+    )
+    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+      "No shore contact yet, no link yet",
+    )
+    unmount()
+
+    renderForLeader({ ...LOGISTICS, shareToken: "tok_live" })
+    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+      "Marguerite Vandersteen, link live",
+    )
+  })
+
+  it("shows the leader the shore contact as saved, once opened", async () => {
+    renderForLeader()
+    await openShore()
 
     const shore = screen.getByRole("region", { name: "Shore contact" })
     expect(within(shore).getByText("Marguerite Vandersteen")).toBeInTheDocument()
@@ -212,6 +291,7 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
   it("lets the leader save a shore contact from here", async () => {
     vi.mocked(upsertLogistics).mockResolvedValue({ success: true })
     renderForLeader(null)
+    await openShore()
 
     const shore = screen.getByRole("region", { name: "Shore contact" })
     await userEvent.click(within(shore).getByRole("button", { name: "Edit" }))
@@ -229,6 +309,7 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
 
   it("lets the leader generate the share link", async () => {
     renderForLeader(null)
+    await openShore()
 
     const share = screen.getByRole("region", { name: "Share and print" })
     expect(
@@ -236,8 +317,9 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
     ).toBeInTheDocument()
   })
 
-  it("links the leader to the printable float plan", () => {
+  it("links the leader to the printable float plan", async () => {
     renderForLeader()
+    await openShore()
 
     expect(screen.getByRole("link", { name: /printable float plan/i })).toHaveAttribute(
       "href",
@@ -248,8 +330,8 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
   it("shows crew none of it: the shore contact, the link and the print page are the leader's", () => {
     render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
 
+    expect(screen.queryByRole("button", { name: /^shore/i })).toBeNull()
     expect(screen.queryByRole("region", { name: "Shore contact" })).toBeNull()
-    expect(screen.queryByRole("region", { name: "Share and print" })).toBeNull()
     expect(screen.queryByRole("link", { name: /printable float plan/i })).toBeNull()
   })
 

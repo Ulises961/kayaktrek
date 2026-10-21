@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { TriangleAlertIcon, UsersIcon } from "lucide-react"
+import { UsersIcon } from "lucide-react"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
 import { PauseControls } from "@/components/trips/pause-controls"
@@ -9,7 +9,6 @@ import { TripActionsMenu } from "@/components/trips/trip-actions-menu"
 import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
 import { daysBetween, formatDateRange, tripDayLabel } from "@/lib/trips/format"
 import type { Membership } from "@/lib/trips/membership"
-import { satelliteTrackingIsOff } from "@/lib/trips/satellite"
 import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import type { Trip } from "@/lib/dtos/trip"
 import { PageHeading } from "@/components/common/page-heading"
@@ -19,28 +18,19 @@ const MAX_VISIBLE_AVATARS = 5
 interface TripIdentityHeaderProps {
   trip: Trip
   membership: Membership
-  /** Whether the user has a satellite feed registered in Settings (M29). */
-  hasSatelliteFeed: boolean
   /** Today's ISO date, passed in so the server and the browser render the same day label. */
   today: string
 }
 
 // Who the trip is and where it stands. Everything you can do to it, including moving it to
 // its next state, sits behind the actions menu, so the tabs start right under this block.
-export function TripIdentityHeader({
-  trip,
-  membership,
-  hasSatelliteFeed,
-  today,
-}: TripIdentityHeaderProps) {
-  const { isLeader, isMember, currentMember, currentMemberId } = membership
+export function TripIdentityHeader({ trip, membership, today }: TripIdentityHeaderProps) {
+  const { isLeader, isMember, currentMemberId } = membership
   const travellers = trip.travellers ?? []
   const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
   const dayLabel = tripDayLabel(trip, today)
   const visibleTravellers = travellers.slice(0, MAX_VISIBLE_AVATARS)
   const overflowCount = travellers.length - visibleTravellers.length
-
-  const trackingOff = satelliteTrackingIsOff(trip.state, currentMember, hasSatelliteFeed)
 
   return (
     <div className="flex flex-col gap-2">
@@ -98,19 +88,6 @@ export function TripIdentityHeader({
           </Link>
         )}
       </div>
-
-      {/* A warning is not metadata: it takes a line of its own, and only while it applies. */}
-      {trackingOff && (
-        <div className="border-notice-border bg-notice-bg text-notice-ink flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <p className="min-w-0 flex-1">
-            inReach is off, so your position is not being shared.{" "}
-            <Link href={`/trips/${trip.id}/my-float-plan`} className="font-medium underline">
-              Turn it on
-            </Link>
-          </p>
-        </div>
-      )}
 
       <PauseControls trip={trip} isLeader={isLeader} />
     </div>

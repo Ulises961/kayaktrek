@@ -4,7 +4,7 @@ import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { UserSchema } from "@/lib/dtos/user"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
-import { hasRegisteredFeed } from "@/lib/satellite-feeds/registered"
+import { listSatelliteFeeds } from "@/lib/satellite-feeds/actions"
 import { deriveMembership } from "@/lib/trips/membership"
 import { FloatPlanTab } from "@/components/trips/tabs/float-plan-tab"
 
@@ -18,11 +18,11 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   const { currentMember, isLeader } = deriveMembership(trip, session)
   if (!currentMember) redirect(`/trips/${id}`)
 
-  const [userProfile, hasSatelliteFeed, logistics] = await Promise.all([
+  const [userProfile, satelliteFeeds, logistics] = await Promise.all([
     apiGet("/api/user/me")
       .then((raw) => UserSchema.parse(raw))
       .catch(() => null),
-    hasRegisteredFeed(),
+    listSatelliteFeeds(),
     // The shore contact and share link are the leader's; crew never see them.
     isLeader
       ? apiGet(`/api/logistics/${id}`)
@@ -59,7 +59,7 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
       tripId={id}
       tripState={trip.state}
       currentMember={mergedCurrentMember}
-      hasSatelliteFeed={hasSatelliteFeed}
+      hasSatelliteFeed={satelliteFeeds.length > 0}
       isLeader={isLeader}
       logistics={logistics}
       medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
