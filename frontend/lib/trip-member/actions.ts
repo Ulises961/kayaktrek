@@ -79,8 +79,7 @@ export async function setSatelliteTracking(
 ): Promise<FloatPlanActionResult> {
   try {
     await apiPut(`/api/trip/${tripId}/member/me/satellite-tracking`, { enabled })
-    revalidatePath(`/trips/${tripId}/my-float-plan`)
-    revalidatePath(`/trips/float-plan/${tripId}`)
+    revalidatePath("/trips/[id]", "layout")
     return { success: true }
   } catch (e) {
     if (isRedirectError(e)) throw e

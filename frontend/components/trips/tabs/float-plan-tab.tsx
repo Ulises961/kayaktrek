@@ -3,26 +3,20 @@
 import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AnchorIcon, PencilIcon, SatelliteDishIcon, ShieldAlertIcon } from "lucide-react"
+import { AnchorIcon, PencilIcon, ShieldAlertIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { FloatPlanMedicalTabSection } from "@/components/trips/float-plan-medical-tab-section"
-import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
 import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
-import { TRIP_STATE } from "@/lib/dtos/trip"
 import { FloatPlanFormSchema } from "@/lib/dtos/trip-member"
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
-import type { TripState } from "@/lib/dtos/trip"
 import type { TripMember, FloatPlanFormValues } from "@/lib/dtos/trip-member"
 
 interface FloatPlanTabProps {
   tripId: string
-  tripState: TripState | null | undefined
   currentMember: TripMember
-  /** Whether the user has a satellite feed registered in Settings (M29). */
-  hasSatelliteFeed: boolean
   /** Current user's medical-notes reset flag — drives the re-entry prompt. */
   medicalNotesResetAt?: string | null
 }
@@ -99,19 +93,7 @@ function floatPlanFormValues(member: TripMember): FloatPlanFormValues {
   }
 }
 
-export function FloatPlanTab({
-  tripId,
-  tripState,
-  currentMember,
-  hasSatelliteFeed,
-  medicalNotesResetAt,
-}: FloatPlanTabProps) {
-  // Offered while the trip is being planned or under way, to a member still aboard: a
-  // finished trip has nothing left to receive a position, and a member who left no longer
-  // shares one.
-  const canShareSatellite =
-    (tripState === TRIP_STATE.BUILDING || tripState === TRIP_STATE.HAPPENING) &&
-    !currentMember.leftAt
+export function FloatPlanTab({ tripId, currentMember, medicalNotesResetAt }: FloatPlanTabProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -299,23 +281,6 @@ export function FloatPlanTab({
             <EmergencyReadOnly member={currentMember} />
           </div>
         </div>
-      )}
-
-      {canShareSatellite && (
-        <>
-          <Separator />
-
-          <div className="flex flex-col gap-3">
-            <SectionLabel icon={<SatelliteDishIcon className="size-4" />}>
-              inReach tracking
-            </SectionLabel>
-            <SatelliteTrackingSwitch
-              tripId={tripId}
-              enabled={!!currentMember.sharesSatellitePosition}
-              hasFeed={hasSatelliteFeed}
-            />
-          </div>
-        </>
       )}
 
       {MEDICAL_NOTES_ENABLED && (

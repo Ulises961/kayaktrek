@@ -140,11 +140,10 @@ describe("setSatelliteTracking", () => {
     })
   })
 
-  it("revalidates the member's float plan page and the printable float plan on success", async () => {
+  it("revalidates the trip layout on success: the switch lives in the header it renders", async () => {
     vi.mocked(apiPut).mockResolvedValue(MEMBER_FIXTURE)
     await setSatelliteTracking(TRIP_ID, true)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
-    expect(revalidatePath).toHaveBeenCalledWith(`/trips/float-plan/${TRIP_ID}`)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
   })
 
   it("returns success: true on success", async () => {

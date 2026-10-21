@@ -21,8 +21,10 @@ import { DeleteTripButton } from "@/components/trips/delete-trip-button"
 import { LeaveTripButton } from "@/components/trips/leave-trip-button"
 import { SuccessorPicker } from "@/components/trips/successor-picker"
 import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
+import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
 import { daysBetween, formatDateRange } from "@/lib/trips/format"
 import type { Membership } from "@/lib/trips/membership"
+import { canShareSatellitePosition } from "@/lib/trips/satellite"
 import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import {
   TRIP_STATE,
@@ -75,10 +77,17 @@ function StateTimeline({ currentState }: { currentState: TripState }) {
 interface TripIdentityHeaderProps {
   trip: Trip
   membership: Membership
+  /** Whether the user has a satellite feed registered in Settings (M29). */
+  hasSatelliteFeed: boolean
 }
 
-export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps) {
-  const { isLeader, isMember, currentMemberId } = membership
+export function TripIdentityHeader({
+  trip,
+  membership,
+  hasSatelliteFeed,
+}: TripIdentityHeaderProps) {
+  const { isLeader, isMember, currentMember, currentMemberId } = membership
+  const offersSatellite = canShareSatellitePosition(trip.state, currentMember)
   const [editOpen, setEditOpen] = useState(false)
   const travellers = trip.travellers ?? []
   const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
@@ -193,6 +202,20 @@ export function TripIdentityHeader({ trip, membership }: TripIdentityHeaderProps
                   <span className={fieldLabelClass}>Difficulty</span>
                   <p className="text-sm">{DIFFICULTY_LABELS[trip.difficulty]}</p>
                 </div>
+              )}
+
+              {offersSatellite && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-2">
+                    <span className={fieldLabelClass}>inReach tracking</span>
+                    <SatelliteTrackingSwitch
+                      tripId={trip.id!}
+                      enabled={!!currentMember?.sharesSatellitePosition}
+                      hasFeed={hasSatelliteFeed}
+                    />
+                  </div>
+                </>
               )}
 
               {isLeader && (
