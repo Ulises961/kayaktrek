@@ -214,36 +214,15 @@ describe("TripIdentityHeader — crew", () => {
   })
 })
 
-describe("TripIdentityHeader — the next state step", () => {
-  it("shows the leader the advance button, in the open, on a trip being planned", () => {
-    render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)
-    expect(screen.getByRole("button", { name: /begin expedition/i })).toBeInTheDocument()
-  })
-
-  it("shows the leader 'Mark as past' on a happening trip", () => {
-    render(
-      <TripIdentityHeader
-        trip={{ ...TRIP, state: TRIP_STATE.HAPPENING }}
-        membership={LEADER_MEMBERSHIP}
-      />,
-    )
-    expect(screen.getByRole("button", { name: /mark as past/i })).toBeInTheDocument()
-  })
-
-  it("shows no advance button once the trip is past", () => {
-    render(
-      <TripIdentityHeader
-        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
-        membership={LEADER_MEMBERSHIP}
-      />,
-    )
-    expect(screen.queryByRole("button", { name: /mark as past|begin expedition/i })).toBeNull()
-  })
-
-  it("shows crew no advance button", () => {
-    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
-    expect(screen.queryByRole("button", { name: /begin expedition/i })).not.toBeInTheDocument()
-  })
+describe("TripIdentityHeader — the trip menu and the state controls", () => {
+  it.each([TRIP_STATE.BUILDING, TRIP_STATE.HAPPENING])(
+    "keeps the state step off the page while the trip is %s: it is in the menu",
+    (state) => {
+      render(<TripIdentityHeader trip={{ ...TRIP, state }} membership={LEADER_MEMBERSHIP} />)
+      expect(screen.queryByRole("button", { name: /begin expedition|mark as past/i })).toBeNull()
+      expect(screen.getByRole("button", { name: /trip actions/i })).toBeInTheDocument()
+    },
+  )
 
   it("keeps the trip menu out of the way: nothing it holds is on the page until it is opened", () => {
     render(<TripIdentityHeader trip={TRIP} membership={LEADER_MEMBERSHIP} />)

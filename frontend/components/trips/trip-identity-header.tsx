@@ -4,7 +4,6 @@ import Link from "next/link"
 import { TriangleAlertIcon, UsersIcon } from "lucide-react"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { PauseControls } from "@/components/trips/pause-controls"
 import { TripActionsMenu } from "@/components/trips/trip-actions-menu"
 import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
@@ -12,7 +11,7 @@ import { daysBetween, formatDateRange, tripDayLabel } from "@/lib/trips/format"
 import type { Membership } from "@/lib/trips/membership"
 import { satelliteTrackingIsOff } from "@/lib/trips/satellite"
 import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
-import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
+import type { Trip } from "@/lib/dtos/trip"
 import { PageHeading } from "@/components/common/page-heading"
 
 const MAX_VISIBLE_AVATARS = 5
@@ -26,9 +25,8 @@ interface TripIdentityHeaderProps {
   today: string
 }
 
-// Who the trip is and where it stands. Everything occasional sits behind the actions menu,
-// so the tabs start right under this block. The next state step stays out here as a button:
-// it turns a plan into a live expedition, and a control that consequential must be seen.
+// Who the trip is and where it stands. Everything you can do to it, including moving it to
+// its next state, sits behind the actions menu, so the tabs start right under this block.
 export function TripIdentityHeader({
   trip,
   membership,
@@ -42,7 +40,6 @@ export function TripIdentityHeader({
   const visibleTravellers = travellers.slice(0, MAX_VISIBLE_AVATARS)
   const overflowCount = travellers.length - visibleTravellers.length
 
-  const canAdvanceState = isLeader && trip.state && trip.state !== TRIP_STATE.PAST
   const trackingOff = satelliteTrackingIsOff(trip.state, currentMember, hasSatelliteFeed)
 
   return (
@@ -54,8 +51,7 @@ export function TripIdentityHeader({
         isMember={isMember}
         currentMemberId={currentMemberId}
       />
-      {/* The advance button takes its own line on a phone and joins the title row from `sm`. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           <PageHeading className="min-w-0 truncate">
             {trip.destination ?? "Untitled trip"}
@@ -67,14 +63,7 @@ export function TripIdentityHeader({
             </span>
           )}
         </div>
-        <div className="order-2 flex items-center">
-          <TripActionsMenu trip={trip} isLeader={isLeader} isMember={isMember} />
-        </div>
-        {canAdvanceState && trip.state && (
-          <div className="order-3 w-full sm:order-1 sm:w-auto">
-            <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
-          </div>
-        )}
+        <TripActionsMenu trip={trip} isLeader={isLeader} isMember={isMember} />
       </div>
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">

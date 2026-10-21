@@ -1,4 +1,4 @@
-import { APIRequestContext, Page, test, expect } from "@playwright/test"
+import { APIRequestContext, test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import {
   apiGetAccessToken,
@@ -8,7 +8,7 @@ import {
   apiInviteByEmail,
   apiAcceptInvitation,
 } from "../fixtures/trips"
-import { mutateAndSettle } from "../fixtures/ui"
+import { mutateAndSettle, openTripMenu } from "../fixtures/ui"
 import { BASE_URL } from "../playwright.config"
 
 // M8's live-expedition features (Navigate mode position sharing, the crew SSE
@@ -69,13 +69,6 @@ async function createHappeningTrip(
   const itineraryId = (trip.itinerary as { id: string }).id
   await apiTransitionState(request, leaderToken, tripId, "happening")
   return { tripId, itineraryId }
-}
-
-/** Opens the trip actions menu, the `•••` beside the trip title, where Pause expedition lives.
- * Resume and Abort are not in it: once paused they sit on the page, under the title. A reload
- * closes the menu, so call it again after every reload-settled mutation that reads it. */
-async function openTripMenu(page: Page) {
-  await page.getByRole("button", { name: "Trip actions" }).click()
 }
 
 test.describe("Live expedition — pause / resume / abort", () => {

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
-import { mutateAndSettle } from "../fixtures/ui"
+import { mutateAndSettle, openTripMenu } from "../fixtures/ui"
 import { API_URL } from "../playwright.config"
 
 test.describe("Trip state transitions", () => {
@@ -20,14 +20,16 @@ test.describe("Trip state transitions", () => {
 
   test("leader advances building → happening via UI", async ({ page }) => {
     await page.goto(`/trips/${tripId}`)
-    await page.getByRole("button", { name: /begin expedition/i }).click()
+    await openTripMenu(page)
+    await page.getByRole("menuitem", { name: /begin expedition/i }).click()
     // Confirmation dialog
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
       reload: true,
     })
-    // "Mark as past" appearing is the end-state signal: state is now "happening" AND RSC has
-    // re-rendered.
-    await expect(page.getByRole("button", { name: /mark as past/i })).toBeVisible()
+    // "Mark as past" appearing in the menu is the end-state signal: state is now "happening"
+    // AND RSC has re-rendered. The reload closed the menu, so open it again to read it.
+    await openTripMenu(page)
+    await expect(page.getByRole("menuitem", { name: /mark as past/i })).toBeVisible()
   })
 
   test("leader advances happening → past via UI", async ({ page, request }) => {
@@ -39,7 +41,8 @@ test.describe("Trip state transitions", () => {
     expect(res.ok()).toBeTruthy()
 
     await page.goto(`/trips/${tripId}`)
-    await page.getByRole("button", { name: /mark as past/i }).click()
+    await openTripMenu(page)
+    await page.getByRole("menuitem", { name: /mark as past/i }).click()
     await mutateAndSettle(page, () => page.getByRole("button", { name: /confirm/i }).click(), {
       reload: true,
     })
@@ -64,10 +67,12 @@ test.describe("Trip state transitions", () => {
     const crewPage = await crewContext.newPage()
     await crewPage.goto(`/trips/${tripId}`)
 
-    // Advance state button must not be present for crew. Wait for the page to have rendered
-    // first: "not visible" holds on a blank page too, which would prove nothing about crew.
-    await expect(crewPage.getByRole("link", { name: "Itinerary" })).toBeVisible()
-    await expect(crewPage.getByRole("button", { name: /begin expedition/i })).not.toBeVisible()
+    // The state step must not be offered to crew. The menu is opened, and shown to hold
+    // Leave, so "no Begin expedition" is a statement about what crew are offered and not
+    // about a menu that failed to open.
+    await openTripMenu(crewPage)
+    await expect(crewPage.getByRole("menuitem", { name: /leave trip/i })).toBeVisible()
+    await expect(crewPage.getByRole("menuitem", { name: /begin expedition/i })).not.toBeVisible()
     await crewContext.close()
   })
 })

@@ -90,3 +90,14 @@ export async function mutateAndSettle(
     await page.reload()
   }
 }
+
+/**
+ * Open the trip actions menu, the `•••` beside the trip title. It holds the trip's next
+ * state (Begin expedition, Mark as past), Pause expedition, Edit, Leave and Delete.
+ *
+ * A reload closes it, so call it again after every reload-settled mutation that reads it.
+ * Resume and Abort are not in it: once paused they sit on the page, under the title.
+ */
+export async function openTripMenu(page: Page) {
+  await page.getByRole("button", { name: "Trip actions" }).click()
+}

@@ -11,12 +11,13 @@ vi.mock("@/lib/trips/actions", () => ({
   deleteTripForEveryone: vi.fn(),
   leaveTrip: vi.fn(),
   pauseTrip: vi.fn(),
+  advanceState: vi.fn(),
 }))
 
 import { TripActionsMenu } from "../trip-actions-menu"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 import { MEMBER_ROLE } from "@/lib/dtos/trip-member"
-import { leaveTrip, pauseTrip, deleteTripForEveryone } from "@/lib/trips/actions"
+import { leaveTrip, pauseTrip, deleteTripForEveryone, advanceState } from "@/lib/trips/actions"
 
 const TRIP: Trip = {
   id: "01952f1a-0000-7000-8000-000000000001",
@@ -73,6 +74,26 @@ describe("TripActionsMenu — what each person is offered", () => {
     expect(item(/pause expedition/i)).toBeInTheDocument()
   })
 
+  it("offers the leader the trip's next state: begin while planning, mark as past while happening", async () => {
+    const { unmount } = render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    expect(item(/begin expedition/i)).toBeInTheDocument()
+    expect(item(/mark as past/i)).not.toBeInTheDocument()
+    unmount()
+
+    render(<TripActionsMenu trip={HAPPENING} isLeader isMember />)
+    await openMenu()
+    expect(item(/mark as past/i)).toBeInTheDocument()
+    expect(item(/begin expedition/i)).not.toBeInTheDocument()
+  })
+
+  it("offers no next state once the trip is past", async () => {
+    render(<TripActionsMenu trip={{ ...TRIP, state: TRIP_STATE.PAST }} isLeader isMember />)
+    await openMenu()
+    expect(item(/begin expedition|mark as past/i)).not.toBeInTheDocument()
+    expect(item(/edit trip/i)).toBeInTheDocument()
+  })
+
   it("offers no pause while the trip is already paused: Resume lives on the page", async () => {
     render(<TripActionsMenu trip={{ ...HAPPENING, isPaused: true }} isLeader isMember />)
     await openMenu()
@@ -85,6 +106,7 @@ describe("TripActionsMenu — what each person is offered", () => {
     expect(item(/leave trip/i)).toBeInTheDocument()
     expect(item(/edit trip/i)).not.toBeInTheDocument()
     expect(item(/pause expedition/i)).not.toBeInTheDocument()
+    expect(item(/mark as past|begin expedition/i)).not.toBeInTheDocument()
     expect(item(/delete trip/i)).not.toBeInTheDocument()
   })
 
@@ -108,6 +130,31 @@ describe("TripActionsMenu — each item opens its own confirmation, and nothing 
 
     expect(await screen.findByRole("dialog", { name: /edit trip/i })).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: /destination/i })).toHaveValue("Cinque Terre")
+  })
+
+  it("asks before beginning the expedition, and moves this trip to happening once confirmed", async () => {
+    vi.mocked(advanceState).mockResolvedValue({ success: true })
+    render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/begin expedition/i)!)
+
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument()
+    expect(advanceState).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }))
+    expect(advanceState).toHaveBeenCalledWith(TRIP.id, TRIP_STATE.HAPPENING)
+  })
+
+  it("asks before marking a happening trip as past, and does nothing when cancelled", async () => {
+    render(<TripActionsMenu trip={HAPPENING} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/mark as past/i)!)
+
+    expect(await screen.findByText(/the trip will be marked as completed/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }))
+
+    expect(advanceState).not.toHaveBeenCalled()
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
   })
 
   it("asks before pausing, and pauses this trip once confirmed", async () => {
