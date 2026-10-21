@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useOptimistic, useState, useTransition } from "react"
+import { PositionConsentDialog, POSITION_SOURCE } from "@/components/common/position-consent-dialog"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { setSatelliteTracking } from "@/lib/trip-member/actions"
@@ -28,14 +29,23 @@ export function SatelliteTrackingSwitch({
   const [shown, setShown] = useOptimistic(enabled)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
-  function handleChange(next: boolean) {
+  function submit(next: boolean) {
     setError(null)
     startTransition(async () => {
       setShown(next)
       const result = await setSatelliteTracking(tripId, next)
       if (!result.success) setError(result.error)
     })
+  }
+
+  // Switching on shares a position with the crew and the shore contact, so it goes through
+  // the consent dialog and nothing is sent until it is confirmed. Switching off stops a
+  // share and needs no confirmation.
+  function handleChange(next: boolean) {
+    if (next) setConfirming(true)
+    else submit(false)
   }
 
   return (
@@ -66,6 +76,12 @@ export function SatelliteTrackingSwitch({
         </p>
       )}
       {error && <p className="text-destructive text-xs">{error}</p>}
+      <PositionConsentDialog
+        source={POSITION_SOURCE.INREACH}
+        open={confirming}
+        onOpenChange={setConfirming}
+        onConfirm={() => submit(true)}
+      />
     </div>
   )
 }

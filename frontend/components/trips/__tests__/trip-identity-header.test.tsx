@@ -369,6 +369,7 @@ describe("TripIdentityHeader, inReach switch (M29)", () => {
     await openDetails()
 
     await userEvent.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
 
     expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP.id, true)
   })

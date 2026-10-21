@@ -18,6 +18,14 @@ function renderSwitch(
   return render(<SatelliteTrackingSwitch tripId={TRIP_ID} enabled={false} hasFeed {...overrides} />)
 }
 
+const CONSENT_TITLE = "Share your inReach position?"
+
+// Switching on asks for consent first; this is the whole gesture a paddler makes.
+async function switchOnAndConfirm(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+  await user.click(screen.getByRole("button", { name: /start sharing/i }))
+}
+
 beforeEach(() => {
   vi.mocked(setSatelliteTracking).mockReset().mockResolvedValue({ success: true })
 })
@@ -59,12 +67,65 @@ describe("SatelliteTrackingSwitch — what it shows", () => {
   })
 })
 
-describe("SatelliteTrackingSwitch — switching", () => {
-  it("switches it on for this trip", async () => {
+describe("SatelliteTrackingSwitch — consent", () => {
+  it("asks before switching on and sends nothing until the paddler confirms", async () => {
     const user = userEvent.setup()
     renderSwitch({ enabled: false })
 
     await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+
+    expect(screen.getByText(CONSENT_TITLE)).toBeInTheDocument()
+    expect(setSatelliteTracking).not.toHaveBeenCalled()
+    // An open modal hides everything behind it from the accessibility tree.
+    expect(screen.getByRole("switch", { name: SWITCH_NAME, hidden: true })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+  })
+
+  it("leaves it off and sends nothing when the paddler cancels", async () => {
+    const user = userEvent.setup()
+    renderSwitch({ enabled: false })
+
+    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await user.click(screen.getByRole("button", { name: /cancel/i }))
+
+    expect(setSatelliteTracking).not.toHaveBeenCalled()
+    expect(screen.queryByText(CONSENT_TITLE)).not.toBeInTheDocument()
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+  })
+
+  it("asks again the next time it is switched on after a cancel", async () => {
+    const user = userEvent.setup()
+    renderSwitch({ enabled: false })
+
+    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await user.click(screen.getByRole("button", { name: /cancel/i }))
+    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+
+    expect(screen.getByText(CONSENT_TITLE)).toBeInTheDocument()
+  })
+
+  it("does not ask to switch it off: stopping a share needs no consent", async () => {
+    const user = userEvent.setup()
+    renderSwitch({ enabled: true })
+
+    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+
+    expect(screen.queryByText(CONSENT_TITLE)).not.toBeInTheDocument()
+    expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP_ID, false)
+  })
+})
+
+describe("SatelliteTrackingSwitch — switching", () => {
+  it("switches it on for this trip once confirmed", async () => {
+    const user = userEvent.setup()
+    renderSwitch({ enabled: false })
+
+    await switchOnAndConfirm(user)
 
     expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP_ID, true)
   })
@@ -88,7 +149,7 @@ describe("SatelliteTrackingSwitch — switching", () => {
     )
     renderSwitch({ enabled: false })
 
-    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await switchOnAndConfirm(user)
 
     const control = screen.getByRole("switch", { name: SWITCH_NAME })
     expect(control).toHaveAttribute("aria-checked", "true")
@@ -108,7 +169,7 @@ describe("SatelliteTrackingSwitch — switching", () => {
     })
     renderSwitch({ enabled: false })
 
-    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await switchOnAndConfirm(user)
 
     expect(await screen.findByText(/this trip is over/i)).toBeInTheDocument()
     await waitFor(() =>
@@ -143,10 +204,10 @@ describe("SatelliteTrackingSwitch — switching", () => {
     vi.mocked(setSatelliteTracking).mockResolvedValueOnce({ success: false, error: "Try later." })
     renderSwitch({ enabled: false })
 
-    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await switchOnAndConfirm(user)
     expect(await screen.findByText("Try later.")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await switchOnAndConfirm(user)
 
     await waitFor(() => expect(screen.queryByText("Try later.")).not.toBeInTheDocument())
   })
