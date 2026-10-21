@@ -7,7 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -15,7 +14,6 @@ import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
 import { PauseTripDialog } from "@/components/trips/pause-controls"
 import { LeaveTripDialog } from "@/components/trips/leave-trip-dialog"
 import { DeleteTripDialog } from "@/components/trips/delete-trip-dialog"
-import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 
 type MenuDialog = "edit" | "pause" | "leave" | "delete"
@@ -32,14 +30,13 @@ interface TripActionsMenuProps {
 export function TripActionsMenu({ trip, isLeader, isMember }: TripActionsMenuProps) {
   const [dialog, setDialog] = useState<MenuDialog | null>(null)
   const tripId = trip.id!
-  const difficultyLabel = trip.difficulty ? DIFFICULTY_LABELS[trip.difficulty] : null
   const canPause = isLeader && trip.state === TRIP_STATE.HAPPENING && !trip.isPaused
   // The leader's two groups: Edit and Pause manage the trip; Leave and Delete end one's part
   // in it. Everyone else has Leave alone.
   const hasManageItems = isLeader
   const hasExitItems = isMember || isLeader
 
-  if (!difficultyLabel && !hasManageItems && !hasExitItems) return null
+  if (!hasManageItems && !hasExitItems) return null
 
   function closeDialog(open: boolean) {
     if (!open) setDialog(null)
@@ -60,13 +57,6 @@ export function TripActionsMenu({ trip, isLeader, isMember }: TripActionsMenuPro
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          {difficultyLabel && (
-            <DropdownMenuLabel className="text-muted-foreground font-normal">
-              Difficulty: {difficultyLabel}
-            </DropdownMenuLabel>
-          )}
-          {difficultyLabel && (hasManageItems || hasExitItems) && <DropdownMenuSeparator />}
-
           {isLeader && (
             <DropdownMenuItem onSelect={() => setDialog("edit")}>
               <PencilIcon />

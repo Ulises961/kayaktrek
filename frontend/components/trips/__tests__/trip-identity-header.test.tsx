@@ -17,6 +17,7 @@ vi.mock("@/lib/trips/actions", () => ({
 }))
 
 import { TripIdentityHeader as Header } from "../trip-identity-header"
+import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 import { MEMBER_ROLE, type TripMember } from "@/lib/dtos/trip-member"
 import type { Membership } from "@/lib/trips/membership"
@@ -99,6 +100,16 @@ describe("TripIdentityHeader — identity", () => {
   it("shows the state badge", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     expect(screen.getByText("Planning")).toBeInTheDocument()
+  })
+
+  it("shows the trip's difficulty beside its state, as a property of the trip", () => {
+    render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
+    expect(screen.getByText(DIFFICULTY_LABELS[TRIP.difficulty!])).toBeInTheDocument()
+  })
+
+  it("shows no difficulty when the trip has none", () => {
+    render(<TripIdentityHeader trip={{ ...TRIP, difficulty: null }} membership={CREW_MEMBERSHIP} />)
+    expect(screen.queryByText(DIFFICULTY_LABELS[TRIP.difficulty!])).not.toBeInTheDocument()
   })
 
   it("shows the date range with an inclusive day count while the trip is not happening", () => {
@@ -256,7 +267,8 @@ describe("TripIdentityHeader — the next state step", () => {
 })
 
 describe("TripIdentityHeader — inReach not sharing (M29)", () => {
-  const WARNING = /inreach not sharing/i
+  // The notice says what is wrong and offers the one way to fix it.
+  const WARNING = /turn it on/i
 
   function crewMembership(overrides: Partial<TripMember> = {}): Membership {
     const currentMember: TripMember = { ...TRIP.travellers![1], ...overrides }
@@ -273,6 +285,7 @@ describe("TripIdentityHeader — inReach not sharing (M29)", () => {
 
   it("warns a member of a happening trip whose registered feed is switched off, and links to the Float plan", () => {
     render(<TripIdentityHeader trip={HAPPENING} membership={crewMembership()} />)
+    expect(screen.getByText(/your position is not being shared/i)).toBeInTheDocument()
     expect(screen.getByRole("link", { name: WARNING })).toHaveAttribute(
       "href",
       `/trips/${TRIP.id}/my-float-plan`,

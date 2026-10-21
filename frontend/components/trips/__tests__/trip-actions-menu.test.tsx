@@ -14,7 +14,6 @@ vi.mock("@/lib/trips/actions", () => ({
 }))
 
 import { TripActionsMenu } from "../trip-actions-menu"
-import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 import { MEMBER_ROLE } from "@/lib/dtos/trip-member"
 import { leaveTrip, pauseTrip, deleteTripForEveryone } from "@/lib/trips/actions"
@@ -89,26 +88,15 @@ describe("TripActionsMenu — what each person is offered", () => {
     expect(item(/delete trip/i)).not.toBeInTheDocument()
   })
 
-  it("shows the difficulty as plain text, not as an item", async () => {
-    render(<TripActionsMenu trip={TRIP} isLeader={false} isMember />)
+  it("holds only actions: the trip's difficulty is on the page, not in the menu", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader isMember />)
     await openMenu()
-    const label = `Difficulty: ${DIFFICULTY_LABELS[TRIP.difficulty!]}`
-    expect(screen.getByText(label)).toBeInTheDocument()
-    expect(screen.queryByRole("menuitem", { name: label })).not.toBeInTheDocument()
+    expect(screen.queryByText(/difficulty/i)).not.toBeInTheDocument()
   })
 
-  it("renders nothing for someone with no actions and no difficulty to show", () => {
-    const { container } = render(
-      <TripActionsMenu trip={{ ...TRIP, difficulty: null }} isLeader={false} isMember={false} />,
-    )
+  it("renders nothing for someone with no actions to offer", () => {
+    const { container } = render(<TripActionsMenu trip={TRIP} isLeader={false} isMember={false} />)
     expect(container).toBeEmptyDOMElement()
-  })
-
-  it("still shows the difficulty to someone who is not a member", async () => {
-    render(<TripActionsMenu trip={TRIP} isLeader={false} isMember={false} />)
-    await openMenu()
-    expect(screen.getByText(/difficulty: moderate/i)).toBeInTheDocument()
-    expect(item(/leave trip/i)).not.toBeInTheDocument()
   })
 })
 
