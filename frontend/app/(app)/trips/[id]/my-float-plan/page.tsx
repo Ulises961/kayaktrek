@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
+import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { UserSchema } from "@/lib/dtos/user"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
@@ -17,11 +18,20 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   const { currentMember, isLeader } = deriveMembership(trip, session)
   if (!currentMember) redirect(`/trips/${id}`)
 
-  const [userProfile, hasSatelliteFeed] = await Promise.all([
+  const [userProfile, hasSatelliteFeed, logistics] = await Promise.all([
     apiGet("/api/user/me")
       .then((raw) => UserSchema.parse(raw))
       .catch(() => null),
     hasRegisteredFeed(),
+    // The shore contact and share link are the leader's; crew never see them.
+    isLeader
+      ? apiGet(`/api/logistics/${id}`)
+          .then((raw) => LogisticsSchema.parse(raw))
+          .catch((error) => {
+            rethrowUnlessClientError(error)
+            return null
+          })
+      : null,
   ])
 
   // TripMember snapshot always wins; profile fills gaps (e.g. profile updated
@@ -51,6 +61,7 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
       currentMember={mergedCurrentMember}
       hasSatelliteFeed={hasSatelliteFeed}
       isLeader={isLeader}
+      logistics={logistics}
       medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
     />
   )

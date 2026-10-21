@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import {
   AnchorIcon,
   FileTextIcon,
+  LinkIcon,
   PencilIcon,
   SatelliteDishIcon,
   ShieldAlertIcon,
@@ -16,9 +17,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { FloatPlanMedicalTabSection } from "@/components/trips/float-plan-medical-tab-section"
+import { FloatPlanShareSection } from "@/components/trips/float-plan-share-section"
+import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
 import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
 import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 import { canShareSatellitePosition } from "@/lib/trips/satellite"
+import type { Logistics } from "@/lib/dtos/logistics"
 import type { TripState } from "@/lib/dtos/trip"
 import { FloatPlanFormSchema } from "@/lib/dtos/trip-member"
 import { updateMyFloatPlan } from "@/lib/trip-member/actions"
@@ -30,8 +34,10 @@ interface FloatPlanTabProps {
   currentMember: TripMember
   /** Whether the user has a satellite feed registered in Settings (M29). */
   hasSatelliteFeed: boolean
-  /** The leader also gets the printable float plan. */
+  /** The leader also manages the shore contact and the share link, and prints the plan. */
   isLeader: boolean
+  /** The trip's logistics record, which holds the shore contact and share link. Leader only. */
+  logistics: Logistics | null
   /** Current user's medical-notes reset flag — drives the re-entry prompt. */
   medicalNotesResetAt?: string | null
 }
@@ -114,6 +120,7 @@ export function FloatPlanTab({
   currentMember,
   hasSatelliteFeed,
   isLeader,
+  logistics,
   medicalNotesResetAt,
 }: FloatPlanTabProps) {
   const canShareSatelliteFeed = canShareSatellitePosition(tripState, currentMember)
@@ -323,22 +330,6 @@ export function FloatPlanTab({
         </>
       )}
 
-      {isLeader && (
-        <>
-          <Separator />
-
-          <div className="flex flex-col gap-3">
-            <SectionLabel icon={<FileTextIcon className="size-4" />}>Float plan</SectionLabel>
-            <Button variant="outline" size="sm" className="w-fit" asChild>
-              <Link href={`/trips/float-plan/${tripId}`}>
-                <AnchorIcon className="size-3.5" />
-                Printable float plan
-              </Link>
-            </Button>
-          </div>
-        </>
-      )}
-
       {MEDICAL_NOTES_ENABLED && (
         <>
           <Separator />
@@ -355,6 +346,37 @@ export function FloatPlanTab({
               profileResetAt={medicalNotesResetAt}
             />
           </div>
+        </>
+      )}
+
+      {isLeader && (
+        <>
+          <Separator />
+
+          <section aria-label="Shore contact" className="flex flex-col gap-3">
+            <SectionLabel icon={<AnchorIcon className="size-4" />}>Shore contact</SectionLabel>
+            <p className="text-muted-foreground -mt-1 text-xs">
+              Person who receives this float plan before departure.
+            </p>
+            <ShoreContactForm tripId={tripId} logistics={logistics} />
+          </section>
+
+          <Separator />
+
+          <section aria-label="Share and print" className="flex flex-col gap-3">
+            <SectionLabel icon={<LinkIcon className="size-4" />}>Share and print</SectionLabel>
+            <p className="text-muted-foreground -mt-1 text-xs">
+              A read-only link for your shore contact. It holds vessel descriptions and emergency
+              contacts.
+            </p>
+            <FloatPlanShareSection tripId={tripId} logistics={logistics} />
+            <Button variant="outline" size="sm" className="w-fit" asChild>
+              <Link href={`/trips/float-plan/${tripId}`}>
+                <FileTextIcon className="size-3.5" />
+                Printable float plan
+              </Link>
+            </Button>
+          </section>
         </>
       )}
     </div>

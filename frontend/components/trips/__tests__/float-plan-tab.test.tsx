@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 vi.mock("@/lib/trip-member/actions", () => ({
   updateMyFloatPlan: vi.fn(),
   shareMedicalNotes: vi.fn(),
   setSatelliteTracking: vi.fn(),
+}))
+vi.mock("@/lib/logistics/actions", () => ({
+  upsertLogistics: vi.fn(),
+  generateFloatPlanShare: vi.fn(),
+  sendFloatPlanShareEmail: vi.fn(),
 }))
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
@@ -15,8 +20,10 @@ vi.mock("@/lib/profile/actions", () => ({
 }))
 
 import { updateMyFloatPlan, setSatelliteTracking } from "@/lib/trip-member/actions"
+import { upsertLogistics } from "@/lib/logistics/actions"
 import { FloatPlanTab } from "../tabs/float-plan-tab"
 import { TRIP_STATE } from "@/lib/dtos/trip"
+import type { Logistics } from "@/lib/dtos/logistics"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -47,6 +54,7 @@ const TAB_PROPS = {
   tripState: TRIP_STATE.BUILDING,
   hasSatelliteFeed: true,
   isLeader: false,
+  logistics: null,
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -177,9 +185,59 @@ describe("FloatPlanTab — inReach tracking (M29)", () => {
   })
 })
 
-describe("FloatPlanTab — the printable float plan", () => {
-  it("links the leader to it", () => {
-    render(<FloatPlanTab {...TAB_PROPS} isLeader currentMember={BASE_MEMBER} />)
+describe("FloatPlanTab — the shore side, which is the leader's", () => {
+  const LOGISTICS: Logistics = {
+    id: "01952f1a-0000-7000-8000-000000000050",
+    shoreContactName: "Marguerite Vandersteen",
+    shoreContactEmail: "marguerite@harbourwatch.example.com",
+    shoreContactPhone: "+39 011 555 0142",
+    shoreContactRelationship: "Harbour master",
+    shareToken: null,
+  }
+
+  function renderForLeader(logistics: Logistics | null = LOGISTICS) {
+    render(
+      <FloatPlanTab {...TAB_PROPS} isLeader logistics={logistics} currentMember={BASE_MEMBER} />,
+    )
+  }
+
+  it("shows the leader the shore contact as saved", () => {
+    renderForLeader()
+
+    const shore = screen.getByRole("region", { name: "Shore contact" })
+    expect(within(shore).getByText("Marguerite Vandersteen")).toBeInTheDocument()
+    expect(within(shore).getByText("marguerite@harbourwatch.example.com")).toBeInTheDocument()
+  })
+
+  it("lets the leader save a shore contact from here", async () => {
+    vi.mocked(upsertLogistics).mockResolvedValue({ success: true })
+    renderForLeader(null)
+
+    const shore = screen.getByRole("region", { name: "Shore contact" })
+    await userEvent.click(within(shore).getByRole("button", { name: "Edit" }))
+    await userEvent.type(within(shore).getByLabelText("Name"), "Alice Shore")
+    await userEvent.click(within(shore).getByRole("button", { name: "Save" }))
+
+    await waitFor(() =>
+      expect(upsertLogistics).toHaveBeenCalledWith(
+        TRIP_ID,
+        expect.objectContaining({ shoreContactName: "Alice Shore" }),
+      ),
+    )
+    expect(await within(shore).findByText("Alice Shore")).toBeInTheDocument()
+  })
+
+  it("lets the leader generate the share link", async () => {
+    renderForLeader(null)
+
+    const share = screen.getByRole("region", { name: "Share and print" })
+    expect(
+      within(share).getByRole("button", { name: /generate float plan link/i }),
+    ).toBeInTheDocument()
+  })
+
+  it("links the leader to the printable float plan", () => {
+    renderForLeader()
 
     expect(screen.getByRole("link", { name: /printable float plan/i })).toHaveAttribute(
       "href",
@@ -187,10 +245,19 @@ describe("FloatPlanTab — the printable float plan", () => {
     )
   })
 
-  it("does not offer it to crew: the page itself is the leader's", () => {
+  it("shows crew none of it: the shore contact, the link and the print page are the leader's", () => {
     render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
 
+    expect(screen.queryByRole("region", { name: "Shore contact" })).toBeNull()
+    expect(screen.queryByRole("region", { name: "Share and print" })).toBeNull()
     expect(screen.queryByRole("link", { name: /printable float plan/i })).toBeNull()
+  })
+
+  it("keeps the leader's own vessel and emergency contact, which every member has", () => {
+    renderForLeader()
+
+    expect(screen.getByText("Wilderness Systems Tempest 170")).toBeInTheDocument()
+    expect(screen.getByText("Bob Smith")).toBeInTheDocument()
   })
 })
 

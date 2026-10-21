@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
-import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip, apiInviteByEmail, apiAcceptInvitation } from "../fixtures/trips"
+import {
+  apiGetAccessToken,
+  apiCreateTrip,
+  apiDeleteTrip,
+  apiInviteByEmail,
+  apiAcceptInvitation,
+} from "../fixtures/trips"
 import { mutateAndSettle } from "../fixtures/ui"
 
 test.describe("Logistics — shore contact and float plan", () => {
@@ -17,14 +23,20 @@ test.describe("Logistics — shore contact and float plan", () => {
     await apiDeleteTrip(request, leaderToken, tripId)
   })
 
-  test("leader sets shore contact on float plan page", async ({ page }) => {
-    // Shore contact lives on the printable /trips/float-plan/:id page, not the logistics segment
-    await page.goto(`/trips/float-plan/${tripId}`)
+  test("leader sets shore contact on the Float plan tab", async ({ page }) => {
+    // Shore contact lives on the Float plan tab, not the logistics segment. The printable
+    // /trips/float-plan/:id page only shows it.
+    await page.goto(`/trips/${tripId}/my-float-plan`)
 
-    await page.getByRole("button", { name: "Edit", exact: true }).click()
-    await page.getByLabel(/name/i).fill("Alice Shore")
-    await page.getByLabel(/email/i).fill("alice@example.com")
-    await page.getByRole("button", { name: /save/i }).click()
+    const shore = page.getByRole("region", { name: "Shore contact" })
+    await shore.getByRole("button", { name: "Edit", exact: true }).click()
+    await shore.getByLabel(/name/i).fill("Alice Shore")
+    await shore.getByLabel(/email/i).fill("alice@example.com")
+    await shore.getByRole("button", { name: /save/i }).click()
+    await expect(shore.getByText("Alice Shore")).toBeVisible()
+
+    // And it is on the printed plan.
+    await page.goto(`/trips/float-plan/${tripId}`)
     await expect(page.getByText("Alice Shore")).toBeVisible()
   })
 
@@ -38,10 +50,11 @@ test.describe("Logistics — shore contact and float plan", () => {
   })
 
   test("leader generates float plan share link", async ({ page }) => {
-    await page.goto(`/trips/float-plan/${tripId}`)
-    await page.getByRole("button", { name: /generate float plan link/i }).click()
-    await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible()
-    await expect(page.getByText(/last generated/i)).toBeVisible()
+    await page.goto(`/trips/${tripId}/my-float-plan`)
+    const share = page.getByRole("region", { name: "Share and print" })
+    await share.getByRole("button", { name: /generate float plan link/i }).click()
+    await expect(share.getByRole("button", { name: /copy link/i })).toBeVisible()
+    await expect(share.getByText(/last generated/i)).toBeVisible()
   })
 })
 

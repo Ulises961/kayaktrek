@@ -23,6 +23,11 @@ vi.mock("@/lib/trip-member/actions", () => ({
   shareMedicalNotes: vi.fn(),
   readMemberMedicalNotes: vi.fn(),
 }))
+vi.mock("@/lib/logistics/actions", () => ({
+  upsertLogistics: vi.fn(),
+  generateFloatPlanShare: vi.fn(),
+  sendFloatPlanShareEmail: vi.fn(),
+}))
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
   getKeypair: vi.fn(),
@@ -95,6 +100,7 @@ describe("float plan tab, medical notes parked", () => {
         currentMember={MEMBER_WITH_NOTES}
         hasSatelliteFeed
         isLeader
+        logistics={null}
         medicalNotesResetAt="2026-08-20T10:00:00"
       />,
     )
@@ -110,6 +116,7 @@ describe("float plan tab, medical notes parked", () => {
         currentMember={MEMBER_WITH_NOTES}
         hasSatelliteFeed
         isLeader
+        logistics={null}
       />,
     )
 
