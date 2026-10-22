@@ -235,7 +235,55 @@ describe("FloatPlanTab — inReach tracking (M29)", () => {
   })
 })
 
-describe("FloatPlanTab — the shore side, which is the leader's", () => {
+describe("FloatPlanTab — the order of its sections", () => {
+  // Each section is a row of the accordion, opened by a button named after it.
+  function sectionTitles() {
+    return screen
+      .getAllByRole("button", { name: /^(safety and rescue information|your details|inreach)/i })
+      .map((trigger) => trigger.textContent)
+  }
+
+  it("puts safety and rescue information first, then the member's details, then inReach", () => {
+    render(<FloatPlanTab {...TAB_PROPS} isLeader currentMember={BASE_MEMBER} />)
+
+    expect(sectionTitles()).toEqual([
+      expect.stringMatching(/^Safety and rescue information/),
+      expect.stringMatching(/^Your details/),
+      "inReach",
+    ])
+  })
+
+  it("starts with the member's details first for crew, who have no safety section", () => {
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
+
+    expect(sectionTitles()).toEqual([expect.stringMatching(/^Your details/), "inReach"])
+  })
+
+  it("keeps the member's details and inReach open and the safety section folded", () => {
+    render(<FloatPlanTab {...TAB_PROPS} isLeader currentMember={BASE_MEMBER} />)
+
+    const [safety, details, inReach] = screen.getAllByRole("button", {
+      name: /^(safety and rescue information|your details|inreach)/i,
+    })
+    expect(safety).toHaveAttribute("aria-expanded", "false")
+    expect(details).toHaveAttribute("aria-expanded", "true")
+    expect(inReach).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("folds the member's details away and brings them back", async () => {
+    render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
+    const details = screen.getByRole("button", { name: /^your details/i })
+
+    await userEvent.click(details)
+    expect(screen.queryByText("Wilderness Systems Tempest 170")).toBeNull()
+
+    await userEvent.click(details)
+    expect(screen.getByText("Wilderness Systems Tempest 170")).toBeInTheDocument()
+  })
+})
+
+describe("FloatPlanTab — the safety and rescue side, which is the leader's", () => {
+  const SAFETY = /^safety and rescue information/i
   const LOGISTICS: Logistics = {
     id: "01952f1a-0000-7000-8000-000000000050",
     shoreContactName: "Marguerite Vandersteen",
@@ -252,13 +300,13 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
   }
 
   async function openShore() {
-    await userEvent.click(screen.getByRole("button", { name: /^shore/i }))
+    await userEvent.click(screen.getByRole("button", { name: SAFETY }))
   }
 
   it("starts folded, with a line saying where the shore side stands", () => {
     renderForLeader()
 
-    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: SAFETY })).toHaveTextContent(
       "Marguerite Vandersteen, no link yet",
     )
     expect(screen.queryByRole("region", { name: "Shore contact" })).toBeNull()
@@ -268,13 +316,13 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
     const { unmount } = render(
       <FloatPlanTab {...TAB_PROPS} isLeader logistics={null} currentMember={BASE_MEMBER} />,
     )
-    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: SAFETY })).toHaveTextContent(
       "No shore contact yet, no link yet",
     )
     unmount()
 
     renderForLeader({ ...LOGISTICS, shareToken: "tok_live" })
-    expect(screen.getByRole("button", { name: /^shore/i })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: SAFETY })).toHaveTextContent(
       "Marguerite Vandersteen, link live",
     )
   })
@@ -330,7 +378,7 @@ describe("FloatPlanTab — the shore side, which is the leader's", () => {
   it("shows crew none of it: the shore contact, the link and the print page are the leader's", () => {
     render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
 
-    expect(screen.queryByRole("button", { name: /^shore/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: SAFETY })).toBeNull()
     expect(screen.queryByRole("region", { name: "Shore contact" })).toBeNull()
     expect(screen.queryByRole("link", { name: /printable float plan/i })).toBeNull()
   })

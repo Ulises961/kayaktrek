@@ -1,8 +1,7 @@
 "use client"
 
 import { SatelliteDishIcon, TriangleAlertIcon } from "lucide-react"
-import { FloatPlanHeading } from "@/components/trips/float-plan-heading"
-import { FloatPlanPanel } from "@/components/trips/float-plan-panel"
+import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
 import { satelliteTrackingIsOff } from "@/lib/trips/satellite"
 import type { TripState } from "@/lib/dtos/trip"
@@ -28,19 +27,26 @@ export function FloatPlanInReachSection({
   const trackingOff = satelliteTrackingIsOff(tripState, currentMember, hasSatelliteFeed)
 
   return (
-    <FloatPlanPanel aria-label="inReach">
-      <FloatPlanHeading icon={<SatelliteDishIcon className="size-4" />}>inReach</FloatPlanHeading>
-      {trackingOff && (
-        <div className="border-notice-border bg-notice-bg text-notice-ink flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <p className="min-w-0 flex-1">inReach is off, so your position is not being shared.</p>
-        </div>
-      )}
-      <SatelliteTrackingSwitch
-        tripId={tripId}
-        enabled={!!currentMember.sharesSatellitePosition}
-        hasFeed={hasSatelliteFeed}
-      />
-    </FloatPlanPanel>
+    <AccordionItem value="inreach">
+      <AccordionTrigger className="text-sm font-medium hover:no-underline">
+        <span className="flex items-center gap-2">
+          <SatelliteDishIcon className="text-muted-foreground size-3.5 shrink-0" />
+          inReach
+        </span>
+      </AccordionTrigger>
+      <AccordionContent className="flex flex-col gap-3">
+        {trackingOff && (
+          <div className="border-notice-border bg-notice-bg text-notice-ink flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+            <p className="min-w-0 flex-1">inReach is off, so your position is not being shared.</p>
+          </div>
+        )}
+        <SatelliteTrackingSwitch
+          tripId={tripId}
+          enabled={!!currentMember.sharesSatellitePosition}
+          hasFeed={hasSatelliteFeed}
+        />
+      </AccordionContent>
+    </AccordionItem>
   )
 }

@@ -4,15 +4,19 @@ import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AnchorIcon, CheckIcon, PencilIcon, ShieldAlertIcon } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { FloatPlanHeading } from "@/components/trips/float-plan-heading"
 import { FloatPlanInReachSection } from "@/components/trips/float-plan-inreach-section"
 import { FloatPlanMedicalTabSection } from "@/components/trips/float-plan-medical-tab-section"
-import { FloatPlanPanel } from "@/components/trips/float-plan-panel"
-import { FloatPlanShoreSection } from "@/components/trips/float-plan-shore-section"
+import { FloatPlanSafetySection } from "@/components/trips/float-plan-safety-section"
 import { MEDICAL_NOTES_ENABLED } from "@/lib/features"
 import { canShareSatellitePosition } from "@/lib/trips/satellite"
 import { formatDayDate } from "@/lib/utils/date"
@@ -35,6 +39,10 @@ interface FloatPlanTabProps {
   /** Current user's medical-notes reset flag — drives the re-entry prompt. */
   medicalNotesResetAt?: string | null
 }
+
+// Rows of the accordion that start open. The safety section is not here: it is done once
+// before departure, so it starts folded. A value with no row is ignored.
+const OPEN_BY_DEFAULT = ["details", "inreach", "medical"]
 
 function SubHeading({ children }: { children: React.ReactNode }) {
   return <h3 className="text-sm font-medium">{children}</h3>
@@ -163,159 +171,154 @@ export function FloatPlanTab({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <FloatPlanPanel aria-label="Your details">
-        <FloatPlanHeading
-          icon={<AnchorIcon className="size-4" />}
-          action={
-            !isEditing && (
+    <Accordion type="multiple" defaultValue={OPEN_BY_DEFAULT}>
+      {isLeader && <FloatPlanSafetySection tripId={tripId} logistics={logistics} />}
+
+      <AccordionItem value="details">
+        <AccordionTrigger className="text-sm font-medium hover:no-underline">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <AnchorIcon className="text-muted-foreground size-3.5 shrink-0" />
+            Your details
+            {isConfirmed && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs font-normal">
+                <CheckIcon className="size-3" />
+                {confirmedLabel}
+              </span>
+            )}
+          </span>
+        </AccordionTrigger>
+        <AccordionContent className="flex flex-col gap-4">
+          {!isConfirmed && (
+            <div className="border-notice-border bg-notice-bg text-notice-ink rounded-md border px-3 py-2">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Review your float plan for this trip and save it to confirm.
+              </p>
+            </div>
+          )}
+
+          {isEditing ? (
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
+                <SubHeading>Vessel</SubHeading>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpVesselMake">Make</Label>
+                    <Input
+                      id="fpVesselMake"
+                      placeholder="e.g. Wilderness Systems"
+                      disabled={isPending}
+                      {...register("vesselMake")}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpVesselModel">Model</Label>
+                    <Input
+                      id="fpVesselModel"
+                      placeholder="e.g. Tempest 170"
+                      disabled={isPending}
+                      {...register("vesselModel")}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpVesselLength">Length (cm)</Label>
+                    <Input
+                      id="fpVesselLength"
+                      type="number"
+                      min={1}
+                      disabled={isPending}
+                      {...register("vesselLengthCm")}
+                    />
+                    {errors.vesselLengthCm && (
+                      <p className="text-destructive text-xs">{errors.vesselLengthCm.message}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpColorPrimary">Primary colour</Label>
+                    <Input
+                      id="fpColorPrimary"
+                      placeholder="e.g. Red"
+                      disabled={isPending}
+                      {...register("vesselColorPrimary")}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpColorSecondary">Secondary colour</Label>
+                    <Input
+                      id="fpColorSecondary"
+                      placeholder="e.g. White"
+                      disabled={isPending}
+                      {...register("vesselColorSecondary")}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-col gap-4">
+                <SubHeading>Emergency contact</SubHeading>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpEmergencyName">Name</Label>
+                    <Input
+                      id="fpEmergencyName"
+                      disabled={isPending}
+                      {...register("emergencyContactName")}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fpEmergencyRelationship">Relationship</Label>
+                    <Input
+                      id="fpEmergencyRelationship"
+                      placeholder="e.g. Partner"
+                      disabled={isPending}
+                      {...register("emergencyContactRelationship")}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="fpEmergencyPhone">Phone</Label>
+                  <Input
+                    id="fpEmergencyPhone"
+                    type="tel"
+                    disabled={isPending}
+                    {...register("emergencyContactPhone")}
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                {isConfirmed && (
-                  <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                    <CheckIcon className="size-3.5" />
-                    {confirmedLabel}
-                  </span>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleEdit}
-                  className="h-6 shrink-0 px-2 text-xs"
-                >
-                  <PencilIcon className="size-3" />
-                  Edit
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? "Saving…" : "Save float plan"}
                 </Button>
+                <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
+                  Cancel
+                </Button>
+                {error && <p className="text-destructive text-xs">{error}</p>}
               </div>
-            )
-          }
-        >
-          Your details
-        </FloatPlanHeading>
-
-        {!isConfirmed && (
-          <div className="border-notice-border bg-notice-bg text-notice-ink rounded-md border px-3 py-2">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              Review your float plan for this trip and save it to confirm.
-            </p>
-          </div>
-        )}
-
-        {isEditing ? (
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              <SubHeading>Vessel</SubHeading>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpVesselMake">Make</Label>
-                  <Input
-                    id="fpVesselMake"
-                    placeholder="e.g. Wilderness Systems"
-                    disabled={isPending}
-                    {...register("vesselMake")}
-                  />
+            </form>
+          ) : (
+            <div className="flex items-start justify-between gap-4">
+              <div className="grid min-w-0 flex-1 gap-5 sm:grid-cols-2">
+                <div className="flex flex-col gap-2.5">
+                  <SubHeading>Vessel</SubHeading>
+                  <VesselReadOnly member={currentMember} />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpVesselModel">Model</Label>
-                  <Input
-                    id="fpVesselModel"
-                    placeholder="e.g. Tempest 170"
-                    disabled={isPending}
-                    {...register("vesselModel")}
-                  />
+                <div className="flex flex-col gap-2.5">
+                  <SubHeading>Emergency contact</SubHeading>
+                  <EmergencyReadOnly member={currentMember} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpVesselLength">Length (cm)</Label>
-                  <Input
-                    id="fpVesselLength"
-                    type="number"
-                    min={1}
-                    disabled={isPending}
-                    {...register("vesselLengthCm")}
-                  />
-                  {errors.vesselLengthCm && (
-                    <p className="text-destructive text-xs">{errors.vesselLengthCm.message}</p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpColorPrimary">Primary colour</Label>
-                  <Input
-                    id="fpColorPrimary"
-                    placeholder="e.g. Red"
-                    disabled={isPending}
-                    {...register("vesselColorPrimary")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpColorSecondary">Secondary colour</Label>
-                  <Input
-                    id="fpColorSecondary"
-                    placeholder="e.g. White"
-                    disabled={isPending}
-                    {...register("vesselColorSecondary")}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="flex flex-col gap-4">
-              <SubHeading>Emergency contact</SubHeading>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpEmergencyName">Name</Label>
-                  <Input
-                    id="fpEmergencyName"
-                    disabled={isPending}
-                    {...register("emergencyContactName")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="fpEmergencyRelationship">Relationship</Label>
-                  <Input
-                    id="fpEmergencyRelationship"
-                    placeholder="e.g. Partner"
-                    disabled={isPending}
-                    {...register("emergencyContactRelationship")}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="fpEmergencyPhone">Phone</Label>
-                <Input
-                  id="fpEmergencyPhone"
-                  type="tel"
-                  disabled={isPending}
-                  {...register("emergencyContactPhone")}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Saving…" : "Save float plan"}
+              <Button variant="outline" size="sm" onClick={handleEdit} className="shrink-0">
+                <PencilIcon className="size-3.5" />
+                Edit
               </Button>
-              <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
-                Cancel
-              </Button>
-              {error && <p className="text-destructive text-xs">{error}</p>}
             </div>
-          </form>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="flex flex-col gap-2.5">
-              <SubHeading>Vessel</SubHeading>
-              <VesselReadOnly member={currentMember} />
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <SubHeading>Emergency contact</SubHeading>
-              <EmergencyReadOnly member={currentMember} />
-            </div>
-          </div>
-        )}
-      </FloatPlanPanel>
+          )}
+        </AccordionContent>
+      </AccordionItem>
 
       {canShareSatelliteFeed && (
         <FloatPlanInReachSection
@@ -327,23 +330,26 @@ export function FloatPlanTab({
       )}
 
       {MEDICAL_NOTES_ENABLED && (
-        <FloatPlanPanel aria-label="Medical notes">
-          <FloatPlanHeading icon={<ShieldAlertIcon className="size-4" />}>
-            Medical notes
-          </FloatPlanHeading>
-          <p className="text-muted-foreground -mt-2 text-xs">
-            Private — visible only to the trip leader on the float plan.
-          </p>
-          <FloatPlanMedicalTabSection
-            tripId={tripId}
-            hasStoredNotes={!!currentMember.hasTripMedicalNotes}
-            sharedAt={currentMember.medicalNotesConsentAt ?? null}
-            profileResetAt={medicalNotesResetAt}
-          />
-        </FloatPlanPanel>
+        <AccordionItem value="medical">
+          <AccordionTrigger className="text-sm font-medium hover:no-underline">
+            <span className="flex items-center gap-2">
+              <ShieldAlertIcon className="text-muted-foreground size-3.5 shrink-0" />
+              Medical notes
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="flex flex-col gap-4">
+            <p className="text-muted-foreground text-xs">
+              Private — visible only to the trip leader on the float plan.
+            </p>
+            <FloatPlanMedicalTabSection
+              tripId={tripId}
+              hasStoredNotes={!!currentMember.hasTripMedicalNotes}
+              sharedAt={currentMember.medicalNotesConsentAt ?? null}
+              profileResetAt={medicalNotesResetAt}
+            />
+          </AccordionContent>
+        </AccordionItem>
       )}
-
-      {isLeader && <FloatPlanShoreSection tripId={tripId} logistics={logistics} />}
-    </div>
+    </Accordion>
   )
 }
