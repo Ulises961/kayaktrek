@@ -1,9 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { LogOutIcon } from "lucide-react"
 import { leaveTrip } from "@/lib/trips/actions"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,13 +11,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-interface LeaveTripButtonProps {
+interface LeaveTripDialogProps {
   tripId: string
   isLeader: boolean
   soleMember: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 function leaveDescription(isLeader: boolean, soleMember: boolean): string {
@@ -32,7 +31,14 @@ function leaveDescription(isLeader: boolean, soleMember: boolean): string {
   return "You'll lose access to this trip's itinerary, crew, and logistics unless invited back."
 }
 
-export function LeaveTripButton({ tripId, isLeader, soleMember }: LeaveTripButtonProps) {
+// Opened from the trip menu, which owns `open`.
+export function LeaveTripDialog({
+  tripId,
+  isLeader,
+  soleMember,
+  open,
+  onOpenChange,
+}: LeaveTripDialogProps) {
   const [isPending, startTransition] = useTransition()
 
   function handleConfirm() {
@@ -42,13 +48,7 @@ export function LeaveTripButton({ tripId, isLeader, soleMember }: LeaveTripButto
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isPending} className="w-fit">
-          <LogOutIcon className="size-3.5" />
-          Leave trip
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Leave this trip?</AlertDialogTitle>

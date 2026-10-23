@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { canShareSatellitePosition } from "../satellite"
+import { canShareSatellitePosition, satelliteTrackingIsOff } from "../satellite"
 import { TRIP_STATE } from "@/lib/dtos/trip"
 import { MEMBER_ROLE, type TripMember } from "@/lib/dtos/trip-member"
 
@@ -38,5 +38,35 @@ describe("canShareSatellitePosition", () => {
   it("is not offered to a member who has left: the backend would refuse it", () => {
     const departed = { ...MEMBER, leftAt: "2026-10-02T09:30:00" }
     expect(canShareSatellitePosition(TRIP_STATE.HAPPENING, departed)).toBe(false)
+  })
+})
+
+describe("satelliteTrackingIsOff", () => {
+  const OFF = { ...MEMBER, sharesSatellitePosition: false }
+  const ON = { ...MEMBER, sharesSatellitePosition: true }
+
+  it("is true for a member of a happening trip who has a feed and the switch off", () => {
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, OFF, true)).toBe(true)
+    // The field is absent until the member switches it on once.
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, MEMBER, true)).toBe(true)
+  })
+
+  it("is false when the switch is on", () => {
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, ON, true)).toBe(false)
+  })
+
+  it("is false without a registered feed: a paddler with no inReach is not warned", () => {
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, OFF, false)).toBe(false)
+  })
+
+  it("is false before the trip starts, when nothing is yet expected to be sharing", () => {
+    expect(satelliteTrackingIsOff(TRIP_STATE.BUILDING, OFF, true)).toBe(false)
+  })
+
+  it("is false once the trip is over, for a non-member, and for a member who has left", () => {
+    expect(satelliteTrackingIsOff(TRIP_STATE.PAST, OFF, true)).toBe(false)
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, undefined, true)).toBe(false)
+    const departed = { ...OFF, leftAt: "2026-10-02T09:30:00" }
+    expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, departed, true)).toBe(false)
   })
 })

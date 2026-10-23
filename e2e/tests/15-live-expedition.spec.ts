@@ -1,4 +1,4 @@
-import { APIRequestContext, Page, test, expect } from "@playwright/test"
+import { APIRequestContext, test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
 import {
   apiGetAccessToken,
@@ -8,7 +8,7 @@ import {
   apiInviteByEmail,
   apiAcceptInvitation,
 } from "../fixtures/trips"
-import { mutateAndSettle } from "../fixtures/ui"
+import { mutateAndSettle, openTripMenu } from "../fixtures/ui"
 import { BASE_URL } from "../playwright.config"
 
 // M8's live-expedition features (Navigate mode position sharing, the crew SSE
@@ -71,17 +71,6 @@ async function createHappeningTrip(
   return { tripId, itineraryId }
 }
 
-/** Opens the trip identity card's "Details" disclosure.
- *
- * Pause/resume/abort no longer live in here — they sit above it, always visible, alongside
- * the state-progression button. Kept because a reload collapses the disclosure and the
- * assertions below still read what remains inside it (description, timeline, share/print),
- * so call it after every reload-settled mutation. */
-async function openTripDetails(page: Page) {
-  const trigger = page.getByRole("button", { name: "Details" })
-  if ((await trigger.count()) > 0) await trigger.click()
-}
-
 test.describe("Live expedition — pause / resume / abort", () => {
   let leaderToken: string
 
@@ -93,17 +82,21 @@ test.describe("Live expedition — pause / resume / abort", () => {
     const { tripId } = await createHappeningTrip(request, leaderToken, "E2E Pause Resume")
     try {
       await page.goto(`/trips/${tripId}`)
-      await openTripDetails(page)
+      await openTripMenu(page)
 
-      await page.getByRole("button", { name: /pause expedition/i }).click()
+      await page.getByRole("menuitem", { name: /pause expedition/i }).click()
       await mutateAndSettle(
         page,
         () => page.getByRole("button", { name: "Pause", exact: true }).click(),
         { reload: true },
       )
-      await openTripDetails(page)
       await expect(page.getByText(/expedition paused since/i)).toBeVisible()
-      await expect(page.getByRole("button", { name: /pause expedition/i })).not.toBeVisible()
+      // Paused: the menu no longer offers a pause. It is open here, so the assertion cannot
+      // hold just because the menu is shut.
+      await openTripMenu(page)
+      await expect(page.getByRole("menuitem", { name: /leave trip/i })).toBeVisible()
+      await expect(page.getByRole("menuitem", { name: /pause expedition/i })).not.toBeVisible()
+      await page.keyboard.press("Escape")
 
       await page.getByRole("button", { name: "Resume", exact: true }).click()
       // Leave the resume date unset — resumeTrip defaults to today server-side,
@@ -115,9 +108,9 @@ test.describe("Live expedition — pause / resume / abort", () => {
         () => resumeDialog.getByRole("button", { name: "Resume", exact: true }).click(),
         { reload: true },
       )
-      await openTripDetails(page)
       await expect(page.getByText(/expedition paused since/i)).not.toBeVisible()
-      await expect(page.getByRole("button", { name: /pause expedition/i })).toBeVisible()
+      await openTripMenu(page)
+      await expect(page.getByRole("menuitem", { name: /pause expedition/i })).toBeVisible()
     } finally {
       await apiDeleteTrip(request, leaderToken, tripId)
     }
@@ -127,15 +120,14 @@ test.describe("Live expedition — pause / resume / abort", () => {
     const { tripId } = await createHappeningTrip(request, leaderToken, "E2E Abort")
     try {
       await page.goto(`/trips/${tripId}`)
-      await openTripDetails(page)
+      await openTripMenu(page)
 
-      await page.getByRole("button", { name: /pause expedition/i }).click()
+      await page.getByRole("menuitem", { name: /pause expedition/i }).click()
       await mutateAndSettle(
         page,
         () => page.getByRole("button", { name: "Pause", exact: true }).click(),
         { reload: true },
       )
-      await openTripDetails(page)
       await expect(page.getByText(/expedition paused since/i)).toBeVisible()
 
       await page.getByRole("button", { name: /abort expedition/i }).click()
@@ -162,10 +154,11 @@ test.describe("Live expedition — pause / resume / abort", () => {
       const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
       const crewPage = await crewContext.newPage()
       await crewPage.goto(`/trips/${tripId}`)
-      // Opened deliberately: with the disclosure shut, "not visible" holds for a leader
-      // too, so the assertion would pass without proving anything about crew privileges.
-      await openTripDetails(crewPage)
-      await expect(crewPage.getByRole("button", { name: /pause expedition/i })).not.toBeVisible()
+      // The menu is opened, and shown to hold Leave, so "no Pause" is a statement about what
+      // crew are offered and not about a menu that failed to open.
+      await openTripMenu(crewPage)
+      await expect(crewPage.getByRole("menuitem", { name: /leave trip/i })).toBeVisible()
+      await expect(crewPage.getByRole("menuitem", { name: /pause expedition/i })).not.toBeVisible()
       await crewContext.close()
     } finally {
       await apiDeleteTrip(request, leaderToken, tripId)

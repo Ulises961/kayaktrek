@@ -86,4 +86,14 @@ describe("TripCard", () => {
     render(<TripCard trip={{ ...BASE_TRIP, dateFrom: undefined, dateTo: undefined }} />)
     expect(screen.queryByText(/days/)).toBeNull()
   })
+
+  it("shows the trip's description: this card is the one place it is read besides the Edit dialog", () => {
+    render(<TripCard trip={{ ...BASE_TRIP, description: "A week of sea caves and wild camps" }} />)
+    expect(screen.getByText("A week of sea caves and wild camps")).toBeDefined()
+  })
+
+  it("shows no description line for a trip without one", () => {
+    const { container } = render(<TripCard trip={{ ...BASE_TRIP, description: null }} />)
+    expect(container.querySelector("p")).toBeNull()
+  })
 })

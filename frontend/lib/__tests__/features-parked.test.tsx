@@ -19,8 +19,14 @@ vi.mock("@/lib/features", () => ({ MEDICAL_NOTES_ENABLED: false }))
 
 vi.mock("@/lib/trip-member/actions", () => ({
   updateMyFloatPlan: vi.fn(),
+  setSatelliteTracking: vi.fn(),
   shareMedicalNotes: vi.fn(),
   readMemberMedicalNotes: vi.fn(),
+}))
+vi.mock("@/lib/logistics/actions", () => ({
+  upsertLogistics: vi.fn(),
+  generateFloatPlanShare: vi.fn(),
+  sendFloatPlanShareEmail: vi.fn(),
 }))
 vi.mock("@/lib/profile/actions", () => ({
   reAuth: vi.fn(),
@@ -39,6 +45,7 @@ vi.mock("@/lib/crypto/medical", () => ({
 import { FloatPlanTab } from "@/components/trips/tabs/float-plan-tab"
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
 import { KeypairPromptBanner } from "@/components/common/keypair-prompt-banner"
+import { TRIP_STATE } from "@/lib/dtos/trip"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -89,7 +96,11 @@ describe("float plan tab, medical notes parked", () => {
     render(
       <FloatPlanTab
         tripId={TRIP_ID}
+        tripState={TRIP_STATE.BUILDING}
         currentMember={MEMBER_WITH_NOTES}
+        hasSatelliteFeed
+        isLeader
+        logistics={null}
         medicalNotesResetAt="2026-08-20T10:00:00"
       />,
     )
@@ -98,7 +109,16 @@ describe("float plan tab, medical notes parked", () => {
   })
 
   it("still renders the rest of the float plan", () => {
-    render(<FloatPlanTab tripId={TRIP_ID} currentMember={MEMBER_WITH_NOTES} />)
+    render(
+      <FloatPlanTab
+        tripId={TRIP_ID}
+        tripState={TRIP_STATE.BUILDING}
+        currentMember={MEMBER_WITH_NOTES}
+        hasSatelliteFeed
+        isLeader
+        logistics={null}
+      />,
+    )
 
     expect(screen.getByText("Wilderness Systems Tempest 170")).toBeDefined()
     expect(screen.getByText("Bob Smith")).toBeDefined()

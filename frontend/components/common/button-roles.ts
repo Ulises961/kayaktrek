@@ -14,9 +14,9 @@
 /**
  * Bringing something into existence, or into effect.
  *
- * Creating a trip, a log, a checklist item brings it into existence. "Begin expedition"
- * and the auth submits create nothing, but bring a trip or a session into effect. One
- * idea, so there are no special cases to remember.
+ * Creating a trip, a log, a checklist item brings it into existence. The auth submits
+ * create nothing, but bring a session into effect. One idea, so there are no special
+ * cases to remember.
  *
  * This replaced an earlier "the one action a surface exists to produce" rule, which asked
  * what a surface was *for* — a judgement that has to be re-made every time someone adds a

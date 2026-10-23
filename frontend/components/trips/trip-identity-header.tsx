@@ -1,102 +1,36 @@
 "use client"
 
-import { Fragment, useState } from "react"
 import Link from "next/link"
-import { AnchorIcon, PencilIcon, UsersIcon } from "lucide-react"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { UsersIcon } from "lucide-react"
 import { StateBadge } from "@/components/common/state-badge"
 import { UserAvatar } from "@/components/common/user-avatar"
-import { fieldLabelClass } from "@/components/common/form-field"
-import { AdvanceStateButton } from "@/components/trips/advance-state-button"
 import { PauseControls } from "@/components/trips/pause-controls"
-import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
-import { DeleteTripButton } from "@/components/trips/delete-trip-button"
-import { LeaveTripButton } from "@/components/trips/leave-trip-button"
-import { SuccessorPicker } from "@/components/trips/successor-picker"
+import { TripActionsMenu } from "@/components/trips/trip-actions-menu"
 import { LeaderlessTripBanner } from "@/components/trips/leaderless-trip-banner"
-import { SatelliteTrackingSwitch } from "@/components/trips/satellite-tracking-switch"
-import { daysBetween, formatDateRange } from "@/lib/trips/format"
+import { daysBetween, formatDateRange, tripDayLabel } from "@/lib/trips/format"
 import type { Membership } from "@/lib/trips/membership"
-import { canShareSatellitePosition } from "@/lib/trips/satellite"
 import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
-import {
-  TRIP_STATE,
-  TRIP_STATES,
-  TRIP_STATE_LABELS,
-  type Trip,
-  type TripState,
-} from "@/lib/dtos/trip"
+import type { Trip } from "@/lib/dtos/trip"
 import { PageHeading } from "@/components/common/page-heading"
 
 const MAX_VISIBLE_AVATARS = 5
 
-function StateTimeline({ currentState }: { currentState: TripState }) {
-  const currentIndex = TRIP_STATES.indexOf(currentState)
-  return (
-    <div className="flex items-start">
-      {TRIP_STATES.map((s, i) => (
-        <Fragment key={s}>
-          <div className="flex shrink-0 flex-col items-center gap-1.5">
-            <div
-              className={`size-3.5 rounded-full border-2 transition-colors ${
-                i === currentIndex
-                  ? "bg-primary border-primary"
-                  : i < currentIndex
-                    ? "bg-primary/30 border-primary/30"
-                    : "bg-background border-border"
-              }`}
-            />
-            <span
-              className={`text-[10px] leading-none capitalize ${
-                i === currentIndex ? "text-foreground font-semibold" : "text-muted-foreground"
-              }`}
-            >
-              {TRIP_STATE_LABELS[s]}
-            </span>
-          </div>
-          {i < TRIP_STATES.length - 1 && (
-            <div
-              className={`mt-[5px] h-0 min-w-4 flex-1 border-t border-dashed ${
-                i < currentIndex ? "border-primary/40" : "border-border"
-              }`}
-            />
-          )}
-        </Fragment>
-      ))}
-    </div>
-  )
-}
-
 interface TripIdentityHeaderProps {
   trip: Trip
   membership: Membership
-  /** Whether the user has a satellite feed registered in Settings (M29). */
-  hasSatelliteFeed: boolean
+  /** Today's ISO date, passed in so the server and the browser render the same day label. */
+  today: string
 }
 
-export function TripIdentityHeader({
-  trip,
-  membership,
-  hasSatelliteFeed,
-}: TripIdentityHeaderProps) {
-  const { isLeader, isMember, currentMember, currentMemberId } = membership
-  const offersSatellite = canShareSatellitePosition(trip.state, currentMember)
-  const [editOpen, setEditOpen] = useState(false)
+// Who the trip is and where it stands. Everything you can do to it, including moving it to
+// its next state, sits behind the actions menu, so the tabs start right under this block.
+export function TripIdentityHeader({ trip, membership, today }: TripIdentityHeaderProps) {
+  const { isLeader, isMember, currentMemberId } = membership
   const travellers = trip.travellers ?? []
   const days = trip.dateFrom && trip.dateTo ? daysBetween(trip.dateFrom, trip.dateTo) : null
+  const dayLabel = tripDayLabel(trip, today)
   const visibleTravellers = travellers.slice(0, MAX_VISIBLE_AVATARS)
   const overflowCount = travellers.length - visibleTravellers.length
-
-  const canAdvanceState = isLeader && trip.state && trip.state !== TRIP_STATE.PAST
-  const hasDetails =
-    !!trip.description || !!trip.difficulty || canAdvanceState || isLeader || isMember
 
   return (
     <div className="flex flex-col gap-2">
@@ -107,36 +41,36 @@ export function TripIdentityHeader({
         isMember={isMember}
         currentMemberId={currentMemberId}
       />
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <PageHeading className="truncate">{trip.destination ?? "Untitled trip"}</PageHeading>
-          {trip.state && <StateBadge state={trip.state} />}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <PageHeading className="min-w-0 truncate">
+            {trip.destination ?? "Untitled trip"}
+          </PageHeading>
+          {trip.state && <StateBadge state={trip.state} className="shrink-0" />}
+          {trip.difficulty && (
+            <span className="border-border text-muted-foreground inline-flex shrink-0 items-center rounded-[3px] border px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase">
+              {DIFFICULTY_LABELS[trip.difficulty]}
+            </span>
+          )}
         </div>
-        {isLeader && (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Edit trip"
-              className="size-7"
-              onClick={() => setEditOpen(true)}
-            >
-              <PencilIcon className="size-3.5" />
-            </Button>
-            <DeleteTripButton tripId={trip.id!} destination={trip.destination} />
-          </div>
-        )}
+        <TripActionsMenu trip={trip} isLeader={isLeader} isMember={isMember} />
       </div>
 
-      {isLeader && <EditTripDialog trip={trip} open={editOpen} onOpenChange={setEditOpen} />}
-
-      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
+      <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
         <span>
           {formatDateRange(trip.dateFrom, trip.dateTo)}
-          {days !== null && <span className="ml-1 text-xs">({days} days)</span>}
+          {dayLabel ? (
+            <span className="text-foreground ml-1.5 text-xs font-medium">{dayLabel}</span>
+          ) : (
+            days !== null && <span className="ml-1 text-xs">({days} days)</span>
+          )}
         </span>
         {travellers.length > 0 && (
-          <span className="flex items-center gap-1.5">
+          <Link
+            href={`/trips/${trip.id}/crew`}
+            aria-label={`Crew, ${travellers.length}`}
+            className="hover:text-foreground flex items-center gap-1.5 rounded-md"
+          >
             <UsersIcon className="size-3.5" />
             <span className="flex -space-x-1.5">
               {visibleTravellers.map((m) => (
@@ -151,115 +85,11 @@ export function TripIdentityHeader({
               ))}
             </span>
             {overflowCount > 0 && <span className="text-xs">+{overflowCount}</span>}
-          </span>
+          </Link>
         )}
       </div>
 
-      {/* The next state action stays out here, always visible. It was inside the Details
-          accordion, which is collapsed by default — so the single most consequential
-          control in the product ("Begin expedition": a plan becomes a live expedition, and
-          it cannot be undone) was two clicks deep and invisible until you went looking.
-          There is only ever one of these, so it costs a row rather than a block, which is
-          what let the accordion be both too bulky open and unnoticeable shut. Everything
-          occasional — share, print, abort, the description — stays folded below. */}
-      {canAdvanceState && trip.state && (
-        <div className="flex flex-col gap-3">
-          {/* The timeline travels with the buttons that move it. Splitting them left the
-              controls out here and "where the trip is" folded away, so you could advance a
-              trip without seeing what you were advancing it from. */}
-          <StateTimeline currentState={trip.state} />
-          <div className="flex flex-wrap items-center gap-2">
-            <AdvanceStateButton tripId={trip.id!} currentState={trip.state} />
-            <PauseControls trip={trip} isLeader={isLeader} />
-          </div>
-        </div>
-      )}
-
-      {hasDetails && (
-        <Accordion type="single" collapsible>
-          <AccordionItem value="details" className="border-none">
-            {/* Full width with the chevron pushed to the far end, so the row reads as a
-                control rather than a stray word. It was `w-fit` muted text at the same
-                weight as the body around it, which made the one way into share, print and
-                abort effectively invisible. */}
-            {/* `rounded-none` overrides the primitive's `rounded-md`: the radius
-                curves the ends of this row's `border-t`, so the rule dividing the
-                state controls from Details tapers off instead of meeting both
-                edges. */}
-            <AccordionTrigger className="text-foreground border-border w-full justify-between rounded-none border-t py-2 text-sm font-semibold hover:no-underline">
-              Details
-            </AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-4 pt-1 pb-2">
-              {trip.description && (
-                <div className="flex flex-col gap-2">
-                  <span className={fieldLabelClass}>Description</span>
-                  <p className="text-sm">{trip.description}</p>
-                </div>
-              )}
-
-              {trip.difficulty && (
-                <div className="flex flex-col gap-2">
-                  <span className={fieldLabelClass}>Difficulty</span>
-                  <p className="text-sm">{DIFFICULTY_LABELS[trip.difficulty]}</p>
-                </div>
-              )}
-
-              {offersSatellite && (
-                <>
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <span className={fieldLabelClass}>inReach tracking</span>
-                    <SatelliteTrackingSwitch
-                      tripId={trip.id!}
-                      enabled={!!currentMember?.sharesSatellitePosition}
-                      hasFeed={hasSatelliteFeed}
-                    />
-                  </div>
-                </>
-              )}
-
-              {isLeader && (
-                <>
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <span className={fieldLabelClass}>Share &amp; print</span>
-                    <Button variant="outline" size="sm" className="w-fit" asChild>
-                      <Link href={`/trips/float-plan/${trip.id}`}>
-                        <AnchorIcon className="size-3.5" />
-                        Printable float plan
-                      </Link>
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {isLeader && (
-                <>
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <span className={fieldLabelClass}>Successor</span>
-                    <SuccessorPicker tripId={trip.id!} travellers={travellers} />
-                  </div>
-                </>
-              )}
-
-              {isMember && (
-                <>
-                  <Separator />
-                  <div className="flex flex-col gap-2">
-                    <span className={fieldLabelClass}>Leave</span>
-                    <LeaveTripButton
-                      tripId={trip.id!}
-                      isLeader={isLeader}
-                      soleMember={travellers.length <= 1}
-                    />
-                  </div>
-                </>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+      <PauseControls trip={trip} isLeader={isLeader} />
     </div>
   )
 }

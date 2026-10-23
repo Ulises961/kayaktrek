@@ -110,7 +110,8 @@ test.describe("Multi-device live sync (M36)", () => {
   }) => {
     await apiTransitionState(request, leaderToken, tripId, "happening")
     await page.goto(`/trips/${tripId}/crew`)
-    await expect(page.getByRole("button", { name: /pause expedition/i })).toBeVisible()
+    // The Live tab exists only while the trip is happening: the page rendered that state.
+    await expect(page.getByRole("link", { name: "Live" })).toBeVisible()
     await expectStreamLive(page)
 
     // What the phone's queue does when it comes back online: one batch of envelopes. This is

@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation"
-import { apiGet } from "@/lib/api/client"
+import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
+import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { UserSchema } from "@/lib/dtos/user"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
+import { listSatelliteFeeds } from "@/lib/satellite-feeds/actions"
 import { deriveMembership } from "@/lib/trips/membership"
 import { FloatPlanTab } from "@/components/trips/tabs/float-plan-tab"
 
@@ -13,12 +15,24 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   if (!trip) notFound()
 
   const session = await getSession()
-  const { currentMember } = deriveMembership(trip, session)
+  const { currentMember, isLeader } = deriveMembership(trip, session)
   if (!currentMember) redirect(`/trips/${id}`)
 
-  const userProfile = await apiGet("/api/user/me")
-    .then((raw) => UserSchema.parse(raw))
-    .catch(() => null)
+  const [userProfile, satelliteFeeds, logistics] = await Promise.all([
+    apiGet("/api/user/me")
+      .then((raw) => UserSchema.parse(raw))
+      .catch(() => null),
+    listSatelliteFeeds(),
+    // The shore contact and share link are the leader's; crew never see them.
+    isLeader
+      ? apiGet(`/api/logistics/${id}`)
+          .then((raw) => LogisticsSchema.parse(raw))
+          .catch((error) => {
+            rethrowUnlessClientError(error)
+            return null
+          })
+      : null,
+  ])
 
   // TripMember snapshot always wins; profile fills gaps (e.g. profile updated
   // after the trip was created).
@@ -43,7 +57,11 @@ export default async function TripMyFloatPlanPage({ params }: { params: Promise<
   return (
     <FloatPlanTab
       tripId={id}
+      tripState={trip.state}
       currentMember={mergedCurrentMember}
+      hasSatelliteFeed={satelliteFeeds.length > 0}
+      isLeader={isLeader}
+      logistics={logistics}
       medicalNotesResetAt={userProfile?.medicalNotesResetAt ?? null}
     />
   )

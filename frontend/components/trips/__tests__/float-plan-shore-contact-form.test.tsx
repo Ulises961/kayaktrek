@@ -7,7 +7,7 @@ vi.mock("@/lib/logistics/actions", () => ({
 }))
 
 import { upsertLogistics } from "@/lib/logistics/actions"
-import { ShoreContactForm } from "../float-plan-shore-contact-form"
+import { ShoreContactDetails, ShoreContactForm } from "../float-plan-shore-contact-form"
 import type { Logistics } from "@/lib/dtos/logistics"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
@@ -40,6 +40,30 @@ describe("ShoreContactForm — viewing state", () => {
   it("shows an Edit button", () => {
     render(<ShoreContactForm tripId={TRIP_ID} logistics={LOGISTICS} />)
     expect(screen.getByRole("button", { name: /edit/i })).toBeDefined()
+  })
+})
+
+describe("ShoreContactDetails — the contact as printed", () => {
+  it("shows every field the contact has, each under its label", () => {
+    render(
+      <ShoreContactDetails contact={{ ...LOGISTICS, shoreContactEmail: "jane@example.com" }} />,
+    )
+    expect(screen.getByText("Jane Doe")).toBeDefined()
+    expect(screen.getByText("Partner")).toBeDefined()
+    expect(screen.getByText("+1234567890")).toBeDefined()
+    expect(screen.getByText("jane@example.com")).toBeDefined()
+    expect(screen.getByText("Email")).toBeDefined()
+  })
+
+  it("leaves out the rows the contact has no value for", () => {
+    render(<ShoreContactDetails contact={LOGISTICS} />)
+    expect(screen.queryByText("Email")).toBeNull()
+  })
+
+  it("says there is no contact when none was recorded, and offers no way to edit it", () => {
+    render(<ShoreContactDetails contact={{}} />)
+    expect(screen.getByText(/no shore contact recorded/i)).toBeDefined()
+    expect(screen.queryByRole("button")).toBeNull()
   })
 })
 

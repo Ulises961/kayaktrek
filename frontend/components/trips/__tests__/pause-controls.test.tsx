@@ -12,7 +12,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }))
 
 import { pauseTrip, resumeTrip, abortTrip } from "@/lib/trips/actions"
 import { toast } from "sonner"
-import { PauseControls } from "../pause-controls"
+import { PauseControls, PauseTripDialog } from "../pause-controls"
 import type { Trip } from "@/lib/dtos/trip"
 
 const baseTrip: Trip = {
@@ -39,37 +39,55 @@ describe("PauseControls — not leader / not happening", () => {
 })
 
 describe("PauseControls — happening, not paused", () => {
-  it("renders a Pause button", () => {
-    render(<PauseControls trip={baseTrip} isLeader={true} />)
-    expect(screen.getByRole("button", { name: /pause expedition/i })).toBeDefined()
+  it("renders nothing: pausing is an action in the trip menu, not a state on the page", () => {
+    const { container } = render(<PauseControls trip={baseTrip} isLeader={true} />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
+describe("PauseTripDialog", () => {
+  function renderDialog(open = true) {
+    const onOpenChange = vi.fn()
+    render(<PauseTripDialog tripId={baseTrip.id!} open={open} onOpenChange={onOpenChange} />)
+    return { onOpenChange }
+  }
+
+  it("renders nothing while closed", () => {
+    renderDialog(false)
+    expect(screen.queryByRole("alertdialog")).toBeNull()
   })
 
-  it("does not render Resume or Abort controls", () => {
-    render(<PauseControls trip={baseTrip} isLeader={true} />)
-    expect(screen.queryByRole("button", { name: /^resume$/i })).toBeNull()
-    expect(screen.queryByRole("button", { name: /abort expedition/i })).toBeNull()
+  it("says what pausing does to the checkpoint alerts and the remaining days", () => {
+    renderDialog()
+    expect(screen.getByText(/checkpoint alerts pause until you resume/i)).toBeDefined()
+    expect(screen.getByText(/shifts the remaining days forward/i)).toBeDefined()
   })
 
   it("calls pauseTrip when the pause is confirmed", async () => {
     vi.mocked(pauseTrip).mockResolvedValue({ success: true })
-    render(<PauseControls trip={baseTrip} isLeader={true} />)
+    renderDialog()
 
-    await userEvent.click(screen.getByRole("button", { name: /pause expedition/i }))
-    const confirmBtn = await screen.findByRole("button", { name: /^pause$/i })
-    await userEvent.click(confirmBtn)
+    await userEvent.click(screen.getByRole("button", { name: /^pause$/i }))
 
     await waitFor(() => {
       expect(pauseTrip).toHaveBeenCalledWith(baseTrip.id)
     })
   })
 
-  it("toasts the error and leaves the dialog state alone when pause fails", async () => {
-    vi.mocked(pauseTrip).mockResolvedValue({ success: false, error: "Trip is already paused." })
-    render(<PauseControls trip={baseTrip} isLeader={true} />)
+  it("pauses nothing when cancelled", async () => {
+    const { onOpenChange } = renderDialog()
 
-    await userEvent.click(screen.getByRole("button", { name: /pause expedition/i }))
-    const confirmBtn = await screen.findByRole("button", { name: /^pause$/i })
-    await userEvent.click(confirmBtn)
+    await userEvent.click(screen.getByRole("button", { name: /^cancel$/i }))
+
+    expect(pauseTrip).not.toHaveBeenCalled()
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it("toasts the error when pause fails", async () => {
+    vi.mocked(pauseTrip).mockResolvedValue({ success: false, error: "Trip is already paused." })
+    renderDialog()
+
+    await userEvent.click(screen.getByRole("button", { name: /^pause$/i }))
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith("Trip is already paused.")

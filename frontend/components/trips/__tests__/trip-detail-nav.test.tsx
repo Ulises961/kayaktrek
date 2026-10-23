@@ -36,16 +36,16 @@ describe("TripDetailNav", () => {
     expect(links[0]).toHaveAccessibleName(/itinerary/i)
   })
 
-  it("hides the Emergency info link when showFloatPlan is false", () => {
+  it("hides the Float plan link when showFloatPlan is false", () => {
     mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
     render(<TripDetailNav tripId={TRIP_ID} showFloatPlan={false} />)
-    expect(screen.queryByRole("link", { name: /emergency info/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /float plan/i })).not.toBeInTheDocument()
   })
 
-  it("shows the Emergency info link pointing at my-float-plan when showFloatPlan is true", () => {
+  it("shows the Float plan link pointing at my-float-plan when showFloatPlan is true", () => {
     mockUsePathname.mockReturnValue(`/trips/${TRIP_ID}`)
     render(<TripDetailNav tripId={TRIP_ID} showFloatPlan={true} />)
-    expect(screen.getByRole("link", { name: /emergency info/i }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: /float plan/i }).getAttribute("href")).toBe(
       `/trips/${TRIP_ID}/my-float-plan`,
     )
   })

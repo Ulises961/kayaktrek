@@ -33,7 +33,7 @@ export function TripDetailNav({ tripId, showFloatPlan, liveHref }: TripDetailNav
       ? [
           {
             href: `/trips/${tripId}/my-float-plan`,
-            label: "Emergency info",
+            label: "Float plan",
             icon: ShieldAlertIcon,
           },
         ]

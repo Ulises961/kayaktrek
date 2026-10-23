@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { format } from "date-fns"
-import { AnchorIcon, LinkIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
+import { AnchorIcon, ShieldAlertIcon, UserIcon } from "lucide-react"
 import { apiGet, rethrowUnlessClientError } from "@/lib/api/client"
 import { getSession } from "@/lib/auth/session"
 import { TripSchema } from "@/lib/dtos/trip"
@@ -8,9 +8,8 @@ import { LogisticsSchema } from "@/lib/dtos/logistics"
 import { formatDateRange } from "@/lib/trips/format"
 import { BackLink } from "@/components/common/back-link"
 import { PrintButton } from "@/components/trips/print-button"
-import { ShoreContactForm } from "@/components/trips/float-plan-shore-contact-form"
+import { ShoreContactDetails } from "@/components/trips/float-plan-shore-contact-form"
 import { FloatPlanCrewManifest } from "@/components/trips/float-plan-crew-manifest"
-import { FloatPlanShareSection } from "@/components/trips/float-plan-share-section"
 import { FloatPlanSection } from "@/components/trips/float-plan-section"
 import { PageHeading } from "@/components/common/page-heading"
 
@@ -84,20 +83,7 @@ export default async function FloatPlanPage({ params }: { params: Promise<{ id: 
         <p className="text-muted-foreground -mt-1 mb-3 text-sm">
           Person who receives this float plan before departure.
         </p>
-        <ShoreContactForm tripId={id} logistics={logistics} />
-      </FloatPlanSection>
-
-      {/* Share link */}
-      <FloatPlanSection
-        title="Share"
-        icon={<LinkIcon className="size-4" />}
-        className="border-border bg-muted/30 rounded-lg border p-4 print:hidden"
-      >
-        <p className="text-muted-foreground -mt-1 mb-3 text-sm">
-          Generate a read-only link for your shore contact. The link contains vessel descriptions
-          and emergency contacts — no medical notes.
-        </p>
-        <FloatPlanShareSection tripId={id} logistics={logistics} />
+        <ShoreContactDetails contact={logistics ?? {}} />
       </FloatPlanSection>
 
       {/* Crew Manifest */}

@@ -59,10 +59,11 @@ describe("upsertLogistics", () => {
     expect(apiPut).toHaveBeenCalledWith(`/api/logistics/${TRIP_ID}`, { shoreContactName: "Maria" })
   })
 
-  it("revalidates the logistics segment and the printable float plan on success", async () => {
+  it("revalidates the logistics segment, the Float plan tab and the printable plan on success", async () => {
     vi.mocked(apiPut).mockResolvedValue(LOGISTICS_FIXTURE)
     await upsertLogistics(TRIP_ID, {})
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/logistics`)
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/float-plan/${TRIP_ID}`)
   })
 
@@ -84,6 +85,7 @@ describe("generateFloatPlanShare", () => {
     vi.mocked(apiPost).mockResolvedValue(LOGISTICS_FIXTURE)
     const result = await generateFloatPlanShare(TRIP_ID)
     expect(apiPost).toHaveBeenCalledWith(`/api/logistics/${TRIP_ID}/share`, {})
+    expect(revalidatePath).toHaveBeenCalledWith(`/trips/${TRIP_ID}/my-float-plan`)
     expect(revalidatePath).toHaveBeenCalledWith(`/trips/float-plan/${TRIP_ID}`)
     expect(result).toEqual({ success: true, logistics: LOGISTICS_FIXTURE })
   })

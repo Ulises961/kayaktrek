@@ -37,6 +37,34 @@ function FieldRow({ label, value }: { label: string; value: string | null | unde
   )
 }
 
+type ShoreContact = Pick<
+  Logistics,
+  "shoreContactName" | "shoreContactEmail" | "shoreContactPhone" | "shoreContactRelationship"
+>
+
+// The shore contact as read: on the printed float plan, and in the form's own resting state.
+export function ShoreContactDetails({ contact }: { contact: ShoreContact }) {
+  const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } =
+    contact
+  const hasAny =
+    shoreContactName || shoreContactPhone || shoreContactEmail || shoreContactRelationship
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {hasAny ? (
+        <>
+          <FieldRow label="Name" value={shoreContactName} />
+          <FieldRow label="Relationship" value={shoreContactRelationship} />
+          <FieldRow label="Phone" value={shoreContactPhone} />
+          <FieldRow label="Email" value={shoreContactEmail} />
+        </>
+      ) : (
+        <p className="text-muted-foreground text-base italic">No shore contact recorded.</p>
+      )}
+    </div>
+  )
+}
+
 export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -88,25 +116,9 @@ export function ShoreContactForm({ tripId, logistics }: ShoreContactFormProps) {
   }
 
   if (!isEditing) {
-    const { shoreContactName, shoreContactEmail, shoreContactPhone, shoreContactRelationship } =
-      displayed
-    const hasAny =
-      shoreContactName || shoreContactPhone || shoreContactEmail || shoreContactRelationship
-
     return (
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          {hasAny ? (
-            <>
-              <FieldRow label="Name" value={shoreContactName} />
-              <FieldRow label="Relationship" value={shoreContactRelationship} />
-              <FieldRow label="Phone" value={shoreContactPhone} />
-              <FieldRow label="Email" value={shoreContactEmail} />
-            </>
-          ) : (
-            <p className="text-muted-foreground text-base italic">No shore contact recorded.</p>
-          )}
-        </div>
+        <ShoreContactDetails contact={displayed} />
         <Button variant="outline" size="sm" onClick={handleEdit} className="shrink-0 print:hidden">
           <PencilIcon className="size-3.5" />
           Edit

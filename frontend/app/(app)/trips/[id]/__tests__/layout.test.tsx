@@ -4,15 +4,15 @@ import { render, screen } from "@testing-library/react"
 const { getTripCore, getSession, listSatelliteFeeds } = vi.hoisted(() => ({
   getTripCore: vi.fn(),
   getSession: vi.fn(),
-  listSatelliteFeeds: vi.fn().mockResolvedValue([]),
+  listSatelliteFeeds: vi.fn(),
 }))
 vi.mock("@/lib/trips/core", () => ({ getTripCore }))
 vi.mock("@/lib/auth/session", () => ({ getSession }))
 vi.mock("@/lib/satellite-feeds/actions", () => ({ listSatelliteFeeds }))
 vi.mock("@/components/common/set-breadcrumbs", () => ({ SetBreadcrumbs: () => null }))
 vi.mock("@/components/trips/trip-identity-header", () => ({
-  TripIdentityHeader: ({ hasSatelliteFeed }: { hasSatelliteFeed: boolean }) => (
-    <div data-testid="identity-header" data-has-satellite-feed={String(hasSatelliteFeed)} />
+  TripIdentityHeader: ({ today }: { today: string }) => (
+    <div data-testid="identity-header" data-today={today} />
   ),
 }))
 vi.mock("@/components/trips/trip-detail-nav", () => ({
@@ -32,6 +32,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import TripDetailLayout from "../layout"
+import { todayIso } from "@/lib/utils/date"
 
 const TRIP_ID = "01952f1a-0000-7000-8000-000000000001"
 const ITINERARY_ID = "01952f1a-0000-7000-8000-000000000002"
@@ -103,67 +104,29 @@ describe("TripDetailLayout — live sync (M36)", () => {
   })
 })
 
-describe("TripDetailLayout — inReach switch (M29)", () => {
-  afterEach(() => {
-    vi.clearAllMocks()
-    // Back to "no feed", which is what the other describes in this file run under.
-    listSatelliteFeeds.mockResolvedValue([])
-  })
+describe("TripDetailLayout — the satellite feed", () => {
+  afterEach(() => vi.clearAllMocks())
 
-  const FEED = { id: "01952f1a-0000-7000-8000-000000000004" }
+  it("looks nothing up for it: this layout wraps every tab, and the feed is the Float plan tab's", async () => {
+    getTripCore.mockResolvedValue(trip({ state: "happening" }))
+    getSession.mockResolvedValue({ userId: USER_ID })
 
-  async function renderLayout() {
     render(await TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }))
-    return screen.getByTestId("identity-header")
-  }
 
-  it("tells the header a feed is registered, for a member of a trip that offers the switch", async () => {
-    getTripCore.mockResolvedValue(trip({ state: "building" }))
-    getSession.mockResolvedValue({ userId: USER_ID })
-    listSatelliteFeeds.mockResolvedValue([FEED])
-
-    expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "true")
+    expect(listSatelliteFeeds).not.toHaveBeenCalled()
   })
+})
 
-  it("tells the header there is no feed when the member has none registered", async () => {
+describe("TripDetailLayout — day label", () => {
+  afterEach(() => vi.clearAllMocks())
+
+  it("hands the header today's date, so the server and the browser render the same day", async () => {
     getTripCore.mockResolvedValue(trip())
     getSession.mockResolvedValue({ userId: USER_ID })
-    listSatelliteFeeds.mockResolvedValue([])
 
-    expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "false")
-    expect(listSatelliteFeeds).toHaveBeenCalledTimes(1)
-  })
+    render(await TripDetailLayout({ children: null, params: Promise.resolve({ id: TRIP_ID }) }))
 
-  it("does not look the feed up where the switch is not offered", async () => {
-    // The layout wraps every tab, so each lookup is paid on every trip page load.
-    getTripCore.mockResolvedValue(trip({ state: "past" }))
-    getSession.mockResolvedValue({ userId: USER_ID })
-    listSatelliteFeeds.mockResolvedValue([FEED])
-
-    expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "false")
-    expect(listSatelliteFeeds).not.toHaveBeenCalled()
-  })
-
-  it("does not look the feed up for someone who is not a member", async () => {
-    getTripCore.mockResolvedValue(trip())
-    getSession.mockResolvedValue({ userId: "someone-else" })
-    listSatelliteFeeds.mockResolvedValue([FEED])
-
-    expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "false")
-    expect(listSatelliteFeeds).not.toHaveBeenCalled()
-  })
-
-  it("does not look the feed up for a member who has left", async () => {
-    getTripCore.mockResolvedValue(
-      trip({
-        travellers: [{ role: "crew", leftAt: "2026-10-02T09:30:00", user: { id: USER_ID } }],
-      }),
-    )
-    getSession.mockResolvedValue({ userId: USER_ID })
-    listSatelliteFeeds.mockResolvedValue([FEED])
-
-    expect(await renderLayout()).toHaveAttribute("data-has-satellite-feed", "false")
-    expect(listSatelliteFeeds).not.toHaveBeenCalled()
+    expect(screen.getByTestId("identity-header")).toHaveAttribute("data-today", todayIso())
   })
 })
 

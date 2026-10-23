@@ -16,7 +16,7 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, hero = false, route = null }: TripCardProps) {
-  const { id, destination, state, dateFrom, dateTo, travellers } = trip
+  const { id, destination, description, state, dateFrom, dateTo, travellers } = trip
   const crewCount = travellers?.length ?? 0
   const days = dateFrom && dateTo ? daysBetween(dateFrom, dateTo) : null
 
@@ -51,6 +51,11 @@ export function TripCard({ trip, hero = false, route = null }: TripCardProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-0.5 px-3 pt-0 pb-3">
+          {description && (
+            <p className="text-muted-foreground mb-1.5 line-clamp-2 text-xs leading-snug">
+              {description}
+            </p>
+          )}
           <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
             <CalendarIcon className="size-3 shrink-0" />
             <span>{formatDateRange(dateFrom, dateTo)}</span>
