@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test"
 import { LEADER, CREW } from "../fixtures/auth"
-import { apiGetAccessToken, apiCreateTrip, apiDeleteTrip } from "../fixtures/trips"
+import {
+  apiAcceptInvitation,
+  apiCreateTrip,
+  apiDeleteTrip,
+  apiGetAccessToken,
+  apiInviteByEmail,
+} from "../fixtures/trips"
 import { mutateAndSettle, openTripMenu } from "../fixtures/ui"
 import { API_URL } from "../playwright.config"
 
@@ -52,16 +58,12 @@ test.describe("Trip state transitions", () => {
   })
 
   test("crew cannot transition state", async ({ browser, request }) => {
-    // Invite and have crew accept via API
-    const crewToken = await apiGetAccessToken(request, "e2e.crew@example.com", "Crew$ecure1!")
-    await request.post(`${API_URL}/api/v1/trip/${tripId}/invite`, {
-      headers: { Authorization: `Bearer ${leaderToken}` },
-      data: { email: "e2e.crew@example.com" },
-    })
-    await request.post(`${API_URL}/api/v1/trip/${tripId}/invitation`, {
-      headers: { Authorization: `Bearer ${crewToken}` },
-      data: { accepted: true },
-    })
+    // Invite and have crew accept via API. The invite endpoint takes a userId, never a bare
+    // email, so the shared helper resolves it; posting `{ email }` by hand is refused with 400,
+    // which left the crew member outside the trip and this assertion proving nothing.
+    const crewToken = await apiGetAccessToken(request, CREW.mail, CREW.pwd)
+    await apiInviteByEmail(request, leaderToken, tripId, CREW.mail)
+    await apiAcceptInvitation(request, crewToken, tripId)
 
     const crewContext = await browser.newContext({ storageState: "e2e/.auth/crew.json" })
     const crewPage = await crewContext.newPage()

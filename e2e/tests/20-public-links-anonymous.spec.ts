@@ -165,7 +165,10 @@ test.describe("Public links stay public", () => {
         try {
           await page.goto("/explore")
           await expect(page).not.toHaveURL(/\/login/)
-          expect(new URL(page.url()).pathname).toBe("/")
+          // Polled: a stale cookie costs a /me round trip before the page knows the session
+          // is dead, by which time the response has started streaming, so the redirect
+          // arrives as a client navigation after `goto` resolves rather than as a 307.
+          await expect.poll(() => new URL(page.url()).pathname).toBe("/")
           await expect(page.getByLabel(/search routes by name/i)).toBeVisible()
         } finally {
           await context.close()
