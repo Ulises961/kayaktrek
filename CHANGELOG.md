@@ -7,6 +7,84 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.4.0] - 2026-10-23
+
+### Added
+
+- **Switch your inReach on for each trip.** A registered inReach feed no longer posts to every
+  trip that happens to be under way. You switch it on for the trips you are paddling, in the
+  trip's Float plan tab, and it is off until you do. A trip you have not switched it on for gets
+  nothing, and leaving a trip ends it. Switching it on asks you first, and says who sees the
+  position: the other crew and, if a float plan link has been shared, the shore contact.
+  **After this update an inReach that was feeding a trip stops until you switch it on for that
+  trip.**
+- **Heading and speed from the inReach.** The positions it posts now carry heading and speed
+  where the device reports them. This has not yet been checked against a real inReach feed.
+- **Navigate shows the crew without sharing your phone when your inReach is the source.** With
+  the inReach switched on and its feed being read, Navigate no longer asks to share your phone's
+  location and no longer sends it. The status chip reads "inReach · N crew live" instead of
+  "Sharing position". If the feed was removed or needs its password again, Navigate behaves as
+  before.
+- **An "inReach is off" notice on a trip under way.** If you have a feed registered and have not
+  switched it on for a trip that is under way, the Float plan tab says so.
+
+### Changed
+
+- **A compact trip header, and one Float plan tab.** The trip header is now the title, state,
+  difficulty, dates, crew and a menu. Begin expedition, Mark as past, Pause, Edit, Leave and
+  Delete are in that menu; each still asks for confirmation. The Details drawer is gone. The
+  description is on the trip card, and the successor picker is in the Crew tab. The former
+  Emergency info tab is now **Float plan**, and holds your details, your inReach switch and, for
+  the leader, **Safety and rescue information** (the shore contact, the share link and email, and
+  the printable plan).
+- **The privacy policy now covers the inReach feed.** It says what is kept for a registered feed,
+  that the stored password can be read by the service (it has to be, to fetch your feed), that
+  Garmin sees the requests, and when sharing ends.
+- **The Settings card for the feed says a trip receives your position only once you switch it on
+  for that trip.** On the mobile app, which is not released yet, it points to the web for now.
+- **Backend housekeeping, with no behaviour change intended.** Every backend function is now
+  type-annotated and checked in CI, endpoints no longer catch every exception themselves (the
+  central handler does, and logs the traceback), and data access moved out of the endpoint layer.
+  The visible effects are the Fixed entries below. It is the part of this release that touches the
+  most files (126 in the backend), so look here first if an endpoint behaves differently.
+
+### Fixed
+
+- **The data export failed for anyone with a logged distance.** The export task stopped before
+  uploading anything, so those accounts received no export at all. Distances are now written as
+  numbers.
+- **A crewmate's consent time was visible in some trip responses.** Only the leader should see
+  when another member shared their medical notes (a feature that is not offered at the moment).
+  The rule now applies to every response that lists a trip's members, including the list a crew
+  member opens their trips from.
+- **Some refusals were reported as server errors.** A "you may not do that" from deep in the app
+  could come back as a generic 500; it is now a 403 carrying the reason, and other mistakes by the
+  caller (a malformed request, a missing record) are reported as such rather than as a crash.
+
+### Security
+
+- **Next.js updated to 16.4.2.** Three advisories were published against 16.0.0 to 16.4.0, two
+  critical (remote code execution in the image optimizer with SVG files, and in `use cache`
+  functions) and one high (denial of service through Server Actions). The app does not use
+  `use cache`, and its lockfile already resolved the patched `sharp` that the image advisory asks
+  for (the running image was not inspected), so the one that applies to it is the Server Actions
+  denial of service, which needs no sign-in and affects availability only.
+- **A user's password hash no longer appears if a user object is printed to a log.**
+- Dependency updates, among them `zod`, `vitest`, `lucide-react`, `motion`, `logfire` and
+  `prettier`.
+
+### Deploy notes
+
+- **One migration, expand-only:** `trip_member.shares_satellite_position`, a non-null boolean
+  with a default of false. The previous release's code keeps working against it, so a rolling
+  deploy is safe. It is applied by the usual `alembic upgrade head` step.
+- **No new required environment variable, no email template change, no forced logout.** The
+  compose and `.env.example` files are unchanged since 1.3.0, and the token, session and login
+  code changed only in type annotations, comments and removed catch-all error arms.
+- **Check after deploying:** open a trip's Float plan tab as a leader and as a crew member (the
+  new layout has not been looked at on a real screen before this release), and switch an inReach
+  on and off for a trip.
+
 ## [1.3.0] - 2026-10-16
 
 ### Added
