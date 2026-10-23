@@ -62,6 +62,20 @@ beforeEach(() => {
 })
 
 describe("SatelliteFeedSection", () => {
+  describe("what it says about trips", () => {
+    it("says a trip gets a position only once inReach is switched on for it, and where that is done", async () => {
+      const { findByText, queryByText } = await render(<SatelliteFeedSection />)
+
+      expect(await findByText(/only once you switch your inReach on for that trip/i)).toBeTruthy()
+      expect(await findByText(/float plan tab on the web/i)).toBeTruthy()
+      expect(await findByText(/a trip you have not switched on gets nothing/i)).toBeTruthy()
+      // The earlier wording promised every trip under way the position, which is no longer so.
+      expect(
+        queryByText(/it is polled about every 10 minutes while a trip is under way/i),
+      ).toBeNull()
+    })
+  })
+
   describe("what it shows", () => {
     it("offers to add a feed when none is registered", async () => {
       const { findByTestId, findByText } = await render(<SatelliteFeedSection />)
