@@ -39,6 +39,48 @@ describe("PrivacyPage", () => {
     expect(screen.getByText(/disabled by default/i)).toBeInTheDocument()
   })
 
+  // M29: an inReach feed is a second source of the same position data. The policy must say
+  // what is kept for it, that the Service can read the password it stores (it has to, to fetch
+  // the feed unattended), and that registering a feed shares nothing by itself.
+  describe("the satellite feed (M29)", () => {
+    it("names what is kept for a registered feed, and says the Service can decrypt the password", () => {
+      render(<PrivacyPage />)
+      expect(screen.getByText(/satellite feed data/i)).toBeInTheDocument()
+      expect(screen.getByText(/encrypted at rest/i)).toBeInTheDocument()
+      expect(screen.getByText(/the service can decrypt it/i)).toBeInTheDocument()
+    })
+
+    it("says the position can come from an inReach switched on for that trip, not from the feed alone", () => {
+      render(<PrivacyPage />)
+      expect(screen.getByText(/switched it on for that trip/i)).toBeInTheDocument()
+      expect(screen.getByText(/registering a feed shares nothing/i)).toBeInTheDocument()
+    })
+
+    it("says what is recorded from the feed, how often, and that Garmin sees the requests", () => {
+      render(<PrivacyPage />)
+      expect(screen.getByText(/about every ten minutes/i)).toBeInTheDocument()
+      expect(screen.getByText(/heading and speed/i)).toBeInTheDocument()
+      expect(screen.getByText(/garmin sees those requests/i)).toBeInTheDocument()
+    })
+
+    it("says sharing ends when the inReach is switched off, the trip is left or it concludes", () => {
+      render(<PrivacyPage />)
+      expect(screen.getByText(/switch your inreach off/i)).toBeInTheDocument()
+    })
+
+    it("lists how long the feed's address and password are kept", () => {
+      render(<PrivacyPage />)
+      expect(
+        screen.getByText(/until you remove the feed or delete your account/i),
+      ).toBeInTheDocument()
+    })
+
+    it("says Garmin is the source of the positions and not a recipient of the user's data", () => {
+      render(<PrivacyPage />)
+      expect(screen.getByText(/garmin is the source of those positions/i)).toBeInTheDocument()
+    })
+  })
+
   // Stated twice on purpose — once where location sharing is explained, once in the retention
   // list — so asserting the count catches removal from either place.
   it("gives the retention window for recorded positions in both places", () => {
