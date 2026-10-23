@@ -9,6 +9,7 @@ import logging
 from Models.trip import Trip, TripStateType
 from Models.trip_member import TripMember, MemberRoleType
 from Models.medical_notes_access_log import MedicalNotesAccessLog
+from Models.satellite_feed import SatelliteFeed
 from Models.user import User
 from Api.database import db
 from Schemas.base_schema import camelcase
@@ -21,6 +22,18 @@ _FLOAT_PLAN_FIELDS = frozenset({
     "emergency_contact_name", "emergency_contact_phone",
     "emergency_contact_relationship",
 })
+
+
+_SATELLITE_TRACKING_TRIP_STATES = frozenset({TripStateType.BUILDING, TripStateType.HAPPENING})
+
+
+class SatelliteTrackingRefusedError(Exception):
+    """Switching a satellite feed on for a trip was refused. `reason` is a stable code:
+    "member_has_left", "trip_finished" or "satellite_feed_required"."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 class TripMemberService:
@@ -60,6 +73,57 @@ class TripMemberService:
             "user_id": str(g.current_user_id), "trip_id": trip_id,
         })
         return membership
+
+    @staticmethod
+    def set_satellite_tracking(trip_id: str, enabled: bool) -> TripMember:
+        """
+        Switch the current user's satellite feed on or off for this trip.
+
+        Switching off is always allowed. Switching on needs a registered feed, a trip
+        that is still building or happening, and a member who has not left. The float
+        plan is not touched: this is not a float-plan confirmation.
+
+        Raises:
+            NoResultFound: If the user is not a member of the trip
+            SatelliteTrackingRefusedError: When switching on is refused
+        """
+        membership = TripMemberService.get_my_membership(trip_id)
+
+        if enabled:
+            if membership.left_at is not None:
+                raise SatelliteTrackingRefusedError("member_has_left")
+            trip = db.session.get(Trip, UUID(trip_id))
+            if trip is None or trip.state not in _SATELLITE_TRACKING_TRIP_STATES:
+                raise SatelliteTrackingRefusedError("trip_finished")
+            feed_id = db.session.query(SatelliteFeed.id).filter_by(user_id=membership.user_id).first()
+            if feed_id is None:
+                raise SatelliteTrackingRefusedError("satellite_feed_required")
+
+        membership.shares_satellite_position = enabled
+        db.session.commit()
+        db.session.refresh(membership)
+        logger.info("satellite_tracking_set", extra={
+            "user_id": str(membership.user_id), "trip_id": trip_id, "enabled": enabled,
+        })
+        return membership
+
+    @staticmethod
+    def trip_ids_receiving_satellite_position(user_id: UUID) -> list[UUID]:
+        """The trips a user's satellite feed posts to: happening, switched on for this
+        trip, and the member has not left. Leaving by removal deletes the row, and a
+        recorded departure sets left_at, so either ends it."""
+        rows = (
+            db.session.query(TripMember.trip_id)
+            .join(Trip, Trip.id == TripMember.trip_id)
+            .filter(
+                TripMember.user_id == user_id,
+                TripMember.shares_satellite_position.is_(True),
+                TripMember.left_at.is_(None),
+                Trip.state == TripStateType.HAPPENING,
+            )
+            .all()
+        )
+        return [trip_id for (trip_id,) in rows]
 
     @staticmethod
     def _member_leaving(trip_id: str, member_id: str) -> TripMember:

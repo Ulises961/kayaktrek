@@ -5,8 +5,7 @@ from typing import Any, Optional
 
 
 class SatelliteProvider(str, Enum):
-    """Value stored in SatelliteFeed.provider and echoed as PositionPing.source —
-    matches the string M8's ingest pipeline already expects in `source`."""
+    """Value stored in SatelliteFeed.provider."""
 
     INREACH_MAPSHARE = "inreach_mapshare"
     SPOT = "spot"
@@ -23,4 +22,6 @@ class NormalizedPosition:
     lng: float
     timestamp: datetime  # tz-aware, UTC
     source: SatelliteProvider
+    heading_deg: Optional[float] = None  # true degrees, 0-360
+    speed_ms: Optional[float] = None  # metres per second, normalised from the provider's unit
     raw: Optional[dict[str, Any]] = None  # the provider's own per-point payload, pre-normalization

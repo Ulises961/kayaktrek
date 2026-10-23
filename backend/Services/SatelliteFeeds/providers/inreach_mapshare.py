@@ -1,4 +1,5 @@
 import base64
+import re
 from datetime import datetime, timezone
 from typing import ClassVar, Optional
 from xml.etree.ElementTree import Element
@@ -11,6 +12,9 @@ from Services.SatelliteFeeds.base import (
     SatelliteFeedSource,
 )
 from Services.SatelliteFeeds.types import NormalizedPosition, SatelliteProvider
+
+_LEADING_NUMBER = re.compile(r"\s*(-?\d+(?:\.\d+)?)")
+_KILOMETRES_PER_HOUR_TO_METRES_PER_SECOND = 1 / 3.6
 
 _KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
 
@@ -64,7 +68,14 @@ class InReachMapShareSource(SatelliteFeedSource):
                 continue
             lng, lat = coords
             positions.append(
-                NormalizedPosition(lat=lat, lng=lng, timestamp=timestamp, source=self.provider)
+                NormalizedPosition(
+                    lat=lat,
+                    lng=lng,
+                    timestamp=timestamp,
+                    source=self.provider,
+                    heading_deg=self._extract_heading_deg(placemark),
+                    speed_ms=self._extract_speed_ms(placemark),
+                )
             )
 
         positions.sort(key=lambda p: p.timestamp)
@@ -75,16 +86,53 @@ class InReachMapShareSource(SatelliteFeedSource):
         # ExtendedData "Time UTC" is preferred — it's explicitly UTC, unlike the
         # placemark <name> which the KML feed docs describe as ISO 8601 UTC but which
         # some MapShare configurations have been observed to render in local time.
-        for data in placemark.iter("{http://www.opengis.net/kml/2.2}Data"):
-            if data.get("name") == "Time UTC":
-                value = data.find("{http://www.opengis.net/kml/2.2}value")
-                if value is not None and value.text:
-                    return InReachMapShareSource._parse_iso(value.text)
+        time_utc = InReachMapShareSource._data_text(placemark, "Time UTC")
+        if time_utc is not None:
+            return InReachMapShareSource._parse_iso(time_utc)
 
         name = placemark.find("{http://www.opengis.net/kml/2.2}name")
         if name is not None and name.text:
             return InReachMapShareSource._parse_iso(name.text)
         return None
+
+    @staticmethod
+    def _data_text(placemark: Element, name: str) -> Optional[str]:
+        for data in placemark.iter("{http://www.opengis.net/kml/2.2}Data"):
+            if data.get("name") == name:
+                value = data.find("{http://www.opengis.net/kml/2.2}value")
+                if value is not None and value.text:
+                    return value.text
+        return None
+
+    @staticmethod
+    def _leading_number(text: str) -> tuple[Optional[float], str]:
+        """The number a value starts with, and the lower-cased text after it (its unit)."""
+        match = _LEADING_NUMBER.match(text)
+        if match is None:
+            return None, ""
+        return float(match.group(1)), text[match.end():].strip().lower()
+
+    @staticmethod
+    def _extract_heading_deg(placemark: Element) -> Optional[float]:
+        text = InReachMapShareSource._data_text(placemark, "Course")
+        if text is None:
+            return None
+        degrees, _ = InReachMapShareSource._leading_number(text)
+        if degrees is None or not 0 <= degrees <= 360:
+            return None
+        return degrees
+
+    @staticmethod
+    def _extract_speed_ms(placemark: Element) -> Optional[float]:
+        text = InReachMapShareSource._data_text(placemark, "Velocity")
+        if text is None:
+            return None
+        kilometres_per_hour, unit = InReachMapShareSource._leading_number(text)
+        if kilometres_per_hour is None or kilometres_per_hour < 0:
+            return None
+        if unit and not unit.startswith("km/h"):
+            return None
+        return kilometres_per_hour * _KILOMETRES_PER_HOUR_TO_METRES_PER_SECOND
 
     @staticmethod
     def _parse_iso(text: str) -> Optional[datetime]:

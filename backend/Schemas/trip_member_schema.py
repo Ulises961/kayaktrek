@@ -32,6 +32,8 @@ class TripMemberSchema(BaseSchema):
     left_at = fields.DateTime(allow_none=True, dump_only=True)
     left_note = fields.String(allow_none=True, dump_only=True)
     nominated_successor = fields.Boolean(dump_only=True)
+    # Changed through its own endpoint, never through a float-plan update.
+    shares_satellite_position = fields.Boolean(dump_only=True)
 
     # Computed flags — never expose raw ciphertext in API responses
     has_trip_medical_notes = fields.Method("get_has_trip_medical_notes", dump_only=True)
@@ -77,3 +79,8 @@ class TripMemberUpdateSchema(BaseSchema):
     @post_load
     def to_dict(self, data, **kwargs):
         return {camelcase(k): v for k, v in data.items()}
+
+
+class TripMemberSatelliteTrackingSchema(BaseSchema):
+    """Load-only schema for PUT /api/trip/:id/member/me/satellite-tracking."""
+    enabled = fields.Boolean(required=True)
