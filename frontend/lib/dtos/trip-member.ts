@@ -30,6 +30,10 @@ export const TripMemberSchema = z.object({
   leftNote: z.string().nullish(),
   // Leadership succession (trip-leadership-succession)
   nominatedSuccessor: z.boolean().optional(),
+  // The member's own switch for the satellite feed registered in their settings (M29):
+  // while on, the trip is happening and they have not left, the feed's positions are
+  // posted to this trip.
+  sharesSatellitePosition: z.boolean().optional(),
 })
 
 export type TripMember = z.infer<typeof TripMemberSchema>

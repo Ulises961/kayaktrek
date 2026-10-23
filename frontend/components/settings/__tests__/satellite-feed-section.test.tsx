@@ -30,6 +30,14 @@ beforeEach(() => {
 })
 
 describe("SatelliteFeedSection", () => {
+  it("says the feed reaches a trip only once it is switched on for that trip", () => {
+    render(<SatelliteFeedSection feeds={[]} />)
+
+    expect(screen.getByText(/switch your inreach on for each trip/i)).toBeInTheDocument()
+    expect(screen.getByText(/from that trip.s details/i)).toBeInTheDocument()
+    expect(screen.getByText(/a trip you have not switched on gets nothing/i)).toBeInTheDocument()
+  })
+
   it("invites a first feed when none is registered", async () => {
     render(<SatelliteFeedSection feeds={[]} />)
 

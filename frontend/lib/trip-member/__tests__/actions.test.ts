@@ -5,15 +5,17 @@ vi.mock("@/lib/api/client", () => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
+  apiPut: vi.fn(),
   apiDelete: vi.fn(),
   isRedirectError: vi.fn().mockReturnValue(false),
 }))
 
 import { revalidatePath } from "next/cache"
-import { apiGet, apiPatch, apiPost, apiDelete, isRedirectError } from "@/lib/api/client"
+import { apiGet, apiPatch, apiPost, apiPut, apiDelete, isRedirectError } from "@/lib/api/client"
 import {
   getMyMembership,
   updateMyFloatPlan,
+  setSatelliteTracking,
   getTripMedicalNotes,
   setTripMedicalNotes,
   revokeTripMedicalNotes,
@@ -126,6 +128,56 @@ describe("updateMyFloatPlan", () => {
       success: false,
       error: expect.any(String),
     })
+  })
+})
+
+describe("setSatelliteTracking", () => {
+  it.each([true, false])("PUTs enabled=%s to the satellite-tracking path", async (enabled) => {
+    vi.mocked(apiPut).mockResolvedValue(MEMBER_FIXTURE)
+    await setSatelliteTracking(TRIP_ID, enabled)
+    expect(apiPut).toHaveBeenCalledWith(`/api/trip/${TRIP_ID}/member/me/satellite-tracking`, {
+      enabled,
+    })
+  })
+
+  it("revalidates the trip layout on success: the switch lives in the header it renders", async () => {
+    vi.mocked(apiPut).mockResolvedValue(MEMBER_FIXTURE)
+    await setSatelliteTracking(TRIP_ID, true)
+    expect(revalidatePath).toHaveBeenCalledWith("/trips/[id]", "layout")
+  })
+
+  it("returns success: true on success", async () => {
+    vi.mocked(apiPut).mockResolvedValue(MEMBER_FIXTURE)
+    expect(await setSatelliteTracking(TRIP_ID, true)).toEqual({ success: true })
+  })
+
+  it("returns the server's refusal message so the paddler sees why", async () => {
+    vi.mocked(apiPut).mockRejectedValue(new Error("Register your inReach feed in Settings first."))
+    expect(await setSatelliteTracking(TRIP_ID, true)).toEqual({
+      success: false,
+      error: "Register your inReach feed in Settings first.",
+    })
+  })
+
+  it("does not revalidate when the request failed", async () => {
+    vi.mocked(apiPut).mockRejectedValue(new Error("409"))
+    await setSatelliteTracking(TRIP_ID, true)
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("falls back to a generic message when the thrown value is not an Error", async () => {
+    vi.mocked(apiPut).mockRejectedValue("boom")
+    expect(await setSatelliteTracking(TRIP_ID, true)).toEqual({
+      success: false,
+      error: "Failed to update inReach sharing.",
+    })
+  })
+
+  it("rethrows a redirect signal instead of reporting a failure", async () => {
+    const redirectError = new Error("NEXT_REDIRECT")
+    vi.mocked(apiPut).mockRejectedValue(redirectError)
+    vi.mocked(isRedirectError).mockReturnValueOnce(true)
+    await expect(setSatelliteTracking(TRIP_ID, true)).rejects.toBe(redirectError)
   })
 })
 

@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest"
+import type { ComponentProps } from "react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
@@ -15,10 +16,24 @@ vi.mock("@/lib/trips/actions", () => ({
   abortTrip: vi.fn(),
 }))
 
-import { TripIdentityHeader } from "../trip-identity-header"
+vi.mock("@/lib/trip-member/actions", () => ({
+  setSatelliteTracking: vi.fn(),
+}))
+
+import { TripIdentityHeader as Header } from "../trip-identity-header"
 import { DIFFICULTY_LABELS } from "@/lib/dtos/difficulty"
-import { type Trip } from "@/lib/dtos/trip"
+import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
+import type { TripMember } from "@/lib/dtos/trip-member"
 import type { Membership } from "@/lib/trips/membership"
+import { setSatelliteTracking } from "@/lib/trip-member/actions"
+
+// Most of these tests are about the rest of the header, where a registered feed is
+// the ordinary case; the inReach tests below say so explicitly when they need otherwise.
+function TripIdentityHeader(
+  props: Omit<ComponentProps<typeof Header>, "hasSatelliteFeed"> & { hasSatelliteFeed?: boolean },
+) {
+  return <Header hasSatelliteFeed {...props} />
+}
 
 const TRIP: Trip = {
   id: "01952f1a-0000-7000-8000-000000000001",
@@ -233,5 +248,129 @@ describe("TripIdentityHeader", () => {
   it("does not show the leaderless banner when a leader exists", () => {
     render(<TripIdentityHeader trip={TRIP} membership={CREW_MEMBERSHIP} />)
     expect(screen.queryByText(/this trip has no leader/i)).not.toBeInTheDocument()
+  })
+})
+
+describe("TripIdentityHeader, inReach switch (M29)", () => {
+  const SWITCH_NAME = "Share my inReach on this trip"
+
+  beforeEach(() => vi.clearAllMocks())
+
+  function crewMembership(overrides: Partial<TripMember> = {}): Membership {
+    const currentMember: TripMember = { ...TRIP.travellers![1], ...overrides }
+    return {
+      isLeader: false,
+      isMember: true,
+      currentMember,
+      currentMemberId: currentMember.id,
+      leaderId: "u1",
+    }
+  }
+
+  async function openDetails() {
+    await userEvent.click(screen.getByRole("button", { name: /details/i }))
+  }
+
+  it("keeps the switch inside Details, out of sight until it is opened", async () => {
+    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
+    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
+
+    await openDetails()
+
+    expect(screen.getByText("inReach tracking")).toBeInTheDocument()
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+  })
+
+  it.each([TRIP_STATE.BUILDING, TRIP_STATE.HAPPENING])(
+    "offers the switch to a member while the trip is %s",
+    async (state) => {
+      render(<TripIdentityHeader trip={{ ...TRIP, state }} membership={crewMembership()} />)
+      await openDetails()
+      expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+    },
+  )
+
+  it("offers it to the leader too: it is every member's own switch", async () => {
+    const leader = TRIP.travellers![0]
+    render(
+      <TripIdentityHeader
+        trip={TRIP}
+        membership={{ ...LEADER_MEMBERSHIP, currentMember: leader }}
+      />,
+    )
+    await openDetails()
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeInTheDocument()
+  })
+
+  it("offers no switch once the trip is past", async () => {
+    render(
+      <TripIdentityHeader
+        trip={{ ...TRIP, state: TRIP_STATE.PAST }}
+        membership={crewMembership()}
+      />,
+    )
+    await openDetails()
+    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
+    expect(screen.queryByText("inReach tracking")).not.toBeInTheDocument()
+  })
+
+  it("offers no switch to someone who is not a member", async () => {
+    render(<TripIdentityHeader trip={TRIP} membership={NON_MEMBER} />)
+    await openDetails()
+    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
+  })
+
+  it("offers no switch to a member who has left", async () => {
+    render(
+      <TripIdentityHeader
+        trip={TRIP}
+        membership={crewMembership({ leftAt: "2026-10-02T09:30:00" })}
+      />,
+    )
+    await openDetails()
+    expect(screen.queryByRole("switch", { name: SWITCH_NAME })).not.toBeInTheDocument()
+  })
+
+  it("shows the member's own setting: on when they have it on, off when the field is absent", async () => {
+    const { unmount } = render(
+      <TripIdentityHeader
+        trip={TRIP}
+        membership={crewMembership({ sharesSatellitePosition: true })}
+      />,
+    )
+    await openDetails()
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    unmount()
+
+    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
+    await openDetails()
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+  })
+
+  it("cannot be switched on without a registered feed, and points at Settings", async () => {
+    render(
+      <TripIdentityHeader trip={TRIP} membership={crewMembership()} hasSatelliteFeed={false} />,
+    )
+    await openDetails()
+
+    expect(screen.getByRole("switch", { name: SWITCH_NAME })).toBeDisabled()
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings")
+  })
+
+  it("switches the feed on for this trip, not another", async () => {
+    vi.mocked(setSatelliteTracking).mockResolvedValue({ success: true })
+    render(<TripIdentityHeader trip={TRIP} membership={crewMembership()} />)
+    await openDetails()
+
+    await userEvent.click(screen.getByRole("switch", { name: SWITCH_NAME }))
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
+
+    expect(setSatelliteTracking).toHaveBeenCalledWith(TRIP.id, true)
   })
 })

@@ -10,7 +10,7 @@ import { useLivePositions } from "@/hooks/use-live-positions"
 import { useServerItinerarySync } from "@/hooks/use-server-itinerary-sync"
 import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
-import { NavigateConsentDialog } from "./navigate-consent-dialog"
+import { PositionConsentDialog, POSITION_SOURCE } from "@/components/common/position-consent-dialog"
 import type { MapCoreProps } from "./map-core"
 import { PointListPane } from "./point-list-pane"
 import type { Day } from "@/lib/dtos/day"
@@ -96,7 +96,7 @@ export function MapBuilder({
 
   // ── Navigate mode (M8) ──────────────────────────────────────────────────
   // Turning Navigate ON shares live location (Privacy §2/§3's "explicit consent"
-  // claim) and goes through NavigateConsentDialog first. Turning it OFF stops
+  // claim) and goes through PositionConsentDialog first. Turning it OFF stops
   // sharing and needs no confirmation of its own.
 
   const handleToggleNavigate = useCallback(() => {
@@ -532,7 +532,8 @@ export function MapBuilder({
           navigateMode={navigateMode}
           onToggleNavigate={handleToggleNavigate}
         />
-        <NavigateConsentDialog
+        <PositionConsentDialog
+          source={POSITION_SOURCE.DEVICE}
           open={showNavigateConfirm}
           onOpenChange={setShowNavigateConfirm}
           onConfirm={handleConfirmNavigate}
