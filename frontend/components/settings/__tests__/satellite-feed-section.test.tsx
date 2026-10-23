@@ -34,7 +34,7 @@ describe("SatelliteFeedSection", () => {
     render(<SatelliteFeedSection feeds={[]} />)
 
     expect(screen.getByText(/switch your inreach on for each trip/i)).toBeInTheDocument()
-    expect(screen.getByText(/from that trip.s details/i)).toBeInTheDocument()
+    expect(screen.getByText(/in that trip.s float plan tab/i)).toBeInTheDocument()
     expect(screen.getByText(/a trip you have not switched on gets nothing/i)).toBeInTheDocument()
   })
 
