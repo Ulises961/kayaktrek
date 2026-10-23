@@ -87,7 +87,7 @@ export default function PrivacyPage() {
         <HistoryBackLink />
         <div className="flex flex-col gap-1">
           <PageHeading>Privacy Policy</PageHeading>
-          <p className="text-muted-foreground text-xs">Last updated 7 September 2026</p>
+          <p className="text-muted-foreground text-xs">Last updated 23 October 2026</p>
         </div>
 
         <Section title="1. Who we are">
@@ -140,6 +140,12 @@ export default function PrivacyPage() {
             logs.
           </p>
           <p>
+            <strong>Satellite feed data.</strong> If you register a Garmin inReach MapShare feed,
+            its address and, if you protect it, its password. The password is encrypted at rest, but
+            the Service can decrypt it, because it has to present it to Garmin to fetch your feed
+            when you are not signed in. Removing the feed deletes both.
+          </p>
+          <p>
             <strong>Location data</strong> is covered in section 3.
           </p>
           <p>
@@ -164,13 +170,24 @@ export default function PrivacyPage() {
         <Section title="3. Location data">
           <p>
             When a trip is underway and you have enabled position sharing, the Service records your
-            device&rsquo;s precise location at intervals and makes it available to the other members
-            of that trip, and to the trip&rsquo;s designated shore contact where the leader has
-            shared a float plan link.
+            position at intervals and makes it available to the other members of that trip, and to
+            the trip&rsquo;s designated shore contact where the leader has shared a float plan link.
+            The position is your device&rsquo;s precise location while Navigate mode is on or, if
+            you have registered a Garmin inReach feed and switched it on for that trip, the position
+            of your inReach.
+          </p>
+          <p>
+            For an inReach, the Service fetches your feed from Garmin&rsquo;s servers about every
+            ten minutes, using the address and password you provided, and records the positions you
+            have published there: time, latitude and longitude, and where your device reports them,
+            heading and speed. Garmin sees those requests, which come from the Service&rsquo;s
+            servers. Registering a feed shares nothing: it applies only to a trip you switch it on
+            for.
           </p>
           <p className="font-medium">
             Position sharing is disabled by default. It applies only to the trip for which it is
-            enabled, and ends when you leave that mode or the trip concludes.
+            enabled, and ends when you leave that mode, switch your inReach off, leave the trip, or
+            the trip concludes.
           </p>
           <p>
             Recorded positions are deleted <strong>30 days after the trip ends</strong>. A summary
@@ -233,6 +250,11 @@ export default function PrivacyPage() {
             Map imagery is retrieved by our servers and relayed to you, so map data providers do not
             receive your IP address.
           </p>
+          <p>
+            If you register an inReach feed, the Service retrieves it from Garmin&rsquo;s servers.
+            Garmin is the source of those positions, not a recipient of your data from us, and sees
+            only the requests themselves.
+          </p>
           <p>The identity of our current processors is available on request.</p>
         </Section>
 
@@ -253,6 +275,10 @@ export default function PrivacyPage() {
           <ul className="ml-4 flex list-disc flex-col gap-1">
             <li>Account and trip data: retained until you delete your account.</li>
             <li>Recorded positions: deleted 30 days after the trip ends.</li>
+            <li>
+              Satellite feed address and password: kept until you remove the feed or delete your
+              account.
+            </li>
             <li>
               Deleted accounts: erased after a 30-day grace period, during which deletion can be
               cancelled.
