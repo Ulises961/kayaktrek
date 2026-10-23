@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { canShareSatellitePosition, satelliteTrackingIsOff } from "../satellite"
+import {
+  canShareSatellitePosition,
+  inReachIsPositionSource,
+  satelliteTrackingIsOff,
+} from "../satellite"
+import { SATELLITE_PROVIDER, type SatelliteFeed } from "@/lib/dtos/satellite-feed"
 import { TRIP_STATE } from "@/lib/dtos/trip"
 import { MEMBER_ROLE, type TripMember } from "@/lib/dtos/trip-member"
 
@@ -68,5 +73,48 @@ describe("satelliteTrackingIsOff", () => {
     expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, undefined, true)).toBe(false)
     const departed = { ...OFF, leftAt: "2026-10-02T09:30:00" }
     expect(satelliteTrackingIsOff(TRIP_STATE.HAPPENING, departed, true)).toBe(false)
+  })
+})
+
+describe("inReachIsPositionSource", () => {
+  const ON = { ...MEMBER, sharesSatellitePosition: true }
+
+  function feed(overrides: Partial<SatelliteFeed> = {}): SatelliteFeed {
+    return {
+      id: "01952f1a-0000-7000-8000-000000000030",
+      provider: SATELLITE_PROVIDER.INREACH_MAPSHARE,
+      feedUrl: "https://share.garmin.com/ada",
+      hasPassword: false,
+      needsReauth: false,
+      ...overrides,
+    }
+  }
+
+  it("is true for a member aboard with the switch on and a feed that is being polled", () => {
+    expect(inReachIsPositionSource(ON, [feed()])).toBe(true)
+  })
+
+  it("is false with the switch off, or while the field is absent", () => {
+    expect(inReachIsPositionSource({ ...MEMBER, sharesSatellitePosition: false }, [feed()])).toBe(
+      false,
+    )
+    expect(inReachIsPositionSource(MEMBER, [feed()])).toBe(false)
+  })
+
+  it("is false with no feed registered: the switch is left on but nothing is being polled", () => {
+    expect(inReachIsPositionSource(ON, [])).toBe(false)
+  })
+
+  it("is false when the only feed needs its password again: the poll skips it", () => {
+    expect(inReachIsPositionSource(ON, [feed({ needsReauth: true })])).toBe(false)
+  })
+
+  it("is true when any one feed is being polled", () => {
+    expect(inReachIsPositionSource(ON, [feed({ needsReauth: true }), feed()])).toBe(true)
+  })
+
+  it("is false for someone who is not a member, and for a member who has left", () => {
+    expect(inReachIsPositionSource(undefined, [feed()])).toBe(false)
+    expect(inReachIsPositionSource({ ...ON, leftAt: "2026-10-02T09:30:00" }, [feed()])).toBe(false)
   })
 })

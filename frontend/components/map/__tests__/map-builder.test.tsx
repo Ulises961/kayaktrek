@@ -1042,6 +1042,108 @@ describe("MapBuilder — Navigate mode", () => {
   })
 })
 
+describe("MapBuilder — Navigate mode when inReach is the source (M29)", () => {
+  function renderWithInReach() {
+    return render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+        inReachIsSource={true}
+        tripState="happening"
+      />,
+    )
+  }
+
+  it("enters Navigate on the first press and asks nothing: nothing from the device is shared", async () => {
+    renderWithInReach()
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("navigate-chrome")).toBeInTheDocument()
+  })
+
+  it("never turns the phone's position sharing on", async () => {
+    renderWithInReach()
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, false)
+  })
+
+  it("says where the position comes from, with the live crew count", async () => {
+    mockUseLivePositions.mockReturnValue({
+      positions: [{ userId: "u1" }, { userId: "u2" }],
+      status: "live",
+    })
+    renderWithInReach()
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    // The same split-across-`sr-only` chip as the device label, so the sentence is
+    // asserted whole on the element's text content.
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("inReach · 2 crew live")
+    expect(screen.queryByText("Acquiring location…")).not.toBeInTheDocument()
+    expect(screen.queryByText("Location denied")).not.toBeInTheDocument()
+  })
+
+  it("still shows the crew's positions on the map", async () => {
+    mockUseLivePositions.mockReturnValue({
+      positions: [{ userId: "u1" }, { userId: "u2" }],
+      status: "live",
+    })
+    renderWithInReach()
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.getByTestId("map-core")).toHaveAttribute("data-live-position-count", "2")
+  })
+
+  it("enters Navigate straight from ?navigate=1, with no dialog", () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("navigate=1"))
+    renderWithInReach()
+
+    expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
+  })
+
+  it("turns Navigate off again with one press", async () => {
+    renderWithInReach()
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    )
+    expect(screen.queryByTestId("navigate-chrome")).not.toBeInTheDocument()
+  })
+
+  it("leaves Navigate exactly as it was when inReach is not the source", async () => {
+    mockUsePositionWatch.mockReturnValue({ status: "acquiring", lastSentAt: null })
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+        inReachIsSource={false}
+        tripState="happening"
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
+
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, true)
+    expect(screen.getByText("Acquiring location…")).toBeInTheDocument()
+  })
+})
+
 describe("MapBuilder — other people's changes (M36)", () => {
   // The builder seeds its reducer from the itinerary prop once, so a router.refresh() that
   // brings someone else's edit changed nothing on screen until it applied the new props.

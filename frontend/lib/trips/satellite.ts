@@ -1,3 +1,4 @@
+import type { SatelliteFeed } from "@/lib/dtos/satellite-feed"
 import { TRIP_STATE, type TripState } from "@/lib/dtos/trip"
 import type { TripMember } from "@/lib/dtos/trip-member"
 
@@ -36,4 +37,22 @@ export function satelliteTrackingIsOff(
     canShareSatellitePosition(tripState, currentMember) &&
     !currentMember?.sharesSatellitePosition
   )
+}
+
+/**
+ * Whether the member's position on this trip comes from their inReach rather than the phone.
+ *
+ * The switch is on, the member is still aboard, and at least one registered feed is being
+ * polled. A feed that needs its password again is skipped by the poll, and a feed that was
+ * removed after the switch was left on is not there at all; in both the switch says "on"
+ * while nothing arrives, so Navigate must go on sharing the phone's position instead.
+ */
+export function inReachIsPositionSource(
+  currentMember: TripMember | undefined,
+  feeds: SatelliteFeed[],
+): boolean {
+  if (!currentMember || currentMember.leftAt || !currentMember.sharesSatellitePosition) {
+    return false
+  }
+  return feeds.some((feed) => !feed.needsReauth)
 }

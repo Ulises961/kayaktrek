@@ -54,6 +54,10 @@ type MapBuilderProps = {
   // separate axis from isLeader, which only gates the View/Edit route-editing
   // toggle. Computed server-side (deriveMembership + tripState === "happening").
   showNavigate?: boolean
+  // The member's position on this trip comes from their inReach (`inReachIsPositionSource`),
+  // so Navigate shows the crew without sending the phone's position, and has nothing from
+  // the device to ask consent for. Off, Navigate shares the phone's GPS as before.
+  inReachIsSource?: boolean
   initialDistanceUnit?: DistanceUnit
 }
 
@@ -66,6 +70,7 @@ export function MapBuilder({
   tripState = null,
   isLeader = true,
   showNavigate = false,
+  inReachIsSource = false,
   initialDistanceUnit = DISTANCE_UNIT.NM,
 }: MapBuilderProps) {
   useCollapseSidebar()
@@ -84,11 +89,13 @@ export function MapBuilder({
   // rather than an effect, so a user who explicitly turns Navigate off is never
   // fought by a later re-run. It opens the consent dialog rather than entering
   // Navigate mode directly: a deep link is exactly as much "I am now sharing my
-  // location" as a button click, and must not skip the same confirmation.
+  // location" as a button click, and must not skip the same confirmation. With
+  // inReach as the source nothing from the device is shared, so it enters directly.
   const searchParams = useSearchParams()
-  const [navigateMode, setNavigateMode] = useState(false)
+  const navigateDeepLink = showNavigate && searchParams.get("navigate") === "1"
+  const [navigateMode, setNavigateMode] = useState(() => navigateDeepLink && inReachIsSource)
   const [showNavigateConfirm, setShowNavigateConfirm] = useState(
-    () => showNavigate && searchParams.get("navigate") === "1",
+    () => navigateDeepLink && !inReachIsSource,
   )
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
 
@@ -97,20 +104,25 @@ export function MapBuilder({
   // ── Navigate mode (M8) ──────────────────────────────────────────────────
   // Turning Navigate ON shares live location (Privacy §2/§3's "explicit consent"
   // claim) and goes through PositionConsentDialog first. Turning it OFF stops
-  // sharing and needs no confirmation of its own.
+  // sharing and needs no confirmation of its own. When the member's position comes
+  // from their inReach, Navigate only shows the crew, so it starts without asking.
+
+  const handleConfirmNavigate = useCallback(() => {
+    setNavigateMode(true)
+    setViewMode(true)
+  }, [])
 
   const handleToggleNavigate = useCallback(() => {
     if (navigateMode) {
       setNavigateMode(false)
       return
     }
+    if (inReachIsSource) {
+      handleConfirmNavigate()
+      return
+    }
     setShowNavigateConfirm(true)
-  }, [navigateMode])
-
-  const handleConfirmNavigate = useCallback(() => {
-    setNavigateMode(true)
-    setViewMode(true)
-  }, [])
+  }, [navigateMode, inReachIsSource, handleConfirmNavigate])
 
   const mintStreamUrl = useCallback(
     () => (tripId ? getStreamTicket(tripId) : Promise.resolve(null)),
@@ -131,29 +143,33 @@ export function MapBuilder({
     }
   }, [navigateMode, tripId, mintStreamUrl])
 
-  const positionWatch = usePositionWatch(tripId ?? "", navigateMode)
+  const positionWatch = usePositionWatch(tripId ?? "", navigateMode && !inReachIsSource)
   const liveStream = useLivePositions(navigateMode ? streamUrl : null, {
     mintUrl: mintStreamUrl,
   })
 
-  const navigateStatusLabel =
-    positionWatch.status === "denied" ? (
-      "Location denied"
-    ) : positionWatch.status === "unsupported" ? (
-      "Location unavailable"
-    ) : positionWatch.status === "sending" ? (
-      // Shortened on a phone to "Sharing · N live", where this chip and
-      // CloseDayButton share one row over a ~311px map and the full sentence took
-      // the whole width on its own. The dropped words are `sr-only` rather than
-      // removed, so the status announced is the same sentence at every width.
-      <>
-        Sharing<span className="sr-only sm:not-sr-only"> position</span> ·{" "}
-        {liveStream.positions.length}
-        <span className="sr-only sm:not-sr-only"> crew</span> live
-      </>
-    ) : (
-      "Acquiring location…"
-    )
+  const navigateStatusLabel = inReachIsSource ? (
+    <>
+      inReach · {liveStream.positions.length}
+      <span className="sr-only sm:not-sr-only"> crew</span> live
+    </>
+  ) : positionWatch.status === "denied" ? (
+    "Location denied"
+  ) : positionWatch.status === "unsupported" ? (
+    "Location unavailable"
+  ) : positionWatch.status === "sending" ? (
+    // Shortened on a phone to "Sharing · N live", where this chip and
+    // CloseDayButton share one row over a ~311px map and the full sentence took
+    // the whole width on its own. The dropped words are `sr-only` rather than
+    // removed, so the status announced is the same sentence at every width.
+    <>
+      Sharing<span className="sr-only sm:not-sr-only"> position</span> ·{" "}
+      {liveStream.positions.length}
+      <span className="sr-only sm:not-sr-only"> crew</span> live
+    </>
+  ) : (
+    "Acquiring location…"
+  )
 
   // Persist the cruising speed only after the user stops dragging the slider.
   const debouncedSaveSpeed = useMemo(
