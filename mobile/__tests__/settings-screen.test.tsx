@@ -18,6 +18,7 @@ import {
   setPhone,
   setUnitPreference,
 } from "../lib/profile/actions"
+import { listSatelliteFeeds } from "../lib/satellite-feeds/actions"
 import { listSessions, revokeSession } from "../lib/sessions/actions"
 import { loadMeCache, saveMeCache } from "../lib/db/profile-cache"
 import { useIsOffline } from "../lib/network/use-is-offline"
@@ -35,6 +36,11 @@ jest.mock("../lib/profile/actions", () => ({
 jest.mock("../lib/sessions/actions", () => ({
   listSessions: jest.fn(),
   revokeSession: jest.fn(),
+}))
+jest.mock("../lib/satellite-feeds/actions", () => ({
+  listSatelliteFeeds: jest.fn(),
+  saveSatelliteFeed: jest.fn(),
+  deleteSatelliteFeed: jest.fn(),
 }))
 jest.mock("../lib/auth/actions", () => ({
   logoutEverywhere: jest.fn(),
@@ -58,6 +64,7 @@ const mockEmailChange = requestEmailChange as jest.Mock
 const mockDataExport = requestDataExport as jest.Mock
 const mockDeletion = requestAccountDeletion as jest.Mock
 const mockListSessions = listSessions as jest.Mock
+const mockListFeeds = listSatelliteFeeds as jest.Mock
 const mockRevokeSession = revokeSession as jest.Mock
 const mockLogoutEverywhere = logoutEverywhere as jest.Mock
 const mockLoadMeCache = loadMeCache as jest.Mock
@@ -99,6 +106,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockGetMe.mockResolvedValue(ME)
   mockListSessions.mockResolvedValue([THIS_DEVICE, OTHER_DEVICE])
+  mockListFeeds.mockResolvedValue([])
   mockLoadMeCache.mockResolvedValue(null)
   mockSaveMeCache.mockResolvedValue(undefined)
   mockUseIsOffline.mockReturnValue(false)
@@ -255,6 +263,46 @@ describe("SettingsScreen", () => {
     })
   })
 
+  describe("satellite tracking", () => {
+    it("offers to register a feed", async () => {
+      const { findByText, findByTestId } = await render(<SettingsScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+
+      expect(await findByText("Satellite tracking")).toBeTruthy()
+      expect(await findByTestId("satellite-add")).toBeTruthy()
+    })
+
+    it("shows a registered feed", async () => {
+      mockListFeeds.mockResolvedValue([
+        {
+          id: "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5d",
+          provider: "inreach_mapshare",
+          feedUrl: "https://share.garmin.com/feed/Share/paddler",
+          feedUsername: null,
+          hasPassword: false,
+          needsReauth: false,
+          lastPolledAt: null,
+          lastIngestedAt: null,
+          created: null,
+        },
+      ])
+
+      const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+
+      expect(await findByText("https://share.garmin.com/feed/Share/paddler")).toBeTruthy()
+    })
+
+    it("does not take the screen down when the feed lookup fails", async () => {
+      mockListFeeds.mockRejectedValue(new Error("500 Internal Server Error"))
+
+      const { findByText } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+
+      expect(await findByText("Could not load your satellite feed.")).toBeTruthy()
+      expect(await findByText("paddler@example.com")).toBeTruthy()
+    })
+  })
+
   describe("privacy and data", () => {
     it("requests a data export", async () => {
       mockDataExport.mockResolvedValue(undefined)
@@ -318,7 +366,14 @@ describe("SettingsScreen — offline", () => {
     })
     await findByText("paddler@example.com")
 
-    for (const id of ["email-open", "phone-save", "password-open", "sign-out-everywhere", "data-export"]) {
+    for (const id of [
+      "email-open",
+      "phone-save",
+      "password-open",
+      "sign-out-everywhere",
+      "data-export",
+      "satellite-add",
+    ]) {
       expect(queryByTestId(id)).toBeNull()
     }
     await fireEvent.press(getByTestId(`unit-${DISTANCE_UNIT.KM}`))
@@ -358,6 +413,7 @@ describe("SettingsScreen — offline", () => {
     await findByText("paddler@example.com")
 
     expect(queryByTestId("phone-save")).toBeNull()
+    expect(queryByTestId("satellite-add")).toBeNull()
     await fireEvent.press(getByTestId(`unit-${DISTANCE_UNIT.KM}`))
     expect(mockSetUnit).not.toHaveBeenCalled()
   })
