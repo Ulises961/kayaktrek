@@ -6,7 +6,9 @@ import { ItinerarySchema } from "@/lib/dtos/itinerary"
 import { TripSchema, TRIP_STATE } from "@/lib/dtos/trip"
 import type { TripState } from "@/lib/dtos/trip"
 import { DISTANCE_UNIT } from "@/lib/itinerary/distance"
+import { listSatelliteFeeds } from "@/lib/satellite-feeds/actions"
 import { deriveMembership } from "@/lib/trips/membership"
+import { inReachIsPositionSource } from "@/lib/trips/satellite"
 import { MapBuilder } from "@/components/map/map-builder"
 import { TripChangesListener } from "@/components/trips/trip-changes-listener"
 
@@ -32,6 +34,7 @@ export default async function ItineraryBuilderPage({
   let tripState: TripState | null = null
   let isLeader = true
   let showNavigate = false
+  let inReachIsSource = false
   let isTripMember = false
 
   const me = await getMe()
@@ -51,6 +54,14 @@ export default async function ItineraryBuilderPage({
       isLeader = membership.isLeader
       isTripMember = membership.isMember
       showNavigate = membership.isMember && tripState === TRIP_STATE.HAPPENING
+      // Only a member who can navigate and has switched their inReach on has a reason to
+      // look the feed up; everyone else keeps sharing the phone's position.
+      if (showNavigate && membership.currentMember?.sharesSatellitePosition) {
+        inReachIsSource = inReachIsPositionSource(
+          membership.currentMember,
+          await listSatelliteFeeds(),
+        )
+      }
     } catch (error) {
       rethrowIfRedirect(error)
       // fall back to defaults
@@ -71,6 +82,7 @@ export default async function ItineraryBuilderPage({
         tripState={tripState}
         isLeader={isLeader}
         showNavigate={showNavigate}
+        inReachIsSource={inReachIsSource}
         initialDistanceUnit={initialDistanceUnit}
       />
     </>
