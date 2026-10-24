@@ -39,7 +39,7 @@ dependencies = [
     "gevent",
     "psycogreen",
     "timezonefinder>=8.2.5",
-    "logfire[celery,flask,requests,sqlalchemy]>=4.38.0",
+    "logfire[celery,flask,requests,sqlalchemy]>=5.2.0",
     "apispec>=6.10.0",
     "apispec-webframeworks>=1.2.0",
     "flask-swagger-ui>=5.32.9",
