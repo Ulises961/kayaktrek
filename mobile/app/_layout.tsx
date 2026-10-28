@@ -5,15 +5,16 @@ import { StyleSheet, View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
-// M9e WP0 spike: registers the background location task before any fix can arrive, and starts
-// the evidence log (app state, network, heartbeat, and the native screen/deep-sleep/battery log).
-import "../lib/spike/location-task"
+// M9e: registers the location and keep-alive tasks before any fix or wake-up can arrive, and starts
+// the evidence log (app state, network, heartbeat, and the native screen/battery/location-switch log).
+import { watchSharing } from "../lib/live/position/position-tasks"
 import { startDeviceWatch } from "../lib/spike/device-watch"
 import { AuthProvider } from "../lib/auth/auth-context"
 import { QueuedChangesProvider } from "../lib/db/queued-changes-provider"
 import { CachedSurfacesProvider } from "../lib/network/cached-surfaces"
 
 startDeviceWatch()
+watchSharing()
 
 // Root layout — the one place `global.css` (NativeWind's stylesheet) is imported, and the
 // one place SafeAreaProvider wraps the tree (react-native-safe-area-context; see the note

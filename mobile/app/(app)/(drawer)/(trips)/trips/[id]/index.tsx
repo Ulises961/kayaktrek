@@ -10,10 +10,11 @@ import { useEffect, useState } from "react"
 import { ActivityIndicator, Pressable } from "react-native"
 
 import { DIFFICULTY_LABELS, type Difficulty } from "@shared/dtos/difficulty"
-import type { Trip, TripState } from "@shared/dtos/trip"
+import { TRIP_STATE, type Trip, type TripState } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
+import { SharingCard } from "@mobile/components/live/sharing-card"
 import { TripControls } from "@mobile/components/trips/trip-controls"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
@@ -190,6 +191,8 @@ export default function TripDetailScreen() {
             status={{ state: trip.state, isPaused: trip.isPaused, dateTo: trip.dateTo }}
           />
         )}
+
+        {trip.state === TRIP_STATE.HAPPENING && <SharingCard tripId={id} />}
 
         <Stack className="gap-3">
           {links.map(({ href, label, icon: Icon }) => (
