@@ -36,6 +36,30 @@ describe("parseEvents", () => {
     expect(events.map((event) => event.ev)).toEqual(["launch", "fix", "error", "screen"])
     expect(events[1]).toMatchObject({ ev: "fix", t: at(10), speedMs: null })
   })
+
+  it("reads the sender's events, keeping a stop's reason and dropping a ping or wake it cannot make sense of", () => {
+    const text = [
+      JSON.stringify({ ev: "run-stop", t: at(1), reason: "trip-not-live" }),
+      JSON.stringify({ ev: "run-stop", t: at(2) }),
+      JSON.stringify({ ev: "ping", t: at(3), source: "keep-alive", outcome: "retry", detail: "offline" }),
+      JSON.stringify({ ev: "ping", t: at(4), source: "carrier-pigeon", outcome: "sent" }),
+      JSON.stringify({ ev: "watchdog", t: at(5), outcome: "recent", sinceLastWakeMs: 3_600_000 }),
+      JSON.stringify({ ev: "watchdog", t: at(6), outcome: "exploded" }),
+      JSON.stringify({ ev: "locsw", t: at(7), on: false, source: "native" }),
+      JSON.stringify({ ev: "locsw", t: at(8), on: true }),
+      JSON.stringify({ ev: "reregister", t: at(9), reason: "switch-back-on" }),
+    ].join("\n")
+
+    expect(parseEvents(text)).toEqual([
+      { ev: "run-stop", t: at(1), reason: "trip-not-live" },
+      { ev: "run-stop", t: at(2), reason: null },
+      { ev: "ping", t: at(3), source: "keep-alive", outcome: "retry", detail: "offline" },
+      { ev: "watchdog", t: at(5), outcome: "recent", sinceLastWakeMs: 3_600_000 },
+      { ev: "locsw", t: at(7), on: false, source: "native" },
+      { ev: "locsw", t: at(8), on: true, source: "js" },
+      { ev: "reregister", t: at(9), reason: "switch-back-on" },
+    ])
+  })
 })
 
 describe("splitRuns", () => {
@@ -187,7 +211,7 @@ describe("reportRuns: the rest of the evidence", () => {
   })
 
   it("ends a stopped run at its stop marker, and an unstopped one at its last event", () => {
-    const stopped = reportRuns([runStart(0), fix(10), { ev: "run-stop", t: at(50) }, fix(400)])
+    const stopped = reportRuns([runStart(0), fix(10), { ev: "run-stop", t: at(50), reason: null }, fix(400)])
     const running = reportRuns([runStart(0), fix(10), fix(25)])
 
     expect(stopped[0]).toMatchObject({ stopped: true, endedAt: at(50) })

@@ -88,6 +88,22 @@ describe("formatEvent", () => {
     expect(formatEvent({ ev: "app", t: at(0), state: "background" })).toContain("app background")
   })
 
+  it("tells a stop the paddler pressed from one the share ended by itself", () => {
+    expect(formatEvent({ ev: "run-stop", t: at(0), reason: "user" })).toContain("STOP pressed")
+    expect(formatEvent({ ev: "run-stop", t: at(0), reason: "trip-not-live" })).toContain("STOP (trip-not-live)")
+  })
+
+  it("shows each ping's outcome, each keep-alive wake and each change of the location switch", () => {
+    expect(formatEvent({ ev: "ping", t: at(0), source: "keep-alive", outcome: "retry", detail: "offline" })).toContain(
+      "ping keep-alive: retry (offline)",
+    )
+    expect(formatEvent({ ev: "watchdog", t: at(0), outcome: "sent", sinceLastWakeMs: 3_600_000 })).toContain(
+      "keep-alive wake: sent",
+    )
+    expect(formatEvent({ ev: "locsw", t: at(0), on: false, source: "native" })).toContain("location switch OFF (native)")
+    expect(formatEvent({ ev: "reregister", t: at(0), reason: "task-missing" })).toContain("re-registered: task-missing")
+  })
+
   it("shows where a fix was and how fast the phone was moving", () => {
     const text = formatEvent(fix(0, 1.4))
 

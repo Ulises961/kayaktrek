@@ -4,11 +4,16 @@
 // Throwaway with the rest of lib/spike.
 
 import NetInfo from "@react-native-community/netinfo"
+import * as Location from "expo-location"
 import { AppState } from "react-native"
 
 import { deviceSnapshot, startDeviceEvents, type DeviceSnapshot } from "../../modules/spike-device-events"
+import { POSITION_TASK } from "../live/position/types"
 import { deviceLogPath, logEvent } from "./events"
-import { isSharing } from "./location-task"
+
+function isSharing(): Promise<boolean> {
+  return Location.hasStartedLocationUpdatesAsync(POSITION_TASK)
+}
 
 const BEAT_MS = 60_000
 

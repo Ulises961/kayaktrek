@@ -5,17 +5,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
 import java.io.File
 
-// M9e WP0 spike (plans/M9e.md): writes what the phone itself is doing (screen on or off, deep sleep,
-// battery saver, battery level) to a file, from native code, so the record is complete even while the
-// JavaScript runtime is paused or frozen. Throwaway with the rest of the spike.
+// M9e evidence collector (plans/M9e.md): writes what the phone itself is doing (screen on or off, deep
+// sleep, battery saver, battery level, the system location switch) to a file, from native code, so the
+// record is complete even while the JavaScript runtime is paused or frozen. Throwaway with the rest of
+// the spike, removed before a release.
 class SpikeDeviceEventsModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SpikeDeviceEvents")
@@ -39,6 +42,7 @@ object DeviceEventLog {
   private var path: String? = null
   private var lastLevel = -1
   private var lastCharging: Boolean? = null
+  private var lastLocationOn: Boolean? = null
 
   @Synchronized
   fun start(context: Context, path: String) {
@@ -52,6 +56,8 @@ object DeviceEventLog {
       addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
       addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
       addAction(Intent.ACTION_BATTERY_CHANGED)
+      addAction(LocationManager.MODE_CHANGED_ACTION)
+      addAction(LocationManager.PROVIDERS_CHANGED_ACTION)
     }
     val created = object : BroadcastReceiver() {
       override fun onReceive(context: Context, intent: Intent) {
@@ -71,6 +77,7 @@ object DeviceEventLog {
     write(event("doze").put("idle", power.isDeviceIdleMode))
     write(event("powersave").put("on", power.isPowerSaveMode))
     context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { noteBattery(it) }
+    noteLocation(context)
   }
 
   private fun handle(context: Context, intent: Intent) {
@@ -82,6 +89,27 @@ object DeviceEventLog {
       PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> write(event("powersave").put("on", power.isPowerSaveMode))
       PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> write(event("doze").put("idle", power.isDeviceIdleMode))
       Intent.ACTION_BATTERY_CHANGED -> noteBattery(intent)
+      LocationManager.MODE_CHANGED_ACTION, LocationManager.PROVIDERS_CHANGED_ACTION -> noteLocation(context)
+    }
+  }
+
+  // The system location switch, which the app's own permission does not reflect. Only a change is worth a
+  // line; both broadcasts can fire for one flip.
+  @Synchronized
+  private fun noteLocation(context: Context) {
+    val on = isLocationOn(context)
+    if (on == lastLocationOn) return
+    lastLocationOn = on
+    write(event("locsw").put("on", on).put("source", "native"))
+  }
+
+  private fun isLocationOn(context: Context): Boolean {
+    val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      manager.isLocationEnabled
+    } else {
+      Settings.Secure.getInt(context.contentResolver, Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF) !=
+        Settings.Secure.LOCATION_MODE_OFF
     }
   }
 

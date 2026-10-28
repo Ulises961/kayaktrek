@@ -87,7 +87,15 @@ export function formatEvent(event: SpikeEvent): string {
     case "run-start":
       return `${time} START pressed: ${event.label}${event.killOnDestroy ? ", stops with the app" : ""}`
     case "run-stop":
-      return `${time} STOP pressed`
+      return event.reason === null || event.reason === "user" ? `${time} STOP pressed` : `${time} STOP (${event.reason})`
+    case "ping":
+      return `${time} ping ${event.source}: ${event.outcome}${event.detail ? ` (${event.detail})` : ""}`
+    case "watchdog":
+      return `${time} keep-alive wake: ${event.outcome}${event.sinceLastWakeMs === null ? "" : `, ${duration(event.sinceLastWakeMs)} since the last`}`
+    case "locsw":
+      return `${time} location switch ${event.on ? "ON" : "OFF"} (${event.source})`
+    case "reregister":
+      return `${time} location task re-registered: ${event.reason}`
     case "screen":
       return `${time} screen ${event.on ? "ON" : "OFF"}`
     case "unlock":

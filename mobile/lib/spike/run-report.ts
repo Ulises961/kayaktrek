@@ -9,7 +9,13 @@ export type SpikeEvent =
   | { ev: "fix"; t: number; rx: number; lat: number; lon: number; accuracyM: number | null; speedMs: number | null }
   | { ev: "launch"; t: number; taskRegistered: boolean | null }
   | { ev: "run-start"; t: number; label: string; killOnDestroy: boolean }
-  | { ev: "run-stop"; t: number }
+  | { ev: "run-stop"; t: number; reason: string | null }
+  // WP1's sender: what happened to each ping the throttle let through, and each keep-alive wake.
+  | { ev: "ping"; t: number; source: PingEventSource; outcome: PingEventOutcome; detail: string | null }
+  | { ev: "watchdog"; t: number; outcome: WatchdogOutcome; sinceLastWakeMs: number | null }
+  // The system location switch, from JavaScript where it could be read and from the native log.
+  | { ev: "locsw"; t: number; on: boolean; source: "js" | "native" }
+  | { ev: "reregister"; t: number; reason: string }
   | { ev: "screen"; t: number; on: boolean }
   | { ev: "unlock"; t: number }
   | { ev: "doze"; t: number; idle: boolean }
@@ -30,6 +36,13 @@ export type SpikeEvent =
     }
   | { ev: "perm"; t: number; status: string }
   | { ev: "error"; t: number; message: string }
+
+export const PING_SOURCES = ["movement", "keep-alive"] as const
+export const PING_OUTCOMES = ["sent", "practice", "stop", "retry"] as const
+export const WATCHDOG_OUTCOMES = ["recent", "sent", "no-fix", "stopped", "no-share", "failed"] as const
+export type PingEventSource = (typeof PING_SOURCES)[number]
+export type PingEventOutcome = (typeof PING_OUTCOMES)[number]
+export type WatchdogOutcome = (typeof WATCHDOG_OUTCOMES)[number]
 
 type Raw = Record<string, unknown>
 
@@ -76,7 +89,22 @@ function toEvent(raw: Raw): SpikeEvent | null {
     case "run-start":
       return { ev: "run-start", t, label: isString(raw.label) ? raw.label : "Run", killOnDestroy: raw.killOnDestroy === true }
     case "run-stop":
-      return { ev: "run-stop", t }
+      return { ev: "run-stop", t, reason: orNull(raw.reason, isString) }
+    case "ping": {
+      const source = PING_SOURCES.find((candidate) => candidate === raw.source)
+      const outcome = PING_OUTCOMES.find((candidate) => candidate === raw.outcome)
+      if (!source || !outcome) return null
+      return { ev: "ping", t, source, outcome, detail: orNull(raw.detail, isString) }
+    }
+    case "watchdog": {
+      const outcome = WATCHDOG_OUTCOMES.find((candidate) => candidate === raw.outcome)
+      if (!outcome) return null
+      return { ev: "watchdog", t, outcome, sinceLastWakeMs: orNull(raw.sinceLastWakeMs, isNumber) }
+    }
+    case "locsw":
+      return isBoolean(raw.on) ? { ev: "locsw", t, on: raw.on, source: raw.source === "native" ? "native" : "js" } : null
+    case "reregister":
+      return isString(raw.reason) ? { ev: "reregister", t, reason: raw.reason } : null
     case "screen":
       return isBoolean(raw.on) ? { ev: "screen", t, on: raw.on } : null
     case "unlock":
@@ -209,11 +237,11 @@ export const MISSED_BEAT_MS = 45_000
 const MIN_RUN_FOR_HOURLY_MS = 5 * 60_000
 const LONGEST_GAPS_SHOWN = 3
 
-type Interval = { from: number; to: number }
+export type Interval = { from: number; to: number }
 
 // The stretches, inside [from, to], where a two-state signal read `active`. `before` is the state when
 // the window opened (from the last event ahead of it); `changes` are the events inside it.
-function stretches(
+export function stretches(
   before: boolean,
   changes: { t: number; active: boolean }[],
   from: number,
@@ -237,7 +265,7 @@ const total = (intervals: Interval[]): number => intervals.reduce((sum, interval
 const within = (intervals: Interval[], t: number): Interval | undefined =>
   intervals.find((interval) => t >= interval.from && t <= interval.to)
 
-function lastBefore<T extends SpikeEvent>(all: SpikeEvent[], kind: T["ev"], t: number): T | undefined {
+export function lastBefore<T extends SpikeEvent>(all: SpikeEvent[], kind: T["ev"], t: number): T | undefined {
   let found: T | undefined
   for (const event of all) {
     if (event.t > t) break
