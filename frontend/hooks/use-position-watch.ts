@@ -1,16 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { haversineNm } from "@/lib/itinerary/distance"
 import { sendPositionPing } from "@/lib/live/actions"
+import { shouldSendPing, type PingAnchor } from "@/lib/live/ping-throttle"
 
 export type PositionWatchStatus = "off" | "acquiring" | "sending" | "denied" | "unsupported"
-
-// §D3: at most one ping per 15s, and only if displaced ≥ 10m — dedupes anchor-drift
-// noise from a stationary or slow-moving kayak.
-const THROTTLE_MS = 15_000
-const MIN_DISPLACEMENT_M = 10
-const NM_TO_M = 1852
 
 // Browsers report PERMISSION_DENIED as this code (GeolocationPositionError.PERMISSION_DENIED
 // on a real error instance — hardcoded here so it also matches a plain mock in tests).
@@ -42,7 +36,7 @@ export function usePositionWatch(tripId: string, enabled: boolean) {
 
     let cancelled = false
     let watchId: number | null = null
-    let lastSent: { lat: number; lon: number; at: number } | null = null
+    let lastSent: PingAnchor | null = null
 
     function handleSuccess(position: GeolocationPosition) {
       if (cancelled) return
@@ -51,16 +45,7 @@ export function usePositionWatch(tripId: string, enabled: boolean) {
       const { latitude, longitude, accuracy, heading, speed } = position.coords
       const now = Date.now()
 
-      if (lastSent) {
-        const elapsed = now - lastSent.at
-        if (elapsed < THROTTLE_MS) return
-        const distanceM =
-          haversineNm(
-            { latitude: lastSent.lat, longitude: lastSent.lon },
-            { latitude, longitude },
-          ) * NM_TO_M
-        if (distanceM < MIN_DISPLACEMENT_M) return
-      }
+      if (!shouldSendPing(lastSent, { lat: latitude, lon: longitude }, now)) return
 
       lastSent = { lat: latitude, lon: longitude, at: now }
       sendPositionPing(tripId, {
