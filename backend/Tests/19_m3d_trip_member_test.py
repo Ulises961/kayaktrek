@@ -116,6 +116,21 @@ def test_update_float_plan_vessel_info(client, auth_headers, trip_with_user2_as_
     assert data["vesselLengthCm"] == 520
 
 
+def test_float_plan_keeps_an_ampersand_through_save_and_edit(client, auth_headers, trip_with_user2_as_crew):
+    trip_id = trip_with_user2_as_crew["trip"]["id"]
+    url = f"{TRIP_ENDPOINT}/{trip_id}/member/me"
+
+    saved = client.patch(url, json={"vesselMake": "P&H"}, headers=auth_headers)
+    assert saved.status_code == 200
+    assert json.loads(saved.data)["vesselMake"] == "P&H"
+
+    stored = json.loads(client.get(url, headers=auth_headers).data)["vesselMake"]
+    assert stored == "P&H"
+
+    resaved = client.patch(url, json={"vesselMake": stored}, headers=auth_headers)
+    assert json.loads(resaved.data)["vesselMake"] == "P&H"
+
+
 def test_update_float_plan_emergency_contact(client, auth_headers_2, trip_with_user2_as_crew):
     trip_id = trip_with_user2_as_crew["trip"]["id"]
     response = client.patch(

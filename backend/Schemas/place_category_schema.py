@@ -1,6 +1,6 @@
 import re
 
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, pre_load, validates, ValidationError
 
 from Schemas.base_schema import BaseSchema
@@ -41,7 +41,7 @@ class PlaceCategoryCreateSchema(BaseSchema):
         if cleaned.get("slug") is not None:
             cleaned["slug"] = str(cleaned["slug"]).strip().lower()
         if cleaned.get("name") is not None:
-            cleaned["name"] = bleach.clean(str(cleaned["name"]).strip(), tags=[], strip=True)
+            cleaned["name"] = sanitize_text(cleaned["name"])
         if cleaned.get("icon") is not None:
             cleaned["icon"] = str(cleaned["icon"]).strip().lower() or None
         return cleaned

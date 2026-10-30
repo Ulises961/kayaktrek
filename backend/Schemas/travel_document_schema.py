@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, post_load, validates, validates_schema, ValidationError
 
 from Models.travel_document import TravelDocument, TravelDocumentType
@@ -37,5 +37,5 @@ class TravelDocumentSchema(BaseSchema):
     def sanitize_and_make(self, data, **kwargs):
         for field in ("name", "notes", "confirmation_number", "url"):
             if data.get(field):
-                data[field] = bleach.clean(str(data[field]).strip(), tags=[], strip=True)
+                data[field] = sanitize_text(data[field])
         return TravelDocument(**data)

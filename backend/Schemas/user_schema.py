@@ -4,7 +4,7 @@ from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
 from Schemas.user_certification_schema import UserCertificationSchema
 import re
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 
 
 class UserSchema(BaseSchema):
@@ -68,7 +68,7 @@ class UserSchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('name', 'surname', 'bio', 'homeLocation', 'home_location'):
             if key in data and data[key] is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates('username')
@@ -102,7 +102,7 @@ class UserSchema(BaseSchema):
         """Validate and sanitize name."""
         if value is not None:
             # Sanitize HTML/script tags
-            sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+            sanitized = sanitize_text(value)
             if not sanitized:
                 raise ValidationError("Name cannot be empty")
             if len(sanitized) > 100:
@@ -115,7 +115,7 @@ class UserSchema(BaseSchema):
         """Validate and sanitize surname."""
         if value is not None:
             # Sanitize HTML/script tags
-            sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+            sanitized = sanitize_text(value)
             if len(sanitized) > 100:
                 raise ValidationError("Surname cannot exceed 100 characters")
             if re.search(r'[<>"\';\[\]{}]', sanitized):

@@ -1,6 +1,6 @@
 from flask import g
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 
 from Models.log import Log
 from Schemas.base_schema import BaseSchema
@@ -42,7 +42,7 @@ class LogSchema(BaseSchema):
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         if data.get("notes") is not None:
-            data["notes"] = bleach.clean(str(data["notes"]).strip(), tags=[], strip=True)
+            data["notes"] = sanitize_text(data["notes"])
         return data
 
     @validates('hours')

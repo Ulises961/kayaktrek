@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, pre_load, validates, ValidationError
 
 from Models.wind_diamond import WindDiamond
@@ -11,7 +11,7 @@ _SANITIZE_FIELDS = ("name", "notes")
 def _sanitize_wind_diamond_text(data):
     for key in _SANITIZE_FIELDS:
         if data.get(key) is not None:
-            data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+            data[key] = sanitize_text(data[key])
     return data
 
 

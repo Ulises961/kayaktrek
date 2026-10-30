@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from datetime import date
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
 
@@ -21,7 +21,7 @@ class UserCertificationSchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in _SANITIZE_FIELDS:
             if data.get(key) is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates("organization")
