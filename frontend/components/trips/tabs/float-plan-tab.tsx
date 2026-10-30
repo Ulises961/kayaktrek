@@ -220,7 +220,7 @@ export function FloatPlanTab({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="fpVesselLength">Length (cm)</Label>
                     <Input
@@ -289,14 +289,14 @@ export function FloatPlanTab({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button type="submit" disabled={isPending}>
-                  {isPending ? "Saving…" : "Save float plan"}
+                  {isPending ? "Saving…" : "Save"}
                 </Button>
                 <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
                   Cancel
                 </Button>
-                {error && <p className="text-destructive text-xs">{error}</p>}
+                {error && <p className="text-destructive w-full text-xs">{error}</p>}
               </div>
             </form>
           ) : (
