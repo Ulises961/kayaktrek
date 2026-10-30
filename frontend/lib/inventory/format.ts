@@ -15,8 +15,10 @@ export type CategoryBucket<T> = {
 // Buckets entries by trimmed + case-folded category so "Safety" and " safety "
 // land together (the requirements side is free text — reconciling it to the
 // controlled ItemCategory FK is a known rough edge, out of this phase's scope).
-// Display uses the first-seen casing; null/blank goes to a trailing
-// Uncategorised bucket, never silently dropped.
+// The seeded requirements store a category slug ("first_aid"), so underscores read as
+// spaces: it shows as words and lands with "First aid" typed by hand. Display uses the
+// first-seen casing; null/blank goes to a trailing Uncategorised bucket, never silently
+// dropped.
 export function bucketByCategory<T>(
   entries: T[],
   getCategory: (entry: T) => string | null | undefined,
@@ -24,13 +26,13 @@ export function bucketByCategory<T>(
   const buckets = new Map<string, CategoryBucket<T>>()
   const uncategorised: CategoryBucket<T> = { key: "", label: UNCATEGORISED_LABEL, entries: [] }
   for (const entry of entries) {
-    const raw = (getCategory(entry) ?? "").trim()
-    if (!raw) {
+    const spaced = (getCategory(entry) ?? "").replaceAll("_", " ").trim()
+    if (!spaced) {
       uncategorised.entries.push(entry)
       continue
     }
-    const key = raw.toLowerCase()
-    const bucket = buckets.get(key) ?? { key, label: raw, entries: [] }
+    const key = spaced.toLowerCase()
+    const bucket = buckets.get(key) ?? { key, label: spaced, entries: [] }
     bucket.entries.push(entry)
     buckets.set(key, bucket)
   }

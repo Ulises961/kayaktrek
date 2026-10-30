@@ -13,6 +13,16 @@ describe("bucketByCategory", () => {
     expect(buckets[0].entries.map((e) => e.name)).toEqual(["Flares", "VHF"])
   })
 
+  it("shows a stored category slug as words and merges it with the same category typed by hand", () => {
+    const entries = [
+      { name: "Group first aid kit", category: "first_aid" },
+      { name: "Burn gel", category: "First aid" },
+    ]
+    const buckets = bucketByCategory(entries, (e) => e.category)
+    expect(buckets.map((b) => b.label)).toEqual(["first aid"])
+    expect(buckets[0].entries.map((e) => e.name)).toEqual(["Group first aid kit", "Burn gel"])
+  })
+
   it("sends null, undefined and blank categories to a trailing Uncategorised bucket", () => {
     const entries = [
       { name: "Rope", category: null },
