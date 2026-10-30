@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ctaButtonClass } from "@/components/common/button-roles"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/common/form-field"
 import { ListRow } from "@/components/common/list-row"
 import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
@@ -113,7 +114,7 @@ export function RequirementsChecklist({
     startTransition(async () => {
       const result = await addRequirement(
         inventoryId,
-        { name: trimmed, category: category.trim() || undefined },
+        { name: trimmed, category: category || undefined },
         tripId,
       )
       if (result.success) {
@@ -135,8 +136,8 @@ export function RequirementsChecklist({
           title={`No requirements yet${canManage ? " — add the gear this trip needs below." : "."}`}
         />
       ) : (
-        // Grouped by the free-text category (trimmed + case-folded — see
-        // lib/inventory/format's known rough edge vs the ItemCategory FK).
+        // Grouped by the stored category: a slug from the select above, or the free text older
+        // requirements and other clients carry (see lib/inventory/format).
         <div className="flex flex-col gap-4">
           {bucketByCategory(requirements, (r) => r.category, categories).map((bucket) => (
             <section key={bucket.key || "__uncategorised__"} className="flex flex-col gap-1">
@@ -174,13 +175,20 @@ export function RequirementsChecklist({
             disabled={isPending}
             className="sm:max-w-xs"
           />
-          <Input
+          <NativeSelect
+            aria-label="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category (optional)"
             disabled={isPending}
             className="sm:max-w-[10rem]"
-          />
+          >
+            <option value="">No category</option>
+            {categories.map((option) => (
+              <option key={option.slug} value={option.slug}>
+                {option.name}
+              </option>
+            ))}
+          </NativeSelect>
           <Button
             type="submit"
             size="sm"

@@ -242,6 +242,45 @@ describe("RequirementsChecklist", () => {
     )
   })
 
+  it("offers the item categories as the choice, sends the chosen one's slug and resets after adding", async () => {
+    const user = userEvent.setup()
+    renderChecklist({
+      categories: [
+        { slug: "gear", name: "Gear" },
+        { slug: "first_aid", name: "First Aid" },
+      ],
+    })
+    const picker = screen.getByRole("combobox", { name: /^category$/i }) as HTMLSelectElement
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["No category", "Gear", "First Aid"])
+
+    await user.type(screen.getByPlaceholderText(/add a requirement/i), "Burn gel")
+    await user.selectOptions(picker, "First Aid")
+    await user.click(screen.getByRole("button", { name: /^add$/i }))
+
+    expect(mockAddRequirement).toHaveBeenCalledWith(
+      INVENTORY_ID,
+      { name: "Burn gel", category: "first_aid" },
+      TRIP_ID,
+    )
+    expect(picker.value).toBe("")
+  })
+
+  it("adds a requirement with no category when none is chosen", async () => {
+    const user = userEvent.setup()
+    renderChecklist({ categories: [{ slug: "gear", name: "Gear" }] })
+    await user.type(screen.getByPlaceholderText(/add a requirement/i), "Flares")
+    await user.click(screen.getByRole("button", { name: /^add$/i }))
+    expect(mockAddRequirement).toHaveBeenCalledWith(
+      INVENTORY_ID,
+      { name: "Flares", category: undefined },
+      TRIP_ID,
+    )
+  })
+
   it("hides management controls when the user cannot manage", () => {
     renderChecklist({ canManage: false })
     expect(screen.queryByPlaceholderText(/add a requirement/i)).toBeNull()
