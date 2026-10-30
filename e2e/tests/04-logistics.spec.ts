@@ -46,7 +46,7 @@ test.describe("Logistics — shore contact and float plan", () => {
     // Float plan confirm: leader saves their vessel/emergency info from the emergency info segment
     await page.goto(`/trips/${tripId}/my-float-plan`)
     await page.getByRole("button", { name: "Edit", exact: true }).click()
-    await page.getByRole("button", { name: /save float plan/i }).click()
+    await page.getByRole("button", { name: "Save", exact: true }).click()
     // Amber banner disappears once the leader has saved their float plan info
     await expect(page.getByText(/review your float plan/i)).not.toBeVisible()
   })

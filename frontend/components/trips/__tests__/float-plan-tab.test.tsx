@@ -411,7 +411,7 @@ describe("FloatPlanTab — editing state", () => {
     vi.mocked(updateMyFloatPlan).mockResolvedValue({ success: true })
     render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
-    await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() =>
       expect(updateMyFloatPlan).toHaveBeenCalledWith(
         TRIP_ID,
@@ -428,7 +428,7 @@ describe("FloatPlanTab — editing state", () => {
     })
     render(<FloatPlanTab {...TAB_PROPS} currentMember={BASE_MEMBER} />)
     await userEvent.click(screen.getByRole("button", { name: /edit/i }))
-    await userEvent.click(screen.getByRole("button", { name: /save float plan/i }))
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }))
     await waitFor(() => expect(screen.getByText("Failed to update float plan.")).toBeDefined())
     expect(screen.getByLabelText(/make/i)).toBeDefined()
   })
