@@ -8,6 +8,7 @@ import { getSession } from "../lib/auth/session"
 import {
   addRequirement,
   contributeItem,
+  getItemCategories,
   getMyItems,
   removeRequirement,
   unclaimRequirement,
@@ -46,6 +47,7 @@ jest.mock("../lib/trips/actions", () => ({
   getTrip: jest.fn(),
 }))
 jest.mock("../lib/inventory/actions", () => ({
+  getItemCategories: jest.fn(),
   getMyItems: jest.fn(),
   addRequirement: jest.fn(),
   removeRequirement: jest.fn(),
@@ -96,6 +98,7 @@ jest.mock("../lib/db/cache-freshness", () => ({
 
 const mockGetTrip = getTrip as jest.Mock
 const mockGetMyItems = getMyItems as jest.Mock
+const mockGetItemCategories = getItemCategories as jest.Mock
 const mockAddRequirement = addRequirement as jest.Mock
 const mockRemoveRequirement = removeRequirement as jest.Mock
 const mockContributeItem = contributeItem as jest.Mock
@@ -160,6 +163,7 @@ beforeEach(() => {
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(ME)
   mockGetMyItems.mockResolvedValue([MY_ITEM])
+  mockGetItemCategories.mockReset().mockResolvedValue([])
   mockGetPackingItems.mockResolvedValue([])
   mockLoadRequirementsCache.mockReset().mockResolvedValue([])
   mockLoadGearCache.mockReset().mockResolvedValue([])
@@ -369,6 +373,156 @@ describe("InventoryScreen — group requirements", () => {
     const { findByText } = await render(<InventoryScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("Could not reach the server.")).toBeTruthy()
+  })
+
+  describe("categories", () => {
+    const CATEGORIES = [
+      { slug: "gear", name: "Gear" },
+      { slug: "first_aid", name: "First Aid" },
+    ]
+
+    it("groups the checklist under each category's name, with the rest under Uncategorised", async () => {
+      mockGetItemCategories.mockResolvedValue(CATEGORIES)
+      mockGetTrip.mockResolvedValue({
+        id: "trip-1",
+        inventory: {
+          id: "inv-1",
+          requirements: [
+            { ...NEEDED_REQUIREMENT, category: "first_aid" },
+            { ...COVERED_BY_ME, category: "gear" },
+            { ...NEEDED_REQUIREMENT, id: "req-3", name: "Tent", category: null },
+          ],
+        },
+      })
+
+      const { findByText, getAllByTestId } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+
+      expect(await findByText("Tent")).toBeTruthy()
+      expect(getAllByTestId("requirement-group").map((el) => el.props.children)).toEqual([
+        "First Aid",
+        "Gear",
+        "Uncategorised",
+      ])
+    })
+
+    it("adds a requirement under the category chosen from the chips", async () => {
+      mockGetItemCategories.mockResolvedValue(CATEGORIES)
+      mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+      mockAddRequirement.mockResolvedValue({ id: "req-9", name: "Burn gel", status: "needed" })
+
+      const { findByText, getByPlaceholderText, getByText } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+      await fireEvent.changeText(getByPlaceholderText("Add a requirement"), "Burn gel")
+      await fireEvent.press(await findByText("First Aid"))
+      await fireEvent.press(getByText("Add"))
+
+      await waitFor(() => {
+        expect(mockAddRequirement).toHaveBeenCalledWith("inv-1", {
+          name: "Burn gel",
+          category: "first_aid",
+        })
+      })
+    })
+
+    it("adds a requirement with no category when none is chosen", async () => {
+      mockGetItemCategories.mockResolvedValue(CATEGORIES)
+      mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+      mockAddRequirement.mockResolvedValue({ id: "req-9", name: "Flares", status: "needed" })
+
+      const { findByText, getByPlaceholderText, getByText } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+      await findByText("First Aid")
+      await fireEvent.changeText(getByPlaceholderText("Add a requirement"), "Flares")
+      await fireEvent.press(getByText("Add"))
+
+      await waitFor(() => {
+        expect(mockAddRequirement).toHaveBeenCalledWith("inv-1", {
+          name: "Flares",
+          category: undefined,
+        })
+      })
+    })
+
+    it("tapping the chosen category again clears it", async () => {
+      mockGetItemCategories.mockResolvedValue(CATEGORIES)
+      mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+      mockAddRequirement.mockResolvedValue({ id: "req-9", name: "Flares", status: "needed" })
+
+      const { findByText, getByPlaceholderText, getByText } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+      await fireEvent.changeText(getByPlaceholderText("Add a requirement"), "Flares")
+      const chip = await findByText("Gear")
+      await fireEvent.press(chip)
+      await fireEvent.press(chip)
+      await fireEvent.press(getByText("Add"))
+
+      await waitFor(() => {
+        expect(mockAddRequirement).toHaveBeenCalledWith("inv-1", {
+          name: "Flares",
+          category: undefined,
+        })
+      })
+    })
+
+    it("clears the chosen category after adding", async () => {
+      mockGetItemCategories.mockResolvedValue(CATEGORIES)
+      mockGetTrip.mockResolvedValue({ id: "trip-1", inventory: { id: "inv-1", requirements: [] } })
+      mockAddRequirement.mockResolvedValue({ id: "req-9", name: "Burn gel", status: "needed" })
+
+      const { findByText, getByPlaceholderText, getByText } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+      await fireEvent.changeText(getByPlaceholderText("Add a requirement"), "Burn gel")
+      await fireEvent.press(await findByText("First Aid"))
+      await fireEvent.press(getByText("Add"))
+      await waitFor(() => expect(mockAddRequirement).toHaveBeenCalledTimes(1))
+      await fireEvent.changeText(getByPlaceholderText("Add a requirement"), "Splint")
+      await fireEvent.press(getByText("Add"))
+
+      await waitFor(() => expect(mockAddRequirement).toHaveBeenCalledTimes(2))
+      expect(mockAddRequirement).toHaveBeenLastCalledWith("inv-1", {
+        name: "Splint",
+        category: undefined,
+      })
+    })
+
+    it("still shows the checklist, with no category chips, when the categories cannot be fetched", async () => {
+      mockGetItemCategories.mockRejectedValue(new Error("Could not reach the server."))
+      mockGetTrip.mockResolvedValue({
+        id: "trip-1",
+        inventory: { id: "inv-1", requirements: [{ ...NEEDED_REQUIREMENT, category: "first_aid" }] },
+      })
+
+      const { findByText, queryByText } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+
+      expect(await findByText("First aid kit")).toBeTruthy()
+      expect(queryByText("Gear")).toBeNull()
+    })
+
+    it("groups the cached checklist by the heading it was saved with", async () => {
+      mockGetTrip.mockRejectedValue(new Error("Could not reach the server."))
+      mockLoadRequirementsCache.mockResolvedValue([
+        { id: "req-1", name: "First aid kit", status: "needed", category: "First Aid" },
+        { id: "req-2", name: "Tent", status: "needed", category: null },
+      ])
+
+      const { findByText, getAllByTestId } = await render(<InventoryScreen />, {
+        wrapper: WithCachedSurfaces,
+      })
+
+      expect(await findByText("First aid kit")).toBeTruthy()
+      expect(getAllByTestId("requirement-group").map((el) => el.props.children)).toEqual([
+        "First Aid",
+        "Uncategorised",
+      ])
+    })
   })
 })
 

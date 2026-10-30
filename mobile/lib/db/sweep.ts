@@ -1,6 +1,6 @@
 import { listBlocks } from "../blocks/actions"
 import { listConnections } from "../connections/actions"
-import { getMyItems } from "../inventory/actions"
+import { getItemCategories, getMyItems } from "../inventory/actions"
 import { getPackingItems } from "../inventory/personal-packing-actions"
 import { getShuttleVehicles, getTravelDocuments } from "../logistics/actions"
 import { buildDayColoredRoute } from "../itinerary/day-route"
@@ -171,9 +171,15 @@ async function warmKit(tripId: string): Promise<void> {
 // lighter endpoint — so this is the heaviest request in a trip's sweep. Paid
 // anyway: the alternative is the same hole the route had, a trip whose Items
 // screen was never opened while connected having no requirements offline.
+//
+// The categories only name the checklist's groups, so they are fetched alongside it and a
+// failure there costs the headings, never the checklist.
 async function warmRequirements(tripId: string): Promise<void> {
-  const trip = await getTrip(tripId)
-  await saveRequirementsCache(tripId, trip.inventory?.requirements ?? [])
+  const [trip, categories] = await Promise.all([
+    getTrip(tripId),
+    getItemCategories().catch(() => []),
+  ])
+  await saveRequirementsCache(tripId, trip.inventory?.requirements ?? [], categories)
 }
 
 // Tier 3's other half, and the reason it is not part of syncOneTrip: the gear

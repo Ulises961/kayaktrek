@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 13,
+  version: 14,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -278,12 +278,15 @@ export const appDatabaseSchema = appSchema({
       // unlike cached_logs/cached_connections/cached_blocks. Only name/status:
       // who's covering what (contributions, proposedBy) has no offline reader,
       // same trim as cached_logs dropping notes/geometry/endorsers. Covering,
-      // adding, and removing a requirement all need a connection regardless.
+      // adding, and removing a requirement all need a connection regardless. The category is the
+      // heading's name, resolved when the row is saved (the same way gear caches its category's
+      // name), so a screen offline can group without the category list.
       name: "cached_requirements",
       columns: [
         { name: "trip_id", type: "string", isIndexed: true },
         { name: "name", type: "string" },
         { name: "status", type: "string", isOptional: true },
+        { name: "category", type: "string", isOptional: true },
       ],
     }),
     tableSchema({

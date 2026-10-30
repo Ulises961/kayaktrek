@@ -1,6 +1,6 @@
 import { TRIP_STATE } from "@shared/dtos/trip"
 
-import { getMyItems } from "../../inventory/actions"
+import { getItemCategories, getMyItems } from "../../inventory/actions"
 import { getPackingItems } from "../../inventory/personal-packing-actions"
 import { CACHE_KEY, readCachedAt } from "../cache-freshness"
 import { saveGearCache } from "../gear-cache"
@@ -26,7 +26,7 @@ import { loadTripListCache, saveTripListCache } from "../trip-list-cache"
 
 jest.mock("../database", () => ({ database: {} }))
 jest.mock("../trip-list-cache", () => ({ loadTripListCache: jest.fn(), saveTripListCache: jest.fn() }))
-jest.mock("../../inventory/actions", () => ({ getMyItems: jest.fn() }))
+jest.mock("../../inventory/actions", () => ({ getMyItems: jest.fn(), getItemCategories: jest.fn() }))
 jest.mock("../../inventory/personal-packing-actions", () => ({ getPackingItems: jest.fn() }))
 jest.mock("../gear-cache", () => ({ saveGearCache: jest.fn() }))
 jest.mock("../kit-cache", () => ({ saveKitCache: jest.fn() }))
@@ -58,6 +58,7 @@ const mockReadCachedAt = readCachedAt as jest.Mock
 const mockSyncTrip = syncTrip as jest.Mock
 const mockPullRoute = pullRoute as jest.Mock
 const mockGetMyItems = getMyItems as jest.Mock
+const mockGetItemCategories = getItemCategories as jest.Mock
 const mockGetPackingItems = getPackingItems as jest.Mock
 const mockSaveGearCache = saveGearCache as jest.Mock
 const mockSaveKitCache = saveKitCache as jest.Mock
@@ -109,6 +110,7 @@ beforeEach(() => {
   mockSyncTrip.mockResolvedValue(undefined)
   mockPullRoute.mockResolvedValue(undefined)
   mockGetMyItems.mockResolvedValue([])
+  mockGetItemCategories.mockResolvedValue([])
   mockGetPackingItems.mockResolvedValue([])
   mockSaveGearCache.mockResolvedValue(undefined)
   mockSaveKitCache.mockResolvedValue(undefined)
@@ -532,12 +534,53 @@ describe("runSweep — tier 3, kit and gear", () => {
     await runSweep()
 
     expect(mockGetTrip.mock.calls.map(([id]) => id).sort()).toEqual(["t1", "t2"])
-    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [
-      { id: "req-t1", name: "VHF radio" },
-    ])
-    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t2", [
-      { id: "req-t2", name: "VHF radio" },
-    ])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith(
+      "t1",
+      [{ id: "req-t1", name: "VHF radio" }],
+      [],
+    )
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith(
+      "t2",
+      [{ id: "req-t2", name: "VHF radio" }],
+      [],
+    )
+  })
+
+  // The checklist is grouped by category, and a stored category is a slug; offline there is no
+  // list to look one up in, so the cache is handed the list to save the heading's name.
+  it("hands the item categories to the requirements cache", async () => {
+    const categories = [{ slug: "first_aid", name: "First Aid" }]
+    mockGetItemCategories.mockResolvedValue(categories)
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockResolvedValue({
+      id: "t1",
+      inventory: { requirements: [{ id: "req-1", name: "Kit", category: "first_aid" }] },
+    })
+
+    await runSweep()
+
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith(
+      "t1",
+      [{ id: "req-1", name: "Kit", category: "first_aid" }],
+      categories,
+    )
+  })
+
+  it("still caches the checklist when the item categories cannot be fetched", async () => {
+    mockGetItemCategories.mockRejectedValue(new Error("Could not reach the server."))
+    mockLoadTripListCache.mockResolvedValue([cachedTrip({ id: "t1" })])
+    mockGetTrip.mockResolvedValue({
+      id: "t1",
+      inventory: { requirements: [{ id: "req-1", name: "Kit", category: "first_aid" }] },
+    })
+
+    await runSweep()
+
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith(
+      "t1",
+      [{ id: "req-1", name: "Kit", category: "first_aid" }],
+      [],
+    )
   })
 
   // An empty checklist is a real answer and must replace a stale one, not be
@@ -549,7 +592,7 @@ describe("runSweep — tier 3, kit and gear", () => {
 
     await runSweep()
 
-    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [])
+    expect(mockSaveRequirementsCache).toHaveBeenCalledWith("t1", [], [])
   })
 
   it("does not fetch requirements for a trip the sweep skipped", async () => {

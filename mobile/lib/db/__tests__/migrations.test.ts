@@ -36,6 +36,17 @@ describe("migrations", () => {
     expect(createdTables).toEqual(["cached_requirements"])
   })
 
+  it("has a migration step adding the category column to cached_requirements at v14", () => {
+    const v14 = migrations.sortedMigrations.find((migration) => migration.toVersion === 14)
+    expect(v14).toBeDefined()
+
+    const addedColumns = v14!.steps.flatMap((step) =>
+      step.type === "add_columns" ? [`${step.table}.${step.columns.map((c) => c.name).join(",")}`] : [],
+    )
+
+    expect(addedColumns).toEqual(["cached_requirements.category"])
+  })
+
   // Both kit tables land in ONE version bump on purpose: every bump is a
   // chance for a device to end up stamped at a version whose migration step
   // was still being written, which has already cost one `adb shell pm clear`.
