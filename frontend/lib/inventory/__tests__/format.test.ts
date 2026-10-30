@@ -13,14 +13,44 @@ describe("bucketByCategory", () => {
     expect(buckets[0].entries.map((e) => e.name)).toEqual(["Flares", "VHF"])
   })
 
-  it("shows a stored category slug as words and merges it with the same category typed by hand", () => {
-    const entries = [
-      { name: "Group first aid kit", category: "first_aid" },
-      { name: "Burn gel", category: "First aid" },
+  describe("with the item categories", () => {
+    const categories = [
+      { slug: "gear", name: "Gear" },
+      { slug: "first_aid", name: "First Aid" },
     ]
-    const buckets = bucketByCategory(entries, (e) => e.category)
-    expect(buckets.map((b) => b.label)).toEqual(["first aid"])
-    expect(buckets[0].entries.map((e) => e.name)).toEqual(["Group first aid kit", "Burn gel"])
+
+    it("shows a stored slug as the category's name, keyed by the slug", () => {
+      const buckets = bucketByCategory(
+        [{ name: "Group first aid kit", category: "first_aid" }],
+        (e) => e.category,
+        categories,
+      )
+      expect(buckets.map((b) => [b.key, b.label])).toEqual([["first_aid", "First Aid"]])
+    })
+
+    it("merges the slug with the category's name typed by hand, in any case", () => {
+      const entries = [
+        { name: "Group first aid kit", category: "first_aid" },
+        { name: "Burn gel", category: "first aid" },
+        { name: "Splint", category: " First Aid " },
+      ]
+      const buckets = bucketByCategory(entries, (e) => e.category, categories)
+      expect(buckets.map((b) => b.label)).toEqual(["First Aid"])
+      expect(buckets[0].entries.map((e) => e.name)).toEqual([
+        "Group first aid kit",
+        "Burn gel",
+        "Splint",
+      ])
+    })
+
+    it("keeps free text that matches no category as typed", () => {
+      const buckets = bucketByCategory(
+        [{ name: "Stove", category: "My_stuff" }],
+        (e) => e.category,
+        categories,
+      )
+      expect(buckets.map((b) => b.label)).toEqual(["My_stuff"])
+    })
   })
 
   it("sends null, undefined and blank categories to a trailing Uncategorised bucket", () => {

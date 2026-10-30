@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { CircleAlertIcon, CircleCheckIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { TripRequirement } from "@/lib/dtos/inventory"
+import type { ItemCategory } from "@/lib/dtos/item-category"
 import type { Item } from "@/lib/dtos/item"
 import {
   addRequirement,
@@ -37,6 +38,8 @@ interface RequirementsChecklistProps {
   inventoryId: string
   tripId: string
   requirements: TripRequirement[]
+  /** Resolves a requirement's stored category slug to the name its group is headed with. */
+  categories: ItemCategory[]
   myItems: Item[]
   /** Whether the current user is a trip member (may add requirements / contribute). */
   canManage: boolean
@@ -77,6 +80,7 @@ export function RequirementsChecklist({
   inventoryId,
   tripId,
   requirements,
+  categories,
   myItems,
   canManage,
   currentUserId,
@@ -134,7 +138,7 @@ export function RequirementsChecklist({
         // Grouped by the free-text category (trimmed + case-folded — see
         // lib/inventory/format's known rough edge vs the ItemCategory FK).
         <div className="flex flex-col gap-4">
-          {bucketByCategory(requirements, (r) => r.category).map((bucket) => (
+          {bucketByCategory(requirements, (r) => r.category, categories).map((bucket) => (
             <section key={bucket.key || "__uncategorised__"} className="flex flex-col gap-1">
               <SectionLabel>{bucket.label}</SectionLabel>
               <ul className="flex flex-col">
