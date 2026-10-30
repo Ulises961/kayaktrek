@@ -7,6 +7,49 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.4.1] - 2026-10-30
+
+### Changed
+
+- **A requirement's category is chosen from a list.** Adding a requirement used to take the
+  category as free text, so "First aid", "first aid" and "FIRST_AID" each made a group of their
+  own. The form now offers the categories and keeps the one you pick. A category typed by hand
+  before this that is a category's name or key, in any case, is moved under it.
+- **The group headings on the Items tab read as names.** The seeded requirements stored the
+  category's key, so one group was headed `FIRST_AID`; it is now "First Aid".
+- **The float plan form's button reads "Save".**
+
+### Fixed
+
+- **A typed "&" was saved as "&amp;" and shown that way.** Anything with an ampersand in a free-text
+  field, such as a vessel make "P&H", a trip or place name, a note or a caption, was stored as
+  `&amp;` and displayed as `P&amp;H`. It now keeps the "&", and text saved before is repaired. A
+  name or surname containing "&" was also refused when registering or editing a profile; it is now
+  accepted.
+- **The float plan form and the Items tab were cramped on a phone.** At the narrowest width the
+  vessel fields sat two to a row with the last one alone, the Cancel button was cut off, Withdraw
+  pushed the item name into a thin column, and the covered/needed label moved with the length of
+  the name. The fields now stack, the buttons wrap, the status is a fixed icon in front of the name
+  (wider screens keep the labels), the remove cross stays at the end of the name, and the two
+  pills read "Group" and "Mine".
+- **Opening a trip scrolled the page sideways for a moment.** The loading placeholder was wider
+  than the card it stands in for.
+
+### Deploy notes
+
+- **Two migrations, both data-only and expand-only, and neither can be undone.**
+  `907aa38bb546` rewrites `&amp;` to `&` in the free-text columns of 17 tables and moves each
+  changed row's `updated` time, so phones fetch the corrected text. `45087e1ceeea` rewrites a
+  requirement category that matches a category's key or name to the key. Both run in the usual
+  `alembic upgrade head` step, so a rolling deploy is safe. A rollback restores the code and not
+  the data, and text typed with an "&amp;" on purpose loses one level of it.
+- **No new environment variable, no email template change, no forced logout.** The compose and
+  `.env.example` files are unchanged since 1.4.0.
+- **The mobile app is not part of this release** (it is not published). Its requirement categories
+  are a separate, unmerged change.
+- **Check after deploying:** save a float plan with a vessel make containing "&" and read it back;
+  open a trip's Items tab at phone width and on a desktop.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added
