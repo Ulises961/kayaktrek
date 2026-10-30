@@ -220,9 +220,9 @@ function RequirementRow({
 
   return (
     <ListRow className="flex flex-col gap-2 px-2 py-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium">{req.name}</span>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="min-w-0 text-sm font-medium break-words">{req.name}</span>
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
               "inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase",
@@ -232,7 +232,13 @@ function RequirementRow({
             {req.status ?? "needed"}
           </span>
           {canManage && myContribution && (
-            <Button variant="outline" size="sm" disabled={isPending} onClick={handleWithdraw}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={handleWithdraw}
+              className="touch-target h-6 px-2 text-xs sm:h-8 sm:px-3 sm:text-sm"
+            >
               Withdraw
             </Button>
           )}
