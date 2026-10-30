@@ -18,9 +18,21 @@ export function ItemsNav({ tripId, showKit }: ItemsNavProps) {
   const pathname = usePathname()
 
   const items = [
-    { href: `/trips/${tripId}/items`, label: "Group requirements", icon: PackageIcon },
+    {
+      href: `/trips/${tripId}/items`,
+      label: "Group requirements",
+      shortLabel: "Group",
+      icon: PackageIcon,
+    },
     ...(showKit
-      ? [{ href: `/trips/${tripId}/items/kit`, label: "My kit", icon: BackpackIcon }]
+      ? [
+          {
+            href: `/trips/${tripId}/items/kit`,
+            label: "My kit",
+            shortLabel: "Mine",
+            icon: BackpackIcon,
+          },
+        ]
       : []),
   ]
 
@@ -44,7 +56,10 @@ export function ItemsNav({ tripId, showKit }: ItemsNavProps) {
             )}
           >
             <Icon className="size-3.5" />
-            {item.label}
+            <span aria-hidden className="sm:hidden">
+              {item.shortLabel}
+            </span>
+            <span className="sr-only sm:not-sr-only">{item.label}</span>
           </Link>
         )
       })}
