@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ctaButtonClass } from "@/components/common/button-roles"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/common/form-field"
 import { ListRow } from "@/components/common/list-row"
 import { SectionLabel } from "@/components/common/section-label"
 import { UserAvatar } from "@/components/common/user-avatar"
@@ -113,7 +114,7 @@ export function RequirementsChecklist({
     startTransition(async () => {
       const result = await addRequirement(
         inventoryId,
-        { name: trimmed, category: category.trim() || undefined },
+        { name: trimmed, category: category || undefined },
         tripId,
       )
       if (result.success) {
@@ -135,8 +136,8 @@ export function RequirementsChecklist({
           title={`No requirements yet${canManage ? " — add the gear this trip needs below." : "."}`}
         />
       ) : (
-        // Grouped by the free-text category (trimmed + case-folded — see
-        // lib/inventory/format's known rough edge vs the ItemCategory FK).
+        // Grouped by the stored category: a slug from the select above, or the free text older
+        // requirements and other clients carry (see lib/inventory/format).
         <div className="flex flex-col gap-4">
           {bucketByCategory(requirements, (r) => r.category, categories).map((bucket) => (
             <section key={bucket.key || "__uncategorised__"} className="flex flex-col gap-1">
@@ -174,13 +175,20 @@ export function RequirementsChecklist({
             disabled={isPending}
             className="sm:max-w-xs"
           />
-          <Input
+          <NativeSelect
+            aria-label="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category (optional)"
             disabled={isPending}
             className="sm:max-w-[10rem]"
-          />
+          >
+            <option value="">No category</option>
+            {categories.map((option) => (
+              <option key={option.slug} value={option.slug}>
+                {option.name}
+              </option>
+            ))}
+          </NativeSelect>
           <Button
             type="submit"
             size="sm"
@@ -247,21 +255,23 @@ function RequirementRow({
 
   return (
     <ListRow className="flex flex-col gap-2 px-2 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex min-w-0 items-start gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="order-1 flex min-w-0 flex-1 items-start gap-2">
           <StatusMark status={req.status} className="mt-0.5 sm:hidden" />
           <span className="min-w-0 text-sm font-medium break-words">{req.name}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "hidden items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase sm:inline-flex",
-              statusBadgeClass(req.status),
-            )}
-          >
-            {req.status ?? "needed"}
-          </span>
-          {canManage && myContribution && (
+        {/* Below sm the remove cross stays at the end of the name line and Withdraw takes the
+            line under it; from sm the order is name, status, Withdraw, remove. */}
+        <span
+          className={cn(
+            "hidden items-center rounded-[3px] px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] uppercase sm:order-2 sm:inline-flex",
+            statusBadgeClass(req.status),
+          )}
+        >
+          {req.status ?? "needed"}
+        </span>
+        {canManage && myContribution && (
+          <div className="order-3 w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
@@ -271,41 +281,41 @@ function RequirementRow({
             >
               Withdraw
             </Button>
-          )}
-          {canManage && isProposer && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
+          </div>
+        )}
+        {canManage && isProposer && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={isPending}
+                aria-label={`Remove ${req.name}`}
+                className="text-muted-foreground hover:text-destructive order-2 sm:order-4"
+              >
+                <XIcon className="size-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {req.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove “{req.name}” from the inventory. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleRemove}
                   disabled={isPending}
-                  aria-label={`Remove ${req.name}`}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="bg-destructive hover:bg-destructive/90"
                 >
-                  <XIcon className="size-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remove {req.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will remove “{req.name}” from the inventory. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleRemove}
-                    disabled={isPending}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Remove
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {contributions.length > 0 && (
