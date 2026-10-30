@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 import re
 from marshmallow import Schema, fields, post_load, validates, ValidationError, pre_load, EXCLUDE
 
@@ -28,7 +28,7 @@ class WeatherSchema(Schema):
     def validate_model(self, value, **kwargs):
         if not value or not value.strip():
             raise ValidationError("Weather model cannot be empty")
-        sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+        sanitized = sanitize_text(value)
         if len(sanitized) > 100:
             raise ValidationError("Weather model name cannot exceed 100 characters")
         if re.search(r'[<>"\';]', sanitized):

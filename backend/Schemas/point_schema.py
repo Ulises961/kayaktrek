@@ -2,7 +2,7 @@ from marshmallow import fields, post_load, pre_load, validates, ValidationError,
 from Models.point import Point, PointType
 from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.image_schema import ImageSchema
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 
 
 class PointSchema(BaseSchema):
@@ -28,9 +28,9 @@ class PointSchema(BaseSchema):
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         if 'name' in data and data['name'] is not None:
-            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+            data['name'] = sanitize_text(data['name'])
         if 'notes' in data and data['notes'] is not None:
-            data['notes'] = bleach.clean(str(data['notes']).strip(), tags=[], strip=True)
+            data['notes'] = sanitize_text(data['notes'])
         return data
 
     @validates('type')

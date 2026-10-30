@@ -6,7 +6,7 @@ from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.itinerary_schema import ItinerarySchema
 from Schemas.inventory_schema import InventorySchema
 from Schemas.trip_member_schema import TripMemberSchema
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 
 
 class TripSchema(BaseSchema):
@@ -49,7 +49,7 @@ class TripSchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('destination', 'description'):
             if key in data and data[key] is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates('destination')

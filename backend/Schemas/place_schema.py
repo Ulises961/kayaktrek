@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, pre_load, validates, ValidationError
 
 from Models.place import Place, PlaceVisibility
@@ -12,7 +12,7 @@ _SANITIZE_FIELDS = ("label", "note")
 def _sanitize_place_text(data):
     for key in _SANITIZE_FIELDS:
         if data.get(key) is not None:
-            data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+            data[key] = sanitize_text(data[key])
     return data
 
 

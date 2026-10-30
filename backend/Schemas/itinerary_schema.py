@@ -2,7 +2,7 @@ from typing import Optional
 
 from flask import g
 from marshmallow import fields, post_dump, post_load, pre_load, validates, ValidationError
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from Api.database import db
 from Models.difficulty import DifficultyType
 from Models.itinerary import Itinerary
@@ -54,7 +54,7 @@ class ItinerarySchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('name', 'description'):
             if key in data and data[key] is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates('name')
@@ -103,7 +103,7 @@ class ItineraryUpdateSchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in ('name', 'description'):
             if key in data and data[key] is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates('name')

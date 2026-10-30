@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, post_load, validates, ValidationError
 
 from Models.shuttle_vehicle import ShuttleVehicle
@@ -34,5 +34,5 @@ class ShuttleVehicleSchema(BaseSchema):
     def sanitize_and_make(self, data, **kwargs):
         for field in ("driver_name", "driver_contact", "vehicle_description", "pickup_point"):
             if data.get(field):
-                data[field] = bleach.clean(str(data[field]).strip(), tags=[], strip=True)
+                data[field] = sanitize_text(data[field])
         return ShuttleVehicle(**data)
