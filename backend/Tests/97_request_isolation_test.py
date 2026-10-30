@@ -12,7 +12,7 @@ as its absence with the isolated one. A test that passes under both would prove 
 from typing import Any
 
 import pytest
-from flask import Flask, g, jsonify
+from flask import Flask, Response, g, has_request_context, jsonify, stream_with_context
 from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -37,6 +37,16 @@ def mini_app():
     @app.get("/read-user")
     def read_user():
         return jsonify(user=g.get("current_user_id"))
+
+    @app.get("/stream")
+    def stream():
+        # The shape of the live routes: a generator kept inside its request by
+        # stream_with_context, so the request stays open until the stream is finished.
+        def chunks():
+            yield "retry: 5000\n\n"
+            yield "event: snapshot\n\n"
+
+        return Response(stream_with_context(chunks()), mimetype="text/event-stream")
 
     @app.get("/session")
     def session_probe():
@@ -111,6 +121,39 @@ def test_plain_client_leaves_the_test_bodys_transaction_open(mini_app):
     client.get("/read-user")
 
     assert database.session().in_transaction()
+
+
+# A streamed response keeps its request context pushed until the stream is finished. Tests that
+# check only the status of one and never read it left that context on the stack, to be popped
+# whenever the garbage collector finalised the response: during some later, unrelated test, which
+# tore down the worker's session and detached the shared `user_1` for the rest of the run. It
+# showed only on slower runners, where the collection landed at a different moment.
+def test_plain_client_leaves_a_streamed_request_context_pushed_until_it_is_closed(mini_app):
+    app, _, _ = mini_app
+    client = app.test_client()
+
+    response = client.get("/stream")
+
+    try:
+        assert has_request_context()
+    finally:
+        response.close()
+    assert not has_request_context()
+
+
+def test_isolated_client_finishes_a_streamed_response_it_was_never_asked_to_read(mini_app):
+    app, _, _ = mini_app
+    app.test_client_class = PerRequestContextClient
+    client = app.test_client()
+
+    response = client.get("/stream")
+
+    try:
+        assert not has_request_context()
+        assert response.status_code == 200
+        assert "event: snapshot" in response.get_data(as_text=True)
+    finally:
+        response.close()
 
 
 def test_suite_client_is_the_isolated_one(client: FlaskClient):
