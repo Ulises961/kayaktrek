@@ -25,9 +25,16 @@ class PerRequestContextClient(FlaskClient):
     as it would be to a real second connection. Rolling back also expires what the body holds, so
     its next read sees what the request committed. A test that adds rows and relies on the request
     seeing them must commit, exactly as production data has been committed before a request reads it.
+
+    The response is read to the end before the request's context is popped (`buffered`). A streamed
+    response (the live routes) keeps its request context pushed until the stream is finished, so one
+    a test never read would leave that context on the stack and have it popped whenever the garbage
+    collector got to it, in some other test, tearing down the worker's session. Streams in tests are
+    finite, so reading one to the end costs nothing.
     """
 
     def open(self, *args: Any, **kwargs: Any) -> TestResponse:
+        kwargs.setdefault("buffered", True)
         self.application.extensions["sqlalchemy"].session.rollback()
         with self.application.app_context():
             return super().open(*args, **kwargs)
