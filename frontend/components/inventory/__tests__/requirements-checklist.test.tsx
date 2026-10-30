@@ -101,6 +101,7 @@ function renderChecklist(
       inventoryId={INVENTORY_ID}
       tripId={TRIP_ID}
       requirements={REQUIREMENTS}
+      categories={[]}
       myItems={[OWNED_ITEM, OWNED_ITEM_2, SUGGESTED_ITEM]}
       canManage={true}
       currentUserId={ME}
@@ -151,6 +152,18 @@ describe("RequirementsChecklist", () => {
     expect(screen.getByText("First aid kit")).toBeTruthy()
     // Requirement name + its contribution's item name both render.
     expect(screen.getAllByText("Bilge pump").length).toBeGreaterThan(0)
+  })
+
+  it("heads a group stored under a category slug with that category's name", () => {
+    renderChecklist({
+      requirements: [
+        { ...REQ_PROPOSED_BY_ME, category: "first_aid" },
+        { ...REQ_PROPOSED_BY_OTHER, category: "First aid" },
+      ],
+      categories: [{ slug: "first_aid", name: "First Aid" }],
+    })
+    const labels = screen.getAllByText(/first.aid/i).filter((el) => el.tagName === "P")
+    expect(labels.map((el) => el.textContent)).toEqual(["First Aid"])
   })
 
   it("shows Remove only on requirements the current user proposed", () => {

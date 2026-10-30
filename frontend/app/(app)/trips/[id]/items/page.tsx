@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { PackageIcon } from "lucide-react"
 import { apiGet } from "@/lib/api/client"
 import { ItemsSchema } from "@/lib/dtos/item"
+import { ItemCategoriesSchema } from "@/lib/dtos/item-category"
 import { getTripCore } from "@/lib/trips/core"
 import { getSession } from "@/lib/auth/session"
 import { deriveMembership } from "@/lib/trips/membership"
@@ -18,12 +19,18 @@ export default async function TripItemsPage({ params }: { params: Promise<{ id: 
   const session = await getSession()
   const { isMember } = deriveMembership(trip, session)
 
-  // The contribute dropdown needs the member's own owned gear.
-  const myItems = isMember
-    ? await apiGet("/api/item/all")
-        .then((raw) => ItemsSchema.parse(raw))
-        .catch(() => [])
-    : []
+  // The contribute dropdown needs the member's own owned gear; the headings need the category
+  // names behind the slugs the requirements store.
+  const [myItems, categories] = await Promise.all([
+    isMember
+      ? apiGet("/api/item/all")
+          .then((raw) => ItemsSchema.parse(raw))
+          .catch(() => [])
+      : [],
+    apiGet("/api/item-categories")
+      .then((raw) => ItemCategoriesSchema.parse(raw))
+      .catch(() => []),
+  ])
 
   return (
     <section className="flex flex-col gap-3">
@@ -37,6 +44,7 @@ export default async function TripItemsPage({ params }: { params: Promise<{ id: 
           inventoryId={trip.inventory.id!}
           tripId={id}
           requirements={trip.inventory.requirements ?? []}
+          categories={categories}
           myItems={myItems}
           canManage={isMember}
           currentUserId={session?.userId}
