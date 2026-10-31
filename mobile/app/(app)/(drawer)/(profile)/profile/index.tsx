@@ -43,7 +43,7 @@ const header = (
 
 // Certifications render read-only here — add/edit/delete needs the elevated
 // re-auth token flow (backend/Resources/user_certification_resource.py), which
-// mobile doesn't have yet. Deferred rather than half-built (plans/M9i.md WP1).
+// mobile doesn't have yet. Deferred rather than half-built (the M9i plan WP1).
 export default function ProfileScreen() {
   const [togglingVisibility, setTogglingVisibility] = useState(false)
 

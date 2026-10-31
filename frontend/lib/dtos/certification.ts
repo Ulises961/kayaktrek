@@ -3,7 +3,7 @@ import { isoDateField, noHtmlTags } from "../validators"
 
 // A paddler's qualification/membership badge (e.g. BC Sea Leader, RYA).
 // Mirrors the backend UserCertification model. Self-asserted — never an
-// endorsement input (see plans/M7a.md: badge, not authority).
+// endorsement input (see the M7a plan: badge, not authority).
 export const CertificationSchema = z.object({
   id: z.uuidv7().optional(),
   userId: z.uuidv7().nullish(),

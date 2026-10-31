@@ -40,7 +40,7 @@ describe("DISALLOWED_PATHS", () => {
   })
 
   // Reinstated 2026-09-12 once two real, author-pitched routes were published to the
-  // library (§5 of plans/M25-web-1.0-release.md) — the discovery surface is no longer
+  // library (§5 of the M25 plan) — the discovery surface is no longer
   // held back from crawlers. /explore stays allowed even though it redirects an
   // anonymous crawler: disallowing it would stop the redirect ever being discovered.
   it("allows the discovery surface now that the library has real content", () => {

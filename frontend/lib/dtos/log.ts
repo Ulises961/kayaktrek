@@ -3,7 +3,7 @@ import { isoDateField, noHtmlTags } from "../validators"
 
 // Shallow endorser identity — mirrors the backend _ShallowEndorserSchema.
 // Deliberately flat (no rank/cert fields): endorsement is factual attestation,
-// not a rank broadcast (see plans/M7a.md).
+// not a rank broadcast (see the M7a plan).
 export const EndorserSchema = z.object({
   id: z.uuidv7(),
   username: z.string(),
@@ -31,7 +31,7 @@ export const LogSchema = z.object({
 
 // Mirrors ExploreSort (lib/dtos/itinerary.ts) — one canonical date-sort convention
 // across the app's Load-more listing surfaces (M12 §K). Enum-backed per the
-// project convention (frontend/CLAUDE.md) — never compare against a raw literal.
+// project convention (the frontend conventions doc) — never compare against a raw literal.
 export const LOG_SORT = {
   NEWEST: "newest",
   OLDEST: "oldest",

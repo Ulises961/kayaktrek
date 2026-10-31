@@ -68,7 +68,7 @@ def test_delete_itinerary(client, auth_headers, itinerary):
 
 
 def test_delete_itinerary_cascades_days_and_points(client, auth_headers, itinerary):
-    """The GDPR-motivating cascade (plans/M16-backend-test-quality.md): deleting
+    """The GDPR-motivating cascade (the M16 plan): deleting
     an Itinerary must cascade-delete its Days and its Points cleanly (DB-level
     ondelete=CASCADE down the itinerary -> day -> point chain), not raise a
     ForeignKeyViolation and not leave orphaned rows behind.

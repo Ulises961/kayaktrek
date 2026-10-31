@@ -7,7 +7,7 @@ const projectRoot = __dirname;
 // and Zod DTO schemas (lib/dtos/*) directly rather than duplicating them. There is no
 // root pnpm-workspace.yaml; `mobile/` is a sibling directory like `frontend/`/`backend/`,
 // so Metro is told about the sibling explicitly instead of relying on workspace tooling.
-// See plans/M9.md item 11 / plans/M9a.md WP5.
+// See the M9 plan item 11 / the M9a plan WP5.
 const frontendRoot = path.resolve(projectRoot, "..", "frontend");
 
 const config = getDefaultConfig(projectRoot);

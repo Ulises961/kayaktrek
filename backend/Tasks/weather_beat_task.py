@@ -31,7 +31,7 @@ ATTENTION_TIMEOUT_DAYS = 7
 def effective_horizon_days(user_id: Optional[str]) -> int:
     """Wired through PremiumEntitlementService.has_extended_forecast_access rather
     than returning FORECAST_HORIZON_DAYS directly, so a future extended-range
-    premium tier (ROADMAP.md "Weather forecast resolution & refresh control") is a
+    premium tier (the product roadmap "Weather forecast resolution & refresh control") is a
     matter of flipping that stub, not re-deriving this gate. Always the free
     10-day cutoff today — the stub is closed by default. user_id is None for the
     beat sweep itself, which has no single "requesting user" — always the free

@@ -3,12 +3,12 @@
 **Status**: M9a WP4 (design-only prerequisite) research output. Not a build task — this feeds
 the M9 launch timeline and M9a WP6's coordinator sign-off.
 
-**Why this exists**: `plans/M9.md` item 10 pulled this into M9a specifically because it costs
+**Why this exists**: the M9 plan item 10 pulled this into M9a specifically because it costs
 **calendar time, not engineering time** — a closed-testing tenure requirement or a permission
 review discovered at M9h (ship time) blocks a launch date; discovered now, it's a scheduling
 input.
 
-**Research method — read before trusting any number below.** `plans/M9.md` explicitly flagged
+**Research method — read before trusting any number below.** The M9 plan explicitly flagged
 that Play policy has been revised multiple times (the closed-testing tester count alone changed
 from 20 → 12 in December 2024) and instructed against answering from training data. In this
 research session, direct `WebFetch` access to `support.google.com` (and every other external
@@ -165,14 +165,14 @@ listing suppression/removal. This app collects two categories worth getting righ
 
 The rest of this section applies **only if medical notes are unparked.** It required the most
 care of anything here, because it must be described **accurately, not omitted just because
-it's encrypted**, per the explicit instruction in both `plans/M9.md` and this task.
+it's encrypted**, per the explicit instruction in both the M9 plan and this task.
 
 **Correction (2026-09-01):** this section originally claimed the feature (M3g) was "genuinely
 client-side E2E encrypted" when it was written (2026-08-26) — that was false at the time. The
 crypto ran server-side: keypair generation and every decrypt sent the plaintext password to the
 backend (`Services/crypto_service.py`), which could therefore read a note in transit even though
 it never stored plaintext. `docs/adr/safety-privacy.md`'s 2026-08-31 correction pass caught the
-same false claim in `CLAUDE.md` and the Terms of Use and fixed both, but missed this file — the
+same false claim in the conventions doc and the Terms of Use and fixed both, but missed this file — the
 "all corrected" note in that decision log was wrong about scope, not about the underlying fact.
 **M22 (2026-09-01) closed the gap by changing the code, not just the words**: the crypto moved
 client-side (`frontend/lib/crypto/medical.ts`), no medical-notes endpoint accepts a password any
@@ -229,7 +229,7 @@ that lets a user create an account must provide **both**:
    app.
 
 **Backend already supports this — this is scoped as UI work, not backend work.** Per root
-`CLAUDE.md`'s GDPR section, the Flask backend already implements Article 17 erasure end to end:
+the conventions doc's GDPR section, the Flask backend already implements Article 17 erasure end to end:
 
 - `DELETE /api/v1/user/me` (authenticated) — begins the erasure grace period: deactivates the
   account, revokes all sessions, and emails a cancellation link valid 30 days
@@ -250,7 +250,7 @@ that lets a user create an account must provide **both**:
   trigger the same deletion-request flow if they still remember credentials, or (b), since
   Google's bar is "can request deletion without installing/logging in," at minimum clearly
   explain how to request deletion and provide a contact/form path — this is the "one public web
-  page" referenced in `plans/M9.md`. This is a small, standalone frontend task, not gated on
+  page" referenced in the M9 plan. This is a small, standalone frontend task, not gated on
   mobile shipping, and could reasonably land in the M9 frontend track or earlier.
 - The existing `support_email` fallback already wired into the deletion-request email template
   (`support@kayakplanner.app` default) could double as the no-login contact path if a full
@@ -261,13 +261,13 @@ that lets a user create an account must provide **both**:
 **Sources** (checked 2026-08-26, via WebSearch snippets):
 - [Understanding Google Play's app account deletion requirements — Play Console Help](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en)
 - [About the Data Safety Form and Account Deletion — Play Developer Community guide](https://support.google.com/googleplay/android-developer/community-guide/246344978/about-the-data-safety-form-and-account-deletion?hl=en)
-- Root `CLAUDE.md` "GDPR" references + `backend/Resources/user_resource.py` + `backend/Tasks/erasure.py` (read directly from the repo, not web research — the "already built" half of this claim).
+- The root conventions doc "GDPR" references + `backend/Resources/user_resource.py` + `backend/Tasks/erasure.py` (read directly from the repo, not web research — the "already built" half of this claim).
 
 ---
 
 ## 5. No social login (already decided, not re-researched here)
 
-Per `plans/M9.md` item 10 and root `CLAUDE.md`, the app will **not** add Google or Facebook
+Per the M9 plan item 10 and the root conventions doc, the app will **not** add Google or Facebook
 sign-in. This is a deliberate decision, not a gap: adding third-party social login on iOS
 triggers Apple's **Sign in with Apple** requirement (any app offering a third-party social login
 option must also offer Sign in with Apple) for the eventual App Store release. Staying with
@@ -279,9 +279,9 @@ because it interacts with §3/§4 (an email/password-only account is exactly wha
 
 ---
 
-## Summary — what differs from `plans/M9.md`'s current assumptions
+## Summary — what differs from the M9 plan's current assumptions
 
-Nothing found in this research **contradicts** `plans/M9.md`'s existing text — every item it
+Nothing found in this research **contradicts** the M9 plan's existing text — every item it
 flagged (tenure requirement revised more than once, background-location review, Data safety
 declaration needing to describe E2E-encrypted medical notes accurately, GDPR backend already
 built) held up under live-ish research. The medical-notes half of that has since been removed
@@ -290,7 +290,7 @@ not collected. Three points sharpen or add to what the plan currently
 says and are worth folding back in:
 
 1. **The 12-testers/14-days figure has been stable since December 2024 and is still current** —
-   `plans/M9.md` correctly flagged it as "revised more than once" but didn't state the current
+   the M9 plan correctly flagged it as "revised more than once" but didn't state the current
    number; it's **12 testers, 14 continuous days**, confirmed current as of 2026-08-26.
 2. **A newer minimum-scope "location button" pattern** for one-off/transactional location
    requests is worth designing the mobile map screens around from the start, so the background

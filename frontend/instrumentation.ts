@@ -4,7 +4,7 @@ import { API_URL, SSE_URL } from "@/lib/api/config"
 // M13 §A.3 — server-side distributed tracing (ADR-009). Mirrors the backend's
 // Api/observability.py: unset LOGFIRE_TOKEN is a clean no-op (no exporter registered,
 // no network calls). Browser-side RUM is explicitly out of scope
-// (plans/M13-observability-logfire.md A.3) — no client bundle weight added for it.
+// (the M13 plan A.3) — no client bundle weight added for it.
 //
 // "Unset" is a claim about the environment, not a guarantee this file makes. A developer
 // with LOGFIRE_TOKEN exported in their shell profile has it inherited by anything they

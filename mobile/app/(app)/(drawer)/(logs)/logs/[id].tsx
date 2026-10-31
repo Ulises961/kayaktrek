@@ -22,7 +22,7 @@ const header = <RouterStack.Screen options={{ title: "Log" }} />
 
 // Own logs are editable in place; a log surfaced via the "Endorsed" tab (someone
 // else's) shows read-only with an endorse/withdraw toggle instead — same screen,
-// branching on whether the caller is the author (plans/M9i.md WP1).
+// branching on whether the caller is the author (the M9i plan WP1).
 export default function LogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()

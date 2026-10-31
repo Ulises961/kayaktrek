@@ -261,7 +261,7 @@ test.describe("Responsive — the log card's actions", () => {
     // mutation landing rather than a guess at how long it takes. The reload then
     // gets the list from the server: Next 16.2.10 drops the apply of a streamed
     // action response often enough that the new card otherwise never appears
-    // (root CLAUDE.md, E2E section).
+    // (the root conventions doc, E2E section).
     await expect(dialog).toBeHidden()
     await page.reload()
 

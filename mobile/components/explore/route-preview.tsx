@@ -5,7 +5,7 @@ import { palette } from "@shared/tokens"
 
 // A flat SVG trace of the route, from the simplified [lat, lng] pairs the explore
 // listing already carries — no map instance, no tile fetch. Same reasoning as the trip
-// card's deliberate lack of a live thumbnail (plans/M9b2.md WP3): N MapLibre instances
+// card's deliberate lack of a live thumbnail (the M9b2 plan WP3): N MapLibre instances
 // in a scrolling list is a real performance problem, and a listing card only needs the
 // route's silhouette.
 const HEIGHT = 64

@@ -16,7 +16,7 @@ import Schemas
 OPENAPI_SPEC_ENDPOINT = "/api/v1/openapi.json"
 DOCS_URL_PREFIX = "/api/v1/docs"
 
-# Dev-only routes (404 outside DEVELOPMENT, backend/CLAUDE.md) aren't part of the public
+# Dev-only routes (404 outside DEVELOPMENT, the backend conventions doc) aren't part of the public
 # contract a client generator should ever see.
 _EXCLUDED_BLUEPRINTS = {"dev"}
 

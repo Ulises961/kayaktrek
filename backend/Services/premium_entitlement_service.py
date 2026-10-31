@@ -1,6 +1,6 @@
 class PremiumEntitlementService:
     """No-op self-hosted default for the "is this user entitled to a paid integration"
-    check, per ROADMAP.md's "Open-core licensing + premium integrations broker" — Core
+    check, per the product roadmap's "Open-core licensing + premium integrations broker" — Core
     BE always contains this check; a real implementation that calls the Premium Broker
     is wired only in the hosted deployment, never in this (public) repo. Same
     "interface in Core BE, no-op self-hosted default, real implementation swapped in

@@ -13,7 +13,7 @@ interface SectionProps {
   children: ReactNode
 }
 
-// Draft ToU: reasonable starting content covering CLAUDE.md's pre-production checklist
+// Draft ToU: reasonable starting content covering the conventions doc's pre-production checklist
 // (safety disclaimer + no-vouching-for-user-content clause), grounded in how comparable
 // marine navigation apps (Savvy Navvy, eSeaGo, SeaNav) phrase their own "not for
 // navigation" disclaimers. Not a substitute for actual legal review before a real launch

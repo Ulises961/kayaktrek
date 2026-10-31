@@ -77,7 +77,7 @@ describe("fitZoom", () => {
 
 describe("tilePackRegion", () => {
   // The free tier caches the view the itinerary opens at, not the detail below it
-  // (plans/M26.md M9g, "Zoom split").
+  // (the M26 plan M9g, "Zoom split").
   it("stops at the zoom the itinerary opens at", () => {
     const region = tilePackRegion(ROUTE, VIEWPORT)
 

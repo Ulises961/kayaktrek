@@ -21,7 +21,7 @@ jest.mock("../lib/db/sync-trigger", () => ({
 
 // AppLayout's own job is the auth-gate branching, not the drawer navigator it hands
 // off to once authenticated — that's expo-router's own machinery (rubric rule 7,
-// plans/M9-mobile-test-quality.md: don't test the framework). Redirect/Slot are
+// the M9-mobile-test-quality plan: don't test the framework). Redirect/Slot are
 // stubbed to plain markers so this test asserts AppLayout's branching, not
 // expo-router's internals, the same way jest.setup.ts already stubs Stack.Screen.
 jest.mock("expo-router", () => {

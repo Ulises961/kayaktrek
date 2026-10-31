@@ -267,7 +267,7 @@ services:
       # It was absent here entirely until now, which is the actual bug: `environment:` is
       # the only path into these containers (no `env_file:`), so a value set in .env.prod
       # was discarded and no operator action could fix it. Same shape as INVITE_CODE (see
-      # CLAUDE.md) and M32's OPEN_METEO_* vars — three instances of one pattern.
+      # the conventions doc) and M32's OPEN_METEO_* vars — three instances of one pattern.
       FEED_CREDENTIAL_KEY: ${FEED_CREDENTIAL_KEY:-}
       # Shared with the `frontend` service, and only with it. Sign-in and refresh arrive
       # from a Next server action, so this request's own User-Agent is Node's and its
@@ -282,7 +282,7 @@ services:
       # `environment:` is the only path into these containers — there is no `env_file:` in
       # this compose file — so the backend has always received an empty INVITE_CODE, and
       # `_invite_code_valid` treats empty as "no gate". The gate has therefore never been
-      # active in production, whatever CLAUDE.md said; registration has been open since
+      # active in production, whatever the conventions doc said; registration has been open since
       # #160 shipped.
       #
       # Left empty here, because M25 opens registration deliberately. What the line buys is
@@ -576,7 +576,7 @@ services:
       # It was absent here entirely until now, which is the actual bug: `environment:` is
       # the only path into these containers (no `env_file:`), so a value set in .env.prod
       # was discarded and no operator action could fix it. Same shape as INVITE_CODE (see
-      # CLAUDE.md) and M32's OPEN_METEO_* vars — three instances of one pattern.
+      # the conventions doc) and M32's OPEN_METEO_* vars — three instances of one pattern.
       FEED_CREDENTIAL_KEY: ${FEED_CREDENTIAL_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
