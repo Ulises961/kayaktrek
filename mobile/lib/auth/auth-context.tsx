@@ -16,7 +16,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 // Every M9b screen is authenticated-only — there is no anonymous surface on mobile yet
 // (unlike the web client's (public) route group), so "unauthenticated" always means
-// "show the login screen", never "render a public view". See plans/M9b.md WP1.
+// "show the login screen", never "render a public view". See the M9b plan WP1.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading")
 

@@ -23,14 +23,14 @@
 #   sed -i 's/kayak\.example\.com/<real-domain>/g' kayak-expedition-planner.conf
 #
 # Five server blocks, not one path-based vhost — frontend/backend/SSE are three separate
-# origins by design (frontend/CLAUDE.md, ADR-033: different gunicorn process, separate
+# origins by design (the frontend conventions doc, ADR-033: different gunicorn process, separate
 # NEXT_PUBLIC_API_URL/NEXT_PUBLIC_SSE_URL, CORS/CSP built around cross-origin
 # fetch/EventSource calls), so nginx mirrors that instead of introducing a second,
 # path-based routing scheme the app doesn't otherwise assume. www. and the redirect-only
 # apex are the two blocks M28 adds — see below.
 #
 # The MinIO `storage.` vhost this file used to carry is gone: object storage moved to
-# Cloudflare R2 on 2026-08-26 (root CLAUDE.md "Object storage"), and
+# Cloudflare R2 on 2026-08-26 (the root conventions doc "Object storage"), and
 # `docker-compose.prod.yml` says plainly "MinIO is no longer in this file" — there has
 # been nothing on :9000 in production to proxy to since that migration. Drop its DNS
 # route and cert SAN on the box the next time the cert is touched (M28's SAN-list change

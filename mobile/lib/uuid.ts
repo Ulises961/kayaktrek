@@ -1,6 +1,6 @@
 // UUIDv7 (RFC 9562): a 48-bit millisecond timestamp, then random bits. The project's
 // primary-key format — anything created offline carries an id generated here, so later
-// queued changes can refer to it before the server has seen it (plans/M9d.md).
+// queued changes can refer to it before the server has seen it (the M9d plan).
 //
 // These ids need to be unique, not secret: the server authorises every change by the
 // signed-in account, never by knowing an id. So Math.random stands in when the runtime

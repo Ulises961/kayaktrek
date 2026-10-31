@@ -9,7 +9,7 @@ import {
 } from "../fixtures/itinerary"
 
 // M14 — flat itinerary-edit surface. Closes the gap flagged in
-// plans/M14-flat-itinerary-edit.md §7: none of the other 16 specs in this
+// the M14 plan §7: none of the other 16 specs in this
 // directory has ever driven the itinerary builder's own editing UI (dragging
 // a day boundary, saving/discarding a draft, dropping a point on the map).
 // That surface is the actual product, and its M14 regressions (the implicit

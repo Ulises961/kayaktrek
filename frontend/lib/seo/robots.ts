@@ -33,7 +33,7 @@ export const INDEXABLE_PATHS = ["/", "/about", "/terms", "/privacy"]
 //   - the token-bearing auth callbacks: single-use links that mean nothing to a crawler.
 //
 // `/explore` and `/routes` were temporarily disallowed from 2026-09-07 while the public
-// library held only the operator's own demo content (§5 of `plans/M25-web-1.0-release.md`
+// library held only the operator's own demo content (§5 of the M25 plan
 // was still open). Reinstated 2026-09-12 once two real, author-pitched routes were
 // published — text description + difficulty grade was judged enough to be worth crawling;
 // photos and a trip narrative (M7d) are a nice-to-have for future routes, not a gate on

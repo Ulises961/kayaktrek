@@ -25,7 +25,7 @@ export async function getPublicProfile(username: string): Promise<PublicUser | n
 
 // Deliberately narrower than web's ProfileFormSchema (frontend/lib/dtos/user.ts) —
 // vessel/emergency-contact fields are float-plan territory, out of scope for M9i
-// (plans/M9i.md WP1 only covers the M7a identity fields).
+// (the M9i plan WP1 only covers the M7a identity fields).
 export type ProfileEditFields = {
   name: string
   surname?: string | null

@@ -9,7 +9,7 @@
 #      swap. An email header band is a fixed dark navy (#122540) regardless of the
 #      reader's theme, so the *dark* colourway has to be baked in — the light one is
 #      a near-black navy that would vanish into the band. That is the same trap the
-#      previous mark fell into against the dark app shell (frontend/CLAUDE.md).
+#      previous mark fell into against the dark app shell (the frontend conventions doc).
 #   3. ImageMagick here has no librsvg delegate, and its internal renderer does not
 #      reliably apply CSS classes. Resolving them to inline fill= attributes first
 #      makes the rasterisation independent of which renderer is installed.

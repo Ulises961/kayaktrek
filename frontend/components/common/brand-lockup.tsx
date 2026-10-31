@@ -76,7 +76,7 @@ export function BrandLockup({
         // unlayered CSS (globals.css, outside any `@layer`) and forces uppercase,
         // which beats any Tailwind `normal-case` override regardless of source order
         // (`.chart-eyebrow` isn't in `@layer utilities`, `normal-case` is) — see
-        // frontend/CLAUDE.md's `@layer components` note. A thin rule instead of a dot:
+        // the frontend conventions doc's `@layer components` note. A thin rule instead of a dot:
         // a dot is a list/breadcrumb separator between two peers, a rule is a divider
         // inside one unit.
         <span

@@ -20,7 +20,7 @@
 # See DEPLOY.md for the lifecycle rule and the key-application settings.
 #
 # Exit codes: 0 success, non-zero on any failure (cron will mail the output to the local
-# user; there is deliberately no app-level alerting yet — see CLAUDE.md's alerting item).
+# user; there is deliberately no app-level alerting yet — see the conventions doc's alerting item).
 
 set -euo pipefail
 

@@ -1,6 +1,6 @@
 # `SatelliteFeedSource` parser interface — design spec
 
-> M9a WP3. Feeds `plans/M9.md` M9f (Tier 2 — server-side satellite feed polling). Produced
+> M9a WP3. Feeds the M9 plan M9f (Tier 2 — server-side satellite feed polling). Produced
 > alongside WP2 (tile UX), WP4 (Play Store checklist), WP5 (mobile scaffold) as an independent
 > M9a work package; reconciled into `docs/adr/mobile-offline.md` by WP6 once WP1's schema lands.
 > This file is **not** an edit to `mobile-offline.md` — WP2 is editing that file concurrently.

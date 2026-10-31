@@ -2,7 +2,7 @@
 #
 # Reproduce the remote E2E CI run locally under the GitHub-hosted runner's real
 # resource envelope using `act`, so contention-driven post-mutation flakiness
-# surfaces without burning remote runs. See plans/e2e-hardening.md / ADR-030.
+# surfaces without burning remote runs. See the e2e-hardening plan / ADR-030.
 #
 # Usage:
 #   e2e/run-constrained-ci.sh                 # faithful: 2 CPU / 7g

@@ -68,7 +68,7 @@ warn_unused_ignores = true
 # Strictness is tightened per layer in the override below, and only once a layer has no
 # unannotated function left: a layer on the list can never gain one. Schemas stay outside
 # on purpose — their functions are marshmallow hooks and validators whose signatures the
-# library dictates, so annotating 175 of them would mostly mean `Any` (plans/M37-discipline-pass.md WP3).
+# library dictates, so annotating 175 of them would mostly mean `Any` (the M37 plan WP3).
 
 [[tool.mypy.overrides]]
 module = ["Api.*", "Models.*", "Resources.*", "Services.*", "Tasks.*"]

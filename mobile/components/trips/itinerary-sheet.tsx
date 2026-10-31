@@ -8,7 +8,7 @@ import { lightTokens } from "@shared/tokens";
 import { PointSummaryCard } from "./point-summary-card";
 import { hasConditions, WeatherSeaPanel } from "./weather-sea-panel";
 
-// M9b3 WP2: `@gorhom/bottom-sheet` (see plans/M9b3.md's library-choice table) — a
+// M9b3 WP2: `@gorhom/bottom-sheet` (see the M9b3 plan's library-choice table) — a
 // non-modal, persistently-docked panel, unlike the reverted `@expo/ui` prototype.
 // M9l WP2 (revised): the day strip used to live in this sheet's handle; it's now
 // `DayRail`, a separate bar above the map (matching web's actual layout — see

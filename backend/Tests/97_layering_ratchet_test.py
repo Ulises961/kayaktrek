@@ -10,7 +10,7 @@ in *either* direction:
   describing the code and the ratchet only ever tightens.
 
 Counts come from the AST, not a text search, so comments and strings cannot move them. When a
-baseline dictionary is empty the rule is simply enforced. See ``plans/M37-discipline-pass.md``.
+baseline dictionary is empty the rule is simply enforced. See the M37 plan.
 """
 import ast
 import configparser

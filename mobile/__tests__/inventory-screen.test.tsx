@@ -32,7 +32,7 @@ import { useIsOffline } from "../lib/network/use-is-offline"
 
 // Extends jest.setup.ts's global Stack.Screen stub rather than replacing the module —
 // this screen also needs useLocalSearchParams, which no other screen test has needed
-// yet (M9b's map/float-plan screens have no tests, per CLAUDE.md's M9b entry).
+// yet (M9b's map/float-plan screens have no tests, per the conventions doc's M9b entry).
 jest.mock("expo-router", () => {
   const actual = jest.requireActual("expo-router")
   return {

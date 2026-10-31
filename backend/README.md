@@ -60,4 +60,4 @@ pipenv run flask --app Api.app db migrate -m "description"
 pipenv run flask --app Api.app db upgrade
 ```
 
-For full developer documentation, conventions, and known gaps see [CLAUDE.md](CLAUDE.md).
+For how to contribute and where the architecture decisions are recorded, see [CONTRIBUTING.md](../CONTRIBUTING.md) and `docs/adr/`.

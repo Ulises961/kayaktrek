@@ -46,7 +46,7 @@ type Tab = "search" | "buddies" | "blocked"
 
 // A connection has no notion of "which side is me" on its own — the caller's own
 // user id (from the session, not the connection row) decides both the counterparty
-// and whether a pending row is incoming or outgoing (M9i WP2, plans/M9i.md).
+// and whether a pending row is incoming or outgoing (M9i WP2, the M9i plan).
 function directionOf(connection: Connection, userId: string | null): ConnectionDirection {
   if (connection.status === "accepted") return "accepted"
   return connection.addressee.id === userId ? "incoming" : "outgoing"

@@ -13,7 +13,7 @@ import { startTripChanges } from "../../lib/live/trip-changes"
 // Renders <Slot />, not a Stack: the matched child is (drawer)/_layout.tsx, which is
 // its own navigator (a Drawer) supplying its own chrome — wrapping it in another Stack
 // here would nest two navigators for no reason. This layout's only job is the auth
-// gate (M9i WP0, plans/M9i.md — a drawer, not a bottom tab bar, since the destination
+// gate (M9i WP0, the M9i plan — a drawer, not a bottom tab bar, since the destination
 // count won't stay small: logs, buddies, inventory, settings, and M9j's voice-control
 // affordance are all plausible top-level entries).
 export default function AppLayout() {
@@ -29,7 +29,7 @@ export default function AppLayout() {
   // Guarded on `authenticated` because every sync call needs a token; starting
   // it while the session is still loading would just burn a sweep on 401s.
   // Mounting an effect here is unrelated to the `<Stack.Screen name=...>`
-  // duplicate-registration hazard M9b documented for layouts (root CLAUDE.md) —
+  // duplicate-registration hazard M9b documented for layouts (the root conventions doc) —
   // this layout registers no screens, it renders a <Slot />.
   useEffect(() => {
     if (status !== "authenticated") return

@@ -5,11 +5,11 @@ import { palette } from "@shared/tokens"
 // Port of frontend/components/common/brand-mark.tsx — same path data (a modern
 // nautical rose by Kertase, CC0 1.0, see docs/brand/licences.md), same three-tone
 // split (ink/lit/hull). Web paints these from --mark-* CSS custom properties,
-// which react-native-svg cannot read — this is a minimal pass (plans/M9b2.md WP5),
+// which react-native-svg cannot read — this is a minimal pass (the M9b2 plan WP5),
 // not the full brand system, so it maps to the closest existing shared palette
 // swatches (ocean900/ocean500/sunset500) instead of adding new --mark-* tokens to
 // tokens.ts. No dark-mode swap either: mobile has none yet (M9b's own gap, see
-// plans/M9b2.md's "Not in scope").
+// the M9b2 plan's "Not in scope").
 const FLATTEN = "matrix(0.264583,0,0,0.264583,-44.785859,-101.392814)"
 const BOX = 135.987
 

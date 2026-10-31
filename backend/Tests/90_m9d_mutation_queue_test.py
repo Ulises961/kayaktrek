@@ -3,7 +3,7 @@
 POST /api/v1/sync/mutations: a phone that was offline sends the changes it queued, as
 envelopes. Each is applied through the ordinary service layer, in the order it was made
 on the device, in its own transaction, and exactly once however often the batch is
-retried (plans/M9d.md, docs/adr/mobile-offline.md "Sync up").
+retried (the M9d plan, docs/adr/mobile-offline.md "Sync up").
 """
 import json
 from datetime import datetime, timedelta, timezone

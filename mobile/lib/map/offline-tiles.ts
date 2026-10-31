@@ -5,7 +5,7 @@ import { Dimensions } from "react-native"
 import type { Bounds } from "./bounds"
 import { MAP_STYLE, OSM_TILE_URL } from "./tiles"
 
-// M9g, free tier (plans/M26.md, "Zoom split"): every synced trip keeps the map
+// M9g, free tier (the M26 plan, "Zoom split"): every synced trip keeps the map
 // tiles for the view its itinerary opens at, so the map under the route still
 // renders at sea. Deeper zoom is a later, premium download, not this one.
 //

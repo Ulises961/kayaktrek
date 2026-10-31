@@ -20,7 +20,7 @@ import { Text } from "../ui/text"
 // Mirrors frontend/components/common/trip-card.tsx's field choices (destination as
 // title, state badge, date range, crew count, icon meta row) — not its exact visual
 // treatment (no route thumbnail, no hero ring; this is a plain list row, not the web
-// dashboard grid — see plans/M9b2.md WP3 for why the thumbnail is deliberately out).
+// dashboard grid — see the M9b2 plan WP3 for why the thumbnail is deliberately out).
 // `Link asChild` clones its child and injects onPress/href handling, which only a
 // Pressable-like component honors — `Card` is a plain View, so it wraps a Pressable.
 export function TripCard({ trip }: { trip: TripCardData }) {

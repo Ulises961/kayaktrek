@@ -47,7 +47,7 @@ function DayRailEntry({
 
   // Content-bearing placeholder words ("No points", "Add date") stay at full
   // muted-foreground / ≥85% opacity — opacity-quieted variants are reserved for
-  // decorative elements (M12 §E contrast rule, frontend/CLAUDE.md).
+  // decorative elements (M12 §E contrast rule, the frontend conventions doc).
   const placeholderColor = isActive ? "text-primary-foreground/85" : "text-muted-foreground"
 
   return (
