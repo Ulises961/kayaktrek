@@ -48,6 +48,11 @@ class Config:
     # (special-category health data), so an environment that forgets to configure this must not
     # end up collecting it. See docs/adr/safety-privacy.md "Parked" and Api/features.py.
     MEDICAL_NOTES_ENABLED = os.getenv("MEDICAL_NOTES_ENABLED", "").lower() in {"1", "true", "yes"}
+    # Who may use a paid integration (Services/premium_entitlement_service.py). Blank selects the
+    # built-in provider; otherwise `module:Class`. The built-in one answers no to everyone unless
+    # PREMIUM_FEATURES_OPEN is set, so a deployment that configures neither opens nothing.
+    ENTITLEMENT_PROVIDER = os.getenv("ENTITLEMENT_PROVIDER", "")
+    PREMIUM_FEATURES_OPEN = os.getenv("PREMIUM_FEATURES_OPEN", "").lower() in {"1", "true", "yes"}
     CACHE_TYPE = "RedisCache"
     # Key for satellite feed credentials (Services/Utils/server_secret_crypto.py): an application
     # secret rather than a user-derived one, because the beat task decrypts unattended. Empty by
@@ -84,6 +89,9 @@ class TestingConfig(Config):
     # Forced on so the parked feature keeps its test coverage; the flag-off path is covered by
     # Tests/81_medical_notes_parked_test.py, which overrides this.
     MEDICAL_NOTES_ENABLED = True
+    # Pinned so a developer's .env cannot change what the suite asserts about the default provider.
+    ENTITLEMENT_PROVIDER = ""
+    PREMIUM_FEATURES_OPEN = False
     # A real value may come from a local .env, but the suite must not require every
     # contributor to set one (same as SECRET_KEY above).
     FEED_CREDENTIAL_KEY = os.getenv("FEED_CREDENTIAL_KEY", "00" * 32)

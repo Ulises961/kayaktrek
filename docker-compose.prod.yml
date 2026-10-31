@@ -254,6 +254,11 @@ services:
       OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
       OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
       OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      # Who may use a paid integration (M41). Blank keeps the built-in provider, which says no
+      # to everyone; needed on `backend` for the weather-refresh route and on `worker` for the
+      # forecast horizon.
+      ENTITLEMENT_PROVIDER: ${ENTITLEMENT_PROVIDER:-}
+      PREMIUM_FEATURES_OPEN: ${PREMIUM_FEATURES_OPEN:-}
       # M29 satellite-feed credentials, encrypted at rest with AES-GCM under this key
       # (Services/Utils/server_secret_crypto.py). Needed on `backend`, which encrypts on
       # create/update, and on `worker`, which decrypts on every poll — not on `beat`, which
@@ -563,6 +568,9 @@ services:
       OPEN_METEO_WEATHER_BASE_URL: ${OPEN_METEO_WEATHER_BASE_URL:-}
       OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-}
       OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+      # Entitlement provider (M41) — see the matching block on `backend`.
+      ENTITLEMENT_PROVIDER: ${ENTITLEMENT_PROVIDER:-}
+      PREMIUM_FEATURES_OPEN: ${PREMIUM_FEATURES_OPEN:-}
       # M29 satellite-feed credentials, encrypted at rest with AES-GCM under this key
       # (Services/Utils/server_secret_crypto.py). Needed on `backend`, which encrypts on
       # create/update, and on `worker`, which decrypts on every poll — not on `beat`, which
