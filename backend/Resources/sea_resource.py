@@ -13,7 +13,7 @@ from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner
 from Services.day_service import DayService
 from Services.open_meteo_service import OpenMeteoService
-from Services.premium_entitlement_service import PremiumEntitlementService
+from Services.premium_entitlement_service import get_entitlement_provider
 from Services.sea_service import SeaService
 from Services.tidal_service import TidalService
 from Tasks.weather_fetch_task import fetch_weather
@@ -256,7 +256,7 @@ def trigger_weather_refresh(id: str) -> ResponseReturnValue:
         day = DayService.get_day_by_id(id)
         if not day.date:
             abort(HTTPStatus.BAD_REQUEST, description="Day must have a date before fetching weather")
-        if not PremiumEntitlementService.has_weather_refresh_access(g.current_user_id):
+        if not get_entitlement_provider().has_weather_refresh_access(g.current_user_id):
             abort(HTTPStatus.FORBIDDEN, description="Weather refresh requires a premium plan")
 
         cooldown_key = f"weather_refresh_cooldown:{id}"

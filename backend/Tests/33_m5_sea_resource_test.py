@@ -207,7 +207,7 @@ def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerar
     mock_result.id = "mock-celery-task-id"
     with (
         patch(
-            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            "Services.premium_entitlement_service.PremiumEntitlementService.has_weather_refresh_access",
             return_value=True,
         ),
         patch("Resources.sea_resource.fetch_weather") as mock_task,
@@ -232,7 +232,7 @@ def test_weather_refresh_429_within_cooldown(client, auth_headers, itinerary):
     mock_result.id = "mock-celery-task-id"
     with (
         patch(
-            "Resources.sea_resource.PremiumEntitlementService.has_weather_refresh_access",
+            "Services.premium_entitlement_service.PremiumEntitlementService.has_weather_refresh_access",
             return_value=True,
         ),
         patch("Resources.sea_resource.fetch_weather") as mock_task,

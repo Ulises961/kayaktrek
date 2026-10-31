@@ -17,6 +17,7 @@ from Api.openapi import setup_openapi
 from Api.error_handlers import register_error_handlers
 from Api.seed import seed_item_categories, seed_place_categories
 from Api.celery_app import init_celery
+from Services.premium_entitlement_service import get_entitlement_provider
 from Services.Utils.json_encoder import CustomJSONProvider
 
 from Resources.user_resource import user_api
@@ -88,6 +89,9 @@ def createApp(config_mode: str, *, schema: str | None = None) -> Flask:
         template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"),
     )
     app.config.from_object(config[config_mode])
+
+    with app.app_context():
+        get_entitlement_provider()  # a bad ENTITLEMENT_PROVIDER stops the process here
 
     if schema:
         engine_opts = dict(app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
