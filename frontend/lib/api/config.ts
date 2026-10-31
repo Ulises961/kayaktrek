@@ -31,7 +31,7 @@ export const API_PREFIX = `/api/${API_VERSION}`
 // The M8 SSE sidecar (ADR-033) — a separate gevent-worker process from the main
 // sync-worker backend, since long-lived EventSource connections would otherwise
 // starve the request pool. Dev: two ports, no proxy (docker-compose.yml). Prod: one
-// public origin, nginx routes `/api/v1/live/.../stream` here (see plans/M8.md
+// public origin, nginx routes `/api/v1/live/.../stream` here (see the M8 plan
 // Appendix — reverse-proxy routing sketch).
 export const SSE_URL = resolveOrigin(
   process.env.NEXT_PUBLIC_SSE_URL,

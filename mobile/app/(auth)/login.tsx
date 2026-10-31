@@ -43,7 +43,7 @@ export default function LoginScreen() {
     // static hero. The card below is the cartouche.
     //
     // The gradient is drawn with react-native-svg, which is already a dependency (the
-    // brand mark is SVG), rather than with expo-linear-gradient as plans/M30-*.md WP1
+    // brand mark is SVG), rather than with expo-linear-gradient as the M30 plan WP1
     // suggested. Same result, one fewer native module — and no dev-client rebuild, so
     // this ships as a JS-only change.
     <Screen className="items-center justify-center bg-ocean-900 p-6">

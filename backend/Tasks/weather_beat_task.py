@@ -11,7 +11,7 @@ from Api.database import db
 from Models.day import Day
 from Models.itinerary import Itinerary
 from Models.trip import Trip, TripStateType
-from Services.premium_entitlement_service import PremiumEntitlementService
+from Services.premium_entitlement_service import get_entitlement_provider
 from Tasks.weather_fetch_task import fetch_weather
 
 logger = logging.getLogger(__name__)
@@ -29,15 +29,13 @@ ATTENTION_TIMEOUT_DAYS = 7
 
 
 def effective_horizon_days(user_id: Optional[str]) -> int:
-    """Wired through PremiumEntitlementService.has_extended_forecast_access rather
-    than returning FORECAST_HORIZON_DAYS directly, so a future extended-range
-    premium tier (ROADMAP.md "Weather forecast resolution & refresh control") is a
-    matter of flipping that stub, not re-deriving this gate. Always the free
-    10-day cutoff today — the stub is closed by default. user_id is None for the
-    beat sweep itself, which has no single "requesting user" — always the free
-    default in that case.
+    """Asks the configured entitlement provider about extended forecasts rather than
+    returning FORECAST_HORIZON_DAYS directly, so an extended-range tier is a matter of a
+    provider answering yes, not re-deriving this gate. Always the free 10-day cutoff
+    today. user_id is None for the beat sweep itself, which has no single "requesting
+    user" — always the free default in that case.
     """
-    if user_id and PremiumEntitlementService.has_extended_forecast_access(user_id):
+    if user_id and get_entitlement_provider().has_extended_forecast_access(user_id):
         return FORECAST_HORIZON_DAYS  # no extended-range implementation exists yet
     return FORECAST_HORIZON_DAYS
 

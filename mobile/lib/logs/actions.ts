@@ -12,7 +12,7 @@ import { StatsSchema, type Stats } from "@shared/dtos/public-profile"
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client"
 
 // Page 1 only, matching M9b's "validate the round trip first" scope rather than
-// building pagination/filter UI up front (M9i, plans/M9i.md WP1).
+// building pagination/filter UI up front (M9i, the M9i plan WP1).
 export async function getLogs(sort: LogSort = LOG_SORT.NEWEST): Promise<LogPage> {
   const raw = await apiGet<unknown>(`/api/log/all?page=1&sort=${sort}`)
   return LogPageSchema.parse(raw)

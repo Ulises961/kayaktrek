@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 import re
 from marshmallow import Schema, fields, post_load, validates, ValidationError, pre_load, EXCLUDE
 
@@ -59,7 +59,7 @@ class WeatherStateSchema(Schema):
     @validates('cloud')
     def validate_cloud(self, value, **kwargs):
         if value is not None:
-            sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+            sanitized = sanitize_text(value)
             if len(sanitized) > 50:
                 raise ValidationError("Cloud description cannot exceed 50 characters")
             if re.search(r'[<>"\';]', sanitized):

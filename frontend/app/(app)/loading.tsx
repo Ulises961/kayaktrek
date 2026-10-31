@@ -11,7 +11,7 @@ export default function AppLoading() {
 
       {/* Primary content card */}
       <div className="bg-card flex flex-col gap-4 rounded-lg border p-6">
-        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-5 w-48 max-w-full" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-4/5" />
         <Skeleton className="h-4 w-3/5" />

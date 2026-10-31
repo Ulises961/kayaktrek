@@ -1,7 +1,7 @@
 from flask import g
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
 from uuid import UUID
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 
 from Models.catalog_item import CatalogItem
 from Schemas.base_schema import BaseSchema
@@ -28,7 +28,7 @@ class CatalogItemSchema(BaseSchema):
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         if 'name' in data and data['name'] is not None:
-            data['name'] = bleach.clean(str(data['name']).strip(), tags=[], strip=True)
+            data['name'] = sanitize_text(data['name'])
         return data
 
     @validates('name')

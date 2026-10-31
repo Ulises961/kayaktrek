@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 a route thumbnail on a trip card, the explore map — is not inside a
                 stacking context that contains them, so at z-20 the header was painted
                 *under* the map it was supposed to sit above. Same reason the frontend
-                CLAUDE.md requires z-[1001]+ for anything overlaid on a map; the app chrome
+                conventions doc requires z-[1001]+ for anything overlaid on a map; the app chrome
                 is overlaid on a map too, it just does not look like it. */}
             <header className="chart-header-app sticky top-0 z-[1100] flex h-(--app-header-h) shrink-0 flex-row items-center gap-2 px-4">
               <SidebarTrigger className="md:hidden" />

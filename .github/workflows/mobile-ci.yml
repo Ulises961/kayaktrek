@@ -71,7 +71,7 @@ jobs:
 
       # `mobile/` imports `../frontend/lib/tokens.ts` and `../frontend/lib/dtos/*` directly
       # over Metro's watchFolders (metro.config.js) rather than through any workspace
-      # tooling — plans/M9.md item 11 / plans/M9a.md WP5. Those files' own dependencies
+      # tooling — the M9 plan item 11 / the M9a plan WP5. Those files' own dependencies
       # (zod) have to actually be on disk for typecheck/lint/test/export to resolve them,
       # so the frontend workspace needs installing too, even though this job never runs
       # any frontend script.

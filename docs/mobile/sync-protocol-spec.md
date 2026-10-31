@@ -48,7 +48,7 @@ construction. Each queued envelope is a change record. The only live decision wa
 
 > **Sync-up superseded, 2026-09-25 (M9d).** The app uses WatermelonDB for sync-*down* only.
 > Everything the phone changes, except the route, goes up as envelopes through the mutation
-> queue (`docs/adr/mobile-offline.md` "Sync up", `plans/M9d.md`); the `pushChanges` endpoint
+> queue (`docs/adr/mobile-offline.md` "Sync up", the M9d plan); the `pushChanges` endpoint
 > item 4 below built was removed once nothing used it. The route still travels on its own
 > channel (§8.2). The `pushChanges` discussion below is kept as the design history it is.
 
@@ -174,7 +174,7 @@ is that it needs triggers (or service-layer cascade) to capture DB-cascaded dele
 `BaseModel`: no `id`, no `created`, no `updated`. `Weather`/`Sea` are keyed by `day_id`;
 `WeatherState`/`SeaState` by the composite `(day_id, time)`.
 
-This is deliberate and documented as a pattern (`plans/M5.md:99` calls out `TidalStreamEntry` as
+This is deliberate and documented as a pattern (the M5 plan calls out `TidalStreamEntry` as
 "composite PK, no `BaseModel`"). The reason is visible in `Tasks/weather_fetch_task.py:90`:
 
 ```python
@@ -513,7 +513,7 @@ phone that can be lost at sea. That trade is what M9c has to weigh, and it still
 
 **What M22 changes is the cost side of that trade, not the decision.** Medical-notes crypto now
 runs client-side (`frontend/lib/crypto/medical.ts` on web; the same module, or a React Native
-port of it per the library-choice note in `plans/M22-client-side-medical-crypto.md`, would run on
+port of it per the library-choice note in the M22 plan, would run on
 mobile). Concretely, if M9c decides notes should sync:
 
 - What syncs down is `User.public_key` / `private_key_ciphertext/nonce/salt` and the sealed

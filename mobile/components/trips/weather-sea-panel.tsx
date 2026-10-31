@@ -18,7 +18,7 @@ import { Text } from "../ui/text";
 import { SeaHourGrid } from "./sea-hour-grid";
 import { WeatherHourGrid } from "./weather-hour-grid";
 
-// WP5 (plans/M9b.md): pure display, no rule-of-twelfths interactivity — the web
+// WP5 (the M9b plan): pure display, no rule-of-twelfths interactivity — the web
 // builder's tidal-gate calculator is explicitly out of scope for this milestone.
 // One representative hourly reading per condition, same convention the web day
 // strip/feature-drawer chips use (representativeHour prefers midday).
@@ -56,7 +56,7 @@ export function conditionsTeaser(day: Day | null): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-// M9c WP5 (plans/M9c.md, docs/mobile/sync-protocol-spec.md §6.4): device-initiated
+// M9c WP5 (the M9c plan, docs/mobile/sync-protocol-spec.md §6.4): device-initiated
 // refresh, gated by `PremiumEntitlementService` on the backend — a closed-by-default
 // self-hosted stub, so a 403 here is an expected outcome, not a failure state.
 // `refreshDayWeather` only queues the refetch; it carries no completion signal, so
@@ -145,7 +145,7 @@ export function WeatherSeaPanel({
       {/* M9l WP4: the full hourly series, not just one representative hour — this
           plan's own analysis had wrongly deferred these as if they were the
           TidalEntryForm/RuleOfTwelfthsTable editing widgets, when they're pure
-          display (see plans/M9l.md's corrected table row). */}
+          display (see the M9l plan's corrected table row). */}
       <WeatherHourGrid
         states={day?.weather?.weatherStates ?? []}
         selectedHour={selectedHour}

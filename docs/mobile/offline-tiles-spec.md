@@ -1,11 +1,11 @@
 # Offline Map Tile Management — Mobile Client Design Spec
 
-> **Status: design only, unreviewed.** Written 2026-08-26 as M9a work package 2 (`plans/M9a.md`
+> **Status: design only, unreviewed.** Written 2026-08-26 as M9a work package 2 (the M9a plan
 > WP2), answering `docs/adr/mobile-offline.md`'s "Unresolved before M9 starts" item 4 and the
 > "Map SDK — MapLibre React Native" section's offline-tile paragraph. No app code exists yet.
 > This document does not edit `docs/adr/mobile-offline.md` directly — WP3 is concurrently
 > editing that file; folding this in (or linking it from the decision log) is WP6's
-> reconciliation pass, not this document's job. Feeds M9g (`plans/M9.md`).
+> reconciliation pass, not this document's job. Feeds M9g (the M9 plan).
 
 ## Scope
 
@@ -103,7 +103,7 @@ proxy, not Mapbox's. The method itself is still worth using, as a **self-imposed
 safety valve** (§6), just not for the reason its docstring names.
 
 **Native module, not Expo Go**: consistent with M9a's already-decided styling boundary
-(`plans/M9a.md` — "anything wrapping a native third-party view, MapLibre RN chief among them, is
+(the M9a plan — "anything wrapping a native third-party view, MapLibre RN chief among them, is
 budgeted as a native RN rewrite from day one"), `offlineManager` is a native module. It requires
 an Expo dev-client / EAS build, not Expo Go. No new decision here, just noting the offline API
 inherits the same constraint as the map view itself.
@@ -117,7 +117,7 @@ inherits the same constraint as the map view itself.
 Reasoning:
 
 - **The data already exists on-device by the time this matters.** M9c's WatermelonDB sync
-  (`plans/M9.md`) lands full itinerary days + points before M9g's tile download does — the
+  (the M9 plan) lands full itinerary days + points before M9g's tile download does — the
   corridor geometry (a buffered polyline through the trip's points, per day or for the whole
   trip) is a pure client-side computation over data the app already has, no extra network round
   trip and no new backend endpoint.

@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, post_load, pre_load
 from Models.trip_member import TripMember, MemberRoleType
 from Schemas.base_schema import BaseSchema, camelcase
@@ -73,7 +73,7 @@ class TripMemberUpdateSchema(BaseSchema):
     def sanitize_text_fields(self, data, **kwargs):
         for key in _MEMBER_TEXT_FIELDS:
             if data.get(key) is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @post_load

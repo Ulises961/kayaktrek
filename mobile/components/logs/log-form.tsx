@@ -51,7 +51,7 @@ function toLogFields(values: LogFormValues): LogFields {
 // No trip picker — a log created here is standalone (non-endorsable) until a
 // future WP wires this form into a trip context. `tripId` is deliberately left
 // untouched by this form (create/update payloads never send it), matching
-// LogFieldsSchema not needing one for a manual entry (plans/M9i.md WP1).
+// LogFieldsSchema not needing one for a manual entry (the M9i plan WP1).
 export function LogForm({
   initial,
   submitLabel,

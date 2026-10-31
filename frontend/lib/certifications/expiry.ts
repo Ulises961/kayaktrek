@@ -1,5 +1,5 @@
 // A cert is expired when its valid_until date is strictly before today (local).
-// Pure comparison — no storage, no backend involvement (plans/M7a.md §3).
+// Pure comparison — no storage, no backend involvement (the M7a plan §3).
 export function isCertExpired(validUntil?: string | null): boolean {
   if (!validUntil) return false
   const today = new Date().toISOString().slice(0, 10)

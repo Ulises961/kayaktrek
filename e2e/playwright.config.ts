@@ -41,7 +41,7 @@ export default defineConfig({
   // trip-detail re-render after a mutation (7-call fan-out + heavy client
   // reconcile) genuinely takes well over 10s. Size the waits to the runner, not
   // to a fast dev box. (Real fix is the aggregate GET /api/trip/:id/detail — see
-  // ADR-030 / plans/e2e-hardening.md.)
+  // ADR-030 / the e2e-hardening plan.)
   timeout: 120_000,
   expect: { timeout: 30_000 },
 
@@ -78,7 +78,7 @@ export default defineConfig({
     // existing specs at a second viewport would roughly double a 4.8-minute run for no
     // signal. It reuses the SAME storageState as chromium, so it costs zero extra
     // logins — which matters, since a full suite already brushes /auth/login's
-    // 50-an-hour cap (root CLAUDE.md, E2E section).
+    // 50-an-hour cap (the root conventions doc, E2E section).
     //
     // The viewport here is only a default: the canary sets its own per assertion, since
     // it checks each route at both 320 and 640. What this project really supplies is a

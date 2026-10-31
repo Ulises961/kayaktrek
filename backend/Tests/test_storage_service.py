@@ -8,7 +8,7 @@ from Services.storage_service import StorageService
 # STORAGE_PUBLIC_URL (e.g. http://localhost:9000) is what a browser can
 # actually resolve. A presigned URL generated against STORAGE_ENDPOINT embeds
 # and signs a Host the browser can never reach — every private image request
-# would hang/fail. See docs/adr or plans/M7d.md for the incident writeup.
+# would hang/fail. See docs/adr or the M7d plan for the incident writeup.
 
 
 def test_presigned_url_is_signed_against_the_public_endpoint(monkeypatch):

@@ -6,7 +6,7 @@ name: E2E Tests
 # making it useless as a required remote check. Run it locally before milestone
 # commits via `e2e/run-constrained-ci.sh` (act executes this exact workflow).
 # `workflow_dispatch` keeps it manually triggerable but off the PR/push path.
-# (Decision 2026-06-25; see plans/e2e-hardening.md / ADR-030.)
+# (Decision 2026-06-25; see the e2e-hardening plan / ADR-030.)
 on:
   workflow_dispatch:
 

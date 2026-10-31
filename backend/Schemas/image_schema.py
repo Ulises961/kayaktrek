@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import (
     fields, post_dump, post_load, pre_load, validates, ValidationError
 )
@@ -26,7 +26,7 @@ class ImageSchema(BaseSchema):
         # Both are client-supplied free text; location is a server-generated URL.
         for key in ("name", "caption"):
             if data.get(key) is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates("caption")
@@ -63,7 +63,7 @@ class ImageUpdateSchema(BaseSchema):
     @pre_load
     def sanitize_text_fields(self, data, **kwargs):
         if data.get("caption") is not None:
-            data["caption"] = bleach.clean(str(data["caption"]).strip(), tags=[], strip=True)
+            data["caption"] = sanitize_text(data["caption"])
         return data
 
     @validates("caption")

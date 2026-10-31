@@ -69,7 +69,7 @@ def test_insert_itinerary_with_day(client, auth_headers, test_trip):
     assert response.status_code == 201
     body = json.loads(response.data)
     # Assert the created day actually exists, not just that the request routed —
-    # this exact gap (201-only) is the motivating example in plans/M16-backend-test-quality.md.
+    # this exact gap (201-only) is the motivating example in the M16 plan.
     numbered_days = [d for d in body["days"] if d["dayNumber"] != 0]
     assert len(numbered_days) == 1
     assert numbered_days[0]["dayNumber"] == 1

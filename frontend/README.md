@@ -33,4 +33,4 @@ hooks/          Custom React hooks
 
 Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Leaflet + leaflet-velocity, Zod v4, Motion.
 
-For developer conventions, routing rules, map integration notes, and current implementation status see [CLAUDE.md](CLAUDE.md).
+For how to contribute and where the architecture decisions are recorded, see [CONTRIBUTING.md](../CONTRIBUTING.md) and `docs/adr/`.

@@ -415,7 +415,7 @@ def test_fetch_weather_reindexes_a_partial_response_onto_the_full_24_hour_grid(a
 
     with app.app_context():
         # Distinct coordinates from test_cache_miss_calls_api, on purpose —
-        # both tests run in this file's single worker in order (backend/CLAUDE.md),
+        # both tests run in this file's single worker in order (the backend conventions doc),
         # and sharing a cache key lets one test's leftover entry silently
         # short-circuit the other's "calls the API" assertion.
         cache.delete("weather:51.2:-6.2:2026-08-16")

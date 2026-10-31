@@ -64,7 +64,7 @@ cd android
 ```
 
 Prefer EAS for anything beyond local debug testing (release signing, Play Store artifacts) —
-see `docs/mobile/` / `plans/M9a.md` for the EAS profile setup once it exists.
+see `docs/mobile/` / the M9a plan for the EAS profile setup once it exists.
 
 ## Install / logs / debug
 

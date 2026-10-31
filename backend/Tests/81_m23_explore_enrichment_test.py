@@ -13,7 +13,7 @@ description and a null difficulty and cannot be enriched by asking nicely:
     different from a bare polyline in the listing.
 
 The region label deliberately is NOT here: it needs a bundled dataset, and that
-decision was deferred rather than rushed (`plans/M23-anonymous-discovery.md`).
+decision was deferred rather than rushed (the M23 plan).
 """
 from datetime import date
 

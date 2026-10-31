@@ -26,7 +26,7 @@ mistaken for a feature:
 The distinction is not academic. `mobile-offline.md` is `accepted` and `not-built`: 289 lines of
 sync protocol, conflict resolution and GPS integration, with no `mobile/` workspace, no
 WatermelonDB dependency and no service worker in the repo. It also states, as a settled decision,
-that the PWA-offline tier ships first — and that was read as done, so `plans/M9.md` inherited a
+that the PWA-offline tier ships first — and that was read as done, so the M9 plan inherited a
 prerequisite nobody had built, which M18's planning is what finally surfaced. One word in the
 header would have said so.
 

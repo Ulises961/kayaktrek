@@ -5,7 +5,6 @@ import secrets
 from typing import Dict, List, Optional, Set, Tuple
 from uuid import UUID
 
-import bleach
 import defusedxml.ElementTree
 import gpxpy
 import gpxpy.gpx
@@ -27,6 +26,7 @@ from Services.Utils.point_ordering import bump_route_version, chain_in_order, wa
 from Services.Utils.rdp import rdp_simplify
 from Services.Utils.route_distance import compute_day_miles, compute_total_miles
 from Services.Utils.seasons import VALID_SEASONS, season_months, season_of
+from Services.Utils.text_sanitizer import sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -870,7 +870,7 @@ class ItineraryService:
                 if "type" in upd:
                     point.type = PointType(upd["type"])
                 if "name" in upd and upd["name"] is not None:
-                    point.name = bleach.clean(str(upd["name"]).strip(), tags=[], strip=True)
+                    point.name = sanitize_text(upd["name"])
 
         bump_route_version(itinerary)
         db.session.commit()
@@ -945,9 +945,7 @@ class ItineraryService:
             raise ValueError(f"Invalid GPX file: {exc}") from exc
 
         base_name = filename[:-4] if filename.lower().endswith(".gpx") else filename
-        itinerary_name = bleach.clean(
-            (gpx.name or base_name or "Imported route").strip(), tags=[], strip=True
-        )
+        itinerary_name = sanitize_text(gpx.name or base_name or "Imported route")
 
         raw_points: List[Tuple[float, float, str]] = []
 

@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from geoalchemy2.shape import to_shape
 from marshmallow import fields, pre_load, validates, validates_schema, ValidationError, post_load
 
@@ -16,7 +16,7 @@ _SIMPLE_REQUIRED = ("max_spring_rate_knots", "flood_direction_degrees", "ebb_dir
 def _sanitize_station_text(data):
     for key in _SANITIZE_FIELDS:
         if data.get(key) is not None:
-            data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+            data[key] = sanitize_text(data[key])
     return data
 
 

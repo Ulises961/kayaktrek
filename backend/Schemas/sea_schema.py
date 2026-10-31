@@ -1,6 +1,6 @@
 import re
 
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import Schema, fields, validates, ValidationError, pre_load, EXCLUDE
 
 from Schemas.base_schema import camelcase
@@ -124,7 +124,7 @@ class SeaSchema(Schema):
     @validates('moon_phase')
     def validate_moon_phase(self, value, **kwargs):
         if value is not None:
-            sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+            sanitized = sanitize_text(value)
             if len(sanitized) > 50:
                 raise ValidationError("Moon phase description cannot exceed 50 characters")
             if re.search(r'[<>"\';]', sanitized):
@@ -138,7 +138,7 @@ class SeaSchema(Schema):
     @validates('reference_port_name')
     def validate_reference_port_name(self, value, **kwargs):
         if value is not None:
-            sanitized = bleach.clean(value.strip(), tags=[], strip=True)
+            sanitized = sanitize_text(value)
             if len(sanitized) > 100:
                 raise ValidationError("Reference port name cannot exceed 100 characters")
             if re.search(r'[<>"\';]', sanitized):

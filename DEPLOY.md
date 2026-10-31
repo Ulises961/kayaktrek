@@ -159,7 +159,7 @@ stack was brought up by hand on the old home box (`aspire`) before that move and
 over, and `scripts/deploy-sync.sh`'s `FILES` list never included this compose file either, so
 nothing about it ever reached the droplet through the normal deploy path. Found only by directly
 checking `docker ps` on the box against this doc's claim — the same "a claim in one file is not
-evidence for another" gap the `INVITE_CODE` entry in root `CLAUDE.md` already names. Both are
+evidence for another" gap the `INVITE_CODE` entry in the root conventions doc already names. Both are
 fixed now: the file is in `deploy-sync.sh`'s `FILES`, and `portainer`/`glances`/`pgweb` are
 running on `kayak-do`.
 
@@ -222,7 +222,7 @@ ssh -L 9002:127.0.0.1:9002 -L 61208:127.0.0.1:61208 -L 8081:127.0.0.1:8081 <box>
 
 Portainer, Glances and pgweb are pull tools: they answer when you go look, and cannot tell you
 anything is wrong on their own. Uptime Kuma is the one push tool in this set, and it is the one
-that matters for the root `CLAUDE.md` alerting checklist item (second in that item's cost order,
+that matters for the root conventions doc alerting checklist item (second in that item's cost order,
 after a Logfire error-rate alert).
 
 **This section describes the real, external, home-box Uptime Kuma instance.** It is not deployed
@@ -846,7 +846,7 @@ a real production domain before:
   "all fine" — if `aspire` fails to wake, no email arrives either way. DO's layer covers the
   important half.
 - **A Logfire alert on error rate** — cheap, not yet done, and first in the alerting cost order.
-  Sentry proper stays deliberately deferred past the Play closed beta (`CLAUDE.md`'s observability
+  Sentry proper stays deliberately deferred past the Play closed beta (the conventions doc's observability
   checklist).
 - **R2 object versioning** — R2's durability covers hardware; versioning covers our own delete bug.
 - ✅ **Privacy policy live in the app** (2026-08-31) — `frontend/app/(public)/privacy`. The

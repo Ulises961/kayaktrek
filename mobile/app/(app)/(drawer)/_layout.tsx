@@ -21,7 +21,7 @@ export const unstable_settings = {
   initialRouteName: "(trips)",
 }
 
-// A drawer, not a bottom tab bar (M9i WP0, plans/M9i.md, decided 2026-09-06) — the
+// A drawer, not a bottom tab bar (M9i WP0, the M9i plan, decided 2026-09-06) — the
 // destination count won't stay small: logs, buddies, inventory, settings, and M9j's
 // voice-control affordance are all plausible top-level entries, and a tab bar degrades
 // past ~5 items while a drawer scales cleanly.

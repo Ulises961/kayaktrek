@@ -655,7 +655,7 @@ export default function TripMapScreen() {
           made before this plan's side-by-side reading of what web does). The map fills
           the remaining space; ItinerarySheet (`@gorhom/bottom-sheet`) docks weather/sea
           over it, revealed by dragging or by re-tapping the selected day in the rail —
-          see plans/M9b3.md's library-choice table for why gorhom over the reverted
+          see the M9b3 plan's library-choice table for why gorhom over the reverted
           `@expo/ui` modal prototype. */}
       <View style={{ flex: 1 }}>
         <OfflineNotice visible={isOffline} cachedAt={cachedAt} onRetry={() => void reload()} />

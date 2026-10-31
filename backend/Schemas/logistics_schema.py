@@ -1,4 +1,4 @@
-import bleach
+from Services.Utils.text_sanitizer import sanitize_text
 from marshmallow import fields, post_load, pre_load, validates, ValidationError
 
 from Schemas.base_schema import BaseSchema, camelcase
@@ -27,7 +27,7 @@ class LogisticsSchema(BaseSchema):
     def sanitize(self, data, **kwargs):
         for key in _SANITIZE_FIELDS:
             if data.get(key) is not None:
-                data[key] = bleach.clean(str(data[key]).strip(), tags=[], strip=True)
+                data[key] = sanitize_text(data[key])
         return data
 
     @validates("shore_contact_phone")
