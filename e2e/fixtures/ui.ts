@@ -13,8 +13,7 @@ interface MutateOptions {
    * bytes always applies). The server is provably fresh — revalidation runs
    * and the response body contains the new data — so reloading renders the
    * correct view deterministically. Revisit when a Next release fixes the
-   * streamed-apply drop; the repro lives in the 2026-07-10 e2e-alignment
-   * notes (docs/reviews/2026-07-10-e2e-alignment.md).
+   * streamed-apply drop, but verify the removal on its own.
    *
    * NOTE: a reload resets client-only state (open dialogs, accordion sections
    * expanded via click) — the trip-detail tabs are real route segments now
