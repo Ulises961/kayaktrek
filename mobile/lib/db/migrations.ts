@@ -222,5 +222,15 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // The Items screen's checklist groups by category, so the offline copy keeps it too.
+      toVersion: 14,
+      steps: [
+        addColumns({
+          table: "cached_requirements",
+          columns: [{ name: "category", type: "string", isOptional: true }],
+        }),
+      ],
+    },
   ],
 })

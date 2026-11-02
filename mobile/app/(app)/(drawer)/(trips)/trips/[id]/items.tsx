@@ -1,11 +1,13 @@
 import { Stack as RouterStack, useLocalSearchParams } from "expo-router"
 import { PackageCheckIcon, PackageIcon } from "lucide-react-native"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Alert, ScrollView } from "react-native"
 
 import type { Item } from "@shared/dtos/item"
+import type { ItemCategory } from "@shared/dtos/item-category"
 import type { TripRequirement } from "@shared/dtos/inventory"
 import type { PersonalPackingItem } from "@shared/dtos/personal-packing"
+import { bucketByCategory } from "@shared/inventory/format"
 import { palette } from "@shared/tokens"
 
 import { Badge } from "@mobile/components/ui/badge"
@@ -15,6 +17,7 @@ import { Chip } from "@mobile/components/ui/chip"
 import { Input } from "@mobile/components/ui/input"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { OfflineNotice } from "@mobile/components/ui/offline-notice"
+import { SectionLabel } from "@mobile/components/ui/section-label"
 import { Text } from "@mobile/components/ui/text"
 import { getSession } from "@mobile/lib/auth/session"
 import { loadGearCache, saveGearCache } from "@mobile/lib/db/gear-cache"
@@ -35,6 +38,7 @@ import { useQueuedChanges } from "@mobile/lib/network/queued-changes"
 import {
   addRequirement,
   contributeItem,
+  getItemCategories,
   getMyItems,
   removeRequirement,
   unclaimRequirement,
@@ -79,6 +83,13 @@ export default function InventoryScreen() {
   const [inventoryId, setInventoryId] = useState<string | null>(null)
 
   const [newRequirementName, setNewRequirementName] = useState("")
+  // The slug the next requirement is filed under — chosen from the item categories, never typed.
+  const [newRequirementCategory, setNewRequirementCategory] = useState<string | null>(null)
+  // A requirement stores its category as a slug; these name the groups and fill the chips. They
+  // only label, so a failed fetch leaves them empty and costs the headings, not the checklist.
+  // The ref is what the cache save reads, since it runs before the next render.
+  const [categories, setCategories] = useState<ItemCategory[]>([])
+  const categoriesRef = useRef<ItemCategory[]>([])
   const [coveringId, setCoveringId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -93,18 +104,30 @@ export default function InventoryScreen() {
   //
   const requirementsCache = useLiveCache<TripRequirement[]>({
     fetchLive: async () => {
-      const [session, trip] = await Promise.all([getSession(), getTrip(id)])
+      const [session, trip, fetchedCategories] = await Promise.all([
+        getSession(),
+        getTrip(id),
+        getItemCategories().catch(() => []),
+      ])
       setUserId(session?.userId ?? null)
       setInventoryId(trip.inventory?.id ?? null)
+      categoriesRef.current = fetchedCategories
+      setCategories(fetchedCategories)
       return trip.inventory?.requirements ?? []
     },
     loadCache: async () => {
       const session = await getSession()
       setUserId(session?.userId ?? null)
       const cached = await loadRequirementsCache(id)
-      return cached.map((r) => ({ id: r.id, name: r.name, status: r.status as never }))
+      // The cache saved each heading's name, so the groups need no category list offline.
+      return cached.map((r) => ({
+        id: r.id,
+        name: r.name,
+        status: r.status as never,
+        category: r.category,
+      }))
     },
-    saveCache: (reqs) => saveRequirementsCache(id, reqs),
+    saveCache: (reqs) => saveRequirementsCache(id, reqs, categoriesRef.current),
     isCacheEmpty: (reqs) => reqs.length === 0,
     cacheKey: CACHE_KEY.tripRequirements(id),
   })
@@ -206,9 +229,13 @@ export default function InventoryScreen() {
   async function handleAddRequirement() {
     if (!inventoryId || !newRequirementName.trim()) return
     try {
-      const created = await addRequirement(inventoryId, { name: newRequirementName.trim() })
+      const created = await addRequirement(inventoryId, {
+        name: newRequirementName.trim(),
+        category: newRequirementCategory ?? undefined,
+      })
       requirementsCache.setData((prev) => [...(prev ?? []), created])
       setNewRequirementName("")
+      setNewRequirementCategory(null)
     } catch (err) {
       requirementsCache.setError(err instanceof Error ? err.message : "Failed to add requirement.")
     }
@@ -400,116 +427,143 @@ export default function InventoryScreen() {
               Add
             </Button>
           </Row>
+          {categories.length > 0 && (
+            <Row className="flex-wrap gap-2">
+              {categories.map((category) => (
+                <Chip
+                  key={category.slug}
+                  active={newRequirementCategory === category.slug}
+                  disabled={isOffline}
+                  onPress={() =>
+                    setNewRequirementCategory(
+                      newRequirementCategory === category.slug ? null : category.slug,
+                    )
+                  }
+                >
+                  {category.name}
+                </Chip>
+              ))}
+            </Row>
+          )}
           {error && <Text className="text-sm text-destructive">{error}</Text>}
-          {(requirements ?? []).map((requirement) => {
-            const myContribution = requirement.contributions?.find(
-              (c) => c.member?.user?.id === userId,
-            )
-            const queuedContribution = queuedContributions.find(
-              (change) => change.entityId === requirement.id,
-            )
-            return (
-              <Card key={requirement.id}>
-                <CardHeader>
-                  <Row className="justify-between">
-                    <CardTitle className="flex-1" numberOfLines={1}>
-                      {requirement.name}
-                    </CardTitle>
-                    <Row className="items-center gap-1.5">
-                      {requirement.status === "covered" ? (
-                        <PackageCheckIcon size={12} color={palette.ocean500} />
-                      ) : (
-                        <PackageIcon size={12} color={palette.ocean500} />
-                      )}
-                      <Badge variant={requirement.status === "covered" ? "default" : "secondary"}>
-                        {requirement.status === "covered" ? "Covered" : "Needed"}
-                      </Badge>
+          {bucketByCategory(requirements ?? [], (r) => r.category, categories).flatMap((bucket) => [
+            <SectionLabel
+              key={`group-${bucket.key}`}
+              testID="requirement-group"
+              className="pt-1"
+            >
+              {bucket.label}
+            </SectionLabel>,
+            ...bucket.entries.map((requirement) => {
+              const myContribution = requirement.contributions?.find(
+                (c) => c.member?.user?.id === userId,
+              )
+              const queuedContribution = queuedContributions.find(
+                (change) => change.entityId === requirement.id,
+              )
+              return (
+                <Card key={requirement.id}>
+                  <CardHeader>
+                    <Row className="justify-between">
+                      <CardTitle className="flex-1" numberOfLines={1}>
+                        {requirement.name}
+                      </CardTitle>
+                      <Row className="items-center gap-1.5">
+                        {requirement.status === "covered" ? (
+                          <PackageCheckIcon size={12} color={palette.ocean500} />
+                        ) : (
+                          <PackageIcon size={12} color={palette.ocean500} />
+                        )}
+                        <Badge variant={requirement.status === "covered" ? "default" : "secondary"}>
+                          {requirement.status === "covered" ? "Covered" : "Needed"}
+                        </Badge>
+                      </Row>
                     </Row>
-                  </Row>
-                </CardHeader>
-                <CardContent className="gap-2">
-                  {!!requirement.contributions?.length && (
-                    <Stack className="gap-1">
-                      {requirement.contributions.map((c) => (
-                        <Text key={c.id} className="text-sm text-muted-foreground">
-                          {c.member?.user?.username ?? "Someone"} · {c.item?.name ?? "an item"}
-                        </Text>
-                      ))}
-                    </Stack>
-                  )}
-                  <Row className="gap-2">
-                    {requirement.proposedBy?.user?.id === userId && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busyId === requirement.id || isOffline}
-                        onPress={() => confirmRemoveRequirement(requirement)}
-                      >
-                        Remove
-                      </Button>
+                  </CardHeader>
+                  <CardContent className="gap-2">
+                    {!!requirement.contributions?.length && (
+                      <Stack className="gap-1">
+                        {requirement.contributions.map((c) => (
+                          <Text key={c.id} className="text-sm text-muted-foreground">
+                            {c.member?.user?.username ?? "Someone"} · {c.item?.name ?? "an item"}
+                          </Text>
+                        ))}
+                      </Stack>
                     )}
-                    {queuedContribution ? (
-                      <Stack className="flex-1 gap-1">
-                        <Text className="text-xs text-muted-foreground">
-                          {`You're bringing ${
-                            myItems.find((item) => item.id === queuedContribution.payload.itemId)?.name ??
-                            "an item"
-                          } (not sent yet)`}
-                        </Text>
+                    <Row className="gap-2">
+                      {requirement.proposedBy?.user?.id === userId && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="self-start"
-                          onPress={() => void dismiss(queuedContribution.mutationId)}
+                          disabled={busyId === requirement.id || isOffline}
+                          onPress={() => confirmRemoveRequirement(requirement)}
                         >
-                          Undo
+                          Remove
                         </Button>
-                      </Stack>
-                    ) : myContribution ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busyId === requirement.id || isOffline}
-                        onPress={() => void handleUnclaim(requirement)}
-                      >
-                        Withdraw
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        disabled={busyId === requirement.id}
-                        onPress={() =>
-                          setCoveringId(coveringId === requirement.id ? null : (requirement.id ?? null))
-                        }
-                      >
-                        Cover
-                      </Button>
-                    )}
-                  </Row>
-                  {coveringId === requirement.id && (
-                    <Stack className="gap-1 pt-1">
-                      {myItems.length === 0 ? (
-                        <Text className="text-sm text-muted-foreground">
-                          No owned gear to contribute yet.
-                        </Text>
-                      ) : (
-                        myItems.map((item) => (
+                      )}
+                      {queuedContribution ? (
+                        <Stack className="flex-1 gap-1">
+                          <Text className="text-xs text-muted-foreground">
+                            {`You're bringing ${
+                              myItems.find((item) => item.id === queuedContribution.payload.itemId)?.name ??
+                              "an item"
+                            } (not sent yet)`}
+                          </Text>
                           <Button
-                            key={item.id}
                             size="sm"
                             variant="outline"
-                            onPress={() => void handleContribute(requirement, item)}
+                            className="self-start"
+                            onPress={() => void dismiss(queuedContribution.mutationId)}
                           >
-                            {item.name}
+                            Undo
                           </Button>
-                        ))
+                        </Stack>
+                      ) : myContribution ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === requirement.id || isOffline}
+                          onPress={() => void handleUnclaim(requirement)}
+                        >
+                          Withdraw
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={busyId === requirement.id}
+                          onPress={() =>
+                            setCoveringId(coveringId === requirement.id ? null : (requirement.id ?? null))
+                          }
+                        >
+                          Cover
+                        </Button>
                       )}
-                    </Stack>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
+                    </Row>
+                    {coveringId === requirement.id && (
+                      <Stack className="gap-1 pt-1">
+                        {myItems.length === 0 ? (
+                          <Text className="text-sm text-muted-foreground">
+                            No owned gear to contribute yet.
+                          </Text>
+                        ) : (
+                          myItems.map((item) => (
+                            <Button
+                              key={item.id}
+                              size="sm"
+                              variant="outline"
+                              onPress={() => void handleContribute(requirement, item)}
+                            >
+                              {item.name}
+                            </Button>
+                          ))
+                        )}
+                      </Stack>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            }),
+          ])}
         </ScrollView>
       )}
 

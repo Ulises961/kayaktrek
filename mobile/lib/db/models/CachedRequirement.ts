@@ -7,4 +7,5 @@ export class CachedRequirement extends Model {
   @field("trip_id") tripId!: string
   @field("name") name!: string
   @field("status") status!: string | null
+  @field("category") category!: string | null
 }
