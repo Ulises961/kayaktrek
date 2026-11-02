@@ -27,6 +27,12 @@ jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
 }))
 jest.mock("../lib/db/trip-role", () => ({ isTripLeader: jest.fn() }))
+// The card has its own test; here only whether the hub shows it matters.
+jest.mock("../components/live/sharing-card", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Text } = require("react-native")
+  return { SharingCard: ({ tripId }: { tripId: string }) => <Text testID="sharing-card">{tripId}</Text> }
+})
 
 // M9c WP7: every offline branch below now reads how old its cache is. The real
 // lookup needs a database; the age itself is asserted as a relative offset so
@@ -74,6 +80,23 @@ describe("TripDetailScreen", () => {
     await findByText("Costa Brava")
 
     expect(queryByTestId("trip-pause")).toBeNull()
+  })
+
+  it("offers position sharing to a member of a trip under way, for that trip", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "happening" })
+
+    const { findByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+
+    expect((await findByTestId("sharing-card")).props.children).toBe("trip-1")
+  })
+
+  it("does not offer position sharing before the trip is under way", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+
+    const { findByText, queryByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    await findByText("Costa Brava")
+
+    expect(queryByTestId("sharing-card")).toBeNull()
   })
 
   it("shows the trip's destination and state once loaded", async () => {

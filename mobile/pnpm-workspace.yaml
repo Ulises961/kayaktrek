@@ -1,2 +1,4 @@
 allowBuilds:
   unrs-resolver: true
+patchedDependencies:
+  expo-task-manager@57.0.21: patches/expo-task-manager@57.0.21.patch
