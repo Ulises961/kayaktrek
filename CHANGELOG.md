@@ -7,6 +7,46 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.5.0] - 2026-11-06
+
+### Added
+
+- **The server can say where the crew is on request.** A new read, `GET /api/v1/live/trip/<id>/positions`,
+  returns the newest position of each crew member on a trip that is under way, in the shape the live
+  stream's opening message already uses. It exists for the mobile app, which cannot hold a stream
+  open, and nothing on the web uses it yet. It answers a crew member only, and a trip that is not
+  under way, a non-member and a signed-out caller all get the same 404.
+- **A way to plug in who may use a paid integration.** Weather refresh and the extended forecast ask
+  a configurable provider rather than a fixed rule. Left unset, the built-in provider still says no
+  to everyone, so nothing changes for this deployment; a self-hosted install that pays for its own
+  weather key can set `PREMIUM_FEATURES_OPEN=true`.
+
+### Changed
+
+- **An open trip page notices other people's changes sooner.** The page checked for changes every
+  7 seconds but only redrew itself at most once every 30, so an edit on another device could sit
+  unseen for the best part of half a minute. It now redraws as soon as a check finds something. The
+  default request limit rose from 200 to 1000 an hour to carry the extra reads; routes with their
+  own limit (sign-in, paddler search, the public float plan and route pages) are unchanged.
+- **Dependencies were brought up to date**, among them Next.js 16.4.3, React 19.3.1, and the form
+  validation resolver (a major version). No screen is meant to look or behave differently.
+
+### Deploy notes
+
+- **No migration, no email template change, no forced logout.**
+- **Two optional environment variables, `ENTITLEMENT_PROVIDER` and `PREMIUM_FEATURES_OPEN`**, are now
+  declared on `backend` and `worker` in `docker-compose.prod.yml`. Both default to blank, which keeps
+  the built-in provider; nothing needs to be set. An unimportable `ENTITLEMENT_PROVIDER` stops the app
+  at start-up, so leave it blank.
+- **The default request limit is five times higher** and applies to every route that has no limit of
+  its own, including public ones keyed on the visitor's address.
+- **Check after deploying:** that spans still reach Logfire (the trace exporter moved from 0.223 to
+  0.300 and was only tested without a token); that an open trip page picks up an edit made on another
+  device within about 10 seconds; and that a form (login, a log, a float plan) still validates and
+  submits.
+- **The mobile app is not part of this release** (it is not published). Its position sharing, crew
+  overlay and Live screen are built and wait for a device acceptance run.
+
 ## [1.4.1] - 2026-10-30
 
 ### Changed
