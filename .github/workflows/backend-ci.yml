@@ -5,13 +5,13 @@ name: Backend CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
       - ".github/workflows/_backend-test-run.yml"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
@@ -21,13 +21,13 @@ on:
 # a PR runs three full suites to completion and only the last one's result is ever read — at
 # ~7 minutes each that is most of the spend on a branch being iterated on.
 #
-# Grouped per ref, so runs on different PRs never cancel each other. `master` is deliberately
-# excluded from cancellation (see the `!= 'refs/heads/master'` guard): a push to master is the
+# Grouped per ref, so runs on different PRs never cancel each other. `main` is deliberately
+# excluded from cancellation (see the `!= 'refs/heads/main'` guard): a push to main is the
 # gate for a commit that is already merged, and cancelling it would leave that commit with no
 # result at all.
 concurrency:
   group: backend-ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # GitHub-hosted first: it's idle capacity we're not otherwise using, and it starts

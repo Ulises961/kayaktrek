@@ -5,13 +5,13 @@ name: Frontend CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
       - ".github/workflows/_frontend-validate-run.yml"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
@@ -21,7 +21,7 @@ on:
 # independently — a frontend-only push should not cancel a backend run on the same ref.
 concurrency:
   group: frontend-ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # GitHub-hosted first: see backend-ci.yml for the fallback policy — same reasoning here.

@@ -35,18 +35,18 @@ phase, DigitalOcean after the graduation trigger. Same steps either way — only
 
 ## Cutting a release
 
-Merging to `master` runs the gates (Backend CI, Frontend CI) but **publishes nothing**. Images
+Merging to `main` runs the gates (Backend CI, Frontend CI) but **publishes nothing**. Images
 are built and pushed only by `release.yml`, which triggers on a version tag:
 
 ```bash
-git checkout master && git pull
+git checkout main && git pull
 git tag -a v0.2.0 -m "Per-device sessions"
 git push origin v0.2.0
 ```
 
 That builds *both* images regardless of which paths changed and pushes
 `:v0.2.0`, `:sha-<short>` and `:latest` for each. The workflow refuses to publish a commit that
-isn't an ancestor of `origin/master`, so a tag on an unmerged branch can't reach GHCR without
+isn't an ancestor of `origin/main`, so a tag on an unmerged branch can't reach GHCR without
 having been through PR CI.
 
 To rebuild without a code change (e.g. after changing a `NEXT_PUBLIC_*` repo Variable, which is
@@ -54,7 +54,7 @@ baked in at build time), run it by hand:
 
 ```bash
 gh workflow run release.yml --ref v0.2.0     # republishes that version, moves :latest
-gh workflow run release.yml --ref master     # publishes :sha-<short> only, never :latest
+gh workflow run release.yml --ref main     # publishes :sha-<short> only, never :latest
 ```
 
 A manual run on a branch deliberately does **not** move `:latest` — `:latest` only ever points at
@@ -771,7 +771,7 @@ Live end-to-end for the first time: `kayaktrek.app` (frontend, bare apex — see
 `api.kayaktrek.app`, `live.kayaktrek.app`, `storage.kayaktrek.app` (MinIO S3 API, correctly
 denying anonymous root-listing while serving `avatars/`/`point-images/` public-read) all resolve
 through Cloudflare → `cloudflared` Tunnel → host nginx (TLS via certbot-dns-cloudflare,
-auto-renewing) → the right container. GHCR images built and pushed on every merge to `master` at
+auto-renewing) → the right container. GHCR images built and pushed on every merge to `main` at
 the time; since 2026-08-02 (PR #100) publishing is driven by version tags instead — see "Cutting a
 release" above.
 
@@ -795,7 +795,7 @@ average away the way the existing bandwidth check can for a live SSE session's s
 frames. Lives in the separate `~/Documents/aspire-sleep` box-management repo, not this one.
 
 Five real, first-time-ever-exercised bugs surfaced getting here, none of them present in local
-dev/CI-only testing because nothing had ever run this pipeline's `push`-to-`master` path or hit
+dev/CI-only testing because nothing had ever run this pipeline's `push`-to-`main` path or hit
 a real production domain before:
 1. **`toLower()` isn't a real GitHub Actions expression function** — invalidated the *entire*
    workflow file (any invalid expression does, regardless of which job references it), blocking

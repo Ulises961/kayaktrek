@@ -6,7 +6,7 @@ name: Mobile CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "mobile/**"
       - "frontend/lib/tokens.ts"
@@ -16,7 +16,7 @@ on:
       - "frontend/lib/user/format.ts"
       - ".github/workflows/mobile-ci.yml"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - "mobile/**"
       - "frontend/lib/tokens.ts"
@@ -30,7 +30,7 @@ on:
 # independently.
 concurrency:
   group: mobile-ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   validate:

@@ -9,7 +9,7 @@ name: Release
 # on a one-line change, which is the opposite of what a release wants.
 #
 # Triggered by pushing a version tag, or by hand (Actions > Release > Run workflow, or
-# `gh workflow run release.yml --ref <tag-or-master>`) when the images need rebuilding
+# `gh workflow run release.yml --ref <tag-or-main>`) when the images need rebuilding
 # without a code change.
 on:
   push:
