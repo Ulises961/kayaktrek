@@ -28,9 +28,11 @@ import {
 
 import type { Day } from "@shared/dtos/day";
 import { POINT_TYPE } from "@shared/dtos/point";
+import { TRIP_STATE } from "@shared/dtos/trip";
 import { getDayColor } from "@shared/itinerary/colors";
 import { lightTokens, palette } from "@shared/tokens";
 
+import { CrewPositionMarkers } from "@mobile/components/live/crew-position-markers";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
@@ -75,6 +77,9 @@ type ScreenTrip = {
   destination: string | null;
   days: Day[];
   avgSpeedKnots: number;
+  // Known only from a live read: the live crew layer is for a trip under way, and offline there is
+  // no one to poll.
+  isHappening?: boolean;
 };
 
 // Same fallback web's builder uses (map-builder.tsx) when the itinerary has never
@@ -221,6 +226,7 @@ export default function TripMapScreen() {
         destination: t.destination ?? null,
         days,
         avgSpeedKnots: t.itinerary?.avgSpeedKnots ?? DEFAULT_AVG_SPEED_KNOTS,
+        isHappening: t.state === TRIP_STATE.HAPPENING,
       });
       setIsOffline(false);
       setCachedAt(null);
@@ -815,6 +821,8 @@ export default function TripMapScreen() {
                 />
               </ViewAnnotation>
             )}
+
+            <CrewPositionMarkers tripId={id} live={!!trip.isHappening} />
           </MapLibreMap>
 
           {/* Straight after the map, before everything else drawn over it: a later sibling

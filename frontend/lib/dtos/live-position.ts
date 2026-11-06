@@ -15,3 +15,9 @@ export const LivePositionSchema = z.object({
 })
 
 export type LivePosition = z.infer<typeof LivePositionSchema>
+
+// The polled `GET /live/trip/<id>/positions` answer (M9e WP2): the same entries as the stream's
+// snapshot, in an object so a field can be added without breaking the shape.
+export const LivePositionsPageSchema = z.object({
+  positions: z.array(LivePositionSchema),
+})
