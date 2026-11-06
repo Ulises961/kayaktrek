@@ -1,4 +1,5 @@
 name: Backend CI
+# Verification no-op: proves this workflow runs on the new repository.
 
 # Gate only — this workflow builds no image. Publishing moved to release.yml so that
 # what is deployable is always a deliberate version tag, not whatever merged last.
