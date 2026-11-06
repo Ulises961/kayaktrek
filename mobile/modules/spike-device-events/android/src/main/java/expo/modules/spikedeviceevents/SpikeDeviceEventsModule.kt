@@ -15,7 +15,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
 import java.io.File
 
-// M9e evidence collector (plans/M9e.md): writes what the phone itself is doing (screen on or off, deep
+// M9e evidence collector (the M9e plan): writes what the phone itself is doing (screen on or off, deep
 // sleep, battery saver, battery level, the system location switch) to a file, from native code, so the
 // record is complete even while the JavaScript runtime is paused or frozen. Throwaway with the rest of
 // the spike, removed before a release.

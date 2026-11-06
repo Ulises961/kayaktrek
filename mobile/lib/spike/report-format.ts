@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): the report and the event list as text, for the screen and for the
+// M9e WP0 spike (the M9e plan): the report and the event list as text, for the screen and for the
 // Share button (so a walk's evidence can leave the phone with no cable). Throwaway with the rest of
 // lib/spike.
 

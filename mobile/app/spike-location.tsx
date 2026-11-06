@@ -1,4 +1,4 @@
-// M9e evidence screen (plans/M9e.md): throwaway, removed before a release. It reads the evidence log the
+// M9e evidence screen (the M9e plan): throwaway, removed before a release. It reads the evidence log the
 // app and the phone write while the screen is off, so the report is what really happened, and lists the
 // conditions WP0 left open with what the log has shown for each so far. A practice share runs the real
 // engine and sends nothing, so a condition can be exercised without a trip under way. Nothing here needs

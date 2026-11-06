@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): what the phone and the app are doing, written to the evidence log
+// M9e WP0 spike (the M9e plan): what the phone and the app are doing, written to the evidence log
 // for as long as the process lives: the app's state, the network, a heartbeat every minute, and the
 // start of the native log (screen, deep sleep, battery). Called once from the root layout.
 // Throwaway with the rest of lib/spike.

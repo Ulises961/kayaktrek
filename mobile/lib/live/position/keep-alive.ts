@@ -1,4 +1,4 @@
-// The keep-alive watchdog (plans/M9e.md WP1): the missed-checkpoint alert reads silence, and a phone
+// The keep-alive watchdog (the M9e plan, WP1): the missed-checkpoint alert reads silence, and a phone
 // that is not moving sends nothing under the 10 m rule, so a periodic wake-up sends one fresh fix
 // if nothing has gone out lately. Asking "has anything been sent" rather than "has the phone moved"
 // also covers a moving sender whose pings stopped arriving.
