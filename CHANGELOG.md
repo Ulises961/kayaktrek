@@ -1258,4 +1258,4 @@ First tagged release. The app had already been deployed once (2026-07-31) from a
   request. If Redis is unreachable the check fails open — a revoked session survives until its
   access token expires, which is the pre-release behaviour, rather than logging out every user.
 
-[0.1.0]: https://github.com/Ulises961/kayak-expedition-planner/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Ulises961/kayaktrek/tree/v0.1.0

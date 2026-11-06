@@ -1,9 +1,9 @@
 # Kayak Expedition Planner
 
-[![Backend CI](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/backend-ci.yml)
-[![Frontend CI](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/frontend-ci.yml)
-[![Mobile CI](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/Ulises961/kayak-expedition-planner/actions/workflows/mobile-ci.yml)
-[![codecov](https://codecov.io/gh/Ulises961/kayak-expedition-planner/graph/badge.svg)](https://codecov.io/gh/Ulises961/kayak-expedition-planner)
+[![Backend CI](https://github.com/Ulises961/kayaktrek/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ulises961/kayaktrek/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/Ulises961/kayaktrek/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Ulises961/kayaktrek/actions/workflows/frontend-ci.yml)
+[![Mobile CI](https://github.com/Ulises961/kayaktrek/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/Ulises961/kayaktrek/actions/workflows/mobile-ci.yml)
+[![codecov](https://codecov.io/gh/Ulises961/kayaktrek/graph/badge.svg)](https://codecov.io/gh/Ulises961/kayaktrek)
 
 A platform for planning, running, and sharing multi-day kayak expeditions — built for kayakers by kayakers.
 

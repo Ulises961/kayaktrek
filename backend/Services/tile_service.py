@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # OSM and OpenSeaMap servers, so a cached tile is served for about three months.
 FRESHNESS = timedelta(days=90)
 REQUEST_TIMEOUT_SECONDS = 10
-USER_AGENT = "KayakExpeditionPlanner/0.1 (+https://github.com/Ulises961/kayak-expedition-planner)"
+USER_AGENT = "KayakExpeditionPlanner/0.1 (+https://github.com/Ulises961/kayaktrek)"
 
 _LAYER_UPSTREAM = {
     "osm": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
