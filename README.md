@@ -9,6 +9,11 @@ A platform for planning, running, and sharing multi-day kayak expeditions — bu
 
 Live at [kayaktrek.app](https://kayaktrek.app).
 
+> **Status: maintenance mode.** Active development has wound down. The hosted instance stays up
+> for as long as its domain registration runs; after that, the code here is what remains. No
+> support is promised, and issues and pull requests may go unanswered. You are welcome to run
+> your own copy: [`DEPLOY.md`](DEPLOY.md) describes the production setup.
+
 ## What it does
 
 Planning a kayak expedition involves more than picking a destination. You need to coordinate a crew, build a route around tides and sea conditions, manage gear across multiple people, and stay flexible when the weather changes. This app handles all of it.
@@ -68,3 +73,9 @@ See each sub-area's README for setup and developer documentation:
 | Mobile | React Native (Expo), MapLibre, WatermelonDB (offline sync in progress) |
 | Async | Celery + RabbitMQ (task queue, offline sync) |
 | Real-time | Redis pub/sub (live position during expedition) |
+
+## License
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified copy
+as a network service, the AGPL requires you to offer your users its source. The name and mark
+"Kayaktrek" are not covered by the licence.
