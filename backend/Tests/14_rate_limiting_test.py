@@ -37,9 +37,9 @@ def rate_limits_enabled(app):
 class TestHealthRateLimitExemption:
 
     def test_health_is_exempt_from_the_default_rate_limit(self, client):
-        """The 200/hour default_limits would otherwise start throttling a
+        """The 1000/hour default_limits would otherwise start throttling a
         compose/load-balancer healthcheck polling every few seconds (M11 §4)."""
-        for _ in range(205):
+        for _ in range(1005):
             r = client.get("/api/v1/health")
             assert r.status_code == 200
 

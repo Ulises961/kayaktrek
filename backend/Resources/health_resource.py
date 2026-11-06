@@ -18,7 +18,7 @@ health_api = Blueprint("health", __name__, url_prefix="/api/v1")
 def health() -> ResponseReturnValue:
     """Liveness/readiness probe for the compose healthcheck / a future load balancer.
     No auth (a prerequisite for a healthcheck) and exempt from the default rate limit
-    (polled far more often than the 200/hour default allows). Pings the DB so a backend
+    (polled far more often than the 1000/hour default allows). Pings the DB so a backend
     that's up but can't reach Postgres still reports unhealthy.
     ---
     get:

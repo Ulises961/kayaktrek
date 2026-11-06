@@ -6,9 +6,9 @@ import { getChangesPollUrl } from "./actions"
 import { createTripChangesHub } from "./trip-changes-hub"
 import { createStreamingGate } from "./trip-changes-lifecycle"
 
-// Slower than the web's 7 s: every poll wakes the phone's radio, and a paddler in a tent is
-// not waiting on a crewmate's edit to the second. Coming to the foreground polls at once.
-const POLL_INTERVAL_MS = 10_000
+// The same 7 s as the web. Every poll wakes the phone's radio, so battery is the cost to watch.
+// Coming to the foreground polls at once.
+const POLL_INTERVAL_MS = 7_000
 
 // The app-wide hub. The route travels on its own channel (spec §8.2), so a change pulls both:
 // the generic delta for crew/kit/weather and the route wholesale. `pullRoute` leaves a

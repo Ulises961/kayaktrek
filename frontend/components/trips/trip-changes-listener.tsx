@@ -10,10 +10,10 @@ import { changesAffectPage } from "@/lib/trips/change-relevance"
 export const TRIP_CHANGES_REFRESH_DEBOUNCE_MS = 250
 
 // A refresh re-runs the whole layout's reads (the account, connections and invitations calls
-// among them), and the backend limits each of those routes to 200 an hour per user. Polling
-// every 7 s could otherwise refresh ~500 times an hour on a busy trip; at one every 30 s a
-// page spends at most 120 of that budget and leaves the rest for navigating.
-export const TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS = 30_000
+// among them), and the backend limits each of those routes to 1000 an hour per user
+// (`Api/limiter.py`). Matching the 7 s poll, a page refreshed on every poll for a whole hour
+// spends at most ~514 of that budget and leaves the rest for navigating.
+export const TRIP_CHANGES_MIN_REFRESH_INTERVAL_MS = 7_000
 
 type TripChangesListenerProps = {
   tripId: string

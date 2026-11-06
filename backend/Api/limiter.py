@@ -13,5 +13,7 @@ def user_or_ip() -> str:
 limiter = Limiter(
     key_func=user_or_ip,
     storage_uri=os.getenv("RATELIMIT_STORAGE_URI"),
-    default_limits=["200 per hour"],
+    # Sized for M36: a page refreshed on every 7 s poll re-runs the layout's reads, ~514 calls an
+    # hour per route. Sensitive routes carry their own, stricter limits.
+    default_limits=["1000 per hour"],
     headers_enabled=True)
