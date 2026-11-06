@@ -1,5 +1,5 @@
 import { ApiError, apiPost } from "../../api/client"
-import { getChangesPollUrl } from "../actions"
+import { getChangesPollUrl, getPositionsPollUrl } from "../actions"
 
 jest.mock("../../api/client", () => {
   class MockApiError extends Error {
@@ -47,5 +47,31 @@ describe("getChangesPollUrl", () => {
   it("rejects a response without a ticket rather than building a url from undefined", async () => {
     mockedApiPost.mockResolvedValue({})
     await expect(getChangesPollUrl(TRIP_ID)).rejects.toThrow()
+  })
+})
+
+describe("getPositionsPollUrl", () => {
+  it("mints a changes ticket, which is the poll's credential, and returns the positions url carrying it", async () => {
+    mockedApiPost.mockResolvedValue({ ticket: "tok-2" })
+
+    const url = await getPositionsPollUrl(TRIP_ID)
+
+    expect(mockedApiPost).toHaveBeenCalledWith(`/api/live/trip/${TRIP_ID}/changes-ticket`, {})
+    expect(url).toBe(`http://sse.test/api/v1/live/trip/${TRIP_ID}/positions?ticket=tok-2`)
+  })
+
+  it.each([403, 404])("returns null when the server refuses with %s: not on the trip", async (status) => {
+    mockedApiPost.mockRejectedValue(new ApiError("refused", status))
+    await expect(getPositionsPollUrl(TRIP_ID)).resolves.toBeNull()
+  })
+
+  it.each([429, 500, 503])("throws on %s, so the poller backs off instead of concluding anything", async (status) => {
+    mockedApiPost.mockRejectedValue(new ApiError("struggling", status))
+    await expect(getPositionsPollUrl(TRIP_ID)).rejects.toThrow("struggling")
+  })
+
+  it("rejects a response without a ticket rather than building a url from undefined", async () => {
+    mockedApiPost.mockResolvedValue({})
+    await expect(getPositionsPollUrl(TRIP_ID)).rejects.toThrow()
   })
 })
