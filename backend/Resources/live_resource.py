@@ -330,9 +330,9 @@ def post_changes_ticket(id: str) -> ResponseReturnValue:
 
 
 def _changes_caller(trip_id: str) -> Optional[str]:
-    """Who is polling `trip_id`'s change log: a normal access token, else a `?ticket=` from
-    POST .../changes-ticket. The rate limiter needs this before the view does, so it runs
-    twice per request; verifying a ticket is a signature check."""
+    """Who is polling `trip_id` (its change log or its crew positions): a normal access token,
+    else a `?ticket=` from POST .../changes-ticket. The rate limiter needs this before the view
+    does, so it runs twice per request; verifying a ticket is a signature check."""
     user_id = JWTService.resolve_user_id_from_bearer_header()
     if user_id is None:
         ticket = request.args.get("ticket")
@@ -416,3 +416,74 @@ def trip_changes(id: str) -> ResponseReturnValue:
 
 # Self-authenticating, for the same reason as `trip_stream` above.
 trip_changes._populates_current_user = True  # type: ignore[attr-defined]
+
+
+@live_api.route("/trip/<string:id>/positions", methods=["GET"])
+@limiter.limit(_CHANGES_POLL_RATE_LIMIT, key_func=_changes_rate_key)
+def trip_positions(id: str) -> ResponseReturnValue:
+    """The crew's newest positions, for a client that cannot hold the stream open.
+    Missing, forbidden, unauthenticated and not-happening are one undifferentiated 404.
+    ---
+    get:
+      summary: Newest position per crew member
+      description: >
+        Poll while the screen is visible. Authorised like the trip-changes poll: an access
+        token, else a `?ticket=` from POST .../changes-ticket. Each entry has the shape of
+        the crew stream's snapshot event. A member who has never shared a position is absent.
+        The caller's own entry is included.
+      parameters:
+        - name: ticket
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: The newest ping of each member who has one
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  positions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                        name:
+                          type: string
+                        lat:
+                          type: number
+                        lon:
+                          type: number
+                        accuracyM:
+                          type: number
+                          nullable: true
+                        headingDeg:
+                          type: number
+                          nullable: true
+                        speedMs:
+                          type: number
+                          nullable: true
+                        recordedAt:
+                          type: string
+                          format: date-time
+        404:
+          description: Not authorized, no such trip, or the trip isn't currently happening
+    """
+    user_id = _changes_caller(id)
+    if user_id is None or not LiveStreamService.is_trip_member_cached(id, user_id):
+        return Response(status=HTTPStatus.NOT_FOUND)
+
+    if TripService.find_happening_trip(id) is None:
+        return Response(status=HTTPStatus.NOT_FOUND)
+
+    response = jsonify({"positions": LivePositionService.snapshot(id)})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+# Self-authenticating, for the same reason as `trip_stream` above.
+trip_positions._populates_current_user = True  # type: ignore[attr-defined]

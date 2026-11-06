@@ -81,6 +81,12 @@ class LivePositionService:
             logger.warning("live_position_publish_failed", extra={"trip_id": trip_id, "error": str(e)})
 
     @staticmethod
+    def snapshot(trip_id: str) -> list[dict[str, Any]]:
+        """The newest ping per member in the D2 wire shape: the SSE stream's opening event
+        and the polled `GET .../positions` answer are the same list."""
+        return [LivePositionService.to_broadcast_dict(ping) for ping in LivePositionService.latest_positions(trip_id)]
+
+    @staticmethod
     def latest_positions(trip_id: str) -> list[PositionPing]:
         """The newest persisted ping per trip member (DISTINCT ON user_id)."""
         return (

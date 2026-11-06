@@ -159,10 +159,7 @@ class LiveStreamService:
         with logfire.span("sse_connection", trip_id=trip_id) as span:
             yield "retry: 5000\n\n"
 
-            snapshot = [
-                LivePositionService.to_broadcast_dict(p)
-                for p in LivePositionService.latest_positions(trip_id)
-            ]
+            snapshot = LivePositionService.snapshot(trip_id)
             yield f"event: snapshot\ndata: {json.dumps(snapshot)}\n\n"
 
             owns_pubsub = pubsub is None
