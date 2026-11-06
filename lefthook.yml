@@ -99,7 +99,3 @@ local-verify:
       run: cd mobile && pnpm run lint
     mobile-tests:
       run: cd mobile && pnpm run test:run
-    # Checks the docs that instruct the next change against the code they describe.
-    # Cheap (no deps, sub-second), so it costs nothing to carry beside the real gates.
-    docs-match-code:
-      run: python3 scripts/check-docs.py

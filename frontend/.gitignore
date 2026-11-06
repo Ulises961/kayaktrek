@@ -31,7 +31,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — .env.example is the committed template (root CLAUDE.md convention); only the
+# env files — .env.example is the committed template (see CONTRIBUTING.md); only the
 # real, secret-bearing files are ignored.
 .env
 .env.local
