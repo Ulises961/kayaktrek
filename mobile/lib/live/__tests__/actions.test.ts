@@ -1,5 +1,5 @@
 import { ApiError, apiPost } from "../../api/client"
-import { getChangesPollUrl, getPositionsPollUrl } from "../actions"
+import { closeDay, getChangesPollUrl, getPositionsPollUrl } from "../actions"
 
 jest.mock("../../api/client", () => {
   class MockApiError extends Error {
@@ -73,5 +73,34 @@ describe("getPositionsPollUrl", () => {
   it("rejects a response without a ticket rather than building a url from undefined", async () => {
     mockedApiPost.mockResolvedValue({})
     await expect(getPositionsPollUrl(TRIP_ID)).rejects.toThrow()
+  })
+})
+
+describe("closeDay", () => {
+  it("posts to the trip's close-day endpoint and returns the date that was closed", async () => {
+    mockedApiPost.mockResolvedValue({ taskId: "task-1", date: "2026-11-06" })
+
+    const result = await closeDay(TRIP_ID)
+
+    expect(mockedApiPost).toHaveBeenCalledWith(`/api/live/trip/${TRIP_ID}/close-day`, {})
+    expect(result).toEqual({ date: "2026-11-06" })
+  })
+
+  it("lets the server's reason through when it refuses, so the leader can be told", async () => {
+    mockedApiPost.mockRejectedValue(new ApiError("There's no itinerary day scheduled for that date.", 409))
+
+    await expect(closeDay(TRIP_ID)).rejects.toThrow("There's no itinerary day scheduled for that date.")
+  })
+
+  it("lets a failed request throw rather than reporting a day closed", async () => {
+    mockedApiPost.mockRejectedValue(new Error("Could not reach the server."))
+
+    await expect(closeDay(TRIP_ID)).rejects.toThrow("Could not reach the server.")
+  })
+
+  it("rejects an answer that does not say which day was closed", async () => {
+    mockedApiPost.mockResolvedValue({ taskId: "task-1" })
+
+    await expect(closeDay(TRIP_ID)).rejects.toThrow()
   })
 })

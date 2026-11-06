@@ -3,6 +3,7 @@ import {
   ClipboardListIcon,
   MapPinIcon,
   PackageIcon,
+  RadioIcon,
   UsersIcon,
 } from "lucide-react-native"
 import { Link, Stack as RouterStack, useLocalSearchParams } from "expo-router"
@@ -14,7 +15,6 @@ import { TRIP_STATE, type Trip, type TripState } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
-import { SharingCard } from "@mobile/components/live/sharing-card"
 import { TripControls } from "@mobile/components/trips/trip-controls"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
@@ -144,6 +144,11 @@ export default function TripDetailScreen() {
     label: string
     icon: typeof MapPinIcon
   }[] = [
+    // First while the trip is under way, as web's Live tab is: it is what a paddler on the water
+    // opens, and it is where position sharing is started.
+    ...(trip.state === TRIP_STATE.HAPPENING
+      ? [{ href: `/trips/${id}/live`, label: "Live", icon: RadioIcon }]
+      : []),
     { href: `/trips/${id}/itinerary`, label: "Itinerary", icon: MapPinIcon },
     { href: `/trips/${id}/crew`, label: "Crew", icon: UsersIcon },
     { href: `/trips/${id}/logistics`, label: "Logistics", icon: ClipboardListIcon },
@@ -191,8 +196,6 @@ export default function TripDetailScreen() {
             status={{ state: trip.state, isPaused: trip.isPaused, dateTo: trip.dateTo }}
           />
         )}
-
-        {trip.state === TRIP_STATE.HAPPENING && <SharingCard tripId={id} />}
 
         <Stack className="gap-3">
           {links.map(({ href, label, icon: Icon }) => (

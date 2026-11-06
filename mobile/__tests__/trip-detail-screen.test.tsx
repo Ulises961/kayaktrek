@@ -1,5 +1,7 @@
 import { render } from "@testing-library/react-native"
 
+import { TRIP_STATE } from "@shared/dtos/trip"
+
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 import TripDetailScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/index"
@@ -27,13 +29,6 @@ jest.mock("../lib/db/trip-list-cache", () => ({
   loadTripListCache: jest.fn(),
 }))
 jest.mock("../lib/db/trip-role", () => ({ isTripLeader: jest.fn() }))
-// The card has its own test; here only whether the hub shows it matters.
-jest.mock("../components/live/sharing-card", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Text } = require("react-native")
-  return { SharingCard: ({ tripId }: { tripId: string }) => <Text testID="sharing-card">{tripId}</Text> }
-})
-
 // M9c WP7: every offline branch below now reads how old its cache is. The real
 // lookup needs a database; the age itself is asserted as a relative offset so
 // the expectation can't rot into an absolute date as the suite gets older.
@@ -82,21 +77,31 @@ describe("TripDetailScreen", () => {
     expect(queryByTestId("trip-pause")).toBeNull()
   })
 
-  it("offers position sharing to a member of a trip under way, for that trip", async () => {
-    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "happening" })
+  it("links a member of a trip under way to its Live screen, where position sharing now lives", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: TRIP_STATE.HAPPENING })
 
-    const { findByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    const { findByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
 
-    expect((await findByTestId("sharing-card")).props.children).toBe("trip-1")
+    expect(await findByText("Live")).toBeTruthy()
+    expect(queryByText("Share my position")).toBeNull()
   })
 
-  it("does not offer position sharing before the trip is under way", async () => {
-    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+  it("has no Live entry before the trip is under way", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: TRIP_STATE.BUILDING })
 
-    const { findByText, queryByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    const { findByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
     await findByText("Costa Brava")
 
-    expect(queryByTestId("sharing-card")).toBeNull()
+    expect(queryByText("Live")).toBeNull()
+  })
+
+  it("has no Live entry once the trip is over", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: TRIP_STATE.PAST })
+
+    const { findByText, queryByText } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    await findByText("Costa Brava")
+
+    expect(queryByText("Live")).toBeNull()
   })
 
   it("shows the trip's destination and state once loaded", async () => {

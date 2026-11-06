@@ -28,6 +28,16 @@ export async function getChangesPollUrl(tripId: string): Promise<string | null> 
   return ticket === null ? null : `${SSE_URL}${API_PREFIX}/live/trip/${tripId}/changes?ticket=${ticket}`
 }
 
+const CloseDayResultSchema = z.object({ taskId: z.string(), date: z.string() })
+
+// Closes a happening trip's day (leader only): the server starts generating that day's expedition
+// logs from the shared positions and answers with the date it closed. A refusal throws with the
+// server's own reason (the trip is not happening; no itinerary day for that date).
+export async function closeDay(tripId: string): Promise<{ date: string }> {
+  const { date } = CloseDayResultSchema.parse(await apiPost<unknown>(`/api/live/trip/${tripId}/close-day`, {}))
+  return { date }
+}
+
 // The sidecar URL to poll for the crew's newest positions (M9e WP2).
 export async function getPositionsPollUrl(tripId: string): Promise<string | null> {
   const ticket = await mintPollTicket(tripId)
