@@ -1,4 +1,4 @@
-// M9e WP1 (plans/M9e.md): sharing the paddler's position. An Android foreground service delivers
+// M9e WP1 (the M9e plan): sharing the paddler's position. An Android foreground service delivers
 // fixes to `handleFixes`; the shared throttle decides which become pings; `deliver` sends one and acts
 // on the answer. The same code runs a practice share that sends nothing, so a condition can be
 // exercised without a trip under way. Every step writes to the evidence log (lib/spike/events.ts), so
@@ -169,7 +169,7 @@ function registerTask(target: SharingTarget): Promise<void> {
       notificationTitle: "Kayaktrek",
       notificationBody:
         target.kind === "trip" ? "Sharing your position with the crew" : "Practice share: nothing is sent",
-      // The service outlives the app being swiped away (measured on the Mi 8, plans/M9e.md WP0).
+      // The service outlives the app being swiped away (measured on the Mi 8, the M9e plan, WP0).
       killServiceOnDestroy: false,
     },
   })

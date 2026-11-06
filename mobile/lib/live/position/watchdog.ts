@@ -26,7 +26,7 @@ async function currentFix(): Promise<PositionFix | null> {
 
 const liveDeps: WatchdogDeps = { now: Date.now, send: sendPositionPing, log: logEvent, currentFix }
 
-// The keep-alive (plans/M9e.md WP1), run by the work scheduler about hourly. It first makes sure the
+// The keep-alive (the M9e plan, WP1), run by the work scheduler about hourly. It first makes sure the
 // location service is still alive, then, if no ping has gone out lately, sends one fresh fix so that
 // a phone sitting still is not read as a phone that has gone quiet.
 export async function runWatchdog(deps: WatchdogDeps = liveDeps): Promise<void> {

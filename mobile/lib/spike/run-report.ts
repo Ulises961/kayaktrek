@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): everything the walk wrote down, and the report that sets the fixes
+// M9e WP0 spike (the M9e plan): everything the walk wrote down, and the report that sets the fixes
 // against what the phone itself was doing (screen on or off, deep sleep, battery, the app in or out of
 // the foreground). Pure, so it is tested; the file reading lives in events.ts. Throwaway with the
 // rest of lib/spike.

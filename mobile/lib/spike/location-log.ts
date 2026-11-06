@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): reads the fix log the background task writes and boils it
+// M9e WP0 spike (the M9e plan): reads the fix log the background task writes and boils it
 // down to the numbers the spike has to report. Throwaway with the rest of lib/spike.
 
 export type SpikeFix = {

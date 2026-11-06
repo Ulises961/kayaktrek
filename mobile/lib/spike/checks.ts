@@ -1,4 +1,4 @@
-// The conditions M9e WP0 left open (plans/M9e.md), kept as a standing list the evidence log answers by
+// The conditions M9e WP0 left open (the M9e plan), kept as a standing list the evidence log answers by
 // itself: each one says what to do to exercise it, stays "waiting" until the log shows it happened, and
 // then states what was measured. They are collected passively while WP1 is built, so nobody has to
 // remember what has been seen. Pure; the screen and the shared report print the result. Throwaway with

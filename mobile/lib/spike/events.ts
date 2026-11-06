@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): the evidence files. JavaScript writes one (fixes, runs, app state,
+// M9e WP0 spike (the M9e plan): the evidence files. JavaScript writes one (fixes, runs, app state,
 // network, heartbeats); the native module writes another (screen, deep sleep, battery saver, battery),
 // because the native side must keep logging when JavaScript is paused. They share a clock and are read
 // together. There is deliberately no way to clear them. Throwaway with the rest of lib/spike.

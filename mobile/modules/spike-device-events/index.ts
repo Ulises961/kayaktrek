@@ -1,4 +1,4 @@
-// M9e WP0 spike (plans/M9e.md): the native side of the evidence collector. Throwaway with lib/spike.
+// M9e WP0 spike (the M9e plan): the native side of the evidence collector. Throwaway with lib/spike.
 
 import { requireNativeModule } from "expo-modules-core"
 

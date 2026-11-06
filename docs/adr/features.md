@@ -226,7 +226,7 @@ speed analogue of the rule of 12s (already implemented in `TidalService.stream_r
 simple-mode entries are synthesised into `TidalStreamEntry` rows so the read path stays uniform.
 
 **Out of scope (roadmap):** automated tidal fetch via a user-supplied API key (BYOK) fills the same
-diamond entities once the manual model exists. See ROADMAP.
+diamond entities once the manual model exists. See the product roadmap.
 
 **react-leaflet integration pattern** — `leaflet-velocity` is a vanilla Leaflet plugin with no react-leaflet wrapper. The correct integration is a `"use client"` component that:
 
@@ -544,7 +544,7 @@ tightened to this rule in M7a.
 warnings, weather, rule-of-12s). A "planning aid only — not a substitute for official charts, tide
 tables, and sound seamanship" disclaimer must appear **both in the app UI** (where safety data is
 shown) **and in the Terms of Use** (the TOU is what limits liability; the banner alone does not).
-Tracked on the conventions doc Production Readiness checklist and ROADMAP Privacy & Legal.
+Tracked on the conventions doc Production Readiness checklist and the product roadmap's Privacy & Legal list.
 
 ### Revision (M27): position-only diamond sharing
 

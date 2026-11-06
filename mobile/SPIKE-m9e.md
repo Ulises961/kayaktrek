@@ -1,7 +1,7 @@
 # M9e WP0 spike — does sharing survive a locked screen?
 
 Throwaway. Lives on `spike/m9e-location-survival` and is deleted (or becomes WP1's base) once
-`plans/M9e.md` WP0 has its answers. Nothing on this branch is meant to merge as it stands.
+The M9e plan's WP0 has its answers. Nothing on this branch is meant to merge as it stands.
 
 ## What the source already tells us (expo-location ~57.0.21, `LocationModule.kt`)
 
@@ -102,7 +102,7 @@ report shows process launches.
    minutes, reopen: did the count keep rising?
 3. Start, then **Force stop** in Android's app settings: reopen and confirm nothing was logged after.
 
-## Answers to write back into `plans/M9e.md` WP0
+## Answers to write back into the M9e plan's WP0
 
 Survival (A/B), permission set that sufficed, what MIUI needed, battery per hour for each setting,
 behaviour with no signal, teardown. Then delete this file.
