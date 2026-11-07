@@ -1,6 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  # The backend is managed by uv (pyproject.toml + uv.lock), so this reads those.
+  - package-ecosystem: "uv"
     directory: "/backend"
     schedule:
       interval: "weekly"
