@@ -56,6 +56,7 @@ function isTokenExpired(token: string): boolean {
 // rather than a hand-kept copy of it — a new (app) segment that misses robots.txt then
 // fails a test instead of quietly becoming crawlable.
 export const AUTH_GATED_PREFIXES = [
+  "/admin",
   "/dashboard",
   "/design",
   "/gear",

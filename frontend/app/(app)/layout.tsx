@@ -89,6 +89,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     username: user.username,
                     mail: user.mail,
                     avatarUrl: user.avatarUrl,
+                    isAdmin: user.admin === true,
                   }
                 }
               />

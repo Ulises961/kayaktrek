@@ -651,8 +651,11 @@ which addresses are registered). The resend page tells them to write to `support
 admin-only, `POST /api/v1/user/correct-unverified-mail`, which moves the account to the right
 address, voids its old verification links and mails a new one there.
 
-It needs an admin account's bearer token (`users.admin = true`, set in the database; there is no
-UI for it). Ask the person for their **username** and the address they meant, then:
+Ask the person for their **username** and the address they meant. An administrator (an account
+with `users.admin = true`, set in the database) does it from **Admin** in the account menu,
+`/admin`: username, correct address, "Move account and send link". The page 404s for anyone else.
+
+The same call without the page, for when the web app is down or you are on the box:
 
 ```bash
 read -rsp "admin password: " ADMIN_PWD; echo
