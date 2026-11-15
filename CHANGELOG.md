@@ -7,6 +7,23 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.6.1] - 2026-11-15
+
+### Fixed
+
+- **A route's detail panel is usable on a phone.** Opening a route from Explore showed a panel that
+  could not be scrolled properly when the description or the daily breakdown was long, and whose
+  "Use this route" button sat hard against the bottom edge, partly under the browser's address bar.
+  The panel now scrolls as one column, the button has room below it, and the description and the
+  daily breakdown fold away with a tap. The breakdown starts folded; the description starts open.
+- **Place and hazard popups on the map are readable in dark mode.** A pin's popup stayed white
+  while its text turned near-white, so a place's name and its Edit button could not be read. The
+  popup now follows the theme.
+
+### Deploy notes
+
+Frontend only: no migration, no new environment variable, no forced logout.
+
 ## [1.6.0] - 2026-11-15
 
 ### Added
