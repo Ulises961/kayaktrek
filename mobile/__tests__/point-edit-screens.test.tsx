@@ -6,6 +6,7 @@ import EditPointScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/point/[poi
 import { requestPush } from "../lib/db/push-pending"
 import { editRoute, loadEditableRoute } from "../lib/db/route-edit"
 import { isTripLeader } from "../lib/db/trip-role"
+import { READ_ONLY_PARAM } from "../lib/itinerary/edit-mode"
 import type { EditableRoute } from "../lib/itinerary/route-edits"
 
 const mockBack = jest.fn()
@@ -105,6 +106,18 @@ describe("EditPointScreen", () => {
   // PointDetailModal `canEdit` split — rather than being turned away entirely.
   it("shows crew a read-only view instead of the edit form", async () => {
     mockIsLeader.mockResolvedValue(false)
+    const { findByText, queryByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByText("position")).toBeTruthy()
+    expect(queryByTestId("point-submit")).toBeNull()
+    expect(queryByTestId("point-name")).toBeNull()
+  })
+
+  // M42: a leader who opens a point from the itinerary's view mode is reading, not editing, so the
+  // form they would get in edit mode must not appear.
+  it("shows the leader a read-only view when the point was opened from view mode", async () => {
+    mockIsLeader.mockResolvedValue(true)
+    mockParams = { id: "trip-1", pointId: "b", readOnly: READ_ONLY_PARAM }
     const { findByText, queryByTestId } = await render(<EditPointScreen />, { wrapper: WithCachedSurfaces })
 
     expect(await findByText("position")).toBeTruthy()
