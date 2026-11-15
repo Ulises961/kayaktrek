@@ -25,6 +25,7 @@ import {
   saveBiometricCredentials,
 } from "../../lib/auth/biometric-store"
 import { fieldErrors } from "../../lib/auth/field-errors"
+import { readRememberedMail, rememberMail } from "../../lib/auth/remembered-mail"
 
 const REGISTERED_FLAG = "1"
 
@@ -45,6 +46,10 @@ export default function LoginScreen() {
 
   useEffect(() => {
     let cancelled = false
+    // Only fills an untouched field: if the user already started typing, theirs wins.
+    void readRememberedMail().then((remembered) => {
+      if (!cancelled && remembered) setMail((typed) => typed || remembered)
+    })
     void hasBiometricCredentials().then((saved) => {
       if (!cancelled) setFingerprintSaved(saved)
     })
@@ -87,6 +92,7 @@ export default function LoginScreen() {
     const result = await signIn(parsed.data.mail, parsed.data.password)
     setIsPending(false)
     if (result.success) {
+      void rememberMail(parsed.data.mail)
       offerFingerprint(parsed.data)
       return
     }

@@ -15,6 +15,7 @@ import {
   readBiometricCredentials,
   saveBiometricCredentials,
 } from "../lib/auth/biometric-store"
+import { readRememberedMail, rememberMail } from "../lib/auth/remembered-mail"
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
 jest.mock("expo-router", () => {
@@ -40,6 +41,13 @@ jest.mock("../lib/auth/biometric-store", () => ({
   clearBiometricCredentials: jest.fn(),
 }))
 
+jest.mock("../lib/auth/remembered-mail", () => ({
+  readRememberedMail: jest.fn(),
+  rememberMail: jest.fn(),
+}))
+
+const mockReadRememberedMail = readRememberedMail as jest.Mock
+const mockRememberMail = rememberMail as jest.Mock
 const mockUseAuth = useAuth as jest.Mock
 const mockSearchParams = useLocalSearchParams as jest.Mock
 const mockCanUseBiometrics = canUseBiometrics as jest.Mock
@@ -77,6 +85,8 @@ describe("LoginScreen", () => {
     mockCanUseBiometrics.mockReturnValue(false)
     mockHasCredentials.mockResolvedValue(false)
     mockReadCredentials.mockReset()
+    mockReadRememberedMail.mockReset().mockResolvedValue("")
+    mockRememberMail.mockReset().mockResolvedValue(undefined)
     mockSaveCredentials.mockReset().mockResolvedValue(undefined)
     mockClearCredentials.mockReset().mockResolvedValue(undefined)
     openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
@@ -96,6 +106,49 @@ describe("LoginScreen", () => {
     await waitFor(() => {
       expect(signIn).toHaveBeenCalledWith("paddler@example.com", "correct-horse")
     })
+  })
+
+  it("fills in the address used last time, leaving only the password to type", async () => {
+    mockReadRememberedMail.mockResolvedValue("paddler@example.com")
+    signedOut()
+    const screen = await renderLogin()
+
+    await waitFor(() => {
+      expect(screen.getByTestId("login-email").props.value).toBe("paddler@example.com")
+    })
+    expect(screen.getByTestId("login-password").props.value).toBe("")
+  })
+
+  it("keeps what was typed when the remembered address arrives late", async () => {
+    let deliver: (mail: string) => void = () => undefined
+    mockReadRememberedMail.mockReturnValue(new Promise<string>((resolve) => (deliver = resolve)))
+    signedOut()
+    const screen = await renderLogin()
+
+    await fireEvent.changeText(screen.getByTestId("login-email"), "other@example.com")
+    deliver("paddler@example.com")
+
+    await waitFor(() => expect(mockReadRememberedMail).toHaveBeenCalled())
+    expect(screen.getByTestId("login-email").props.value).toBe("other@example.com")
+  })
+
+  it("remembers the address after a sign-in that worked", async () => {
+    signedOut(jest.fn().mockResolvedValue({ success: true }))
+    const screen = await renderLogin()
+
+    await fillAndSubmit(screen, "paddler@example.com", "correct-horse")
+
+    await waitFor(() => expect(mockRememberMail).toHaveBeenCalledWith("paddler@example.com"))
+  })
+
+  it("does not remember an address whose sign-in was refused", async () => {
+    signedOut(jest.fn().mockResolvedValue({ success: false, error: "Invalid email or password." }))
+    const screen = await renderLogin()
+
+    await fillAndSubmit(screen, "paddler@example.com", "wrong")
+
+    await screen.findByText("Invalid email or password.")
+    expect(mockRememberMail).not.toHaveBeenCalled()
   })
 
   it("shows the server's error message on a failed sign-in, not a generic fallback", async () => {
