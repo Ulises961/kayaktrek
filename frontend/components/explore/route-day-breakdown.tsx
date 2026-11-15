@@ -11,6 +11,7 @@ import {
 } from "@/lib/itinerary/distance"
 import { POINT_TYPE } from "@/lib/dtos/point"
 import { railConnectorClass, RailTypeIcon, ViaDots } from "@/components/common/route-rail"
+import { RouteDetailSection } from "@/components/explore/route-detail-section"
 import type { RouteDaySegment, RoutePoint } from "@/lib/itinerary/public-routes"
 
 // `routeLegs`/`groupStopsWithVia` key on `latitude`/`longitude` (the authenticated
@@ -40,10 +41,12 @@ export function RouteDayBreakdown({
   days,
   avgSpeedKnots,
   unit = DISTANCE_UNIT.NM,
+  defaultOpen = true,
 }: {
   days: RouteDaySegment[]
   avgSpeedKnots?: number | null
   unit?: DistanceUnit
+  defaultOpen?: boolean
 }) {
   // Keyed by the arriving stop's point id — several can be open at once, across days.
   const [openVia, setOpenVia] = useState<Set<string>>(new Set())
@@ -60,14 +63,10 @@ export function RouteDayBreakdown({
   }
 
   return (
-    // Sized by what the panel has left rather than by a fixed cap. `min-h-0` is what
-    // lets the list be the part that gives way when the panel is short — without it
-    // a flex item refuses to shrink below its content and the scroll never engages.
-    <div className="border-border flex min-h-0 flex-col gap-1 border-t pt-3">
-      <p className="text-muted-foreground shrink-0 text-xs font-medium tracking-wide uppercase">
-        Daily breakdown
-      </p>
-      <div className="divide-border/50 min-h-0 divide-y overflow-y-auto">
+    // The list grows to its full length and the panel around it scrolls: a list that
+    // scrolled inside a panel that scrolls left a phone with two scrollbars to fight.
+    <RouteDetailSection title="Daily breakdown" defaultOpen={defaultOpen}>
+      <div className="divide-border/50 divide-y">
         {days.map((day) => {
           const stops = groupStopsWithVia(day.points.map(withCoords))
           return (
@@ -173,6 +172,6 @@ export function RouteDayBreakdown({
           )
         })}
       </div>
-    </div>
+    </RouteDetailSection>
   )
 }

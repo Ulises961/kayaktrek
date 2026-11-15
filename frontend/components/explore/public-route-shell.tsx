@@ -35,7 +35,9 @@ export function PublicRouteShell({ map, children }: PublicRouteShellProps) {
   const [open, setOpen] = useState(true)
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden">
+    // `dvh`, not `vh`: on a phone `100vh` is the height with the browser's address bar
+    // retracted, so the foot of the panel — the call to action — sat under it.
+    <div className="relative flex h-dvh w-full overflow-hidden">
       <div className="relative min-h-0 min-w-0 flex-1">{map}</div>
 
       <div
