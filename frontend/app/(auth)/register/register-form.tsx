@@ -4,7 +4,7 @@ import { useActionState, useTransition } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { register as registerAction } from "@/lib/auth/actions"
-import { RegisterFormSchema, PASSWORD_RULES, type RegisterFormInput } from "@/lib/auth/schemas"
+import { RegisterSchema, PASSWORD_RULES, type RegisterInput } from "@/lib/auth/schemas"
 import { generateKeypair } from "@/lib/crypto/medical"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,8 +47,8 @@ export function RegisterForm({ inviteCodeRequired }: { inviteCodeRequired: boole
     handleSubmit,
     control,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormInput>({
-    resolver: zodResolver(RegisterFormSchema),
+  } = useForm<RegisterInput>({
+    resolver: zodResolver(RegisterSchema),
     mode: "onBlur",
   })
 
@@ -122,22 +122,6 @@ export function RegisterForm({ inviteCodeRequired }: { inviteCodeRequired: boole
             {...register("mail")}
           />
           {errors.mail && <p className="text-[11px] text-red-600">{errors.mail.message}</p>}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="confirmMail" className="auth-label">
-            Confirm email
-          </label>
-          <Input
-            id="confirmMail"
-            type="email"
-            autoComplete="off"
-            className="auth-input"
-            {...register("confirmMail")}
-          />
-          {errors.confirmMail && (
-            <p className="text-[11px] text-red-600">{errors.confirmMail.message}</p>
-          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

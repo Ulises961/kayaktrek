@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest"
 import {
   LoginSchema,
   RegisterSchema,
-  RegisterFormSchema,
   CorrectUnverifiedMailSchema,
   PASSWORD_RULES,
   ForgotPasswordSchema,
@@ -215,42 +214,6 @@ describe("ResetPasswordSchema", () => {
     it("accepts when confirmPassword matches password exactly", () => {
       expect(ResetPasswordSchema.safeParse(valid).success).toBe(true)
     })
-  })
-})
-
-describe("RegisterFormSchema", () => {
-  const valid = {
-    mail: "user@example.com",
-    confirmMail: "user@example.com",
-    username: "kayaker_42",
-    password: STRONG_PASSWORD,
-  }
-
-  it("accepts matching addresses", () => {
-    expect(RegisterFormSchema.safeParse(valid).success).toBe(true)
-  })
-
-  it("accepts addresses that differ only by case or surrounding space", () => {
-    expect(
-      RegisterFormSchema.safeParse({ ...valid, confirmMail: " User@Example.COM " }).success,
-    ).toBe(true)
-  })
-
-  it("rejects a mistyped confirmation and puts the error on the confirm field", () => {
-    const result = RegisterFormSchema.safeParse({ ...valid, confirmMail: "usr@example.com" })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues[0].path).toEqual(["confirmMail"])
-      expect(result.error.issues[0].message).toBe("The email addresses do not match.")
-    }
-  })
-
-  it("rejects a missing confirmation", () => {
-    expect(RegisterFormSchema.safeParse({ ...valid, confirmMail: "" }).success).toBe(false)
-  })
-
-  it("still enforces everything RegisterSchema does", () => {
-    expect(RegisterFormSchema.safeParse({ ...valid, password: "weak" }).success).toBe(false)
   })
 })
 

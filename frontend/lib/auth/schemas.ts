@@ -35,14 +35,6 @@ function sameAddress(first: string, second: string): boolean {
   return first.trim().toLowerCase() === second.trim().toLowerCase()
 }
 
-// What the register form validates. `confirmMail` never leaves the browser — it exists to catch
-// a typo before it strands the account behind a verification mail that goes to the wrong place —
-// so the server action keeps parsing the narrower RegisterSchema.
-export const RegisterFormSchema = RegisterSchema.extend({ confirmMail: z.string() }).refine(
-  (data) => sameAddress(data.mail, data.confirmMail),
-  { message: MAIL_MISMATCH, path: ["confirmMail"] },
-)
-
 // The always-visible signup checklist mirrors RegisterSchema's password regexes
 // verbatim (M12 §F) — change them together or the live checklist lies.
 // Special-character set must match the backend's validate_pwd exactly
@@ -106,7 +98,6 @@ export const ResetPasswordSchema = z
 
 export type LoginInput = z.infer<typeof LoginSchema>
 export type RegisterInput = z.infer<typeof RegisterSchema>
-export type RegisterFormInput = z.infer<typeof RegisterFormSchema>
 export type CorrectUnverifiedMailInput = z.infer<typeof CorrectUnverifiedMailSchema>
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>
