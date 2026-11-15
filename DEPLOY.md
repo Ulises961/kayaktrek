@@ -643,6 +643,32 @@ add a periodic `rclone` copy R2 → B2; R2 charges no egress, so it is free to r
 **`.env` itself** is not backed up either, and holds `JWT_SECRET_KEY` — losing it logs out
 every user. It belongs in your password manager.
 
+## Correcting a mistyped signup address
+
+Someone who typed their email wrong at signup never receives the verification link and cannot
+fix it themselves — sign-in only ever says "invalid credentials" (saying "not verified" would leak
+which addresses are registered). The resend page tells them to write to `support@`; the fix is
+admin-only, `POST /api/v1/user/correct-unverified-mail`, which moves the account to the right
+address, voids its old verification links and mails a new one there.
+
+It needs an admin account's bearer token (`users.admin = true`, set in the database; there is no
+UI for it). Ask the person for their **username** and the address they meant, then:
+
+```bash
+read -rsp "admin password: " ADMIN_PWD; echo
+TOKEN=$(curl -s -X POST https://api.<domain>/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d "{\"mail\":\"<admin address>\",\"pwd\":\"$ADMIN_PWD\"}" | jq -r .access_token)
+curl -s -X POST https://api.<domain>/api/v1/user/correct-unverified-mail \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"username":"<their username>","newMail":"<the right address>"}'
+```
+
+It answers plainly because the caller is an admin: 404 no such username, 409 the account is
+already verified (its address is then changed from their own profile, not here) or the address
+belongs to another account, 400 a malformed address. A 200 means the mail was handed to the
+provider; if it still does not arrive, check the Mail monitor above.
+
 ## Closing registration in a hurry
 
 M25 opens registration to anyone. The kill switch is `INVITE_CODE`: set it, restart the backend,

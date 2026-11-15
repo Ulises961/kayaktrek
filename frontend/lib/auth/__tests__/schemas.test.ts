@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   LoginSchema,
   RegisterSchema,
-  CorrectUnverifiedMailSchema,
+  ResendVerificationSchema,
   PASSWORD_RULES,
   ForgotPasswordSchema,
   ResetPasswordSchema,
@@ -217,54 +217,14 @@ describe("ResetPasswordSchema", () => {
   })
 })
 
-describe("CorrectUnverifiedMailSchema", () => {
-  const valid = { mail: "typo@example.com", password: "anything" }
-
-  it("accepts just the credentials, which means resend to the same address", () => {
-    expect(CorrectUnverifiedMailSchema.safeParse(valid).success).toBe(true)
+describe("ResendVerificationSchema", () => {
+  it("accepts an email address", () => {
+    expect(ResendVerificationSchema.safeParse({ mail: "kayaker@example.com" }).success).toBe(true)
   })
 
-  it("treats blank new-address fields as not provided", () => {
-    expect(
-      CorrectUnverifiedMailSchema.safeParse({ ...valid, newMail: "", confirmNewMail: "" }).success,
-    ).toBe(true)
-  })
-
-  it("accepts a new address that is confirmed", () => {
-    expect(
-      CorrectUnverifiedMailSchema.safeParse({
-        ...valid,
-        newMail: "right@example.com",
-        confirmNewMail: "Right@example.com",
-      }).success,
-    ).toBe(true)
-  })
-
-  it("rejects an unconfirmed new address, on the confirm field", () => {
-    const result = CorrectUnverifiedMailSchema.safeParse({
-      ...valid,
-      newMail: "right@example.com",
-      confirmNewMail: "",
-    })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues[0].path).toEqual(["confirmNewMail"])
-      expect(result.error.issues[0].message).toBe("The email addresses do not match.")
-    }
-  })
-
-  it("rejects a malformed new address, on the new-address field", () => {
-    const result = CorrectUnverifiedMailSchema.safeParse({
-      ...valid,
-      newMail: "not-an-address",
-      confirmNewMail: "not-an-address",
-    })
-    expect(result.success).toBe(false)
-    if (!result.success) expect(result.error.issues[0].path).toEqual(["newMail"])
-  })
-
-  it("requires the password and a valid current address", () => {
-    expect(CorrectUnverifiedMailSchema.safeParse({ ...valid, password: "" }).success).toBe(false)
-    expect(CorrectUnverifiedMailSchema.safeParse({ ...valid, mail: "nope" }).success).toBe(false)
+  it("rejects a malformed or missing address", () => {
+    expect(ResendVerificationSchema.safeParse({ mail: "nope" }).success).toBe(false)
+    expect(ResendVerificationSchema.safeParse({ mail: "" }).success).toBe(false)
+    expect(ResendVerificationSchema.safeParse({}).success).toBe(false)
   })
 })

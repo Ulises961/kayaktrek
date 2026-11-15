@@ -72,11 +72,7 @@ export function LoginForm() {
     <AuthCard>
       {registered && (
         <p className="auth-notice auth-notice-success">
-          Account created — check your email to verify before signing in. Nothing there?{" "}
-          <Link href="/resend-verification" className="auth-link">
-            Fix your email address
-          </Link>{" "}
-          or resend the link.
+          Account created — check your email to verify before signing in.
         </p>
       )}
       {passwordReset && (

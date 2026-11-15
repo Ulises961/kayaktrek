@@ -42,23 +42,14 @@ describe("LoginForm", () => {
       ).toHaveAttribute("href", "/resend-verification")
     })
 
-    it("offers the fix right where it says to check your email after registering", () => {
+    it("leaves the post-registration notice as plain text, so the footer link is the one way in", () => {
       searchParams = new URLSearchParams("registered=1")
       render(<LoginForm />)
 
       expect(screen.getByText(/check your email to verify/i)).toBeInTheDocument()
-      expect(screen.getByRole("link", { name: /fix your email address/i })).toHaveAttribute(
-        "href",
-        "/resend-verification",
-      )
-    })
-
-    it("does not show that notice on an ordinary visit", () => {
-      render(<LoginForm />)
-
       expect(
-        screen.queryByRole("link", { name: /fix your email address/i }),
-      ).not.toBeInTheDocument()
+        screen.getAllByRole("link", { name: /verification email|email address/i }),
+      ).toHaveLength(1)
     })
   })
 

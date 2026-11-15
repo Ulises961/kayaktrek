@@ -5,9 +5,9 @@ beside it — addresses were stored and compared exactly as typed, so a capital 
 reset found nobody and, by design, said nothing.
 
 Covers the three repairs: addresses are one case-insensitive form everywhere
-(`Services/Utils/mail_address.py`), `POST /auth/correct-unverified-mail` lets the password
-holder of an unverified account fix the address, and a failed send is recorded where
-`GET /health/mail` can report it.
+(`Services/Utils/mail_address.py`), an administrator can move an unverified account to the
+right address with `POST /user/correct-unverified-mail` (the public resend answers every
+address alike), and a failed send is recorded where `GET /health/mail` can report it.
 """
 import logging
 import re
@@ -28,8 +28,10 @@ from Services.mail_service import (
     send_template_email,
 )
 from Services.Utils.mail_address import is_valid_mail, normalize_mail
+from Tests.auth_helpers import access_token_for
 
-CORRECT_ENDPOINT = "/api/v1/auth/correct-unverified-mail"
+CORRECT_ENDPOINT = "/api/v1/user/correct-unverified-mail"
+RESEND_ENDPOINT = "/api/v1/auth/resend-verification"
 PASSWORD = "Recover9$"
 
 
@@ -128,133 +130,176 @@ class TestAddressNormalisation:
         assert db.session.query(User).filter_by(username=data["username"]).first() is not None
 
 
-class TestCorrectUnverifiedMail:
-    def test_moves_the_account_and_mails_the_new_address_only(self, app, client):
+class TestResendVerificationIsNoOracle:
+    """The public resend must look the same for every address, or its form lists who is registered."""
+
+    def test_an_unverified_account_gets_a_link(self, app, client):
         data = _register(client)
+
+        with mail.record_messages() as outbox:
+            response = client.post(RESEND_ENDPOINT, json={"mail": data["mail"]})
+
+        assert response.status_code == 200
+        assert [message.recipients for message in outbox] == [[data["mail"]]]
+
+    def test_unknown_verified_and_unverified_answer_identically(self, app, client):
+        unverified = _register(client)
+        verified = _register(client)
+        _user(verified["mail"]).active = True
+        db.session.commit()
+
+        answers = [
+            client.post(RESEND_ENDPOINT, json={"mail": address})
+            for address in (unverified["mail"], verified["mail"], "nobody@example.com")
+        ]
+
+        assert {response.status_code for response in answers} == {200}
+        assert len({response.get_data() for response in answers}) == 1
+
+    def test_a_verified_or_unknown_address_is_sent_nothing(self, app, client):
+        verified = _register(client)
+        _user(verified["mail"]).active = True
+        db.session.commit()
+
+        with mail.record_messages() as outbox:
+            client.post(RESEND_ENDPOINT, json={"mail": verified["mail"]})
+            client.post(RESEND_ENDPOINT, json={"mail": "nobody@example.com"})
+
+        assert outbox == []
+
+    @pytest.mark.parametrize("body", [{}, {"mail": ""}, {"mail": 5}])
+    def test_a_missing_address_is_a_400(self, client, body):
+        assert client.post(RESEND_ENDPOINT, json=body).status_code == 400
+
+
+@pytest.fixture
+def admin_headers(app, client):
+    """An active administrator's bearer header."""
+    data = _register(client)
+    admin = _user(data["mail"])
+    admin.active = True
+    admin.admin = True
+    db.session.commit()
+    return {"Authorization": f"Bearer {access_token_for(admin)}"}
+
+
+def _correct(client, headers, **body):
+    return client.post(CORRECT_ENDPOINT, json=body, headers=headers)
+
+
+class TestAdminCorrectUnverifiedMail:
+    def test_moves_the_account_and_mails_the_new_address_only(self, app, client, admin_headers):
+        stranded = _register(client)
         new_mail = f"right_{uuid.uuid4().hex[:8]}@example.com"
 
         with mail.record_messages() as outbox:
-            response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": new_mail})
+            response = _correct(client, admin_headers, username=stranded["username"], newMail=new_mail)
 
         assert response.status_code == 200
-        assert _user(data["mail"]) is None
-        assert _user(new_mail).username == data["username"]
+        assert response.get_json()["mail"] == new_mail
+        assert _user(stranded["mail"]) is None
+        assert _user(new_mail).username == stranded["username"]
         assert [message.recipients for message in outbox] == [[new_mail]]
 
-    def test_the_new_link_activates_the_account_and_the_old_one_is_dead(self, app, client):
-        data = _register(client)
-        user = _user(data["mail"])
-        old_token = AuthToken.query.filter_by(user_id=user.id, type=AuthTokenType.VERIFICATION, used=False).first()
+    def test_the_new_link_activates_the_account_and_the_old_one_is_dead(self, app, client, admin_headers):
+        stranded = _register(client)
+        old_token = AuthToken.query.filter_by(
+            user_id=_user(stranded["mail"]).id, type=AuthTokenType.VERIFICATION, used=False
+        ).first()
         assert old_token is not None
         new_mail = f"right_{uuid.uuid4().hex[:8]}@example.com"
 
         with mail.record_messages() as outbox:
-            client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": new_mail})
+            _correct(client, admin_headers, username=stranded["username"], newMail=new_mail)
         db.session.refresh(old_token)
 
         assert old_token.used is True
         assert client.get(f"/api/v1/auth/verify?token={_token_in(outbox[0].body)}").status_code == 200
         assert client.post("/api/v1/auth/login", json={"mail": new_mail, "pwd": PASSWORD}).status_code == 200
 
-    def test_new_address_is_stored_normalised(self, app, client):
-        data = _register(client)
+    def test_the_new_address_is_stored_normalised(self, app, client, admin_headers):
+        stranded = _register(client)
         suffix = uuid.uuid4().hex[:8]
 
-        client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": f" Right_{suffix}@Example.COM"})
+        _correct(client, admin_headers, username=stranded["username"], newMail=f" Right_{suffix}@Example.COM ")
 
         assert _user(f"right_{suffix}@example.com") is not None
 
-    def test_without_a_new_address_it_resends_to_the_current_one(self, app, client):
-        data = _register(client)
+    def test_the_same_address_resends_to_it(self, app, client, admin_headers):
+        stranded = _register(client)
 
         with mail.record_messages() as outbox:
-            response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"].upper(), "pwd": PASSWORD})
+            response = _correct(client, admin_headers, username=stranded["username"], newMail=stranded["mail"].upper())
 
         assert response.status_code == 200
-        assert _user(data["mail"]) is not None
-        assert [message.recipients for message in outbox] == [[data["mail"]]]
+        assert [message.recipients for message in outbox] == [[stranded["mail"]]]
 
-    def test_wrong_password_and_unknown_account_are_the_same_401(self, app, client):
-        data = _register(client)
-
-        wrong_password = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": "Wrong9$xx", "newMail": "x@example.com"})
-        unknown = client.post(CORRECT_ENDPOINT, json={"mail": "nobody@example.com", "pwd": PASSWORD, "newMail": "x@example.com"})
-
-        assert wrong_password.status_code == unknown.status_code == 401
-        assert wrong_password.get_json() == unknown.get_json()
-        assert _user(data["mail"]) is not None
-
-    def test_a_wrong_password_sends_nothing_and_changes_nothing(self, app, client):
-        data = _register(client)
-
-        with mail.record_messages() as outbox:
-            client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": "Wrong9$xx", "newMail": "x@example.com"})
-
-        assert outbox == []
-        assert _user(data["mail"]) is not None
-        assert _user("x@example.com") is None
-
-    def test_a_verified_account_cannot_use_it(self, app, client):
-        data = _register(client)
-        _user(data["mail"]).active = True
-        db.session.commit()
-
-        response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": "x@example.com"})
-
-        assert response.status_code == 400
-        assert response.get_json()["code"] == "already_verified"
-        assert _user(data["mail"]) is not None
-
-    def test_a_wrong_password_on_a_verified_account_does_not_say_it_is_verified(self, app, client):
-        data = _register(client)
-        _user(data["mail"]).active = True
-        db.session.commit()
-
-        response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": "Wrong9$xx"})
-
-        assert response.status_code == 401
-        assert "code" not in response.get_json()
-
-    def test_a_pending_deletion_is_not_revealed(self, app, client):
-        data = _register(client)
-        from datetime import datetime, timezone
-        _user(data["mail"]).deletion_requested_at = datetime.now(timezone.utc)
-        db.session.commit()
-
-        response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": "x@example.com"})
-
-        assert response.status_code == 401
-
-    def test_a_taken_address_looks_like_success_and_warns_its_owner(self, app, client):
+    def test_an_address_held_by_another_account_is_refused_and_nothing_moves(self, app, client, admin_headers):
         stranded = _register(client)
         owner = _register(client)
 
         with mail.record_messages() as outbox:
-            response = client.post(CORRECT_ENDPOINT, json={"mail": stranded["mail"], "pwd": PASSWORD, "newMail": owner["mail"].upper()})
+            response = _correct(client, admin_headers, username=stranded["username"], newMail=owner["mail"].upper())
 
-        assert response.status_code == 200
+        assert response.status_code == 409
         assert _user(stranded["mail"]) is not None
-        assert [message.recipients for message in outbox] == [[owner["mail"]]]
-        assert "already" in outbox[0].subject.lower() or "tried to register" in outbox[0].subject.lower()
+        assert outbox == []
 
-    @pytest.mark.parametrize("new_mail", ["not-an-address", "a@b", 42])
-    def test_a_malformed_new_address_is_a_400_and_changes_nothing(self, app, client, new_mail):
-        data = _register(client)
+    def test_a_verified_account_is_refused(self, app, client, admin_headers):
+        verified = _register(client)
+        _user(verified["mail"]).active = True
+        db.session.commit()
 
-        response = client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": PASSWORD, "newMail": new_mail})
+        with mail.record_messages() as outbox:
+            response = _correct(client, admin_headers, username=verified["username"], newMail="x@example.com")
+
+        assert response.status_code == 409
+        assert _user(verified["mail"]) is not None
+        assert outbox == []
+
+    def test_an_unknown_username_is_a_404(self, app, client, admin_headers):
+        assert _correct(client, admin_headers, username="nobody_here", newMail="x@example.com").status_code == 404
+
+    @pytest.mark.parametrize("new_mail", ["not-an-address", "a@b"])
+    def test_a_malformed_address_is_a_400_and_changes_nothing(self, app, client, admin_headers, new_mail):
+        stranded = _register(client)
+
+        response = _correct(client, admin_headers, username=stranded["username"], newMail=new_mail)
 
         assert response.status_code == 400
-        assert _user(data["mail"]) is not None
+        assert _user(stranded["mail"]) is not None
 
-    @pytest.mark.parametrize("body", [{}, {"mail": "a@example.com"}, {"pwd": PASSWORD}, {"mail": 5, "pwd": PASSWORD}])
-    def test_missing_fields_are_a_400(self, client, body):
-        assert client.post(CORRECT_ENDPOINT, json=body).status_code == 400
+    @pytest.mark.parametrize("body", [{}, {"username": "x"}, {"newMail": "a@example.com"}, {"username": 5, "newMail": "a@example.com"}])
+    def test_missing_fields_are_a_400(self, client, admin_headers, body):
+        assert _correct(client, admin_headers, **body).status_code == 400
 
-    def test_the_session_is_usable_after_a_refused_correction(self, app, client):
-        data = _register(client)
-        client.post(CORRECT_ENDPOINT, json={"mail": data["mail"], "pwd": "Wrong9$xx"})
+    def test_a_non_admin_is_refused_and_nothing_moves(self, app, client):
+        stranded = _register(client)
+        caller = _register(client)
+        _user(caller["mail"]).active = True
+        db.session.commit()
+        headers = {"Authorization": f"Bearer {access_token_for(_user(caller['mail']))}"}
 
-        assert _user(data["mail"]) is not None
+        with mail.record_messages() as outbox:
+            response = _correct(client, headers, username=stranded["username"], newMail="x@example.com")
+
+        assert response.status_code == 403
+        assert _user(stranded["mail"]) is not None
+        assert outbox == []
+
+    def test_an_anonymous_caller_is_refused(self, app, client):
+        stranded = _register(client)
+
+        response = client.post(CORRECT_ENDPOINT, json={"username": stranded["username"], "newMail": "x@example.com"})
+
+        assert response.status_code == 401
+        assert _user(stranded["mail"]) is not None
+
+    def test_the_session_is_usable_after_a_refusal(self, app, client, admin_headers):
+        stranded = _register(client)
+        _correct(client, admin_headers, username=stranded["username"], newMail="nope")
+
+        assert _user(stranded["mail"]) is not None
 
 
 class TestMailFailureMonitoring:

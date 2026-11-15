@@ -35,6 +35,10 @@ class AccountAlreadyVerifiedError(Exception):
     """The account behind a verification request has already been verified."""
 
 
+class MailAddressTakenError(Exception):
+    """The address an account is being moved to already belongs to another account."""
+
+
 class AuthService:
 
     _KEYPAIR_FIELDS = (
@@ -211,46 +215,44 @@ class AuthService:
         AuthService._send_verification_email(user)
 
     @staticmethod
-    def correct_unverified_mail(mail_addr: str, password: str, new_mail: Optional[str]) -> None:
+    def admin_correct_unverified_mail(username: str, new_mail: str, admin_id: str) -> User:
         """
-        Let the holder of an unverified account fix a mistyped address and get a fresh
-        verification email at the right one.
+        Move an unverified account to the address its owner meant to type, and mail a fresh
+        verification link there. An administrator's tool for someone who mistyped their
+        address at signup and so can never receive the original link.
 
-        Ownership is the password, not the mailbox: the mailbox is the thing that is wrong.
-        `new_mail` omitted (or equal to the current address) just resends to the current one.
-        When the new address already belongs to another account, the owner gets the usual
-        "you already have an account" email and this returns normally, so a caller holding
-        valid credentials cannot use it to probe which addresses are registered.
+        Unlike the public flows this is allowed to say why it refused: the caller is an
+        authenticated administrator, not an anonymous client probing for registered addresses.
+
+        Args:
+            username: The account to move.
+            new_mail: The address to move it to, in any case and with surrounding space.
+            admin_id: The administrator acting, for the audit log.
+
+        Returns:
+            The updated user, whose `mail` is the stored (normalised) form.
 
         Raises:
-            PermissionError: No account at `mail_addr`, wrong password, or deletion pending —
-                all one outcome, the same as a failed login.
-            AccountAlreadyVerifiedError: The password was right and the account is verified.
+            NoResultFound: No account has this username.
+            AccountAlreadyVerifiedError: The account is already verified, so its address is
+                not a signup typo and is changed through the owner's own email-change flow.
             ValueError: `new_mail` is malformed.
+            MailAddressTakenError: Another account already holds `new_mail`.
         """
-        user = db.session.query(User).filter_by(mail=normalize_mail(mail_addr)).first()
+        user = db.session.query(User).filter_by(username=username).first()
         if user is None:
-            check_password_hash(_DUMMY_HASH, password)
-            raise PermissionError("Invalid credentials")
-        if not check_password_hash(user.pwd, password) or user.deletion_requested_at is not None:
-            raise PermissionError("Invalid credentials")
+            raise NoResultFound(f"No user named {username}")
         if user.active:
             raise AccountAlreadyVerifiedError()
 
-        mail_changed = False
-        if new_mail:
-            new_mail = normalize_mail(new_mail)
-            if not is_valid_mail(new_mail):
-                raise ValueError("Invalid email format")
-            if new_mail != user.mail:
-                holder = db.session.query(User).filter_by(mail=new_mail).first()
-                if holder:
-                    AuthService._send_already_registered_email(holder)
-                    logger.info("unverified_mail_correction_to_taken_address", extra={"user_id": str(user.id)})
-                    return
-                user.mail = new_mail
-                mail_changed = True
+        new_mail = normalize_mail(new_mail)
+        if not is_valid_mail(new_mail):
+            raise ValueError("Invalid email format")
+        holder = db.session.query(User).filter_by(mail=new_mail).first()
+        if holder is not None and holder.id != user.id:
+            raise MailAddressTakenError()
 
+        user.mail = new_mail
         db.session.query(AuthToken).filter_by(
             user_id=user.id,
             type=AuthTokenType.VERIFICATION,
@@ -259,7 +261,8 @@ class AuthService:
         db.session.commit()
 
         AuthService._send_verification_email(user)
-        logger.info("unverified_mail_corrected", extra={"user_id": str(user.id), "mail_changed": mail_changed})
+        logger.info("unverified_mail_corrected_by_admin", extra={"user_id": str(user.id), "admin_id": admin_id})
+        return user
 
     @staticmethod
     def request_password_reset(mail_addr: str) -> None:

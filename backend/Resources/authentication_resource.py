@@ -10,7 +10,7 @@ from sqlalchemy.exc import NoResultFound
 
 from Api.limiter import limiter
 from Schemas.user_schema import UserSchema
-from Services.auth_service import AccountAlreadyVerifiedError, AuthService
+from Services.auth_service import AuthService
 from Services.mail_service import send_template_email
 from Services.session_service import SessionService
 from Services.user_service import UserService
@@ -361,11 +361,14 @@ def verify_email_change() -> ResponseReturnValue:
 
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def resend_verification() -> ResponseReturnValue:
     """
     ---
     post:
       summary: Resend the account verification email
+      description: >
+        No-oracle: always 200, whether or not the address belongs to an unverified account.
       requestBody:
         content:
           application/json:
@@ -378,81 +381,19 @@ def resend_verification() -> ResponseReturnValue:
                   format: email
       responses:
         200:
-          description: Verification email sent
-        404:
-          description: No account with that email address
-    """
-    data = request.get_json()
-    if not data or not data.get("mail"):
-        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
-    try:
-        AuthService.resend_verification(data["mail"])
-        return jsonify({"status": "success", "message": "Verification email sent"}), HTTPStatus.OK
-    except NoResultFound:
-        abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
-    except ValueError as e:
-        abort(HTTPStatus.BAD_REQUEST, description=str(e))
-
-
-@api.route("/api/v1/auth/correct-unverified-mail", methods=["POST"])
-@limiter.limit("5 per hour", key_func=_resend_key)
-@limiter.limit("20 per hour", key_func=get_remote_address)
-def correct_unverified_mail() -> ResponseReturnValue:
-    """
-    ---
-    post:
-      summary: Fix the address of an unverified account and resend the verification email
-      description: >
-        For someone who mistyped their email at registration and so never received the
-        verification link. Proves ownership with the password, since the mailbox is the part
-        that is wrong. `newMail` omitted or equal to `mail` just resends to the current
-        address. If `newMail` already belongs to another account the response is the same
-        200 and that account's owner is mailed instead, so this cannot be used to probe for
-        registered addresses.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [mail, pwd]
-              properties:
-                mail:
-                  type: string
-                  format: email
-                  description: The address the account was registered with.
-                pwd:
-                  type: string
-                  format: password
-                newMail:
-                  type: string
-                  format: email
-      responses:
-        200:
-          description: A verification email was sent, if the address could be used
-        400:
-          description: Malformed address, or the account is already verified
-        401:
-          description: No such account or wrong password
+          description: Sent, if applicable
     """
     data = request.get_json(silent=True) or {}
-    mail, password, new_mail = data.get("mail"), data.get("pwd"), data.get("newMail")
-    if not isinstance(mail, str) or not isinstance(password, str) or not mail or not password:
-        abort(HTTPStatus.BAD_REQUEST, description="Missing mail or password")
-    if new_mail is not None and not isinstance(new_mail, str):
-        abort(HTTPStatus.BAD_REQUEST, description="Invalid email format")
+    mail = data.get("mail")
+    if not isinstance(mail, str) or not mail:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
     try:
-        AuthService.correct_unverified_mail(mail, password, new_mail)
-    except PermissionError:
-        return jsonify({"status": "fail", "message": "Invalid credentials"}), HTTPStatus.UNAUTHORIZED
-    except AccountAlreadyVerifiedError:
-        return jsonify({
-            "status": "fail",
-            "code": "already_verified",
-            "message": "This account is already verified.",
-        }), HTTPStatus.BAD_REQUEST
+        AuthService.resend_verification(mail)
+    except (NoResultFound, ValueError):
+        logger.info("verification_resend_skipped")
     return jsonify({
         "status": "success",
-        "message": "If that address can be used, a verification email is on its way.",
+        "message": "If that address has an unverified account, a verification email is on its way.",
     }), HTTPStatus.OK
 
 
