@@ -3,6 +3,7 @@ import { Stack as RouterStack } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
 import {
   DownloadIcon,
+  FingerprintPatternIcon,
   LockIcon,
   MailIcon,
   RulerIcon,
@@ -19,6 +20,7 @@ import { formatDayDate } from "@shared/utils/date"
 import { DISTANCE_UNIT, type DistanceUnit } from "@shared/itinerary/distance"
 import { palette } from "@shared/tokens"
 
+import { FingerprintSection } from "@mobile/components/settings/fingerprint-section"
 import { SatelliteFeedSection } from "@mobile/components/settings/satellite-feed-section"
 import { Badge } from "@mobile/components/ui/badge"
 import { Button } from "@mobile/components/ui/button"
@@ -153,6 +155,14 @@ export default function SettingsScreen() {
                 loadError={sessionsError}
                 onRevoked={loadSessions}
               />
+
+              {/* Turning it on checks the password with the server, so like its neighbours it
+                  leaves with them when the device is offline. */}
+              {me && (
+                <SectionCard icon={FingerprintPatternIcon} title="Fingerprint sign-in">
+                  <FingerprintSection mail={me.mail} />
+                </SectionCard>
+              )}
 
               {/* Needs the server for everything it does, so it sits beside the other
                   online-only cards and leaves with them when the device is offline. */}

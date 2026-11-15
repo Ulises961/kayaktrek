@@ -18,6 +18,7 @@ import {
   setPhone,
   setUnitPreference,
 } from "../lib/profile/actions"
+import { canUseBiometrics, hasBiometricCredentials } from "../lib/auth/biometric-store"
 import { listSatelliteFeeds } from "../lib/satellite-feeds/actions"
 import { listSessions, revokeSession } from "../lib/sessions/actions"
 import { loadMeCache, saveMeCache } from "../lib/db/profile-cache"
@@ -44,6 +45,12 @@ jest.mock("../lib/satellite-feeds/actions", () => ({
 }))
 jest.mock("../lib/auth/actions", () => ({
   logoutEverywhere: jest.fn(),
+}))
+jest.mock("../lib/auth/biometric-store", () => ({
+  canUseBiometrics: jest.fn(),
+  hasBiometricCredentials: jest.fn(),
+  saveBiometricCredentials: jest.fn(),
+  clearBiometricCredentials: jest.fn(),
 }))
 jest.mock("../lib/db/profile-cache", () => ({
   loadMeCache: jest.fn(),
@@ -104,6 +111,8 @@ function confirmAlert(buttonText: string) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  ;(canUseBiometrics as jest.Mock).mockResolvedValue(true)
+  ;(hasBiometricCredentials as jest.Mock).mockResolvedValue(false)
   mockGetMe.mockResolvedValue(ME)
   mockListSessions.mockResolvedValue([THIS_DEVICE, OTHER_DEVICE])
   mockListFeeds.mockResolvedValue([])
@@ -263,6 +272,14 @@ describe("SettingsScreen", () => {
     })
   })
 
+  describe("fingerprint sign-in", () => {
+    it("has its own entry, so it can be turned on without waiting for the sign-in offer", async () => {
+      const { findByTestId } = await render(<SettingsScreen />, { wrapper: WithCachedSurfaces })
+
+      expect(await findByTestId("fingerprint-switch")).toBeTruthy()
+    })
+  })
+
   describe("satellite tracking", () => {
     it("offers to register a feed", async () => {
       const { findByText, findByTestId } = await render(<SettingsScreen />, {
@@ -373,6 +390,7 @@ describe("SettingsScreen — offline", () => {
       "sign-out-everywhere",
       "data-export",
       "satellite-add",
+      "fingerprint-switch",
     ]) {
       expect(queryByTestId(id)).toBeNull()
     }

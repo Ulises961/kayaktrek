@@ -65,8 +65,8 @@ export default function LoginScreen() {
   // Offered once, right after a password sign-in that worked — the one moment the password is
   // known to be right and the user is looking at the phone. Declining costs nothing and the
   // question comes back the next time they sign in by password.
-  function offerFingerprint(credentials: { mail: string; password: string }) {
-    if (fingerprintSaved || !canUseBiometrics()) return
+  async function offerFingerprint(credentials: { mail: string; password: string }) {
+    if (fingerprintSaved || !(await canUseBiometrics())) return
     Alert.alert(
       "Use your fingerprint next time?",
       "Your email and password are kept on this phone, locked behind your fingerprint.",
@@ -93,7 +93,7 @@ export default function LoginScreen() {
     setIsPending(false)
     if (result.success) {
       void rememberMail(parsed.data.mail)
-      offerFingerprint(parsed.data)
+      await offerFingerprint(parsed.data)
       return
     }
     setError(result.error)

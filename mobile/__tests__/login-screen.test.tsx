@@ -82,12 +82,12 @@ describe("LoginScreen", () => {
   beforeEach(() => {
     mockUseAuth.mockReset()
     mockSearchParams.mockReturnValue({})
-    mockCanUseBiometrics.mockReturnValue(false)
+    mockCanUseBiometrics.mockResolvedValue(false)
     mockHasCredentials.mockResolvedValue(false)
     mockReadCredentials.mockReset()
     mockReadRememberedMail.mockReset().mockResolvedValue("")
     mockRememberMail.mockReset().mockResolvedValue(undefined)
-    mockSaveCredentials.mockReset().mockResolvedValue(undefined)
+    mockSaveCredentials.mockReset().mockResolvedValue(true)
     mockClearCredentials.mockReset().mockResolvedValue(undefined)
     openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
     alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
@@ -256,7 +256,7 @@ describe("LoginScreen", () => {
 
   describe("fingerprint shortcut", () => {
     it("offers to save the credentials after a password sign-in on a phone with a fingerprint", async () => {
-      mockCanUseBiometrics.mockReturnValue(true)
+      mockCanUseBiometrics.mockResolvedValue(true)
       signedOut(jest.fn().mockResolvedValue({ success: true }))
       const screen = await renderLogin()
 
@@ -276,7 +276,7 @@ describe("LoginScreen", () => {
     })
 
     it("stores nothing when the offer is declined", async () => {
-      mockCanUseBiometrics.mockReturnValue(true)
+      mockCanUseBiometrics.mockResolvedValue(true)
       signedOut(jest.fn().mockResolvedValue({ success: true }))
       const screen = await renderLogin()
 
@@ -290,18 +290,20 @@ describe("LoginScreen", () => {
     })
 
     it("does not offer on a phone with no usable fingerprint", async () => {
-      mockCanUseBiometrics.mockReturnValue(false)
+      mockCanUseBiometrics.mockResolvedValue(false)
       const signIn = signedOut(jest.fn().mockResolvedValue({ success: true }))
       const screen = await renderLogin()
 
       await fillAndSubmit(screen, "paddler@example.com", "correct-horse")
 
       await waitFor(() => expect(signIn).toHaveBeenCalled())
+      // The phone is asked first, so "no alert" only means something once it has answered.
+      await waitFor(() => expect(mockCanUseBiometrics).toHaveBeenCalled())
       expect(alertSpy).not.toHaveBeenCalled()
     })
 
     it("does not offer again once the credentials are saved", async () => {
-      mockCanUseBiometrics.mockReturnValue(true)
+      mockCanUseBiometrics.mockResolvedValue(true)
       mockHasCredentials.mockResolvedValue(true)
       const signIn = signedOut(jest.fn().mockResolvedValue({ success: true }))
       const screen = await renderLogin()
@@ -314,7 +316,7 @@ describe("LoginScreen", () => {
     })
 
     it("does not offer after a failed sign-in", async () => {
-      mockCanUseBiometrics.mockReturnValue(true)
+      mockCanUseBiometrics.mockResolvedValue(true)
       signedOut(jest.fn().mockResolvedValue({ success: false, error: "Invalid email or password." }))
       const screen = await renderLogin()
 
